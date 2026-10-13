@@ -33,6 +33,7 @@ function createAutoArrangeController(opts){
   life.listen(button,'click',function(){
     var current=opts.context();if(current.error){opts.message(current.error);return;}
     try{autoArrangeInput(current.diagram);}catch(error){opts.message(error.message);return;}
+    if(builderLockedNodeIds(current.diagram).length===Object.keys(current.diagram.nodes || {}).length){opts.message('Every graph node is position-locked, so there is nothing to auto arrange. Unlock a node in Layers or Inspect to arrange it.');return;}
     snapshot=current;invalid=false;calculating(false);status.textContent='';confirm.disabled=false;cancel.textContent='Cancel';
     dialog.querySelector('[data-arrange-warning]').textContent=current.label || 'Arrange the active diagram.';
     opts.pause();dialog.showModal();cancel.focus();

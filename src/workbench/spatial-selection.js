@@ -58,6 +58,7 @@ function createBuilderSpatialSelection(opts){
       if(controls)help='Enter selects; Shift+Enter adds or removes; Shift+F10 opens actions. Select and use the move or resize handle; arrow keys on handles change geometry. Group movement and alignment support nodes and panels.';
       if(!controls && !panel && nodeRecord.imported)help='This imported node can be aligned here; only this consumer’s arrangement is saved. '+help;
       else if(!controls && !panel && !(got.d.floats || []).some(function(f){return f.id===id;}))help='Row nodes follow the row layout. Use Free placement to move this node. '+help;
+      if(!controls && !panel && nodeRecord && !nodeRecord.imported && nodeRecord.value.locked===true)help='Position locked; selection and content editing remain available. '+help;
       var attrs={},values={tabindex:'0',role:'group','aria-label':(value.title || id)+(controls?' on canvas':panel?' canvas panel':' node'),'aria-haspopup':'menu','aria-keyshortcuts':controls?'Enter Shift+Enter Shift+F10':'Enter Shift+Enter ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10','aria-description':help,title:help,'data-dv-object-menu':''};
       Object.keys(values).forEach(function(name){attrs[name]=el.getAttribute(name);el.setAttribute(name,values[name]);});
       focusNodes.push({el:el,attrs:attrs});
@@ -105,7 +106,7 @@ function createBuilderSpatialSelection(opts){
     view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
   function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null,reason=fitReason(c);fitButton.disabled=!!reason;fitButton.title=reason || 'Frame selected canvas objects';}}
-  function distribute(direction){var c=context();if(!active() || !c)return;opts.apply(planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry),null,c.s);}
+  function distribute(direction){var c=context();if(!active() || !c)return;var plan=planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry);if(plan.noop){announce('Every selected graph node is position-locked; nothing moved.',c.shell);return;}opts.apply(plan,null,c.s);}
   function actions(host,lifetime){
     var c=context();sync();if(!c)return;
     var box=doc.createElement('div');box.className='iactions dv-spatial-actions';host.appendChild(box);
@@ -122,7 +123,7 @@ function createBuilderSpatialSelection(opts){
   function finishNudge(){
     if(!nudge)return;var g=nudge,plan=planNudgeSpatial(g.c.s.text,g.c.s.raw,g.c.targets,g.c.id,g.c.geometry,g.dx,g.dy);cancelNudge();
     if(!active() || opts.session.text()!==g.c.s.text)return;
-    if(plan.error){announce(plan.error,g.c.shell);return;}
+    if(plan.error){announce(plan.error,g.c.shell);return;}if(plan.noop){announce('Every selected graph node is position-locked; nothing moved.',g.c.shell);return;}
     if(opts.apply(plan,null,g.c.s)){var el=opts.find(g.focus);if(el)el.focus({preventScroll:true});sync();}
   }
   function keyboard(ev){
@@ -139,8 +140,9 @@ function createBuilderSpatialSelection(opts){
       if(!currentTargets().some(function(x){return x.kind===t.kind && x.section===t.section && x.id===t.id;}))opts.select([t]);
       var c=context();if(!c)return;var check=builderMovableSpatial(c.s.text,c.s.raw,c.targets,c.id,c.geometry);
       if(check.error){announce(check.error,c.shell);return;}
+      if(check.noop){announce('Every selected graph node is position-locked; nothing moved.',c.shell);return;}
       if(status)status.remove();status=null;
-      nudge={c:c,focus:t,dx:0,dy:0,keys:new Set(),preview:c.targets.map(function(x){return {el:x.el,node:x.kind==='node',transform:x.kind==='node'?x.el.getAttribute('transform'):x.el.style.transform};})};
+      nudge={c:c,focus:t,dx:0,dy:0,keys:new Set(),preview:c.targets.filter(function(x){return x.kind!=='node' || !builderNodePositionLocked(check.d,x.id);}).map(function(x){return {el:x.el,node:x.kind==='node',transform:x.kind==='node'?x.el.getAttribute('transform'):x.el.style.transform};})};
     }
     var step=ev.shiftKey?50:10;nudge.dx+=dir[0]*step;nudge.dy+=dir[1]*step;nudge.keys.add(ev.key);
     nudge.preview.forEach(function(p){var move='translate('+nudge.dx+(p.node?' ': 'px,')+nudge.dy+(p.node?')':'px)');if(p.node)p.el.setAttribute('transform',(p.transform || '')+' '+move);else p.el.style.transform=(p.transform || '')+' '+move;});
@@ -171,7 +173,7 @@ function createBuilderSpatialSelection(opts){
     item('Inspect',function(){opts.inspect();});
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
-    ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(!plan.noop)opts.apply(plan,null,s);},alignment.error);});
+    ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(plan.noop)announce('Every selected graph node is position-locked or already aligned; nothing moved.',shell);else opts.apply(plan,null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,fitReason(context()));
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;

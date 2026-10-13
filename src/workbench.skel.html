@@ -142,6 +142,7 @@
       <button type="button" role="tab" id="editor-tab-agent" aria-controls="editor-agent" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">✧</span>Agent</button>
       <button type="button" role="tab" id="editor-tab-brief" aria-controls="editor-brief" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▧</span>Brief</button>
       <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
+      <button type="button" role="tab" id="editor-tab-layers" aria-controls="editor-layers" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>Layers</button>
       <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
       <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
       <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">{}</span>JSON</button>
@@ -183,6 +184,13 @@
         <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
         <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
         </div>
+      </div>
+      <div class="editor-pane layers-pane" id="editor-layers" role="tabpanel" aria-labelledby="editor-tab-layers" hidden>
+        <div class="editor-pane-heading"><h2>Layers</h2><p>Graph nodes in the active section. Locks protect position only; unlocking keeps the pinned position.</p></div>
+        <label class="layers-search-label" for="layers-search">Filter nodes</label>
+        <input class="fctl" type="search" id="layers-search" placeholder="Title or node ID…" autocomplete="off">
+        <div class="outline-status" id="layers-status" role="status" aria-live="polite"></div>
+        <nav class="layers-list" id="layers-list" aria-label="Graph node layers"></nav>
       </div>
       <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
       <details class="ssec" id="sec-steps" open>

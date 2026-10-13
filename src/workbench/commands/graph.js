@@ -16,6 +16,31 @@ function planBindNodeService(text, raw, sectionIdx, nodeId, binding){
   return planSetFields(text, raw, got.path.concat(['nodes', nodeId]), fields);
 }
 
+function planSetNodesLocked(text,raw,sectionIdx,nodeIds,locked){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(typeof locked!=='boolean')return {error:'Choose locked or unlocked.'};
+  var ids=Array.from(new Set((nodeIds || []).filter(function(id){return typeof id==='string';})));
+  if(!ids.length)return {error:'Choose graph nodes to lock.'};
+  for(var i=0;i<ids.length;i++){
+    var node=got.d.nodes && got.d.nodes[ids[i]];
+    if(!node || typeof node!=='object' || Array.isArray(node))return {error:'node "'+ids[i]+'" not found'};
+  }
+  var changed=ids.filter(function(id){return (got.d.nodes[id].locked===true)!==locked;});
+  if(!changed.length)return {noop:true};
+  var positions=layout(got.d).pos;
+  return builderRewrite(text,raw,got.path,function(d){
+    changed.forEach(function(id){if(locked)d.nodes[id].locked=true;else delete d.nodes[id].locked;});
+    if(locked){
+      var missing=changed.find(function(id){return !positions[id];});
+      if(missing)return {error:'Place “'+missing+'” in the diagram before locking its position.'};
+      builderFreezeLockedPositions(d,positions,ids);
+    }
+  });
+}
+function planSetNodeLocked(text,raw,sectionIdx,nodeId,locked){
+  return planSetNodesLocked(text,raw,sectionIdx,[nodeId],locked);
+}
+
 function planAddNode(text, raw, sectionIdx, preset){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */

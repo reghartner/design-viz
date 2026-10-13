@@ -1551,6 +1551,13 @@ body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-pre
 
 /* Keep authored selection above skin-specific node strokes. */
 body .docview .section-viewport .boardcanvas g.node.dv-sel .card{stroke:var(--accent);stroke-width:3.5;}
+/* Position locks are authoring chrome only. The solid violet edge differs from
+   the dashed selection ring, and the badge keeps the state non-color-only. */
+body:not(.workbench-reader-preview-active) .docview g.node.dv-position-locked .card{stroke:#7657c8;stroke-width:2.5;}
+body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge{pointer-events:none;color:#7657c8;}
+body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge rect{fill:var(--card,#fff);stroke:currentColor;stroke-width:1.4;}
+body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge path{fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;}
+body:not(.workbench-reader-preview-active) .docview g.node.dv-position-locked.dv-sel .card{stroke:var(--accent);stroke-width:3.5;stroke-dasharray:7 5;}
 
 body .docview .section-viewport .boardcanvas g.node[data-dv-object-menu]:focus-visible .card{stroke:var(--accent);stroke-width:4;stroke-dasharray:3 3;}
 

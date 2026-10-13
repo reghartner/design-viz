@@ -389,6 +389,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
+    if (Object.prototype.hasOwnProperty.call(n, 'locked') && typeof n.locked !== 'boolean')
+      warnings.push(DP + '.nodes.' + id + '.locked: must be true or false — treating this node as unlocked');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
     if (n.tint && TINT_SET.indexOf(n.tint) < 0) warnings.push(DP + '.nodes.' + id + '.tint: unknown tint "' + n.tint + '" — using "cmd" (valid: ' + TINT_SET.join(' ') + ')');
     if (n.image != null && !embeddedImageKind(n.image))

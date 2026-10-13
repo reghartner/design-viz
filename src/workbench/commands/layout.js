@@ -1,6 +1,42 @@
 /* Pure authored placement, layout and named-view commands. Measured boxes
    are inputs; DOM measurements and pointer lifetimes belong to controllers. */
 
+function builderLockedNodeIds(d,ids){
+  var nodes=d && d.nodes || {},wanted=ids && new Set(ids);
+  return Object.keys(nodes).filter(function(id){return (!wanted || wanted.has(id)) && nodes[id] && nodes[id].locked===true;});
+}
+function builderNodePositionLocked(d,id){return !!(d && d.nodes && d.nodes[id] && d.nodes[id].locked===true);}
+/* A pin is an absolute float. Lifting raw-authored locked row nodes here makes
+   old/manual JSON obey the same invariant as the Layers and Inspect controls. */
+function builderFreezeLockedPositions(d,positions,onlyIds){
+  var locked=builderLockedNodeIds(d,onlyIds),wanted=new Set(locked);if(!locked.length)return false;
+  var before=JSON.stringify([d.rows,d.floats]);
+  d.rows=(Array.isArray(d.rows)?d.rows:[[]]).map(function(row){
+    if(!Array.isArray(row))return row;
+    var next=[];row.forEach(function(slot){
+      if(Array.isArray(slot)){
+        var kept=slot.filter(function(id){return !wanted.has(id);});
+        if(kept.length===1)next.push(kept[0]);else if(kept.length>1)next.push(kept);
+      }else if(!wanted.has(slot))next.push(slot);
+    });return next;
+  });
+  var found=new Set(),floats=Array.isArray(d.floats)?d.floats:[];
+  d.floats=floats.map(function(f){
+    if(!f || !wanted.has(f.id))return f;
+    var p=positions[f.id];if(!p)return f;
+    var next=Object.assign({},f,{side:'below',x:p.cx,y:p.cy,noSpread:true});
+    delete next.dx;delete next.dy;found.add(f.id);return next;
+  });
+  locked.forEach(function(id){var p=positions[id];if(p && !found.has(id))d.floats.push({id:id,side:'below',x:p.cx,y:p.cy,noSpread:true});});
+  return JSON.stringify([d.rows,d.floats])!==before;
+}
+function builderPlacementPlan(text,raw,path,before,after){
+  var pairs=[];
+  if(JSON.stringify(after.rows)!==JSON.stringify(before.rows))pairs.push(['rows',after.rows==null?null:JSON.stringify(after.rows)]);
+  if(JSON.stringify(after.floats)!==JSON.stringify(before.floats))pairs.push(['floats',after.floats==null?null:JSON.stringify(after.floats)]);
+  return pairs.length?planSetFields(text,raw,path,pairs):{noop:true};
+}
+
 function planEdgeCurve(text,raw,sectionIdx,index,points,cubic){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   if(!got.d.edges || !got.d.edges[index])return {error:'Connection not found.'};
@@ -18,12 +54,21 @@ function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
   if (got.error) return got;
   var rows = got.d.rows;
   if (!Array.isArray(rows) || !rows[fromIdx]) return {error: 'row not found'};
+  var movable=builderFlatRowIds([rows[fromIdx]]).filter(function(id){return !builderNodePositionLocked(got.d,id);});
+  if(!movable.length)return {noop:true};
   if (toIdx < 0 || toIdx >= rows.length) return {error: 'no row slot there'};
   if (toIdx === fromIdx) return {error: 'already there'};
-  var r = builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
-    var item = copy.splice(fromIdx, 1)[0];
-    copy.splice(toIdx, 0, item);
-  });
+  var locked=builderLockedNodeIds(got.d);
+  if(!locked.length){
+    var r=builderRewrite(text,raw,got.path.concat(['rows']),function(copy){
+      var item=copy.splice(fromIdx,1)[0];copy.splice(toIdx,0,item);
+    });
+  }else{
+    var positions=layout(got.d).pos,copy=builderClone(got.d);
+    builderFreezeLockedPositions(copy,positions);
+    var item=copy.rows.splice(fromIdx,1)[0];copy.rows.splice(toIdx,0,item);
+    var r=builderPlacementPlan(text,raw,got.path,got.d,copy);
+  }
   if (r.error) return r;
   r.index = toIdx;
   return r;
@@ -34,15 +79,21 @@ function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
   if (got.error) return got;
   var nodes = got.d.nodes || {}, members = Object.create(null);
   Object.keys(nodes).forEach(function(id){
-    if (nodes[id] && nodes[id].group === groupKey) members[id] = true;
+    if (nodes[id] && nodes[id].group === groupKey && nodes[id].locked!==true) members[id] = true;
   });
-  if (!Object.keys(members).length) return {error: 'group "' + groupKey + '" not found'};
+  var groupExists=Object.keys(nodes).some(function(id){return nodes[id] && nodes[id].group===groupKey;});
+  if (!groupExists) return {error: 'group "' + groupKey + '" not found'};
+  if (!Object.keys(members).length)return {noop:true};
   var rows = got.d.rows;
   if (!builderFlatRowIds(rows).some(function(id){ return members[id]; }))
     return {error: 'group "' + groupKey + '" has no nodes placed in rows'};
-  return builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
-    return builderLiftAndInsert(copy, members, drop);
+  if(!builderLockedNodeIds(got.d).length)return builderRewrite(text,raw,got.path.concat(['rows']),function(copy){
+    return builderLiftAndInsert(copy,members,drop);
   });
+  var positions=layout(got.d).pos,copy=builderClone(got.d);
+  builderFreezeLockedPositions(copy,positions);
+  var out=builderLiftAndInsert(copy.rows,members,drop);if(out && out.error)return out;
+  return builderPlacementPlan(text,raw,got.path,got.d,copy);
 }
 
 function builderLiftAndInsert(copy, members, drop, opts){
@@ -112,28 +163,35 @@ function planMoveNode(text, raw, sectionIdx, id, drop){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
+  if(builderNodePositionLocked(got.d,id))return {noop:true};
   var inRows = builderFlatRowIds(got.d.rows).indexOf(id) >= 0;
   var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
   if (!inRows && !floating) return {error: 'node "' + id + '" has no layout slot (rows or floats) to move'};
   if (!Array.isArray(got.d.rows) || !got.d.rows.length) return {error: 'no rows layout in this section'};
-  var copy = builderClone(got.d.rows), members = Object.create(null);
-  members[id] = true;
-  var out = builderLiftAndInsert(copy, members, drop, {plainStacks: true, run: inRows ? [] : [id]});
-  if (out && out.error) return out;
-  var pairs = [['rows', JSON.stringify(copy)]];
-  if (floating){
-    var d = {floats: builderClone(got.d.floats)};
-    builderRemoveFloat(d, id);
-    pairs.push(['floats', d.floats ? JSON.stringify(d.floats) : null]);
+  var members=Object.create(null);members[id]=true;
+  if(!builderLockedNodeIds(got.d).length){
+    var rows=builderClone(got.d.rows),out=builderLiftAndInsert(rows,members,drop,{plainStacks:true,run:inRows?[]:[id]});
+    if(out && out.error)return out;
+    var pairs=[['rows',JSON.stringify(rows)]];
+    if(floating){var floats={floats:builderClone(got.d.floats)};builderRemoveFloat(floats,id);pairs.push(['floats',floats.floats?JSON.stringify(floats.floats):null]);}
+    return planSetFields(text,raw,got.path,pairs);
   }
-  return planSetFields(text, raw, got.path, pairs);
+  var positions=layout(got.d).pos,copy=builderClone(got.d);
+  builderFreezeLockedPositions(copy,positions);
+  var out=builderLiftAndInsert(copy.rows,members,drop,{plainStacks:true,run:inRows?[]:[id]});
+  if(out && out.error)return out;
+  if(floating)builderRemoveFloat(copy,id);
+  return builderPlacementPlan(text,raw,got.path,got.d,copy);
 }
 
 function planPlaceFloat(text,raw,sectionIdx,id,x,y){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   if(!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,id))return {error:'node not found'};
+  if(builderNodePositionLocked(got.d,id))return {noop:true};
   if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
+  var positions=layout(got.d).pos;
   return builderRewrite(text,raw,got.path,function(d){
+    builderFreezeLockedPositions(d,positions);
     if(builderFlatRowIds(d.rows).indexOf(id)>=0){
       var members=Object.create(null);members[id]=true;
       var out=builderLiftAndInsert(d.rows,members,null,{liftOnly:true,allowEmpty:true});if(out && out.error)return out;
@@ -228,18 +286,20 @@ function builderNodeArrangementTargets(text,raw,targets,context){
 function builderSelectedFloats(text,raw,targets,context){
   if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
   var got=builderNodeArrangementTargets(text,raw,targets,context);if(got.error)return got;
-  if(got.records.some(function(record){return record.local && !(got.d.floats || []).some(function(f){return f && f.id===record.id;});}))
+  if(got.records.some(function(record){return record.local && !builderNodePositionLocked(got.d,record.id) && !(got.d.floats || []).some(function(f){return f && f.id===record.id;});}))
     return {error:'Use Free placement for every selected local node before aligning or moving them together.'};
   if(got.records.some(function(record){return !record.position;}))return {error:'Render the selected nodes before arranging them.'};
+  got.noop=got.records.every(function(record){return record.local && builderNodePositionLocked(got.d,record.id);});
   return got;
 }
 function planTransformFloats(text,raw,targets,change,context){
   var got=builderSelectedFloats(text,raw,targets,context);if(got.error)return got;
   if(!change || ['horizontal','vertical','move'].indexOf(change.type)<0)return {error:'Choose horizontal or vertical alignment, or a move.'};
   if(change.type==='move' && (!Number.isFinite(change.dx) || !Number.isFinite(change.dy)))return {error:'Move distances must be finite.'};
-  var anchor=got.records[0].position,updated=Object.create(null),different=false;
-  for(var i=0;i<got.records.length;i++){
-    var record=got.records[i],id=record.id,p=record.position;
+  var anchor=got.records[0].position,updated=Object.create(null),different=false,movable=got.records.filter(function(record){return !record.local || !builderNodePositionLocked(got.d,record.id);});
+  if(!movable.length)return {noop:true};
+  for(var i=0;i<movable.length;i++){
+    var record=movable[i],id=record.id,p=record.position;
     var x=change.type==='vertical'?anchor.cx:p.cx+(change.type==='move'?change.dx:0);
     var y=change.type==='horizontal'?anchor.cy:p.cy+(change.type==='move'?change.dy:0);
     if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
@@ -249,16 +309,17 @@ function planTransformFloats(text,raw,targets,change,context){
     if(Math.abs(updated[id].x-p.cx)>=.0001 || Math.abs(updated[id].y-p.cy)>=.0001)different=true;
   }
   if(!different)return {noop:true};
-  if(got.records.every(function(record){return record.local;})){
+  if(!builderLockedNodeIds(got.d).length && movable.every(function(record){return record.local;})){
     var floats=got.d.floats.map(function(f){
       if(!updated[f.id])return f;
       var next=Object.assign({},f,updated[f.id]);delete next.dx;delete next.dy;return next;
     });
     return planSetField(text,raw,got.path,'floats',JSON.stringify(floats));
   }
+  var lockedPositions=layout(got.d).pos;
   return builderRewrite(text,raw,got.path,function(d){
-    var localChanged=false;
-    got.records.forEach(function(record){
+    var localChanged=false;builderFreezeLockedPositions(d,lockedPositions);
+    movable.forEach(function(record){
       var next=updated[record.id];
       if(record.local){
         var f=(d.floats || []).find(function(item){return item && item.id===record.id;});
@@ -285,6 +346,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
+  if(builderNodePositionLocked(got.d,id))return {noop:true};
   var side = sideOrNull == null || sideOrNull === '' ? null : sideOrNull;
   if(side==='free'){
     var p=layout(got.d).pos[id] || {cx:W/2,cy:70};
@@ -297,7 +359,9 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   if (side && inRows && !ids.some(function(other){ return other !== id; }))
     return {error: 'the last node in rows cannot float'};
   if (!Array.isArray(got.d.rows) || !got.d.rows.length) return {error: 'no rows layout in this section'};
+  var positions=layout(got.d).pos;
   return builderRewrite(text, raw, got.path, function(d){
+    builderFreezeLockedPositions(d,positions);
     if (!side){
       builderRemoveFloat(d, id);
       /* a node malformed into BOTH rows and floats just loses the float
@@ -342,6 +406,7 @@ function planSwapNodes(text, raw, sectionIdx, idA, idB){
   if (!rec) return {error: 'section not found — reselect and try again'};
   var d = specValueAt(raw, rec.diagram);
   if (!d) return {error: 'no diagram in this section'};
+  if(builderNodePositionLocked(d,idA) || builderNodePositionLocked(d,idB))return {noop:true};
   var found = {a: false, b: false};
   function sw(id){
     if (id === idA){ found.a = true; return idB; }
@@ -385,8 +450,10 @@ function planStackNodes(text, raw, sectionIdx, nodeIds){
   if (!d || !Array.isArray(d.rows)) return {error: 'no rows layout in this section to stack into'};
   var want = {};
   (nodeIds || []).forEach(function(id){ if (typeof id === 'string') want[id] = true; });
-  var wantList = Object.keys(want);
-  if (wantList.length < 2) return {error: 'select at least two nodes to stack'};
+  var requested=Object.keys(want),wantList=requested.filter(function(id){return !builderNodePositionLocked(d,id);});
+  if (requested.length < 2) return {error: 'select at least two nodes to stack'};
+  if(wantList.length<2)return {noop:true};
+  want=Object.create(null);wantList.forEach(function(id){want[id]=true;});
   /* flat-row order of the selected ids, and which of them actually sit in rows */
   var ordered = [], seen = {};
   d.rows.forEach(function(row){
@@ -422,7 +489,11 @@ function planStackNodes(text, raw, sectionIdx, nodeIds){
   if (!placed) return {error: 'could not place the stack'};
   if (JSON.stringify(newRows) === JSON.stringify(d.rows))
     return {error: 'those nodes are already one stack'};
-  var plan = planSetFields(text, raw, rec.diagram, [['rows', JSON.stringify(newRows)]]);
+  if(!builderLockedNodeIds(d).length)var plan=planSetFields(text,raw,rec.diagram,[['rows',JSON.stringify(newRows)]]);
+  else{
+    var positions=layout(d).pos,copy=builderClone(d);copy.rows=builderClone(newRows);builderFreezeLockedPositions(copy,positions);
+    var plan=builderPlacementPlan(text,raw,rec.diagram,d,copy);
+  }
   if (plan.error) return plan;
   plan.kind = 'node';
   return plan;
@@ -732,6 +803,7 @@ function sectionLayoutDetachSteps(d,items){
 
 function planAutoArrange(text,raw,section,result){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var locked=builderLockedNodeIds(got.d);if(locked.length===Object.keys(got.d.nodes || {}).length)return {noop:true};
   try{
     var ids=autoArrangeInput(got.d);
     if(!result || !Array.isArray(result.positions) || result.positions.length!==ids.length ||
@@ -742,6 +814,9 @@ function planAutoArrange(text,raw,section,result){
         !validCurveControls(e.curveControls) || !validEdgePort(e.fromPort) || !validEdgePort(e.toPort) ||
         ['labelDx','labelDy'].some(function(k){return e[k]!=null && !floatCoordinate(e[k]);});}))
       return {error:'The layout returned invalid geometry. The source is unchanged.'};
+    var before=layout(got.d).pos,byId=new Map(result.positions.map(function(p){return [p.id,p];}));
+    if(locked.some(function(id){var a=before[id],b=byId.get(id);return !a || !b || Math.abs(a.cx-b.x)>.0001 || Math.abs(a.cy-b.y)>.0001;}))
+      return {error:'Auto arrange did not preserve every locked node position. The source is unchanged.'};
     // Only a fixed geometry allowlist crosses the worker/transaction boundary.
     var clean={positions:result.positions,frame:{x:result.frame.x,y:result.frame.y,w:result.frame.w,h:result.frame.h},edges:result.edges.map(function(e){var out={};
       ['curveControls','fromPort','toPort','labelDx','labelDy'].forEach(function(k){if(e[k]!=null)out[k]=e[k];});return out;})};
@@ -770,16 +845,18 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
   var got=builderSpatialTargets(text,raw,targets,context);if(got.error)return got;
   if(targets.length<2)return {error:'Select at least two objects to align.'};
   if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose an alignment direction.'};
-  if(got.records.some(function(record){return !record.panel && record.local && !(got.d.floats || []).some(function(f){return f.id===record.id;});}))return {error:'Use Free placement for every selected local node before aligning.'};
+  if(got.records.some(function(record){return !record.panel && record.local && !builderNodePositionLocked(got.d,record.id) && !(got.d.floats || []).some(function(f){return f.id===record.id;});}))return {error:'Use Free placement for every selected local node before aligning.'};
   var view=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
   if(anchorIndex==null)anchorIndex=0;
   if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
+  if(!targets.some(function(t){return t.kind!=='node' || !builderNodePositionLocked(got.d,t.id);}))return {noop:true};
   var axis=direction==='vertical'?'x':'y',size=direction==='vertical'?'w':'h',anchorCenter=rects[anchorIndex][axis]+rects[anchorIndex][size]/2;
   if(rects.every(function(r){return Math.abs(r[axis]+r[size]/2-anchorCenter)<.0001;}))return {noop:true};
   var effectiveBefore=layout(got.d).pos,selectedNodes=Object.create(null);targets.forEach(function(t){if(t.kind==='node' && Object.prototype.hasOwnProperty.call(got.d.nodes || {},t.id))selectedNodes[t.id]=true;});
   var changed=false,plan=builderRewrite(text,raw,got.path,function(d){
+    builderFreezeLockedPositions(d,effectiveBefore);
     // Context-menu alignment can anchor a later selection member. Fixed
     // anchors retain their authored placement; automatic anchors are pinned
     // only when another object actually changes so the rerender cannot move
@@ -793,6 +870,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
     for(var i=0;i<targets.length;i++){
       if(i===anchorIndex)continue;
       var t=targets[i],r=rects[i],x=direction==='vertical'?cx:coordinate(r.x+r.w/2),y=direction==='horizontal'?cy:coordinate(r.y+r.h/2);
+      if(t.kind==='node' && builderNodePositionLocked(got.d,t.id))continue;
       if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
       if(t.kind==='node'){
         var record=got.records[i];
@@ -850,19 +928,25 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
 /* Shared placement validation for measured selection actions. */
 function builderMovableSpatial(text,raw,targets,layoutId,rects){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
-  if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Row nodes follow the row layout. Use Free placement for every selected node to move or distribute them.'};
+  if(targets.some(function(t){return t.kind==='node' && !builderNodePositionLocked(got.d,t.id) && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Row nodes follow the row layout. Use Free placement for every selected unlocked node to move or distribute them.'};
   var definition=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!definition || definition.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before moving them.'};
+  got.noop=!targets.some(function(t){return t.kind!=='node' || !builderNodePositionLocked(got.d,t.id);});
   return got;
 }
 function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas){
   var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
+  if(got.noop)return {noop:true};
   if(deltas.every(function(delta){return Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001;}))return {error:'The selected objects are already in position.'};
+  if(targets.every(function(t,i){return t.kind==='node' && builderNodePositionLocked(got.d,t.id) || Math.abs(deltas[i].x)<.00001 && Math.abs(deltas[i].y)<.00001;}))return {noop:true};
+  var positions=layout(got.d).pos;
   return builderRewrite(text,raw,got.path,function(d){
+    builderFreezeLockedPositions(d,positions);
     var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
     for(var i=0;i<targets.length;i++){
       var t=targets[i],r=rects[i],delta=deltas[i],x=r.x+delta.x,y=r.y+delta.y;
+      if(t.kind==='node' && builderNodePositionLocked(got.d,t.id))continue;
       if(!floatCoordinate(x) || !floatCoordinate(y) || !floatCoordinate(x+r.w/2) || !floatCoordinate(y+r.h/2))return {error:'Movement is outside the supported canvas coordinates.'};
       if(Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001)continue;
       if(t.kind==='node'){
@@ -883,6 +967,7 @@ function planNudgeSpatial(text,raw,targets,layoutId,rects,dx,dy){
 }
 function planDistributeSpatial(text,raw,targets,layoutId,direction,rects){
   var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
+  if(got.noop)return {noop:true};
   if(targets.length<3)return {error:'Select at least three objects to distribute.'};
   if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose a distribution direction.'};
   var axis=direction==='horizontal'?'x':'y',size=direction==='horizontal'?'w':'h';

@@ -514,6 +514,13 @@ with no `title` shows its id:
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
+- `locked` — optional boolean. `true` pins this ordinary graph node's center at
+  its current graph coordinates. Workbench lifts a newly locked row node into
+  explicit free placement in the same undoable edit. Mixed selections keep the
+  locked node selected while moving only unlocked members, and Auto arrange
+  routes unlocked nodes around pins. It does not lock the node's size/content,
+  links, edges, story state, copy, playback, or deletion. The lock border and
+  badge are editing chrome and do not appear in readers, previews, or SVG export.
 - `handoff` — arrow-shaped endpoint that continues to another diagram.
   Use `{localSection:"stable-section-id"}` to switch to an ordinary diagram
   section in this spec, including its tab. The mounted destination retains its
@@ -673,6 +680,14 @@ In the workbench, select **float → Free placement** or drag any floating node
 to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to
 release the pin, or **in rows** to return the node to the grid. Row nodes retain
 their row insertion/swap gestures. See `docs/free-node-placement.md`.
+
+The **Layers** rail lists the active section's ordinary graph nodes in authored
+placement order (rows and stacks, then floats, then unplaced definitions), with
+search, selection sync, per-node position locks, and a one-edit **Lock row** action
+that pins the row's member nodes through those same node locks. Unlocking keeps
+the explicit pinned position. The same lock is available in **Inspect → position
+lock**. Layers works in Standard and Explore; imported
+topology members, groups, panels, visibility, and z-order are not layers.
 
 Optional `dx` / `dy` (numbers, px) manually nudge a float from its computed
 spot — a below float pinned under a tall last row can be raised into the

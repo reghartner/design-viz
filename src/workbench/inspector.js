@@ -493,6 +493,9 @@ function nodeForm(val, ctx){
         return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
       })),
+      frow('position lock', checkboxControl(val.locked === true, function(on){
+        return commitCascade(function(raw){return planSetNodeLocked(session.text(),raw,t.section,t.id,on);},{after:function(){renderInspector();}});
+      })),
       frow('float', floatControl)
     ].concat(floatRows,[
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); }))

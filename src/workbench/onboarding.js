@@ -210,7 +210,7 @@ function workbenchPracticeLessons(chapter){
       step('inspector','#editor-inspect','Select something to edit it','Click a node on the diagram, then edit its title, icon, style and other fields in the inspector. Changes are immediate and undoable. Panels have their own fields when selected.'),
       step('rows','#workbench-workspace','Arrange diagram nodes in rows','This node’s float field is set to in rows. Drag it to another row or slot, or drag a row handle to move the row. Rows and stacks organize diagram nodes; panel positions are managed separately in the section layout.'),
       step('align','#editor-inspect','Multi-select and align','These sample nodes are freely positioned floats. Shift-select nodes, then Align horizontally or Align vertically. Alignment uses the first selected node; row nodes use their row and slot controls.'),
-      step('service','#editor-inspect','Bind a node to a real company service','Use Company service, then Service API and API operation. The choices come from the catalog. These sample entries demonstrate the same controls used with your Backstage-sourced services.'),
+      step('service','#editor-inspect','Bind a node to a real company service',/*@company:name*/'Use Company service, then Service API and API operation. The choices come from the catalog. These sample entries demonstrate the same controls used with your Backstage-sourced services.'),
       step('choose-step','#editor-steps','Select a step, then inspect it','Choose the detection step in the Steps list, then click Inspect selected step. The inspector now edits that step’s node selections, connections, and panel changes.'),
       step('step-inspector','#editor-inspect','Edit what belongs to this step','The selected step has its own text, nodes, edges and panel fields. ADD TO STEP lets you choose its participants directly on the canvas. Keep this step selected for the next lessons.'),
       step('add-to-step','#workbench-workspace','Add to Step: click on the diagram','ADD TO STEP is armed for your selected step. Click nodes, connections or panels to toggle their membership. Each click takes effect immediately. Done or Esc exits and keeps your changes. Adding an empty panel patch does not change its contents or visibility.'),
@@ -302,7 +302,7 @@ function initWorkbenchPractice(opts){
       if(id==='panel-library'){click('diagram-add');click('add-panel');}
       if(id==='catalog')builder.openCatalog();
       if(id==='inspector' || id==='service')select({kind:'node',section:0,id:'cloud'});
-      if(id==='service')revealInspector(Array.from(doc.querySelectorAll('#guide .flab')).find(function(label){return label.textContent==='Company service';}));
+      if(id==='service')revealInspector(Array.from(doc.querySelectorAll('#guide .flab')).find(function(label){return label.textContent===/*@company:name*/'Company service';}));
       if(id==='rows')select({kind:'node',section:0,id:'camera'});
       if(id==='align'){
         if(!aligned){

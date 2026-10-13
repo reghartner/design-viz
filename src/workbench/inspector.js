@@ -393,7 +393,7 @@ function vocabularyControl(kind,page,value,target){
         }catch(ex){formError(ex.message);return false;}
       },true);
       Array.prototype.forEach.call(picker.options,function(option){var s=registry.services.find(function(s){return s.entityRef===option.value;});if(s) option.textContent=s.title+' · '+s.entityRef;});
-      rows.push(frow('Company service',picker));
+      rows.push(frow(/*@company:name*/'Company service',picker));
       if(service){
         rows.push(frow('Service API',selectControl((service.apis || []).map(function(a){return a.entityRef;}),bound.api && bound.api.entityRef,function(api){var ok=set(service.entityRef,api);if(ok)refreshFormSoon();return ok;},true)));
         var api=(service.apis || []).find(function(a){return bound.api && a.entityRef===bound.api.entityRef;});
@@ -1904,7 +1904,7 @@ function documentForm(){
     },{textarea:true,placeholder:'Leave empty to use the built-in reader tour'});
     tour.rows=6;tour.setAttribute('aria-label','Reader tour JSON');advanced.appendChild(frowBlock('Reader tour JSON',tour));
     advanced.appendChild(note('A custom tour replaces the built-in tour for readers; it does not run in the editing workspace. Invalid configurations stay here for correction. Clear the field to restore the built-in tour.'));
-    var docs=document.createElement('a');docs.href='https://github.com/reghartner/design-viz/blob/main/docs/tour.md';docs.target='_blank';docs.rel='noopener noreferrer';docs.textContent='Reader tour authoring guide ↗';advanced.appendChild(docs);
+    var docs=document.createElement('a');docs.href=/*@company:repository*/'https://github.com/reghartner/design-viz/blob/main/docs/tour.md';docs.target='_blank';docs.rel='noopener noreferrer';docs.textContent='Reader tour authoring guide ↗';advanced.appendChild(docs);
     if(typeof FlowviewCompatibility!=='undefined'){
       var compatibility=FlowviewCompatibility.check(parsed.raw),metadata=specObject(val.flowview)?val.flowview:{};
       advanced.appendChild(note('Compatibility: '+compatibility.status+' · Runtime '+compatibility.runtimeVersion+' (contract '+FlowviewCompatibility.contract+'). Document contract: '+(val.contract==null?'default':String(val.contract))+'.'));

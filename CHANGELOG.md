@@ -1,5 +1,23 @@
 # Changelog
 
+## Company identity from configuration (2026-10-13)
+
+- `company/company.json` sets a fork's `companyName`, `repository`,
+  `revision`, `brand` file and Backstage `package` identity. The workbench
+  header GitHub link, repository field, authoring-skill link, repository-root
+  example and reader-tour guide link use the repository; the **Company
+  repository** and **Company service** labels (and the onboarding tour and
+  user guide that name them) use the company name; the brand file replaces
+  the placeholder brand in every viewer, the workbench and the runtime. Forks no
+  longer edit `src/workbench.skel.html`, `src/welcome.workbench.js`,
+  `src/canon.workbench.js`, `src/workbench/inspector.js` or
+  `src/company-brand.config.js`. Without the file, outputs are byte-identical;
+  `build.py --no-config` ignores it.
+- `node tools/backstage-pack.mjs pack|publish` stamps `repository.url` and
+  `publishConfig.registry` from `company.json` or `FLOWVIEW_PACKAGE_*`
+  variables at pack/publish time instead of edits to
+  `apps/backstage/package.json`. CI packs the plugin release with it.
+
 ## Company overlay for forks (2026-10-13)
 
 - A company fork can keep its customizations in `company/`, which upstream

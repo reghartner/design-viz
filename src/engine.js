@@ -1637,6 +1637,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
     var visible=stops();stepN.textContent = 'STEP ' + (visible.indexOf(cur) + 1) + '/' + visible.length;
     termbar.lanePill.hidden = !s.lane;
+    // Clear the label too: hidden text still reaches the caption's comment anchor.
+    if (!s.lane) termbar.lanePill.textContent = '';
     if (s.lane){
       var lm = lanes[s.lane] || {label: s.lane, color: LANE_FALLBACK};
       termbar.lanePill.textContent = lm.label;

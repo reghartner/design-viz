@@ -9,10 +9,10 @@ import {repo} from '../helpers/prepare.mjs';
    from when it was placed. The shared step caption line is that element, so
    its text must name the step it shows, and the transition copy must not be
    a second target. */
-const raw={page:{title:'Step comment anchors',sections:[{id:'paths',heading:'Delivery',diagram:{view:'step',autoplay:false,
+const raw={page:{title:'Step comment anchors',lanes:{dev:{label:'DEV'},cloud:{label:'CLOUD'}},sections:[{id:'paths',heading:'Delivery',diagram:{view:'step',autoplay:false,
  nodes:{sender:{title:'Sender'},receiver:{title:'Receiver'}},rows:[['sender','receiver']],edges:[{from:'sender',to:'receiver',kind:'int'}],
- steps:[{id:'start',text:'Ready to send',nodes:['sender']},{id:'delivered',text:'Delivery succeeded',edge:'sender->receiver'},
-  {id:'failed',text:'Delivery failed',nodes:['receiver']},{id:'recover',text:'Recovered on alternate path',nodes:['receiver']}],
+ steps:[{id:'start',lane:'dev',text:'Ready to send',nodes:['sender']},{id:'delivered',lane:'cloud',text:'Delivery succeeded',edge:'sender->receiver'},
+  {id:'failed',lane:'cloud',text:'Delivery failed',nodes:['receiver']},{id:'recover',text:'Recovered on alternate path',nodes:['receiver']}],
  paths:[{id:'happy',label:'Happy path',steps:['start','delivered']},{id:'alternate',label:'Alternate path',steps:['start','failed','recover']}]}}]}};
 
 // The caption transition copy exists only when motion is allowed.
@@ -26,16 +26,18 @@ test('step caption line is one comment target whose text names the shown step',a
  const chip=source=>sec.locator('.schip[data-step-source="'+source+'"]');
  await expect(line).toHaveAttribute('data-comment-target','');
  await expect(line).not.toHaveAttribute('id',/./);
- await expect(line).toContainText(/STEP 1\/2\s*Ready to send/);
+ await expect(line).toContainText(/STEP 1\/2\s*DEV\s*Ready to send/);
  await page.evaluate(()=>{
   window.ghosts=[];
   new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(n=>{
    if(n.classList && n.classList.contains('dv-caption-old'))window.ghosts.push({target:n.hasAttribute('data-comment-target'),uncommentable:n.hasAttribute('data-uncommentable')});
   }))).observe(document.body,{childList:true,subtree:true});
  });
- for(const [source,label] of [[1,/STEP 2\/2\s*Delivery succeeded/],[2,/STEP 2\/3\s*Delivery failed/],[3,/STEP 3\/3\s*Recovered on alternate path/],[0,/STEP 1\/3\s*Ready to send/]]){
+ for(const [source,label] of [[1,/STEP 2\/2\s*CLOUD\s*Delivery succeeded/],[2,/STEP 2\/3\s*CLOUD\s*Delivery failed/],[3,/STEP 3\/3\s*Recovered on alternate path/],[0,/STEP 1\/3\s*DEV\s*Ready to send/]]){
   await chip(source).click();
   await expect(line).toContainText(label);
+  // A step without a lane must not keep the previous step's lane label.
+  if(source===3)await expect(line).not.toContainText(/CLOUD|DEV/);
   await expect(sec.locator('[data-comment-target]')).toHaveCount(1);
  }
  const ghosts=await page.evaluate(()=>window.ghosts);

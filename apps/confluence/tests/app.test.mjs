@@ -155,47 +155,53 @@ for(const skin of ['daylight','editorial'])test('saved legacy '+skin+' stays sel
 
 test('Forge selects the Confluence composition and preserves alternate state through live view switches',async t=>{
   const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
-  d.sectionLayout={default:[{x:0,y:0,w:8,h:12}],confluence:[{panel:'home',x:0,y:0,w:12,h:12},{x:0,y:12,w:12,h:12}]};
+  d.layouts=[{id:'resident',name:'Resident',sectionLayout:{default:[{x:0,y:0,w:8,h:12}],confluence:[{panel:'home',x:0,y:0,w:12,h:12},{x:0,y:12,w:12,h:12}]}},
+    {id:'flow',name:'Data flow',sectionLayout:{confluence:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='resident';
   const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
-  const grid=view.querySelector('.section-layout-grid');assert.equal(grid.dataset.layoutTarget,'confluence');
+  const grid=view.querySelector('.section-layout-grid');assert.ok(grid,s.el('import-status').textContent);assert.equal(grid.dataset.layoutTarget,'confluence');
   assert.equal(grid.firstChild.dataset.layoutKey,'panel:home');assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'24');
   assert.equal(grid.querySelectorAll('.pwidget').length,d.panels.length,'unspecified panels stay visible');
   const bar=view.querySelector('.termbar'),map=view.querySelector('.pt-homemap'),board=view.querySelector('.board');
   view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
   const caption=bar.querySelector('.stepline').textContent;
   assert.equal(view.querySelectorAll('.diagram-view-choice button').length,2);
-  assert.equal(view.querySelector('[data-view-focus="panel"]'),null,'the custom layout replaces Home');
+  assert.equal(view.querySelector('[data-view-focus="panel"]'),null,'authored arrangements supply the complete choice set');
   for(let i=0;i<2;i++){
-    view.querySelector('[data-view-focus="flow"]').click();assert.equal(grid.hidden,true);
-    view.querySelector('[data-view-layout]').click();assert.equal(grid.hidden,false);
+    view.querySelector('[data-view-layout][data-layout-id="flow"]').click();assert.equal(grid.hidden,false);assert.equal(grid.dataset.layoutId,'flow');assert.equal(grid.firstChild.dataset.layoutKey,'diagram');
+    view.querySelector('[data-view-layout][data-layout-id="resident"]').click();assert.equal(grid.hidden,false);assert.equal(grid.firstChild.dataset.layoutKey,'panel:home');
     assert.equal(view.querySelector('.pt-homemap'),map);assert.equal(view.querySelector('.board'),board);
     assert.equal(view.querySelector('.termbar'),bar);assert.equal(bar.querySelector('.stepline').textContent,caption);
   }
   assert.equal(view.querySelectorAll('.termbar').length,1);
 });
 
-test('a diagram without panels restores its board and controls from a custom layout',async t=>{
+test('default Confluence geometry keeps its live board and controls without adding reader choices',async t=>{
   const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
   delete d.panels;delete d.primaryPanel;delete d.paths;d.steps=[{id:'start',nodes:['camera'],text:'Start'}];
-  d.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};
-  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+  d.sectionLayout={default:[{x:0,y:0,w:8,h:12}],confluence:[{x:0,y:0,w:12,h:16},{controls:'steps',x:0,y:16,w:12,h:6}]};
+  const source=JSON.stringify(raw),s=await setup(t,{config:{specJson:source}}),view=s.el('docview');
   const grid=view.querySelector('.section-layout-grid'),board=view.querySelector('.board'),bar=view.querySelector('.termbar');
+  assert.equal(grid.hidden,false);assert.equal(grid.dataset.layoutTarget,'confluence');
+  assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'24');assert.equal(grid.firstChild.style.getPropertyValue('--tile-h'),'16');
+  assert.equal(view.querySelectorAll('[data-view-layout],[data-view-focus]').length,0,'geometry never adds section choices');
   for(let i=0;i<2;i++){
-    [...view.querySelectorAll('.diagram-view-choice button')].find(b=>b.textContent==='Data flow').click();
-    assert.equal(grid.hidden,true);assert.equal(view.querySelector('.boardgrid').hidden,false);
-    view.querySelector('[data-view-layout]').click();assert.equal(grid.hidden,false);
-    assert.equal(grid.querySelector('.board'),board);assert.equal(grid.querySelector('.termbar'),bar);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();assert.equal(bar.hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);
+    assert.equal(grid.querySelector('.board'),board);assert.equal(grid.querySelector('[data-layout-key="steps"]>.termbar'),bar);
+    assert.equal(view.querySelectorAll('.termbar').length,1);
   }
+  assert.equal(s.el('spec-input').value,source,'host rendering leaves saved geometry unchanged');
+  s.el('save').click();await settle();assert.deepEqual(JSON.parse(s.calls.submits[0].config.specJson),raw);
 });
 
 test('detached step controls retain one live transport across layout focus, alternates, and ambient mode',async t=>{
   for(const panels of [true,false])for(const controlsFirst of [true,false]){
     const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
     if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
-    d.sectionLayout={confluence:[
+    d.layouts=[{id:'detached',name:'Detached controls',sectionLayout:{confluence:[
       {x:0,y:controlsFirst?6:0,w:12,h:12},
       {controls:'steps',x:0,y:controlsFirst?0:12,w:12,h:6}
-    ]};
+    ]}},{id:'flow',name:'Data flow',sectionLayout:{confluence:[{x:0,y:0,w:12,h:18}]}}];d.defaultLayout='detached';
     const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
     const grid=view.querySelector('.section-layout-grid'),bar=view.querySelector('.termbar'),board=view.querySelector('.board');
     function detached(){
@@ -206,9 +212,9 @@ test('detached step controls retain one live transport across layout focus, alte
     detached();view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
     const caption=bar.querySelector('.stepline').textContent;assert.match(caption,/STEP 3\/4/);
     for(let i=0;i<2;i++){
-      [...view.querySelectorAll('.diagram-view-choice button')].find(b=>b.textContent==='Data flow').click();
-      assert.equal(grid.hidden,true);assert.equal(bar.querySelector('.stepline').textContent,caption);
-      view.querySelector('[data-view-layout]').click();detached();assert.equal(bar.querySelector('.stepline').textContent,caption);
+      view.querySelector('[data-view-layout][data-layout-id="flow"]').click();
+      assert.equal(grid.hidden,false);assert.equal(grid.dataset.layoutId,'flow');assert.equal(grid.querySelector('[data-layout-key="diagram"] .termbar'),bar);assert.equal(bar.querySelector('.stepline').textContent,caption);
+      view.querySelector('[data-view-layout][data-layout-id="detached"]').click();detached();assert.equal(bar.querySelector('.stepline').textContent,caption);
     }
     [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();assert.equal(bar.hidden,true);
     [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);detached();

@@ -42,6 +42,7 @@ function mermaidFlowchartToSpec(source){
   }
   if(quote || brackets.length || pipe)fail('unclosed label or node delimiter');emit();
   var header=statements.shift(),match=header && /^(?:flowchart|graph)\s+(TD|TB|BT|LR|RL)$/.exec(header.text);
+  if(header)line=header.line;
   if(!match)fail('expected flowchart/graph followed by TD, TB, BT, LR, or RL');direction=match[1];
   var idPattern=/^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*/;
   var delimiters=[['(((',')))'],['([','])'],['[[',']]'],['[(',')]'],['((', '))'],['{'+'{','}'+'}'],['[/','/]'],['[\\','\\]'],['[/','\\]'],['[\\','/]'],['[',']'],['(',')'],['{','}']];

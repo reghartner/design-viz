@@ -45,7 +45,7 @@ test('cycles, self-loops and disconnected nodes terminate with a unique valid pl
 });
 test('unsupported semantic constructs and malformed sources fail before returning a partial graph',()=>{
   const cases=[
-    ['flowchart XX\nA-->B',/expected flowchart/],['flowchart TD',/no flowchart nodes/],
+    ['flowchart XX\nA-->B',/^Error: line 1: expected flowchart/],['flowchart TD',/no flowchart nodes/],
     ['flowchart TD\nA-->',/expected a node/],['flowchart TD\nA---B',/directed/],['flowchart TD\nA<-->B',/unsupported/],
     ['flowchart TD\nA-.->B',/unsupported/],['flowchart TD\nA==>B',/unsupported/],['flowchart TD\nA --> B\nA --> B',/parallel/],
     ['flowchart TD\nA[open',/unclosed/],['flowchart TD\nA[bad)',/mismatched/],['flowchart TD\nA-->||B',/plain-text/],

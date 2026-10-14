@@ -529,6 +529,16 @@ test('Explore defaults validate independently and remain view-local through dupl
   assert.ok(ctx.planSectionExploreLayout(text,raw,0,'missing',value).error);
   d.layouts[0].presentation='standard';assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'engineering',value).error);
 });
+test('top-level Explore authoring materializes an automatic section arrangement on its first edit',()=>{
+  const d=diagram();delete d.primaryPanel;const raw={page:{blocks:[{diagram:d}]}},text=JSON.stringify(raw);
+  const value={panels:[{panel:'home',x:.5,y:.1,w:.3,h:.4,stacked:false}]};
+  assert.ok(ctx.planSectionExploreLayout(text,raw,0,'flow',value).error);
+  const first=ctx.planSectionExploreLayout(text,raw,0,'flow',value,true);assert.ok(!first.error,first.error);
+  const next=JSON.parse(first.text),diagramNext=next.page.blocks[0].diagram,flow=diagramNext.layouts.find(view=>view.id==='flow');
+  assert.equal(diagramNext.defaultLayout,'flow');assert.deepEqual(flow.exploreLayout,value);assert.equal(flow.presentation,undefined);assert.equal(JSON.stringify(raw),text);
+  const changed={...value,panelPlacement:'canvas'},second=ctx.planSectionExploreLayout(first.text,next,0,'flow',changed,true);assert.ok(!second.error,second.error);
+  assert.deepEqual(JSON.parse(second.text).page.blocks[0].diagram.layouts.find(view=>view.id==='flow').exploreLayout,changed);
+});
 test('malformed Explore geometry warns and falls back without hiding the view or altering source',()=>{
   const d=diagram();const value={panels:[{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'missing',x:0,y:0,w:.3,h:.4},{panel:'phone',x:0,y:0,w:0,h:1}],controls:{x:0,y:0,w:1,h:2},camera:{zoom:0,x:0,y:0}};
   d.layouts=[{id:'eng',name:'Eng',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];

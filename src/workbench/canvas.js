@@ -222,9 +222,9 @@ function initWorkbenchCanvas(){
           // the reader left it. An actual authored camera/type change resets it.
           memory={};var oldViews=diagramLayoutViews(prior.diagram);
           diagramLayoutViews(d).forEach(function(definition){
-            var old=oldViews.find(function(v){return v.id===definition.id;}),state=prior.reader[definition.id];
-            if(!old || !state || old.presentation!==definition.presentation ||
-              JSON.stringify(old.exploreLayout && old.exploreLayout.camera)!==JSON.stringify(definition.exploreLayout && definition.exploreLayout.camera))return;
+            var old=oldViews.find(function(v){return v.id===definition.id;}),implicitView=!oldViews.length && ['flow','home'].indexOf(definition.id)>=0,state=prior.reader[definition.id];
+            var oldCamera=old && old.exploreLayout && old.exploreLayout.camera,newCamera=definition.exploreLayout && definition.exploreLayout.camera;
+            if(!state || (!implicitView && (!old || old.presentation!==definition.presentation)) || JSON.stringify(oldCamera)!==JSON.stringify(newCamera))return;
             memory[definition.id]={panels:{},focus:state.focus,scroll:state.scroll,zoom:state.zoom,layout:definition.exploreLayout || {}};
           });
         }

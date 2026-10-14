@@ -78,9 +78,12 @@ function initSectionLayoutEditor(opts){
   }
   function presentation(index){
     var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
-    return rec && rec.presentation;
+    // Automatic diagrams have an Explore viewport before their first saved
+    // section arrangement exists. That viewport still needs the same author
+    // seam as an already named arrangement.
+    return rec && (rec.presentation || rec.viewport);
   }
-  function activeLayout(index){var p=presentation(index);return p && p.layoutId?p.layoutId():undefined;}
+  function activeLayout(index){var p=presentation(index);return p && p.layoutId?p.layoutId():p && p.viewDefinition?p.viewDefinition().id:undefined;}
   function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
   function currentItems(index,d){return sectionLayoutItems(d || rawDiagram(index),profile,activeLayout(index));}
   function forceLayout(index){
@@ -329,7 +332,8 @@ function initSectionLayoutEditor(opts){
       section.classList.toggle('section-arranging',editing===index);
       if(actions.showPopover){if(editing===index && !actions.matches(':popover-open'))actions.showPopover();else if(editing!==index && actions.matches(':popover-open'))actions.hidePopover();}
       var p=presentation(index);if(p && p.setLayoutTarget)p.setLayoutTarget(profile);if(p && p.setArranging)p.setArranging(editing===index);
-      if(p && p.setExploreAuthor)p.setExploreAuthor({
+      var setExploreAuthor=p && (p.setExploreAuthor || p.setAuthor);
+      if(setExploreAuthor)setExploreAuthor.call(p,{
         begin:function(id){
           if(!ready() || activeLayout(index)!==id)return false;
           var focused=document.activeElement,host=focused && focused.closest('.explore-window,.explore-player');
@@ -433,7 +437,7 @@ function initSectionLayoutEditor(opts){
   updateTarget();return {refresh:life.guard(refresh),refreshViewSettings:life.guard(refreshViewSettings),cancel:life.guard(cancel),
     beforeReplace:life.guard(function(request){cancel();if(!request || ['edit','history'].indexOf(request.origin)<0)endEditing();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();endEditing();
-      var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.presentation.setArranging)rec.presentation.setArranging(false);if(rec.presentation && rec.presentation.setExploreAuthor)rec.presentation.setExploreAuthor(null);});
+      var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){var p=rec.presentation || rec.viewport;if(p && p.setArranging)p.setArranging(false);var clear=p && (p.setExploreAuthor || p.setAuthor);if(clear)clear.call(p,null);});
       view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-controls-resize').forEach(function(node){node.remove();});
       view.querySelectorAll('.section-arranging,.layout-selected').forEach(function(node){node.classList.remove('section-arranging','layout-selected');});
       view.style.removeProperty('--home-max-height');

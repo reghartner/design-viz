@@ -43,6 +43,12 @@ const outcome=page=>page.locator('[data-explore-panel=outcome]');
 const clip=page=>page.locator('[data-explore-panel=clip]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
+async function openNewBlankExplore(page,server){
+ await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();await page.getByRole('button',{name:/Blank diagram/}).click();
+ await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();await page.locator('.panel-picker-card[data-panel-type=table]').click();await page.locator('#panel-picker-add').click();await closeTools(page);
+ const navigation=page.locator('#docview>.explore-navigation');await navigation.locator('.section-view-options>summary').click();await navigation.getByLabel('View presentation',{exact:true}).selectOption('explore');await closeTools(page);
+ return page.locator('.explore-window[data-explore-panel]').first();
+}
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
 async function fit(page,host){await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
@@ -102,6 +108,31 @@ test('Workbench canvas mode and object gestures save one Undo action, preserve t
  expect((await home(reader).boundingBox()).width).toBeCloseTo((await reader.locator('.explore-stage').boundingBox()).width*.25,0);
  await selectPlacement(reader,'canvas');expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
  expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).width))).toBeCloseTo(r.w,1);await reader.close();
+});
+
+test('new blank project Explore panels save floating geometry, canvas placement, and Undo history',async({page,server})=>{
+ const panel=await openNewBlankExplore(page,server),grip=panel.locator('.explore-window-grip'),resize=panel.locator('.explore-window-resize');
+ await expect(panel).toBeVisible();const states=[await source(page)],floatingBefore=await panel.boundingBox(),label=await grip.innerText();
+ await board(page).evaluate(el=>{el.scrollLeft+=80;el.scrollTop+=55;});const camera=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+ await drag(page,grip,-120,70);const moved=await panel.boundingBox();expect(moved.x).toBeLessThan(floatingBefore.x-80);expect(moved.y).toBeGreaterThan(floatingBefore.y+40);states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));
+ await expect(page.locator('.workspace-active-section')).toHaveAttribute('data-view-id','flow');expect(JSON.parse(states.at(-1)).page.defaultView).toBe('standard');
+ await expect.poll(()=>board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(camera);
+ const materialized=JSON.parse(states.at(-1)).page.blocks[0].diagram;expect(materialized.layouts.find(view=>view.id==='flow').exploreLayout.panels[0].stacked).toBe(false);
+ await drag(page,resize,80,45);const resized=await panel.boundingBox();expect(resized.width).toBeGreaterThan(moved.width+50);expect(resized.height).toBeGreaterThan(moved.height+25);states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));
+ await panelPlacement(page,label,'canvas');await expect(page.getByLabel('Placement for '+label,{exact:true})).toHaveValue('canvas');expect(await panel.evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));
+ await selectPlacement(page,'canvas');await expect(page.getByLabel('Default panel placement',{exact:true})).toHaveValue('canvas');states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));
+ for(let i=states.length-2;i>=0;i--){await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(states[i]);}
+ for(const text of states.slice(1)){await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(text);}
+ await expect(page.getByLabel('Default panel placement',{exact:true})).toHaveValue('canvas');await expect(page.getByLabel('Placement for '+label,{exact:true})).toHaveValue('canvas');expect(await panel.evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
+});
+
+test('new blank project persists per-panel canvas placement as its first Explore edit',async({page,server})=>{
+ const panel=await openNewBlankExplore(page,server),label=await panel.locator('.explore-window-grip').innerText(),before=await source(page);
+ await panelPlacement(page,label,'canvas');await expect(page.getByLabel('Placement for '+label,{exact:true})).toHaveValue('canvas');expect(await panel.evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
+ const after=await source(page),diagram=JSON.parse(after).page.blocks[0].diagram,flow=diagram.layouts.find(view=>view.id==='flow'),id=diagram.panels[0].id;
+ expect(after).not.toBe(before);expect(flow.exploreLayout.panelPlacements).toEqual([{panel:id,placement:'canvas'}]);expect(flow.exploreLayout.canvas.panels[0].panel).toBe(id);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.getByLabel('Placement for '+label,{exact:true})).toHaveValue('floating');expect(await panel.evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await expect(page.getByLabel('Placement for '+label,{exact:true})).toHaveValue('canvas');expect(await panel.evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
 });
 
 test('Fit recovers a far-away canvas panel and Floating retains its normal zoom floor',async({page,server})=>{

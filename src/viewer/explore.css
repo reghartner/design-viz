@@ -45,7 +45,7 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
   .explore-window:not(.explore-window-automatic)>.explore-window-body>.pwidget:has(.panel-fill-scroll)>.pbody{display:flex;flex:1;min-height:0;flex-direction:column;overflow:auto;}
   .explore-window:not(.explore-window-automatic) .pbody:has(.panel-fill-scroll)>.swpanel,
   .explore-window:not(.explore-window-automatic) .panel-fill-column{display:flex;flex:1;min-height:0;flex-direction:column;}
-  .explore-window:not(.explore-window-automatic) .panel-fill-scroll{flex:1;min-height:0;max-height:none;}
+  .explore-window:not(.explore-window-automatic) .panel-fill-scroll{flex:1;min-height:0;height:auto;max-height:none;}
 }
 .explore-prose-window .sec-prose{box-sizing:border-box;width:100%;min-width:0;padding:12px 14px 24px;color:var(--dtext);font:16px/1.55 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
 .docview .section-viewport .explore-prose-window .sec-text,.docview .section-viewport .explore-prose-window .sec-bullets{font-size:16px;line-height:1.55;}

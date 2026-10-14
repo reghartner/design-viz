@@ -89,7 +89,7 @@
   .docview .section-layout-tile>.pwidget:has(.panel-fill-scroll)>.pbody{display:flex;flex:1;min-height:0;flex-direction:column;overflow:auto;}
   .section-layout-tile .pbody:has(.panel-fill-scroll)>.swpanel,
   .section-layout-tile .panel-fill-column{display:flex;flex:1;min-height:0;flex-direction:column;}
-  .section-layout-tile .panel-fill-scroll{flex:1;min-height:0;max-height:none;}
+  .section-layout-tile .panel-fill-scroll{flex:1;min-height:0;height:auto;max-height:none;}
 }
 body .docview .section-layout-tile>.layout-docked-card>.termbar{border:0;border-top:1px solid var(--dfaint);border-radius:0;box-shadow:none;padding:10px 0 0;margin-top:10px;max-height:60%;}
 /* Caption wrapping must not steal space from the host. The saved controls

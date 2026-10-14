@@ -4,7 +4,7 @@ PanelViews.register(
   function (host, panel, state, skin, states, stepIdx, animate) {
     var h = '';
     var tags = panel.tags || {};
-    h += '<div class="plog">';
+    h += '<div class="plog panel-fill-scroll">';
     (state.log || []).forEach(function (line) {
       var tag = line && line.tag ? String(line.tag) : '';
       var col2 = isHex(tags[tag]) ? tags[tag] : null;
@@ -99,6 +99,8 @@ PanelRegistry.extend('log', {
     font-size:10px;
     line-height:1.5;
   }
+  body.sk-blueprint .docview .section-layout-tile .plog.panel-fill-scroll,
+  body.sk-blueprint .docview .explore-window:not(.explore-window-automatic) .plog.panel-fill-scroll{height:auto;}
 }
 @media screen {
   body.sk-blueprint .plogline{gap:6px;}

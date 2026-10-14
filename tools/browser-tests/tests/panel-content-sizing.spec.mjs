@@ -25,7 +25,8 @@ function auditFixture(){
  const replicas=Array.from({length:8},(_,i)=>({id:'replica-'+i,label:'Replica '+i})),replicaState=Object.fromEntries(replicas.map((replica,i)=>[replica.id,{series:'audit/log',position:100-i,role:i?'follower':'primary',status:'online',observedAt:'audit'}]));
  const contractColumns=[{id:'type',label:'Type',width:140},{id:'notes',label:'Notes',width:300}],fields=Array.from({length:18},(_,i)=>({id:'field-'+i,label:'field_'+i,cells:{type:'string',notes:'Documented contract field '+i}}));
  const traceSpans=[{id:'request',service:'api',name:'request',startMs:0,ms:200},...Array.from({length:12},(_,i)=>({id:'op-'+i,parentId:'request',service:'api',name:'operation '+i,startMs:i*9,ms:7}))];
- const bases=[
+ const log=Array.from({length:30},(_,i)=>({tag:i%2?'INFO':'GATE',text:'Recorded log evidence line '+(i+1)})),bases=[
+  {type:'log',title:'Log',initial:{log}},
   {type:'checks',title:'Checks',checks,initial:{results}},
   {type:'table',title:'Table',columns,initial:{rows}},
   {type:'waterfall',title:'Waterfall',spans},
@@ -40,11 +41,17 @@ function auditFixture(){
 
 test('all capped panel regions use available large-tile height and retain small-tile scrolling',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(auditFixture()));await closeTools(page);
- const contracts=[['checks','.swchecks',300],['table','.swtablewrap',300],['waterfall','.wf-timed',350],['replicas','.rep-list',480],['data-contract','.dcontract-scroll',480],['trace','.tr-operations',300]];
+ const contracts=[['log','.plog',170],['checks','.swchecks',300],['table','.swtablewrap',300],['waterfall','.wf-timed',350],['replicas','.rep-list',480],['data-contract','.dcontract-scroll',480],['trace','.tr-operations',300]];
  for(const [type,selector,cap] of contracts){
   const small=await overflow(page.locator('[data-layout-key="panel:'+type+'-small"] '+selector)),large=await overflow(page.locator('[data-layout-key="panel:'+type+'-large"] '+selector));
   expect(small.scrollHeight-small.clientHeight,type+' small overflow').toBeGreaterThan(5);expect(large.clientHeight,type+' large height').toBeGreaterThan(cap+20);expect(large.maxHeight,type+' cap removed').toBe('none');expect(large.scrollHeight-large.clientHeight,type+' unnecessary large scrollbar').toBeLessThanOrEqual(1);
  }
+});
+
+test('Blueprint Log overrides its compact cap inside a large sized tile',async({page,server})=>{
+ const raw=auditFixture();raw.page.skin='blueprint';await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
+ const small=await overflow(page.locator('[data-layout-key="panel:log-small"] .plog')),large=await overflow(page.locator('[data-layout-key="panel:log-large"] .plog'));
+ expect(small.scrollHeight-small.clientHeight).toBeGreaterThan(5);expect(large.clientHeight).toBeGreaterThan(168);expect(large.scrollHeight-large.clientHeight).toBeLessThanOrEqual(1);
 });
 
 test('Standard panel content follows authoring resize and short tiles retain reachable notes',async({page,server},info)=>{

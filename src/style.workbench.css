@@ -1504,6 +1504,9 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 .page-preview>header{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:10px 16px;box-sizing:border-box;flex:none;}
 .page-preview>header .layout-preview-tools{flex-basis:100%;margin:0;}
 #page-preview-surface{position:relative;flex:1;min-height:0;overflow:auto;max-width:100%;margin:0 auto;}
+#page-preview-surface>#page-preview-view{box-sizing:border-box;width:100%;max-width:none;}
+#page-preview-surface[data-target="confluence"]>#page-preview-view{padding:12px;border-radius:0;}
+#page-preview-surface[data-target="backstage"]>#page-preview-view{padding:16px;border-radius:4px;}
 #page-preview-surface .viewer-diagram-canvas{position:absolute;}
 #page-preview-surface.viewer-exploring{overflow:hidden;}
 .diagram-add-destination-picker{margin:0 20px 16px;}

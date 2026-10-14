@@ -288,10 +288,10 @@ test('attached controls share geometry, survive Optimize, and fall back to detac
   const flow=plain(ctx.sectionLayoutOptimize(d,'default',ctx.sectionLayoutAttach(d,original,'diagram')));
   assert.equal(flow.find(t=>ctx.sectionLayoutKey(t)==='diagram').y,0,'the coupled diagram leads a view even when Home is also visible');
 });
-test('named view conversion and step selection preserve story definitions, generate stable IDs, and copy filters',()=>{
+test('named view step selection preserves story definitions, generates stable IDs, and copies filters',()=>{
   const d=diagram();delete d.paths;d.steps.push({text:'Second'},{id:'third',text:'Third'});
-  const conversion=ctx.planEnsureSectionView(JSON.stringify(d),d,0);assert.ok(!conversion.error,conversion.error);
-  const named=JSON.parse(conversion.text);assert.equal(named.layouts[0].name,'Home');assert.equal(named.layouts[0].sectionLayout.default.find(t=>t.controls).attachTo,'panel:home');
+  d.layouts=[{id:'view-1',name:'Home',sectionLayout:{columns:24,default:plain(ctx.sectionLayoutOptimize(d,'default',null))}}];
+  const conversion={text:JSON.stringify(d)},named=JSON.parse(conversion.text);
   const selection=ctx.planSectionViewSteps(conversion.text,named,0,'view-1',[0,2]);assert.ok(!selection.error,selection.error);
   const selected=JSON.parse(selection.text);assert.deepEqual(selected.layouts[0].steps,['one','third']);assert.ok(selected.steps[1].id);assert.deepEqual(selected.steps[0],d.steps[0]);
   const duplicate=ctx.planDuplicateSectionLayout(selection.text,selected,0,'view-1');assert.deepEqual(JSON.parse(duplicate.text).layouts[1].steps,['one','third']);
@@ -732,4 +732,32 @@ test('chapter visibility creates a default when only a host-specific profile exi
   const plan=ctx.planSectionDiagramVisibility(JSON.stringify(d),d,0,'only-host',false);assert.ok(!plan.error,plan.error);
   const next=JSON.parse(plan.text);
   for(const host of ['default','backstage','confluence'])assert.equal(ctx.sectionLayoutItems(next,host,'only-host').find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
+});
+
+for(const kind of ['named','legacy-named','legacy-grid','automatic'])test('explicit arrangement edits preserve Views and story for '+kind+' documents',()=>{
+  const raw=require('./fixtures/arrange-views.cjs')(kind),text=JSON.stringify(raw,null,2),tab=raw.page.blocks[0].tabs[0],d=tab.sections[0].diagram;
+  const id=d.layouts?'standard-layout':undefined;
+  const before=plain(d),items=ctx.sectionLayoutItems(d,'default',id),optimized=plain(ctx.sectionLayoutOptimize(d,'default',items));
+  const plan=ctx.planSectionLayout(text,raw,0,'default',optimized,id);assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text),nextTab=next.page.blocks[0].tabs[0],saved=nextTab.sections[0].diagram;
+  assert.equal(JSON.stringify(raw,null,2),text,'planning never mutates the source object');
+  assert.deepEqual(nextTab.views,tab.views);assert.equal(nextTab.defaultView,tab.defaultView);
+  assert.equal(saved.defaultLayout,d.defaultLayout);
+  if(d.layouts){
+    assert.deepEqual(saved.layouts[1],d.layouts[1],'Explore geometry, camera, filters and identity survive exactly');
+    assert.deepEqual(saved.layouts[0],{...d.layouts[0],sectionLayout:{...migrated(d.layouts[0].sectionLayout),default:optimized}});
+    before.layouts=saved.layouts;
+  }else{
+    assert.equal(saved.layouts,undefined,'the first grid does not replace the section with a synthetic named View');
+    assert.deepEqual(saved.sectionLayout,{...(d.sectionLayout?migrated(d.sectionLayout):{columns:24}),default:optimized});
+    before.sectionLayout=saved.sectionLayout;
+  }
+  assert.deepEqual(saved,before,'only the selected arrangement changes');
+  assert.deepEqual(plain(ctx.validate(ctx.normalize(next)).errors),[]);
+  if(items){
+    const moved=ctx.sectionLayoutGesture(items,'panel:home',0,-1,false);
+    const drag=ctx.planSectionLayout(text,raw,0,'default',moved,id);assert.ok(!drag.error,drag.error);
+    const dragged=JSON.parse(drag.text).page.blocks[0].tabs[0];assert.deepEqual(dragged.views,tab.views);
+    assert.deepEqual(plain(ctx.sectionLayoutItems(dragged.sections[0].diagram,'default',id)),plain(moved));
+  }
 });

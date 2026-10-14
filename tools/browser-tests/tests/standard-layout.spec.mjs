@@ -138,3 +138,59 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   await page.getByRole('button',{name:'Done arranging',exact:true}).click();
   expect(await page.locator('.layout-preview-stage').evaluate(el=>el.style.minHeight)).toBe('');
 });
+
+// Desktop authoring only. These tests run in CI; no local browser execution is
+// required to develop the source-preserving Arrange transition.
+import arrangeViews from '../../../tests/fixtures/arrange-views.cjs';
+import {chooseNavigation} from '../helpers/test.mjs';
+for(const kind of ['named','legacy-named','legacy-grid','automatic'])test(`Arrange preserves the current geometry and both Views for ${kind} JSON`,async({page,server})=>{
+  await page.setViewportSize({width:1500,height:1000});
+  const raw=arrangeViews(kind),source=JSON.stringify(raw,null,2),tab=raw.page.blocks[0].tabs[0],original=tab.sections[0].diagram;
+  const nav=page.locator('#docview .explore-navigation');
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await prepareEditorSurface(page);
+  await chooseNavigation(nav,'View','Standard');await page.evaluate(()=>document.fonts.ready);await settle(page);
+  const selected=()=>nav.getByRole('tab',{name:'Standard',exact:true,includeHidden:true});
+  await expect(selected()).toHaveAttribute('aria-selected','true');
+  // Positions relative to the section ignore incidental document scrolling but
+  // catch grid conversion, packing, resizing, and changes in graph scale.
+  const geometry=()=>page.locator('#docview .doc-sec[data-dv-section="0"]').evaluate(section=>{
+    const origin=section.getBoundingClientRect();
+    return Array.from(section.querySelectorAll('.section-layout-tile,.board,.pwidget')).filter(el=>el.getBoundingClientRect().width && el.getBoundingClientRect().height).map(el=>{
+      const rect=el.getBoundingClientRect();return {key:el.getAttribute('data-layout-key') || el.className,x:rect.x-origin.x,y:rect.y-origin.y,w:rect.width,h:rect.height};
+    });
+  });
+  const before=await geometry();expect(before.length).toBeGreaterThan(0);
+  await arrangeChapter(page);await settle(page);
+  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await expect(selected()).toHaveAttribute('aria-selected','true');expect(await geometry()).toEqual(before);
+  await expect(nav.getByRole('tab',{name:'Explore',exact:true,includeHidden:true})).toHaveCount(1);
+  if(kind==='automatic'){
+    await expect(page.locator('.section-arrange-fields')).toContainText('Choose Optimize layout to create an editable grid');
+    await expect(page.locator('.section-layout-grid')).toHaveCount(0);
+  }else{
+    // Existing grids remain directly editable without an initialization write.
+    const handle=page.locator('[data-layout-key="panel:home"] .section-tile-move');
+    await handle.focus();await page.keyboard.press('ArrowUp');
+    await expect(page.locator('#src')).not.toHaveValue(source);
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+    await expect(page.locator('#undo-builder')).toBeDisabled();
+  }
+  await page.getByRole('button',{name:'Optimize layout',exact:true}).click();
+  await expect(page.locator('#src')).not.toHaveValue(source);
+  const optimized=await page.locator('#src').inputValue(),nextTab=JSON.parse(optimized).page.blocks[0].tabs[0],next=nextTab.sections[0].diagram;
+  expect(nextTab.views).toEqual(tab.views);expect(nextTab.defaultView).toBe(tab.defaultView);
+  expect(next.paths).toEqual(original.paths);expect(next.steps).toEqual(original.steps);
+  expect(next.defaultLayout).toBe(original.defaultLayout);
+  if(original.layouts)expect(next.layouts[1]).toEqual(original.layouts[1]);
+  else expect(next.layouts).toBeUndefined();
+  await expect(page.locator('.section-layout-grid')).toBeVisible();
+  await expect(selected()).toHaveAttribute('aria-selected','true');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+  await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(optimized);
+  await page.getByRole('button',{name:'Done arranging',exact:true}).click();
+  await chooseNavigation(nav,'View','Explore');await expect(page.locator('#docview .explore-board')).toBeVisible();
+  await expect(nav.getByRole('tab',{name:'Explore',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
+  await chooseNavigation(nav,'View','Standard');await expect(selected()).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#src')).toHaveValue(optimized);
+});

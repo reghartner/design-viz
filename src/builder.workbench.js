@@ -970,7 +970,6 @@ function initWorkbenchBuilder(opts){
     setPresentation:function(section,id,value){
       var nextId,ok=commitCascade(function(raw){var plan=planSectionViewPresentation(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
-    ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(session.text(),raw,section,target);});},
     steps:function(section,id,indices){
       var prior=session.target;session.target=null;
       var ok=commitCascade(function(raw){return planSectionViewSteps(session.text(),raw,section,id,indices);});

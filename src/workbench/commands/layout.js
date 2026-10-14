@@ -603,11 +603,6 @@ function planSectionExploreLayout(text,raw,section,layoutId,value){
   if(warnings.length)return {error:warnings.join('\n')};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
 }
-function builderEnsureSectionView(d){
-  var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
-  d.layouts=[{id:'view-1',name:name,sectionLayout:builderSectionLayout24(source?source.sectionLayout:{columns:24,default:sectionLayoutOptimize(d,'default',null)})}];
-  d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
-}
 /* Match the viewer's legacy Home/Layout and Data choices when a header action
    first authors them. Only geometry is new: the story and its default survive. */
 function builderPromoteSectionViews(d,layoutId){
@@ -637,14 +632,6 @@ function builderPromoteSectionViews(d,layoutId){
   views.push({id:'flow',name:'Data flow',sectionLayout:profiles});
   d.layouts=views;d.defaultLayout=defaultId;delete d.sectionLayout;delete d.layoutName;
   return {layoutId:selected};
-}
-function planEnsureSectionView(text,raw,section,optimizeTarget){
-  var got=builderDiagram(text,raw,section);if(got.error)return got;
-  if(Array.isArray(got.d.layouts))return {error:'This diagram already has saved arrangements.'};
-  return builderRewrite(text,raw,got.path,function(d){
-    builderEnsureSectionView(d);
-    if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
-  });
 }
 function planSectionViewSteps(text,raw,section,layoutId,indices){
   var got=builderDiagram(text,raw,section);if(got.error)return got;

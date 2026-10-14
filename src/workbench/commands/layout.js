@@ -85,10 +85,12 @@ function planClearCustomEdges(text,raw,scope){
     if(selection.all)edges.forEach(function(_,index){if(local(index))wanted.add(index);});
     selection.edges.forEach(function(target){
       if(target.imported===true)return;
-      if(typeof target.key==='string'){
+      if(Number.isInteger(target.index) && local(target.index) &&
+        (typeof target.key!=='string' || builderEdgeKey(edges[target.index])===target.key))wanted.add(target.index);
+      else if(typeof target.key==='string'){
         var matches=[];edges.forEach(function(edge,index){if(local(index) && builderEdgeKey(edge)===target.key)matches.push(index);});
         if(matches.length===1)wanted.add(matches[0]);
-      }else if(Number.isInteger(target.index) && local(target.index))wanted.add(target.index);
+      }
     });
     if(selection.nodes.size)edges.forEach(function(edge,index){
       if(local(index) && (selection.nodes.has(edge.from) || selection.nodes.has(edge.to)))wanted.add(index);

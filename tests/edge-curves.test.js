@@ -92,6 +92,15 @@ test('clear custom edges skips provider-owned edges and reports an unchanged sco
   const all=C.planClearCustomEdges(text,raw,{all:true,section:0});assert.equal(all.count,1);assert.deepEqual(JSON.parse(all.text).edges[1],raw.edges[1]);
 });
 
+test('clear custom edges uses an authored index to distinguish parallel connections with the same endpoints',()=>{
+  const raw={nodes:{a:{},b:{}},rows:[['a','b']],edges:[
+    {from:'a',to:'b',fromPort:{side:'right'},label:'first'},
+    {from:'a',to:'b',curvePoints:[{t:.5,dx:40,dy:-20}],label:'second'}
+  ]},text=JSON.stringify(raw,null,2);
+  const plan=C.planClearCustomEdges(text,raw,{targets:[{kind:'edge',section:0,index:1,key:'a->b'}]});assert.equal(plan.count,1);
+  const edges=JSON.parse(plan.text).edges;assert.deepEqual(edges[0],raw.edges[0]);assert.deepEqual(edges[1],{from:'a',to:'b',label:'second'});
+});
+
 test('manual curves take precedence over lanes and ports and advertise export compatibility',()=>{
   const d={nodes:{a:{},b:{}},rows:[['a','b']],routing:'lanes',edges:[{from:'a',to:'b',fromPort:{side:'top'},curvePoints:[{t:.5,dx:0,dy:-120}]}]};
   const L=C.layout(d),e=d.edges[0];assert.equal(C.edgePath(e,L,C.laneRoutes(d,L)[0]),C.edgeCurvePath(e,L));

@@ -96,7 +96,3 @@ For ordinary file authoring, deliver spec and ledger together; create questions
 only for unresolved material story decisions. HTML requires an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.
-
-When the user asks to publish the HTML as a claude.ai artifact, follow
-[claude.ai artifacts](references/integrations.md#claudeai-artifacts): declare the
-comments capability and republish an existing artifact to its same URL.

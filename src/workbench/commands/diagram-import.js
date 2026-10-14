@@ -3,7 +3,8 @@
 function builderDiagramImportRecognized(text){
   if(typeof text!=='string')return false;
   var value=text.trim();
-  if(/^sequenceDiagram(?:\s|$)/.test(value) || /^```mermaid\s*$/m.test(value))return true;
+  if(new TextEncoder().encode(value).byteLength>BUILDER_CLIPBOARD_LIMIT)return false;
+  if(/^(?:(?:%%[^\n]*\n)\s*)*(?:sequenceDiagram|flowchart|graph)(?:\s|$)/.test(value) || /^```mermaid\s*$/m.test(value))return true;
   if(value[0]!=='{' || new TextEncoder().encode(value).byteLength>BUILDER_CLIPBOARD_LIMIT)return false;
   try{var raw=JSON.parse(value);return specSectionPaths(raw).some(function(rec){var d=specValueAt(raw,rec.diagram);return d && builderClipboardObject(d.nodes) && Array.isArray(d.rows);});}catch(ex){return false;}
 }
@@ -13,7 +14,7 @@ function prepareBuilderDiagramImport(text){
     var raw,todos=[];
     if(text.trim()[0]==='{')raw=JSON.parse(text);
     else {raw=mermaidToSpec(text,{strictIds:true});todos=raw.todos || [];if(todos.some(function(todo){return /block not converted/.test(todo);}))throw new Error('Mermaid conditional and loop blocks cannot be merged without losing connections. Expand the messages into a sequenceDiagram first.');}
-    if(!normalize(raw))throw new Error('Choose a Flowview JSON diagram or Mermaid sequenceDiagram.');
+    if(!normalize(raw))throw new Error('Choose a Flowview JSON diagram, Mermaid sequenceDiagram, or flowchart.');
     var sections=specSectionPaths(raw).map(function(rec,index){
       var d=specValueAt(raw,rec.diagram),s=specValueAt(raw,rec.section);
       return d && d.nodes ? {index:index,label:s && s.heading || 'Section '+(index+1)} : null;

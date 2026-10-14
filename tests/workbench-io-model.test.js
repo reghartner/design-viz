@@ -54,7 +54,7 @@ test('mermaidToSpec extracts the first markdown mermaid fence as the Python orac
   assert.deepStrictEqual(plain(B.mermaidToSpec('# Intro\n\n```mermaid\n' + MERMAID_SEQ +
     '```\nprose\n```mermaid\nsequenceDiagram\nX->>Y: later\n```')), plain(B.mermaidToSpec(MERMAID_SEQ)));
   assert.throws(() => B.mermaidToSpec('```mermaid\nflowchart TD\n```\n```mermaid\n' +
-    MERMAID_SEQ + '```'), /line 1: not a sequenceDiagram/);
+    MERMAID_SEQ + '```'), /no flowchart nodes/);
 });
 
 test('mermaidToSpec infers protocols in Python priority order and splits long flows into rows', () => {
@@ -105,7 +105,7 @@ test('mermaidToSpec counts nested blocks once and preserves notes in encounter o
 test('mermaidToSpec rejects garbage and malformed or message-free input with line information', () => {
   const cases = [
     ['', /line 1: not a sequenceDiagram/],
-    ['flowchart TD\nA-->B', /line 1: not a sequenceDiagram/],
+    ['stateDiagram-v2\nA-->B', /line 1: not a sequenceDiagram/],
     ['sequenceDiagram\n\nA-xB: dies', /line 2: unsupported syntax.*A-xB/],
     ['sequenceDiagram\nelse ok', /line 2: 'else' outside/],
     ['sequenceDiagram\nend', /line 2: 'end' without/],

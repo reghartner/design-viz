@@ -45,3 +45,13 @@ test('bare diagram destination wraps only when protocol definitions require it',
   const raw={nodes:{keep:{title:'Keep'}},rows:[['keep']]},out=c.planAddBuilderDiagram(JSON.stringify(raw),raw,source(),0,0);
   assert.equal(out.error,undefined);const result=JSON.parse(out.text);assert.ok(result.page.sections[0].diagram.nodes.keep);assert.ok(result.page.protocols['https-copy']);
 });
+test('flowcharts merge with complete native groups, neutral connections and unchanged destination history content',()=>{
+  const text='flowchart RL\nsubgraph team [Team]\nA{Ready} -->|yes| B\nend\nB --> C';
+  assert.equal(c.builderDiagramImportRecognized(text),true);assert.equal(c.builderDiagramImportRecognized('graph TD; A-->B'),true);
+  const prepared=c.prepareBuilderDiagramImport(text);assert.equal(prepared.error,undefined);assert.match(prepared.todos.join(' '),/native cards/);
+  const raw=destination(),original=JSON.stringify(raw),out=c.planAddBuilderDiagram(original,raw,prepared.raw,0,0);
+  assert.equal(out.error,undefined);const next=JSON.parse(out.text),d=next.page.sections[0].diagram;
+  assert.equal(d.nodes['A-copy'].group,'team-copy');assert.equal(d.edges.length,2);assert.equal(d.edges[0].label,'yes');assert.equal(next.page.protocols.mermaid.label,'Connection');
+  assert.deepEqual(d.floats[0],raw.page.sections[0].diagram.floats[0]);assert.deepEqual(d.steps,[]);assert.equal(JSON.stringify(raw),original);
+  assert.equal(c.builderDiagramImportRecognized('flowchart TD\n'+'A'.repeat(2*1024*1024)),false);
+});

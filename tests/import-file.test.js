@@ -19,7 +19,7 @@ test('file preparation classifies supported content and produces useful summarie
 
 test('file preparation rejects invalid, unsupported, binary and oversized sources',()=>{
   assert.throws(()=>C.prepareFlowviewFileImport({name:'bad.json'},'{'),/Invalid Flowview JSON/);
-  assert.throws(()=>C.prepareFlowviewFileImport({name:'bad.mmd'},'graph TD\nA-->B'),/Invalid Mermaid sequence/);
+  assert.throws(()=>C.prepareFlowviewFileImport({name:'bad.mmd'},'graph TD\nA---B'),/Invalid Mermaid diagram.*directed/);
   assert.throws(()=>C.prepareFlowviewFileImport({name:'notes.txt'},'ordinary notes'),/Unsupported file/);
   assert.throws(()=>C.prepareFlowviewFileImport({name:'image.json'},'{}\0png'),/Binary files/);
   assert.throws(()=>C.prepareFlowviewFileImport({name:'large.json',size:C.FLOWVIEW_IMPORT_MAX_BYTES+1},SPEC),/4 MiB/);

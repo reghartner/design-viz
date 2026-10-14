@@ -5,28 +5,22 @@ import {test,expect,chooseNavigation} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 /* Published claude.ai artifacts declare comments {composer_only, customAnchors}.
-   Comment subjects carry data-derived ids, so the shell's own-id anchors
-   (`#<id>`) survive View reordering. With customAnchors the page owns pin
-   placement: hidden Tab/View/step threads stay unplaced, "Go to" (reveal)
-   switches Tab, View and step, and comment-mode clicks compose with a Tab-first
-   label. The shell is a recording stub whose domAnchor follows the observed
-   claude.ai grammar. */
+   The page then owns pin placement: threads on a hidden Tab/View stay unplaced,
+   "Go to" (reveal) switches Tab/View, a step-caption comment is saved against
+   the shown step's numbered button and replays that step, and step controls
+   keep working in comment mode. The shell is a recording stub whose domAnchor
+   matches claude.ai (contract 0.2.78): purely positional, ids ignored. */
 const diagram=(node,title,steps)=>({view:'step',autoplay:false,nodes:{[node]:{title}},rows:[[node]],steps:steps.map((text,i)=>({id:node+'-'+i,text,nodes:[node]}))});
 const raw={page:{title:'Comment anchors',blocks:[{tabs:[
- {label:'Overview',defaultView:'sequence',views:[
-   {id:'sequence',name:'Sequence',presentation:'standard',sections:['ring']},
-   {id:'answer',name:'Answer',presentation:'standard',sections:['reply']},
-   {id:'both',name:'Reply first',presentation:'standard',sections:['reply','ring']}],sections:[
-  {id:'ring',heading:'Ring the doorbell',text:['A visitor presses the button.'],diagram:diagram('door','Door',['PIR sensor trips','Chime plays'])},
+ {label:'Overview',defaultView:'sequence',views:[{id:'sequence',name:'Sequence',presentation:'standard',sections:['ring']},{id:'answer',name:'Answer',presentation:'standard',sections:['reply']}],sections:[
+  {id:'ring',heading:'Ring the doorbell',text:['A visitor presses the button.'],bullets:['Motion first','Then the press','Chime last'],
+   diagram:diagram('door','Door',['PIR sensor trips','Chime plays','Camera wakes','Clip records','Owner notified'])},
   {id:'reply',heading:'Answer the door',diagram:diagram('phone','Phone',['Owner answers'])}]},
  {label:'Storage',sections:[{id:'clip',heading:'Store the clip',diagram:diagram('vault','Vault',['Clip saved to storage'])}]}]}]}};
 
 function stubClaude(){
  const log=window.__comments={callbacks:null,placed:[],compose:[]};
- // Observed claude.ai grammar: an element's OWN id, else a positional
- // nth-of-type path rooted at #docview that ignores ancestor ids.
  function cssPath(el){
-  if(el.id)return '#'+el.id;
   const parts=[];let n=el;
   for(;n && n.id!=='docview' && n!==document.documentElement;n=n.parentElement){
    const same=Array.prototype.filter.call(n.parentElement.children,c=>c.tagName===n.tagName);
@@ -35,10 +29,11 @@ function stubClaude(){
   return (n && n.id==='docview'?'#docview':'html')+' > '+parts.join(' > ');
  }
  window.__cssPath=cssPath;
+ window.__center=el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2+scrollX,y:r.top+r.height/2+scrollY};};
  const controller={
   placed(map){log.placed.push(JSON.parse(JSON.stringify(map)));},
-  compose(anchor,at,opts){log.compose.push({anchor,at,opts});return Promise.resolve({opened:true});},
-  domAnchor(el,ev){if(!el.isConnected)throw new TypeError('not in document');const r=el.getBoundingClientRect();return [cssPath(el),{x:(ev?ev.clientX:r.left+r.width/2)+scrollX,y:(ev?ev.clientY:r.top+r.height/2)+scrollY}];},
+  compose(anchor,at,opts){log.compose.push({anchor,at:at instanceof Element?'element':at,opts});return Promise.resolve({opened:true});},
+  domAnchor(el,ev){if(!el.isConnected)throw new TypeError('not in document');return [cssPath(el),ev?{x:ev.clientX+scrollX,y:ev.clientY+scrollY}:window.__center(el)];},
   open(){return Promise.resolve();},exitMode(){},release(){},areas:false};
  const comments=Object.freeze({customAnchors(callbacks){log.callbacks=callbacks;return Promise.resolve(controller);}});
  window.claude=Object.freeze({use:name=>Promise.resolve(name==='comments'?comments:null)});
@@ -55,107 +50,102 @@ const placedKeys=async page=>Object.keys(await lastPlaced(page)).sort();
 const composed=(page,i)=>page.evaluate(i=>window.__comments.compose[i],i);
 const composeCount=page=>page.evaluate(()=>window.__comments.compose.length);
 
-test('data-derived comment ids follow Tabs, Views and steps; reveal reaches hidden subjects',async({page,server})=>{
+test('step captions anchor to the shown step button; Tabs, Views and step controls stay navigable',async({page,server})=>{
  await page.addInitScript(stubClaude);
  const root=await open(page,server),nav=root.locator('.explore-navigation').first(),viewStrip=nav.locator('.reader-view-strip');
- const ringLine=root.locator('#section-ring .stepline:not(.dv-caption-old)'),door=root.locator('#section-ring .node[data-dv-node=door]'),vault=root.locator('#section-clip .node[data-dv-node=vault]');
+ const ring=root.locator('#section-ring'),ringLine=ring.locator('.stepline:not(.dv-caption-old)'),chip=n=>ring.locator('.schip').nth(n-1);
  const tab=name=>nav.getByRole('tab',{name,exact:true,includeHidden:true});
- // Registration reports immediately (an empty map tells the shell the page listens).
  await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);
  await page.evaluate(()=>window.__comments.callbacks.mode(true));
- // (i) Subject ids come from data and survive a View that reorders sections.
- await expect(door).toHaveAttribute('id','c-ring-node-door');
- await expect(ringLine).toHaveAttribute('id','c-ring-step-door-0');
- await expect(root.locator('#section-ring .sec-heading-row')).toHaveAttribute('id','c-ring-heading');
- await expect(root.locator('#section-ring .sec-text[data-dv-para="0"]')).toHaveAttribute('id','c-ring-para-1');
- await expect(vault).toHaveAttribute('id','c-clip-node-vault');
- const positional=()=>page.evaluate(()=>__cssPath(document.querySelector('#section-ring .sec-h')));
- const before=await positional();
- await door.click();
+ // (d) Step buttons, next and the mode toggle act normally in comment mode.
+ await chip(2).click();
+ await expect(ringLine).toContainText(/STEP 2\/5\s*Chime plays/);
+ await ring.getByRole('button',{name:'Next step'}).click();
+ await expect(ringLine).toContainText(/STEP 3\/5\s*Camera wakes/);
+ await ring.locator('.mtoggle .mbtn',{hasText:'AMBIENT'}).click();
+ await expect(ring.locator('.termbar')).toBeHidden();
+ await ring.locator('.mtoggle .mbtn',{hasText:'STEP'}).click();
+ await expect(ringLine).toBeVisible();
+ await chip(2).click();
+ await expect(ringLine).toContainText('Chime plays');
+ expect(await composeCount(page)).toBe(0);
+ // (a) A caption click composes against the active step button, at the click point.
+ const box=await ringLine.boundingBox();
+ await page.mouse.click(box.x+10,box.y+box.height/2);
  await expect.poll(()=>composeCount(page)).toBe(1);
- expect((await composed(page,0)).anchor).toBe('#c-ring-node-door');
- await viewStrip.getByRole('tab',{name:'Reply first',exact:true}).click();
- await expect(root.locator('#section-reply')).toBeVisible();await expect(door).toBeVisible();
- expect(await page.evaluate(()=>document.querySelector('#section-reply').compareDocumentPosition(document.querySelector('#section-ring'))&Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
- expect(await positional()).not.toBe(before);
- await expect(door).toHaveAttribute('id','c-ring-node-door');
- await door.click();
+ const stepComment=await composed(page,0);
+ const chip2=await page.evaluate(()=>__cssPath(document.querySelector('#section-ring .schip[aria-current="true"]')));
+ expect(chip2).toMatch(/button:nth-of-type\(2\)$/);
+ expect(stepComment.anchor).toBe(chip2);
+ const scroll=await page.evaluate(()=>({x:scrollX,y:scrollY}));
+ expect(Math.abs(stepComment.at.x-(box.x+10+scroll.x))).toBeLessThanOrEqual(1);
+ expect(Math.abs(stepComment.at.y-(box.y+box.height/2+scroll.y))).toBeLessThanOrEqual(1);
+ expect(stepComment.opts.label).toMatch(/^Tab: Overview › View: Sequence › Ring the doorbell › STEP 2\/5 Chime plays/);
+ // An ordinary subject composes at its own positional path; the label keeps its text.
+ await ring.locator('li[data-dv-bullet="2"]').click();
  await expect.poll(()=>composeCount(page)).toBe(2);
- const nodeComment=await composed(page,1);
- expect(nodeComment.anchor).toBe('#c-ring-node-door');
- // (v) The label still starts with the Tab.
- expect(nodeComment.opts.label).toMatch(/^Tab: Overview › View: Reply first › Ring the doorbell › Door/);
- expect(new TextEncoder().encode(nodeComment.opts.label).length).toBeLessThanOrEqual(128);
- await viewStrip.getByRole('tab',{name:'Sequence',exact:true}).click();
- await expect(root.locator('#section-reply')).toBeHidden();
- // (ii)/(iii) Threads: a node on the hidden Tab, step 2's caption, a legacy positional path.
- const legacy=await page.evaluate(()=>__cssPath(document.querySelector('#section-ring .sec-h')));
- expect(legacy).toMatch(/^#docview > /);
- await page.evaluate(([legacy])=>window.__comments.callbacks.threads([
-  {id:'h-vault',anchor:'#c-clip-node-vault',resolved:false,active:false},
-  {id:'h-step2',anchor:'#c-ring-step-door-1',resolved:false,active:false},
-  {id:'h-legacy',anchor:legacy,resolved:false,active:false},
-  {id:'h-bad',anchor:'div[[',resolved:false,active:false}]),[legacy]);
- expect(await placedKeys(page)).toEqual(['h-legacy']);
- // (iii) reveal shows the hidden-Tab node and places it.
+ const bullet=await composed(page,1);
+ expect(bullet.anchor).toMatch(/ul:nth-of-type\(1\) > li:nth-of-type\(3\)$/);
+ expect(bullet.opts.label).toMatch(/^Tab: Overview › View: Sequence › Ring the doorbell › Chime last/);
+ // (b)/(e) Threads: the step button, the bullet, a node on the hidden Tab.
+ const vaultPath=await page.evaluate(()=>__cssPath(document.querySelector('#section-clip .node[data-dv-node=vault]')));
+ await page.evaluate(([a,b,c])=>window.__comments.callbacks.threads([
+  {id:'h-step',anchor:a,resolved:false,active:false},{id:'h-bullet',anchor:b,resolved:false,active:false},
+  {id:'h-vault',anchor:c,resolved:false,active:false},{id:'h-bad',anchor:'div[[',resolved:false,active:false}]),[chip2,bullet.anchor,vaultPath]);
+ let placed=await lastPlaced(page);
+ expect(Object.keys(placed).sort()).toEqual(['h-bullet','h-step']);
+ // Pins sit at the shell's own anchor point for the subject (its center here).
+ const centers=await page.evaluate(()=>({chip:__center(document.querySelector('#section-ring .schip[aria-current="true"]')),bullet:__center(document.querySelector('#section-ring li[data-dv-bullet="2"]'))}));
+ for(const [key,c] of [['h-step',centers.chip],['h-bullet',centers.bullet]]){
+  expect(Math.abs(placed[key].x-c.x)).toBeLessThanOrEqual(1);expect(Math.abs(placed[key].y-c.y)).toBeLessThanOrEqual(1);
+ }
+ // AMBIENT hides the step buttons, so the step thread is unplaced.
+ await ring.locator('.mtoggle .mbtn',{hasText:'AMBIENT'}).click();
+ await expect.poll(()=>placedKeys(page)).toEqual(['h-bullet']);
+ // Hidden-Tab thread: reveal switches Tab and places it.
  await page.evaluate(()=>window.__comments.callbacks.reveal('h-vault'));
  await expect(tab('Storage')).toHaveAttribute('aria-selected','true');
- await expect(vault).toBeVisible();await expect(vault).toBeInViewport();
+ await expect(root.locator('#section-clip .node[data-dv-node=vault]')).toBeInViewport();
  await expect.poll(()=>placedKeys(page)).toEqual(['h-vault']);
- expect(page.url()).toContain('t=storage');
- // (ii) From another Tab, reveal moves to the step's Tab AND step; it pins only while shown.
- await page.evaluate(()=>window.__comments.callbacks.reveal('h-step2'));
+ // (c) From another Tab, reveal returns to the step button's Tab and replays its step.
+ await page.evaluate(()=>window.__comments.callbacks.reveal('h-step'));
  await expect(tab('Overview')).toHaveAttribute('aria-selected','true');
- await expect(ringLine).toContainText('Chime plays');
- await expect(ringLine).toHaveAttribute('id','c-ring-step-door-1');
- await expect.poll(()=>placedKeys(page)).toEqual(['h-legacy','h-step2']);
+ await expect(ringLine).toContainText(/STEP 2\/5\s*Chime plays/);
+ await expect(ringLine).toBeInViewport();
+ await expect.poll(()=>placedKeys(page)).toEqual(['h-bullet','h-step']);
  expect(page.url()).toMatch(/s=door-1/);
- await page.evaluate(()=>window.__comments.callbacks.mode(false));
- await root.locator('#section-ring .schip').first().click();
- await expect(ringLine).toContainText('PIR sensor trips');
- await page.evaluate(()=>window.__comments.callbacks.mode(true));
- await page.evaluate(()=>window.__comments.callbacks.threads([{id:'h-step2',anchor:'#c-ring-step-door-1',resolved:false,active:false}]));
- await expect(ringLine).toHaveAttribute('id','c-ring-step-door-0');
- expect(await placedKeys(page)).toEqual([]);
- // Comment-mode clicks: the caption composes with its step id; navigation passes through.
- await ringLine.click();
- await expect.poll(()=>composeCount(page)).toBe(3);
- const stepComment=await composed(page,2);
- expect(stepComment.anchor).toBe('#c-ring-step-door-0');
- expect(stepComment.opts.label).toMatch(/^Tab: Overview › View: Sequence › Ring the doorbell › STEP 1\/2 PIR sensor trips/);
+ // (c) From step 4 on the same Tab.
+ await chip(4).click();
+ await expect(ringLine).toContainText(/STEP 4\/5\s*Clip records/);
+ await page.evaluate(()=>window.__comments.callbacks.reveal('h-step'));
+ await expect(ringLine).toContainText(/STEP 2\/5\s*Chime plays/);
+ await expect(chip(2)).toHaveAttribute('aria-current','true');
+ // Navigation controls pass through; other clicks still compose.
  await chooseNavigation(nav,'Tab','Storage');
  await expect(tab('Storage')).toHaveAttribute('aria-selected','true');
- await root.locator('#section-clip .stepline:not(.dv-caption-old)').click();
- await expect.poll(()=>composeCount(page)).toBe(4);
- expect((await composed(page,3)).opts.label).toMatch(/^Tab: Storage › Store the clip › STEP 1\/1 Clip saved to storage/);
  await chooseNavigation(nav,'Tab','Overview');
+ await viewStrip.getByRole('tab',{name:'Answer',exact:true}).click();
+ await expect(root.locator('#section-reply')).toBeVisible();await expect(ring).toBeHidden();
+ await expect.poll(()=>placedKeys(page)).toEqual([]);
+ await viewStrip.getByRole('tab',{name:'Sequence',exact:true}).click();
  await expect(ringLine).toBeVisible();
- expect(await composeCount(page)).toBe(4);
- // A step chip click composes instead of stepping while comment mode is on.
- await root.locator('#section-ring .schip').nth(1).click();
- await expect.poll(()=>composeCount(page)).toBe(5);
- await expect(ringLine).toContainText('PIR sensor trips');
- // Leaving comment mode restores ordinary clicks.
+ expect(await composeCount(page)).toBe(2);
  await page.evaluate(()=>window.__comments.callbacks.mode(false));
  await expect(page.locator('html')).not.toHaveClass(/dv-commenting/);
- await root.locator('#section-ring .schip').nth(1).click();
- await expect(ringLine).toContainText('Chime plays');
- expect(await composeCount(page)).toBe(5);
+ await ringLine.click();
+ expect(await composeCount(page)).toBe(2);
 });
 
-// (iv) Without the capability the caption keeps no id (the shell would show a
-// missing-id anchor on every step); static subject ids are present regardless.
-test('without window.claude the caption has no id and clicks behave as before',async({page,server})=>{
+// (f) Without the capability the page is unchanged (step-comment-anchor.spec.mjs covers the caption).
+test('without window.claude the viewer keeps shell anchoring and ordinary clicks',async({page,server})=>{
  const root=await open(page,server),line=root.locator('#section-ring .stepline:not(.dv-caption-old)');
  await expect(line).toBeVisible();
  expect(await page.evaluate(()=>typeof window.claude)).toBe('undefined');
- await expect(line).toHaveAttribute('data-comment-target','');
- await expect(line).not.toHaveAttribute('id',/./);
  await expect(root.locator('#section-ring [data-comment-target]')).toHaveCount(1);
- await expect(root.locator('#section-ring .node[data-dv-node=door]')).toHaveAttribute('id','c-ring-node-door');
+ await expect(line).not.toHaveAttribute('id',/./);
+ await expect(root.locator('#section-ring .node[data-dv-node=door]')).toHaveAttribute('id',/^fs\d+-n-door$/);
  await root.locator('#section-ring .schip').nth(1).click();
  await expect(line).toContainText('Chime plays');
- await expect(line).not.toHaveAttribute('id',/./);
  await expect(page.locator('html')).not.toHaveClass(/dv-commenting/);
  await expect(page.locator('.dv-comment-ring')).toHaveCount(0);
 });
@@ -166,25 +156,5 @@ test('a refused customAnchors registration leaves the page inert',async({page,se
  await expect.poll(()=>page.evaluate(()=>window.__asked)).toEqual(['comments']);
  await root.locator('#section-ring .schip').nth(1).click();
  await expect(line).toContainText('Chime plays');
- await expect(line).not.toHaveAttribute('id',/./);
  await expect(page.locator('html')).not.toHaveClass(/dv-commenting/);
-});
-
-// The caption transition copy is a clone of the line; it must not duplicate the step id.
-test.describe('caption transition',()=>{
- test.use({reducedMotion:'no-preference'});
- test('the caption ghost never carries the step comment id',async({page,server})=>{
-  await page.addInitScript(stubClaude);
-  const root=await open(page,server),line=root.locator('#section-ring .stepline:not(.dv-caption-old)');
-  await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);
-  await expect(line).toHaveAttribute('id','c-ring-step-door-0');
-  await page.evaluate(()=>{window.__ghostIds=[];new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(n=>{if(n.classList && n.classList.contains('dv-caption-old'))window.__ghostIds.push(n.id);}))).observe(document.body,{childList:true,subtree:true});});
-  await root.locator('#section-ring .schip').nth(1).click();
-  await expect(line).toContainText('Chime plays');
-  await page.evaluate(()=>window.__comments.callbacks.threads([{id:'h',anchor:'#c-ring-step-door-1',resolved:false,active:false}]));
-  await expect(line).toHaveAttribute('id','c-ring-step-door-1');
-  const ghosts=await page.evaluate(()=>window.__ghostIds);
-  expect(ghosts.length).toBeGreaterThan(0);
-  expect(ghosts.every(id=>id==='')).toBe(true);
- });
 });

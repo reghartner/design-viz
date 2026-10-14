@@ -104,22 +104,24 @@ on a hidden Tab or View. When publishing a standalone Flowview page as a
 claude.ai artifact, declare
 `capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
 The page then places comment pins itself (`src/viewer/artifact-comments.js`):
-new comments are labelled Tab first (`Tab: … › View: … › section › excerpt`),
-threads on hidden Tabs, Views or steps are listed unplaced, and "Go to" selects
-the thread's Tab, View and step through the normal navigation (URL included)
-before scrolling to it. Document navigation (Tab, View and Contents controls)
-still works while comment mode is on.
 
-Standalone pages give every comment subject a fixed id derived from page data,
-which the shell stores as the anchor (`#<id>`): `c-<section>-heading`,
-`c-<section>-para-<n>`, `c-<section>-bullet-<n>`, `c-<section>-node-<node>`,
-`c-<section>-panel-<panel>` and the existing `contract-…` card and row ids.
-These survive View reordering and republishes that keep the same data. The
-step caption gets `c-<section>-step-<step>` only while custom anchors are
-registered, because the shell shows a comment whose id is missing at its saved
-position on every step. Without the declaration — and in saved files,
-Backstage and Confluence, where `window.claude` is absent — the shell's default
-anchoring is used and the caption keeps no id.
+- New comments are labelled Tab first (`Tab: … › View: … › section › excerpt`)
+  and anchored by the shell's own positional path for the clicked element.
+- A comment on the step caption is saved against the numbered step button of
+  the step shown at that moment; its label keeps the caption text and its pin
+  sits on that button.
+- Only rendered subjects are pinned: threads on hidden Tabs or Views, and step
+  threads while the diagram is in Ambient mode, are listed unplaced.
+- "Go to" selects the thread's Tab and View through the normal navigation (URL
+  included), expands collapsed prose, and for a step button puts the diagram
+  in Step mode on that step before scrolling to it.
+- Document navigation (Tab, View and Contents controls) and the stepper's
+  controls (numbered step buttons, previous/play/next, Ambient/Step, path
+  choices) keep working while comment mode is on.
+
+Without that declaration — and in saved files, Backstage and Confluence, where
+`window.claude` is absent — the module is inert and the shell's default
+anchoring is used.
 
 ## Existing documents and migration
 

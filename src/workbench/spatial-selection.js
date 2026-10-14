@@ -185,10 +185,10 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)!==topologyKey)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
-    var clearPlan=planClearCustomEdges(s.text,s.raw,{targets:routingTargets}),clearReason=clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null);
-    item('Clear Custom Edges',function(){opts.apply(clearPlan,null,s);},clearReason);
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
+    var clearPlan=planClearCustomEdges(s.text,s.raw,{targets:routingTargets}),clearReason=clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null);
+    item('Clear Custom Edges',function(){opts.apply(clearPlan,null,s);},clearReason);
     ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(plan.noop)announce('Every selected graph node is position-locked or already aligned; nothing moved.',shell);else opts.apply(plan,null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,fitReason(context()));

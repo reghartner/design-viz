@@ -94,7 +94,7 @@ PanelViews.register('table', function (host, panel, state, skin, states, stepIdx
   // Leave room for unset columns and the Change badge when fixed widths exceed the card.
   var minWidth = widths.reduce(function (total, width) { return total + (width || 80); }, 80);
   h +=
-    '<div class="swtablewrap" tabindex="0" role="region" aria-label="' +
+    '<div class="swtablewrap panel-fill-scroll" tabindex="0" role="region" aria-label="' +
     esc(panel.title || 'Data state') +
     '">' +
     '<table class="swtable' + (fixed ? ' swtable-fixed' : '') + '"' +

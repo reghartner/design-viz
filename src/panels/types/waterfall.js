@@ -79,7 +79,7 @@ PanelViews.register('waterfall', function (host, panel, state, skin, states, ste
       })
     : null;
   host._wfRevealed = wfNow;
-  h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
+  h += '<div class="wfall' + (wm.timed ? ' wf-timed panel-fill-scroll' : '') + '">';
   wm.rows.forEach(function (r) {
     h +=
       '<div class="wfrow' +

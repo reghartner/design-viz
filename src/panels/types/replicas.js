@@ -179,7 +179,7 @@ function replicaPanelHTML(panel, state) {
   var m = replicaModel(panel, state),
     ref = m.reference;
   var h =
-    '<div class="replicas-view"><div class="rep-reference"><b>' +
+    '<div class="replicas-view panel-fill-column"><div class="rep-reference"><b>' +
     (ref ? 'Reference ' + esc(String(ref.position)) + ' ' + esc(m.unit) : 'Reference unavailable') +
     '</b>' +
     (ref
@@ -195,7 +195,7 @@ function replicaPanelHTML(panel, state) {
       ' ' +
       esc(m.unit) +
       ' · dashed marker = reference</div>';
-  h += '<div class="rep-list" tabindex="0" role="region" aria-label="Replica observations">';
+  h += '<div class="rep-list panel-fill-scroll" tabindex="0" role="region" aria-label="Replica observations">';
   m.rows.forEach(function (r) {
     var comparison =
       r.comparison === 'equal'

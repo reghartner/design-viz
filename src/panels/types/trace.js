@@ -210,7 +210,7 @@ function tracePanelHTML(panel, state, states) {
     );
   var s = m.selected,
     duration = s.span.ms,
-    h = '<div class="tr-time">';
+    h = '<div class="tr-time panel-fill-column">';
   var serviceSteps = new Map(),
     spanServices = new Map();
   panel.spans.forEach(function (span) {
@@ -293,7 +293,7 @@ function tracePanelHTML(panel, state, states) {
     h += '<p class="tr-notice">' + esc(n) + '</p>';
   });
   h +=
-    '<div class="tr-ophead">Service operations · inclusive / uncovered</div><div class="tr-operations">';
+    '<div class="tr-ophead">Service operations · inclusive / uncovered</div><div class="tr-operations panel-fill-scroll">';
   m.rows.forEach(function (r) {
     var step = (states || []).findIndex(function (st) {
       return st && st.selected === r.span.id;

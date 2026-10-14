@@ -57,7 +57,7 @@ PanelViews.register('checks', function (host, panel, state, skin, states, stepId
     passed +
     ' / ' +
     checks.length +
-    ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
+    ' passed <span>Authored outcomes</span></div><ul class="swchecks panel-fill-scroll">';
   checks.forEach(function (check) {
     h +=
       '<li><div class="swcheckhead"><span>' +

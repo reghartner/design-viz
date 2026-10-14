@@ -83,6 +83,12 @@ packets and step highlights follow the resulting path. Pinning does not guarante
 that a path avoids every other card; drag the arrow to add smooth through-points (`curvePoints`) and use label nudges for crowded routes. Manual curves override avoidance and can be reset in Inspect.
 Float layouts use curve routing, as reported by validation when lanes are requested.
 
+Use **Clear Custom Edges** in an edge Inspector or its right-click menu to restore
+automatic entry, exit and curve routing without changing the connection type,
+label or label placement. A multi-selection clears selected edges plus edges
+incident to selected nodes; the section Inspector applies the same one-Undo action
+to the whole diagram. Imported provider edges stay read-only.
+
 The feature is shared by standalone HTML, native Backstage and Forge viewers.
 Exports advertise `layout.free-nodes` and `layout.edge-ports` compatibility
 capabilities so an older renderer can flag an incomplete display.

@@ -168,6 +168,17 @@ function commitCascade(planFor, opt){
     return applyPlan(planFor(parsed.raw), opt, parsed);
   }
 
+function clearCustomEdgesAction(scope,after){
+    var snapshot=parseEditor(),draft=snapshot.error?{error:snapshot.error}:planClearCustomEdges(snapshot.text,snapshot.raw,scope);
+    var button=actionButton('Clear Custom Edges',function(){
+      return commitCascade(function(raw){var plan=planClearCustomEdges(session.text(),raw,scope);return plan.noop?{error:'No authored custom edge geometry is in scope.'}:plan;},after?{after:after}:undefined);
+    });
+    var reason=draft.error || (draft.noop?'No authored custom edge geometry is in scope.':'');
+    button.disabled=!!reason;
+    button.title=reason || 'Restore automatic entry, exit, and curve routing while keeping connection meaning and label placement.';
+    return button;
+  }
+
 function commitValue(valueText){
     /* replace the selected element's WHOLE value (bullet string, paragraph) */
     var parsed = parseEditor();
@@ -2321,7 +2332,14 @@ function renderMultiInspector(multiSel){
     guide.appendChild(err);
     if(opts.spatialActions)opts.spatialActions(guide,formLife);
     var exportForm=multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})?topologyExportForm(multiSel):null;
-    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}finishForm(previous);return;}
+    if(!homogeneous){
+      if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}
+      if(multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})){
+        var mixedActions=actionGroup('Selected topology item actions','inspector-actions');
+        mixedActions.appendChild(clearCustomEdgesAction({targets:multiSel},function(){renderMultiInspector(multiSel);}));guide.appendChild(mixedActions);
+      }
+      finishForm(previous);return;
+    }
     var form = document.createElement('div');
     form.className = 'iform';
     var multiTopologyContext=session.topologyContext(),multiTopologyKey=JSON.stringify(multiTopologyContext),includesImported=false;
@@ -2376,6 +2394,7 @@ function renderMultiInspector(multiSel){
       }, {placeholder: 'lane id from page.lanes — empty removes'})));
     }
     var acts = actionGroup('Selected '+kind+' actions','inspector-actions');
+    if(kind==='node' || kind==='edge')acts.appendChild(clearCustomEdgesAction({targets:multiSel},function(){renderMultiInspector(multiSel);}));
     if(kind==='node' && !includesImported)acts.appendChild(actionButton('Create domain from selected nodes',function(){
       if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
         formError('Choose nodes from a single section to create a domain.');return;
@@ -2503,6 +2522,10 @@ function renderInspector(){
         guide.appendChild(connectImported);
       }
       var importedError=document.createElement('div');importedError.className='gerr ierr';importedError.hidden=true;guide.appendChild(importedError);
+      if(t.kind==='node' || t.kind==='edge'){
+        var importedActions=actionGroup('Imported topology actions','inspector-actions');
+        importedActions.appendChild(clearCustomEdgesAction({targets:[t]},renderInspector));guide.appendChild(importedActions);
+      }
       var arrangementContextKey=JSON.stringify(session.topologyContext());
       var resetArrangement=actionButton('Reset node arrangement',function(){
         if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==arrangementContextKey){formError('The source or provider context changed. Render and reselect before resetting.');return false;}
@@ -2587,6 +2610,8 @@ function renderInspector(){
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       var acts = actionGroup(g.title+' actions','inspector-actions');
+      if(t.kind==='edge' || t.kind==='node')acts.appendChild(clearCustomEdgesAction({targets:[t]},renderInspector));
+      if(t.kind==='section')acts.appendChild(clearCustomEdgesAction({all:true,section:t.section},renderInspector));
       if(t.kind==='document' && !builderDocumentPage(parsed.raw))acts.appendChild(actionButton('Add document settings',function(){
         return commitCascade(function(raw){return planWrapDocument(session.text(),raw);},{after:refreshFormSoon});
       }));

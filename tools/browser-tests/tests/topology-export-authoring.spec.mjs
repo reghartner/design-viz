@@ -24,7 +24,7 @@ test('local canvas selection creates, updates, renames and removes exports with 
   expect(created).toContain('"title" : "Export authoring"');await history(page,before,created);
   await selectPair(page);await edge(page,0).click({modifiers:['Shift']});
   await expect(page.locator('#guide')).toContainText('3 topology items selected');await expect(form(page)).toContainText('a->b');
-  await expect(page.locator('#guide > .inspector-actions')).toHaveCount(0);await expect(page.locator('#object-copy')).toBeDisabled();await expect(page.locator('#object-duplicate')).toBeDisabled();
+  const clear=page.locator('#guide > .inspector-actions').getByRole('button',{name:'Clear Custom Edges',exact:true});await expect(clear).toBeDisabled();await expect(clear).toHaveAttribute('title',/No authored custom edge geometry/);await expect(page.locator('#object-copy')).toBeDisabled();await expect(page.locator('#object-duplicate')).toBeDisabled();
   await page.keyboard.press('Delete');await expect(src).toHaveValue(created);
   await form(page).getByLabel('Topology export',{exact:true}).selectOption('delivery');await form(page).getByLabel('Export name',{exact:true}).fill('delivery-v2');
   await form(page).getByRole('button',{name:'Update export',exact:true}).click();const updated=await src.inputValue();

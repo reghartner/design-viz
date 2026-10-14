@@ -115,6 +115,34 @@ test('messages can refresh Inspector content without revealing its disclosure',(
   assert.equal(h.guide.hidden,false);assert.equal(h.guide.children[0].textContent,'history message');
 });
 
+test('edge, mixed selection, and section inspectors clear authored custom routing in one undo step',()=>{
+  function spec(){return {page:{blocks:[{heading:'Flow',diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[
+    {from:'a',to:'b',fromPort:{side:'right'},curvePoints:[{t:.5,dx:20,dy:10}],label:'AB',labelAt:.3,labelDx:7,labelDy:8},
+    {from:'b',to:'c',kind:'mqtt'},
+    {from:'c',to:'a',toPort:{side:'top'},ret:true}
+  ]}}]}};}
+  const e=environment(),single=e.mount(spec()),before=single.text;single.session.target={kind:'edge',section:0,index:0};single.inspector.render();
+  const edgeAction=single.guide.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.ok(edgeAction);assert.equal(edgeAction.disabled,false);edgeAction.fire('click');
+  const cleared=JSON.parse(single.text).page.blocks[0].diagram.edges[0];assert.equal(cleared.fromPort,undefined);assert.equal(cleared.curvePoints,undefined);
+  assert.deepEqual(cleared,{from:'a',to:'b',label:'AB',labelAt:.3,labelDx:7,labelDy:8});assert.equal(single.session.undo(),true);assert.equal(single.text,before);assert.equal(single.session.canUndo(),false);
+
+  const mixed=e.mount(spec());mixed.inspector.renderMulti([{kind:'node',section:0,id:'a'},{kind:'edge',section:0,index:1,key:'b->c'}]);
+  const mixedAction=mixed.guide.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.ok(mixedAction);assert.equal(mixedAction.disabled,false);mixedAction.fire('click');
+  const mixedEdges=JSON.parse(mixed.text).page.blocks[0].diagram.edges;assert.equal(mixedEdges[0].fromPort,undefined);assert.equal(mixedEdges[2].toPort,undefined);assert.deepEqual(mixedEdges[1],{from:'b',to:'c',kind:'mqtt'});
+
+  const section=e.mount(spec());section.session.target={kind:'section',section:0};section.inspector.render();const all=section.guide.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');
+  assert.ok(all);assert.equal(all.disabled,false);all.fire('click');assert.equal(JSON.parse(section.text).page.blocks[0].diagram.edges.some(edge=>edge.fromPort || edge.toPort || edge.curvePoints),false);
+  const disabled=section.guide.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.equal(disabled.disabled,true);assert.match(disabled.title,/No authored custom edge geometry/);
+});
+
+test('clear custom edges inspector action is disabled when only provider-owned geometry is selected',()=>{
+  const spec={nodes:{'p::a':{},'p::b':{}},rows:[['p::a','p::b']],edges:[{from:'p::a',to:'p::b',curvePoints:[{t:.5,dx:10,dy:20}],label:'provider'}],
+    topologyProvenance:{version:1,imports:[{spec:'provider',export:'main',as:'p',position:{x:0,y:0},nodes:['p::a','p::b'],edges:['p::a->p::b'],groups:[]}]}};
+  const e=environment(),h=e.mount(spec);h.session.target={kind:'edge',section:0,index:0};h.inspector.render();
+  const action=h.guide.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.ok(action);assert.equal(action.disabled,true);assert.match(action.title,/No authored custom edge geometry/);
+  const before=h.text;action.fire('click');assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
 test('palette-created simple panels expose typed starting state with sparse exact history',()=>{
   const e=environment(),empty={nodes:{},rows:[[]]},added=e.C.planAddPanel(JSON.stringify(empty),empty,0,'gauge');
   assert.equal(added.error,undefined);

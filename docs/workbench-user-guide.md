@@ -62,9 +62,10 @@ otherwise opens the same standalone SVG as selected text for manual copy. Invali
 source may keep the last usable preview; the export message calls that out
 explicitly.
 
-Drop a Flowview `.spec.json`/`.json`, Mermaid `.mmd`/`.mermaid`, or Markdown
-file containing a Mermaid sequence or flowchart onto Welcome or the open Workbench. The File
-panel's **import Flowview / Mermaid…** button provides the same keyboard route.
+Drop a Flowview `.spec.json`/`.json`, Mermaid `.mmd`/`.mermaid`, Markdown
+file containing a Mermaid sequence or flowchart, or draw.io `.drawio`/`.xml`
+onto Welcome or the open Workbench. The File panel's
+**import Flowview / Mermaid / draw.io…** button provides the same keyboard route.
 Flowview inspects the bounded local file in your browser and shows its detected
 type and a short summary before anything changes. Choose **Import** once to
 continue, or **Cancel**/Escape to leave the current document and Undo history
@@ -95,12 +96,46 @@ Whole-file/inline import allows 4 MiB; additive import allows 2 MiB.
 These additions apply to the browser; `tools/mermaid2spec.py` remains
 sequence-only.
 
+draw.io browser import accepts a bare `mxGraphModel` or an `mxfile` containing
+plain XML, compressed pages, or both. All pages become sections in a whole-file
+import; **Add / Paste diagram** lets you select one source page to add to the
+current canvas. Compressed pages decode locally using raw DEFLATE; a browser
+without that capability asks for uncompressed XML instead.
+
+Explicit labels, directed connections, ordinary group/swimlane hierarchy,
+visible layers, and node centers (including parent offsets) are retained.
+Source-only arrows reverse the native connection. Native cards and routing
+replace shapes, sizes, formatting and style; the preview explains the
+conversion before confirmation. Text-only shapes become labeled cards.
+Basic HTML formatting (`b`, `strong`, `i`, `em`, `u`, `s`, `span`, `font`, `div`,
+`p`, `br`) becomes inert plain text. User-object metadata, notes, and links
+are omitted with a warning. No resource, script or hyperlink is loaded or run.
+
+The importer rejects hidden/collapsed content, relative vertices and ports,
+complex/custom containers or shapes, group/edge endpoints, separate child
+edge-label cells, dangling or parallel connections, undirected/bidirectional
+arrows, and semantic markers such as crow's feet, diamonds or circles.
+It also rejects images, custom stencils/libraries, background images,
+rotated/flipped geometry, dynamic placeholders, math, custom stylesheets,
+DOCTYPE/entities, active HTML, and embedded `.drawio.png`/SVG/PDF carriers.
+Export plain supported shapes and put connection labels on the edge itself
+before importing. Unsupported content is refused as a whole, never silently
+partially imported.
+
+The existing 4 MiB whole-file and 2 MiB additive limits apply. Decoding is bounded
+before buffering: all pages together may use at most 8 MiB of inflated
+URI-encoded bytes plus plain XML bytes. Limits also include 20 pages, 1,000
+cells, 500 nodes, 1,000 connections, 64 groups, 32 parent levels, 1,000-character
+labels, and coordinates within ±100,000 after parent offsets. Changing the
+input, source, project or destination, or closing the additive preview, retires
+pending decoding and preserves the current source.
+
 Both keeps the stamped authored JSON and creates a separate
 read-only HTML snapshot of the current page. Shared topology stays referenced
 in JSON; the HTML contains the visible resolved nodes and edges with no provider
 context or topology declarations/provenance. Local providers can export offline
 once the viewer template is available. Imported consumers require their approved
-frozen providers already loaded in Workbench; **Import Flowview / Mermaid…**, opening an agent
+frozen providers already loaded in Workbench; **Import Flowview / Mermaid / draw.io…**, opening an agent
 diagram folder, or opening from Canon acquires them from the approved catalog.
 The exported HTML then opens without those sources and never refreshes itself.
 

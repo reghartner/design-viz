@@ -4,6 +4,7 @@ function builderDiagramImportRecognized(text){
   if(typeof text!=='string')return false;
   var value=text.trim();
   if(new TextEncoder().encode(value).byteLength>BUILDER_CLIPBOARD_LIMIT)return false;
+  if(drawioImportRecognized(value))return true;
   if(/^(?:(?:%%[^\n]*\n)\s*)*(?:sequenceDiagram|flowchart|graph)(?:\s|$)/.test(value) || /^```mermaid\s*$/m.test(value))return true;
   if(value[0]!=='{' || new TextEncoder().encode(value).byteLength>BUILDER_CLIPBOARD_LIMIT)return false;
   try{var raw=JSON.parse(value);return specSectionPaths(raw).some(function(rec){var d=specValueAt(raw,rec.diagram);return d && builderClipboardObject(d.nodes) && Array.isArray(d.rows);});}catch(ex){return false;}
@@ -21,6 +22,13 @@ function prepareBuilderDiagramImport(text){
     }).filter(Boolean);
     if(!sections.length)throw new Error('This source contains no diagrams.');
     return {raw:raw,sections:sections,todos:todos};
+  }catch(ex){return {error:ex.message};}
+}
+async function prepareBuilderDiagramImportAsync(text,options){
+  if(!drawioImportRecognized(text))return prepareBuilderDiagramImport(text);
+  try{
+    var raw=await drawioToSpec(text,Object.assign({},options,{maxBytes:BUILDER_CLIPBOARD_LIMIT}));
+    return {raw:raw,sections:raw.page.sections.map(function(section,index){return {index:index,label:section.heading};}),todos:raw.todos};
   }catch(ex){return {error:ex.message};}
 }
 function planAddBuilderDiagram(text,raw,source,sourceSection,destination,point,validateSource){

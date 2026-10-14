@@ -19,6 +19,7 @@ assets=build.entrypoint_assets('workbench')
 styles={item['key']:item['source'] for item in assets['styles']}
 facade='''
 window.__editorTest={
+  parseDrawio:drawioToSpec,
   get builder(){return workbenchBuilder;},
   remount:function(){
     workbenchBuilder=initWorkbenchBuilder({view:view,src:src,workspace:workspace,deferInitialSave:true,

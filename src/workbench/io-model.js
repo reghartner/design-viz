@@ -317,6 +317,25 @@ function prepareFlowviewFileImport(meta,text,check){
   throw Error('Unsupported file. Choose Flowview .spec.json/.json, Mermaid .mmd/.mermaid, or Markdown containing a Mermaid diagram.');
 }
 
+/* Existing JSON/Mermaid callers retain their synchronous contract. XML decoding
+   is selected only by the browser adapter, whose owner supplies cancellation. */
+function drawioImportRecognized(text){
+  if(typeof text!=='string')return false;var offset=0,end;
+  while(offset<text.length){
+    if(/\s/.test(text[offset])){offset++;continue;}
+    if(text.slice(offset,offset+4)==='<!--'){end=text.indexOf('-->',offset+4);if(end<0)return false;offset=end+3;continue;}
+    if(text.slice(offset,offset+5)==='<?xml'){end=text.indexOf('?>',offset+5);if(end<0)return false;offset=end+2;continue;}break;
+  }
+  return /^<(?:mxfile|mxGraphModel|!DOCTYPE|!ENTITY)\b/i.test(text.slice(offset,offset+32));
+}
+async function prepareFlowviewFileImportAsync(meta,text,check,options){
+  if(!drawioImportRecognized(text) && !/\.(?:drawio|xml)$/i.test(meta && meta.name || ''))return prepareFlowviewFileImport(meta,text,check);
+  if(meta && typeof meta.size==='number' && (meta.size<0 || meta.size>FLOWVIEW_IMPORT_MAX_BYTES))throw Error('Use a file no larger than 4 MiB.');
+  var converted=await drawioToSpec(text,Object.assign({},options,{maxBytes:FLOWVIEW_IMPORT_MAX_BYTES}));
+  (check || importValidate)(converted);
+  return {name:meta && meta.name || 'draw.io XML',kind:'drawio',type:'draw.io XML',text:JSON.stringify(converted,null,2),raw:converted,summary:flowviewImportSummary(converted),todos:converted.todos.slice()};
+}
+
 /* ---------------- durability: filenames ---------------- */
 
 function specFileName(raw){

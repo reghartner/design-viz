@@ -82,14 +82,9 @@ function initSectionLayoutEditor(opts){
     var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' view arrangement · Undo restores the previous arrangement.');
     return ok;
   }
-  function presentation(index){
-    var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
-    // Automatic diagrams have an Explore viewport before their first saved
-    // section arrangement exists. That viewport still needs the same author
-    // seam as an already named arrangement.
-    return rec && (rec.presentation || rec.viewport);
-  }
-  function activeLayout(index){return sectionLayoutActiveId(presentation(index));}
+  function record(index){var ctl=opts.ctl && opts.ctl();return ctl && ctl.sections.find(function(r){return r.number===index+1;});}
+  function presentation(index){var rec=record(index);return rec && rec.presentation;}
+  function activeLayout(index){var rec=record(index);return sectionLayoutActiveId(rec && (rec.presentation || rec.viewport));}
   function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
   function currentItems(index,d){return sectionLayoutItems(d || rawDiagram(index),profile,activeLayout(index));}
   function forceLayout(index){
@@ -338,8 +333,11 @@ function initSectionLayoutEditor(opts){
       section.classList.toggle('section-arranging',editing===index);
       if(actions.showPopover){if(editing===index && !actions.matches(':popover-open'))actions.showPopover();else if(editing!==index && actions.matches(':popover-open'))actions.hidePopover();}
       var p=presentation(index);if(p && p.setLayoutTarget)p.setLayoutTarget(profile);if(p && p.setArranging)p.setArranging(editing===index);
-      var setExploreAuthor=p && (p.setExploreAuthor || p.setAuthor);
-      if(setExploreAuthor)setExploreAuthor.call(p,{
+      // Automatic diagrams have an Explore viewport before their first saved
+      // section arrangement exists. Only the author seam and active identity
+      // fall back to that viewport; arrangement controls use the presentation.
+      var rec=record(index),authorTarget=p || rec && rec.viewport,setExploreAuthor=authorTarget && (authorTarget.setExploreAuthor || authorTarget.setAuthor);
+      if(setExploreAuthor)setExploreAuthor.call(authorTarget,{
         begin:function(id){
           if(!ready() || activeLayout(index)!==id)return false;
           var focused=document.activeElement,host=focused && focused.closest('.explore-window,.explore-player');

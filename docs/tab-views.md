@@ -13,7 +13,7 @@ and utilities above centered **‹ Page n of m ›** controls.
 View choices remain available when Contents is closed; on narrow screens they
 wrap within the first header bar. Arrow keys move between View choices, and
 Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**; full section titles appear
-under Explore Views. In Standard, Page arrows scroll through the intact stack;
+under Standard Views and under expanded Explore Views. In Standard, a section title or Page arrow scrolls through the intact stack;
 in Explore they select only the current View’s ordered members. Desktop Contents
 pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
 Escape closes an open menu first, then Contents, returning focus to its trigger.

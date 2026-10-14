@@ -96,6 +96,33 @@ View. Native `navigate({section, view})` rejects a mismatched explicit pair;
 omitting `view` deliberately chooses an eligible View if needed. Native snapshots
 report the canonical View ID. Back/Forward retain View and member selection.
 
+## Comments on claude.ai artifacts
+
+Inactive Tabs and Views are hidden, so the claude.ai shell's default comment
+anchoring cannot show which Tab a comment is on and cannot "Go to" a comment
+on a hidden Tab or View. When publishing a standalone Flowview page as a
+claude.ai artifact, declare
+`capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
+The page then places comment pins itself (`src/viewer/artifact-comments.js`):
+
+- New comments are labelled Tab first (`Tab: … › View: … › section › excerpt`)
+  and anchored by the shell's own positional path for the clicked element.
+- A comment on the step caption is saved against the numbered step button of
+  the step shown at that moment; its label keeps the caption text and its pin
+  sits on that button.
+- Only rendered subjects are pinned: threads on hidden Tabs or Views, and step
+  threads while the diagram is in Ambient mode, are listed unplaced.
+- "Go to" selects the thread's Tab and View through the normal navigation (URL
+  included), expands collapsed prose, and for a step button puts the diagram
+  in Step mode on that step before scrolling to it.
+- Document navigation (Tab, View and Contents controls) and the stepper's
+  controls (numbered step buttons, previous/play/next, Ambient/Step, path
+  choices) keep working while comment mode is on.
+
+Without that declaration — and in saved files, Backstage and Confluence, where
+`window.claude` is absent — the module is inert and the shell's default
+anchoring is used.
+
 ## Existing documents and migration
 
 Loading old documents never rewrites source. Direct sections form an implicit

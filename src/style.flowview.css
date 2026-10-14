@@ -35,3 +35,9 @@ body.sk-daylight{background:#F4F2EC;}
 .layer-lock[aria-pressed="true"]{color:var(--ink);background:color-mix(in srgb,var(--acc) 15%,transparent);}
 .layer-select:focus-visible,.layer-lock:focus-visible,.layer-row-lock:focus-visible{outline:2px solid var(--acc);outline-offset:1px;}
 .layers-empty{margin:12px 0;}
+/* claude.ai comment mode with page-owned anchors: the shell's pin cursor and
+   hover ring stand down inside the artifact, so the page supplies both.
+   Document navigation stays an ordinary control surface. */
+html.dv-commenting .docview>:not(.explore-navigation),html.dv-commenting .docview>:not(.explore-navigation) :not([role="tab"]){cursor:crosshair;}
+.dv-comment-ring{position:fixed;z-index:2147483646;pointer-events:none;box-sizing:border-box;border:2px solid var(--acc,#2f6fde);border-radius:4px;background:color-mix(in srgb,var(--acc,#2f6fde) 8%,transparent);}
+.dv-comment-ring[hidden]{display:none;}

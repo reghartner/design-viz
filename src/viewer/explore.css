@@ -37,6 +37,16 @@
 .explore-window-body{flex:none;min-height:0;width:calc(100% / var(--explore-overlay-scale,1));height:calc((100% - 32px) / var(--explore-overlay-scale,1));transform:scale(var(--explore-overlay-scale,1));transform-origin:top left;overflow:auto;overscroll-behavior:contain;container-type:inline-size;}
 body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-box;width:100%;max-width:none;min-width:0;min-height:100%;margin:0;border:0;border-radius:0;padding:8px;box-shadow:none;}
 .explore-window-body>.pwidget>.ptitle{display:none;}
+/* Once a reader or author resizes a panel, its opted-in content region owns
+   overflow and follows the window in both directions. Automatic windows stay
+   intrinsic so their initial content measurement remains stable. */
+@media screen{
+  .explore-window:not(.explore-window-automatic)>.explore-window-body>.pwidget:has(.panel-fill-scroll){display:flex;flex-direction:column;height:100%;overflow:hidden;}
+  .explore-window:not(.explore-window-automatic)>.explore-window-body>.pwidget:has(.panel-fill-scroll)>.pbody{display:flex;flex:1;min-height:0;flex-direction:column;overflow:auto;}
+  .explore-window:not(.explore-window-automatic) .pbody:has(.panel-fill-scroll)>.swpanel,
+  .explore-window:not(.explore-window-automatic) .panel-fill-column{display:flex;flex:1;min-height:0;flex-direction:column;}
+  .explore-window:not(.explore-window-automatic) .panel-fill-scroll{flex:1;min-height:0;max-height:none;}
+}
 .explore-prose-window .sec-prose{box-sizing:border-box;width:100%;min-width:0;padding:12px 14px 24px;color:var(--dtext);font:16px/1.55 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
 .docview .section-viewport .explore-prose-window .sec-text,.docview .section-viewport .explore-prose-window .sec-bullets{font-size:16px;line-height:1.55;}
 .docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-prose,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-text,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-bullets{font-size:clamp(19px,calc(40px - 1.09375vw),26px);}

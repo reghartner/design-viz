@@ -397,6 +397,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
     w.el.classList.toggle('explore-stacked',w.state.stacked);
+    w.el.classList.toggle('explore-window-automatic',!!w.state.automatic);
     var sizing=canvasSizing(w),instruction=sizing && sizing.mode==='fixed-aspect'?'; visual proportions stay fixed; panel height fits content':sizing?'; height fits content from its width':'';
     w.resize.setAttribute('aria-label','Resize '+w.label+instruction+'; use arrow keys');
   }

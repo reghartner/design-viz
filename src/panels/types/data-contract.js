@@ -62,7 +62,7 @@
     panel = content(panel, state);
     var cols = columns(panel), rows = fields(panel), firstWidth = width(panel.fieldWidth, 180);
     var total = cols.reduce(function (sum, col) { return sum + width(col.width, 160); }, firstWidth);
-    var h = '<div class="dcontract-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data contract') + '">' +
+    var h = '<div class="dcontract-scroll panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data contract') + '">' +
       '<table class="dcontract-table" style="width:' + total + 'px"><caption class="dcontract-caption">' + esc(panel.title || 'Data contract') +
       '</caption><colgroup><col style="width:' + firstWidth + 'px">';
     cols.forEach(function (col) { h += '<col style="width:' + width(col.width, 160) + 'px">'; });

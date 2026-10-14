@@ -18,6 +18,8 @@ pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
+Opening **Arrange selected section…** preserves the current View, every saved arrangement, and the visible positions; it does not optimize or write JSON. Saved grids can be dragged immediately. A legacy Home/Data flow presentation without an active grid stays visible; choose **Optimize layout** to create an editable grid explicitly.
+
 To arrange a Standard view, choose **View → Arrange selected section…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a 24-column grid. Overlapping tiles move down to remain visible. Choose
@@ -55,7 +57,7 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
 - Tab to a grab bar and use arrow keys to move; Shift + arrows resize. Arrow
   keys on the resize handle resize directly.
 - Choose an element in the arrangement controls and edit **Column**, **Row**,
-  **Width**, and **Height** for precise placement or phone editing. Column and
+  **Width**, and **Height** for precise desktop placement. Column and
   Row are displayed starting at 1. Width is in columns; height is in grid rows.
 - **Optimize layout** saves a starting arrangement for the selected arrangement profile.
   It arranges only visible elements and preserves hidden panels and Data flow

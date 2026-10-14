@@ -168,7 +168,11 @@ function initSectionLayoutEditor(opts){
     var rec=sectionScope(section);rec.fields.destroy();rec.fields=createWorkbenchLifetime();var fieldLife=rec.fields;controlsLife=fieldLife;
     var row=section.querySelector('.section-arrange-fields');if(!row)return;row.replaceChildren();
     var index=Number(section.getAttribute('data-dv-section')),id=activeLayout(index),definition=sectionLayoutDefinition(d,id);
-    var items=currentItems(index,d);if(!items)return;
+    var items=currentItems(index,d),p=presentation(index);
+    if(!items || p && p.mode()!=='layout'){
+      row.appendChild(el('p','fnote','This section has no active grid arrangement. Choose Optimize layout to create an editable grid from the current content.'));
+      return;
+    }
     var explore=definition && definition.presentation==='explore';
     if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this View with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
     var dock=sectionLayoutDock(items);
@@ -286,9 +290,9 @@ function initSectionLayoutEditor(opts){
           if(!ready())return;
           if(editing===index){endEditing();refresh();var trigger=view.querySelector('.explore-navigation .section-view-options>summary') || section.querySelector('.section-view-options>summary');if(trigger)trigger.focus({preventScroll:true});return;}
           arrangementDisclosure.reset();editing=index;selected='diagram';if(opts.pause)opts.pause();
-          var current=rawDiagram(index),items=currentItems(index,current);
-          if(!Array.isArray(current.layouts)){opts.ensureView(index,profile);return;}
-          forceLayout(index);refresh();
+          // Opening Arrange is workspace state only. Keep the current View,
+          // authored grid and legacy Home/Data flow presentation untouched.
+          refresh();
         });arrange.setAttribute('data-arrange-toggle','');controls.appendChild(arrange);
         var disclosure=button('Hide arrangement controls',function(){arrangementDisclosure.toggle();refresh();});disclosure.setAttribute('data-arrange-disclosure','');controls.appendChild(disclosure);
         var profileLabel=el('label',null,'Arrangement profile '),profileSelect=el('select');profileSelect.setAttribute('aria-label','Arrangement profile');
@@ -297,10 +301,10 @@ function initSectionLayoutEditor(opts){
         actionsLife.listen(profileSelect,'change',function(){if(!ready()){profileSelect.value=profile;return;}cancel();profile=profileSelect.value;forceLayout(index);refresh();profileSelect.focus({preventScroll:true});});
         controls.appendChild(button('Optimize layout',function(){
           if(!ready())return;editing=index;
-          if(!Array.isArray(rawDiagram(index).layouts)){opts.ensureView(index,profile);return;}
           var current=rawDiagram(index),items=currentItems(index,current),p=presentation(index);
-          if(sectionLayoutDefinition(current,activeLayout(index)).presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
-          persist(index,sectionLayoutOptimize(current,profile,items));
+          var definition=sectionLayoutDefinition(current,activeLayout(index));
+          if(definition && definition.presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
+          if(persist(index,sectionLayoutOptimize(current,profile,items))){forceLayout(index);refresh();}
         }));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;var p=presentation(index),v=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));if(v && v.presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}endEditing();persist(index,null);}));
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
@@ -351,7 +355,7 @@ function initSectionLayoutEditor(opts){
       });
       section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
       if(editing===index){
-        forceLayout(index);fields(section,d);
+        fields(section,d);
         if(!definition || definition.presentation!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
           if(!tile.querySelector('.section-tile-move')){
             var name=tile.getAttribute('data-layout-label');

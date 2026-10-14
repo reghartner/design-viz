@@ -6,7 +6,10 @@ test.use({reducedMotion:'no-preference'});
 test('copied production Forge resource imports, saves and reloads through only the simulated bridge',async({page,context,server})=>{
   const raw=JSON.parse(await readFile(path.join(repo,'src/starters/homemap-story.json'),'utf8')),diagram=raw.page.sections[0].diagram;
   diagram.autoplay=false;diagram.nodes.camera.link='https://example.com/hld';
-  diagram.sectionLayout={confluence:[{panel:'home',x:0,y:0,w:8,h:16},{x:8,y:0,w:4,h:16},{controls:'steps',attachTo:'panel:home',x:0,y:16,w:8,h:6}]};
+  diagram.layouts=[
+    {id:'resident',name:'Resident story',sectionLayout:{confluence:[{panel:'home',x:0,y:0,w:8,h:16},{x:8,y:0,w:4,h:16},{controls:'steps',attachTo:'panel:home',x:0,y:16,w:8,h:6}]}},
+    {id:'flow',name:'Data flow',sectionLayout:{confluence:[{x:0,y:0,w:12,h:16},{panel:'home',x:0,y:22,w:12,h:16},{controls:'steps',attachTo:'diagram',x:0,y:16,w:12,h:6}]}},
+  ];diagram.defaultLayout='resident';
   async function open(page,configuring,config={}){
     await page.addInitScript(({configuring,config})=>{
       window.__calls=[];window.__bridge={callBridge:async(method,payload)=>{
@@ -28,10 +31,10 @@ test('copied production Forge resource imports, saves and reloads through only t
   await expect(published.locator('#configuration')).toBeHidden();await expect(published.locator('#spec-editor')).toHaveCount(0);
   await expect(published.locator('.hmframe')).toBeVisible();const grid=published.locator('.section-layout-grid');await expect(grid).toHaveAttribute('data-layout-target','confluence');
   await published.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();await expect(published.locator('.stepline')).toContainText('STEP 3/4');
-  const caption=await published.locator('.stepline').innerText();await published.locator('[data-view-focus="flow"]').click();await expect(grid).toBeHidden();
+  const caption=await published.locator('.stepline').innerText();await published.locator('[data-view-layout][data-layout-id="flow"]').click();await expect(grid).toBeVisible();await expect(grid).toHaveAttribute('data-layout-id','flow');
   await published.locator('a[href="https://example.com/hld"]').click();await published.waitForFunction(()=>__calls.some(c=>c.method==='navigate'));
   expect(await published.evaluate(()=>__calls.find(c=>c.method==='navigate').payload)).toEqual({url:'https://example.com/hld',type:'new-tab'});
-  await published.locator('[data-view-layout]').click();await expect(grid).toBeVisible();await expect(published.locator('.stepline')).toHaveText(caption,{useInnerText:true});await expect(published.locator('.termbar')).toHaveCount(1);
+  await published.locator('[data-view-layout][data-layout-id="resident"]').click();await expect(grid).toBeVisible();await expect(grid).toHaveAttribute('data-layout-id','resident');await expect(published.locator('.stepline')).toHaveText(caption,{useInnerText:true});await expect(published.locator('.termbar')).toHaveCount(1);
   await published.locator('.playback-button').click();await expect(published.locator('.playback-status')).toContainText('Playing');
   await published.locator('.playback-button').click();await expect(published.locator('.playback-status')).toHaveText('Paused');
 });

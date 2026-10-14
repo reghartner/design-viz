@@ -41,7 +41,7 @@ for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view 
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('default');await expect(section(page)).toHaveAttribute('data-view-id',flow);
   await page.locator('#workspace-appearance>summary').click();
   await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture(kind),null,2));await prepareEditorSurface(page);
-  await expect(section(page)).toHaveAttribute('data-view-id',kind==='named'?'home-story':kind==='single layout'?'layout':'home');
+  await expect(section(page)).toHaveAttribute('data-view-id',kind==='named'?'home-story':'home');
 });
 
 test('removing the selected view uses the remaining authored default',async({page,server})=>{

@@ -49,7 +49,7 @@ test('hash navigation restores named views without history-dependent filters or 
  await page.evaluate(()=>{location.hash='d=front-door';});await expect(selected(page)).toHaveAttribute('data-layout-id','home-story');
 });
 
-test('legacy Home, Data flow and single-layout aliases work, while named IDs take precedence',async({page,server})=>{
+test('legacy Home and Data flow preserve saved geometry, while named IDs take precedence',async({page,server})=>{
  const spec=structuredClone(named),d=spec.page.sections[0].diagram;delete d.layouts;delete d.defaultLayout;
  const url=await build(server,spec,'legacy-views');
  await page.goto(url+'#d=front-door&v=flow&m=step&s=notify');await expect(page.locator('#section-front-door')).toHaveAttribute('data-view-id','flow');
@@ -58,9 +58,9 @@ test('legacy Home, Data flow and single-layout aliases work, while named IDs tak
  await page.reload();await expect(page.locator('[data-view-focus="panel"]')).toHaveAttribute('aria-pressed','true');
  d.sectionLayout=named.page.sections[0].diagram.layouts[0].sectionLayout;
  const layoutURL=await build(server,spec,'legacy-layout');await page.goto(layoutURL+'#d=front-door&v=home');
- await expect(page.locator('#section-front-door')).toHaveAttribute('data-view-id','layout');expect(viewOf(page)).toBe('layout');
+ await expect(page.locator('#section-front-door')).toHaveAttribute('data-view-id','home');expect(viewOf(page)).toBe('home');
  await page.getByRole('button',{name:'Data flow',exact:true}).click();await expect.poll(()=>viewOf(page)).toBe('flow');await page.reload();
- await expect(page.locator('.section-layout-grid')).toBeHidden();await expect(page.locator('.board')).toBeVisible();
+ await expect(page.locator('.section-layout-grid')).toBeVisible();await expect(page.locator('.board')).toBeHidden();await expect(page.locator('[data-view-layout]')).toHaveCount(0);
  const collision=structuredClone(named),cd=collision.page.sections[0].diagram;cd.layouts[1].id='home';
  const collisionURL=await build(server,collision,'named-home');await page.goto(collisionURL+'#d=front-door&v=home');
  await expect(selected(page)).toHaveText('Service flow');await expect(page.locator('.board')).toBeVisible();

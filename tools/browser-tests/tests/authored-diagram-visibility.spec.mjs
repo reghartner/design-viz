@@ -50,11 +50,14 @@ for(const width of [1280,1800])test('chapter diagram visibility saves and restor
 });
 for(const savedLayout of [false,true])test('legacy '+(savedLayout?'saved':'automatic')+' chapters gain undoable visibility without a reader reveal override',async({page,server})=>{
   const d=structuredClone(seed.page.sections[0].diagram);delete d.layouts;delete d.defaultLayout;
-  if(savedLayout)d.sectionLayout=structuredClone(seed.page.sections[0].diagram.layouts[0].sectionLayout);
+  if(savedLayout){
+    d.sectionLayout=structuredClone(seed.page.sections[0].diagram.layouts[0].sectionLayout);
+    d.sectionLayout.default.forEach(item=>{if(!item.panel&&!item.controls)delete item.hidden;});
+  }
   d.autoplay=false;const raw={page:{sections:[{heading:'Legacy story',diagram:d}]}};
   await open(page,server,raw);const initial=await source(page);
   await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true}).click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
-  expect(saved.layouts.map(v=>v.id)).toEqual([savedLayout?'layout':'home','flow']);expect(saved.layouts[1].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
+  expect(saved.layouts.map(v=>v.id)).toEqual(['home','flow']);expect(saved.layouts[1].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
   await expect(section(page).locator('.board')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(section(page).locator('.board')).toBeVisible();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);await expect(section(page).locator('.board')).toBeHidden();

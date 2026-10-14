@@ -20,9 +20,9 @@ test('Explore keeps the graph through playback and Standard restores authored vi
   await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);
 });
 
-test('legacy Data flow and saved layout remain curated until their View type changes',async({page,server})=>{
+test('authored Data flow and Layout remain curated until their View type changes',async({page,server})=>{
   const spec=await named(),d=spec.page.sections[0].diagram;
-  d.sectionLayout=d.layouts[0].sectionLayout;delete d.layouts;delete d.defaultLayout;d.autoplay=false;
+  d.layouts[0].name='Layout';d.layouts[1].name='Data flow';d.layouts.forEach(view=>view.presentation='standard');d.autoplay=false;
   const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);await prepareEditorSurface(page);
   const section=page.locator('#docview .doc-sec').first();
   await nav(page).getByRole('button',{name:'Data flow',exact:true}).click();

@@ -30,7 +30,7 @@ test('new single-file HTML works offline with exact composed navigation and loca
     };
   });
   const hash='#t=distance-gate&d=alert-only-inside-15-feet&m=step&s=6&c=alert-only-inside-15-feet&r=2';
-  const canonicalHash=hash.replace('&m=step','&v=flow&m=step');
+  const canonicalHash=hash.replace('&m=step','&v=standard&m=step');
   await page.goto(pathToFileURL(path.join(server.root,'standalone.html')).href+hash);
   const row=page.locator('#contract-alert-only-inside-15-feet-row-2');
   await expect(row).toHaveClass(/dv-hash-target/);await expect(row).toBeFocused();await expect(row).toBeInViewport();

@@ -121,7 +121,8 @@ test('teaching flow keeps camera shutdown, health delivery, missed visits and re
   assert.deepEqual(plain(validate(spec)),{errors:[],warnings:[]});
   const d=spec.page.sections[0].diagram,byId=id=>d.panels.find(p=>p.id===id);
   assert.equal(d.autoplay,false);
-  assert.ok(d.sectionLayout.default.some(t=>!t.panel&&!t.controls),'Both views retain the topology');
+  assert.deepEqual(d.layouts.map(v=>v.name),['At the door','Data flow']);
+  assert.ok(d.layouts.find(v=>v.id===d.defaultLayout).sectionLayout.default.some(t=>!t.panel&&!t.controls),'Both views retain the topology');
   for(const id of ['hot','cold']){
     const active=C.diagramForPath(d,id),folded=C.foldPanelStates(active);
     const index=suffix=>active.steps.findIndex(s=>s.id===id+'-'+suffix);

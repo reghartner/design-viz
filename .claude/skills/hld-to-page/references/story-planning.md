@@ -139,7 +139,7 @@ physical continuity and coordinated state; do not reward animation count or
 decorative widgets that add no information.
 
 For engineering and business-story perspectives, use one shared step registry
-and paths with `primaryPanel` or a named `sectionLayout` plus Data flow. Emphasize
+and paths with `primaryPanel` or explicitly named `diagram.layouts` arrangements (including Data flow when intended). Emphasize
 service/dependency detail in Data flow, and people/place/outcomes in the story
 layout. Both must cover the complete sequence and keep the selected step/path
 when switching. Do not simplify the business story by silently dropping failure

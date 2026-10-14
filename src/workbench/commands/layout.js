@@ -681,14 +681,11 @@ function builderPromoteSectionViews(d,layoutId){
   var source=sectionLayoutDefinition(d),panels=Array.isArray(d.panels)?d.panels:[];
   var focus=panels.find(function(p){return p && typeof p.id==='string' && p.id && p.id===d.primaryPanel;}) ||
     panels.find(function(p){return p && typeof p.id==='string' && p.id && panelCapability(p.type,'focusByDefault',false);});
-  var first=source?'layout':focus?'home':null,defaultId=source?'layout':focus && d.primaryPanel===focus.id?'home':'flow';
-  var selected=layoutId==null || layoutId==='default'?defaultId:source && layoutId==='home'?'layout':layoutId;
+  var first=focus?'home':null,defaultId=focus && d.primaryPanel===focus.id?'home':'flow';
+  var selected=layoutId==null || layoutId==='default'?defaultId:source && layoutId==='layout'?'flow':layoutId;
   if(selected!=='flow' && selected!==first)return {error:'Reselect the view before editing it.'};
   var views=[],targets=['default'];
-  if(source){
-    views.push({id:'layout',name:source.name,sectionLayout:builderSectionLayout24(source.sectionLayout)});
-    ['backstage','confluence'].forEach(function(target){if(Array.isArray(source.sectionLayout[target]))targets.push(target);});
-  }else if(focus){
+  if(focus){
     var homeDiagram=Object.assign({},d,{primaryPanel:focus.id}),preset=sectionLayoutPreset(homeDiagram,'default');
     var hidden=Object.assign({},preset.find(function(it){return sectionLayoutKey(it)==='diagram';}),{hidden:true});
     var controls=preset.find(function(it){return it.controls==='steps';}),items;
@@ -701,7 +698,8 @@ function builderPromoteSectionViews(d,layoutId){
   }
   var flowDiagram=Object.assign({},d,{primaryPanel:undefined}),profiles={columns:24};
   targets.forEach(function(target){profiles[target]=sectionLayoutOptimize(flowDiagram,target,null);});
-  views.push({id:'flow',name:'Data flow',sectionLayout:profiles});
+  if(source)profiles=builderSectionLayout24(source.sectionLayout);
+  views.push({id:'flow',name:focus?'Data flow':'Standard',sectionLayout:profiles});
   d.layouts=views;d.defaultLayout=defaultId;delete d.sectionLayout;delete d.layoutName;
   return {layoutId:selected};
 }

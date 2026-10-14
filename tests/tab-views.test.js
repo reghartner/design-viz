@@ -121,3 +121,43 @@ test('View edits still reject unresolved or invalid imported topology without pu
  const invalid=c.planTabViewEdit(text,fixture.consumer,0,'main','create',undefined,session.validate);
  assert.match(invalid.error,/missing spec provider/);assert.equal(invalid.text,undefined);
 });
+
+test('default geometry never adds or renames Views, including after Arrange and JSON reload',()=>{
+ for(const explicit of [false,true]){
+  const raw={sections:[{id:'story',diagram:{nodes:{a:{title:'A'}},rows:[['a']]}}]};
+  if(explicit)raw.views=[{id:'reading',name:'Standard',presentation:'standard',sections:['story']}];
+  const choices=value=>{const owner=ctx.tabViewOwners(ctx.normalize(value))[0];return plain(ctx.tabViewDefinitions(owner).map(v=>[v.id,v.name]));};
+  const before=choices(raw);
+  const result=ctx.planSectionLayout(JSON.stringify(raw),raw,0,'default',[{x:0,y:2,w:24,h:18}]);assert.ok(!result.error,result.error);
+  const saved=JSON.parse(result.text);assert.deepEqual(choices(saved),before);
+  assert.deepEqual(plain(ctx.diagramLayoutViews(saved.sections[0].diagram)),[]);
+  assert.deepEqual(plain(ctx.sectionLayoutItems(saved.sections[0].diagram,'default')),[{x:0,y:2,w:24,h:18}]);
+  assert.equal(saved.sections[0].diagram.layouts,undefined);
+  assert.deepEqual(plain(ctx.validate(ctx.normalize(saved)).errors),[]);
+ }
+});
+test('default placement retains existing Home/Data flow choices and compatibility member references',()=>{
+ const raw={sections:[{id:'story',diagram:{nodes:{a:{}},rows:[['a']],primaryPanel:'home',panels:[{id:'home',type:'homemap',title:'Home'}]}}]};
+ const choices=()=>{const o=ctx.tabViewOwners(ctx.normalize(raw))[0],v=ctx.tabViewDefinitions(o);return plain([v.map(v=>[v.id,v.name]),ctx.tabViewDefault(o,v).id]);};
+ const before=choices();raw.sections[0].diagram.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};assert.deepEqual(choices(),before);
+ for(const layout of ['layout','default']){
+  raw.views=[{id:'reading',name:'Standard',presentation:'standard',sections:[{section:'story',layout}]}];
+  assert.deepEqual(plain(ctx.validate(ctx.normalize(raw)).errors),[]);
+ }
+ raw.sections[0].diagram.layouts=[{id:'named',name:'Named',sectionLayout:raw.sections[0].diagram.sectionLayout}];
+ assert.ok(ctx.validate(ctx.normalize(raw)).errors.some(e=>e.includes('.layout')));
+});
+test('presentation promotion keeps geometry-only diagrams to one Standard arrangement',()=>{
+ const d={nodes:{a:{}},rows:[['a']],sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:12}]}};
+ const result=ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'flow','explore');assert.ok(!result.error,result.error);
+ const saved=JSON.parse(result.text);assert.deepEqual(saved.layouts.map(v=>v.name),['Standard']);assert.deepEqual(saved.layouts[0].sectionLayout,d.sectionLayout);
+});
+test('upstream perspective migrations retain every original profile and both deliberate choices',()=>{
+ for(const expected of require('./fixtures/legacy-section-layouts.cjs')){
+  const raw=JSON.parse(fs.readFileSync(expected.file,'utf8')),page=ctx.normalize(raw);
+  assert.deepEqual(plain(ctx.validate(page).errors),[]);
+  const d=ctx.sectionRecords(page).map(r=>r.section.diagram).find(d=>d && d.layouts?.some(v=>v.name===expected.name));assert.ok(d,expected.name);
+  assert.equal(d.defaultLayout,'layout');assert.deepEqual(d.layouts.map(v=>[v.id,v.name]),[['layout',expected.name],['flow','Data flow']]);
+  assert.deepEqual(d.layouts[0].sectionLayout,expected.profiles);assert.equal(d.sectionLayout,undefined);
+ }
+});

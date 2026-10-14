@@ -1596,3 +1596,10 @@ body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:fo
 .section-view-options-body .tab-view-member{display:flex;flex-direction:row;align-items:center;gap:8px;flex:1;min-width:0;}
 .section-view-options-body :is(.tab-view-member,.chapter-diagram-visibility) input{width:15px;height:15px;flex:none;margin:0;}
 .section-view-options-body .fnote{margin:2px 0 0;}
+/* Lavender and Lilac carry their skin into the top title bar (Flowview mark + document title). */
+body.sk-lavender{--fl-title-bar:#F1E8F7;--fl-title-line:#DCCBE8;}
+body.sk-lilac{--fl-title-bar:linear-gradient(90deg,#E7D8F2,#F2E9F8);--fl-title-line:#D9C6E6;}
+body:is(.sk-lavender,.sk-lilac):not(.welcome-active) .workbench-header{background:var(--fl-title-bar);border-color:var(--fl-title-line);}
+body:is(.sk-lavender,.sk-lilac):not(.welcome-active) .workbench-brand{color:var(--fl-accent);}
+body:is(.sk-lavender,.sk-lilac):not(.welcome-active) #workbench-editor-title{font-family:var(--fl-heading);font-size:16px;font-weight:600;color:var(--fl-ink);}
+body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{border-color:var(--fl-title-line);}

@@ -71,8 +71,15 @@ test('additive XML page selection and canvas drop retain locked content, cancel 
 });
 
 async function holdDecompression(page){await page.evaluate(()=>{
-  const Native=window.DecompressionStream;window.__releaseDrawio=null;window.__drawioGateDone=false;
-  window.DecompressionStream=class {constructor(format){const native=new Native(format),gate=new TransformStream({async transform(chunk,controller){try{await new Promise(resolve=>{window.__releaseDrawio=resolve;});controller.enqueue(chunk);}finally{window.__drawioGateDone=true;}}});this.writable=gate.writable;this.readable=gate.readable.pipeThrough(native);}};
+  const Native=window.DecompressionStream;window.__releaseDrawio=null;window.__drawioGateDone=false;window.__drawioCancelled=false;
+  window.DecompressionStream=class {constructor(format){
+    const native=new Native(format),reader=native.readable.getReader();this.writable=native.writable;
+    this.readable=new ReadableStream({async pull(controller){try{
+      await new Promise(resolve=>{window.__releaseDrawio=resolve;});
+      if(window.__drawioCancelled)return;
+      const chunk=await reader.read();if(chunk.done)controller.close();else controller.enqueue(chunk.value);
+    }finally{window.__drawioGateDone=true;}},cancel(){window.__drawioCancelled=true;return reader.cancel();}});
+  }};
   window.__restoreDrawio=()=>{window.DecompressionStream=Native;};
 });}
 for(const change of ['input','file','source','project','close','destroy'])test('late additive decompression is retired after '+change,async({page,server})=>{
@@ -84,6 +91,8 @@ for(const change of ['input','file','source','project','close','destroy'])test('
   if(change==='project')await page.evaluate(()=>__editorTest.builder.loadText(document.querySelector('#src').value));
   if(change==='close')await page.locator('#diagram-import-cancel').click();
   if(change==='destroy')await page.evaluate(()=>__editorTest.builder.destroy());
+  await expect.poll(()=>page.evaluate(()=>window.__drawioCancelled)).toBe(true);
+  expect(await page.evaluate(()=>window.__drawioGateDone)).toBe(false);
   await page.evaluate(()=>{window.__releaseDrawio();window.__restoreDrawio();});
   await expect.poll(()=>page.evaluate(()=>window.__drawioGateDone)).toBe(true);
   if(change==='input'){await expect(page.locator('#diagram-import-preview')).toContainText('2 nodes');await expect(page.locator('#diagram-import-text')).toHaveValue('flowchart TD\nFresh-->Text');}
@@ -95,5 +104,9 @@ for(const change of ['input','file','source','project','close','destroy'])test('
 test('late whole-file decompression cannot open a preview after source changes',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,original);await holdDecompression(page);
   await page.locator('#file-import-input').setInputFiles({name:'orders.drawio',mimeType:'application/xml',buffer:Buffer.from(compressedFile)});await expect.poll(()=>page.evaluate(()=>!!window.__releaseDrawio)).toBe(true);
-  await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await page.evaluate(()=>{window.__releaseDrawio();window.__restoreDrawio();});await expect.poll(()=>page.evaluate(()=>window.__drawioGateDone)).toBe(true);await expect(page.locator('.file-import-dialog:visible')).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original+' ');
+  await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});
+  await expect.poll(()=>page.evaluate(()=>window.__drawioCancelled)).toBe(true);
+  expect(await page.evaluate(()=>window.__drawioGateDone)).toBe(false);
+  await expect(page.locator('.file-import-dialog:visible')).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original+' ');
+  await page.evaluate(()=>{window.__releaseDrawio();window.__restoreDrawio();});await expect.poll(()=>page.evaluate(()=>window.__drawioGateDone)).toBe(true);await expect(page.locator('.file-import-dialog:visible')).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original+' ');
 });

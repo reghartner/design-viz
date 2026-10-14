@@ -43,7 +43,10 @@ function drawioConvertPages(pages,todos){
     function group(cell){if(++totals.groups>64)fail('limited to 64 groups across all pages');groupIds[cell.id]='drawio-group-'+totals.groups;groups[groupIds[cell.id]]={title:cell.label || 'Group'};}
     Object.keys(cells).forEach(function(id){
       var cell=cells[id],s=cell.style;
-      if(s.opacity==='0')fail('fully transparent cells are unsupported: '+id);
+      if(s.opacity!==undefined){
+        if(!/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(s.opacity) || !Number.isFinite(Number(s.opacity)) || Number(s.opacity)<0 || Number(s.opacity)>100)fail('opacity must be a number from 0 to 100: '+id);
+        if(Number(s.opacity)===0)fail('fully transparent cells are unsupported: '+id);
+      }
       if(s.image || s.shape && /^(?:image|stencil\(|mxgraph\.)/.test(s.shape) || s._name==='image')fail('images, custom stencils and libraries are unsupported: '+id);
       if(s.sourcePort || s.targetPort)fail('port endpoints are unsupported: '+id);
       if(s.rotation && Number(s.rotation)!==0 || s.flipH==='1' || s.flipV==='1')fail('rotated or flipped geometry is unsupported: '+id);

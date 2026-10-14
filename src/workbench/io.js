@@ -109,7 +109,11 @@ function createStagedFileImport(opts){
   listen(dialog,'cancel',function(ev){
     if(!pending)return;ev.preventDefault();version++;close(true);
   });
-  return {start:start,retire:retire,destroy:function(reason){
+  return {start:start,retire:retire,sourceChanged:function(){
+    /* A pending stream read cannot poll opening.current(); stop it immediately.
+       Already-staged previews retain their existing confirmation-time check. */
+    if(decoder)retire('Import cancelled because the document changed.');
+  },destroy:function(reason){
     if(disposed)return;
     var had=!!reader || !!decoder || !!pending || dialog.open;
     retire();
@@ -204,6 +208,7 @@ function createBuilderIO(opts){
       begin:opts.beginFileImport,message:inspectorMessage,durableStatus:document.getElementById('workbench-import-status'),confirmed:function(prepared){
         if(prepared.todos.length)importMessage('w',prepared.todos.length+' todo(s) added to the spec — enrich by hand');
       }});
+    listen(src,'input',function(){stagedImport.sourceChanged();});
   }
   var exportMenu=document.getElementById('workspace-export');
   var exportTrigger=document.getElementById('workspace-export-trigger');

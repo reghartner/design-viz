@@ -38,6 +38,16 @@ test('unsupported or ambiguous cells reject the complete conversion',()=>{
   ];
   for(const [mutate,error] of cases){const cells=[...base(),node('a'),node('b'),edge('e','a','b')];mutate(cells);assert.throws(()=>c.drawioConvertPages([{name:'Invalid',cells}]),error);}
 });
+test('opacity validates numeric bounds and rejects every fully transparent spelling',()=>{
+  function cells(value){return [...base(),node('a','1',{style:'opacity='+value})];}
+  for(const value of ['0','0.0','00','-0','.0','0e2','1e-999'])assert.throws(()=>convert(cells(value)),/fully transparent/);
+  for(const value of ['','NaN','Infinity','-1','100.1','101','1e999','0px',' 0','0x10'])assert.throws(()=>convert(cells(value)),/opacity must be a number from 0 to 100/);
+  for(const value of ['0.1','01','50.0','100','1e2'])assert.equal(Object.keys(convert(cells(value)).page.sections[0].diagram.nodes).length,1);
+  for(const index of [0,1,2,4]){
+    const records=[...base(),node('g','1',{style:'group'}),node('a','g'),edge('e','a','a')];records[index].style=(records[index].style || '')+';opacity=0.0';
+    assert.throws(()=>convert(records),/fully transparent/);
+  }
+});
 test('limits cover aggregate pages, cells, nodes, groups, parent depth and coordinates',()=>{
   assert.throws(()=>c.drawioConvertPages(Array.from({length:21},()=>({name:'Page',cells:base()}))),/1–20 pages/);
   assert.throws(()=>c.drawioConvertPages([{name:'Many',cells:[...base(),...Array.from({length:1000},(_,i)=>node('n'+i))]}]),/1000 cells/);

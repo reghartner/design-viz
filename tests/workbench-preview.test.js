@@ -141,3 +141,21 @@ test('reader preview opens the visible authoring canvas instead of a stale prior
     assert.deepEqual(ctl.activeTarget,{kind:'diagram',section:2});
   }
 });
+
+test('reader preview renderer forwards an explicit host target while restoring reading state',()=>{
+  const c={};vm.createContext(c);vm.runInContext(readSource('workbench/preview.js'),c);
+  const targets=[],restores=[];
+  c.renderPage=(view,page,skin,backlinks,options)=>{targets.push(options.layoutTarget);return {sections:[],destroy(){}};};
+  c.restoreActiveTabs=(ctl,saved)=>restores.push(['tabs',saved]);
+  c.restoreWorkbenchPreview=(page,ctl,saved)=>restores.push(['sections',saved]);
+  const snapshot={tabs:[{slug:'story',index:0}],sections:{sections:[]},target:{kind:'diagram',section:1}};
+  for(const target of ['default','backstage','confluence']){
+    const ctl=c.renderWorkbenchReaderPreview({}, {}, 'pastel', null, {layoutTarget:target,snapshot});
+    assert.equal(ctl.activeTarget,snapshot.target);ctl.destroy();
+  }
+  assert.deepEqual(targets,['default','backstage','confluence']);
+  assert.deepEqual(plain(restores),[
+    ['tabs',snapshot.tabs],['sections',snapshot.sections],
+    ['tabs',snapshot.tabs],['sections',snapshot.sections],
+    ['tabs',snapshot.tabs],['sections',snapshot.sections]]);
+});

@@ -74,7 +74,9 @@ function initWorkbenchReaderPreview(opts){
     var reading=ctl?workbenchReaderPreviewSnapshot(state.page,ctl):state.reading;
     destroyReader();
     var target=settings.querySelector('select').value,width=settings.querySelector('input').value;
+    surface.setAttribute('data-target',target);
     surface.style.width=target==='default'?'100%':width+'px';
+    view.style.setProperty('--home-max-height',target==='confluence'?'560px':'70vh');
     try{
       ctl=opts.render(view,state.page,state.skin,null,{layoutTarget:target,snapshot:reading});
       canvas=initViewerExploreCanvas(ctl,view,{container:surface});

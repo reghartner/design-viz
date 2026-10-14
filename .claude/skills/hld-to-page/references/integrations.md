@@ -14,6 +14,24 @@ content is retained. The macro imports a snapshot and presentation settings only
 Do not move the editor into Confluence or add direct publishing. The company-side
 agent handles Forge registration, installation and actual Confluence validation.
 
+## claude.ai artifacts
+
+Publish only when the user asks. Build the HTML from the spec with the current
+template: `python3 <VIZ>/tools/inject.py <spec.json> <VIZ>/template/flowview.html <out.html>`
+(run `python3 <VIZ>/tools/build.py` first if `template/` may be stale). Publish it
+with the Artifact tool and declare
+`capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
+That lets the page label comments by Tab and View, make "Go to" switch Tab,
+View and step, and keep step controls working in comment mode; see
+`docs/tab-views.md` ("Comments on claude.ai artifacts"). Without the declaration
+the page falls back to claude.ai's default comment placement.
+
+To update an existing artifact, read it first and republish to its same URL.
+Comments stay with the artifact URL; publishing a new artifact starts with
+none. Older comments keep their saved location and label. claude.ai saves
+comment locations as position paths, so a rebuild that changes page structure
+can move an older comment to a different element.
+
 ## Catalog, code drift, and incident evidence
 
 **Connect to company evidence when requested.** Read `docs/canon.md`. Preserve

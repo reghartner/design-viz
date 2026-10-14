@@ -30,6 +30,7 @@ topology, notification or outcome without evidence.
 | Honeycomb trace import or measured timing | `docs/trace-import.md` |
 | Backstage bindings, code refs, canon, incidents | [bindings and code](bindings-and-code.md), [integrations](integrations.md), `docs/canon.md` |
 | Confluence export | [integrations](integrations.md) → Confluence |
+| Publishing the HTML as a claude.ai artifact (comments capability, same-URL republish) | [integrations](integrations.md) → claude.ai artifacts |
 | Renderer version requirements | `docs/runtime-compatibility.md` |
 | Handing a diagram to a human editor: Starting state controls, notification composer, carry vs this-step-only (`enterOnce`), panel visibility, drilldown mappings, fragment visibility by path position, bullet and prose editing, custom protocols | [authoring details](authoring-details.md) → Human handoff in the workbench; the workbench User guide |
 | Auto arrange, stable raw node insertion, explicit manual graph geometry, or Home layout editing | [authoring details](authoring-details.md) |

@@ -115,22 +115,27 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     unrelated scenarios.
 12. **Write content, then compose.** For a new diagram, write semantic
     nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
-    run `node <VIZ>/tools/compose-page-layout.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
-    The shared production arranger selects positions, ports, cubic routes and
-    frame from topology; groups and nested groups constrain placement. Its limit
+    run `node <VIZ>/tools/auto-arrange-spec.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
+    The shared production graph arranger selects positions, ports, cubic routes
+    and frame from topology; groups and nested groups constrain placement. Let
+    the reader compose panels and step controls without saved tile rectangles.
+    Never author `sectionLayout` or run `tools/compose-page-layout.cjs`, which
+    writes that field. Preserve the planned perspectives and view membership.
+    The graph arranger's limit
     is 80 nodes and 160 connections per diagram. Inspect the rendered output;
     crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
     existing geometry. For ordinary existing edits, preserve layout and routes;
     add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats.
     User feedback that the rendered candidate clips content or is hard to read
-    authorizes scoped candidate layout repair, including tile sizing, without
+    authorizes scoped candidate graph and content repair, without
     another permission question or handing arrangement back to the user. Keep
-    the repair to the affected section and preserve semantics; use `--rearrange`
-    when the requested repair requires structural node rearrangement. Validate
+    the repair to the affected section and preserve semantics. When structural
+    graph rearrangement is explicitly requested, rerun the graph arranger with
+    `--section` for that section. Validate
     and submit the full candidate for paired Workbench preview, and report the
-    actual tool results. See `docs/auto-arrange.md` for sizing guidance,
-    supported inputs and estimation limits.
+    actual tool results. See `docs/auto-arrange.md` for graph arrangement
+    limits and rendered-review guidance.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -268,10 +273,10 @@ Use a relevant cookbook example when helpful and replace its facts with yours. T
 [routing table](recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
 Confluence, named views, and explicit manual-placement requests). Follow rule 12
-for node placement and connection routing. Standard panel arrangements use
-`sectionLayout.columns:24`; consult [section layouts](../../../../docs/section-layouts.md)
-for host profiles and legacy 12-column migration. Contract-block spans retain
-their separate 12-column grid. The schema's manual floats, ports, bends and
+for node placement and connection routing. Use the reader's default panel and
+step-control composition. Never author `sectionLayout`. Preserve existing layout fields when
+editing an accepted diagram. Contract-block spans retain their separate
+12-column grid. The schema's manual floats, ports, bends and
 curve fields are reference material for user-directed exceptions and for
 preserving an existing diagram; they are not ordinary new-graph defaults.
 

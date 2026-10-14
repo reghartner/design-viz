@@ -22,7 +22,7 @@ Preserve its audience, accepted outcomes and stable story IDs; reconcile the
 engineer's new evidence and any contradictions before adding technical detail.
 
 For a new diagram of an existing flow, author its semantic graph and worksheet
-from the engineer's evidence, run the common skill's pure Node `tools/compose-page-layout.cjs` command,
+from the engineer's evidence, run the common skill's pure Node `tools/auto-arrange-spec.cjs` graph command,
 then submit its output for paired preview. A flow
 being described as “existing” does not prove the supplied design
 was deployed or that all branches were observed. Mark designed, engineer-stated

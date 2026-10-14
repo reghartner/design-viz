@@ -31,7 +31,7 @@ bottleneck. Explain one observed request without presenting it as the complete
 system design. Record design explanations separately from measurements.
 
 The importer produces a validated semantic/timing draft; for a wholly new
-diagram run the common skill's pure Node `tools/compose-page-layout.cjs` command
+diagram run the common skill's pure Node `tools/auto-arrange-spec.cjs` graph command
 before validating and proposing.
 Preserve placement when enriching an existing diagram. Validate the candidate,
 reconcile the ledger, and use the same workbench preview/approval process.

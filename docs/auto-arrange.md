@@ -54,26 +54,32 @@ reference layout into a mandatory shape for other topology.
 
 ## Headless authoring
 
-Write semantic nodes, edges, panels and steps, then run one command:
+Write semantic nodes, edges, panels and steps, then arrange the graph:
 
 ```sh
-node tools/compose-page-layout.cjs --section 0 draft.spec.json arranged.spec.json
+node tools/auto-arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
 ```
 
-The command composes the complete page diagram: nodes, panels and step controls
-in a 24-column Standard layout. Write semantic content, `rows:[[]]` and
-unpositioned floats; do not author placeholder panel rectangles. Existing
-geometry is protected; use `--rearrange` only for an explicitly requested
-rearrangement. Repeat `--section` for selected new diagrams in a mixed page.
-Input/output must be distinct files, including symlinks and hard links. All
-selected diagrams must succeed before one atomic output write. Validate and
-state-walk the result, then submit the full spec for paired Workbench preview.
+The command arranges nodes and connections. Write semantic content, `rows:[[]]`
+and unpositioned floats. Let the reader compose panels and step controls by
+default. Agent-authored diagrams must never use `sectionLayout` or the page
+composer, which writes that field. Preserve the planned perspectives and view
+membership. Repeat `--section` for selected new diagrams in
+a mixed page. Input/output must be distinct files, including symlinks and hard
+links. All selected diagrams must succeed before one atomic output write.
+Validate and state-walk the result, then submit the full spec for paired
+Workbench preview.
 
 **No setup, browser, npm install or browser download is needed.** The command
 runs directly with Node in a source checkout or an exported authoring kit.
 The checkout compiles trusted repository sources in memory; the kit includes
 the backend and panel layout descriptors statically. Browser tests are only a
 development check, never part of the authoring command.
+
+## Existing page-composer reference
+
+The following options and repair notes document existing saved layouts and the
+page-composer tool. They are not agent authoring instructions.
 
 `--width` selects an estimated host viewport (800–1920px, default 1200).
 `--profile default|backstage|confluence` selects the arrangement profile.
@@ -135,7 +141,7 @@ The viewer’s separate Fit diagram action fits both viewport dimensions. The
 composer does not apply a global document cap, because standalone and embedded
 hosts can override one. Review the rendered result when a visual review is available.
 
-### Repairing a rendered layout
+### Repairing a rendered saved layout
 
 The composed layout is the starting point. If the user supplies the host
 viewport, pass it with `--width`; otherwise keep the default rather than
@@ -173,10 +179,10 @@ shared graph geometry across profiles. Semantic content/state/declaration order
 are preserved. Only system-owned compatibility metadata is refreshed, retaining
 prior requirements; bare diagrams become a page wrapper. Errors write nothing.
 
-For graph-only tasks, use the lighter `tools/auto-arrange-spec.cjs`. Both CLIs
+For graph tasks, use `tools/auto-arrange-spec.cjs`. Both CLIs
 compile the current shared arranger sources in a checkout, ignoring generated
 build artifacts, and use the bundled backend in an exported authoring kit.
-The complete authoring workflow uses `compose-page-layout.cjs`.
+The agent authoring workflow uses the graph CLI and default reader composition.
 
 ## Distribution and validation
 

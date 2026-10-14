@@ -94,7 +94,9 @@ class AuthoringPacketTests(unittest.TestCase):
             self.assertNotIn((packet.REFS + 'use-case-honeycomb.md', None), sources)
             self.assertEqual((packet.WORKFLOW, 'Phase 3: Fill the storyboard worksheet') in sources, mode == 'new')
             for requirement in ('Never re-ask supplied facts', 'Retain source-required icons',
-                                'compose-page-layout.cjs', 'occlusion and legibility unverified',
+                                'never author `sectionLayout`', 'tools/auto-arrange-spec.cjs',
+                                'Preserve the intended perspectives and view membership',
+                                'occlusion and legibility unverified',
                                 'N/A to automated', 'spec_walk.py', 'visibility-check.cjs'):
                 if mode == 'edit' and requirement == 'Never re-ask supplied facts':
                     self.assertIn('do not\n   ask the operator to repeat or approve them', text)

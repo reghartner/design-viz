@@ -150,13 +150,13 @@ step patches. Device and room dragging in the step inspector changes all
 paths, while subject dragging edits the selected step. These are authoring
 coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
 
-**Arrange for the delivery surface.** For new diagrams, run `tools/compose-page-layout.cjs`
-after writing semantic content; it creates the 24-column panel/control layout.
-Use `--profile backstage` or `--profile confluence` when requested for that host.
-Preserve existing profiles during ordinary edits. See `docs/auto-arrange.md`
-for supported inputs and estimation limits, and `docs/section-layouts.md` for the schema
-(`columns:24`; an absent marker means legacy 12). Host/width preview is temporary;
-missing profiles fall back to default, then the existing layout.
+**Arrange for the delivery surface.** For new diagrams, run
+`tools/auto-arrange-spec.cjs` after writing semantic graph content. Let the
+reader compose panels and step controls by default. Never author
+`sectionLayout` or run `tools/compose-page-layout.cjs`, which writes it. Do not
+change the planned perspectives or their membership. Preserve existing layout
+fields during ordinary edits. See `docs/auto-arrange.md`
+for graph limits and rendered-review guidance.
 Every row diagram has **Auto / Fit width / Readable** viewing controls, including
 curved edges. Do not enable lane routing just to expose sizing; these choices
 do not modify the spec or routing. Auto scales smoothly with column width;
@@ -165,9 +165,10 @@ Readable keeps labels larger. Regular views also support background drag-to-pan,
 Overflowing diagrams show mouse-friendly
 **Scroll** arrows and a draggable position slider under the view choices;
 no spec field enables them. See `docs/workbench-workspace.md`.
-Use `diagram.layouts:[{id,name,sectionLayout}]` for several named views of one
-story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
-`"standard"` or `"explore"` (omitted means Standard). Use a default Standard view
+For several perspectives of one story, use canonical Tab Views and section
+references as documented in `docs/tab-views.md`.
+Do not create named arrangements with `sectionLayout`. Set View `presentation` to
+`"standard"` or `"explore"`. Use a default Standard view
 for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
 resizable, hideable panels at its edges, and defaults step controls to viewport-pinned
@@ -345,8 +346,8 @@ for the human workflow; no full-contract preload is needed for this schema.
 
 For ordinary new-diagram authoring, follow the packet/workflow rule 12: use unpositioned
 floats and automatic connections, then run the bundled pure Node
-`tools/compose-page-layout.cjs` command. The fields below document existing specs and explicit
-user-directed layout work. The production arranger writes positioned floats,
+`tools/auto-arrange-spec.cjs` graph command. The fields below document existing specs and explicit
+user-directed graph placement. The production arranger writes positioned floats,
 pinned ports, native cubic controls and a graph frame. It preserves group
 membership/nesting and semantic content, with a limit of 80 nodes and 160
 connections. Use `tools/auto-arrange-spec.cjs --section 0 input.json output.json`

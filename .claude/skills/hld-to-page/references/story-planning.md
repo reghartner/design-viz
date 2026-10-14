@@ -139,11 +139,12 @@ physical continuity and coordinated state; do not reward animation count or
 decorative widgets that add no information.
 
 For engineering and business-story perspectives, use one shared step registry
-and paths with `primaryPanel` or a named `sectionLayout` plus Data flow. Emphasize
+and paths with `primaryPanel` or canonical Views. Never author
+`sectionLayout`. Emphasize
 service/dependency detail in Data flow, and people/place/outcomes in the story
 layout. Both must cover the complete sequence and keep the selected step/path
 when switching. Do not simplify the business story by silently dropping failure
-beats. See `docs/section-layouts.md`; no parallel mutable copies of the story.
+beats. See `docs/tab-views.md`; no parallel mutable copies of the story.
 Optimize readability for desktop and the intended Backstage/Confluence content
 area. Keep necessary engineering detail; fitting an entire dense flow on a phone
 is not a default requirement. Test mobile only when it is part of the request.

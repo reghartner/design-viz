@@ -38,11 +38,11 @@ rendered fit, occlusion and legibility unverified until a real Workbench preview
 or already-authorized rendered evidence supplies them. A file-only kit requires
 no browser, server, installation or additional agent.
 
-For new topology, run the packet's production `tools/compose-page-layout.cjs`
-flow (or `tools/auto-arrange-spec.cjs` for graph-only work). Preserve authored
-geometry during ordinary edits. Inspect the rendered result and make scoped
-manual refinements when needed; generated placement is not visual approval.
-Limits and controls are in [automatic arrangement](../../../docs/auto-arrange.md).
+Never author `sectionLayout` or run `tools/compose-page-layout.cjs`, which
+writes it. Use ordinary sections, panels and default reader composition. Arrange new graph topology
+with `tools/auto-arrange-spec.cjs`. Preserve existing geometry. Inspect the
+render; placement needs review. See
+[automatic arrangement](../../../docs/auto-arrange.md).
 
 ## Choose the starting point
 

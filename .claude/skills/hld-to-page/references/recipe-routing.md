@@ -42,8 +42,10 @@ topology, notification or outcome without evidence.
 - `diagram.primaryPanel` makes a panel (often the `homemap`) the centerpiece.
 - Use panel `visible: false` plus step `panelVisibility` to show a panel only
   when it matters; this is different from device-app card `visible`.
-- Let the pure Node `tools/compose-page-layout.cjs` command arrange new graph
-  topology, panels and step controls after writing semantic content. Preserve an existing
+- Let the pure Node `tools/auto-arrange-spec.cjs` command arrange new graph
+  topology after writing semantic content. Let the reader compose panels and
+  step controls by default; never author `sectionLayout` or run the page composer,
+  which writes it. Preserve an existing
   spec's rows, floats, positions, ports, route fields and panel rectangles unless
   the user requests a rearrangement.
   Omit `diagram.routing` unless lanes are requested.

@@ -168,23 +168,25 @@ test('both setup routes give browserless agents one truthful layout policy',()=>
     assert.equal(policies.length,1,workflow);
     const policy=policies[0];
     assert.ok(policy.includes('no browser control'));
-    assert.ok(policy.includes('node tools/compose-page-layout.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
+    assert.ok(policy.includes('node tools/auto-arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
+    assert.ok(policy.includes('Never author sectionLayout or run tools/compose-page-layout.cjs'));
     assert.ok(policy.includes('wholly new diagram'));
     assert.ok(policy.includes('unpositioned {id,side:"below",noSpread:true} floats'));
     assert.ok(policy.includes('preserve all layout and routes'));
-    assert.ok(policy.includes('nodes, panels and step controls'));
-    assert.ok(policy.includes('do not choose coordinates or panel rectangles'));
+    assert.ok(policy.includes('graph command arranges nodes and connections'));
+    assert.ok(policy.includes('reader composes panels and step controls by default'));
+    assert.ok(policy.includes('Preserve the intended perspectives and view membership'));
+    assert.ok(policy.includes('Do not choose coordinates or panel rectangles'));
     assert.ok(policy.length<1200);
     assert.ok(policy.includes('paired Workbench preview'));
-    assert.ok(policy.includes('only when explicitly requested, using --rearrange'));
-    assert.ok(!policy.includes('auto-arrange-spec'));
+    assert.ok(policy.includes('Rearrange only when explicitly requested'));
   }
 });
 
-test('all newly routed authoring guides use the complete browser-free composer',()=>{
+test('all newly routed authoring guides use graph arrangement without authored section tiles',()=>{
   for(const name of ['recipe-routing.md','use-case-existing-flow.md','use-case-honeycomb.md']){
     const text=require('node:fs').readFileSync(require('node:path').join(__dirname,'../.claude/skills/hld-to-page/references',name),'utf8');
-    assert.match(text,/tools\/compose-page-layout\.cjs/,name);
+    assert.match(text,/tools\/auto-arrange-spec\.cjs/,name);
     assert.doesNotMatch(text,/then (?:manually )?author (?:the |its )?panel\/control|author the panel\/control `sectionLayout` rectangles/,name);
   }
 });

@@ -142,10 +142,10 @@ function boot(raw){
   }
   initViewerExploreCanvas(ctl,view);
   wirePresenter(ctl, view, window);
-  /* Published as a claude.ai artifact: page-owned comment anchors so a
-     comment records its Tab/View and "Go to" can switch to it. Inert when
-     window.claude or the declared capability is absent. */
-  if (typeof wireArtifactComments === 'function') wireArtifactComments(ctl, view, window);
+  /* Data-derived comment ids on every comment subject; published as a
+     claude.ai artifact with customAnchors, page-owned pins that record the
+     Tab/View and let "Go to" switch to it. */
+  if (typeof wireArtifactComments === 'function') wireArtifactComments(ctl, view, window, page);
   /* First-run guided tour: a page's own page.tour replaces the built-in
      default wholesale; an unusable override falls back to the default so a
      typo never costs the tour. wireTour itself refuses embeds and #tour=0. */

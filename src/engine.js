@@ -1642,7 +1642,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       captionGhost = captionLine.cloneNode(true);
       captionGhost.classList.add('dv-caption-old');
       captionGhost.setAttribute('aria-hidden', 'true');
-      captionGhost.removeAttribute('data-comment-target'); captionGhost.setAttribute('data-uncommentable', '');
+      captionGhost.removeAttribute('data-comment-target'); captionGhost.removeAttribute('id'); captionGhost.setAttribute('data-uncommentable', '');
       captionGhost.style.left = (lineRect.left - barRect.left) + 'px';
       captionGhost.style.top = (lineRect.top - barRect.top) + 'px';
       captionGhost.style.width = lineRect.width + 'px';

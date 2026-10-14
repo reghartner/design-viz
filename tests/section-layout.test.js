@@ -239,6 +239,13 @@ test('arrangement disclosure state survives control replacement until its Arrang
   disclosure.toggle();disclosure.reset();assert.equal(disclosure.collapsed(),false,'a new Arrange session starts expanded');
 });
 
+test('automatic layout lookup tolerates a viewport before its first view definition',()=>{
+  const context=commandContext(['layout']);vm.runInContext(readSource('layout.workbench.js'),context);
+  assert.equal(context.sectionLayoutActiveId({viewDefinition:()=>null}),undefined);
+  assert.equal(context.sectionLayoutActiveId({viewDefinition:()=>({id:'flow'})}),'flow');
+  assert.equal(context.sectionLayoutActiveId({layoutId:()=> 'canvas',viewDefinition:()=>{throw Error('named presentations use their layout ID');}}),'canvas');
+});
+
 test('optimization preserves hidden elements without reserving their space or changing other views/profiles',()=>{
   for(const target of ['default','backstage','confluence']){
     const d=diagram(),items=plain(ctx.sectionLayoutPreset(d,target));

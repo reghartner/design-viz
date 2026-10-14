@@ -31,6 +31,12 @@ function createSectionArrangementDisclosureState(){
     reset:function(){collapsed=false;}
   };
 }
+function sectionLayoutActiveId(p){
+  if(!p)return;
+  if(p.layoutId)return p.layoutId();
+  var definition=p.viewDefinition && p.viewDefinition();
+  return definition?definition.id:undefined;
+}
 function initSectionLayoutEditor(opts){
   var life=createWorkbenchLifetime(),sections=new Map(),controlsLife=life;
   function clearSections(){var old=Array.from(sections.values());sections.clear();var cleanup=createWorkbenchLifetime();old.forEach(function(rec){cleanup.own(function(){rec.fields.destroy();});cleanup.own(function(){rec.viewFields.destroy();});cleanup.own(function(){rec.life.destroy();});});cleanup.destroy();}
@@ -83,7 +89,7 @@ function initSectionLayoutEditor(opts){
     // seam as an already named arrangement.
     return rec && (rec.presentation || rec.viewport);
   }
-  function activeLayout(index){var p=presentation(index);return p && p.layoutId?p.layoutId():p && p.viewDefinition?p.viewDefinition().id:undefined;}
+  function activeLayout(index){return sectionLayoutActiveId(presentation(index));}
   function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
   function currentItems(index,d){return sectionLayoutItems(d || rawDiagram(index),profile,activeLayout(index));}
   function forceLayout(index){

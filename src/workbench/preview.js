@@ -208,11 +208,11 @@ function createWorkbenchPreviewController(opts){
     function target(doc){
       var record=sectionRecords(doc)[hint.section],d=record && record.section.diagram;
       var matches=d && Array.isArray(d.layouts)?d.layouts.filter(function(v){return v.id===hint.id;}):[];
-      return matches.length===1 && matches[0].presentation==='explore'?matches[0]:null;
+      return matches.length===1?matches[0]:null;
     }
     var before=target(page),after=target(next),rec=(ctl.sections || []).find(function(r){return r.number===hint.section+1;});
-    var presentation=rec && rec.presentation;
-    if(!before || !after || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
+    var presentation=rec && rec.presentation,effective=rec && rec.viewport && rec.viewport.viewDefinition();
+    if(!before || !after || !effective || effective.presentation!=='explore' || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
     var candidate=JSON.parse(JSON.stringify(page)),candidateView=target(candidate);
     if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))candidateView.exploreLayout=after.exploreLayout;
     else delete candidateView.exploreLayout;

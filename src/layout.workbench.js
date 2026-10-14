@@ -31,6 +31,12 @@ function createSectionArrangementDisclosureState(){
     reset:function(){collapsed=false;}
   };
 }
+function sectionLayoutActiveId(p){
+  if(!p)return;
+  if(p.layoutId)return p.layoutId();
+  var definition=p.viewDefinition && p.viewDefinition();
+  return definition?definition.id:undefined;
+}
 function initSectionLayoutEditor(opts){
   var life=createWorkbenchLifetime(),sections=new Map(),controlsLife=life;
   function clearSections(){var old=Array.from(sections.values());sections.clear();var cleanup=createWorkbenchLifetime();old.forEach(function(rec){cleanup.own(function(){rec.fields.destroy();});cleanup.own(function(){rec.viewFields.destroy();});cleanup.own(function(){rec.life.destroy();});});cleanup.destroy();}
@@ -76,11 +82,9 @@ function initSectionLayoutEditor(opts){
     var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' view arrangement · Undo restores the previous arrangement.');
     return ok;
   }
-  function presentation(index){
-    var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
-    return rec && rec.presentation;
-  }
-  function activeLayout(index){var p=presentation(index);return p && p.layoutId?p.layoutId():undefined;}
+  function record(index){var ctl=opts.ctl && opts.ctl();return ctl && ctl.sections.find(function(r){return r.number===index+1;});}
+  function presentation(index){var rec=record(index);return rec && rec.presentation;}
+  function activeLayout(index){var rec=record(index);return sectionLayoutActiveId(rec && (rec.presentation || rec.viewport));}
   function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
   function currentItems(index,d){return sectionLayoutItems(d || rawDiagram(index),profile,activeLayout(index));}
   function forceLayout(index){
@@ -329,7 +333,11 @@ function initSectionLayoutEditor(opts){
       section.classList.toggle('section-arranging',editing===index);
       if(actions.showPopover){if(editing===index && !actions.matches(':popover-open'))actions.showPopover();else if(editing!==index && actions.matches(':popover-open'))actions.hidePopover();}
       var p=presentation(index);if(p && p.setLayoutTarget)p.setLayoutTarget(profile);if(p && p.setArranging)p.setArranging(editing===index);
-      if(p && p.setExploreAuthor)p.setExploreAuthor({
+      // Automatic diagrams have an Explore viewport before their first saved
+      // section arrangement exists. Only the author seam and active identity
+      // fall back to that viewport; arrangement controls use the presentation.
+      var rec=record(index),authorTarget=p || rec && rec.viewport,setExploreAuthor=authorTarget && (authorTarget.setExploreAuthor || authorTarget.setAuthor);
+      if(setExploreAuthor)setExploreAuthor.call(authorTarget,{
         begin:function(id){
           if(!ready() || activeLayout(index)!==id)return false;
           var focused=document.activeElement,host=focused && focused.closest('.explore-window,.explore-player');
@@ -433,7 +441,7 @@ function initSectionLayoutEditor(opts){
   updateTarget();return {refresh:life.guard(refresh),refreshViewSettings:life.guard(refreshViewSettings),cancel:life.guard(cancel),
     beforeReplace:life.guard(function(request){cancel();if(!request || ['edit','history'].indexOf(request.origin)<0)endEditing();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();endEditing();
-      var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.presentation.setArranging)rec.presentation.setArranging(false);if(rec.presentation && rec.presentation.setExploreAuthor)rec.presentation.setExploreAuthor(null);});
+      var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){var p=rec.presentation || rec.viewport;if(p && p.setArranging)p.setArranging(false);var clear=p && (p.setExploreAuthor || p.setAuthor);if(clear)clear.call(p,null);});
       view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-controls-resize').forEach(function(node){node.remove();});
       view.querySelectorAll('.section-arranging,.layout-selected').forEach(function(node){node.classList.remove('section-arranging','layout-selected');});
       view.style.removeProperty('--home-max-height');

@@ -594,13 +594,20 @@ function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
   });
   if(!plan.error)plan.layoutId=selected;return plan;
 }
-function planSectionExploreLayout(text,raw,section,layoutId,value){
+function planSectionExploreLayout(text,raw,section,layoutId,value,allowPresentationOverride){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
-  var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
-  if(index<0 || got.d.layouts[index].presentation!=='explore')return {error:'Select an Explore view before arranging it.'};
   var warnings=[];
   if(value!==null)sectionExploreLayout(got.d,value,warnings,'exploreLayout');
   if(warnings.length)return {error:warnings.join('\n')};
+  if(!Array.isArray(got.d.layouts)){
+    if(!allowPresentationOverride)return {error:'Select an Explore view before arranging it.'};
+    var d=builderClone(got.d),selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
+    var promoted=d.layouts.find(function(v){return v && v.id===selected.layoutId;});if(!promoted)return {error:'Reselect the Explore view before arranging it.'};
+    if(value===null)delete promoted.exploreLayout;else promoted.exploreLayout=builderClone(value);
+    var plan=planReplaceValue(text,raw,got.path,JSON.stringify(d));plan.layoutId=selected.layoutId;return plan;
+  }
+  var index=got.d.layouts.findIndex(function(v){return v && v.id===layoutId;});
+  if(index<0 || got.d.layouts[index].presentation!=='explore' && !allowPresentationOverride)return {error:'Select an Explore view before arranging it.'};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
 }
 /* Match the viewer's legacy Home/Layout and Data choices when a header action

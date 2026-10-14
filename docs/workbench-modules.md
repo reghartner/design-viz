@@ -30,6 +30,10 @@ composer; the inspector supplies its transactions and form lifetime.
 14. `workbench/inspector.js`: forms, panel editor cache and refresh lifetime.
 15. `workbench/io-model.js`: pure bounded file classification/preparation,
     Mermaid conversion, filenames and HTML injection.
+    `workbench/drawio-import.js` supplies pure cell-record conversion plus the
+    inert XML/stream-decoding boundary. Async adapters preserve synchronous
+    JSON/Mermaid preparation; staged import owners cancel decoding and check
+    their source/project/section generations before preview publication.
 16. `workbench/io-browser.js`: bound browser resource adapters.
 17. `workbench/io.js`: import/export controls, staged file/drop confirmation and
     independent operation lifetimes. External drops are classified only after a

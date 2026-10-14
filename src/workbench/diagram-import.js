@@ -1,12 +1,12 @@
 /* Board-specific additive transport. The outer File importer still owns
    document replacement; image and Flowview object clipboard owners run first. */
 function initBuilderDiagramImport(document,options){
-  var life=createWorkbenchLifetime(),win=document.defaultView,sequence=0,reader=null,pending=null,opener=null;
+  var life=createWorkbenchLifetime(),win=document.defaultView,sequence=0,reader=null,decoder=null,pending=null,opener=null;
   function element(tag,text){var el=document.createElement(tag);if(text)el.textContent=text;return el;}
   var dialog=element('dialog');dialog.id='diagram-import';dialog.className='object-clipboard-dialog';
   var title=element('h2','Add diagram to this canvas'),destination=element('p'),scope=element('p','Adds nodes, groups, and internal connections with independent IDs and protocol meanings. Rows and floats become a positioned block. Panels, timelines, prose, and named views are not merged.'),input=element('textarea'),file=element('input'),label=element('label','Source diagram '),select=element('select'),status=element('p'),apply=element('button','Add diagram'),cancel=element('button','Cancel');
-  title.id='diagram-import-title';dialog.setAttribute('aria-labelledby',title.id);input.id='diagram-import-text';input.setAttribute('aria-label','Diagram JSON or Mermaid');input.rows=9;input.style.width='100%';
-  file.type='file';file.accept='.json,.mmd,.mermaid,.md,.txt';file.setAttribute('aria-label','Choose diagram file');select.id='diagram-import-section';select.className='fctl';label.appendChild(select);status.id='diagram-import-preview';status.setAttribute('role','status');apply.id='diagram-import-apply';cancel.id='diagram-import-cancel';apply.type=cancel.type='button';apply.className='rbtn';cancel.className='bbtn';
+  title.id='diagram-import-title';dialog.setAttribute('aria-labelledby',title.id);input.id='diagram-import-text';input.setAttribute('aria-label','Diagram JSON, Mermaid or draw.io XML');input.rows=9;input.style.width='100%';
+  file.type='file';file.accept='.json,.mmd,.mermaid,.md,.txt,.drawio,.xml';file.setAttribute('aria-label','Choose diagram file');select.id='diagram-import-section';select.className='fctl';label.appendChild(select);status.id='diagram-import-preview';status.setAttribute('role','status');apply.id='diagram-import-apply';cancel.id='diagram-import-cancel';apply.type=cancel.type='button';apply.className='rbtn';cancel.className='bbtn';
   var actions=element('div');actions.className='story-actions';actions.appendChild(cancel);actions.appendChild(apply);
   [title,destination,scope,file,input,label,status,actions].forEach(function(el){dialog.appendChild(el);});document.body.appendChild(dialog);
   function editable(target){return target && target.closest && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),dialog');}
@@ -22,23 +22,34 @@ function initBuilderDiagramImport(document,options){
     return !now.error && now.text===before.text && now.project===before.project && now.topologyRevision===before.topologyRevision &&
       now.renderedText===before.renderedText && options.currentSection()===pending.ref.section && options.surface(pending.ref.section)===pending.ref.board && pending.ref.board.isConnected;
   }
-  function retire(){sequence++;if(reader && reader.readyState===1)try{reader.abort();}catch(ex){}reader=null;}
+  function retire(){sequence++;if(reader && reader.readyState===1)try{reader.abort();}catch(ex){}reader=null;if(decoder)decoder.abort();decoder=null;}
   function close(focus){retire();pending=null;if(dialog.open)dialog.close();if(focus!==false && opener && opener.isConnected)opener.focus();opener=null;}
   function preview(reparse){
     apply.disabled=true;
     if(!current()){status.textContent='The destination changed. Close and reopen Add diagram.';return;}
     if(reparse){
-      pending.prepared=prepareBuilderDiagramImport(input.value);select.replaceChildren();
-      if(!pending.prepared.error)pending.prepared.sections.forEach(function(section){var opt=element('option','Section '+(section.index+1)+' · '+section.label);opt.value=section.index;select.appendChild(opt);});
+      pending.prepared=null;pending.plan=null;select.replaceChildren();select.disabled=true;
+      if(drawioImportRecognized(input.value)){
+        var token=++sequence,expected=pending;decoder=new win.AbortController();status.textContent='Decoding draw.io diagram…';
+        prepareBuilderDiagramImportAsync(input.value,{signal:decoder.signal,isCurrent:function(){return token===sequence && pending===expected && current();}}).then(function(prepared){
+          if(!life.alive() || token!==sequence || pending!==expected || !current())return;
+          decoder=null;pending.prepared=prepared;populate();preview(false);
+        });return;
+      }
+      pending.prepared=prepareBuilderDiagramImport(input.value);populate();
     }
     var prepared=pending.prepared;
-    if(!prepared || prepared.error){status.textContent=prepared && prepared.error || 'Paste Flowview JSON, a Mermaid sequenceDiagram or flowchart, or choose a file.';return;}
+    if(!prepared || prepared.error){status.textContent=prepared && prepared.error || 'Paste Flowview JSON, Mermaid, or draw.io XML, or choose a file.';return;}
     var plan=planAddBuilderDiagram(pending.snapshot.text,pending.snapshot.raw,prepared.raw,Number(select.value),pending.ref.section,pending.point,options.validateSource);
     pending.plan=plan;
     if(plan.error){status.textContent=plan.error;return;}
     function count(n,noun){return n+' '+noun+(n===1?'':'s');}
     status.textContent=count(plan.counts.nodes,'node')+', '+count(plan.counts.groups,'group')+', '+count(plan.counts.edges,'connection')+' → '+destination.textContent+'. '+prepared.todos.join(' ');
     apply.disabled=false;
+  }
+  function populate(){
+    select.disabled=false;
+    if(pending.prepared && !pending.prepared.error)pending.prepared.sections.forEach(function(section){var opt=element('option','Section '+(section.index+1)+' · '+section.label);opt.value=section.index;select.appendChild(opt);});
   }
   function open(text,ref,point){
     retire();if(options.blocked()){options.message('Finish the current canvas action before adding a diagram.');return false;}
@@ -62,8 +73,8 @@ function initBuilderDiagramImport(document,options){
     var files=Array.from(data.files || []),items=Array.from(data.items || []).filter(function(item){return item.kind==='file';});
     if(files.length>1 || items.length>1)return null;
     var f=files[0] || items[0] && items[0].getAsFile && items[0].getAsFile();
-    if(f)return /\.(?:json|mmd|mermaid|md|txt)$/i.test(f.name)?{file:f}:null;
-    if(items.length===1 && /^(?:application\/json|text\/(?:plain|markdown))$/.test(items[0].type))return {file:null};
+    if(f)return /\.(?:json|mmd|mermaid|md|txt|drawio|xml)$/i.test(f.name)?{file:f}:null;
+    if(items.length===1 && /^(?:application\/(?:json|xml)|text\/(?:plain|markdown|xml))$/.test(items[0].type))return {file:null};
     if(items.length || files.length)return null;
     var text=data.getData && data.getData('text/plain');return builderDiagramImportRecognized(text)?{text:text}:null;
   }

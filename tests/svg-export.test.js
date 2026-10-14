@@ -27,6 +27,12 @@ test('style URL sanitizer permits same-document fragments and rejects external a
   assert.equal(C.svgExportSafeStyleValue('expression(alert(1))','https://flowview.test/'),null);
 });
 
+test('style staging retains only safe custom properties needed to resolve exported paint',()=>{
+  const values={'--dv-aurora':'#123456',stroke:'#abcdef','--local-marker':'url(#marker)','--remote':'url(https://attacker.test/pixel)'};
+  const style={0:'--dv-aurora',1:'stroke',2:'--local-marker',3:'--remote',length:4,item(index){return this[index];},getPropertyValue(name){return values[name];}};
+  assert.equal(C.svgExportSafeCustomStyles(style,'https://flowview.test/workbench.html'),'--dv-aurora:#123456;--local-marker:url(#marker)');
+});
+
 test('editor-only state classes are removed without changing rendered state classes',()=>{
   assert.equal(C.svgExportClassName('node lit dv-sel dv-instep dv-connect-target tint-api'),'node lit tint-api');
   assert.equal(C.svgExportClassName('dv-rowgrab'), 'dv-rowgrab');

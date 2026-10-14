@@ -56,9 +56,11 @@ if it fails, use **Export → JSON only** to keep your source.
 Download/Copy SVG exports only the active section's rendered diagram graph. It
 preserves the live View, step visibility and skin, embeds the styles and icon
 symbols it needs, and excludes prose, panels, playback controls and editing
-chrome. Copy uses `image/svg+xml` when the browser permits it and otherwise opens
-the same standalone SVG as selected text for manual copy. Invalid source may keep
-the last usable preview; the export message calls that out explicitly.
+chrome. Embedded raster images are omitted; use Static HTML when image nodes must
+remain visible. Copy uses `image/svg+xml` when the browser permits it and
+otherwise opens the same standalone SVG as selected text for manual copy. Invalid
+source may keep the last usable preview; the export message calls that out
+explicitly.
 
 Drop a Flowview `.spec.json`/`.json`, Mermaid `.mmd`/`.mermaid`, or Markdown
 file containing a Mermaid sequence onto Welcome or the open Workbench. The File

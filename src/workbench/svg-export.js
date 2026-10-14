@@ -53,6 +53,16 @@ function svgExportSafeStyleValue(value,base){
   value=value.replace(/url\(([^)]*)\)/gi,function(match,target){var local=svgExportLocalReference(target,base);if(!local){unsafe=true;return '';}return 'url('+local+')';});
   return unsafe?null:value;
 }
+function svgExportSafeCustomStyles(style,base){
+  var styles=[];
+  for(var i=0;style && i<style.length;i++){
+    var name=style.item?style.item(i):style[i];
+    if(!/^--[-_a-z0-9]+$/i.test(name))continue;
+    var value=svgExportSafeStyleValue(style.getPropertyValue(name),base);
+    if(value!=null && value!=='')styles.push(name+':'+value);
+  }
+  return styles.join(';');
+}
 function svgExportStripAttributes(el,base){
   Array.from(el.attributes || []).forEach(function(attr){
     var name=attr.name.toLowerCase(),value=attr.value;
@@ -62,7 +72,9 @@ function svgExportStripAttributes(el,base){
       var classes=svgExportClassName(value);if(classes)el.setAttribute('class',classes);else el.removeAttribute('class');
     }else if(name==='href' || name==='xlink:href'){
       var local=svgExportLocalReference(value,base);if(local)el.setAttribute(attr.name,local);else el.removeAttribute(attr.name);
-    }else if(name==='style')el.removeAttribute(attr.name);
+    }else if(name==='style'){
+      var custom=svgExportSafeCustomStyles(el.style,base);el.removeAttribute(attr.name);if(custom)el.setAttribute('style',custom);
+    }
     else if(/url\(/i.test(value)){
       var safe=svgExportSafeStyleValue(value,base);if(safe==null)el.removeAttribute(attr.name);else el.setAttribute(attr.name,safe);
     }
@@ -96,15 +108,28 @@ function svgExportInjectSymbols(source,clone){
     svgExportReferencedIds(copy).forEach(function(ref){if(!complete.has(ref))pending.push(ref);});
   }
 }
+function svgExportRenderContext(source,clone,doc,base){
+  var boundary=source.closest && (source.closest('.docview') || source.closest('.board')),ancestors=[],node=source.parentElement;
+  if(!boundary)boundary=node;
+  while(node && node!==doc.body){ancestors.unshift(node);if(node===boundary)break;node=node.parentElement;}
+  var root=null,parent=null;
+  ancestors.forEach(function(original){
+    var shell=original.cloneNode(false);svgExportStripAttributes(shell,base);shell.removeAttribute('id');
+    if(parent)parent.appendChild(shell);else root=shell;parent=shell;
+  });
+  if(parent)parent.appendChild(clone);else root=clone;
+  return root;
+}
 function svgExportInlineStyles(root,win,base){
-  [root].concat(Array.from(root.querySelectorAll('*'))).forEach(function(el){
+  var elements=[root].concat(Array.from(root.querySelectorAll('*'))),captured=elements.map(function(el){
     var computed=win.getComputedStyle(el),styles=[];
     SVG_EXPORT_STYLE_PROPERTIES.forEach(function(name){
       var value=svgExportSafeStyleValue(computed.getPropertyValue(name),base);
       if(value!=null && value!=='' && value!=='normal' && value!=='auto')styles.push(name+':'+value);
     });
-    if(styles.length)el.setAttribute('style',styles.join(';'));
+    return styles.join(';');
   });
+  elements.forEach(function(el,index){if(captured[index])el.setAttribute('style',captured[index]);else el.removeAttribute('style');});
 }
 function svgExportRebaseIds(root){
   var ids=new Map(),serial=0;
@@ -130,9 +155,8 @@ function prepareStandaloneSvg(source,options){
   var doc=source.ownerDocument,win=doc.defaultView;if(!win || !win.XMLSerializer)throw Error('This browser cannot serialize SVG.');
   var clone=source.cloneNode(true),base=doc.baseURI || '';
   svgExportCleanTree(clone,base);svgExportInjectSymbols(source,clone);
-  var wrapper=doc.createElement('div'),theme=source.closest && source.closest('.docview');
-  wrapper.className=theme?theme.className:'';wrapper.setAttribute('aria-hidden','true');
-  wrapper.style.cssText='position:fixed;left:-100000px;top:0;width:1200px;pointer-events:none';wrapper.appendChild(clone);doc.body.appendChild(wrapper);
+  var wrapper=doc.createElement('div');wrapper.setAttribute('aria-hidden','true');
+  wrapper.style.cssText='position:fixed;left:-100000px;top:0;width:1200px;pointer-events:none';wrapper.appendChild(svgExportRenderContext(source,clone,doc,base));doc.body.appendChild(wrapper);
   try{svgExportInlineStyles(clone,win,base);}finally{wrapper.remove();}
   clone.setAttribute('xmlns','http://www.w3.org/2000/svg');clone.setAttribute('version','1.1');clone.setAttribute('role','img');
   clone.removeAttribute('aria-label');clone.removeAttribute('aria-labelledby');clone.removeAttribute('focusable');

@@ -7,7 +7,24 @@ const raw={page:{title:'SVG Export',skin:'pastel',sections:[
 ]}};
 const source=JSON.stringify(raw,null,2);
 
+const fidelityRaw={page:{title:'SVG fidelity',protocols:{signal:{label:'Signal',color:{aurora:'#E05DCC',daylight:'#176B87'}}},sections:[
+  {heading:'Theme sample',diagram:{nodes:{sender:{title:'Sender',icon:'cloud',locked:true},receiver:{title:'Receiver',icon:'db'}},rows:[['sender','receiver']],edges:[{from:'sender',to:'receiver',kind:'signal'}]}}
+]}};
+
 async function menu(page,id){await page.locator('#workspace-export-trigger').click();await page.locator('#'+id).click();}
+
+async function graphPaint(page,rootSelector='.boardcanvas > svg',cardSelector='.card'){
+  return page.locator(rootSelector).first().evaluate((svg,cardSelector)=>{
+    const value=(selector,name)=>getComputedStyle(svg.querySelector(selector)).getPropertyValue(name).trim();
+    const edge=svg.querySelector('.edge.main'),marker=value('.edge.main','marker-end');
+    const markerId=(marker.match(/#([^)'"\s]+)/)||[])[1]||'';
+    return {
+      ground:value('.dv-board-ground','fill'),cardFill:value(cardSelector,'fill'),cardStroke:value(cardSelector,'stroke'),
+      edgeStroke:value('.edge.main','stroke'),markerFill:value('marker .dv-protocol-fill','fill'),textFill:value('.t1','fill'),
+      markerResolved:Boolean(markerId && svg.querySelector('#'+CSS.escape(markerId)))
+    };
+  },cardSelector);
+}
 
 test('Download SVG exports only the selected live graph and opens independently',async({page,server},info)=>{
   await page.goto(server.origin+'/workbench.html');await pastePage(page,source);
@@ -29,6 +46,27 @@ test('Download SVG exports only the selected live graph and opens independently'
   await info.attach('standalone-diagram-svg',{body:await reader.screenshot(),contentType:'image/png'});await reader.close();
   const extra=[];page.on('download',item=>extra.push(item));await node.locator('xpath=ancestor::*[contains(@class,"board")][1]').evaluate(board=>board.hidden=true);
   await menu(page,'file-export-svg');await expect(page.locator('#guide')).toContainText('hidden or unavailable');expect(extra).toHaveLength(0);
+});
+
+test('standalone SVG preserves meaningful live paint across Aurora, Daylight, and Pastel',async({page,server},info)=>{
+  await page.goto(server.origin+'/workbench.html');
+  for(const [index,skin] of ['aurora','daylight','pastel'].entries()){
+    const text=JSON.stringify({...fidelityRaw,page:{...fidelityRaw.page,skin}},null,2);
+    if(index===0)await pastePage(page,text);
+    else{await page.locator('#editor-tab-json').click();await page.locator('#src').fill(text);await page.locator('#go').click();await expect(page.locator('#src')).toHaveValue(text);}
+    await page.locator('[data-dv-node="sender"]').click();
+    const before=await graphPaint(page,'.boardcanvas > svg','[data-dv-node="receiver"] .card'),sourceBefore=await page.locator('#src').inputValue();
+    expect(before.markerResolved).toBe(true);
+    const download=page.waitForEvent('download');await menu(page,'file-export-svg');const file=await download;
+    const svg=await readFile(await file.path(),'utf8'),reader=await page.context().newPage();
+    expect(svg).not.toMatch(/dv-sel|dv-position-locked|Position locked|data-dv-/);
+    await reader.goto('data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64'));
+    const reopened=await graphPaint(reader,'svg','.card');
+    expect(reopened).toEqual(before);
+    await expect(page.locator('#src')).toHaveValue(sourceBefore);
+    await info.attach('standalone-'+skin+'-svg',{body:await reader.screenshot(),contentType:'image/png'});
+    await reader.close();
+  }
 });
 
 test('Copy SVG uses image/svg+xml and falls back to selectable text on denial',async({page,server})=>{

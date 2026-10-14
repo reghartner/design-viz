@@ -545,3 +545,50 @@ test('imported-node right-click alignment enables each direction from its own pl
  const authored=JSON.parse(h.session.text()),imp=authored.page.sections[0].diagram.topologyImports[0];assert.ok(imp.nodePositions.api);assert.equal(imp.nodePositions.api.y,600);assert.deepEqual(Object.keys(authored.page.sections[0].diagram.nodes),['client']);
  spatial.destroy();
 });
+
+test('desktop edge context menu clears single and preserved mixed selections, including node-incident edges',()=>{
+ function mounted(){
+  const raw=fixture(),diagram=parent(raw);diagram.edges=[
+    {from:'client',to:'domain',fromPort:{side:'right'},label:'first'},
+    {from:'domain',to:'other',curvePoints:[{t:.5,dx:20,dy:30}],kind:'mqtt'},
+    {from:'other',to:'client',toDx:12,toDy:-4,ret:true}
+  ];
+  const h=ui(raw),section=h.view.appendChild(h.element());section.className='doc-sec';section.setAttribute('data-dv-section','0');
+  const surface=section.appendChild(h.element());surface.className='section-viewport';surface.getBoundingClientRect=()=>({left:0,top:0,right:1200,bottom:800,width:1200,height:800});
+  const append=surface.appendChild.bind(surface);surface.appendChild=child=>{if(child.className==='dv-object-menu')child.getBoundingClientRect=()=>({left:0,top:0,right:260,bottom:300,width:260,height:300});return append(child);};
+  const board=surface.appendChild(h.element('svg'));board.className='board boardcanvas';board.getScreenCTM=()=>({inverse(){return this;}});
+  h.win.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(){return this;}};h.win.innerWidth=1200;h.win.innerHeight=800;
+  function object(tag,kind,id,left){const el=board.appendChild(h.element(tag));el.setAttribute('data-dv-'+kind,String(id));el.getBoundingClientRect=()=>({left,top:100,right:left+100,bottom:160,width:100,height:60});el.getClientRects=()=>[{}];return el;}
+  const nodes={client:object('g','node','client',100),domain:object('g','node','domain',400),other:object('g','node','other',700)};
+  const edges=[object('path','edge',0,220),object('path','edge',1,520),object('path','edge',2,820)];edges.forEach(edge=>edge.className='edge');
+  return {h,surface,nodes,edges};
+ }
+ const one=mounted();let selected=[],selectCalls=0,applied=0;
+ const single=one.h.C.createBuilderSpatialSelection({document:one.h.doc,window:one.h.win,view:one.h.view,src:one.h.src,session:one.h.session,
+  targetFromEvent:ev=>one.edges.includes(ev.target)?{kind:'edge',section:0,index:Number(ev.target.getAttribute('data-dv-edge')),el:ev.target}:null,
+  selection:()=>selected,select(value){selectCalls++;selected=value;},toggle(){},find(){},apply(plan,opt,snapshot){applied++;return one.h.session.accept(plan,{snapshot});},busy:()=>false,inspect(){}});
+ const initial=one.h.text;one.h.view.fire('contextmenu',{target:one.edges[0],clientX:250,clientY:130});
+ assert.equal(selectCalls,1);assert.equal(selected.length,1);assert.equal(selected[0].kind,'edge');const singleClear=one.surface.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');
+ assert.ok(singleClear);assert.equal(singleClear.getAttribute('aria-disabled'),null);singleClear.fire('click');assert.equal(applied,1);assert.equal(parent(JSON.parse(one.h.text)).edges[0].fromPort,undefined);
+ assert.equal(one.h.session.undo(),true);assert.equal(one.h.text,initial);single.destroy();
+
+ const many=mounted();selected=[{kind:'node',section:0,id:'client',el:many.nodes.client},{kind:'edge',section:0,index:1,key:'domain->other',el:many.edges[1]}];selectCalls=0;applied=0;
+ const mixed=many.h.C.createBuilderSpatialSelection({document:many.h.doc,window:many.h.win,view:many.h.view,src:many.h.src,session:many.h.session,
+  targetFromEvent:ev=>many.edges.includes(ev.target)?{kind:'edge',section:0,index:Number(ev.target.getAttribute('data-dv-edge')),el:ev.target}:null,
+  selection:()=>selected,select(value){selectCalls++;selected=value;},toggle(){},find(){},apply(plan,opt,snapshot){applied++;return many.h.session.accept(plan,{snapshot});},busy:()=>false,inspect(){}});
+ const before=many.h.text;many.h.view.fire('contextmenu',{target:many.edges[1],clientX:550,clientY:130});assert.equal(selectCalls,0,'right-clicking a member preserves the multi-selection');
+ const clear=many.surface.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.ok(clear);assert.equal(clear.getAttribute('aria-disabled'),null);clear.fire('click');
+ const next=parent(JSON.parse(many.h.text)).edges;assert.equal(applied,1);assert.equal(next[0].fromPort,undefined);assert.equal(next[1].curvePoints,undefined);assert.equal(next[2].toDx,undefined);assert.equal(next[2].toDy,undefined);
+ assert.equal(next[0].label,'first');assert.equal(next[1].kind,'mqtt');assert.equal(next[2].ret,true);assert.equal(many.h.session.undo(),true);assert.equal(many.h.text,before);assert.equal(many.h.session.canUndo(),false);mixed.destroy();
+
+ const marquee=mounted(),board=marquee.surface.querySelector('.boardcanvas'),queryAll=marquee.surface.querySelectorAll.bind(marquee.surface);selected=[];selectCalls=0;applied=0;
+ marquee.surface.querySelectorAll=selector=>selector.indexOf('.boardcanvas [data-dv-node]')===0?Object.values(marquee.nodes):queryAll(selector);
+ let captured=false;board.setPointerCapture=()=>{captured=true;};board.hasPointerCapture=()=>captured;board.releasePointerCapture=()=>{captured=false;};
+ const afterAlt=marquee.h.C.createBuilderSpatialSelection({document:marquee.h.doc,window:marquee.h.win,view:marquee.h.view,src:marquee.h.src,session:marquee.h.session,
+  targetFromEvent:()=>null,selection:()=>selected,select(value){selectCalls++;selected=value;},toggle(){},find(){},apply(plan,opt,snapshot){applied++;return marquee.h.session.accept(plan,{snapshot});},busy:()=>false,inspect(){}});
+ marquee.h.view.fire('pointerdown',{target:board,button:0,altKey:true,ctrlKey:false,metaKey:false,shiftKey:false,pointerId:7,clientX:50,clientY:50,stopImmediatePropagation(){this.stopped=true;}});
+ marquee.h.win.fire('pointermove',{pointerId:7,clientX:850,clientY:200});marquee.h.win.fire('pointerup',{pointerId:7,clientX:850,clientY:200,stopImmediatePropagation(){this.stopped=true;}});assert.equal(selected.length,3);assert.equal(selectCalls,1);
+ marquee.h.view.fire('contextmenu',{target:marquee.nodes.client,clientX:120,clientY:120});assert.equal(selectCalls,1,'right-click after Alt-marquee keeps its selected objects');
+ const marqueeClear=marquee.surface.querySelectorAll('button').find(button=>button.textContent==='Clear Custom Edges');assert.ok(marqueeClear);marqueeClear.fire('click');assert.equal(applied,1);
+ const marqueeEdges=parent(JSON.parse(marquee.h.text)).edges;assert.equal(marqueeEdges.some(edge=>edge.fromPort || edge.toPort || edge.curvePoints || edge.toDx != null || edge.toDy != null),false);afterAlt.destroy();
+});

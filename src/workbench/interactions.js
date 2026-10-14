@@ -370,10 +370,13 @@ function createBuilderInteractions(opts){
   function openReferenceMenu(ev){
     if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag)return;
     var ref=referenceTarget(ev.target);if(!ref)return;
-    // A selected imported node participates in the ordinary multi-object menu;
-    // leave this event for spatial selection so mixed/imported alignment is
-    // reachable without surrendering the reference menu for single members.
-    if(ref.target.kind==='node' && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ref.target.section && t.id===ref.target.id;}))return;
+    // A selected imported member participates in the ordinary multi-object
+    // menu. Leave this event for spatial selection so actions can combine the
+    // authored members while the provider-owned member remains read only.
+    if(multiSel.length>1 && multiSel.some(function(t){
+      return t.kind===ref.target.kind && t.section===ref.target.section &&
+        (t.kind==='edge'?t.index===ref.target.index:t.id===ref.target.id);
+    }))return;
     ev.preventDefault();ev.stopImmediatePropagation();closeReferenceMenu(false);if(spatial)spatial.clear();pausePreview();
     var context=session.topologyContext(),contextKey=JSON.stringify(context),url=referenceURL(context,ref.imp);
     function current(){var now=parseEditor();return !now.error && now.project===ref.s.project && now.text===ref.s.text && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(session.topologyContext())===contextKey && ref.el && ref.el.isConnected && (!opts.isActive || opts.isActive());}
@@ -387,6 +390,7 @@ function createBuilderInteractions(opts){
     var unavailable='This provider has no verified published link in this repository catalog.';
     item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
+    item('Clear Custom Edges',function(){},'This topology belongs to its provider; no authored custom edge geometry is in scope.');
     item('Copy diagram link',function(){window.navigator.clipboard.writeText(url).catch(function(){if(current())inspectorMessage('Could not copy the diagram link.');});},!url?unavailable:!window.navigator.clipboard?'Clipboard access is unavailable in this browser.':null);
     var got=builderDiagram(ref.s.text,ref.s.raw,ref.section),direct=!got.error && (got.d.topologyImports || []).some(function(imp){return imp.as===ref.imp.as;});
     var reset=direct?planResetTopologyArrangement(ref.s.text,ref.s.raw,ref.section,ref.imp.as):{error:ref.imp.as.indexOf('::')>=0?'Reset the containing reference to restore this nested arrangement.':'Open the authored consumer with its providers to reset its arrangement.'};

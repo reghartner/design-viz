@@ -47,6 +47,69 @@ function planEdgeCurve(text,raw,sectionIdx,index,points,cubic){
   ]);
 }
 
+var BUILDER_EDGE_ROUTING_FIELDS=['fromPort','toPort','curvePoints','curveControls','bend','fromDx','fromDy','toDx','toDy'];
+function builderEdgeHasCustomRouting(edge){
+  return !!edge && BUILDER_EDGE_ROUTING_FIELDS.some(function(key){return Object.prototype.hasOwnProperty.call(edge,key);});
+}
+function builderImportedEdgeKeys(diagram){
+  var imported=new Set();
+  ((((diagram || {}).topologyProvenance || {}).imports) || []).forEach(function(record){
+    (record.edges || []).forEach(function(key){imported.add(key);});
+  });
+  return imported;
+}
+/* Clear only authored routing geometry. scope is either {all:true,section:n}
+   or {targets:[edge/node targets]}; node targets contribute their incident
+   authored edges. A multi-section selection is still one source transaction. */
+function planClearCustomEdges(text,raw,scope){
+  scope=scope || {};var targets=Array.isArray(scope.targets)?scope.targets:null,sections=Object.create(null);
+  if(scope.all===true){
+    if(!Number.isInteger(scope.section))return {error:'Choose one diagram section.'};
+    sections[scope.section]={all:true,edges:[],nodes:new Set()};
+  }else{
+    if(!targets || !targets.length)return {noop:true,count:0};
+    for(var i=0;i<targets.length;i++){
+      var target=targets[i];
+      if(!target || !Number.isInteger(target.section) || ['edge','node'].indexOf(target.kind)<0)continue;
+      var selected=sections[target.section] || (sections[target.section]={all:false,edges:[],nodes:new Set()});
+      if(target.kind==='node' && typeof target.id==='string')selected.nodes.add(target.id);
+      else selected.edges.push(target);
+    }
+  }
+  var chosen=[];
+  Object.keys(sections).forEach(function(sectionKey){
+    var section=Number(sectionKey),selection=sections[sectionKey],got=builderDiagram(text,raw,section);
+    if(got.error){chosen.push({error:got.error});return;}
+    var edges=Array.isArray(got.d.edges)?got.d.edges:[],imported=builderImportedEdgeKeys(got.d),wanted=new Set();
+    function local(index){var edge=edges[index];return !!edge && !imported.has(builderEdgeKey(edge));}
+    if(selection.all)edges.forEach(function(_,index){if(local(index))wanted.add(index);});
+    selection.edges.forEach(function(target){
+      if(target.imported===true)return;
+      if(typeof target.key==='string'){
+        var matches=[];edges.forEach(function(edge,index){if(local(index) && builderEdgeKey(edge)===target.key)matches.push(index);});
+        if(matches.length===1)wanted.add(matches[0]);
+      }else if(Number.isInteger(target.index) && local(target.index))wanted.add(target.index);
+    });
+    if(selection.nodes.size)edges.forEach(function(edge,index){
+      if(local(index) && (selection.nodes.has(edge.from) || selection.nodes.has(edge.to)))wanted.add(index);
+    });
+    Array.from(wanted).sort(function(a,b){return a-b;}).forEach(function(index){
+      if(builderEdgeHasCustomRouting(edges[index]))chosen.push({section:section,index:index,path:got.path.concat(['edges',index])});
+    });
+  });
+  var failure=chosen.find(function(record){return record.error;});if(failure)return {error:failure.error};
+  if(!chosen.length)return {noop:true,count:0};
+  var out=text;
+  for(var c=0;c<chosen.length;c++){
+    for(var f=0;f<BUILDER_EDGE_ROUTING_FIELDS.length;f++){
+      var changed=jsonSetField(out,chosen[c].path,BUILDER_EDGE_ROUTING_FIELDS[f],null);
+      if(!changed)return {error:'Could not clear custom connection routing.'};
+      out=changed.text;
+    }
+  }
+  return {text:out,count:chosen.length};
+}
+
 function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
   /* lift one layout row out of diagram.rows and re-insert it at toIdx
      (index AFTER removal — the drop code converts gap positions) */

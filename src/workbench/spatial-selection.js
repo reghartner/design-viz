@@ -93,6 +93,14 @@ function createBuilderSpatialSelection(opts){
   function cancel(){if(!marquee)return;var m=marquee;marquee=null;if(m.box)m.box.remove();try{if(m.board.hasPointerCapture(m.id))m.board.releasePointerCapture(m.id);}catch(_){} }
   function clear(){close(false);cancel();cancelNudge();if(status)status.remove();status=null;swallow=false;sync();}
   function currentTargets(){return opts.selection().map(function(t){if(t.kind==='panel' && t.el){var shell=surface(t.el),card=shell && Array.from(shell.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.contains(t.el);});if(card){var authored=target(card);if(authored)return authored;}}if(t.kind!=='panel' || t.id)return t;var s=snapshot(),got=s && builderDiagram(s.text,s.raw,t.section),p=got && !got.error && (got.d.panels || [])[t.index];return Object.assign({},t,{id:p && p.id});});}
+  function edgeRoutingTargets(s,targets){
+    var resolved=s.raw;try{if(opts.session.resolve)resolved=opts.session.resolve(s.raw);}catch(_){}
+    return targets.map(function(t){
+      if(t.kind!=='edge' || t.key)return t;
+      var record=specSectionPaths(resolved)[t.section],diagram=record && specValueAt(resolved,record.diagram),edge=diagram && (diagram.edges || [])[t.index];
+      return edge?Object.assign({},t,{key:builderEdgeKey(edge)}):t;
+    });
+  }
   function context(){
     var targets=currentTargets(),shell=targets.length && surface(targets[0].el),s=snapshot();
     if(!s || !shell || targets.some(function(t){return !t.el || surface(t.el)!==shell || !t.el.isConnected || !t.el.getClientRects().length || t.kind==='step-controls' && !t.el.closest('.explore-canvas-objects') || ['node','panel','step-controls'].indexOf(t.kind)<0;}))return null;
@@ -171,6 +179,8 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)!==topologyKey)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
+    var clearPlan=planClearCustomEdges(s.text,s.raw,{targets:edgeRoutingTargets(s,targets)}),clearReason=clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null);
+    item('Clear Custom Edges',function(){opts.apply(clearPlan,null,s);},clearReason);
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
     ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(plan.noop)announce('Every selected graph node is position-locked or already aligned; nothing moved.',shell);else opts.apply(plan,null,s);},alignment.error);});

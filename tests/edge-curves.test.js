@@ -62,6 +62,36 @@ test('curve planners preserve wrapped source and content, reset legacy bend, and
   }
 });
 
+test('clear custom edges removes only authored routing geometry across edge, node, and diagram scopes',()=>{
+  const manual={from:'a',to:'b',fromPort:{side:'right',offset:.2},toPort:{side:'left'},curvePoints:[{t:.5,dx:20,dy:-30}],
+    curveControls:[{t:1/3,dx:1,dy:2},{t:2/3,dx:3,dy:4}],bend:18,fromDx:1,fromDy:2,toDx:3,toDy:4,
+    kind:'https',ret:true,label:'kept',labelAt:.4,labelDx:8,labelDy:9,visibility:'dim',delta:true,future:'also kept'};
+  const untouched={from:'b',to:'c',kind:'mqtt',labelDx:11},incident={from:'c',to:'a',toPort:{side:'top'},label:'incident'};
+  const raw={page:{title:'Exact wrapper',blocks:[{diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[manual,untouched,incident]}}]}};
+  const text=' \n'+JSON.stringify(raw,null,3)+'\n ';
+  const single=C.planClearCustomEdges(text,raw,{targets:[{kind:'edge',section:0,index:0}]}),edge=JSON.parse(single.text).page.blocks[0].diagram.edges[0];
+  for(const key of C.BUILDER_EDGE_ROUTING_FIELDS)assert.equal(edge[key],undefined,key);
+  assert.deepEqual(plain(edge),{from:'a',to:'b',kind:'https',ret:true,label:'kept',labelAt:.4,labelDx:8,labelDy:9,visibility:'dim',delta:true,future:'also kept'});
+  assert.deepEqual(JSON.parse(single.text).page.blocks[0].diagram.edges[1],untouched);assert.ok(single.text.startsWith(' \n'));assert.ok(single.text.endsWith('\n '));
+  const selected=C.planClearCustomEdges(text,raw,{targets:[{kind:'node',section:0,id:'a'},{kind:'edge',section:0,index:1}]});
+  const selectedEdges=JSON.parse(selected.text).page.blocks[0].diagram.edges;assert.equal(selected.count,2);
+  assert.equal(selectedEdges[0].fromPort,undefined);assert.equal(selectedEdges[2].toPort,undefined);assert.deepEqual(selectedEdges[1],untouched);
+  const all=C.planClearCustomEdges(text,raw,{all:true,section:0});assert.equal(all.count,2);
+  assert.equal(C.planClearCustomEdges(all.text,JSON.parse(all.text),{all:true,section:0}).noop,true);
+  assert.equal(JSON.stringify(raw.page.blocks[0].diagram.edges[0]),JSON.stringify(manual),'planner must not mutate input');
+});
+
+test('clear custom edges skips provider-owned edges and reports an unchanged scope as a noop',()=>{
+  const raw={nodes:{a:{},b:{},'provider::x':{},'provider::y':{}},rows:[['a','b','provider::x','provider::y']],
+    edges:[{from:'a',to:'b',fromPort:{side:'right'}},{from:'provider::x',to:'provider::y',curvePoints:[{t:.5,dx:20,dy:20}]}],
+    topologyProvenance:{version:1,imports:[{as:'provider',spec:'p',export:'main',position:{x:0,y:0},nodes:['provider::x','provider::y'],edges:['provider::x->provider::y'],groups:[]}]}};
+  const text=JSON.stringify(raw,null,2),imported=C.planClearCustomEdges(text,raw,{targets:[{kind:'edge',section:0,index:1,key:'provider::x->provider::y'}]});
+  assert.equal(imported.noop,true);assert.equal(imported.text,undefined);
+  const mixed=C.planClearCustomEdges(text,raw,{targets:[{kind:'edge',section:0,index:0,key:'a->b'},{kind:'edge',section:0,index:1,key:'provider::x->provider::y'}]});
+  const edges=JSON.parse(mixed.text).edges;assert.equal(mixed.count,1);assert.equal(edges[0].fromPort,undefined);assert.deepEqual(edges[1],raw.edges[1]);
+  const all=C.planClearCustomEdges(text,raw,{all:true,section:0});assert.equal(all.count,1);assert.deepEqual(JSON.parse(all.text).edges[1],raw.edges[1]);
+});
+
 test('manual curves take precedence over lanes and ports and advertise export compatibility',()=>{
   const d={nodes:{a:{},b:{}},rows:[['a','b']],routing:'lanes',edges:[{from:'a',to:'b',fromPort:{side:'top'},curvePoints:[{t:.5,dx:0,dy:-120}]}]};
   const L=C.layout(d),e=d.edges[0];assert.equal(C.edgePath(e,L,C.laneRoutes(d,L)[0]),C.edgeCurvePath(e,L));

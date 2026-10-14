@@ -980,7 +980,9 @@ body.sk-aurora.sk-blueprint{
 .layout-step-options{display:grid;gap:8px;max-height:240px;overflow:auto;margin-top:10px;}
 .section-arrange-fields .layout-step-options label{align-items:flex-start;line-height:1.4;}
 .section-arrange-fields .layout-step-options input{width:16px;height:16px;min-height:16px;flex:none;margin:2px 0 0;}
-.section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
+/* Arrangement handles overlay the saved tile; entering Arrange must not
+   consume content space or resize the diagram and panels. */
+.section-arranging .section-layout-tile{outline:1px dashed var(--acc);}
 .section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

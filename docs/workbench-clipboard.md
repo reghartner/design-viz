@@ -5,7 +5,7 @@
 Choose **Add → Add / Paste diagram** (also available in Inspect), drop a
 Flowview `.json` or Mermaid `.mmd`, `.mermaid`, `.md`, or `.txt` file onto the
 active Diagram or Explore canvas, or paste an unambiguous Flowview document or
-Mermaid sequence outside text fields. The preview names the destination,
+Mermaid sequence or flowchart outside text fields. The preview names the destination,
 offers a source section chooser when the document contains multiple diagrams,
 and reports node, group, and connection counts before **Add diagram**.
 
@@ -17,6 +17,10 @@ timelines, prose, and named views are not merged. The new nodes are selected;
 one Undo restores the exact previous source.
 
 Files and pasted input are limited to 2 MiB. Markdown Mermaid fences work.
+Flowcharts retain directions, labels, groups, and all supported connections;
+shape/style conversion warnings appear before confirmation. The
+[Mermaid import subset](workbench-user-guide.md) documents supported syntax and
+parser limits. Imported flowcharts add no timeline events.
 Conditional/loop blocks that omit connections, colliding Mermaid participant
 IDs, unresolved local references, shared topology, and local section/timeline
 dependencies are refused with an explanation before any edit. Export a resolved

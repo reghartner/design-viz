@@ -46,6 +46,14 @@ Limits and controls are in [automatic arrangement](../../../docs/auto-arrange.md
 
 ## Choose the starting point
 
+For supplied Mermaid flowcharts, the desktop Workbench can import the bounded
+`flowchart`/`graph` subset described in the
+[user guide](../../../docs/workbench-user-guide.md). File import replaces the
+document after preview; Add / Paste diagram merges its graph into the selected
+canvas in one Undo. Preserve conversion warnings and do not infer timeline
+events or network protocols from static arrows. The Python `mermaid2spec.py`
+tool remains sequence-only.
+
 After the packet, load a guide only for starting-material or handoff details:
 
 | Starting point | Guide |

@@ -63,12 +63,37 @@ source may keep the last usable preview; the export message calls that out
 explicitly.
 
 Drop a Flowview `.spec.json`/`.json`, Mermaid `.mmd`/`.mermaid`, or Markdown
-file containing a Mermaid sequence onto Welcome or the open Workbench. The File
+file containing a Mermaid sequence or flowchart onto Welcome or the open Workbench. The File
 panel's **import Flowview / Mermaid…** button provides the same keyboard route.
 Flowview inspects the bounded local file in your browser and shows its detected
 type and a short summary before anything changes. Choose **Import** once to
 continue, or **Cancel**/Escape to leave the current document and Undo history
 untouched. In an open Workbench, one Undo restores the entire pre-import source.
+
+Mermaid browser import accepts `sequenceDiagram` and a bounded static
+`flowchart`/`graph` subset. The first Mermaid fence in Markdown wins. Flowcharts
+support `TD`/`TB`/`BT`/`LR`/`RL`, case-sensitive alphanumeric/underscore/hyphen IDs,
+implicit nodes, plain or double-quoted labels, solid directed `-->` links,
+`-->|label|` and `-- label -->` labels, chains, `&` branches, and nested
+`subgraph ID [Title]` / `end` groups. Later explicit node labels win. Cycles and
+self-loops are retained; placement follows the declared direction between
+acyclic components. Static imports have no invented timeline or network
+protocol: their legend says **Connection**.
+
+Rectangle, rounded, stadium, subroutine, cylinder, circle/double-circle,
+diamond, hexagon, parallelogram and trapezoid delimiters become native cards.
+The preview explains native layout/arrow appearance and warns when shapes change or `style`, `classDef`, `class`,
+`linkStyle`, or `:::class` styling is omitted. It never executes Mermaid,
+scripts, HTML, click handlers, or network requests. Frontmatter/directives,
+HTML/Markdown labels, entity escapes (use literal quoted characters), subgraph
+directions/endpoints, nodes assigned to multiple groups, parallel links with
+the same ordered endpoints, non-solid or non-directed arrows, and other
+advanced syntax are refused before editing. Unsupported input is not partially
+imported. Labels are single-line, at most 500 characters; a flowchart allows
+200 nodes, 500 connections, 32 groups, 16 nesting levels, and 2,000 statements.
+Whole-file/inline import allows 4 MiB; additive import allows 2 MiB.
+These additions apply to the browser; `tools/mermaid2spec.py` remains
+sequence-only.
 
 Both keeps the stamped authored JSON and creates a separate
 read-only HTML snapshot of the current page. Shared topology stays referenced

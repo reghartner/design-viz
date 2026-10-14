@@ -1,16 +1,159 @@
 /* Pure import/export preparation. Browser resources and publication live in io.js. */
 
+/* ---------------- bounded Mermaid flowcharts ---------------- */
+
+/* Deliberately a parser for a documented subset, never a Mermaid evaluator.
+   Keep this pure leaf self-contained: CLI/VM callers load io-model alone. */
+function mermaidFlowchartToSpec(source){
+  var nodes=Object.create(null),groups=Object.create(null),order=[],edges=[],pairs=Object.create(null),stack=[],todos=['Mermaid layout and arrow appearance use native Flowview rendering.'];
+  var statements=[],buffer='',quote=false,brackets=[],line=1,start=1,direction;
+  function fail(message){throw Error('line '+line+': '+message);}
+  function warning(message){if(todos.indexOf(message)<0)todos.push(message);}
+  function label(value){
+    value=value.trim();
+    if(value[0]==='"'){if(value[value.length-1]!=='"')fail('unclosed quoted label');value=value.slice(1,-1);}
+    if(!value || /[<>`"\r\n]/.test(value))fail('use nonempty plain-text labels; HTML and Markdown labels are unsupported');
+    if(/#(?:\d+|[A-Za-z]+);/.test(value))fail('Mermaid entity escapes are unsupported; paste the literal character in a quoted label');
+    if(value.length>500)fail('labels are limited to 500 characters');
+    return value;
+  }
+  function emit(){if(buffer.trim()){if(statements.length>=2000)fail('flowcharts are limited to 2000 statements');statements.push({text:buffer.trim(),line:start});}buffer='';start=line;}
+  // Split statements without splitting quoted labels, shape delimiters or pipe labels.
+  var pipe=false;
+  for(var at=0;at<source.length;at++){
+    var ch=source[at];
+    if(!quote && source.slice(at,at+2)==='%%'){
+      if(source[at+2]==='{')fail('Mermaid directives are unsupported');
+      while(at<source.length && source[at]!=='\n')at++;
+      ch='\n';
+    }
+    if(ch==='"')quote=!quote;
+    if(!quote){
+      if(ch==='|' && !brackets.length)pipe=!pipe;
+      if(!pipe){
+        if('[({'.indexOf(ch)>=0)brackets.push(ch);
+        if('])}'.indexOf(ch)>=0){if(brackets.pop()!==({']':'[',')':'(','}':'{'})[ch])fail('mismatched node delimiter');}
+      }
+    }
+    if(ch==='\n' || ch==='\r' || ch===';' && !quote && !brackets.length && !pipe){
+      if(quote || brackets.length || pipe)fail('unclosed label or node delimiter; multiline labels are unsupported');
+      emit();if(ch==='\n')line++;start=line;
+    }else buffer+=ch;
+  }
+  if(quote || brackets.length || pipe)fail('unclosed label or node delimiter');emit();
+  var header=statements.shift(),match=header && /^(?:flowchart|graph)\s+(TD|TB|BT|LR|RL)$/.exec(header.text);
+  if(!match)fail('expected flowchart/graph followed by TD, TB, BT, LR, or RL');direction=match[1];
+  var idPattern=/^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*/;
+  var delimiters=[['(((',')))'],['([','])'],['[[',']]'],['[(',')]'],['((', '))'],['{'+'{','}'+'}'],['[/','/]'],['[\\','\\]'],['[/','\\]'],['[\\','/]'],['[',']'],['(',')'],['{','}']];
+  function node(input){
+    var idMatch=idPattern.exec(input);if(!idMatch)fail('expected a node ID (letters, digits, underscores and single hyphens)');
+    var id=idMatch[0],rest=input.slice(id.length).trimStart(),title=null;
+    if(id==='end' || id==='subgraph' || id==='direction')fail('reserved node ID '+id);
+    if(Object.prototype.hasOwnProperty.call(groups,id))fail('subgraph endpoints and node/subgraph ID collisions are unsupported: '+id);
+    var candidates=delimiters.filter(function(d){return rest.indexOf(d[0])===0;});
+    if(candidates.length)candidates=candidates.filter(function(d){return d[0].length===candidates[0][0].length;});
+    var shape=candidates[0];
+    if(shape){
+      var pos=shape[0].length,end=-1,inQuote=false;
+      for(;pos<rest.length;pos++){
+        if(rest[pos]==='"')inQuote=!inQuote;
+        var closing=!inQuote && candidates.find(function(d){return rest.slice(pos,pos+d[1].length)===d[1];});
+        if(closing){shape=closing;end=pos;break;}
+      }
+      if(end<0)fail('unclosed node shape for '+id);
+      title=label(rest.slice(shape[0].length,end));rest=rest.slice(end+shape[1].length).trimStart();
+      if(shape[0]!=='[')warning('Mermaid node shapes are normalized to native cards.');
+    }
+    if(rest.indexOf(':::')===0){var cls=/^:::[A-Za-z_][\w-]*/.exec(rest);if(!cls)fail('invalid node class');rest=rest.slice(cls[0].length).trimStart();warning('Mermaid styles and classes are not imported.');}
+    if(!Object.prototype.hasOwnProperty.call(nodes,id)){
+      if(order.length>=200)fail('flowcharts are limited to 200 nodes');
+      nodes[id]={title:title || id};order.push(id);
+    }else if(title!==null)nodes[id].title=title;
+    if(stack.length){
+      var group=stack[stack.length-1];
+      if(nodes[id].group && nodes[id].group!==group)fail('node '+id+' belongs to multiple subgraphs; move its references outside the subgraph blocks');
+      nodes[id].group=group;
+    }
+    return {id:id,rest:rest};
+  }
+  function endpoints(input){
+    var ids=[],parsed=node(input);ids.push(parsed.id);
+    while(parsed.rest[0]==='&'){parsed=node(parsed.rest.slice(1).trimStart());ids.push(parsed.id);}
+    return {ids:ids,rest:parsed.rest};
+  }
+  function outsideQuote(input,token,start){
+    var quoted=false;for(var i=start;i<input.length;i++){if(input[i]==='"')quoted=!quoted;if(!quoted && input.slice(i,i+token.length)===token)return i;}return -1;
+  }
+  statements.forEach(function(statement){
+    line=statement.line;var input=statement.text;
+    if(/^subgraph\b/.test(input)){
+      var declaration=input.slice(8).trim(),m=idPattern.exec(declaration);
+      if(!m)fail('subgraph requires an explicit simple ID');
+      var id=m[0],tail=declaration.slice(id.length).trim(),title=id;
+      if(tail){if(tail[0]!=='[' || tail[tail.length-1]!==']')fail('use subgraph ID [plain-text title]');title=label(tail.slice(1,-1));}
+      if(Object.prototype.hasOwnProperty.call(nodes,id) || Object.prototype.hasOwnProperty.call(groups,id))fail('duplicate or colliding subgraph ID '+id);
+      if(Object.keys(groups).length>=32 || stack.length>=16)fail('flowcharts are limited to 32 subgraphs and 16 nesting levels');
+      groups[id]={title:title};if(stack.length)groups[id].parent=stack[stack.length-1];stack.push(id);return;
+    }
+    if(input==='end'){if(!stack.length)fail('end without a subgraph');stack.pop();return;}
+    if(/^(?:classDef|class|style|linkStyle)\s+\S+\s+\S/.test(input)){
+      warning('Mermaid styles and classes are not imported.');return;
+    }
+    if(/^(?:click|direction|accTitle|accDescr|classDef|class|style|linkStyle)\b/.test(input))fail('unsupported flowchart statement '+JSON.stringify(input));
+    var left=endpoints(input);
+    while(left.rest){
+      var rest=left.rest,edgeLabel='';
+      if(rest.indexOf('-->')===0){
+        rest=rest.slice(3).trimStart();
+        if(rest[0]==='|'){
+          var close=outsideQuote(rest,'|',1);if(close<0)fail('unclosed edge label');edgeLabel=label(rest.slice(1,close));rest=rest.slice(close+1).trimStart();
+        }
+      }else if(/^--\s+/.test(rest)){
+        var ending=outsideQuote(rest,'-->',2);if(ending<0)fail('only solid directed --> links are supported');edgeLabel=label(rest.slice(2,ending));rest=rest.slice(ending+3).trimStart();
+      }else fail('unsupported flowchart syntax '+JSON.stringify(rest)+'; use solid directed --> links');
+      var right=endpoints(rest);
+      left.ids.forEach(function(from){right.ids.forEach(function(to){
+        var key=from+'->'+to;if(pairs[key])fail('parallel connections '+key+' cannot be represented; use distinct intermediate nodes');
+        if(edges.length>=500)fail('flowcharts are limited to 500 connections');pairs[key]=true;
+        edges.push({from:from,to:to,kind:'mermaid',label:edgeLabel});
+      });});left=right;
+    }
+  });
+  if(stack.length)fail('unclosed subgraph '+stack[stack.length-1]);if(!order.length)fail('no flowchart nodes found');
+  // Condense cycles, then rank the acyclic component graph. Each original node
+  // and connection survives; cycle members share a rank with separate slots.
+  var adjacency=Object.create(null),index=Object.create(null),low=Object.create(null),active=Object.create(null),component=Object.create(null),pending=[],serial=0,components=[];
+  order.forEach(function(id){adjacency[id]=[];});edges.forEach(function(e){adjacency[e.from].push(e.to);});
+  function visit(id){
+    index[id]=low[id]=serial++;pending.push(id);active[id]=true;
+    adjacency[id].forEach(function(next){if(index[next]===undefined){visit(next);low[id]=Math.min(low[id],low[next]);}else if(active[next])low[id]=Math.min(low[id],index[next]);});
+    if(low[id]===index[id]){var members=[],next;do{next=pending.pop();active[next]=false;component[next]=components.length;members.push(next);}while(next!==id);components.push(members);}
+  }
+  order.forEach(function(id){if(index[id]===undefined)visit(id);});
+  var rank=components.map(function(){return 0;}),incoming=components.map(function(){return 0;}),outgoing=components.map(function(){return [];});
+  edges.forEach(function(e){var a=component[e.from],b=component[e.to];if(a!==b && outgoing[a].indexOf(b)<0){outgoing[a].push(b);incoming[b]++;}});
+  var queue=[];incoming.forEach(function(n,i){if(!n)queue.push(i);});
+  for(var qi=0;qi<queue.length;qi++)outgoing[queue[qi]].forEach(function(next){rank[next]=Math.max(rank[next],rank[queue[qi]]+1);if(--incoming[next]===0)queue.push(next);});
+  var max=Math.max.apply(null,rank),slots=Object.create(null),horizontal=direction==='LR' || direction==='RL',reverse=direction==='RL' || direction==='BT';
+  var floats=order.map(function(id){var layer=rank[component[id]],slot=slots[layer] || 0;slots[layer]=slot+1;var primary=reverse?max-layer:layer;
+    return {id:id,side:'below',x:160+(horizontal?primary:slot)*300,y:130+(horizontal?slot:primary)*180,noSpread:true};});
+  return {page:{title:'Converted flowchart',protocols:{mermaid:{label:'Connection',color:'#64748b'}},sections:[{heading:'Converted flowchart',diagram:{view:'ambient',nodes:nodes,groups:groups,rows:[[]],floats:floats,edges:edges,steps:[]}}]},todos:todos};
+}
+
 /* ---------------- Mermaid sequence skeleton ---------------- */
 
 function mermaidToSpec(text, options){
   if (typeof text !== 'string') throw new Error('line 1: expected mermaid text');
-  /* Match the CLI: the first mermaid fence wins, even if it is not a sequence. */
+  if(importUtf8Bytes(text)>4*1024*1024)throw new Error('Mermaid input exceeds 4 MiB.');
+  /* Match the CLI: the first mermaid fence wins. Sequence conversion stays compatible. */
   var fence = /^```mermaid\s*$([\s\S]*?)^```\s*$/m.exec(text);
+  var source=(fence ? fence[1] : text).trim();
+  if(/^(?:(?:%%[^\n]*\n)\s*)*(?:flowchart|graph)\b/.test(source))return mermaidFlowchartToSpec(source);
   var lines = (fence ? fence[1] : text).split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
     .map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln; });
   if (!lines.length || lines[0] !== 'sequenceDiagram')
     throw new Error('line 1: not a sequenceDiagram (first line is ' +
-      JSON.stringify(lines[0] || '<empty>') + '); only mermaid sequenceDiagram input is supported');
+      JSON.stringify(lines[0] || '<empty>') + '); supported Mermaid headers: sequenceDiagram, flowchart, graph');
   var order = [], titles = Object.create(null), originals=Object.create(null), messages = [], todos = [];
   var depth = 0, skipped = 0, header = null, blockLine = 0, n = 1;
   function ensure(pid, title){
@@ -129,6 +272,11 @@ function flowviewImportSummary(raw){
 
 function mermaidImportSummary(spec){
   var diagram=spec.page.sections[0].diagram,participants=Object.keys(diagram.nodes).length,messages=diagram.steps.length,todos=spec.todos.length;
+  if(spec.page.title==='Converted flowchart'){
+    var groups=Object.keys(diagram.groups).length,connections=diagram.edges.length;
+    return {title:spec.page.title,nodes:participants,groups:groups,connections:connections,todos:todos,
+      text:participants+' node'+(participants===1?'':'s')+' · '+groups+' group'+(groups===1?'':'s')+' · '+connections+' connection'+(connections===1?'':'s')};
+  }
   return {title:spec.page.title,participants:participants,messages:messages,todos:todos,
     text:participants+' participant'+(participants===1?'':'s')+' · '+messages+' message'+(messages===1?'':'s')+
       (todos?' · '+todos+' Mermaid todo'+(todos===1?'':'s'):'')};
@@ -143,7 +291,7 @@ function prepareFlowviewFileImport(meta,text,check){
     throw Error('Use a file no larger than 4 MiB.');
   if(typeof text!=='string')throw Error('The file could not be read as text.');
   if(importUtf8Bytes(text)>FLOWVIEW_IMPORT_MAX_BYTES)throw Error('Use a file no larger than 4 MiB.');
-  if(importLooksBinary(text))throw Error('Binary files are not supported. Choose Flowview JSON, Mermaid, or Markdown with a Mermaid sequence.');
+  if(importLooksBinary(text))throw Error('Binary files are not supported. Choose Flowview JSON, Mermaid, or Markdown with a Mermaid diagram.');
   var source=text.replace(/^\ufeff/,''),trimmed=source.trim();
   if(!trimmed)throw Error('The file is empty.');
   var raw,jsonError=null,mermaidError=null;
@@ -155,16 +303,17 @@ function prepareFlowviewFileImport(meta,text,check){
       return {name:name,kind:'flowview',type:'Flowview JSON',text:source,raw:raw,summary:flowviewImportSummary(raw),todos:[]};
     }
   }
-  if(/(^|\n)\s*sequenceDiagram\s*(\n|$)/.test(trimmed) || /^```mermaid\s*$/m.test(source) || /\.(mmd|mermaid|md|markdown)$/i.test(name)){
+  if(/(^|\n)\s*(?:sequenceDiagram|flowchart|graph)\b/.test(trimmed) || /^```mermaid\s*$/m.test(source) || /\.(mmd|mermaid|md|markdown)$/i.test(name)){
     try{
       var converted=mermaidToSpec(source);(check || importValidate)(converted);
-      return {name:name,kind:'mermaid',type:/\.(md|markdown)$/i.test(name)?'Markdown Mermaid sequence':'Mermaid sequence',
+      var type=converted.page.title==='Converted flowchart'?'flowchart':'sequence';
+      return {name:name,kind:'mermaid',type:(/\.(md|markdown)$/i.test(name)?'Markdown Mermaid ':'Mermaid ')+type,
         text:JSON.stringify(converted,null,2),raw:converted,summary:mermaidImportSummary(converted),todos:converted.todos.slice()};
     }catch(ex){mermaidError=ex;}
   }
   if(jsonError)throw Error('Invalid Flowview JSON: '+jsonError.message);
-  if(mermaidError)throw Error('Invalid Mermaid sequence: '+mermaidError.message);
-  throw Error('Unsupported file. Choose Flowview .spec.json/.json, Mermaid .mmd/.mermaid, or Markdown containing a Mermaid sequence.');
+  if(mermaidError)throw Error('Invalid Mermaid diagram: '+mermaidError.message);
+  throw Error('Unsupported file. Choose Flowview .spec.json/.json, Mermaid .mmd/.mermaid, or Markdown containing a Mermaid diagram.');
 }
 
 /* ---------------- durability: filenames ---------------- */

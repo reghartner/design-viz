@@ -63,7 +63,7 @@ function createStagedFileImport(opts){
       if(!active() || run!==version)return;
       if(context===false){message('Import cancelled because the document changed while the file was loading.');return;}
       pending={run:run,prepared:prepared,opening:opening,context:context};
-      status.hidden=true;detail.textContent=prepared.name+' · '+prepared.type;summary.textContent=prepared.summary.text;
+      status.hidden=true;detail.textContent=prepared.name+' · '+prepared.type;summary.textContent=prepared.summary.text+(prepared.todos.length?'. '+prepared.todos.join(' '):'');
       returnFocus=document.activeElement;dialog.showModal();confirm.focus();
     }catch(ex){if(active() && run===version)message('Could not import “'+file.name+'”. '+(ex.message || ex));}
   }
@@ -442,6 +442,12 @@ function createBuilderIO(opts){
   var importText = document.getElementById('import-mermaid-text');
   var importConvert = document.getElementById('import-mermaid-convert');
   var importCancel = document.getElementById('import-mermaid-cancel');
+  var importPreview = document.getElementById('import-mermaid-preview');
+  function previewMermaid(){
+    if(!importPreview)return;
+    try{var prepared=mermaidToSpec(importText.value);importPreview.textContent=mermaidImportSummary(prepared).text+'. '+prepared.todos.join(' ');}
+    catch(ex){importPreview.textContent=ex.message;}
+  }
   function importMessage(cls, message){
     var list = document.getElementById('msgs');
     if (!list) return;
@@ -453,8 +459,10 @@ function createBuilderIO(opts){
   if (importBtn && importBox && importText && importConvert && importCancel){
     listen(importBtn,'click',function(){
       importBox.hidden = false;
+      previewMermaid();
       importText.focus();
     });
+    listen(importText,'input',previewMermaid);
     listen(importCancel,'click',function(){
       importBox.hidden = true;
       importBtn.focus();

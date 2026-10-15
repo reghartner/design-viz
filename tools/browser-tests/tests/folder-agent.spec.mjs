@@ -1238,9 +1238,9 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
     expect(await preview.inputValue()).not.toContain(source);expect(await preview.inputValue()).not.toContain('"rows"');
-    // Document editing is desktop-only; retain the short-height copy/draft cycle.
-    for(const width of [1280,1440])for(let cycle=0;cycle<2;cycle++){
-      await page.setViewportSize({width,height:360});
+    // Document authoring is desktop-only; cover short windows and the supported layout matrix.
+    for(const [width,height] of [[1280,360],[1440,360],[1280,720],[1440,900],[1920,1080]])for(let cycle=0;cycle<2;cycle++){
+      await page.setViewportSize({width,height});
       await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-working')).toHaveAccessibleName(/Open Agent/);
       for(const selector of ['#workbench-home','#workspace-file','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#workspace-export-trigger']){
         const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1)};});
@@ -1248,15 +1248,15 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
       }
       if(!await preview.isVisible())await page.locator('#folder-agent-send').click();
       await expect(preview).toBeVisible();await preview.focus();
-      await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback-'+width+'-'+cycle+'.png')});
-      expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
+      await page.screenshot({path:info.outputPath('unified-agent-desktop-copy-fallback-'+width+'-'+cycle+'.png')});
+      expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable on desktop').toBe(true);
       const windowRect=await page.locator('#workspace-window-agent').boundingBox();
       await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
       await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
       expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
       for(const id of ['#folder-agent-input','#workspace-canvas-tools>summary'])expect(await page.locator(id).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' remains reachable alongside Copy request').toBe(true);
       expect(await page.locator('#workspace-window-agent').boundingBox()).toEqual(windowRect);
-      await page.screenshot({path:info.outputPath('unified-agent-short-return-draft-'+width+'-'+cycle+'.png')});
+      await page.screenshot({path:info.outputPath('unified-agent-desktop-return-draft-'+width+'-'+cycle+'.png')});
     }
     await page.setViewportSize({width:1280,height:900});
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{');

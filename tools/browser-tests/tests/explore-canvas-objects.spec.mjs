@@ -63,7 +63,7 @@ async function expectCanvasChrome(locator,selected){
  else{await expect(locator).not.toHaveClass(/explore-canvas-selected/);await expect(locator).not.toHaveAttribute('aria-current','true');await expect(locator).toHaveCSS('box-shadow','none');}
 }
 async function compactMetrics(locator){return locator.evaluate(el=>{const body=el.querySelector('.explore-window-body'),card=body.firstElementChild;return {outer:el.offsetHeight,body:body.clientHeight,content:card.scrollHeight,gap:body.clientHeight-card.scrollHeight,overflow:card.scrollHeight-body.clientHeight,width:el.offsetWidth,scrollable:body.scrollHeight>body.clientHeight};});}
-async function emptyCanvasPoint(page){return board(page).evaluate(el=>{const r=el.getBoundingClientRect(),occupied='.explore-window,.explore-player,.explore-tools,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]';for(let y=r.top+80;y<r.bottom-80;y+=30)for(let x=r.left+30;x<r.right-60;x+=30){const hit=document.elementFromPoint(x,y);if(hit && !hit.closest(occupied))return {x,y};}throw Error('No empty canvas point');});}
+async function emptyCanvasPoint(page){return board(page).evaluate(el=>{const r=el.getBoundingClientRect(),occupied='.explore-window,.explore-player,.explore-tools,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]';for(let y=r.top+80;y<r.bottom-80;y+=30)for(let x=r.left+30;x<r.right-60;x+=30){const hit=el.getRootNode().elementFromPoint(x,y);if(hit && el.contains(hit) && !hit.closest(occupied))return {x,y};}throw Error('No empty canvas point');});}
 for(const host of ['reader','workbench','backstage'])test(host+': canvas objects pan and zoom with the graph, Fit recovers all objects at desktop sizes',async({page,server},info)=>{
  for(const [width,height] of [[1280,800],[1440,900],[1920,1200]]){
   await page.setViewportSize({width,height});await open(page,server,fixture(),host);await page.evaluate(()=>document.fonts.ready);await fit(page,host);
@@ -268,7 +268,7 @@ for(const host of ['reader','workbench','backstage','inline'])test(host+': mixed
   await info.attach(host+' selected canvas chrome '+width,{body:await page.screenshot(),contentType:'image/png'});
   const empty=await emptyCanvasPoint(page);await page.mouse.click(empty.x,empty.y);await expectCanvasChrome(canvasPanel,false);
   await notes.focus();await expectCanvasChrome(notes,true);await expect(notes.locator('.sec-prose')).toHaveCSS('color',/./);
-  await page.mouse.click(empty.x,empty.y);await expectCanvasChrome(notes,false);
+  const nextEmpty=await emptyCanvasPoint(page);await page.mouse.click(nextEmpty.x,nextEmpty.y);await expectCanvasChrome(notes,false);
   if(host==='workbench'){await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();}
   const floating=await clip(page).boundingBox(),player=await page.locator('.explore-player').boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
   expect(floating.width).toBeCloseTo(stage.width*.22*.8,0);

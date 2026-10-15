@@ -13,6 +13,8 @@ async function expectTwoWide(root){const [a,b,c]=await bounds(root);expect(Math.
 
 test('contract blocks edit independently, resize, duplicate, reorder and undo in the workbench',async({page,server},testInfo)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ // Reserve canvas space while repeatedly editing and selecting contract cards.
+ await page.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
  const root=page.locator('#docview'),guide=page.locator('#guide');
  await expect(root.locator('.ctcard')).toHaveCount(3);await expectTwoWide(root);
  await root.locator('[data-dv-contract="0"] .ctrow').first().click();
@@ -38,6 +40,8 @@ test('contract blocks edit independently, resize, duplicate, reorder and undo in
 
 test('multi-selection keeps equal row indexes in different cards distinct',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ // Reserve canvas space while repeatedly editing and selecting contract cards.
+ await page.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
  const root=page.locator('#docview'),guide=page.locator('#guide');
  const legacy=root.locator('[data-dv-contract="legacy"] .ctrow').first(),reply=root.locator('[data-dv-contract="0"] .ctrow').first();
  await reply.click();await legacy.click({modifiers:['Shift']});await expect(guide).toContainText('2 crows selected');

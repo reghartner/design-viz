@@ -77,6 +77,8 @@ test('authored table widths stay fixed across snapshots, empty rows and history'
   await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
   await page.evaluate(()=>document.fonts.ready);
   const partial=await widths();expect(partial[0]).toBeCloseTo(160,0);
+  // Inspector editing is complete; expose the document playback controls.
+  await closeTools(page);
   await root.getByRole('button',{name:'Next step',exact:true}).click();
   await expect(table).toContainText('record_identifier_');expect(await widths()).toEqual(partial);
   await root.getByRole('button',{name:'Next step',exact:true}).click();
@@ -89,6 +91,7 @@ test('authored table widths stay fixed across snapshots, empty rows and history'
   const full=await widths();expect(full[0]).toBeCloseTo(160,0);expect(full[1]).toBeCloseTo(320,0);
   const wrap=root.locator('.pt-table .swtablewrap');
   expect(await wrap.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  await closeTools(page);
   await root.getByRole('button',{name:'Previous step',exact:true}).click();
   await expect(table).toContainText('record_identifier_');expect(await widths()).toEqual(full);
   await closeTools(page);

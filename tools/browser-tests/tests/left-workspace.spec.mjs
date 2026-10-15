@@ -1,7 +1,10 @@
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {canvasTools} from '../helpers/test.mjs';
 import {readFile} from 'node:fs/promises';
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
+
+test.beforeEach(useProjectDownloads);
 
 async function open(page,server,text=source){await page.goto(server.origin+'/workbench.html');await paste(page,text);}
 async function expectCenterHit(locator,label){
@@ -91,7 +94,7 @@ test('outline shortcut and selection stay in Outline; explicit inspection opens 
   await page.locator('#redo-builder').click();expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.a.title).toBe('Front camera');
 });
 
-test('File hosts company catalog, imports and exports; global Save works from JSON',async({page,server})=>{
+test('File hosts company catalog, imports and exports; complete project export works from JSON',async({page,server})=>{
   await open(page,server);await page.locator('#editor-tab-file').click();
   await page.locator('#editor-company summary').click();await expect(page.getByRole('textbox',{name:'Catalog JSON',exact:true})).toBeVisible();
   await page.locator('#sec-insert > summary').click();await page.locator('#import-mermaid').click();await expect(page.locator('#importbox')).toBeVisible();
@@ -100,7 +103,7 @@ test('File hosts company catalog, imports and exports; global Save works from JS
   const exportedPromise=page.waitForEvent('download');await page.locator('#confluence-export').click();const exported=await exportedPromise;
   expect(exported.suggestedFilename()).toContain('confluence');expect(JSON.parse(await readFile(await exported.path(),'utf8'))).toBeTruthy();
   await page.locator('#editor-tab-json').click();const savePromise=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await savePromise;
-  expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);
+  expect(JSON.parse(await projectSource(saved)).page.title).toBe(editorSpec().page.title);
 });
 
 test('top Home and File keep project navigation and exports reachable at desktop width',async({page,server})=>{
@@ -111,7 +114,7 @@ test('top Home and File keep project navigation and exports reachable at desktop
   await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-preset').selectOption('present');await expect(page.locator('.workspace-window:visible')).toHaveCount(0);
   await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await download;
-  expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);await expect(page.locator('#src')).toHaveValue(original);
+  expect(JSON.parse(await projectSource(saved)).page.title).toBe(editorSpec().page.title);await expect(page.locator('#src')).toHaveValue(original);
   await home.click();await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#workbench-workspace')).toBeHidden();
 });
 

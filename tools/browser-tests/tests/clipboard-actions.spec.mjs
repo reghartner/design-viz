@@ -1,4 +1,8 @@
+import {useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,pastePage as paste} from '../helpers/test.mjs';
+
+test.beforeEach(useProjectDownloads);
+
 
 const spec={page:{title:'Authoring actions',sections:[{heading:'Example',diagram:{view:'step',autoplay:false,
   nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{text:'First',nodes:['a']},{text:'Second',nodes:['b']}]}}]}};
@@ -17,7 +21,7 @@ test('clipboard actions reflect capabilities, retain targetless Paste and duplic
   await expect(copy).toBeDisabled();await expect(duplicate).toBeDisabled();
 });
 
-test('Export JSON only is explicit and browser recovery reports a real write failure and recovery',async({page,server})=>{
+test('Export project is explicit and browser recovery reports a real write failure and recovery',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));
   await expect(page.locator('#workspace-export-trigger')).toHaveText('Export');
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toHaveText('Draft saved in this browser');
@@ -26,5 +30,5 @@ test('Export JSON only is explicit and browser recovery reports a real write fai
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toContainText('Browser recovery unavailable');
   await page.evaluate(()=>window.restoreStorage());await page.locator('#editor-tab-json').click();await source.fill(before+'\n');
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toHaveText('Draft saved in this browser');
-  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();expect((await download).suggestedFilename()).toMatch(/\.json$/);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();expect((await download).suggestedFilename()).toMatch(/\.zip$/);
 });

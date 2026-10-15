@@ -1,3 +1,4 @@
+import {projectFiles} from '../helpers/project-export.mjs';
 import {test,expect,pastePage} from '../helpers/test.mjs';
 import {mkdir,mkdtemp,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import {pathToFileURL,fileURLToPath} from 'node:url';
@@ -18,7 +19,7 @@ function fixtures(){
   };
 }
 
-for(const [mode,action] of [['local-provider','file'],['direct-consumer','file'],['nested-consumer','file'],['nested-consumer','html'],['direct-consumer','both']]){
+for(const [mode,action] of [['local-provider','file'],['direct-consumer','file'],['nested-consumer','file'],['nested-consumer','download'],['direct-consumer','toolbar']]){
   test(action+' export makes a page-only offline HTML snapshot for '+mode,async({page,context,server},info)=>{
     const root=await mkdtemp(path.join(server.root,'topology-export-'));
     try{
@@ -39,11 +40,11 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
       await writeFile(path.join(root,'canon.json'),JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/'+id,owner:'group:default/test'}))}));
       await publishLibrary({registryPath:path.join(root,'canon.json'),output:path.join(workspace,'diagrams.json')});
       // Substitute only the native picker. Real browser file handles/writable
-      // streams persist both artifacts in origin-private storage.
-      await page.addInitScript(()=>{window.showDirectoryPicker=async()=>{
+      // streams persist the complete project in origin-private storage.
+      await page.addInitScript(download=>{window.showDirectoryPicker=download?undefined:async()=>{
         window.exportPickerActive=navigator.userActivation.isActive;
         return navigator.storage.getDirectory();
-      };});
+      };},action==='download');
       await page.goto(url+(local?'':'?diagram=consumer'));
       if(local)await pastePage(page,JSON.stringify(source.provider,null,3));
       else{await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();}
@@ -56,14 +57,15 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
       }
       const providerRequests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))providerRequests.push(request.url());});
       const name=local?'provider':'consumer';let files;
-      if(action==='html'){
-        const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-html').click();
-        const result=await download;expect(result.suggestedFilename()).toBe(name+'.html');
-        files={html:await readFile(await result.path(),'utf8')};
+      if(action==='download'){
+        const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+        const result=await download;expect(result.suggestedFilename()).toBe(name+'.zip');
+        const bundle=await projectFiles(result);files={json:bundle[name+'.spec.json'],html:bundle[name+'.html']};
+        expect(Object.keys(bundle)).toEqual([name+'.spec.json',name+'.html',name+'.ledger.md','README.md']);
         expect(await page.evaluate(()=>window.exportPickerActive)).toBeUndefined();
       }else{
         if(action==='file'){await page.locator('#editor-tab-file').click();await page.locator('#file-export').click();}
-        else{await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-both').click();}
+        else{await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();}
         await expect.poll(()=>page.evaluate(async name=>{
           try{const root=await navigator.storage.getDirectory();return (await(await root.getFileHandle(name+'.html')).getFile()).size;}catch{return 0;}
         },name)).toBeGreaterThan(0);
@@ -74,7 +76,7 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
           return {json:await read('.spec.json'),html:await read('.html')};
         },name);
       }
-      if(action!=='html')expect(files.json).toBe(expected);await expect(page.locator('#src')).toHaveValue(original);
+      expect(files.json).toBe(expected);await expect(page.locator('#src')).toHaveValue(original);
       const snapshot=JSON.parse(files.html.match(/^<script type="application\/json" id="flowspec">\n([\s\S]*?)\n<\/script>/m)[1]);
       expect(JSON.stringify(snapshot)).not.toMatch(/"topology(?:Imports|Exports|Provenance)"/);
       expect(files.html).not.toContain('id="flowview-topology"');

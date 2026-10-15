@@ -307,7 +307,9 @@ python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \
 Use the `request.candidate` filenames and `baseRevision`; a request without
 `candidate` uses `candidate.spec.json`, `candidate.ledger.md` and the revision
 read before planning. Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
-ledger limit: 256 KiB of nonempty UTF-8 text. The helper rejects symlinks,
+ledger limit: 256 KiB of nonempty UTF-8 text. Browser ledger reads preserve UTF-8
+byte-order marks and line endings; malformed UTF-8 is refused without rewriting
+the file. The helper rejects symlinks,
 nonregular files, and filename traversal. Metadata/protocol files are bounded
 at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
 both artifacts. Oversized handwritten artifacts are refused before replacing

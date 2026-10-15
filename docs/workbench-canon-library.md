@@ -16,7 +16,7 @@ replaces a current project, draft, or its history. Returning to a reader display
 the published version, not unsaved editor changes. Use **Continue** on welcome
 or **Back to project** in the header to return to the current local project.
 
-Editing does not write to GitHub or approve a canonical change. Save JSON and
+Editing does not write to GitHub or approve a canonical change. Export the project (JSON, HTML, ledger and README) and
 submit changes through the company's repository review process. The separate
 legacy `?canon=…` review adapter continues to open its explicit editor workflow.
 

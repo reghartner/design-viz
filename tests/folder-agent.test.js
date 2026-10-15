@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 function harness(extra={}){
-  const context={TextEncoder,SyntaxError};vm.createContext(context);
+  const context={TextEncoder,TextDecoder,SyntaxError};vm.createContext(context);
   for(const file of ['agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
   const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
@@ -745,4 +745,15 @@ test('lost folder access clears last verified pilot health',async()=>{
   const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));await h.client.poll();
   h.disk.set('session.json',Object.assign(Error('Permission lost'),{name:'NotAllowedError'}));
   await assert.rejects(h.client.poll(),/Permission lost/);assert.equal(h.last.pilotStatus,null);
+});
+
+
+test('native ledger reads preserve UTF-8 BOM bytes and reject malformed UTF-8 without changing JSON decoding',async()=>{
+  const h=harness(),ledger='\ufeff# Evidence\r\nCafé 🦉  \r\n';
+  const blobs=new Map([['story.ledger.md',new Blob([ledger])],['bad.ledger.md',new Blob([Uint8Array.from([0xc3,0x28])])],['state.json',new Blob(['\ufeff{"version":1}'])]]);
+  const files=h.context.createFolderAgentFiles({async getFileHandle(name){return {async getFile(){return blobs.get(name);}};}});
+  const read=await files.readText('story.ledger.md');assert.equal(read,ledger);
+  assert.deepEqual(Buffer.from(read),Buffer.from(await blobs.get('story.ledger.md').arrayBuffer()));
+  await assert.rejects(files.readText('bad.ledger.md'),/must contain valid UTF-8.*not been changed/);
+  assert.equal((await files.read('state.json')).version,1);
 });

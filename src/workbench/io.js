@@ -115,10 +115,14 @@ function createStagedFileImport(opts){
   }};
 }
 
+// A retired controller may still be closing an authorized disk write. Share
+// only its write queue across mounts of the same document, with weak ownership.
+var builderDirectoryExportQueues=new WeakMap();
 function createBuilderIO(opts){
   var document=opts.document,src=opts.sourceElement,session=opts.session,browser=opts.browser;
   var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null,svgCopyRun=0;
-  var stagedImport=null;
+  var stagedImport=null,exportQueue=builderDirectoryExportQueues.get(document);
+  if(!exportQueue){exportQueue={pending:Promise.resolve()};builderDirectoryExportQueues.set(document,exportQueue);}
   var retireTraceUI=function(){};
   var traceFileVersion=0,traceReader=null,traceReading=false;
   function parseEditor(){return session.snapshot();}
@@ -204,7 +208,6 @@ function createBuilderIO(opts){
   }
   var exportMenu=document.getElementById('workspace-export');
   var exportTrigger=document.getElementById('workspace-export-trigger');
-  var htmlBtn=document.getElementById('file-export-html'),bothBtn=document.getElementById('file-export-both');
   var svgDownload=document.getElementById('file-export-svg'),svgCopy=document.getElementById('file-copy-svg');
   function closeExportMenu(refocus){
     if(!exportMenu)return;
@@ -220,20 +223,7 @@ function createBuilderIO(opts){
       if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closeExportMenu(true);}
     });
   }
-  if (saveBtn){
-    listen(saveBtn,'click',function(){
-      closeExportMenu(true);cancelExport();
-      /* Stamp the downloaded snapshot; preserve the live source and unfinished JSON. */
-      var parsed = parseEditor();
-      var name = specFileName(parsed.error ? null : parsed.raw);
-      var savedText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
-      try{downloadTextFile(name,savedText,'application/json');}
-      catch(ex){inspectorMessage('save failed: '+errorText(ex));return;}
-      session.markSaved();opts.saved();session.save();
-    });
-  }
-
-  /* ---- export: static HTML, optionally paired with editable JSON ---- */
+  /* ---- complete portable project export ---- */
   var EXPORT_TEMPLATE_PATHS = ['../template/flowview.html', 'template/flowview.html', 'flowview.html'];
   function fetchExportTemplate(run,done){
     if(!browser.fetch){done('this browser cannot fetch the page template');return;}
@@ -244,7 +234,7 @@ function createBuilderIO(opts){
       if(!exportCurrent(run))return;
       if(i>=EXPORT_TEMPLATE_PATHS.length){
         exportRequest=null;done('could not load the page template ('+EXPORT_TEMPLATE_PATHS.join(' / ')+') — '+
-          'serve the workbench over http beside template/flowview.html; Export → JSON only still downloads the editable source');return;
+          'serve the workbench over http beside template/flowview.html and retry Export project. Your browser draft is unchanged');return;
       }
       var path=EXPORT_TEMPLATE_PATHS[i++],pending;
       try{pending=browser.fetch(path,{cache:'no-store',signal:request?request.signal:undefined});}
@@ -341,62 +331,68 @@ function createBuilderIO(opts){
     confluenceCopyRun++; confluenceBox.hidden = true; confluenceCopy.focus();
   });
   var exportBtn = document.getElementById('file-export');
-  function exportFiles(mode){
+  function exportFiles(){
     closeExportMenu(true);
     cancelExport();var run=exportVersion;
-    var parsed = parseEditor();
-    if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
-    var exportText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
-    var snapshot = prepareExportSnapshot(exportText,session.resolve);
+    var parsed=parseEditor();
+    if(parsed.error){inspectorMessage('export needs valid JSON — '+parsed.error+'. Copy unfinished text from the JSON workspace to keep a repair copy.');return;}
+    // Source, topology and accepted ledger are read synchronously before any
+    // picker/fetch. Preview proposals and later edits never enter this bundle.
+    var exportText=typeof FlowviewCompatibility!=='undefined'?FlowviewCompatibility.stampText(parsed.text):parsed.text;
+    var ledger=opts.exportLedger?opts.exportLedger(parsed.project):null;
+    var snapshot=prepareExportSnapshot(exportText,session.resolve);
     if(snapshot.error){inspectorMessage(snapshot.error);return;}
-    var jsonName = specFileName(parsed.raw);
-    var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
-    /* the folder picker needs the click's transient activation, which a
-       fetch would spend — so pick the directory FIRST, then fetch, build,
-       and write. Files are overwritten in place. */
-    if(mode==='both' && browser.pickDirectory){
+    // Leave suffix room under the shared ZIP writer’s filename limit.
+    var base=specFileName(parsed.raw).slice(0,-10).slice(0,100);
+    function prepare(tplText){
+      var built=buildExportHtml(tplText,snapshot.text.trim());
+      if(built.error)throw Error(built.error);
+      return buildProjectExportFiles(base,exportText,built.html,ledger);
+    }
+    function publish(dir){
+      fetchExportTemplate(run,async function(err,tplText){
+        if(!exportCurrent(run))return;
+        if(err){inspectorMessage(err);return;}
+        var completed=0;
+        try{
+          var files=prepare(tplText);
+          if(dir){
+            // A superseding export waits for any already-started write to close.
+            // Otherwise an old JSON close could overwrite the newer bundle.
+            var writing=exportQueue.pending.then(async function(){
+              for(var file of files){
+                if(!await writeIntoDirectory(dir,file.name,file.text,run))return;
+                completed++;
+              }
+            });
+            exportQueue.pending=writing.catch(function(){});
+            await writing;
+            if(exportCurrent(run) && completed===files.length)inspectorMessage('Exported project: '+files.map(function(file){return file.name;}).join(', ')+' (overwritten in place).');
+          }else{
+            // One archive avoids browser multiple-download permission loss.
+            var zip=browser.zipFiles(files);
+            if(!exportCurrent(run))return;
+            downloadTextFile(base+'.zip',zip,'application/zip');
+            inspectorMessage('Downloaded '+base+'.zip — extract it to keep the JSON, HTML, ledger and README together.');
+          }
+        }catch(ex){
+          if(!exportCurrent(run))return;
+          inspectorMessage(dir?'export failed while writing: '+errorText(ex)+'. '+completed+' of 4 files completed; the folder may contain an incomplete project. Retry the complete export.':'export failed: '+errorText(ex));
+        }
+      });
+    }
+    // Preserve click activation for the native picker; fetch only afterward.
+    if(browser.pickDirectory){
       var picked;
       try{picked=browser.pickDirectory({mode:'readwrite'});}
       catch(ex){if(!ex || ex.name!=='AbortError')inspectorMessage('export failed: '+errorText(ex));return;}
-      Promise.resolve(picked).then(function(dir){
-        if(!exportCurrent(run))return;
-        fetchExportTemplate(run,function(err, tplText){
-          if(!exportCurrent(run))return;
-          if (err){ inspectorMessage(err); return; }
-          var built = buildExportHtml(tplText, snapshot.text.trim());
-          if (built.error){ inspectorMessage(built.error); return; }
-          writeIntoDirectory(dir,jsonName,exportText,run)
-            .then(function(){ return writeIntoDirectory(dir,htmlName,built.html,run); })
-            .then(function(){ if(!exportCurrent(run))return;inspectorMessage('exported ' + jsonName + ' and ' + htmlName + ' (overwritten in place)'); })
-            ['catch'](function(ex){
-              if(!exportCurrent(run))return;
-              inspectorMessage('export failed while writing: ' + (ex && ex.message ? ex.message : ex));
-            });
-        });
-      })['catch'](function(ex){
-        if(!exportCurrent(run))return;
-        if (ex && ex.name === 'AbortError') return; /* picker dismissed */
-        inspectorMessage('export failed: ' + (ex && ex.message ? ex.message : ex));
+      Promise.resolve(picked).then(function(dir){if(exportCurrent(run))publish(dir);},function(ex){
+        if(exportCurrent(run) && (!ex || ex.name!=='AbortError'))inspectorMessage('export failed: '+errorText(ex));
       });
-    } else {
-      /* Static HTML is one download; Both falls back to two downloads. */
-      fetchExportTemplate(run,function(err, tplText){
-          if(!exportCurrent(run))return;
-        if (err){ inspectorMessage(err); return; }
-        var built = buildExportHtml(tplText, snapshot.text.trim());
-        if (built.error){ inspectorMessage(built.error); return; }
-        try{
-          if(mode==='both')downloadTextFile(jsonName, exportText, 'application/json');
-          if(!exportCurrent(run))return;
-          downloadTextFile(htmlName, built.html, 'text/html');
-        }catch(ex){inspectorMessage('export failed: '+errorText(ex));return;}
-        inspectorMessage(mode==='both'?'no folder picker here — downloaded ' + jsonName + ' and ' + htmlName:'downloaded ' + htmlName);
-      });
-    }
+    }else publish(null);
   }
-  if(exportBtn)listen(exportBtn,'click',function(){exportFiles('both');});
-  if(bothBtn)listen(bothBtn,'click',function(){exportFiles('both');});
-  if(htmlBtn)listen(htmlBtn,'click',function(){exportFiles('html');});
+  if(exportBtn)listen(exportBtn,'click',exportFiles);
+  if(saveBtn)listen(saveBtn,'click',exportFiles);
 
   /* ---- diagram-only SVG: serialize the live active graph, never the source ---- */
   var svgBox=document.getElementById('svg-handoff'),svgText=document.getElementById('svg-copy-text');

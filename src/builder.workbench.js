@@ -478,7 +478,7 @@ function initWorkbenchBuilder(opts){
       archiveFailure:function(error){document.dispatchEvent(new CustomEvent('dv:draftarchiveerror',{detail:{message:error.message}}));},
       status:function(state){
         var status=document.getElementById('workbench-recovery-status');if(!status)return;
-        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Export → JSON only to keep your changes.'}[state];
+        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Use Export → Export project to keep your changes. For unfinished JSON, copy the text from the JSON workspace to a repair file.'}[state];
         status.dataset.state=state;
       }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
@@ -693,6 +693,7 @@ function initWorkbenchBuilder(opts){
   function afterImported(spec){updateTargetLabel(spec);}
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
+    exportLedger:function(project){return agentLedgerProject===project?agentLedger:null;},
     replaceProject:replaceProject,beginFileOpen:beginFileOpen,beginFileImport:beginFileImport,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
     svgExport:function(){
       var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
@@ -1326,7 +1327,7 @@ function initWorkbenchBuilder(opts){
   }
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
-    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Export → JSON only writes a file; Brief can download a review package. Neither publishes to your company.';}
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Export → Export project saves JSON, HTML, ledger and README; Brief can download a review package. Neither publishes to your company.';}
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});

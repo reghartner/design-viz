@@ -67,7 +67,7 @@ specs, briefs and credentials are not placed in history URLs.
 
 If this browser has a saved draft, welcome offers **Resume** with its title and
 save time. A partially edited draft can still be recovered when its JSON is
-unfinished. Drafts are browser-local; save a JSON file for a portable copy. The
+unfinished. Drafts are browser-local; use Export project for a portable JSON, HTML and ledger bundle with README. Copy unfinished JSON from the JSON workspace into a repair file. The
 welcome screen itself does not replace a saved draft. A canonical diagram link
 using `?canon=…` opens directly in the editor. Starting another project detaches
 that review and clears its URL parameters. Back/Forward through its older screen

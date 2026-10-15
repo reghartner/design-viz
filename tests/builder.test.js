@@ -939,8 +939,8 @@ test('baseline survives autosave and recovery, and opening a file resets its bas
   recovered.ids.draftbar.children[1].click();
   assert.deepStrictEqual(recovered.diff(), ['page title changed']);
   recovered.ids['file-save'].click();
-  assert.deepStrictEqual(recovered.diff(), ['no changes']);
-  assert.strictEqual(JSON.parse(w.storage.get('dv-workbench-baseline')).text, JSON.stringify(next));
+  assert.deepStrictEqual(recovered.diff(), ['page title changed']);
+  assert.notStrictEqual(JSON.parse(w.storage.get('dv-workbench-baseline')).text, JSON.stringify(next));
   const file = plain(next); file.page.skin = 'daylight';
   recovered.ids['file-input'].files = [{text: JSON.stringify(file)}];
   recovered.ids['file-input'].fire('change');
@@ -1091,12 +1091,12 @@ test('removed sections stay in their tab list across reordered tabs and page ali
   assert.strictEqual(findings[1].path, 'sections[0].tabs[1].sections');
 });
 
-test('saved invalid JSON reports an unparseable baseline and mismatched storage falls back safely', () => {
+test('unfinished JSON export leaves the original baseline and mismatched storage falls back safely', () => {
   const w = diffWorkbench();
   w.ids.src.value = '{'; w.ids['file-save'].click();
-  assert.deepStrictEqual(w.diff(), ['baseline JSON is unparseable']);
+  assert.deepStrictEqual(w.diff(), ['current JSON is unparseable']);
   w.ids.src.value = JSON.stringify(diffFixture()); w.ids.src.fire('input');
-  assert.deepStrictEqual(w.diff(), ['baseline JSON is unparseable']);
+  assert.deepStrictEqual(w.diff(), ['no changes']);
   const storage = new Map([
     ['dv-workbench-draft', JSON.stringify({text: '{', at: 1})],
     ['dv-workbench-baseline', JSON.stringify({text: '{}', draftText: 'different draft'})]

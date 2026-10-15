@@ -483,10 +483,10 @@ step indices.
 
 ## Import/export ownership
 
-`createBuilderIO()` owns the existing file open/save, HTML export, Mermaid,
+`createBuilderIO()` owns the file open, complete project export, Mermaid,
 trace importer and manual Confluence handoff controls. Its host injects the live
 session, source element, document and bound browser adapters, plus small hooks for
-project replacement, messages, saved-baseline UI, Add chooser closure, active-workbench
+project replacement, accepted ledger access, messages, Add chooser closure, active-workbench
 keyboard policy and before/after-import selection. It does not receive the
 builder's closure or duplicate session history. The returned API is
 `retireProject()` and `destroy()`; builder teardown calls the latter.
@@ -501,7 +501,7 @@ Confluence validation remain in `trace-import.js` and `confluence.js`. The model
 continues to enforce the same HTML injection marker/closing-tag and filename
 rules; it does not rewrite handwritten editor text.
 
-File reads, trace reads, HTML export and Confluence copy each have an independent
+File reads, trace reads, project export and Confluence copy each have an independent
 generation. Starting a newer operation retires only that family's pending work.
 Project retirement invalidates all four, aborts pending readers and template
 fetches, closes import/handoff surfaces and retires trace preview/search callbacks.
@@ -524,14 +524,18 @@ Publication policies stay distinct:
   preserving the outgoing draft in Earlier drafts and starting fresh Undo/Redo.
   The public validated `loadText()` path
   still validates before replacement.
-- **Save** downloads the current snapshot, including invalid JSON, and marks the
-  current exact source as the baseline only after download dispatch succeeds.
-  Compatibility stamping affects a valid download snapshot, not the live source.
 - **Mermaid and trace imports** publish through `session.importText()` once and
   keep the comparison baseline. Only Mermaid sets the imported-text native-Undo
   shortcut marker. Existing warning, focus and selection differences remain.
-- **HTML export** captures matching JSON/HTML text at the initiating click. Normal
-  source typing does not change that authorized snapshot. Retirement or a newer
+- **Project export** captures current working JSON, resolved HTML and the accepted
+  ledger for that project synchronously at the initiating click. Normal source
+  or ledger edits do not change that authorized snapshot. Both Export project
+  controls write matching `.spec.json`, `.html`, `.ledger.md` and static README;
+  absent ledgers get an explicit unverified stub, while existing ledger text is
+  preserved exactly. The fallback uses the existing ZIP writer for one download.
+  Export neither changes the source nor marks a later draft as saved. Invalid
+  JSON is refused; the JSON workspace remains available for a manual repair copy.
+  Compatibility stamping affects only the exported source. Retirement or a newer
   export blocks later template results, follow-on files and stale status messages.
   JSON retains stamped authored references. HTML resolves the current frozen
   session immediately and strips declarations/provenance from every diagram,
@@ -544,7 +548,12 @@ Directory export checks freshness before requesting each file and before startin
 its write. If a writable opens after retirement, it is aborted before writing.
 Once `write()` has started, that authorized snapshot is allowed to finish and the
 stream is closed; a write/close failure attempts `abort()`. Retirement still blocks
-the next file and status update. The controller never deletes or rolls back user
+the next file and status update. Superseding exports serialize directory writes
+across controller remounts on the same document, so a retiring close cannot
+overwrite the newer bundle. Failures report how many
+of the four files completed and warn that the folder may be incomplete. Only the
+four portable files are written; live `.flowview-agent` metadata is untouched.
+The controller never deletes or rolls back user
 files. The platform may have already created a file during `getFileHandle()`;
 a dispatched clipboard write or browser download also cannot reliably be recalled.
 Object URLs for dispatched downloads are revoked on their existing one-second

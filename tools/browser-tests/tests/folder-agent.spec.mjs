@@ -48,6 +48,7 @@ async function setup(page){
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
     if(url.origin!==origin)throw Error('Unexpected network: '+url.href);
+    if(url.pathname.endsWith('/template/flowview.html'))return route.fulfill({contentType:'text/html',body:await readFile(path.join(root,'template/flowview.html'),'utf8')});
     if(url.pathname==='/index.html')return route.fulfill({contentType:'text/html',body:await readFile(path.join(root,'workbench/flowspec.html'),'utf8')});
     return route.fulfill({contentType:'application/json',body:'[]'});
   });
@@ -152,8 +153,10 @@ for(const entry of ['welcome','editor'])test('Open file loads authored topology 
     await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
     await page.locator('#docview [data-dv-node="local"]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited local');await title.press('Enter');
     const edited=await page.locator('#src').inputValue();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);text=edited;
-    const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-    const saved=JSON.parse(await readFile(await(await download).path(),'utf8'));expect(saved.page.sections[0].diagram.topologyImports).toEqual(raw.page.sections[0].diagram.topologyImports);expect(saved.page.canon).toBeUndefined();expect(JSON.stringify(saved)).not.toMatch(/topologyContext|topologyProvenance|shared::api/);
+    await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+    await expect(page.locator('#guide')).toContainText('Exported project:');
+    const saved=JSON.parse(await readFile(path.join(h.folder,'reopened-imported-story.spec.json'),'utf8'));expect(saved.page.sections[0].diagram.topologyImports).toEqual(raw.page.sections[0].diagram.topologyImports);expect(saved.page.canon).toBeUndefined();expect(JSON.stringify(saved)).not.toMatch(/topologyContext|topologyProvenance|shared::api/);
+    await rm(path.join(h.folder,'reopened-imported-story.spec.json'));
     await page.reload();await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
     await writeFile(path.join(h.folder,'story.spec.json'),text);await openAgent(page);await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
     expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);expect(h.hits).toEqual(['catalog','provider']);expect(h.errors).toEqual([]);

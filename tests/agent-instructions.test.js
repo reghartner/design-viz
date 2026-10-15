@@ -8,7 +8,7 @@ test('recommended copy/paste setup never instructs starting or renewing a monito
     assert.match(prompt,/Do not start Monitor, a watcher, a polling loop, or a background listener/);
     assert.doesNotMatch(prompt,/watch --minutes|Renew Monitor|Start Monitor|preflight --monitor/);
     assert.doesNotMatch(prompt,/progress --request|every 20 seconds/);
-    assert.match(prompt,/prepare/);assert.match(prompt,/propose --request/);assert.match(prompt,/Commit update/);
+    assert.match(prompt,/prepare/);assert.match(prompt,/propose --request/);assert.match(prompt,/Accept changes/);
   }
 });
 test('explicit Beta setup retains its bounded Monitor instructions',()=>{
@@ -157,7 +157,7 @@ test('both registered routes edit seeded request candidates and keep the legacy 
     assert.match(prompt,/If request\.json has no candidate, read the latest state\.json before planning/);
     assert.match(prompt,/If rejected, stale or conflicting, reread state\.json for the current pair and revision/);
     assert.match(prompt,/propose --request <request id> --revision <base revision> --file <candidate spec> --ledger <candidate ledger>/);
-    assert.match(prompt,/Commit update/);assert.match(prompt,/reply --request <request id>/);
+    assert.match(prompt,/Accept changes/);assert.match(prompt,/reply --request <request id>/);
     assert.doesNotMatch(prompt,/--operations|assemble|fragment|extract/i);
   }
 });

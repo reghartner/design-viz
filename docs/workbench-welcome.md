@@ -85,7 +85,7 @@ communication and **Talk here with Claude — Beta** for conversation through
 Claude Monitor. Both open the same durable diagram folder, containing a spec and
 coverage ledger, with connection data inside `.flowview-agent/`. Select an
 existing folder or one where these artifacts should be created. Agent proposals
-show a full preview of both artifacts and require **Commit update**; Undo restores
+show a full-window preview of both artifacts and require **Accept changes**; Undo restores
 both. Questions, permissions and interrupts stay in your agent app in the
 recommended flow. See [diagram folders](folder-agent-session.md) for setup,
 merge/conflict feedback and reopening an existing diagram.

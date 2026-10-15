@@ -24,11 +24,12 @@ Then choose where to have the conversation:
   questions and answers inside the workbench. Permission prompts and interrupts
   still happen in Claude.
 
-Both choices use the same diagram folder and the same approval process. In the
-approval preview, **Coverage ledger** starts collapsed and identifies whether it
-changed. Expand it to read, scroll or resize its bounded reading area; switching
-between Current state and Proposed state keeps it open. Collapsing it restores
-the diagram space. Committing still saves the reviewed spec and ledger together.
+Both choices use the same diagram folder and the same approval process. The
+approval preview fills the browser workspace and keeps a compact
+**Preview — changes not applied** bar pinned above the rendered story. Open
+**Details** for the summary, coverage ledger and authored JSON; closing the drawer
+returns to the same review position. Accepting still saves the reviewed spec and
+ledger together.
 
 In the editor, open **Agent** in the left rail. The panel has no workflow tabs.
 When disconnected, it offers **Continue [title] / Reopen diagram folder** for a
@@ -313,8 +314,8 @@ at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
 both artifacts. Oversized handwritten artifacts are refused before replacing
 the last saved pair.
 
-**Preview Agent Updates** shows the proposed rendered diagram and full ledger,
-with **Current state** and **Proposed state** controls. Change highlights start
+**Preview Agent Updates** opens a full-window proposed rendering, with **Current**
+and **Proposed** controls in the pinned decision bar. Change highlights start
 on: Proposed marks added content in green and modified content in amber;
 Current marks removed counterparts in red and modified counterparts in amber.
 The compact legend reports the number of rendered section, node, edge, panel
@@ -323,17 +324,17 @@ unmarked rendering is easier to inspect. Highlights follow redraws, paths and
 contained Explore navigation; they do not become spec data.
 
 Topology exports and imports preview using the same frozen provider context as
-the workbench. The JSON, change comparison and committed source retain authored
+the workbench. The JSON, change comparison and accepted source retain authored
 declarations; previewing does not copy provider nodes into your source.
 
-Use **Full preview** to give a large diagram the complete viewport and collapse
-the summary, ledger and JSON chrome. The state switch, highlight legend and
-toggle, **Discard update**, **Commit update** and **Back to workbench** remain
-available; **Standard preview** restores the supporting material. Explore stays
-inside the preview area so you can navigate its paths, zoom and panels while
-comparison and approval controls remain available. Preview navigation does not
-edit the proposed source. Neither candidate is
-accepted until **Commit update**. One Undo/Redo restores both. This saves local
+The rendered document uses all space below the decision bar without a browser
+fullscreen permission. **Details** opens the summary, Markdown ledger and authored
+JSON in a drawer without resetting the selected version, path, playback or zoom.
+Explore stays inside the preview area so you can navigate its paths, zoom and
+panels while comparison and approval controls remain available. Preview
+navigation does not edit the proposed source. **Close** or Escape leaves the
+proposal waiting, **Decline** rejects it, and neither candidate is accepted until
+**Accept changes**. One Undo/Redo restores both. This saves local
 artifacts; it does not make a Git commit. The agent should reread the accepted
 pair after approval, especially after a merge, and submit a correction if the
 ledger no longer describes the accepted diagram. Record routine acceptance and

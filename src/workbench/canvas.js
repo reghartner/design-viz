@@ -1,5 +1,6 @@
 /* The selected View owns the editor surface, just as in the reader. */
-function initWorkbenchCanvas(){
+function initWorkbenchCanvas(options){
+  options=options || {};
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var focusState=null,navigationState=null,focusFrame=0;
   var focusButton=document.getElementById('workspace-focus-diagram');
@@ -88,6 +89,7 @@ function initWorkbenchCanvas(){
     if(!focusState)return;var state=focusState;focusState=null;cancelAnimationFrame(focusFrame);focusFrame=0;
     if(activeCanvas && activeCanvas.viewport)activeCanvas.viewport.setWorkbenchFocus(false);
     document.querySelectorAll('.workspace-focus-tucked').forEach(function(el){el.classList.remove('workspace-focus-tucked');});
+    if(options.restoreTools)options.restoreTools(state.tools);
     if(navigation && navigation.contents)navigation.contents.setOpen(state.navigation.opened===true);
     paintFocus();
     if(!restore)return;
@@ -96,8 +98,10 @@ function initWorkbenchCanvas(){
     // Restore navigation only. Panel geometry/content edited while focused stays
     // owned by the current preview and its normal Undo history.
     var memory=rec.viewport.snapshotCanvasState();
-    var oldViews=diagramLayoutViews(state.diagram),newViews=diagramLayoutViews(sectionRecords(getPage())[section].section.diagram);
-    Object.keys(state.canvas).forEach(function(id){var oldView=oldViews.find(function(v){return v.id===id;}),newView=newViews.find(function(v){return v.id===id;});if(JSON.stringify(oldView && oldView.exploreLayout && oldView.exploreLayout.camera)!==JSON.stringify(newView && newView.exploreLayout && newView.exploreLayout.camera))return;if(memory[id])['scroll','zoom','fitFloor'].forEach(function(key){memory[id][key]=state.canvas[id][key];});});
+    var resolved=state.detail && resolveDetail(state.detail),diagram=state.detail?resolved && resolved.diagram:sectionRecords(getPage())[section].section.diagram;
+    if(!diagram)return;
+    var oldViews=diagramLayoutViews(state.diagram),newViews=diagramLayoutViews(diagram);
+    Object.keys(state.canvas).forEach(function(id){var oldView=oldViews.find(function(v){return v.id===id;}),newView=newViews.find(function(v){return v.id===id;});if(oldView && !newView)return;if(JSON.stringify(oldView && oldView.exploreLayout && oldView.exploreLayout.camera)!==JSON.stringify(newView && newView.exploreLayout && newView.exploreLayout.camera))return;if(memory[id])['scroll','zoom','fitFloor'].forEach(function(key){memory[id][key]=state.canvas[id][key];});});
     rec.viewport.restoreCanvasState(memory);
     if(rec.boardSize)rec.boardSize.restore(state.board);
     if(navigation && navigation.contents)navigation.contents.restore(state.navigation);
@@ -113,7 +117,9 @@ function initWorkbenchCanvas(){
   function focusDiagram(){
     if(focusState){releaseFocus(true);focusButton.focus({preventScroll:true});return;}
     var rec=current();if(!rec || !rec.viewport || !navigation || !navigation.contents)return;
-    focusState={key:identity(rec),navigation:navigation.contents.snapshot(),canvas:rec.viewport.snapshotCanvasState(),diagram:sectionRecords(getPage())[section].section.diagram,board:rec.boardSize && rec.boardSize.snapshot(),left:surface.scrollLeft,top:surface.scrollTop};
+    var ctl=getController(),detail=detailContext(ctl && ctl.details && ctl.details.snapshot()),resolved=detail && resolveDetail(detail);
+    if(detail && !resolved)return;
+    focusState={key:identity(rec),tools:options.snapshotTools && options.snapshotTools(),detail:detail,navigation:navigation.contents.snapshot(),canvas:rec.viewport.snapshotCanvasState(),diagram:resolved?resolved.diagram:sectionRecords(getPage())[section].section.diagram,board:rec.boardSize && rec.boardSize.snapshot(),left:surface.scrollLeft,top:surface.scrollTop};
     document.querySelectorAll('.workspace-window:not([hidden]):not(#workspace-window-inspect)').forEach(function(el){el.classList.add('workspace-focus-tucked');});
     navigation.contents.setOpen(false);select(section);cancelFit();
     rec.canvasVisited=true;rec.viewport.setWorkbenchFocus(true);paintFocus();

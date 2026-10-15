@@ -59,3 +59,35 @@ test('mixed panel scaling stays independent and focus preserves a closed Content
  await expect(nav(page).locator('.reader-contents')).toBeHidden();expect(await sizes()).toEqual(scaled);await expect(page.locator('#src')).toHaveValue(authored);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
+
+for(const exit of ['Return','navigation','project replacement'])test(`Focus restores every tool's prior visibility after ${exit}`,async({page,server})=>{
+ const input=await open(page,server);await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-inspect').click();
+ const states=()=>page.locator('.workspace-window').evaluateAll(windows=>windows.map(win=>({id:win.id,hidden:win.hidden,tab:document.getElementById('editor-tab-'+win.id.slice(17)).getAttribute('aria-pressed'),tabIndex:document.getElementById('editor-tab-'+win.id.slice(17)).tabIndex})));
+ const before=await states();await page.locator('#workspace-focus-diagram').click();await page.locator('#editor-tab-file').click();await expect(page.locator('#workspace-window-file')).toBeVisible();
+ await page.locator('#editor-tab-inspect').click();await page.locator('#workspace-window-inspect .workspace-window-close').click();
+ if(exit==='Return')await page.getByRole('button',{name:'Return to page',exact:true}).click();
+ else if(exit==='navigation')await nav(page).getByRole('button',{name:'Next Page',exact:true}).click();
+ else{await page.locator('#workspace-home').click();await paste(page,input);}
+ await expect(page.locator('body')).not.toHaveClass(/workspace-diagram-focused/);await expect(page.locator('.workspace-focus-tucked')).toHaveCount(0);expect(await states()).toEqual(before);await assertSource(page,input);
+});
+
+test('Focus restores global Hide tools independently of each tool open preference',async({page,server})=>{
+ const input=await open(page,server);await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-inspect').click();
+ await page.locator('#workspace-canvas-tools>summary').click();await page.getByRole('button',{name:'Hide tools',exact:true}).click();await page.locator('#workspace-canvas-tools>summary').click();
+ const preferences=()=>page.evaluate(()=>{const prefs=JSON.parse(localStorage.getItem('dv-workbench-floating-v1'));return Object.fromEntries(Object.entries(prefs.windows).map(([name,state])=>[name,state.open]));});
+ const before=await preferences();await page.locator('#workspace-focus-diagram').click();await page.locator('#editor-tab-file').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#workspace-window-inspect')).toBeVisible();
+ await page.getByRole('button',{name:'Return to page',exact:true}).click();await expect(page.locator('.workspace-window:visible')).toHaveCount(0);expect(await preferences()).toEqual(before);
+ await page.locator('#workspace-canvas-tools>summary').click();await page.getByRole('button',{name:'Show tools',exact:true}).click();await expect(page.locator('#workspace-window-json')).toBeVisible();await expect(page.locator('#workspace-window-inspect')).toBeVisible();await expect(page.locator('#workspace-window-file')).toBeHidden();await assertSource(page,input);
+});
+
+test('nested detail Focus keeps a newly authored child camera after Render and Return',async({page,server})=>{
+ const section=(id,next)=>({id,heading:id,detailOnly:id!=='root',diagram:{nodes:{a:{title:id, ...(next?{detail:{section:next,mode:'focus'}}:{})}},rows:[['a']],layouts:[{id:'main',name:'Main',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:15}]},exploreLayout:{camera:{zoom:.8,x:.5,y:.5}}}],defaultLayout:'main'}});
+ const raw={page:{title:'Nested cameras',sections:[section('root','middle'),section('middle','leaf'),section('leaf')]}};
+ await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ await page.locator('#section-root [data-dv-detail=a]').click();const child=page.locator('[data-dv-detail-preview]:visible');await child.locator('[data-dv-detail=a]').click();await expect(child.locator('.detail-breadcrumb')).toContainText('leaf');
+ const zoom=()=>child.locator('.explore-board').evaluate(board=>parseFloat(board.style.getPropertyValue('--explore-width'))/board.querySelector('.boardcanvas>svg').viewBox.baseVal.width);
+ await expect.poll(zoom).toBeCloseTo(.8,2);await page.locator('#workspace-focus-diagram').click();await page.locator('#editor-tab-json').click();
+ raw.page.sections[2].diagram.layouts[0].exploreLayout.camera={zoom:.3,x:.1,y:.1};const edited=JSON.stringify(raw,null,2);await page.locator('#src').fill(edited);await page.locator('#go').click();
+ await expect(page.locator('body')).toHaveClass(/workspace-diagram-focused/);await expect(child.locator('.detail-breadcrumb')).toContainText('leaf');await expect.poll(zoom).toBeCloseTo(.3,2);
+ await page.getByRole('button',{name:'Return to page',exact:true}).click();await expect.poll(zoom).toBeCloseTo(.3,2);await assertSource(page,edited);
+});

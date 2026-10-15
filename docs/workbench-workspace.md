@@ -89,7 +89,8 @@ Use **Focus diagram** for temporary desktop editing space. It enlarges the activ
 diagram, collapses Contents and tucks supporting prose, panels and open tools;
 Inspect stays available. If nodes are selected, Focus frames them around Inspect.
 The rail can reopen a tucked tool while focused. **Return to page** restores the
-previous Contents state, page scale, diagram camera and tucked tools. Focus is
+previous Contents state, page scale, diagram camera, active tool, and each tool’s
+open or closed state, including the Hide tools preference. Focus is
 separate from authored Standard/Explore Views: it changes no source, saved
 presentation, export or Undo history. Editing and Undo can continue while focused.
 Selecting another section or View, or opening another project, ends Focus.

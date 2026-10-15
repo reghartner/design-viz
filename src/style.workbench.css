@@ -1569,6 +1569,9 @@ body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge{poin
 body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge rect{fill:var(--card,#fff);stroke:currentColor;stroke-width:1.4;}
 body:not(.workbench-reader-preview-active) .docview .dv-position-lock-badge path{fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;}
 body:not(.workbench-reader-preview-active) .docview g.node.dv-position-locked.dv-sel .card{stroke:var(--accent);stroke-width:3.5;stroke-dasharray:7 5;}
+body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .card{stroke:#7657c8;stroke-width:5;stroke-dasharray:none;}
+body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .dv-position-lock-badge{filter:drop-shadow(0 0 3px currentColor);}
+body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .dv-position-lock-badge rect{stroke-width:2.5;}
 
 body .docview .section-viewport .boardcanvas g.node[data-dv-object-menu]:focus-visible .card{stroke:var(--accent);stroke-width:4;stroke-dasharray:3 3;}
 

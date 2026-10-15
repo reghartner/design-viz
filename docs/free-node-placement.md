@@ -30,6 +30,11 @@ group made only of imported nodes or one mixed with local free nodes. Starting
 the drag from any selected local or imported node moves every movable member by
 the same delta and stores only consumer-owned placement overrides; provider
 topology remains unchanged. Locked local members remain selected and fixed.
+The node menu exposes **Lock position** / **Unlock position**, or explicit selected
+position commands for a node-only multi-selection. A mixed drag can start on a
+selected locked node: unlocked members move together while locked members show a
+local lock cue and remain fixed. If every selected node is locked, the drag is a
+no-op with no Undo entry or Inspector error.
 
 - **Float X / Float Y** set the node center precisely in diagram units. They are
   independent of Auto, Fit width and Readable sizing. X increases rightward; Y

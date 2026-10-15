@@ -1577,6 +1577,7 @@ body .docview .section-viewport .boardcanvas g.node[data-dv-object-menu]:focus-v
 
 body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:focus-visible{outline:3px dashed var(--accent);outline-offset:4px}
 .dv-spatial-status{position:absolute;z-index:1100;left:24px;bottom:84px;max-width:420px;padding:10px 14px;border:1px solid var(--explore-border);border-radius:8px;background:var(--explore-bg);color:var(--dtext);box-shadow:0 4px 16px #0002}
+.dv-spatial-assistive-status{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .dv-spatial-actions .fnote{flex-basis:100%}
 
 .workspace-export{position:relative;font-size:12px;}

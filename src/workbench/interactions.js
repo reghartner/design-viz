@@ -855,7 +855,7 @@ function createBuilderInteractions(opts){
     (nd.topologyBoundaries || []).forEach(function(boundary){boundary.removeAttribute('transform');boundary.classList.remove('dv-topology-boundary-drag');});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
     (nd.lockFeedback || []).forEach(function(el){el.classList.remove('dv-position-lock-feedback');});
-    if(nd.lockFeedback && spatial)spatial.clearAnnouncement();
+    if(nd.lockFeedback && spatial)spatial.clearAssistiveAnnouncement();
   }
   function showPositionLockFeedback(nd){
     if(nd.lockFeedback)return;
@@ -864,7 +864,7 @@ function createBuilderInteractions(opts){
     if(!locked.length)return;
     nd.lockFeedback=locked;locked.forEach(function(el){el.classList.add('dv-position-lock-feedback');});
     var shell=nd.el && nd.el.closest('.section-viewport');
-    if(shell && spatial)spatial.announce(locked.length===1?'Position locked; this object stayed fixed.':locked.length+' selected positions are locked and stayed fixed.',shell);
+    if(shell && spatial)spatial.announceAssistive(locked.length===1?'Position locked; this object stayed fixed.':locked.length+' selected positions are locked and stayed fixed.',shell);
   }
   function cancelGroupDrag(){
     if (!groupDrag) return;

@@ -2,7 +2,7 @@
    authored selection; Explore also contributes canvas panels and controls. This
    owner keeps all menus, capture and marquee DOM transient. */
 function createBuilderSpatialSelection(opts){
-  var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false,focusNodes=[],nudge=null,status=null;
+  var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false,focusNodes=[],nudge=null,status=null,assistiveStatus=null;
   var fitButton=doc.getElementById?doc.getElementById('workspace-fit-selection'):null;
   function active(){return !opts.isActive || opts.isActive();}
   function surface(el){return el && el.closest && el.closest('.section-viewport');}
@@ -91,7 +91,7 @@ function createBuilderSpatialSelection(opts){
   }
   function close(focus){if(menuLife)menuLife.destroy();menuLife=null;if(menu)menu.remove();menu=null;var el=opener;opener=null;if(focus && el && el.isConnected)el.focus({preventScroll:true});}
   function cancel(){if(!marquee)return;var m=marquee;marquee=null;if(m.box)m.box.remove();try{if(m.board.hasPointerCapture(m.id))m.board.releasePointerCapture(m.id);}catch(_){} }
-  function clear(){close(false);cancel();cancelNudge();if(status)status.remove();status=null;swallow=false;sync();}
+  function clear(){close(false);cancel();cancelNudge();if(status)status.remove();status=null;if(assistiveStatus)assistiveStatus.remove();assistiveStatus=null;swallow=false;sync();}
   function currentTargets(){return opts.selection().map(function(t){if(t.kind==='panel' && t.el){var shell=surface(t.el),card=shell && Array.from(shell.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.contains(t.el);});if(card){var authored=target(card);if(authored)return authored;}}if(t.kind!=='panel' || t.id)return t;var s=snapshot(),got=s && builderDiagram(s.text,s.raw,t.section),p=got && !got.error && (got.d.panels || [])[t.index];return Object.assign({},t,{id:p && p.id});});}
   function edgeRoutingTargets(s,targets){
     var resolved=s.raw;try{if(opts.session.resolve)resolved=opts.session.resolve(s.raw);}catch(_){}
@@ -132,7 +132,8 @@ function createBuilderSpatialSelection(opts){
     update();lifetime.listen(opts.src,'input',update);
   }
   function announce(message,shell){if(status)status.remove();status=doc.createElement('div');status.className='dv-spatial-status';status.setAttribute('role','status');status.textContent=message;shell.appendChild(status);}
-  function clearAnnouncement(){if(status)status.remove();status=null;}
+  function announceAssistive(message,shell){if(assistiveStatus)assistiveStatus.remove();assistiveStatus=doc.createElement('div');assistiveStatus.className='dv-spatial-assistive-status';assistiveStatus.setAttribute('role','status');assistiveStatus.setAttribute('aria-live','polite');assistiveStatus.setAttribute('aria-atomic','true');assistiveStatus.textContent=message;shell.appendChild(assistiveStatus);}
+  function clearAssistiveAnnouncement(){if(assistiveStatus)assistiveStatus.remove();assistiveStatus=null;}
   function cancelNudge(){if(!nudge)return;var g=nudge;nudge=null;g.preview.forEach(function(p){if(p.node){if(p.transform===null)p.el.removeAttribute('transform');else p.el.setAttribute('transform',p.transform);}else p.el.style.transform=p.transform;});}
   function finishNudge(){
     if(!nudge)return;var g=nudge,plan=planNudgeSpatial(g.c.s.text,g.c.s.raw,g.c.targets,g.c.id,g.c.geometry,g.dx,g.dy);cancelNudge();
@@ -249,5 +250,5 @@ function createBuilderSpatialSelection(opts){
   life.listen(opts.src,'input',clear);
   life.listen(view,'click',function(ev){if(ev.target.closest('[data-view-layout],[data-tab-view]')){clear();opts.select([]);}},true);
   life.listen(view,'dv:pathchange',clear);
-  return {actions:actions,sync:sync,target:target,clear:clear,refresh:refresh,announce:announce,clearAnnouncement:clearAnnouncement,selectAllNodes:selectAllNodes,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
+  return {actions:actions,sync:sync,target:target,clear:clear,refresh:refresh,announceAssistive:announceAssistive,clearAssistiveAnnouncement:clearAssistiveAnnouncement,selectAllNodes:selectAllNodes,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
 }

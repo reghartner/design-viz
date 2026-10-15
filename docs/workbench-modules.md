@@ -355,7 +355,7 @@ Fit selection control is mounted in Reader or Backstage. Source handwriting clos
 menus and cancels gestures while preserving Inspector selection with stale-source
 feedback. Node-only menus reuse `planSetNodesLocked` for single and bulk position
 commands. `interactions.js` filters locked members from selected drags and owns the
-temporary object-local lock cue and status announcement; cancellation and release
+temporary object-local lock cue and visually hidden status announcement; cancellation and release
 remove both without publishing an Inspector message or session transaction.
 View changes and preview replacement retain their existing selection-retirement
 policy.

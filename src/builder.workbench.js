@@ -546,6 +546,7 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
+    openAdd:function(at){return addMenu && addMenu.openInline(at);},
     selectionChanged:function(){refreshClipboardActions();if(layers)layers.sync();},
     refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();if(diagramImport)diagramImport.refresh();refreshClipboardActions();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
@@ -1022,7 +1023,12 @@ function initWorkbenchBuilder(opts){
 
   function confirmAddition(run,pageStructure){if(addMenu)return addMenu.confirm(run,pageStructure);run();}
 
-  function runInsert(kind, planFn){
+  function currentAddition(at){
+    var current=additionContext();
+    return !current.error && (!opts.isActive || opts.isActive()) && at.shell.isConnected && current.text===at.text && current.project===at.project && current.section===at.section && current.chapter===at.chapter && current.view===at.view;
+  }
+  function runInsert(kind, planFn, destination){
+    if(destination && !currentAddition(destination))return;
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
@@ -1038,7 +1044,7 @@ function initWorkbenchBuilder(opts){
                     kind: plan.kind, id: plan.id, index: plan.index, card:plan.card};
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
-                  index: identity.index, card:identity.card, el: el}, false);
+                  index: identity.index, card:identity.card, el: el}, false,!!destination);
     if(kind==='para' || kind==='bullet')revealProseTarget(identity);
     selectRange(plan);
     if(kind==='para' || kind==='bullet')inspector.focusProse();
@@ -1141,7 +1147,7 @@ function initWorkbenchBuilder(opts){
       });
       var rec=parsed.error ? null : specSectionPaths(parsed.raw)[session.insertSection];
       var selected=ctl && ctl.sections.find(function(section){return section.number===session.insertSection+1;});
-      return {text:session.text(),raw:parsed.raw,project:parsed.project,section:session.insertSection,chapter:selected && selected.viewport && (selected.viewport.viewDefinition() || {}).id,sections:sections,
+      return {text:session.text(),raw:parsed.raw,project:parsed.project,section:session.insertSection,chapter:selected && selected.viewport && (selected.viewport.viewDefinition() || {}).id,view:selected && ctl.views && (ctl.views.current(selected) || {}).id,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
         diagram:rec && specValueAt(parsed.raw,rec.diagram),prose:!!(rec && rec.section.length),error:error,locked:locked};
   }
@@ -1177,22 +1183,35 @@ function initWorkbenchBuilder(opts){
   var diagramImportBtn=document.getElementById('add-diagram-import');
   if(diagramImportBtn)life.listen(diagramImportBtn,'click',function(){confirmAddition(function(){if(diagramImport)diagramImport.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
-    addText:function(){
-      var el=runInsert('node',function(text,raw,si){return planAddTextBox(text,raw,si);});
+    addText:function(at){
+      var el=runInsert('node',function(text,raw,si){return planAddTextBox(text,raw,si,at && at.point);},at);
+      if(at){if(el)interactions.editText(el);return;}
       var board=el && el.closest('.board');if(!board)return;
       var fit=board.classList.contains('explore-board')?document.getElementById('workspace-fit-selection'):board.querySelector('[aria-label="Fit diagram"]');
       if(fit && !fit.disabled)fit.click();
     },
-    addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
-    chooseSection:function(index){
+    addNode:function(preset,at){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset,at && at.point);},at);},
+    addPanel:function(at){
+      if(!panelPicker || !currentAddition(at))return;
+      panelPicker.open(null,{
+        context:function(){return currentAddition(at)?additionContext():{error:'The source or destination changed. Open Add again.'};},
+        insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type,at);},at);}
+      });
+    },
+    addEdge:function(at){if(currentAddition(at))startConnect(at.section);},
+    addStep:function(at){runInsert('step',planAddStep,at);},
+    chooseSection:function(index,inline){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
       var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;
+      if(inline){clearMultiSelect();session.insertSection=index;updateTargetLabel(parsed.raw);markInsertTarget();return;}
       var tool=opts.workspace && opts.workspace.tool(),ti=rec.section.indexOf('tabs');
       if(ti>=0){var tab=document.getElementById('tab-'+rec.section[ti-1]+'-'+rec.section[ti+1]);if(tab)tab.click();}
       clearMultiSelect();selectTarget({kind:'section',section:index,el:findTargetEl({kind:'section',section:index})},false,true);
       if(tool)opts.workspace.showTool(tool);
     }
   });
+
+  ['dv:pathchange','diagram-view-change','tab-view-change'].forEach(function(type){life.listen(view,type,function(){if(addMenu)addMenu.invalidate();if(panelPicker)panelPicker.invalidate();});});
 
   var autoArrange=createAutoArrangeController({document:document,src:src,view:view,button:document.getElementById('auto-arrange'),
     pause:pausePreview,message:inspectorMessage,run:startAutoArrangeWorker,

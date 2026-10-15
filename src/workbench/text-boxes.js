@@ -161,5 +161,5 @@ function createTextBoxEditor(opts){
   });
   life.listen(opts.window,'pointercancel',function(){if(gesture){gesture.ghost.remove();gesture=null;}});life.listen(opts.window,'blur',cancel);
   life.listen(opts.src,'input',clear);life.listen(view,'dv:pathchange',clear);
-  return {refresh:refresh,clear:clear,destroy:function(){clear();life.destroy();}};
+  return {open:open,refresh:refresh,clear:clear,destroy:function(){clear();life.destroy();}};
 }

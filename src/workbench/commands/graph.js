@@ -41,7 +41,7 @@ function planSetNodeLocked(text,raw,sectionIdx,nodeId,locked){
   return planSetNodesLocked(text,raw,sectionIdx,[nodeId],locked);
 }
 
-function planAddNode(text, raw, sectionIdx, preset){
+function planAddNode(text, raw, sectionIdx, preset, point){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */
   var got = builderDiagram(text, raw, sectionIdx);
@@ -57,7 +57,9 @@ function planAddNode(text, raw, sectionIdx, preset){
     if (!rows) return {error: 'could not edit rows in the editor text'};
     placed = rows.text;
   }
-  var r1 = jsonInsertListItemOrCreate(placed, got.path, 'floats', JSON.stringify(builderNewNodeFloats(d, [id])[0]));
+  if(point && (!floatCoordinate(point.x) || !floatCoordinate(point.y)))return {error:'Choose a point within the supported canvas coordinates.'};
+  var placement=point?{id:id,side:'below',x:point.x,y:point.y,noSpread:true}:builderNewNodeFloats(d,[id])[0];
+  var r1 = jsonInsertListItemOrCreate(placed, got.path, 'floats', JSON.stringify(placement));
   if (!r1) return {error: 'could not edit floats in the editor text'};
   var r2 = jsonInsertMember(r1.text, got.path.concat(['nodes']), id,
     '{"title": ' + JSON.stringify(title) + ', "sub": "what it does", "icon": ' +
@@ -66,8 +68,8 @@ function planAddNode(text, raw, sectionIdx, preset){
   return {text: r2.text, start: r2.start, end: r2.end, kind: 'node', id: id};
 }
 
-function planAddTextBox(text,raw,sectionIdx){
-  var plan=planAddNode(text,raw,sectionIdx,{icon:'text',title:'Text'});
+function planAddTextBox(text,raw,sectionIdx,point){
+  var plan=planAddNode(text,raw,sectionIdx,{icon:'text',title:'Text'},point);
   if(plan.error)return plan;
   var next=JSON.parse(plan.text),got=builderDiagram(plan.text,next,sectionIdx);
   var edit=jsonReplaceValue(plan.text,got.path.concat(['nodes',plan.id]),JSON.stringify({type:'text',text:'Type your text',textStyle:{fontSize:24,width:280,height:80}}));
@@ -151,7 +153,7 @@ function planAddEdge(text, raw, sectionIdx){
           index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
 
-function planAddPanel(text, raw, sectionIdx, type){
+function planAddPanel(text, raw, sectionIdx, type, destination){
   /* type (optional): a PANEL_TEMPLATES key; default queue */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -166,6 +168,23 @@ function planAddPanel(text, raw, sectionIdx, type){
   if (instantiate) entry = instantiate(entry, got.d) || entry;
   var r = jsonInsertListItemOrCreate(text, got.path, 'panels', JSON.stringify(entry, null, 2));
   if (!r) return {error: 'could not edit panels in the editor text'};
+  if(destination && destination.explore){
+    var point=destination.point;
+    if(!point || !floatCoordinate(point.x) || !floatCoordinate(point.y))return {error:'Choose a point within the supported canvas coordinates.'};
+    var next=JSON.parse(r.text),placed=builderRewrite(r.text,next,got.path,function(d){
+      var chapter=destination.chapter;
+      // A Tab can present a Standard or legacy arrangement on its Explore canvas.
+      if(!Array.isArray(d.layouts)){var promoted=builderPromoteSectionViews(d,chapter);if(promoted.error)return promoted;chapter=promoted.layoutId;}
+      var definition=(d.layouts || []).find(function(v){return v.id===chapter;});
+      if(!definition)return {error:'The canvas view changed. Open Add again.'};
+      var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={});
+      (canvas.panels || (canvas.panels=[])).push({panel:id,x:point.x,y:point.y,w:320,h:240});
+      (explore.panelPlacements || (explore.panelPlacements=[])).push({panel:id,placement:'canvas'});
+    });
+    if(placed.error)return placed;
+    var range=jsonLocate(placed.text,got.path.concat(['panels',(got.d.panels || []).length]));
+    r=Object.assign({},placed,range && {start:range.start,end:range.end});
+  }
   return {text: r.text, start: r.start, end: r.end, kind: 'panel',
           index: (got.d.panels || []).length};
 }

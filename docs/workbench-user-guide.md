@@ -159,3 +159,5 @@ instructions here; the [reader tour](tour.md) runs only on read-only diagrams.
 
 The [canon library guide](workbench-canon-library.md) explains how a company
 ships its reviewed diagrams beside the editor.
+
+On desktop, right-click blank diagram or Explore canvas space to open **Add** at the pointer. **Text** inserts a box there and starts editing; **Node…** opens the presets, and **Panel…** opens the existing panel library. Canvas panels appear at the chosen point; Standard panels use the section layout. **Connection** starts the two-node connection gesture and **Step** adds to the current path. Escape or clicking elsewhere dismisses the menu. Cancelling a picker adds nothing; each insertion is one Undo action. Changing the source, project, section or view retires the pending destination. The toolbar **Add** remains available.

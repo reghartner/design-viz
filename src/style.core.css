@@ -3599,9 +3599,9 @@ body.sk-terminal .termbar.has-paths .schips{--path-label-bg:var(--tm-ground);}
 body.sk-pastel .termbar.has-paths .schips{--path-label-bg:#F8FAFD;}
 body.sk-blueprint .termbar.has-paths .schips{--path-label-bg:#04264F;}
 .termbar.has-paths .schips:has(.delta-chip-wrap){padding:14px 14px 4px 2px;}
-.path-matrix {display:grid;grid-template-columns:var(--path-label-width,230px) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
+.path-matrix {--path-matrix-label-width:min(var(--path-label-width,230px),max(150px,calc(100cqw - var(--path-step-count) * 35px)));display:grid;grid-template-columns:var(--path-matrix-label-width) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
 .path-row {display:contents}
-.path-matrix .path-chip {position:sticky;left:4px;z-index:4;justify-self:start;width:calc(var(--path-label-visible-width) - 10px);max-width:calc(var(--path-label-visible-width) - 10px);min-height:32px;margin-right:8px;box-sizing:border-box;background:var(--path-label-bg);white-space:normal}
+.path-matrix .path-chip {position:sticky;left:4px;z-index:4;justify-self:start;width:calc(var(--path-matrix-label-width) - 10px);max-width:calc(var(--path-matrix-label-width) - 10px);min-height:32px;margin-right:8px;box-sizing:border-box;background:var(--path-label-bg);white-space:normal}
 .termbar.has-paths .path-row .schip {width:32px;height:32px;margin:0;border-color:color-mix(in srgb,var(--path-color) 45%,transparent)}
 .termbar.has-paths .path-row .schip[aria-current="true"] {border-color:var(--path-color);box-shadow:0 0 0 1px var(--path-color);color:var(--dink)}
 .termbar.has-paths .path-row .schip.shared-step-shadow {opacity:.35}
@@ -3615,7 +3615,7 @@ body.sk-blueprint .termbar.has-paths .schips{--path-label-bg:#04264F;}
 .termbar.has-paths .path-row[data-selected="true"] .path-chip{background:color-mix(in srgb,var(--path-color) 14%,var(--path-label-bg));box-shadow:inset 0 0 0 1px var(--path-color),0 0 0 2px color-mix(in srgb,var(--path-color) 18%,transparent);}
 .termbar.has-paths .stepline {flex-basis:100%}
 .termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
-@media(max-width:640px){.path-matrix{grid-template-columns:var(--path-label-width,230px) repeat(var(--path-step-count),34px)}}
+@media(max-width:640px){.path-matrix{grid-template-columns:var(--path-matrix-label-width) repeat(var(--path-step-count),34px)}}
 @media(max-width:640px){.path-matrix .path-chip{min-height:34px}}
 @media(max-width:640px){.termbar.has-paths .path-row .schip{width:34px;height:34px}}
 /* No full-edge arrow or successful packet is shown for a failed attempt. */
@@ -3898,7 +3898,8 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .termbar.has-paths .path-timeline .schip[data-path-active="false"]{opacity:.36;filter:saturate(.25);}
 .termbar.has-paths .path-timeline .schip[data-path-active="false"]:hover,.termbar.has-paths .path-timeline .schip[data-path-active="false"]:focus-visible{opacity:.72;filter:none;}
 .path-timeline .schip:focus-visible{outline:2px solid var(--path-color);outline-offset:5px;}
-.path-matrix .schip,.path-timeline .schip{scroll-margin-inline-start:calc(var(--path-label-visible-width) + 12px);}
+.path-matrix .schip{scroll-margin-inline-start:calc(var(--path-matrix-label-width) + 12px);}
+.path-timeline .schip{scroll-margin-inline-start:calc(var(--path-label-visible-width) + 12px);}
 
 .handoff-back{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere;}
 @media print{.handoff-back{display:none !important;}}

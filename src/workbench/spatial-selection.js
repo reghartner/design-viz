@@ -167,8 +167,21 @@ function createBuilderSpatialSelection(opts){
   life.listen(win,'keyup',function(ev){if(nudge && nudge.keys.has(ev.key)){ev.preventDefault();nudge.keys.delete(ev.key);if(!nudge.keys.size)finishNudge();}},true);
   life.listen(doc,'pointerdown',cancelNudge,true);
   life.listen(doc,'focusin',function(ev){if(nudge && ev.target!==nudge.focus.el)cancelNudge();},true);
+  function blank(ev){
+    var el=ev.target,shell=surface(el),board=el.closest('.board'),sec=shell && shell.closest('.doc-sec');
+    if(!board || !sec || !snapshot() || !opts.openAdd)return;
+    if(el.closest('[data-dv-detail-preview],.explore-window,.explore-player,.explore-tools,.dv-text-toolbar,.dv-text-editor,a,button,input,select,textarea,[contenteditable],[role="button"],[data-dv-node],[data-dv-edge],[data-dv-step],[data-dv-group],[data-dv-row],[data-dv-panel]'))return;
+    var svg=board.querySelector('.boardcanvas > svg'),matrix=svg && svg.getScreenCTM();
+    if(!matrix || !svg.getClientRects().length)return;
+    var point=new win.DOMPoint(ev.clientX,ev.clientY).matrixTransform(matrix.inverse());
+    if(!Number.isFinite(point.x) || !Number.isFinite(point.y))return;
+    if(opts.openAdd({section:Number(sec.getAttribute('data-dv-section')),point:{x:point.x,y:point.y},explore:shell.classList.contains('viewport-explore'),x:ev.clientX,y:ev.clientY,shell:shell})){
+      ev.preventDefault();ev.stopPropagation();close(false);cancel();cancelNudge();
+    }
+  }
   function open(ev){
-    if(!active() || opts.busy())return;var t=target(ev.target);if(!t)return;
+    if(!active() || opts.busy() || ev.defaultPrevented || ev.target.closest('input,textarea,select,[contenteditable],.dv-text-editor'))return;
+    var t=target(ev.target);if(!t){blank(ev);return;}
     ev.preventDefault();ev.stopPropagation();close(false);cancel();cancelNudge();
     var targets=currentTargets();if(!targets.some(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);})) {opts.select([t]);targets=currentTargets();}
     var shell=surface(t.el),s=snapshot();if(!s)return;

@@ -432,7 +432,7 @@ function createBuilderInteractions(opts){
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
-    inspect:function(){inspectSelection(false);}
+    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd
   });
   life.own(function(){spatial.destroy();});
 
@@ -1722,6 +1722,7 @@ function createBuilderInteractions(opts){
     clearAddModeChrome();clearMultiSelect();clearStepMarkers();setSelected(null);rowGrabRows={};
   }
   return {
+    editText:life.guard(function(el){textEditor.open(el);}),
     setSelected:life.guard(setSelected),
     updateTargetLabel:life.guard(updateTargetLabel),
     markInsertTarget:life.guard(markInsertTarget),

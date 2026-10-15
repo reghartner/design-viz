@@ -79,3 +79,17 @@ test('nudge applies one graph delta to mixed objects, keeps panel dimensions and
  assert.equal(d.floats[0].x,60);assert.equal(d.floats[0].y,80);assert.equal(d.floats[1].x,250);assert.equal(d.floats[1].y,280);assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],{panel:'p',x:610,y:200,w:240,h:900});
  assert.match(B.planNudgeSpatial(text,raw,targets,'explore',rects,Infinity,0).error,/finite/);assert.match(B.planNudgeSpatial(text,raw,targets,'explore',rects,0,0).error,/already/);
 });
+
+test('point insertions preserve unrelated geometry and place canvas panels only in the captured view',()=>{
+ const raw=fixture(),text=JSON.stringify(raw,null,2),point={x:-120.5,y:890.25};
+ for(const plan of [B.planAddNode(text,raw,0,null,point),B.planAddTextBox(text,raw,0,point)]){
+  assert.ok(!plan.error,plan.error);const d=JSON.parse(plan.text).page.sections[0].diagram;
+  assert.deepEqual(d.floats.slice(0,-1),raw.page.sections[0].diagram.floats);assert.deepEqual(d.rows,raw.page.sections[0].diagram.rows);assert.deepEqual(d.layouts,raw.page.sections[0].diagram.layouts);
+  assert.equal(d.floats.at(-1).x,point.x);assert.equal(d.floats.at(-1).y,point.y);assert.equal(d.floats.at(-1).noSpread,true);
+ }
+ const destination={point,explore:true,chapter:'explore'},plan=B.planAddPanel(text,raw,0,'state',destination);assert.ok(!plan.error,plan.error);
+ const d=JSON.parse(plan.text).page.sections[0].diagram,p=d.panels.at(-1),ex=d.layouts[0].exploreLayout;assert.deepEqual(JSON.parse(plan.text.slice(plan.start,plan.end)),p);
+ assert.deepEqual(d.floats,raw.page.sections[0].diagram.floats);assert.deepEqual(ex.canvas.panels[0],raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0]);assert.deepEqual(ex.canvas.panels.at(-1),{panel:p.id,x:point.x,y:point.y,w:320,h:240});assert.deepEqual(ex.panelPlacements.at(-1),{panel:p.id,placement:'canvas'});
+ const standard=B.planAddPanel(text,raw,0,'state',{point,explore:false});assert.deepEqual(JSON.parse(standard.text).page.sections[0].diagram.layouts,raw.page.sections[0].diagram.layouts);
+ assert.match(B.planAddPanel(text,raw,0,'state',{...destination,chapter:'missing'}).error,/view changed/);assert.match(B.planAddTextBox(text,raw,0,{x:NaN,y:2}).error,/coordinates/);assert.equal(JSON.stringify(raw,null,2),text);
+});

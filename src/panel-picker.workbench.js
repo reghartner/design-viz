@@ -77,11 +77,11 @@ function initPanelPicker(opts){
   var filters = document.getElementById('panel-picker-filters'), detail = document.getElementById('panel-picker-preview');
   var add = document.getElementById('panel-picker-add'), status = document.getElementById('panel-picker-status');
   var snapshot = null, selected = null, category = 'All panels', opener = null, invalid = false, referenceImage = null;
-  var operation=null,reviewPlan=null,copyGeneration=0;
+  var operation=null,insertion=null,reviewPlan=null,copyGeneration=0;
   var content=dialog.querySelector('.panel-picker-content'),review=el('panel-picker-review');
   var resize = typeof ResizeObserver === 'function' ? new ResizeObserver(life.guard(fitPreviews)) : null;
   function el(id){ return document.getElementById(id); }
-  function context(){return operation?operation.context():opts.context();}
+  function context(){return operation?operation.context():insertion?insertion.context():opts.context();}
   function fitPreviews(){
     dialog.querySelectorAll('.panel-picker-art').forEach(function(frame){
       var widget = frame.firstElementChild;
@@ -147,7 +147,7 @@ function initPanelPicker(opts){
     cardsLife.destroy();filtersLife.destroy();
     if (resize) resize.disconnect();
     grid.replaceChildren(); detail.replaceChildren(); snapshot = null; selected = null; referenceImage = null;
-    operation=null;reviewPlan=null;copyGeneration++;review.hidden=true;content.hidden=false;
+    operation=null;insertion=null;reviewPlan=null;copyGeneration++;review.hidden=true;content.hidden=false;
     el('panel-picker-original').value='';el('panel-picker-review-details').replaceChildren();
   }
   function close(focus){
@@ -155,8 +155,8 @@ function initPanelPicker(opts){
     dialog.close(); cleanup();
     if (focus!==false && opener && opener.isConnected) opener.focus({preventScroll:true});
   }
-  function open(replacement){
-    operation=replacement || null;
+  function open(replacement,destination){
+    operation=replacement || null;insertion=destination || null;
     var current = context();
     if (current.error){ opts.error(current.error); return; }
     snapshot = current; opener = document.activeElement; invalid = false; selected = null;
@@ -226,7 +226,8 @@ function initPanelPicker(opts){
       if(!reviewPlan){var plan=operation.review(type,snapshot);if(plan.error){status.textContent=plan.error;status.hidden=false;return;}showReview(plan);return;}
       var apply=operation.apply,approved=reviewPlan,original=snapshot;close(false);apply(approved,original);return;
     }
-    close(); opts.insert(type);
+    var insert=insertion?insertion.insert:opts.insert;
+    close(); insert(type);
   });
   life.listen(dialog,'cancel',function(ev){ev.preventDefault();close();});
   life.listen(dialog,'close',function(){if (!dialog.open) cleanup();});

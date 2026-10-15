@@ -1623,3 +1623,5 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-text-toolbar :focus-visible{outline:2px solid #2563eb;outline-offset:2px;}
 .dv-text-toolbar-help{max-width:110px;padding:0 4px;color:var(--muted,#526071);font-size:10px;}
 .dv-text-toolbar-error{position:absolute;left:0;top:calc(100% + 4px);width:100%;box-sizing:border-box;padding:8px;border:1px solid #b91c1c;border-radius:6px;background:var(--card,#fff);color:#b91c1c;}
+
+.dv-add-menu>strong{display:block;padding:6px 12px;font-size:12px;opacity:.7;}

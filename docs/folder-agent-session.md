@@ -68,10 +68,14 @@ provider revisions; it never silently refreshes them from a later deployment.
 The setup first asks whether you are adding an agent to the open diagram,
 continuing an existing agent build, or starting a new diagram with an agent.
 Adding an agent selects the folder containing the existing spec and ledger, or
-where an agent-working copy should live. Continuing selects the durable diagram
-folder used by the earlier build; Flowview finds `.flowview-agent` inside it.
-Starting new requires an empty folder. A different current draft is preserved in
-**Earlier drafts**. Opening an existing spec starts fresh Undo/Redo history.
+where an agent-working copy should live. If the selected folder contains
+`.flowview-agent`, Flowview reconnects that saved build in the same selection and
+restores its accepted spec, ledger, and workbench messages. Continuing remains an
+explicit route to the same saved-session recovery. Both routes refuse an active
+editor owner, rotate the connection identity on a successful reopen, and do not
+replay a previously pending request. Starting new still requires an empty folder.
+A different current draft is preserved in **Earlier drafts**. Opening an existing
+spec starts fresh Undo/Redo history.
 
 One existing `*.spec.json` is detected automatically. Its matching `*.ledger.md`
 is used; for example `payments.spec.json` and `payments.ledger.md`. If several

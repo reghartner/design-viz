@@ -309,6 +309,12 @@ async function resumeFolder(page){
   await expect(page.locator('#folder-agent-connect')).toBeVisible();
   await page.locator('#folder-agent-connect').click();
 }
+async function connectSelectedFolder(page){
+  if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
+  await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#folder-agent-connect')).toBeVisible();
+  await page.locator('#folder-agent-connect').click();
+}
 async function publishedRequest(h,text){
   // Send disables while its file write is pending, before Claude can read it.
   // Synchronize on the exact published turn so a previous request cannot pass.
@@ -563,7 +569,7 @@ test('Claude activity streams before the final answer and remains visible withou
 });
 
 
-test('refused folder Resume preserves the draft and instructions; successful Resume restores saved story and conversation',async({page})=>{
+test('ordinary folder selection refuses an active owner, then reconnects saved story and conversation',async({page})=>{
   const h=await setup(page);
   try{
     await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
@@ -575,6 +581,8 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     const request=await publishedRequest(h,'Keep this conversation for folder Resume');
     h.run('reply','--request',request.id,'--text','The saved folder conversation is ready to continue.');
     await expect(page.locator('#folder-agent-messages')).toContainText('The saved folder conversation is ready to continue.');
+    await page.locator('#folder-agent-input').fill('Keep this pending request without replaying it');await page.locator('#folder-agent-send').click();
+    const staleRequest=await publishedRequest(h,'Keep this pending request without replaying it');
     h.run('prepare');
     const skillFile=path.join(h.session,'authoring/.claude/skills/hld-to-page/SKILL.md');
     await writeFile(skillFile,'Stale skill: use the old API');
@@ -589,7 +597,7 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
     await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:true,at:Date.now()}));
-    await resumeFolder(page);
+    await connectSelectedFolder(page);
     await expect(page.locator('#folder-agent-status')).toContainText('still connected to another editor');
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toContain('# Old helper preserved');
@@ -597,13 +605,16 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     expect((await h.read('session.json')).connectionId).toBe(before.connectionId);
     await expect(page.locator('#src')).toHaveValue(localDraft);expect((await h.read('state.json')).source).toBe(savedSource);
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
-    await resumeFolder(page);
+    await connectSelectedFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/diagram folder/);
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     await expect(page.locator('#folder-agent-recovery-choice')).toBeHidden();
     await expect(page.locator('#src')).toHaveValue(savedSource);
     expect(await page.evaluate(text=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).some(entry=>entry.text===text),localDraft)).toBe(true);
     await closeGuide(page);await expect(page.locator('#folder-agent-messages')).toContainText('The saved folder conversation is ready to continue.');
+    await expect(page.locator('#folder-agent-messages')).toContainText('Keep this pending request without replaying it');
+    await expect(page.locator('#folder-agent-messages article').filter({hasText:'Keep this pending request without replaying it'})).toHaveCount(1);
+    await expect(page.locator('#folder-agent-cancel')).toBeHidden();expect((await h.read('request.json')).id).toBe(staleRequest.id);
     await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
     await page.locator('#editor-tab-agent').focus();await page.keyboard.press('Control+z');await expect(page.locator('#src')).toHaveValue(savedSource);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
@@ -1334,7 +1345,7 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     expect(await readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(handwritten);
     await page.locator('#editor-tab-agent').click();await disconnect(page);
     const outside=source.replace('Doorbell','Outside edit');await writeFile(path.join(h.folder,'payments.spec.json'),outside);
-    await resumeFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(outside);
+    await connectSelectedFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(outside);
     expect((await h.read('state.json')).ledger).toBe(afterLedger);
     expect(await page.evaluate(text=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).some(entry=>entry.text===text && entry.ledger),handwritten)).toBe(true);
     await closeGuide(page);await disconnect(page);await mkdir(path.join(h.folder,'second-diagram'));

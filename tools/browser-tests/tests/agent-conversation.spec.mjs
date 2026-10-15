@@ -107,7 +107,7 @@ test('setup separates conversation mode from adopt, resume and new-folder intent
   await mount(page);await page.locator('#folder-agent-open-setup').click();
   await expect(page.locator('.folder-agent-guide-steps')).toHaveCount(0);await expect(page.getByText('Connect later',{exact:true})).toHaveCount(0);
   await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Diagram Folder');
+  await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Diagram Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('restores its saved diagram, ledger, and workbench history');
   await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Existing Diagram Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('.flowview-agent');
   await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-connect')).toHaveText('Select Empty Folder');
   await page.locator('#folder-agent-setup-mode-external').click();await expect(page.locator('#folder-agent-workflow-note')).toContainText('does not have to be the agent’s working directory');

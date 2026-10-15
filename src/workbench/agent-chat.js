@@ -331,7 +331,7 @@ function initWorkbenchAgentChat(opts){
   function setSetupIntent(value){
     setupIntent=['adopt','resume','new'].includes(value)?value:'adopt';setupUseRemembered=false;
     var copy={
-      adopt:{title:'Select Diagram Folder',description:'Choose the folder containing its existing .spec.json file, or choose a different folder to create an agent-working copy.',note:'This is a new agent setup. Flowview does not restore a previous agent connection.',action:'Select Diagram Folder',next:'Next: if the folder contains several diagrams, choose one from a list. Then review and copy the setup instructions.'},
+      adopt:{title:'Select Diagram Folder',description:'Choose the folder containing its existing .spec.json file, or choose a different folder to create an agent-working copy.',note:'If the folder contains a previous agent connection, Flowview restores its saved diagram, ledger, and workbench history. Old pending work is not replayed.',action:'Select Diagram Folder',next:'Next: if the folder contains several diagrams, choose one from a list. Then review and copy the setup instructions.'},
       resume:{title:'Select Existing Diagram Folder',description:'Choose the diagram folder used by the earlier build—the folder containing its .spec.json file and coverage ledger.',note:'Flowview finds .flowview-agent inside that folder and restores the saved diagram, ledger, and workbench history. The open draft is kept in Earlier drafts, and old pending work is not replayed.',action:'Select Diagram Folder',next:'Next: verify the recovered diagram, then review and copy fresh setup instructions for this connection.'},
       new:{title:'Select an Empty Diagram Folder',description:'Choose where Flowview should create the new spec, coverage ledger, and agent connection data.',note:'The open workbench draft is kept in Earlier drafts. Existing diagram folders are not reopened from this path.',action:'Select Empty Folder',next:'Next: Flowview creates story.spec.json and story.ledger.md, then you review and copy the setup instructions.'}
     }[setupIntent];
@@ -522,7 +522,7 @@ function initWorkbenchAgentChat(opts){
       var resumed=opts.snapshot();
       if(!resumed.open || resumed.source!==saved.savedSource || restored && restored.project!==undefined && restored.project!==resumed.project)
         throw Error('The project changed while opening the saved story. Choose the diagram folder again.');
-      // Explicit Resume opens a new project even when its bytes match. Retire
+      // Reopening a saved build starts a new project even when its bytes match. Retire
       // old chat state without cancelling this intentional connection attempt.
       // Keep recovery writes suspended until the folder's transcript is loaded.
       var composing=saved.newFolder?get('input').value:null;
@@ -634,7 +634,6 @@ function initWorkbenchAgentChat(opts){
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
         if(intent==='new' && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or agent connection. Select a new, empty diagram folder to start fresh. Existing files were not changed.');
         if(intent==='resume' && !found.hasSession)throw Error('This folder does not contain an existing agent build. Select the diagram folder used by the earlier build.');
-        if(intent==='adopt' && found.hasSession)throw Error('This folder already belongs to an agent build. Choose Continue an existing agent build, then select it again.');
         await prepareSource(found.source===null?opening.source:found.source);
         projectFolder=await found.initialize(checkOpening);
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';

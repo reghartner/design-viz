@@ -594,14 +594,14 @@
     </section>
     <p class="folder-agent-choice-label">What are you doing?</p>
     <div class="folder-agent-start-choices" role="group" aria-label="How you are starting">
-      <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Add an agent to this open diagram</b><span>This document has never used an agent diagram folder.</span></button>
+      <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Add an agent to this open diagram</b><span>Select a diagram folder; saved agent work reconnects automatically.</span></button>
       <button type="button" id="folder-agent-start-resume" data-agent-start-choice="resume" aria-pressed="false"><b>Continue an existing agent build</b><span>Reopen the diagram folder used by an earlier agent build.</span></button>
       <button type="button" id="folder-agent-start-new" data-agent-start-choice="new" aria-pressed="false"><b>Start a new diagram with an agent</b><span>Create a new agent-backed diagram in an empty folder.</span></button>
     </div>
     <section class="folder-agent-start-detail" aria-live="polite">
       <h3 id="folder-agent-start-title">Select Diagram Folder</h3>
       <p id="folder-agent-start-description">Choose the folder containing its existing .spec.json file, or choose a different folder to create an agent-working copy.</p>
-      <p id="folder-agent-start-note" class="folder-agent-start-note">This is a new agent setup. Flowview does not restore a previous agent connection.</p>
+      <p id="folder-agent-start-note" class="folder-agent-start-note">If the folder contains a previous agent connection, Flowview restores its saved diagram, ledger, and workbench history. Old pending work is not replayed.</p>
       <button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect">Select Diagram Folder</button>
       <p id="folder-agent-start-next" class="folder-agent-hint">Next: if the folder contains several diagrams, choose one from a list. Then review and copy the setup instructions.</p>
     </section>

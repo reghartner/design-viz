@@ -54,8 +54,9 @@ Upload and manage the collection by selecting the panel itself. See
   actions**; end controls are disabled.
 - **Branch from here** creates an alternate after the selected beat.
 - **Reuse steps…**, available on paths, copies or shares beats from another
-  path with a destination-state preview. **Make independent here** detaches
-  a shared beat in place; **Remove from this path** removes only its occurrence.
+  path with a destination-state preview. Under **Shared step settings**, **Make
+  independent here** detaches a shared beat in place; **Remove from this path**
+  removes only its occurrence.
   See [step reuse](workbench-step-reuse.md) for selecting ranges and continuations.
 
 These actions clear the filter, select their result and use one existing

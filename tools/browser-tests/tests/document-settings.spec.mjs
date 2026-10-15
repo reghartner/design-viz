@@ -1,8 +1,7 @@
 import {test,expect,openInspectorGroup,paste,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
-import {readFile,writeFile} from 'node:fs/promises';
-import {execFileSync} from 'node:child_process';
+import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {repo} from '../helpers/prepare.mjs';
+import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 const source=page=>page.locator('#src').inputValue();
 async function settings(page){await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();}
 async function edit(page,label,value){const field=page.locator('#guide').getByLabel(label,{exact:true});await field.fill(value);await field.press('Enter');}
@@ -11,7 +10,8 @@ const diagram={nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a','b']],e
   {id:'second',name:'Second',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]}}
 ],defaultLayout:'first'};
 
-test('saved document metadata and initial prose collapse survive Save/export, Undo, preview overrides and navigation',async({page,server,context},info)=>{
+test('saved document metadata and initial prose collapse survive project export, Undo, preview overrides and navigation',async({page,server,context},info)=>{
+  await useProjectDownloads({page});
   const raw={page:{title:'Before',skin:'aurora',blocks:[{heading:'Flow',text:['This explains the flow.'],diagram}]}};
   const original=JSON.stringify(raw,null,'\t');await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);
   const section=page.locator('#docview .doc-sec').first();await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Second',exact:true}).click();
@@ -32,13 +32,15 @@ test('saved document metadata and initial prose collapse survive Save/export, Un
   await inspectPageElement(page,section.locator('.sec-h'));const collapse=page.locator('#guide').getByLabel('Initially collapse prose',{exact:true});const beforeCollapse=await source(page);
   await collapse.check();await expect(section.locator('.prosetoggle')).toHaveAttribute('aria-expanded','false');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeCollapse);await expect(section.locator('.prosetoggle')).toHaveAttribute('aria-expanded','true');await page.locator('#redo-builder').click();
-  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await readFile(await (await download).path(),'utf8');
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const bundle=await download,files=await projectFiles(bundle);
+  expect(bundle.suggestedFilename()).toBe('design-notes.zip');expect(Object.keys(files).sort()).toEqual(['README.md','design-notes.html','design-notes.ledger.md','design-notes.spec.json']);
+  const saved=files['design-notes.spec.json'];
   const savedPage=JSON.parse(saved).page;expect(savedPage.title).toBe('Design notes');expect(savedPage.skin).toBe('lilac');expect(savedPage.blocks[0].collapsed).toBe(true);expect(savedPage.generatedFrom).toEqual({url:'https://example.test/design',label:'Design specification',version:'v2',at:'2026-09-29'});
-  const input=path.join(server.root,'document-settings.spec.json'),output=path.join(server.root,'document-settings.html');await writeFile(input,saved);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await writeFile(path.join(server.root,'document-settings.html'),files['design-notes.html']);
   const reader=await context.newPage();await reader.goto(server.origin+'/document-settings.html');await expect(reader.locator('.doc-title')).toHaveText('Design notes');await expect(reader.locator('.docview')).toHaveClass(/sk-lilac/);await expect(reader.locator('.prosetoggle')).toHaveAttribute('aria-expanded','false');await reader.close();
   await settings(page);await page.screenshot({path:info.outputPath('document-settings-desktop.png')});
   const final=await source(page);await page.locator('#workspace-home').click();await page.goBack();await expect(page.locator('#src')).toHaveValue(final);
-  await page.setViewportSize({width:760,height:900});await settings(page);await expect(page.locator('#guide').getByLabel('Document title')).toBeVisible();await page.screenshot({path:info.outputPath('document-settings-narrow.png')});
+  await page.setViewportSize({width:1280,height:900});await settings(page);await expect(page.locator('#guide').getByLabel('Document title')).toBeVisible();await page.screenshot({path:info.outputPath('document-settings-compact-desktop.png')});
 });
 
 test('blank projects and bare sections pages expose saved document settings without canvas selection',async({page,server})=>{

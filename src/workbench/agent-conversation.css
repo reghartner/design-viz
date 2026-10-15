@@ -155,9 +155,14 @@
 
 .folder-agent-guide{width:min(680px,calc(100vw - 32px));}
 .folder-agent-guide .folder-agent-guide-header{margin-bottom:12px;}
-.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-guide-header{margin-bottom:4px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-guide-header{margin-bottom:2px;}
 .folder-agent-guide>h2{margin-top:14px;}
-.folder-agent-guide:has(#folder-agent-status:not(:empty))>h2{margin-top:12px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty))>h2{margin-top:4px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-choice-label{margin:12px 0 6px!important;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-choices{gap:6px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-choices button{padding:8px 13px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-detail{margin-top:12px;padding-top:12px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-detail p{margin:8px 0;}
 .folder-agent-connection-options{margin:20px 0 8px;padding-top:18px;border-top:1px solid var(--line);}
 .folder-agent-connection-options>.folder-agent-choice-label{margin-top:10px!important;}
 .folder-agent-setup-detail{margin:12px 0 0;}

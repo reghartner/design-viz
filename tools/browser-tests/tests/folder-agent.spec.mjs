@@ -361,7 +361,7 @@ test('production setup keeps project intent, folder action and next handoff visi
 
     await page.setViewportSize({width:1280,height:720});await page.locator('#folder-agent-start-adopt').click();await page.evaluate(()=>window.cancelPicker=true);await primary.click();
     const failure=page.locator('#folder-agent-status');await expect(failure).toContainText('open diagram is unchanged');await expect(failure).toBeVisible();await expect(primary).toBeEnabled();
-    for(const locator of [failure,primary]){const box=await locator.boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(720);}
+    for(const locator of [failure,primary,next]){const box=await locator.boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(720);}
     const failedGuide=await guide.boundingBox(),retry=await primary.boundingBox();expect(retry.y+retry.height).toBeLessThanOrEqual(failedGuide.y+failedGuide.height-10);
     await page.screenshot({path:info.outputPath('production-agent-setup-cancelled-1280x720.png')});
     expect(h.errors).toEqual([]);

@@ -98,16 +98,16 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
    outage, keep the last known value and let its freshness age; an overdue
    card is `stale`. A delivered report with no push still updates every app
    card it carries (value, recording, thermal, connection, freshness).
-10. **Bind services and cite code.** Bind every service node in the story
-    that the supplied catalog lists (`node.binding` with `entityRef`, `label`,
-    `owner`, `catalogUrl`). Add `api` (`entityRef`, `operationId`, `method`,
-    `path`) only when the catalog lists the operation that node's call uses.
-    Catalog services that are not in the story stay out.
-    Attach each supplied `codeRef` (full SHA) to its owning node always, and
-    to a step only when that code runs in that step (no upload code on a read,
-    no offline rule on an outage shorter than its threshold). Copy supplied
-    code references exactly, including their `id`; never rename or
-    normalize them. Use only supplied identities; record missing ones as gaps.
+10. **Discover references for every node.** For any diagram with nodes, follow
+    [bindings and code](bindings-and-code.md) before asking about missing sources:
+    inspect available approved catalogs, repositories, links and authorized
+    integrations; never guess an identity, URL or SHA. Record applicability,
+    sources checked and evidence or an honest gap for every node. Bind only a
+    node that represents one verified catalog service. People, devices and
+    aggregate nodes may have no binding but can still have code or docs. Keep
+    supplied references; attach pinned code to its owning node and only to steps
+    where it runs. Cosmetic edits verify affected nodes; new or
+    changed nodes or behavior require lookup.
 11. **One continuous timeline per diagram.** A continuous story (one night,
     one hot day) is one diagram with paths. Do not split it into several
     diagrams: each diagram resets to its initial state. Separate diagrams are
@@ -158,7 +158,8 @@ and the source diff; consult that reference's update sections only for reconcili
 
 While you read, list: candidate paths (happy, failure, alternate endings),
 physical actors and devices, services, any stated times or durations, any
-stated battery, temperature or signal values, and which facts are missing.
+stated battery, temperature or signal values, and which facts are missing. If
+the diagram has nodes, complete the discovery pass in rule 10 for each one.
 
 ## Phase 2: Ask the operator (bounded batches, wait after each)
 
@@ -202,11 +203,14 @@ Then ask only what the source and request leave open, from this list:
 audience; the one-sentence takeaway; the moments the viewer must see;
 which outcomes (paths) to show; and story-critical parts of the starting
 situation (battery, connectivity, what is already on the phone). Count each
-independently selectable outcome or starting-state choice separately. At
-engineering level you may also ask about thresholds, missing catalog services
-and code locations, with each independently answerable gap counted separately.
+independently selectable outcome or starting-state choice separately. For
+Engineering or Mixed diagrams with nodes, after checking all relevant available
+sources for the depicted nodes, ask any needed source/access/location question; each independently
+answerable gap counts separately. Phrase it in plain language (for example,
+"Where can I access the approved service catalog for these boxes?") rather
+than asking the operator for a SHA or anchor.
 
-**Do not ask a story-level or mixed-level operator technical questions**
+**Do not ask a story-level operator technical questions**
 (catalog entries, code SHAs or anchors, protocols, battery rates, report
 timing edge cases, delivery or renderer settings). Decide those yourself from the evidence,
 choose the option that claims least, and list each one in the ledger under
@@ -215,10 +219,11 @@ technical fact would change what the audience sees, and then ask it as a
 story question ("Does the app update while the phone is locked?").
 
 Backstage links and code references are still required at every level: they
-sit behind the nodes and do not add clutter. A node that stands for exactly
-one catalog service is bound. A story-level box that covers several services
-is not bound; list the services it covers in the ledger, and bind them in an
-engineering view or drilldown if the page has one.
+sit behind nodes and do not add clutter. Apply rule 10; audience is not a reason
+to skip discovery. A node that stands for exactly one verified catalog service
+is bound. An aggregate box is not bound; record its scope and any applicable
+code/docs separately. A story with no diagram nodes needs no technical source
+question.
 
 If the batch has questions, stop and wait. (If the request and source
 settle everything, write "No questions needed" in the ledger and continue.)
@@ -254,9 +259,10 @@ I. Checkable expectations
 Use the [worked example](worked-example.md) only when a concrete
 worksheet example would resolve uncertainty; it is not a prerequisite read. Consult the
 [panel time and icon guide](panel-time-and-icons.md) only when the selected
-contracts leave a field/icon question unresolved. Select `--feature bindings`
-for catalog/code contracts; do not reload [bindings and code](bindings-and-code.md)
-when the packet already includes it.
+contracts leave a field/icon question unresolved. Every node-bearing diagram
+follows [bindings and code](bindings-and-code.md). Select `--feature bindings`
+when the packet should inline that owner; do not reload it when the packet
+already includes it.
 
 Do not start the JSON until sections A to I are complete. If the operator
 changes the story later, update the worksheet first, then the spec.
@@ -391,6 +397,9 @@ path in Workbench. Ordinary local specs use the script as shown.
    tones, coverage, icons, bindings/code and expectations against the applicable
    worksheet sections C to I and ledger rows. Fix every mismatch in the spec or
    worksheet and record which changed.
+   Confirm every node has a binding/code applicability result, sources checked,
+   and verified evidence or an explicit gap; verify every binding against an
+   approved catalog and every code revision/anchor against the fetched source.
 3. Reverse audit: walk the authored spec, not just the source or asserted beats.
    Every edge kind, tone, notification, icon, value, number, link, Home signal
    and subject position, binding and codeRef must trace to a ledger row or a
@@ -407,7 +416,7 @@ path in Workbench. Ordinary local specs use the script as shown.
 
 Report the spec and ledger paths, and HTML only when requested; the Canon entry
 or file to open and the paths/views to inspect; the validation result; which checks you ran; illustrative values; unbound services and
-other gaps; and anything out of scope. Do not commit, publish, edit the source
+other per-node reference gaps and attempted sources; and anything out of scope. Do not commit, publish, edit the source
 document, or enroll the page in `canon.json` without authorization. For an
 actual framework defect use [framework bugs](framework-bugs.md).
 
@@ -416,7 +425,8 @@ actual framework defect use [framework bugs](framework-bugs.md).
 - **Small edits.** A small edit the user fully specified (rename, move, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
-  the self-audit for the affected paths.
+  the self-audit for the affected paths. Preserve existing references and verify
+  affected nodes; do not expand a cosmetic change into whole-document enrichment.
 - **Maintained library.** Maintained pages live in `diagrams/<name>/` with the
   spec and HTML together; root `canon.json` controls publication. See
   [Canon library authoring](../../../../docs/workbench-canon-library.md).

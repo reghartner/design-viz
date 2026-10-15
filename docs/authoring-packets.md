@@ -29,6 +29,12 @@ include their maintained owners. Reference/example routes stay on demand. Extrac
 paths, preserving URL queries and anchors; the kit includes the small linked
 example specs and topology providers so those routes work offline.
 
+Every packet routes to the bindings/code owner because every diagram node needs
+an applicability and evidence check, even before a binding or codeRef exists.
+The full owner remains inline only when `bindings` is selected or inferred, so
+ordinary packets stay focused. A prose-only story with no diagram nodes does not
+trigger catalog or repository questions.
+
 `--mode edit` preserves the scoped-edit exception and omits the new-story
 question/inventory phases. An already fully specified edit does not require a
 fresh worksheet or question batch. Existing folder-session approval and source

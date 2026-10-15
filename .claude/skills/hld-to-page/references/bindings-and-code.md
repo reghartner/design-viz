@@ -1,28 +1,54 @@
 # Backstage bindings and code references
 
-Bindings and code references are required whenever the operator supplies a
-catalog or a code location. At engineering level, ask for both in Phase 2
-if they are missing. At story and mixed level, do not ask: use what was
-supplied or can be found, leave bindings and code references out where there
-is none, and record the gap under "Decisions I made" in the ledger. They drive the reader's
+Use this workflow for every diagram with nodes, at every audience level. Treat
+each node separately: determine whether a Backstage binding applies, whether
+code or documentation applies, and record the evidence or gap. Audience changes
+what appears in the story, not whether references behind nodes are discovered.
+They drive the reader's
 node menu (Backstage, API and source links), the Backstage **Diagrams** tab,
 and code-drift scanning. Field definitions: `docs/canon.md` (relative to VIZ).
-The fictional example catalog is `examples/canon/catalog.json`; the example
-spec that uses it is `examples/canon/specs/doorbell.json`.
 
-## Rule: supplied identities only
+## Discover before asking
+
+1. Preserve supplied bindings, codeRefs and links. For a bounded cosmetic edit,
+   verify the affected nodes and do not turn the task into whole-document
+   enrichment. New or changed nodes or behavior require discovery.
+2. Check and read every relevant available authorized source for the depicted
+   nodes before asking: the request, source and ledger; the project's approved catalog (normally
+   `workbench/catalog.json`); supplied repositories, checkouts and source links;
+   and authorized catalog or repository integrations available in the session.
+   Fetch reachable supplied sources rather than treating their URL as evidence.
+   The fictional `examples/canon/` fixtures demonstrate the format and are never
+   company evidence.
+3. For every node, assess binding, implementation code and documentation
+   independently. For each, record the sources checked and one result: verified
+   reference; `not applicable` with a reason; or an honest gap with retrieval
+   attempts. Documentation can complement code, but cannot replace a missing
+   implementation reference when code applies. People, devices and aggregate
+   nodes usually have no catalog binding, but may still have applicable code or
+   documentation links. Never invent a service identity for an aggregate node.
+4. If an Engineering or Mixed diagram still lacks a needed source or access,
+   ask where the approved catalog or repository can be accessed, in plain
+   language. Do not ask the operator to manufacture a SHA or anchor. For a
+   Story diagram, do not interrogate a business reader about technical
+   locations; record the per-node gap for engineer follow-up. A story with no
+   diagram nodes needs no catalog or repository question.
+
+## Rule: verified identities only
 
 - Copy `entityRef`, `owner`, `catalogUrl`, API fields and repository URLs
-  exactly from the supplied catalog, the operator, or the supplied checkout
+  exactly from a verified approved catalog, the operator, or the inspected checkout
   (`git -C <checkout> remote get-url origin`, `git -C <checkout> rev-parse HEAD`).
 - Never build an entityRef or URL from a node title. Never guess a GitHub URL
   from a local path. Never shorten or invent a SHA.
-- A service node that is not in the catalog stays **unbound**. Record it in
-  worksheet section H and as a ledger row: `unbound: not in supplied catalog`.
-- Devices, people, phones and third-party services are usually not catalog
-  services. Write `not a catalog service` in section H.
-- If no catalog was supplied and the operator did not answer, bind nothing and
-  record the gap for each service node.
+- Copy supplied code references exactly, including their `id`; never rename or
+  normalize them.
+- A service node absent from every applicable catalog checked stays **unbound**.
+  Record the checked sources in worksheet section H and a ledger gap such as
+  `unbound: not found in <approved catalog>`.
+- Devices, people, phones, third-party services and aggregate nodes are usually
+  not catalog services. Record why binding is inapplicable, then evaluate their
+  code and documentation separately.
 
 ## `node.binding`
 
@@ -73,8 +99,8 @@ as authored (short, fits the card).
 }]
 ```
 
-- `revision` is the full immutable commit SHA (40 to 64 hex characters) from the supplied checkout or
-  the operator.
+- `revision` is the full immutable commit SHA (40 to 64 hex characters) from an
+  inspected supplied repository/checkout or the operator.
 - `anchor.start` and `anchor.end` are literal lines that each occur exactly once
   in that file at that revision (surrounding whitespace ignored), start before
   end. Existing function declarations or comments work. Check uniqueness:
@@ -92,10 +118,12 @@ as authored (short, fits the card).
   an offline rule is not on an outage shorter than its threshold). A reference
   on steps only is incomplete. Steps with codeRefs need stable `id`s.
 - Only reference code you (or the operator) actually located. If the source
-  names a behavior but no code was found, record `code: not located` in section H.
+  names a behavior but no code was found, record `code: not located` plus the
+  repositories, links or integrations attempted in section H.
 
 ## Ledger rows
 
-Add one `service` ledger row per bound node (`covered @ nodes.<id>.binding`)
-and per unbound service (`out-of-scope: unbound, not in supplied catalog`).
-Add a `service`-class row for each codeRef with its path, lines and SHA.
+Add a ledger row for every node's binding/code applicability and evidence or
+gap. Bound nodes point to `nodes.<id>.binding`; unbound services name the
+approved catalogs checked; inapplicable nodes say why. Add a `service`-class
+row for each codeRef with its path, lines and SHA.

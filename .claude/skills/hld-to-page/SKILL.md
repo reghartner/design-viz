@@ -92,7 +92,8 @@ After the packet, load a guide only for starting-material or handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 
-For ordinary file authoring, deliver spec and ledger together; create questions
-only for unresolved material story decisions. HTML requires an explicit
+Deliver spec/ledger files together. Ask unresolved story decisions and, after
+relevant checks, needed Mixed/Engineering source access plainly.
+HTML requires an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.

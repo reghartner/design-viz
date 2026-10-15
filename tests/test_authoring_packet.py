@@ -103,6 +103,39 @@ class AuthoringPacketTests(unittest.TestCase):
             self.assertNotIn('Install the locked', text)
             self.assertLess(len((ROOT / packet.SKILL).read_text()), 6000)
 
+    def test_reference_discovery_is_routed_without_inlining_for_unbound_nodes(self):
+        raw = {'page': {'sections': [{'id': 'flow', 'diagram': {
+            'nodes': {'person': {'title': 'Operator'}, 'service': {'title': 'Orders'}},
+            'rows': [['person', 'service']]}}]}}
+        for mode in ('new', 'edit'):
+            text, meta = packet.generate([], [], mode=mode, raw=raw)
+            sources = [(item['path'], item['section']) for item in meta['provenance']]
+            self.assertIn((packet.WORKFLOW, 'The rules that matter most'), sources)
+            self.assertNotIn((packet.REFS + 'bindings-and-code.md', None), sources)
+            self.assertIn('`.claude/skills/hld-to-page/references/bindings-and-code.md`', text)
+        core = packet.section((ROOT / packet.WORKFLOW).read_text(), 'The rules that matter most')
+        self.assertIn('For any diagram with nodes', core)
+        self.assertIn('Record applicability', core)
+
+    def test_reference_discovery_route_stays_within_packet_growth_budget(self):
+        # Baselines captured from exact origin/main before the guidance change.
+        budgets = {'new': 78_744 + 1_024, 'edit': 67_458 + 1_024}
+        for mode, maximum in budgets.items():
+            text, _ = packet.generate([], [], mode=mode)
+            self.assertLessEqual(len(text.encode()), maximum)
+
+    def test_no_node_story_does_not_require_technical_source_questions(self):
+        raw = {'page': {'sections': [{'id': 'story', 'heading': 'Story',
+                                      'text': ['A business narrative.']}]}}
+        text, meta = packet.generate([], [], mode='new', raw=raw)
+        self.assertEqual(meta['inferred']['features'], [])
+        self.assertIn('A story with no diagram nodes needs no technical source\nquestion.', text)
+
+    def test_explicit_bindings_still_inlines_detailed_owner_once(self):
+        _, meta = packet.generate([], ['bindings'], mode='new')
+        sources = [(item['path'], item['section']) for item in meta['provenance']]
+        self.assertEqual(sources.count((packet.REFS + 'bindings-and-code.md', None)), 1)
+
     def test_inference_unions_explicit_selection_and_handles_topology_without_resolving(self):
         raw = simple_spec()
         d = raw['page']['sections'][0]['diagram']

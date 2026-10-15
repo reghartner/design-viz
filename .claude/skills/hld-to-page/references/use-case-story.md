@@ -4,8 +4,10 @@ Use the common skill, worksheet and folder approval protocol. The business
 participant can start from a conversation; an HLD or code checkout is not a
 prerequisite. Default to Story detail unless the participant specifies another
 level. Confirm only missing audience, takeaway, starting state and outcomes.
-Use plain names for people, devices, app screens and the backend. Ask technical
-questions only when phrased as a decision about what the audience sees.
+Use plain names for people, devices, app screens and the backend. At Story level,
+ask technical questions only as decisions about what the audience sees. For a
+Mixed or Engineering diagram with nodes, after checking relevant available
+sources, ask any needed catalog or repository access question in plain language.
 
 Record the conversation as source evidence in the coverage ledger. Keep facts,
 operator answers, illustrative choices and unanswered questions distinguishable.
@@ -23,9 +25,12 @@ folder. In the ledger, leave an **Engineer handoff** section with:
 When the engineer continues, read that handoff and the relevant existing
 artifact regions. Reuse the same folder, spec, ledger IDs and accepted story.
 Ask what technical evidence they are adding and whether the audience should
-change. Enrich only from supplied HLD, flow, code/catalog or trace evidence;
+change. Enrich only from verified HLD, flow, code/catalog or trace evidence;
 record each new source and reconcile contradictions with the prior story.
-Add named service hops, bindings and code references where supported. Keep a
+Run the common per-node reference discovery against available approved catalogs,
+repositories, source links and authorized integrations. Add named service hops,
+bindings and code references where verified; record explicit per-node gaps and
+attempts without asking a business reader for SHAs or anchors. Keep a
 Story view and add an engineering view/detail when requested and useful; do not
 silently turn a business story into an engineering-only page. Existing layout
 stays stable under the common placement rules.

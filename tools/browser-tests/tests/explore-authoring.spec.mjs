@@ -26,6 +26,7 @@ test('View presentation, duplication and independent arrangements preserve sourc
   expect(standard.defaultView).toBe(standard.views[0].id);expect(standard.views[1].sections).toEqual([{section:standard.sections[0].id,layout:'service-flow'}]);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(presentation()).toHaveValue('explore');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(presentation()).toHaveValue('standard');
+  await expect(navigation(page).getByRole('button',{name:'Service flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await chapterOptions(page);await presentation().selectOption('explore');
   const explored=await page.locator('#src').inputValue(),expected=JSON.parse(changed);expected.page.views[1].presentation='explore';expect(JSON.parse(explored)).toEqual(expected);
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Done arranging',exact:true})).toHaveCount(0);await prepareEditorSurface(page);

@@ -60,12 +60,19 @@ function workbenchPreviewSnapshot(page, ctl, options){
   });
   return {sections:saved};
 }
+/* Authoring a legacy View materializes its generated ID as an explicit ID.
+   That ID remains authoritative through Undo/Redo. Layout identity is needed
+   only while the destination still derives its Views from section positions. */
+function workbenchPreviewViewReference(ctl,rec,prior){
+  var owner=ctl.views && ctl.views.owner(rec),authored=owner && owner.views && owner.views.some(function(view){return !view.legacy && view.id===prior.tabView && view.members.some(function(member){return member.record.runtime===rec;});});
+  return prior.tabViewLegacyLayout && !authored?prior.tabViewLegacyLayout:prior.tabView;
+}
 function restoreWorkbenchPreview(page, ctl, saved, options){
   if (!saved) return;
   var sections = workbenchPreviewSections(page),matches=matchWorkbenchPreviewSections(saved.sections,sections);
   var restoredOwners=new Set();
-  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1),owner=ctl.views && ctl.views.owner(rec);if(prior && owner && !restoredOwners.has(owner) && prior.tabView){if((prior.tabViewLegacyLayout?ctl.views.ensure(rec,prior.tabViewLegacyLayout,true):ctl.views.select(rec,prior.tabView,undefined,true)))restoredOwners.add(owner);}});
-  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.tabViewSelected && ctl.views)ctl.views.ensure(rec,prior.tabViewLegacyLayout || prior.tabView,true);});
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1),owner=ctl.views && ctl.views.owner(rec);if(prior && owner && !restoredOwners.has(owner) && prior.tabView){var reference=workbenchPreviewViewReference(ctl,rec,prior);if((reference!==prior.tabView?ctl.views.ensure(rec,reference,true):ctl.views.select(rec,reference,undefined,true)))restoredOwners.add(owner);}});
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.tabViewSelected && ctl.views)ctl.views.ensure(rec,workbenchPreviewViewReference(ctl,rec,prior),true);});
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
     var prior=matches.get(rec.number-1);
@@ -155,7 +162,8 @@ function restoreWorkbenchReaderPreviewSnapshot(page,ctl,saved){
     if(rec){
       ctl.activeTarget={kind:'diagram',section:rec.number};
       var prior=matches.get(rec.number-1),stepper=rec.stepper,currentView=ctl.views && ctl.views.current(rec);
-      if(currentView && (prior.tabViewLegacyLayout?currentView.legacyLayout!==prior.tabViewLegacyLayout:currentView.id!==prior.tabView))fallback='Matching View unavailable; showing a View containing this section';
+      var viewReference=workbenchPreviewViewReference(ctl,rec,prior);
+      if(currentView && currentView.id!==viewReference && currentView.legacyLayout!==viewReference)fallback='Matching View unavailable; showing a View containing this section';
       if(prior.path && (!stepper || stepper.path()!==prior.path))fallback='Matching path unavailable; showing the section’s opening path';
       else if(prior.mode==='step' && (!stepper || prior.id && stepper.current().id!==prior.id))fallback='Matching step unavailable; showing the section’s opening step';
     }

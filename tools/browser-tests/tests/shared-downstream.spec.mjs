@@ -91,7 +91,10 @@ test('workbench can detach a downstream shared step and Undo restores its shared
  await page.goto(server.origin+'/workbench.html');await paste(page,source);const root=page.locator('#docview');await checkShared(root);
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-path').selectOption('motion');
  await page.locator('#steps-list [data-step-index="'+processIndex+'"]').click();
- await expect(page.locator('#steps-shared-with')).toContainText('Shared with Button press');await page.locator('#steps-independent').click();
+ const sharing=page.locator('#steps-sharing'),sharingSummary=sharing.locator(':scope > summary');
+ await expect(sharing).not.toHaveAttribute('open','');await sharingSummary.focus();await page.keyboard.press('Enter');
+ await expect(sharing).toHaveAttribute('open','');await expect(page.locator('#steps-shared-with')).toContainText('Shared with Button press');
+ await expect(page.locator('#steps-independent')).toBeVisible();await page.locator('#steps-independent').click();
  await expect(chip(root,'button',processIndex)).not.toHaveClass(/shared-downstream-step/);
  const updated=diagram(JSON.parse(await page.locator('#src').inputValue()));
  const copy=updated.steps.findIndex(step=>step.id===updated.paths[1].steps[3]);

@@ -195,25 +195,29 @@
       <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
       <details class="ssec" id="sec-steps" open>
         <summary>story steps</summary>
-        <button class="bbtn editor-inspect-selection" id="steps-inspect" type="button" disabled>Inspect selected step</button>
         <div class="story-tools">
-          <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
-          <details class="playback-settings">
-            <summary>Playback settings</summary>
-            <label>Open diagram in<select class="fctl" id="steps-opening-view" aria-label="Open diagram in">
-              <option value="ambient">Ambient view</option><option value="step">Step view</option><option value="ambient-only">Ambient only</option>
-            </select></label>
-            <label class="playback-setting-check"><input type="checkbox" id="steps-autoplay"> Autoplay when opened</label>
-            <p class="fnote">Applies to this section and all its paths when entering step view. Off by default; plays every 3 seconds when on. The editor preview always starts paused.</p>
-          </details>
-          <div id="steps-path-tools" hidden>
-            <label>Path<select class="fctl" id="steps-path" aria-label="Story path"></select></label>
-            <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
-            <label>Path color<input class="fctl" id="steps-path-color" type="color" aria-label="Path color"></label>
-            <button class="bbtn" id="steps-path-save">Update path</button>
-            <button class="bbtn" id="steps-path-remove">Remove alternate</button>
+          <div class="story-context">
+            <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+            <label id="steps-path-tools" hidden>Path<select class="fctl" id="steps-path" aria-label="Story path"></select></label>
           </div>
-          <button class="bbtn" id="steps-fork" disabled>+ Alternate after selected step</button>
+          <div class="story-settings">
+            <details class="playback-settings">
+              <summary>Playback settings</summary>
+              <label>Open diagram in<select class="fctl" id="steps-opening-view" aria-label="Open diagram in">
+                <option value="ambient">Ambient view</option><option value="step">Step view</option><option value="ambient-only">Ambient only</option>
+              </select></label>
+              <label class="playback-setting-check"><input type="checkbox" id="steps-autoplay"> Autoplay when opened</label>
+              <p class="fnote">Applies to this section and all its paths when entering step view. Off by default; plays every 3 seconds when on. The editor preview always starts paused.</p>
+            </details>
+            <details class="path-settings" id="steps-path-settings" hidden>
+              <summary>Path settings</summary>
+              <div class="path-settings-content">
+                <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
+                <label>Path color<input class="fctl" id="steps-path-color" type="color" aria-label="Path color"></label>
+                <div class="story-actions"><button class="bbtn" id="steps-path-save">Update path</button><button class="bbtn" id="steps-path-remove">Remove alternate</button></div>
+              </div>
+            </details>
+          </div>
           <input class="fctl" type="search" id="steps-search" aria-label="Filter story steps" placeholder="Caption, step ID, lane, node, or panel…">
           <div class="outline-status" id="steps-status" role="status"></div>
           <nav class="story-list" id="steps-list" aria-label="Story steps"></nav>
@@ -221,21 +225,31 @@
             <button class="bbtn" id="steps-previous">Previous 200</button>
             <button class="bbtn" id="steps-next">Next 200</button>
           </div>
-          <div class="story-actions">
-            <button class="bbtn" id="steps-add">Append step</button>
+          <div class="story-actions story-primary-actions" aria-label="Step actions">
+            <button class="bbtn" id="steps-add" aria-label="Add step" title="Add step">Add</button>
             <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
-            <button class="bbtn" id="steps-reuse" aria-haspopup="dialog" aria-controls="step-reuse" disabled hidden>Reuse steps…</button>
-            <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
-            <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
+            <button class="bbtn" id="steps-fork" aria-label="Branch from here" title="Branch from here" disabled>Branch</button>
+            <button class="bbtn" id="steps-inspect" type="button" disabled>Inspect</button>
+            <details class="story-more-actions">
+              <summary aria-label="More step actions" title="More step actions">More</summary>
+              <div class="story-more-menu">
+                <div class="story-actions">
+                  <button class="bbtn" id="steps-reuse" aria-haspopup="dialog" aria-controls="step-reuse" disabled hidden>Reuse steps…</button>
+                  <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
+                  <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
+                </div>
+                <p class="story-note">Step content is shared by paths that reference it. Add, duplicate and move affect the selected path; deleting a step removes it everywhere.</p>
+              </div>
+            </details>
           </div>
-          <div class="story-sharing" id="steps-sharing" hidden>
+          <details class="story-sharing" id="steps-sharing" hidden>
+            <summary>Shared step settings</summary>
             <p class="story-note" id="steps-shared-with"></p>
             <div class="story-actions">
               <button class="bbtn" id="steps-independent" disabled>Make independent here</button>
               <button class="bbtn" id="steps-remove-occurrence" disabled>Remove from this path</button>
             </div>
-          </div>
-          <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
+          </details>
         </div>
       </details>
       </div>

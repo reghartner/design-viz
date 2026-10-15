@@ -94,7 +94,7 @@ function harness(raw=fixture()){
   doc.createElement=el; doc.getElementById=id=>elements[id] || null;
   for(const id of ['sec-steps','steps-section','steps-search','steps-list','steps-status','steps-paging',
     'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect',
-    'steps-path','steps-path-tools','steps-path-label','steps-path-color','steps-fork','steps-path-save','steps-path-remove',
+    'steps-path','steps-path-tools','steps-path-settings','steps-path-label','steps-path-color','steps-fork','steps-path-save','steps-path-remove',
     'steps-reuse','steps-independent','steps-remove-occurrence','steps-sharing','steps-shared-with',
     'steps-autoplay','steps-opening-view','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
@@ -156,7 +156,7 @@ test('playback settings stay on the chosen section when the last inspected step 
 test('Inspect requires a current selected step and refuses stale source or unfinished builder actions',()=>{
   const h=harness(),button=h.e['steps-inspect'];
   assert.equal(button.disabled,true);button.fire('click');assert.equal(h.inspections.length,0);
-  h.select(1);assert.equal(button.disabled,false);button.fire('click');
+  h.select(1);assert.equal(h.e['steps-list'].children[1].scrolled,true);assert.equal(button.disabled,false);button.fire('click');
   assert.deepEqual(h.inspections,[{kind:'step',section:1,index:1}]);
   h.lock(true);assert.equal(button.disabled,true);button.fire('click');assert.equal(h.inspections.length,1);
   h.lock(false);h.src.value+=' ';button.fire('click');assert.equal(h.inspections.length,1);
@@ -166,7 +166,7 @@ test('Inspect requires a current selected step and refuses stale source or unfin
 test('path occurrence actions select their result, use one undo each and preserve other paths',()=>{
   const raw=fixture();dOf(raw).paths=[{id:'happy',steps:['one','two','three']},{id:'offline',steps:['one','three']}];
   const h=harness(raw),e=h.e;h.selectPath('offline');h.select(0);
-  assert.equal(e['steps-reuse'].disabled,false);assert.equal(e['steps-independent'].hidden,false);
+  assert.equal(e['steps-reuse'].disabled,false);assert.equal(e['steps-independent'].hidden,false);assert.equal(e['steps-path-settings'].hidden,false);
   assert.match(e['steps-shared-with'].textContent,/Happy path/);
   e['steps-independent'].fire('click');
   assert.equal(h.history.length,1);assert.equal(h.target.index,3);
@@ -189,7 +189,7 @@ test('reuse and occurrence controls refuse stale source and active builder gestu
   e['steps-independent'].fire('click');assert.equal(h.history.length,0);
   h.lock(false);h.src.value+=' ';e['steps-remove-occurrence'].fire('click');
   assert.equal(h.history.length,0);assert.equal(e['steps-reuse'].disabled,true);
-  const pathless=harness();assert.equal(pathless.e['steps-reuse'].hidden,true);
+  const pathless=harness();assert.equal(pathless.e['steps-reuse'].hidden,true);assert.equal(pathless.e['steps-path-settings'].hidden,true);
 });
 
 test('filtered navigation and reorder act on original story indices and keep the same selected beat',()=>{

@@ -43,6 +43,7 @@ function initWorkbenchStepList(opts){
   var buttons = {}, sections = [], chosen = null, entries = [], indexedText = null, raw = null;
   var offset = 0, pageSize = 200, lastSelection = '', stale = true;
   var pathSelect=document.getElementById('steps-path'), pathTools=document.getElementById('steps-path-tools');
+  var pathSettings=document.getElementById('steps-path-settings');
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
@@ -105,6 +106,7 @@ function initWorkbenchStepList(opts){
     if(!pathSelect) return;
     var paths=chosen ? diagramPathList(chosen.diagram) : [], selected=route();
     pathTools.hidden=!(chosen && chosen.diagram.paths);
+    if(pathSettings) pathSettings.hidden=pathTools.hidden;
     pathSelect.innerHTML='';
     paths.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=p.label;pathSelect.appendChild(o);});
     if(selected){pathSelect.value=selected.id;pathLabel.value=selected.label;pathColor.value=selected.color.length===4 ? '#' + selected.color.slice(1).split('').map(function(c){return c+c;}).join('') : selected.color;}
@@ -224,8 +226,8 @@ function initWorkbenchStepList(opts){
   function sync(){
     if (opts.src.value !== indexedText || stale){ refresh(); return; }
     if(route() && route().id !== pathSignature && pathSelect){pathControls();filter(true);}
-    var target = opts.selection(), signature = JSON.stringify(target);
-    if (signature !== lastSelection){
+    var target = opts.selection(), signature = JSON.stringify(target), selectionChanged=signature !== lastSelection;
+    if (selectionChanged){
       lastSelection = signature;
       var section = sections.find(function(s){ return target && s.section === target.section; });
       if (section && section !== chosen){ chosen = section; select.value = String(section.section); search.value = ''; pathControls(); filter(true); return; }
@@ -235,6 +237,10 @@ function initWorkbenchStepList(opts){
     Array.prototype.forEach.call(list.children, function(button){
       button.setAttribute('aria-current', Number(button.getAttribute('data-step-index')) === current() ? 'step' : 'false');
     });
+    if (selectionChanged){
+      var selected = list.querySelector('[aria-current="step"]');
+      if (selected) selected.scrollIntoView({block:'nearest'});
+    }
     controls();
   }
   life.listen(select,'change', function(){

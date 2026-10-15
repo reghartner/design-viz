@@ -13,6 +13,15 @@ async function expectCenterHit(locator,label){
   expect(result,label+' center is reachable').toMatchObject({reachable:true});
   expect(result.rect.width,label+' has width').toBeGreaterThan(0);expect(result.rect.height,label+' has height').toBeGreaterThan(0);
 }
+async function expectTabReachable(page,locator,label,limit=30){
+  const visited=[];
+  for(let i=0;i<limit;i++){
+    await page.keyboard.press('Tab');
+    if(await locator.evaluate(el=>document.activeElement===el))return;
+    visited.push(await page.evaluate(()=>document.activeElement && (document.activeElement.id || document.activeElement.getAttribute('aria-label') || document.activeElement.tagName)));
+  }
+  expect(await locator.evaluate(el=>document.activeElement===el),label+' is reachable with Tab; visited '+visited.join(', ')).toBe(true);
+}
 
 test('floating tools leave the diagram full-window and global actions available',async({page,server})=>{
   const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
@@ -64,6 +73,68 @@ test('fresh desktop entry leaves Standard and Explore controls clear until selec
   await page.locator('#workspace-window-inspect .workspace-window-close').click();await page.reload();
   await expect(page.locator('#workspace-window-inspect')).toBeHidden();await page.locator('#docview .node').first().click();
   await expect(page.locator('#workspace-window-inspect')).toBeHidden();
+});
+
+test('Steps opens on rows and preserves the list while filtering, inspecting and changing paths',async({page,server},testInfo)=>{
+  const raw=editorSpec(),diagram=raw.page.blocks[0].diagram;
+  diagram.steps=Array.from({length:16},(_,index)=>({
+    id:'beat-'+(index+1),text:'Checkpoint '+(index+1)+' — a deliberately long caption keeps the customer outcome and the system response readable in the list',
+    nodes:index%2?['b']:['a']
+  }));
+  diagram.paths=[
+    {id:'main',label:'Main path',steps:diagram.steps.map(step=>step.id)},
+    {id:'alternate',label:'Alternate recovery',steps:['beat-1','beat-2','beat-11','beat-12','beat-13']}
+  ];
+  await page.setViewportSize({width:1280,height:720});await open(page,server,JSON.stringify(raw,null,2));
+  await page.locator('#editor-tab-steps').click();
+  const win=page.locator('#workspace-window-steps'),pane=page.locator('#editor-steps'),list=page.locator('#steps-list');
+  await expect(win).toBeVisible();await expect(page.locator('#steps-path-settings')).not.toHaveAttribute('open','');
+  const geometry=await page.evaluate(()=>{
+    const pane=document.querySelector('#editor-steps').getBoundingClientRect(),list=document.querySelector('#steps-list').getBoundingClientRect();
+    const rows=[...document.querySelectorAll('#steps-list .story-step')].filter(row=>{const r=row.getBoundingClientRect();return r.bottom>list.top && r.top<list.bottom;});
+    return {pane:{height:pane.height},list:{height:list.height},visibleRows:rows.length};
+  });
+  expect(geometry.visibleRows).toBeGreaterThanOrEqual(3);expect(geometry.list.height).toBeGreaterThan(120);
+  expect(geometry.list.height).toBeGreaterThan(geometry.pane.height*.5);
+  for(const id of ['steps-add','steps-duplicate','steps-fork','steps-inspect'])await expectCenterHit(page.locator('#'+id),id+' at 1280×720');
+  const more=page.locator('.story-more-actions>summary');await expectCenterHit(more,'More step actions at 1280×720');await more.focus();await page.keyboard.press('Enter');
+  await expect(page.locator('#steps-earlier')).toBeVisible();await page.keyboard.press('Enter');await expect(page.locator('#steps-earlier')).toBeHidden();
+  await testInfo.attach('steps-initial-1280x720',{body:await win.screenshot(),contentType:'image/png'});
+
+  const search=page.locator('#steps-search');await search.focus();await page.keyboard.type('checkpoint 11');
+  await expect(list.locator('.story-step')).toHaveCount(1);await expect(list.locator('.story-caption')).toContainText('deliberately long caption');
+  await testInfo.attach('steps-filtered-long-caption',{body:await win.screenshot(),contentType:'image/png'});
+  await search.press('ControlOrMeta+a');await search.press('Backspace');await expect(list.locator('.story-step')).toHaveCount(16);
+
+  const selected=list.locator('[data-step-index="12"]');await selected.click();await expect(selected).toHaveAttribute('aria-current','step');
+  const scrollBefore=await list.evaluate(node=>node.scrollTop);expect(scrollBefore).toBeGreaterThan(0);
+  await page.locator('#steps-inspect').click();await expect(page.locator('#workspace-window-inspect')).toBeVisible();
+  expect(await list.evaluate(node=>node.scrollTop)).toBe(scrollBefore);await expect(selected).toHaveAttribute('aria-current','step');
+  await page.locator('#workspace-window-inspect .workspace-window-close').click();await expect(selected).toHaveAttribute('aria-current','step');
+
+  await page.locator('#steps-path').selectOption('alternate');await expect(list.locator('.story-step')).toHaveCount(5);
+  const alternateSelected=list.locator('[data-step-index="12"]');await alternateSelected.click();await expect(alternateSelected).toHaveAttribute('aria-current','step');
+  const pathSettings=page.locator('#steps-path-settings');await pathSettings.locator(':scope > summary').focus();await page.keyboard.press('Enter');
+  await expect(pathSettings).toHaveAttribute('open','');
+  const expanded=await page.evaluate(()=>{
+    const pane=document.querySelector('#editor-steps'),list=document.querySelector('#steps-list').getBoundingClientRect();
+    return {listHeight:list.height,paneScrollHeight:pane.scrollHeight,paneClientHeight:pane.clientHeight};
+  });
+  expect(expanded.listHeight).toBeGreaterThanOrEqual(120);expect(expanded.paneScrollHeight).toBeLessThanOrEqual(expanded.paneClientHeight+1);
+  const expandedControls=['steps-path-label','steps-path-color','steps-path-save','steps-path-remove','steps-add','steps-duplicate','steps-fork','steps-inspect'];
+  for(const id of expandedControls)await expectCenterHit(page.locator('#'+id),id+' with Path settings expanded');
+  await expectCenterHit(more,'More step actions with Path settings expanded');
+  const pathLabel=page.locator('#steps-path-label'),pathColor=page.locator('#steps-path-color'),pathSave=page.locator('#steps-path-save'),pathRemove=page.locator('#steps-path-remove');
+  await expectTabReachable(page,pathLabel,'Path label');await expectTabReachable(page,pathColor,'Path color');
+  await expectTabReachable(page,pathSave,'Update path');await expectTabReachable(page,pathRemove,'Remove alternate');
+  for(const id of ['steps-add','steps-duplicate','steps-fork','steps-inspect'])await expectTabReachable(page,page.locator('#'+id),id);
+  await expectTabReachable(page,more,'More step actions');
+  await testInfo.attach('steps-alternate-path-settings',{body:await win.screenshot(),contentType:'image/png'});
+  await page.setViewportSize({width:1440,height:900});await page.locator('#editor-tab-file').click();
+  await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-reset').click();await page.locator('#workspace-window-file .workspace-window-close').click();
+  await expect(list.locator('.story-step')).toHaveCount(5);expect((await win.boundingBox()).height).toBeGreaterThan(600);
+  await testInfo.attach('steps-alternate-1440x900',{body:await win.screenshot(),contentType:'image/png'});
+  await expect(pane).toBeVisible();
 });
 
 test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{

@@ -394,6 +394,8 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .story-settings>details,.story-more-actions,.story-sharing{font-size:11px;color:var(--sub);}
 .story-settings>details>summary,.story-sharing>summary{cursor:pointer;font-weight:600;}
 .story-settings>details[open]{flex:1 0 100%;box-sizing:border-box;}
+.path-settings-content{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,.45fr);column-gap:7px;}
+.path-settings-content>.story-actions{grid-column:1/-1;margin-top:2px;}
 .story-list{display:flex;flex:1 1 180px;flex-direction:column;gap:4px;min-height:120px;overflow:auto;overscroll-behavior:contain;margin:3px 0;padding-right:2px;}
 .story-step{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px;text-align:left;flex-shrink:0;
   color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:7px;

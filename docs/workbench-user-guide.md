@@ -65,8 +65,8 @@ a file cannot grant access to its sibling ledger: choose the folder to save both
 Invalid or incomplete JSON pauses disk writes and preserves the last valid file.
 Browser recovery still saves the unfinished text. Repairing the source resumes
 file saves. Permission/write failures show **File save failed**; **Retry file save**
-requests access again. External file changes stop saving; reopen the destination
-to review its current contents. Flowview never silently replaces those changes.
+requests access again. External file changes detected before a write commits stop
+saving; reopen the destination to review its current contents.
 New, imported and pasted documents start browser-only. Home/Continue retains a
 standalone working association; an agent connection that disconnects must be
 reopened. Reload recovers the browser draft without claiming a writable file;
@@ -81,6 +81,12 @@ by Export. If the working draft changes during export, retry the complete export
 File writes already inside the browser's final close cannot be recalled. Subsequent
 writes wait for those operations, and project changes retire queued/staged writes.
 There is no guaranteed file flush on tab close; wait for **File saved** before leaving.
+Flowview requests an exclusive browser writer, blocking competing browser writes
+where supported. Older browsers may ignore that option; byte comparisons still
+run before writing and immediately before close. These checks cannot prevent an
+operating-system editor from changing the file between the last check and commit:
+the file API has no atomic compare-and-swap, and that race can overwrite an outside
+edit. Avoid editing the same file simultaneously in another application.
 
 The toolbar **Export** menu offers **Export project**, **Download SVG**, and
 **Copy SVG**. **Export project** saves matching `.spec.json`, `.html` and

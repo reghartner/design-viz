@@ -158,3 +158,45 @@ test('a selected file changes during opening without publishing a stale working 
   await page.locator('#welcome-open').click();await expect(page.locator('#welcome-file-error')).toContainText('changed while opening');
   await expect(page.locator('#workbench-welcome')).toBeVisible();expect(await disk(page)).toBe(outside);
 });
+
+for(const paired of [false,true])test(`native exclusive ${paired?'paired-folder':'single-file'} autosave blocks a competing writer at close`,async({page,server})=>{
+  if(paired)await workingExport(page,server);
+  else{await setup(page);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-open').click();await expect(page.locator('#src')).toHaveValue(source);}
+  const name=paired?'browser-contract.spec.json':'chosen.spec.json';
+  await page.evaluate(name=>{
+    const create=FileSystemFileHandle.prototype.createWritable;
+    FileSystemFileHandle.prototype.createWritable=async function(...args){
+      const stream=await create.apply(this,args);
+      if(this.name===name){
+        const close=stream.close.bind(stream);
+        stream.close=async()=>{window.workingCloseHeld=true;await new Promise(resolve=>window.releaseWorkingClose=resolve);return close();};
+      }
+      return stream;
+    };
+  },name);
+  const changed=source.replace('Browser contract','Exclusive writer');await edit(page,changed);
+  await expect.poll(()=>page.evaluate(()=>window.workingCloseHeld)).toBe(true);
+  await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','saving');expect(await disk(page,name)).toBe(source);
+  // Real native handles and streams: only the first close is held. The second
+  // writer must fail in the browser, even using the default siloed mode.
+  const contention=await page.evaluate(async name=>{
+    const root=await navigator.storage.getDirectory(),other=await root.getFileHandle(name);
+    try{const stream=await other.createWritable();await stream.abort();return 'opened';}catch(error){return error.name;}
+  },name);
+  expect(contention).toBe('NoModificationAllowedError');expect(await disk(page,name)).toBe(source);
+  await page.evaluate(()=>window.releaseWorkingClose());
+  await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','saved');expect(await disk(page,name)).toBe(changed);
+});
+
+test('an already-open native writer makes autosave fail visibly; abort and Retry preserve the baseline',async({page,server})=>{
+  await setup(page);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-open').click();await expect(page.locator('#src')).toHaveValue(source);
+  await page.evaluate(async()=>{
+    const root=await navigator.storage.getDirectory(),handle=await root.getFileHandle('chosen.spec.json');
+    window.contendingWriter=await handle.createWritable();await window.contendingWriter.write('uncommitted outside bytes');
+  });
+  const changed=source.replace('Browser contract','Retry after contention');await edit(page,changed);await filePanel(page);
+  await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','failed');expect(await disk(page)).toBe(source);
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text)).toBe(changed);
+  await page.evaluate(()=>window.contendingWriter.abort());await page.locator('#working-file-retry').click();
+  await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','saved');expect(await disk(page)).toBe(changed);
+});

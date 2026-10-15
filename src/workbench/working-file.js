@@ -36,7 +36,9 @@ function createBuilderWorkingFile(opts){
             if(found!==value.expected)throw Error('The file changed outside Flowview. Reopen it to review those changes; no outside edits were overwritten.');}
           await check();
           if(source!==value.expected){
-            var stream=await value.handle.createWritable();
+            // Exclusive mode excludes other browser writers where supported.
+            // OS editors can still race the final check/close; this is not CAS.
+            var stream=await value.handle.createWritable({mode:'exclusive'});
             try{await check();await stream.write(source);await check();await stream.close();value.expected=source;}
             catch(ex){try{await stream.abort();}catch(ignored){}throw ex;}
           }

@@ -679,6 +679,16 @@ Native file selection attaches only after validated publication. Import/paste an
 project replacement retire the association; standalone Home/Continue keeps it.
 Reload restores browser text without restoring a writable claim.
 
+The single-file writer and shared folder adapter request
+`createWritable({mode:'exclusive'})`. Supporting browsers reject competing native
+writable streams until close/abort releases the lock. Unsupported implementations
+may ignore this option; the pre-write and pre-close byte/ownership guards remain
+necessary. Neither these locks nor the paired journal provide an operating-system
+compare-and-swap: another application can change bytes after the last check but
+before close commits, and its update can be lost. Saved means the browser reported
+successful close, not that this external race is impossible. The native OPFS
+contention tests exercise browser locks; they do not model an OS editor.
+
 Folder associations reuse `createFolderAgentClient().flush()` without polling
 proposals. This claims and renews the existing editor lease and delegates spec and
 ledger writes to `openFolderAgentProject().flushArtifacts()` with its existing

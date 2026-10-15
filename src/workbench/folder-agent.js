@@ -37,7 +37,9 @@ function createFolderAgentFiles(directory){
         if(ex.name!=='NotFoundError')throw ex;
         handle=await directory.getFileHandle(name,{create:true});created=true;
       }
-      var stream=await handle.createWritable();
+      // Keep competing browser streams out through close where supported. The
+      // guards still detect outside changes; this does not lock OS editors.
+      var stream=await handle.createWritable({mode:'exclusive'});
       try{
         if(guard)await guard({name:name,created:created,phase:'before-write'});
         await stream.write(text);

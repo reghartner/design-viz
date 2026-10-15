@@ -3,7 +3,9 @@
    comment on a non-active Tab/View. When the artifact declares the comments
    capability with customAnchors, the page reports pins only for rendered
    subjects, labels new comments with their Tab/View/section and switches Tab
-   and View for the shell's "Go to". A comment on the step caption is saved
+   and View for the shell's "Go to". Each View's sections move into that
+   View's own wrapper element, so a comment's saved path names its View and a
+   section shared by two Views takes separate comments in each. A comment on the step caption is saved
    against the numbered step button of the step shown, so it pins on that
    button and "Go to" replays that step. Step controls keep working in comment
    mode. Without window.claude, a null namespace or a refused registration
@@ -41,6 +43,14 @@ function wireArtifactComments(ctl,view,win){
   function resolve(anchor){
     if(typeof anchor!=='string' || !anchor)return null;
     try{return doc.querySelector(anchor);}catch(ex){return null;}
+  }
+  /* A comment made in a View that is not shown names that View's empty
+     wrapper: the longest part of its path that still resolves finds it. */
+  function nearest(anchor){
+    if(typeof anchor!=='string')return null;
+    var parts=anchor.split(' > ');
+    for(var i=parts.length-1;i>0;i--){var node=resolve(parts.slice(0,i).join(' > '));if(node)return node;}
+    return null;
   }
   function rendered(el){
     if(!el || !el.isConnected || el.closest('[hidden]') || !el.getClientRects().length)return false;
@@ -157,8 +167,10 @@ function wireArtifactComments(ctl,view,win){
   function reveal(id){
     try{
       var thread=threads.find(function(t){return t && t.id===id;}),el=thread && resolve(thread.anchor);
-      if(!el)return;
-      tabsOf(el).forEach(function(tab){if(tab.block.active()!==tab.index)tab.block.select(tab.index,false);});
+      var at=thread && ctl.views && ctl.views.viewAt && ctl.views.viewAt(el || nearest(thread.anchor));
+      if(!el && !at)return;
+      tabsOf(el || at.owner.slots.get(at.id)).forEach(function(tab){if(tab.block.active()!==tab.index)tab.block.select(tab.index,false);});
+      if(at && !at.current){ctl.views.showView(at);el=resolve(thread.anchor);if(!el)return;}
       var rec=sectionOf(el);
       if(rec && ctl.views && !rec.detailOnly && !rendered(rec.sectionEl))ctl.views.ensure(rec,undefined,false);
       if(el.classList.contains('schip') && rec && rec.stepper && rec.stepper.jumpSource){
@@ -181,6 +193,7 @@ function wireArtifactComments(ctl,view,win){
     if(!comments || typeof comments.customAnchors!=='function')return;
     return comments.customAnchors({mode:mode,threads:setThreads,reveal:reveal,composing:function(){}}).then(function(controller){
       if(!controller)return;
+      if(ctl.views && ctl.views.useSlots)ctl.views.useSlots();
       ctrl=controller;listen();safeReport(true);
     });
   }).catch(function(){ctrl=null;mode(false);});

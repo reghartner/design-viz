@@ -22,6 +22,7 @@
 .sk-daylight .tabbtn.hl[aria-selected="true"]{border-color:var(--hl,#7C3AED); color:#6D28D9;
   background:color-mix(in srgb, var(--hl,#7C3AED) 12%, #FFFFFF);}
 .tabpanel{margin-top:2px;}
+.tab-view-slot{display:contents;}
 .doc-sec{margin-top:22px; border-radius:14px; padding:18px 20px 20px;
   border:1.5px solid color-mix(in srgb, var(--acc) 45%, transparent);
   background:color-mix(in srgb, var(--acc) 7%, transparent);}

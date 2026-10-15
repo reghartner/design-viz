@@ -5,12 +5,13 @@ function createTabViewController(ctl,page){
   owners.forEach(function(owner){owner.views=tabViewDefinitions(owner);owner.current=tabViewDefault(owner,owner.views);owner.records.forEach(function(record){record.runtime=ctl.sections.find(function(rec){return rec.number===record.number;});record.runtime.detailOnly=record.domainOnly;record.runtime.viewOwner=owner;});owner.selected=owner.current && owner.current.members[0] && owner.current.members[0].record.runtime;});
   function ownerOf(rec){return rec && rec.viewOwner;}
   function members(owner){return owner && owner.current?owner.current.members.map(function(member){return member.record.runtime;}):[];}
-  function placeSection(rec,previous){
-    if(previous.nextSibling===rec.sectionEl)return;
+  // previous null places rec first inside slot.
+  function placeSection(rec,previous,slot){
+    if((previous?previous.nextSibling:slot.firstChild)===rec.sectionEl)return;
     // Reordering a live section clears descendant scroll offsets in Chromium.
     // Keep the Explore camera intact before presentation changes capture it.
     var board=rec.sectionEl.querySelector('.explore-board'),left=board && board.scrollLeft,top=board && board.scrollTop;
-    previous.after(rec.sectionEl);
+    if(previous)previous.after(rec.sectionEl);else slot.prepend(rec.sectionEl);
     if(board){board.scrollLeft=left;board.scrollTop=top;}
   }
   function apply(owner){
@@ -18,7 +19,8 @@ function createTabViewController(ctl,page){
     updating=true;
     try{
       var active=members(owner);if(active.indexOf(owner.selected)<0)owner.selected=active[0];
-      if(!owner.current.legacy && active.length){var anchor=owner.anchor;if(!anchor){anchor=document.createComment('Tab section order');active[0].sectionEl.before(anchor);owner.anchor=anchor;}var previous=anchor;active.forEach(function(rec){placeSection(rec,previous);previous=rec.sectionEl;});}
+      if(owner.slots && active.length){var slot=owner.slots.get(owner.current.id),prior=null;active.forEach(function(rec){placeSection(rec,prior,slot);prior=rec.sectionEl;});}
+      else if(!owner.current.legacy && active.length){var anchor=owner.anchor;if(!anchor){anchor=document.createComment('Tab section order');active[0].sectionEl.before(anchor);owner.anchor=anchor;}var previous=anchor;active.forEach(function(rec){placeSection(rec,previous);previous=rec.sectionEl;});}
       owner.records.forEach(function(record){var rec=record.runtime,member=owner.current.members.find(function(m){return m.record===record;}),visible=!!member && (owner.current.presentation==='standard' || rec===owner.selected);
         rec.viewExcluded=!member;rec.viewingMode=owner.current.presentation;
         if(member && rec.presentation){var layout=member.layout || rec.presentation.defaultView();if(rec.presentation.viewId()!==layout)rec.presentation.setView(layout);}
@@ -65,10 +67,40 @@ function createTabViewController(ctl,page){
     var next=owner.views.find(function(v){return v.legacyLayout===id && v.members.some(function(m){return m.record.runtime===rec;});});
     if(next)select(rec,next.id,rec);
   }
+  /* claude.ai saves a comment as a positional element path. Views share one
+     element per section, so without slots a comment made in one View also
+     resolves, and shows its pin, in every other View holding that section.
+     Each View gets its own display:contents wrapper and its members move into
+     it on selection, so the path names the View. Applied only where the
+     owner's sections are adjacent siblings, so page block order is kept.
+     The wrapper has its own tag so a path saved before wrappers existed,
+     which counts section tags, never resolves to a wrapper. Sections in no
+     shown View wait in one more wrapper that belongs to no View. */
+  function useSlots(){
+    owners.forEach(function(owner){
+      if(owner.slots || !owner.views || owner.views.length<2)return;
+      var els=owner.records.map(function(record){return record.runtime.sectionEl;}),parent=els[0] && els[0].parentNode;
+      if(!parent || els.some(function(el){return el.parentNode!==parent;}))return;
+      var siblings=Array.from(parent.children),first=siblings[Math.min.apply(null,els.map(function(el){return siblings.indexOf(el);}))];
+      var count=0;for(var node=first;node && count<els.length;node=node.nextElementSibling){if(els.indexOf(node)<0)return;count++;}
+      if(count<els.length)return;
+      owner.slots=new Map();owner.views.forEach(function(view){var slot=document.createElement('dv-view-slot');slot.className='tab-view-slot';slot.setAttribute('data-dv-view-slot',view.id);(owner.anchor || first).before(slot);owner.slots.set(view.id,slot);});
+      // Every section leaves the old sibling positions, so a path saved before
+      // wrappers existed resolves to nothing instead of a renumbered neighbour.
+      var rest=document.createElement('dv-view-slot'),prior=null;rest.className='tab-view-slot';(owner.anchor || first).before(rest);
+      owner.records.forEach(function(record){placeSection(record.runtime,prior,rest);prior=record.runtime.sectionEl;});
+      apply(owner);
+    });
+  }
+  function viewAt(el){
+    var slot=el && el.closest && el.closest('[data-dv-view-slot]'),owner=slot && owners.find(function(o){return o.slots && o.slots.get(slot.getAttribute('data-dv-view-slot'))===slot;});
+    return owner?{owner:owner,id:slot.getAttribute('data-dv-view-slot'),current:owner.current && owner.current.id===slot.getAttribute('data-dv-view-slot')}:null;
+  }
   ctl.view.addEventListener('diagram-view-change',legacyChanged);
   owners.forEach(apply);
   return {owners:owners,owner:ownerOf,current:function(rec){var owner=ownerOf(rec);return owner && owner.current;},members:function(rec){return members(ownerOf(rec));},select:select,ensure:ensure,
     primary:function(tabBlock,tab){var owner=owners.find(function(o){return o.tabBlock===tabBlock && o.tab===tab;});return owner && owner.selected;},
-    apply:function(){owners.forEach(apply);},updating:function(){return updating;},
+    apply:function(){owners.forEach(apply);},useSlots:useSlots,viewAt:viewAt,
+    showView:function(at){return select(at.owner.records[0].runtime,at.id);},updating:function(){return updating;},
     destroy:function(){retired=true;ctl.view.removeEventListener('diagram-view-change',legacyChanged);owners.forEach(function(owner){if(owner.anchor)owner.anchor.remove();});}};
 }

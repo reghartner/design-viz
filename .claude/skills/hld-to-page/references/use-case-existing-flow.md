@@ -26,9 +26,11 @@ from the engineer's evidence, run the common skill's pure Node `tools/compose-pa
 then submit its output for paired preview. A flow
 being described as “existing” does not prove the supplied design
 was deployed or that all branches were observed. Mark designed, engineer-stated
-and observed behavior separately. Bind only catalog identities and code SHAs
-actually supplied. Preserve unknown outcomes and missing acknowledgements as
-gaps instead of inventing a happy path.
+and observed behavior separately. For every node, follow the common reference
+discovery workflow: inspect available approved catalogs and supplied or
+authorized source locations before asking about missing access. Bind and cite
+only verified identities and pinned code. Preserve unknown outcomes and missing
+acknowledgements as gaps instead of inventing a happy path.
 
 Propose the complete spec and ledger pair, verify both, and wait for the same
 workbench approval as every other route. In pilot mode, capture questions and

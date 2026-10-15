@@ -44,12 +44,14 @@ source: <source URL, path, or conversation label> | version: <vN or n/a> | updat
 ## Decisions I made
 | # | decision | evidence or reason | applied at |
 |---|----------|--------------------|------------|
-| D1 | left `code-audit-log` unbound | not in supplied catalog | blocks[0].diagram.nodes.audit |
+| D1 | left `code-audit-log` unbound | not in checked catalog | blocks[0].diagram.nodes.audit |
 ```
 
-"Decisions I made" lists the technical choices the author made without asking
-the operator (always at story and mixed level): catalog and code handling,
-unshown reports, protocols, delivery settings. An engineer reviews them here.
+"Decisions I made" lists technical choices the author made without asking the
+operator: per-node catalog/code applicability and discovery gaps for Story
+audiences, unshown reports, protocols and delivery settings. Mixed and
+Engineering source/access gaps follow the mandatory plain-language question
+rule after available sources are checked. An engineer reviews these entries.
 
 Rules that keep it parseable and durable: `class` is one of flow / contract
 / failure / service / number / permalink / amendment. `HLD anchor` is a

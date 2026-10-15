@@ -211,7 +211,8 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         add(CONTRACT, 'panels — declaration mechanics', intro)
         for panel in sorted(panels): add(CONTRACT, 'panel: ' + panel, blocks[panel])
         add(CONTRACT, 'panels — sparse patch mechanics', tail)
-    routes = {'docs/visibility-evidence.md', 'docs/auto-arrange.md', REFS + 'recipe-routing.md'}
+    routes = {'docs/visibility-evidence.md', 'docs/auto-arrange.md',
+              REFS + 'bindings-and-code.md', REFS + 'recipe-routing.md'}
     if mode == 'new': routes.update({REFS + 'storyboard-worksheet.md', REFS + 'worked-example.md'})
     routes.update(path for feature in features for path in ROUTES.get(feature, []))
     # The maintained route table gives examples without embedding the cookbook.

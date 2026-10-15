@@ -13,9 +13,12 @@ adding technical detail; do not silently replace the business narrative.
 
 An HLD describes a design unless separate evidence proves deployed behavior.
 Keep proposed design, reviewed decisions and observed traces distinguishable.
-Preserve exact source links, service identities and supplied code references;
-record missing provenance without manufacturing an identity or SHA. Ask only
-unsettled audience/story decisions and facts needed for an honest depiction.
+Preserve exact source links, service identities and supplied code references.
+For every node, inspect available approved catalogs, supplied repositories and
+authorized integrations before recording missing provenance; never manufacture
+an identity or SHA. Ask only unsettled audience/story decisions and facts needed
+for an honest depiction, plus plain-language source/access questions required
+for Mixed or Engineering reference discovery.
 
 For a revised HLD and existing diagram, start from the current ledger and source
 diff per [evidence and updates](evidence-and-updates.md). Reconcile affected

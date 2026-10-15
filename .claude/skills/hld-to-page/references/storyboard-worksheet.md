@@ -268,20 +268,22 @@ the icon IDs and which elements accept icons.
 
 ## H. Bindings and code
 
-| Node id | Catalog entityRef | API entityRef + operationId, method, path | codeRefs (id: path, lines) | Steps where that code runs (or "none: never runs in this story") | Gap |
+| Node id | Binding applicability + verified catalog entityRef | API entityRef + operationId, method, path | code/docs refs (id: path, lines) | Steps where code runs (or "none") | Sources checked and evidence/gap |
 |---|---|---|---|---|---|
 | | | | | | |
 
-Every service node gets a row. Every catalog service in the story is bound;
+Every diagram node gets a row. Every catalog service in the story is bound;
 add its API operation when the catalog lists the operation that node's call
 uses. Catalog services outside the story are not added. Every supplied code location is attached to its owning
 node, even if it never runs in the story, and to each step where it runs. Test
 each step against the code's purpose: an upload handler does not run on a
 read; an offline rule does not run during an outage shorter than its
-threshold. Devices, people and third parties that are not
-catalog services get a row with `not a catalog service`. A service that should
-be in the catalog but is not gets `unbound: not in supplied catalog` and a
-ledger row. See [bindings and code](bindings-and-code.md).
+threshold. For each node, proactively inspect the available approved project
+catalog, supplied repositories/source links and authorized integrations before
+recording a gap. Devices, people, third parties and aggregate nodes may be
+`binding not applicable`, but evaluate real code/docs links separately. A
+service absent from the checked approved catalogs stays unbound with those
+attempts named in the ledger. See [bindings and code](bindings-and-code.md).
 
 ## I. Checkable expectations
 

@@ -27,10 +27,13 @@ function createBuilderInteractions(opts){
     }});
   life.own(function(){curveEditor.destroy();});
   var textEditor=createTextBoxEditor({view:view,document:document,window:window,src:src,session:session,
-    disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,
-    commit:function(plan,snapshot,section,id){
+    disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,
+    commit:function(plan,snapshot,section,id,nextTarget){
       if(plan.error){inspectorMessage(plan.error);return;}
       if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      // Resolve the clicked authored identity after publication; its old DOM was retired.
+      var nextEl=nextTarget && findTargetEl(nextTarget);
+      if(nextEl){selectTarget(Object.assign({},nextTarget,{el:nextEl}),false,true);return;}
       session.target={section:section,kind:'node',id:id};rehighlight();renderInspector();
     }});
   life.own(function(){textEditor.destroy();});

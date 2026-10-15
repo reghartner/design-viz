@@ -37,7 +37,7 @@ test('text exports retain formatting, escape markup, omit editing chrome and reo
   d.nodes.note={type:'text',text:'<script> is just text\nA second line',locked:true,textStyle:{fontFamily:'Lora',fontSize:30,width:500,color:'#884422',bold:true,italic:true,underline:true,align:'center'}};d.floats=[{id:'note',x:420,y:150,side:'below'}];
   await pastePage(page,JSON.stringify(raw));await closeTools(page);await box(page).click();await expect(box(page).locator('.dv-text-resize')).toHaveCount(1);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();const file=await download,svg=await readFile(await file.path(),'utf8');
-  expect(svg).toContain('&lt;script&gt;');expect(svg).toContain('font-family:Lora');expect(svg).toContain('font-size:30px');expect(svg).toContain('fill:rgb(136, 68, 34)');expect(svg).toContain('text-decoration:underline');expect(svg).not.toMatch(/dv-text-resize|foreignObject|<script|text-box-hit|dv-position-lock|Position locked|data-dv-position-locked/);
+  expect(svg).toContain('&lt;script&gt;');expect(svg).toContain('font-family:Lora');expect(svg).toContain('font-size:30px');expect(svg).toContain('fill:rgb(136, 68, 34)');expect(svg).toContain('text-decoration:underline');expect(svg).not.toMatch(/dv-text-toolbar|dv-text-resize|foreignObject|<script|text-box-hit|dv-position-lock|Position locked|data-dv-position-locked/);
   const reader=await page.context().newPage();await reader.goto('data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64'));await expect(reader.getByText('<script> is just text')).toBeVisible();await info.attach('text-svg',{body:await reader.screenshot(),contentType:'image/png'});await reader.close();
 });
 test('locked text resize changes dimensions while preserving center, with one Undo',async({page,server})=>{
@@ -86,4 +86,67 @@ test('clearing text color restores the theme in one Undo',async({page,server})=>
   const picker=page.locator('#guide').getByLabel('Choose color',{exact:true});await picker.fill('#227755');await picker.dispatchEvent('change');
   await expect(page.locator('#guide').getByLabel('Color',{exact:true})).toHaveValue('#227755');
   await expect(box(page).locator('text')).toHaveCSS('fill','rgb(34, 119, 85)');
+});
+
+for(const inspect of [false,true])test('Escape owns the active text edit with Inspect '+(inspect?'open':'closed'),async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.blocks[0].diagram;
+  d.nodes.note={type:'text',text:'Original',locked:true,textStyle:{width:280,fontSize:24}};d.floats=[{id:'note',x:550,y:120,side:'below'}];const original=JSON.stringify(raw);
+  await pastePage(page,original);await closeTools(page);await box(page).click();if(inspect)await page.locator('#editor-tab-inspect').click();
+  await box(page).dblclick();const edit=page.getByRole('textbox',{name:'Edit text box',exact:true});await expect(edit).toBeFocused();await edit.fill('Cancelled text');await edit.press('Escape');
+  await expect(edit).toHaveCount(0);await expect(box(page)).toBeFocused();await expect(box(page)).toHaveClass(/dv-sel/);await expect(page.locator('#src')).toHaveValue(original);
+});
+
+test('clicking blank canvas finishes text with Inspect closed and one Undo',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.blocks[0].diagram;
+  d.nodes.note={type:'text',text:'Original',textStyle:{width:280,fontSize:24}};d.floats=[{id:'note',x:550,y:120,side:'below'}];const original=JSON.stringify(raw);
+  await pastePage(page,original);await closeTools(page);await box(page).dblclick();const edit=page.getByRole('textbox',{name:'Edit text box',exact:true});await edit.fill('Click outside commits');
+  const surface=page.locator('#docview .section-viewport').first();const r=await surface.boundingBox();await page.mouse.click(r.x+r.width-30,r.y+r.height-30);
+  await expect(edit).toHaveCount(0);await expect.poll(async()=>JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.text).toBe('Click outside commits');const changed=await source(page);
+  await page.locator('#docview [data-dv-node="a"]').click();await expect(page.locator('#docview [data-dv-node="a"]')).toHaveClass(/dv-sel/);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
+  const canvas=page.locator('#docview .boardcanvas').first(),board=page.locator('#docview .board').first(),bounds=await canvas.boundingBox();await page.mouse.move(bounds.x+5,bounds.y+5);await page.mouse.down();await expect(board).toHaveClass(/board-dragging/);await page.mouse.move(bounds.x+25,bounds.y+25,{steps:4});await page.mouse.up();await expect(board).not.toHaveClass(/board-dragging/);await expect(page.locator('#src')).toHaveValue(changed);
+});
+
+test('toolbar preserves text selection, batches formatting and text, and matches Inspect',async({page,server},info)=>{
+  await page.setViewportSize({width:1366,height:900});await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.blocks[0].diagram;
+  d.nodes.note={type:'text',text:'Original',locked:true,textStyle:{width:280,fontSize:24,color:'#884422',underline:true}};d.floats=[{id:'note',x:550,y:120,side:'below'}];const original=JSON.stringify(raw);
+  await pastePage(page,original);await closeTools(page);await box(page).click();const toolbar=page.getByRole('toolbar',{name:'Text formatting'}),edit=page.getByRole('textbox',{name:'Edit text box',exact:true});await expect(toolbar).toBeVisible();await expect(toolbar.getByLabel('Font size',{exact:true})).toHaveValue('24');
+  await box(page).dblclick();await edit.fill('New annotation');await edit.press('Home');await edit.press('ArrowRight');await edit.press('Shift+ArrowRight');
+  const caret=await edit.evaluate(el=>[el.selectionStart,el.selectionEnd]);await toolbar.getByRole('button',{name:'Bold',exact:true}).click();await expect(edit).toBeFocused();expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual(caret);await expect(edit).toHaveCSS('font-weight','700');
+  await edit.press('Tab');await expect(toolbar.getByLabel('Font',{exact:true})).toBeFocused();await toolbar.getByLabel('Font',{exact:true}).selectOption('Lora');await expect(edit).toBeFocused();expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual(caret);
+  const size=toolbar.getByLabel('Font size',{exact:true});await size.fill('30');await size.press('Enter');await expect(edit).toBeFocused();await toolbar.getByRole('button',{name:'Italic',exact:true}).click();await expect(edit).toHaveCSS('font-size','30px');await expect(edit).toHaveCSS('font-style','italic');await expect(page.locator('#src')).toHaveValue(original);
+  const bounds=await toolbar.boundingBox(),textBounds=await edit.boundingBox();expect(bounds.width).toBeLessThan(460);expect(bounds.y+bounds.height<=textBounds.y || bounds.y>=textBounds.y+textBounds.height).toBe(true);await page.screenshot({path:info.outputPath('text-toolbar-desktop.png')});
+  // Document-capture canvas handlers must not process composition keys.
+  await edit.dispatchEvent('compositionstart');await edit.dispatchEvent('keydown',{key:'Escape',isComposing:true});await edit.dispatchEvent('keydown',{key:'Enter',ctrlKey:true,isComposing:true});await expect(edit).toBeFocused();await expect(box(page)).toHaveClass(/dv-sel/);await edit.dispatchEvent('compositionend');
+  await edit.press('Control+Enter');await expect(edit).toHaveCount(0);const committed=await source(page),node=JSON.parse(committed).page.blocks[0].diagram.nodes.note;expect(node.text).toBe('New annotation');expect(node.textStyle).toMatchObject({fontFamily:'Lora',fontSize:30,bold:true,italic:true,color:'#884422',underline:true});expect(node.locked).toBe(true);
+  await page.locator('#editor-tab-inspect').click();const guide=page.locator('#guide');await expect(guide.getByLabel('Font',{exact:true})).toHaveValue('Lora');await expect(guide.getByLabel('Bold',{exact:true})).toBeChecked();await expect(guide.getByLabel('Italic',{exact:true})).toBeChecked();await expect(guide.getByLabel('Font size',{exact:true})).toHaveValue('30');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(committed);
+  await closeTools(page);await box(page).dblclick();await edit.fill('Cancel all');await toolbar.getByRole('button',{name:'Bold',exact:true}).click();await toolbar.getByLabel('Font size',{exact:true}).focus();await page.keyboard.press('Escape');await expect(edit).toHaveCount(0);await expect(box(page)).toBeFocused();await expect(page.locator('#src')).toHaveValue(committed);
+});
+
+test('outside object and closing Inspect finish edits; toolbar keeps the edit internal',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.blocks[0].diagram;d.nodes.note={type:'text',text:'Original'};d.floats=[{id:'note',x:550,y:120,side:'below'}];await pastePage(page,JSON.stringify(raw));await closeTools(page);
+  const edit=page.getByRole('textbox',{name:'Edit text box',exact:true}),other=page.locator('#docview [data-dv-node="a"]');
+  await box(page).dblclick();await edit.fill('Object click');await other.click();await expect(edit).toHaveCount(0);await expect(other).toHaveClass(/dv-sel/);expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.text).toBe('Object click');
+  await box(page).click();await page.locator('#editor-tab-inspect').click();await box(page).dblclick();await edit.fill('Closed during edit');await page.locator('#workspace-window-inspect .workspace-window-close').click();await expect(edit).toHaveCount(0);expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.text).toBe('Closed during edit');
+  await box(page).dblclick();await edit.fill('After closing Inspect');await edit.press('Escape');await expect(edit).toHaveCount(0);expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.text).toBe('Closed during edit');
+  await box(page).dblclick();await edit.fill('After closing saved');await other.click();await expect(edit).toHaveCount(0);expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.text).toBe('After closing saved');
+});
+
+test('selected-box formatting is undoable and toolbar follows desktop canvas zoom',async({page,server},info)=>{
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.blocks[0].diagram;d.nodes.note={type:'text',text:'Zoomed annotation'};d.floats=[{id:'note',x:550,y:120,side:'below'}];const original=JSON.stringify(raw);await pastePage(page,original);await closeTools(page);await box(page).click();
+  const toolbar=page.getByRole('toolbar',{name:'Text formatting'});await toolbar.getByRole('button',{name:'Bold',exact:true}).click();await expect(box(page).locator('text')).toHaveCSS('font-weight','700');await expect(page.getByRole('textbox',{name:'Edit text box',exact:true})).toHaveCount(0);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+  await box(page).click();const size=toolbar.getByLabel('Font size',{exact:true});await size.fill('32');await size.press('Enter');await expect(box(page).locator('text')).toHaveCSS('font-size','32px');await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await box(page).click();const before=await toolbar.boundingBox(),beforeText=await box(page).boundingBox();await page.locator('#docview .board-zoom').getByRole('button',{name:'Zoom in',exact:true}).click();await expect.poll(async()=>(await box(page).boundingBox()).width).toBeGreaterThan(beforeText.width);
+  await expect.poll(async()=>{const b=await toolbar.boundingBox(),r=await box(page).locator('.text-box-hit').boundingBox();return !!b && !!r && b.x>=0 && b.x+b.width<=1280 && (b.y+b.height<=r.y || b.y>=r.y+r.height);}).toBe(true);
+  const after=await toolbar.boundingBox();expect(after.width).toBeCloseTo(before.width,1);await page.screenshot({path:info.outputPath('text-toolbar-zoomed-desktop.png')});
+});
+
+test('stale toolbar callbacks retire on source replacement, preview and builder destroy',async({page,server})=>{
+  await page.goto(server.origin+'/lifetime/index.html');const raw=fixture(),d=raw.page.blocks[0].diagram;d.nodes.note={type:'text',text:'Original'};d.floats=[{id:'note',x:550,y:120,side:'below'}];const original=JSON.stringify(raw);await pastePage(page,original);await closeTools(page);await box(page).dblclick();
+  const edit=page.getByRole('textbox',{name:'Edit text box',exact:true}),toolbar=page.getByRole('toolbar',{name:'Text formatting'});await edit.fill('Stale draft');const held=await toolbar.getByRole('button',{name:'Bold',exact:true}).elementHandle();
+  const replacement=JSON.stringify({...raw,title:'Replacement'});await page.locator('#src').evaluate((el,text)=>{el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));},replacement);await expect(edit).toHaveCount(0);await expect(toolbar).toHaveCount(0);await held.evaluate(el=>el.click());await expect(page.locator('#src')).toHaveValue(replacement);
+  // Render the replacement through the ordinary JSON workspace control.
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await closeTools(page);await box(page).click();await expect(toolbar).toBeVisible();
+  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();await expect(page.locator('#page-preview')).toBeVisible();await expect(toolbar).toHaveCount(0);await expect(page.locator('#page-preview [data-dv-text-box]')).toBeVisible();await expect(page.locator('#page-preview .dv-text-toolbar,#page-preview .dv-text-editor')).toHaveCount(0);await page.locator('#close-page-preview').click();
+  await box(page).dblclick();await edit.fill('Destroy draft');const old=await toolbar.getByLabel('Font',{exact:true}).elementHandle();const before=await source(page);await page.evaluate(()=>__editorTest.builder.destroy());await expect(edit).toHaveCount(0);await expect(toolbar).toHaveCount(0);await old.evaluate(el=>{el.value='Lora';el.dispatchEvent(new Event('change',{bubbles:true}));});await expect(page.locator('#src')).toHaveValue(before);
 });

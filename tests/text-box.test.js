@@ -69,3 +69,11 @@ test('blank color edits remove explicit color without mutating caller style',()=
     assert.deepEqual(JSON.parse(plan.text).nodes.a.textStyle,{bold:true});assert.equal(style.color,color);
   }
 });
+
+test('one whole-box transaction preserves handwritten source and unrelated locked fields',()=>{
+  const raw=fixture();raw.nodes.a={type:'text',text:'Before',locked:true,textStyle:{width:320,color:'#123456',underline:true}};
+  const text=JSON.stringify(raw,null,3)+'\n',style={...raw.nodes.a.textStyle,fontFamily:'Lora',fontSize:32,bold:true,italic:true};
+  const plan=C.planEditTextBox(text,raw,0,'a',{text:'After\nwith formatting',textStyle:style});assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text);assert.deepEqual(next.nodes.a,{...raw.nodes.a,text:'After\nwith formatting',textStyle:style});assert.equal(raw.nodes.a.text,'Before');assert.ok(plan.text.endsWith('\n'));assert.ok(plan.text.includes('   "rows"'));
+  const rejected=C.planEditTextBox(text,raw,0,'a',{text:'Unsaved',textStyle:{...style,fontSize:161}});assert.ok(rejected.error);assert.equal(rejected.text,undefined);
+});

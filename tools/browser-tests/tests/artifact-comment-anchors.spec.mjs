@@ -146,6 +146,8 @@ test('a section shared by two Views keeps separate comments per View',async({pag
  const root=await open(page,server,shared),viewStrip=root.locator('.explore-navigation').first().locator('.reader-view-strip');
  const bullet=root.locator('#section-ring li[data-dv-bullet="2"]'),viewTab=name=>viewStrip.getByRole('tab',{name,exact:true});
  await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);
+ // No section stays at its old position, so a path saved before wrappers existed resolves to nothing.
+ await expect(root.locator('.tabpanel').first().locator(':scope > section')).toHaveCount(0);
  await page.evaluate(()=>window.__comments.callbacks.mode(true));
  await bullet.click();
  await expect.poll(()=>composeCount(page)).toBe(1);

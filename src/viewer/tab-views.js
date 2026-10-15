@@ -74,7 +74,8 @@ function createTabViewController(ctl,page){
      it on selection, so the path names the View. Applied only where the
      owner's sections are adjacent siblings, so page block order is kept.
      The wrapper has its own tag so a path saved before wrappers existed,
-     which counts section tags, never resolves to a wrapper. */
+     which counts section tags, never resolves to a wrapper. Sections in no
+     shown View wait in one more wrapper that belongs to no View. */
   function useSlots(){
     owners.forEach(function(owner){
       if(owner.slots || !owner.views || owner.views.length<2)return;
@@ -84,6 +85,10 @@ function createTabViewController(ctl,page){
       var count=0;for(var node=first;node && count<els.length;node=node.nextElementSibling){if(els.indexOf(node)<0)return;count++;}
       if(count<els.length)return;
       owner.slots=new Map();owner.views.forEach(function(view){var slot=document.createElement('dv-view-slot');slot.className='tab-view-slot';slot.setAttribute('data-dv-view-slot',view.id);(owner.anchor || first).before(slot);owner.slots.set(view.id,slot);});
+      // Every section leaves the old sibling positions, so a path saved before
+      // wrappers existed resolves to nothing instead of a renumbered neighbour.
+      var rest=document.createElement('dv-view-slot'),prior=null;rest.className='tab-view-slot';(owner.anchor || first).before(rest);
+      owner.records.forEach(function(record){placeSection(record.runtime,prior,rest);prior=record.runtime.sectionEl;});
       apply(owner);
     });
   }

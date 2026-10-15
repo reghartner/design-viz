@@ -159,7 +159,11 @@ test('a section shared by two Views keeps separate comments per View',async({pag
  expect((await composed(page,1)).opts.label).toMatch(/^Tab: Overview › View: Both › /);
  await page.evaluate(([a,b])=>window.__comments.callbacks.threads([{id:'v-sequence',anchor:a,resolved:false,active:false},{id:'v-both',anchor:b,resolved:false,active:false}]),[inSequence,inBoth]);
  await expect.poll(()=>placedKeys(page)).toEqual(['v-both']);
+ // From another Tab, "Go to" selects the Tab and then the comment's View.
+ await chooseNavigation(root.locator('.explore-navigation').first(),'Tab','Storage');
+ await expect(root.locator('#section-clip')).toBeVisible();
  await page.evaluate(()=>window.__comments.callbacks.reveal('v-sequence'));
+ await expect(root.locator('.explore-navigation').first().getByRole('tab',{name:'Overview',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
  await expect(viewTab('Sequence')).toHaveAttribute('aria-selected','true');
  await expect(root.locator('#section-reply')).toBeHidden();
  await expect(bullet).toBeInViewport();

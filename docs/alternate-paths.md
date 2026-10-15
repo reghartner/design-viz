@@ -31,15 +31,17 @@ also hides the label and choices.
 ## Build a branch
 
 1. Open the **Steps** tab, choose the section and select the last shared beat.
-2. Click **+ Alternate after selected step**. On the first fork the builder
+2. Click **Branch from here**. On the first fork the builder
    adds stable IDs to any unnamed steps and creates **Happy path** plus an
    orange **Dropped signal** path. The new path shares the prefix and gets
    one editable outcome step.
-3. Edit its caption, node focus, tones and panel patches. Choose **Path label**
-   and **Path color**, then **Update path**, to change its name and color.
-4. Use **Append step**, **Duplicate**, and **Move up / Move down** to build its
-   sequence. These change only the selected path's references. **+ step** in
-   the main insertion toolbar also appends to the active path.
+3. Edit its caption, node focus, tones and panel patches. Open **Path
+   settings**, choose **Path label** and **Path color**, then **Update path**,
+   to change its name and color.
+4. Use **Add**, **Duplicate**, and **Move up / Move down** under **More step
+   actions** to build its sequence. These change only the selected path's
+   references. **+ step** in the main insertion toolbar also appends to the
+   active path.
 
 Shared steps have one body: changing a shared caption or patch updates every
 path referencing it. The inspector names those paths when a shared step is

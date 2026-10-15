@@ -8,7 +8,14 @@ function createFolderAgentFiles(directory){
     try{
       var handle=await directory.getFileHandle(name),file=await handle.getFile(),bound=Math.min(limit(name),maxBytes || limit(name));
       if(file.size>bound)throw Error(name+' exceeds the session size limit.');
-      var text=await file.text();
+      var text;
+      if(/\.ledger\.md$/.test(name) && typeof file.arrayBuffer==='function' && typeof TextDecoder!=='undefined'){
+        // File.text() drops a UTF-8 BOM and replaces malformed bytes. Ledger
+        // evidence must round-trip exactly; preserve the BOM and refuse loss.
+        var bytes=await file.arrayBuffer();
+        try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);}
+        catch(ex){throw Error(name+' must contain valid UTF-8. Its bytes have not been changed.');}
+      }else text=await file.text();
       if(new TextEncoder().encode(text).length>bound)throw Error(name+' exceeds the session size limit.');
       return text;
     }catch(ex){if(ex.name==='NotFoundError')return null;throw ex;}

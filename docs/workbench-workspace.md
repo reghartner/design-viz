@@ -301,9 +301,19 @@ activity state without another button in the header.
 
 **Brief → Download review package** downloads a ZIP containing the current JSON,
 viewer HTML, story notes, and evidence references. It does not publish or submit
-anything. The header’s **File** opens the project files workspace, where export
-writes the JSON and standalone HTML together. The header’s **Export** menu offers **JSON only** for editable source,
-**Static HTML** for one offline reader snapshot, and **Both** for the same two-file
-export as File (folder picker or two downloads). Imported topology is included in
-HTML without dynamic provider lookups. JSON only also preserves invalid source
-for later repair. File reports whether browser recovery was saved.
+anything. **Export → Export project** (also in **File**) saves matching
+`.spec.json`, `.html` and `.ledger.md` artifacts plus a static `README.md` in a
+chosen folder. Without a folder picker, one ZIP delivers those same four files.
+The current accepted ledger is preserved exactly; a document without one gets
+an explicitly unverified placeholder. The source and ledger are captured together
+when export starts. Imported topology is included in the offline HTML without
+dynamic provider lookups; JSON keeps the authored references.
+
+Keep the JSON and Markdown ledger together for future manual or agent editing.
+Commit JSON, HTML and ledger together; README is a fourth support file. Reopen
+via **Agent → Select Diagram Folder** to discover the matching pair and recreate
+connection metadata as needed. Export excludes `.flowview-agent` and all session,
+request, transcript, lease and recovery files, preserving live working metadata.
+File reports whether browser recovery was saved. Export requires valid JSON and
+the viewer template. For unfinished JSON, copy the JSON workspace text to a
+repair file; retry a failed complete export once its reported error is resolved.

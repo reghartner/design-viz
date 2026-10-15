@@ -23,6 +23,8 @@ export default async function prepare(){
   process.env.FLOWVIEW_BROWSER_ROOT=output;
   try {
     await cp(path.join(repo,'workbench/flowspec.html'),path.join(output,'workbench.html'));
+    await mkdir(path.join(output,'template'));
+    await cp(path.join(repo,'template/flowview.html'),path.join(output,'template/flowview.html'));
     await prepareLanding(repo,output);
     execFileSync('python3',[fixture('build-editor.py'),repo,path.join(output,'lifetime')],{stdio:'inherit'});
     for(const directory of [output,path.join(output,'lifetime')]){

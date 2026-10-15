@@ -5,7 +5,7 @@ const C={URL,TextEncoder};
 for(const name of ['document','window','navigator','FileReader','fetch'])
   Object.defineProperty(C,name,{get(){throw new Error('I/O owner used ambient '+name);}});
 vm.createContext(C);
-for(const name of ['canon','validator','confluence','trace-import','workbench/persistence','workbench/session','workbench/io-model','workbench/io'])
+for(const name of ['canon','validator','confluence','trace-import','workbench/persistence','workbench/session','workbench/io-model','workbench/story-brief','workbench/io'])
   vm.runInContext(readSource(name+'.js'),C);
 const INITIAL=' {"page":{"title":"Original","sections":[{"diagram":{"nodes":{"a":{}},"rows":[["a"]]}}]}}\n';
 const TEMPLATE='<!doctype html>\n<title>Old</title>\n<script type="application/json" id="flowspec">\n{}\n</script>\n<main></main>';
@@ -17,6 +17,16 @@ function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{reso
 // Drain chained Promise continuations without arbitrary sleeps.
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 function response(text=TEMPLATE){return {ok:true,text:()=>Promise.resolve(text)};}
+function exportedFiles(h){
+  const bytes=Buffer.from(h.blobs.get(h.downloads.at(-1).url).text),files={};let offset=0;
+  while(bytes.readUInt32LE(offset)===0x04034b50){
+    const size=bytes.readUInt32LE(offset+18),length=bytes.readUInt16LE(offset+26),extra=bytes.readUInt16LE(offset+28);
+    const name=bytes.subarray(offset+30,offset+30+length).toString();offset+=30+length+extra;
+    files[name]=bytes.subarray(offset,offset+size).toString();offset+=size;
+  }
+  return files;
+}
+
 function harness(adapters={},options={}){
   const messages=[],downloads=[],revoked=[],readers=[],requests=[],timers=new Map(),saved=[],elements={},all=[];
   let serial=0,io,renderCount=0;
@@ -40,7 +50,7 @@ function harness(adapters={},options={}){
   }
   Object.assign(doc,element('document'),{createElement:tag=>element(tag),getElementById:id=>elements[id]||null});
   doc.body=element('body');
-  const ids=['src','msgs','file-input','file-open','file-save','file-export-html','file-export-both','file-export','confluence-handoff','confluence-json',
+  const ids=['src','msgs','file-input','file-open','file-save','file-export','confluence-handoff','confluence-json',
     'file-export-svg','file-copy-svg','svg-handoff','svg-copy-text','svg-copy-status','svg-copy-close',
     'confluence-status','confluence-copy','confluence-export','confluence-close','import-mermaid','importbox','import-mermaid-text',
     'import-mermaid-convert','import-mermaid-cancel','import-trace','tracebox','trace-text','trace-feedback','trace-file','trace-scope',
@@ -51,6 +61,7 @@ function harness(adapters={},options={}){
   for(const id of ['confluence-handoff','svg-handoff','importbox','tracebox','trace-preview-box'])elements[id].hidden=true;
   elements['trace-scope'].value='all';elements.src.value=INITIAL;
   const blobs=new Map(),browser={
+    zipFiles:files=>C.storyBriefZip(files),
     reader(){const reader={abortCount:0,abort(){this.abortCount++;},readAsText(file){this.file=file;},
       load(text){this.result=text;this.onload();},fail(){this.onerror();}};readers.push(reader);return reader;},
     fetch(url,options){const d=deferred();requests.push({url,options,...d});return d.promise;},
@@ -150,7 +161,7 @@ test('project replacement, close and fresh input retire trace preview, search ca
 });
 
 test('destroy releases listeners/readers/timers/URLs and held callbacks cannot recreate UI or mutate source',()=>{
-  const h=harness();h.click('file-save');h.click('import-trace');
+  const h=harness();h.io.download('test.txt','test','text/plain');h.click('import-trace');
   const file=h.file('file-input'),trace=h.file('trace-file');
   const held=h.all.flatMap(el=>[...el.handlers.values()].flatMap(set=>[...set]));
   const timers=[...h.timers.values()];assert.ok(held.length>20);assert.equal(h.downloads.length,1);
@@ -163,14 +174,12 @@ test('destroy releases listeners/readers/timers/URLs and held callbacks cannot r
   assert.equal(h.all.reduce((n,el)=>n+[...el.handlers.values()].reduce((a,s)=>a+s.size,0),0),0);
 });
 
-test('save downloads exact invalid handwriting; failed download revokes resources without changing baseline',()=>{
-  const h=harness();h.type('src',' \r\n{ invalid');h.click('file-save');
-  assert.equal(h.blobs.get(h.downloads[0].url).text,h.text);assert.equal(h.downloads[0].name,'flowspec.spec.json');
-  assert.equal(h.session.baseline(),h.text);assert.equal(h.session.canUndo(),false);
-  h.flush();assert.equal(h.revoked.length,1);assert.equal(h.doc.body.children.length,0);
-  const bad=harness({anchorClick(){throw new Error('download denied');}});bad.type('src','{ invalid');bad.click('file-save');
-  assert.equal(bad.revoked.length,1);assert.equal(bad.timers.size,0);assert.equal(bad.doc.body.children.length,0);
-  assert.equal(bad.session.baseline(),INITIAL);assert.deepEqual(bad.saved,[]);assert.match(bad.messages.at(-1),/save failed: download denied/);
+test('complete project export refuses unfinished source without modifying its recovery baseline',()=>{
+  for(const action of ['file-save','file-export']){
+    const h=harness();h.type('src',' \r\n{ invalid');h.click(action);
+    assert.equal(h.downloads.length,0);assert.equal(h.requests.length,0);
+    assert.equal(h.session.baseline(),INITIAL);assert.match(h.messages.at(-1),/Copy unfinished text/);
+  }
 });
 
 test('scoped draft downloads share cleanup without saving or changing the parent document',()=>{
@@ -239,16 +248,16 @@ test('new exports and project retirement block held response and body completion
   h.click('file-export');const body=deferred();h.requests[1].resolve({ok:true,text:()=>body.promise});await settle();
   h.click('file-export');body.resolve(TEMPLATE);await settle();assert.equal(h.downloads.length,0);
   h.requests[2].resolve(response());await settle();
-  assert.deepEqual(h.downloads.map(d=>d.name),['new.spec.json','new.html']);
-  h.flush();assert.equal(h.revoked.length,2);assert.equal(h.doc.body.children.length,0);
+  assert.deepEqual(h.downloads.map(d=>d.name),['new.zip']);
+  h.flush();assert.equal(h.revoked.length,1);assert.equal(h.doc.body.children.length,0);
 });
 
 test('transport and invalid-template fallbacks retain the frozen export snapshot; exhaustion and failure publish no downloads',async()=>{
   const h=harness();h.click('file-export');h.type('src','new invalid handwriting');
   h.requests[0].reject(new Error('404'));await settle();h.requests[1].resolve(response('not a template'));await settle();
   h.requests[2].resolve(response());await settle();
-  assert.equal(h.blobs.get(h.downloads[0].url).text,INITIAL);
-  assert.ok(h.blobs.get(h.downloads[1].url).text.includes(INITIAL.trim()));assert.equal(h.text,'new invalid handwriting');
+  assert.equal(exportedFiles(h)['original.spec.json'],INITIAL);
+  assert.ok(exportedFiles(h)['original.html'].includes(INITIAL.trim()));assert.equal(h.text,'new invalid handwriting');
   assert.equal(h.session.canUndo(),false);assert.equal(h.session.baseline(),INITIAL);
   const failed=harness();failed.click('file-export');
   for(let i=0;i<3;i++){failed.requests[i].reject(new Error('offline'));await settle();}
@@ -267,13 +276,25 @@ function directory(){
   return {events,gates,writer,handle,dir};
 }
 async function startDirectory(h){h.click('file-export');await settle();h.requests[0].resolve(response());await settle();}
+test('a repeated export replaces prior success while its picker, template and writes are pending',async()=>{
+  const d=directory();let picker;
+  const h=harness({pickDirectory:()=>picker?picker.promise:Promise.resolve(d.dir)});await startDirectory(h);
+  assert.match(h.messages.at(-1),/^Exported project:/);
+  picker=deferred();h.click('file-export');
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  picker.resolve(d.dir);await settle();assert.equal(h.requests.length,2);
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  d.gates.close=deferred();h.requests[1].resolve(response());await settle();
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  d.gates.close.resolve();await settle();assert.match(h.messages.at(-1),/^Exported project:/);
+});
 test('retirement at picker, handle or writable boundaries avoids starting a stale disk write',async()=>{
   const pick=deferred(),h=harness({pickDirectory:()=>pick.promise});h.click('file-export');h.session.replaceProject('{}');
   const d=directory();pick.resolve(d.dir);await settle();assert.equal(h.requests.length,0);assert.deepEqual(d.events,[]);
   for(const stage of ['handle','writable']){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
     await startDirectory(h);h.io.retireProject();d.gates[stage].resolve();await settle();
-    assert.deepEqual(d.events.map(e=>e[0]),stage==='handle'?['handle']:['handle','writable','abort']);assert.deepEqual(h.messages,[]);
+    assert.deepEqual(d.events.map(e=>e[0]),stage==='handle'?['handle']:['handle','writable','abort']);assert.deepEqual(h.messages,['Exporting project: original…']);
   }
 });
 
@@ -282,20 +303,20 @@ test('a write already in progress finishes its authorized snapshot and closes, w
   await startDirectory(h);assert.equal(d.events.at(-1)[0],'write');h.session.replaceProject('{"next":true}');
   d.gates.write.resolve();await settle();
   assert.deepEqual(d.events.map(e=>e[0]),['handle','writable','write','close']);assert.equal(d.events[2][1],INITIAL);
-  assert.deepEqual(h.messages,[]);assert.equal(h.text,'{"next":true}');
+  assert.deepEqual(h.messages,['Exporting project: original…']);assert.equal(h.text,'{"next":true}');
 });
 
-test('directory failures abort opened streams and report only current failures; successful export writes both matching files',async()=>{
+test('directory failures abort opened streams and report only current failures; successful export writes all four matching files',async()=>{
   for(const stage of ['write','close'])for(const retire of [false,true]){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
     await startDirectory(h);if(retire)h.io.retireProject();d.gates[stage].reject(new Error(stage+' denied'));await settle();
     assert.equal(d.events.at(-1)[0],'abort');assert.equal(d.events.filter(e=>e[0]==='handle').length,1);
-    if(retire)assert.deepEqual(h.messages,[]);else assert.match(h.messages.at(-1),/export failed while writing: .* denied/);
+    if(retire)assert.deepEqual(h.messages,['Exporting project: original…']);else assert.match(h.messages.at(-1),/export failed while writing: .* denied/);
   }
   const d=directory(),h=harness({pickDirectory:()=>Promise.resolve(d.dir)});await startDirectory(h);
-  assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html']);
+  assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html','original.ledger.md','README.md']);
   const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes[0][1],INITIAL);assert.ok(writes[1][1].includes(INITIAL.trim()));
-  assert.equal(d.events.filter(e=>e[0]==='close').length,2);assert.match(h.messages.at(-1),/exported original/);
+  assert.equal(d.events.filter(e=>e[0]==='close').length,4);assert.match(h.messages.at(-1),/Exported project: original/);
 });
 
 function topologyFixture(nested=false){
@@ -317,8 +338,8 @@ test('local exports without Canon context write authored JSON and a page-only HT
   const h=harness(),{provider}=topologyFixture();delete provider.page.canon;
   const original=JSON.stringify(provider,null,3)+'\n';h.session.replaceProject(original);
   h.click('file-export');h.requests[0].resolve(response());await settle();
-  assert.equal(h.downloads.length,2);assert.equal(h.blobs.get(h.downloads[0].url).text,original);
-  const html=h.blobs.get(h.downloads[1].url).text,snapshot=htmlSpec(html);assertPageOnly(snapshot);
+  assert.equal(h.downloads.length,1);assert.equal(exportedFiles(h)['provider.spec.json'],original);
+  const html=exportedFiles(h)['provider.html'],snapshot=htmlSpec(html);assertPageOnly(snapshot);
   assert.doesNotMatch(html,/flowview-topology/);assert.deepEqual(snapshot.page.sections[0].diagram.nodes,provider.page.sections[0].diagram.nodes);
   assert.equal(h.text,original);
 });
@@ -334,7 +355,7 @@ test('direct and nested imports freeze the stamped click revision and safely esc
     h.click('file-export');await settle();
     h.session.resolve=()=>{throw Error('must not resolve after click');};h.type('src','later unfinished handwriting');
     h.requests[0].resolve(response());await settle();
-    const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes.length,2);assert.equal(writes[0][1],expected);
+    const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes.length,4);assert.equal(writes[0][1],expected);
     const html=writes[1][1],snapshot=htmlSpec(html);assertPageOnly(snapshot);assert.doesNotMatch(html,/flowview-topology|<\/ScRiPt>/);
     const prefix=nested?'shared::base::':'shared::';
     assert.equal(snapshot.page.sections[0].diagram.nodes[prefix+'api'].title,fixture.provider.page.sections[0].diagram.nodes.api.title);
@@ -344,7 +365,7 @@ test('direct and nested imports freeze the stamped click revision and safely esc
 });
 
 test('missing or broken frozen providers refuse all HTML exports before any writes or template fetch',()=>{
-  for(const action of ['file-export','file-export-html','file-export-both'])for(const directoryMode of [false,true])for(const broken of [false,true]){
+  for(const action of ['file-export','file-save'])for(const directoryMode of [false,true])for(const broken of [false,true]){
     const d=directory(),h=harness(directoryMode?{pickDirectory:()=>{throw Error('picker must not open');}}:{}),fixture=topologyFixture();
     if(broken)fixture.provider.page.sections[0].diagram.rows=[['api']];
     h.session.replaceProject(JSON.stringify(fixture.consumer),null,broken?{topologyContext:fixture.context}:null);
@@ -364,7 +385,7 @@ test('Mermaid keyboard ownership preserves the active-workbench gate and Escape 
 
 
 test('I/O instances own separate readers and URLs; retired project callbacks stay inert after destroy',()=>{
-  const a=harness(),b=harness();a.click('file-save');b.click('file-save');
+  const a=harness(),b=harness();a.io.download('a.txt','a','text/plain');b.io.download('b.txt','b','text/plain');
   const old=a.file('file-input'),current=b.file('file-input');a.io.destroy();
   assert.equal(old.abortCount,1);assert.equal(current.abortCount,0);assert.equal(b.revoked.length,0);assert.equal(b.timers.size,1);
   a.e.importbox.hidden=false;a.e.tracebox.hidden=false;a.e['confluence-handoff'].hidden=false;
@@ -386,7 +407,7 @@ test('picker and unopened handle failures publish no files; retired failures lea
   for(const retired of [false,true]){
     const pending=deferred(),h=harness({pickDirectory:()=>pending.promise});h.click('file-export');
     if(retired)h.io.retireProject();pending.reject(new Error('permission denied'));await settle();
-    assert.equal(h.requests.length,0);if(retired)assert.deepEqual(h.messages,[]);else assert.match(h.messages.at(-1),/export failed: permission denied/);
+    assert.equal(h.requests.length,0);if(retired)assert.deepEqual(h.messages,['Exporting project: original…']);else assert.match(h.messages.at(-1),/export failed: permission denied/);
   }
   for(const stage of ['handle','writable']){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
@@ -396,39 +417,71 @@ test('picker and unopened handle failures publish no files; retired failures lea
 });
 
 
-test('Static HTML downloads one frozen snapshot without opening a folder or changing source/history',async()=>{
-  let picks=0;const h=harness({pickDirectory(){picks++;throw Error('must not pick');}});
-  const authored=INITIAL+'  ';h.session.accept({text:authored});
-  const baseline=h.session.baseline();h.click('file-export-html');h.type('src','new unfinished draft');
-  h.requests[0].resolve(response());await settle();
-  assert.equal(picks,0);assert.deepEqual(h.downloads.map(d=>d.name),['original.html']);
-  assert.match(h.blobs.get(h.downloads[0].url).text,/Original/);
-  assert.equal(h.text,'new unfinished draft');assert.equal(h.session.baseline(),baseline);assert.equal(h.session.canUndo(),true);
-  h.flush();assert.equal(h.revoked.length,1);assert.equal(h.doc.body.children.length,0);
+test('folder and single-download fallback carry the identical complete snapshot including exact ledger bytes',async()=>{
+  let ledger='\ufeff# Evidence\r\n\r\n- Café 🦉  \r\n',expectedLedger=ledger;
+  const d=directory(),folder=harness({pickDirectory:()=>Promise.resolve(d.dir)},{exportLedger:()=>ledger});
+  folder.click('file-save');ledger='unaccepted later ledger';folder.type('src','new unfinished draft');
+  await settle();folder.requests[0].resolve(response());await settle();
+  const names=d.events.filter(e=>e[0]==='handle').map(e=>e[1]),texts=d.events.filter(e=>e[0]==='write').map(e=>e[1]);
+  const fallback=harness({},{exportLedger:()=>expectedLedger});fallback.click('file-save');fallback.requests[0].resolve(response());await settle();
+  assert.deepEqual(fallback.downloads.map(d=>d.name),['original.zip']);
+  const files=exportedFiles(fallback);assert.deepEqual(Object.keys(files),names);assert.deepEqual(Object.values(files),texts);
+  assert.equal(files['original.ledger.md'],expectedLedger);assert.equal(files['original.spec.json'],INITIAL);
+  assert.ok(files['original.html'].includes(INITIAL.trim()));assert.match(files['README.md'],/JSON and Markdown ledger together/);
+  assert.match(files['README.md'],/all three project artifacts: JSON, HTML and ledger/);
+  assert.equal(folder.text,'new unfinished draft');assert.equal(folder.session.baseline(),INITIAL);
 });
 
-test('toolbar Both reuses folder and fallback exports; invalid source publishes nothing for either HTML choice',async()=>{
-  const d=directory(),folder=harness({pickDirectory:()=>Promise.resolve(d.dir)});
-  folder.click('file-export-both');await settle();folder.requests[0].resolve(response());await settle();
-  assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html']);
-  const fallback=harness();fallback.click('file-export-both');fallback.requests[0].resolve(response());await settle();
-  assert.deepEqual(fallback.downloads.map(d=>d.name),['original.spec.json','original.html']);
-  for(const action of ['file-export-html','file-export-both']){
-    let picks=0;const bad=harness({pickDirectory(){picks++;}});bad.type('src','{ unfinished');bad.click(action);
-    assert.equal(picks,0);assert.equal(bad.requests.length,0);assert.equal(bad.downloads.length,0);assert.match(bad.messages.at(-1),/valid JSON/);
+test('absent ledger produces an explicit unverified stub; an empty existing ledger is preserved',async()=>{
+  for(const ledger of [null,'']){
+    const h=harness({},{exportLedger:()=>ledger});h.click('file-save');h.requests[0].resolve(response());await settle();
+    const text=exportedFiles(h)['original.ledger.md'];if(ledger===null)assert.match(text,/unverified placeholder, not evidence/);else assert.equal(text,'');
   }
 });
 
-test('new format choices, project replacement and destroy retire pending Static HTML; failures release resources',async()=>{
-  for(const retire of ['file-save','file-export-both','project','destroy']){
-    const h=harness();h.click('file-export-html');const pending=h.requests[0];
+test('project identity is passed to ledger capture and replacement cancels the frozen bundle',async()=>{
+  let project;
+  const h=harness({},{exportLedger:id=>{project=id;return '# Original';}});
+  h.click('file-save');assert.equal(project,h.session.snapshot().project);
+  h.session.replaceProject('{}');h.requests[0].resolve(response());await settle();assert.equal(h.downloads.length,0);
+});
+
+test('partial folder failure reports the count and never claims complete export',async()=>{
+  const d=directory();let count=0;
+  d.writer.write=async text=>{d.events.push(['write',text]);if(++count===3)throw Error('ledger denied');};
+  const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});await startDirectory(h);
+  assert.match(h.messages.at(-1),/2 of 4 files completed/);assert.doesNotMatch(h.messages.join(' '),/Exported project/);
+  assert.equal(d.events.filter(e=>e[0]==='handle').length,3);
+});
+
+test('new exports, project replacement and destroy retire pending requests; failures release resources',async()=>{
+  for(const retire of ['file-save','file-export','project','destroy']){
+    const h=harness();h.click('file-save');const pending=h.requests[0];
     if(retire==='project')h.session.replaceProject('{}');else if(retire==='destroy')h.io.destroy();else h.click(retire);
-    assert.equal(pending.options.signal.aborted,true);const before=h.downloads.length;
-    pending.resolve(response());await settle();assert.equal(h.downloads.length,before,retire);
+    assert.equal(pending.options.signal.aborted,true);pending.resolve(response());await settle();assert.equal(h.downloads.length,0,retire);
   }
-  const failed=harness();failed.click('file-export-html');
+  const failed=harness();failed.click('file-save');
   for(let i=0;i<3;i++){failed.requests[i].resolve(response('bad template'));await settle();}
-  assert.equal(failed.downloads.length,0);assert.match(failed.messages.at(-1),/Export → JSON only/);
-  const denied=harness({anchorClick(){throw Error('denied');}});denied.click('file-export-html');denied.requests[0].resolve(response());await settle();
+  assert.equal(failed.downloads.length,0);assert.match(failed.messages.at(-1),/retry Export project/);
+  const denied=harness({anchorClick(){throw Error('denied');}});denied.click('file-save');denied.requests[0].resolve(response());await settle();
   assert.equal(denied.downloads.length,0);assert.equal(denied.revoked.length,1);assert.equal(denied.timers.size,0);
+  const cancelled=harness({pickDirectory:()=>Promise.reject(Object.assign(Error('cancelled'),{name:'AbortError'}))});
+  cancelled.click('file-save');await settle();assert.equal(cancelled.requests.length,0);assert.deepEqual(cancelled.messages,['Exporting project: original…','Export cancelled.']);
+});
+
+for(const remount of [false,true])test('a newer export waits for a retiring write across '+(remount?'controller remount':'same owner'),async()=>{
+  const firstWrite=deferred(),files=new Map(),events=[];let count=0;
+  const dir={async getFileHandle(name){return {async createWritable(){let text;return {
+    async write(value){text=value;events.push(name);if(++count===1)await firstWrite.promise;},
+    async close(){files.set(name,text);},async abort(){}};
+  }};}};
+  let ledger='# Before';const h=harness({pickDirectory:()=>Promise.resolve(dir)},{exportLedger:()=>ledger});
+  await startDirectory(h);assert.deepEqual(events,['original.spec.json']);
+  const next=INITIAL+' ';h.session.accept({text:next});ledger='# After';
+  if(remount){h.io.destroy();C.createBuilderIO({document:h.doc,sourceElement:h.e.src,session:h.session,browser:h.browser,exportLedger:()=>ledger,message:text=>h.messages.push(text)});}
+  h.click('file-save');await settle();h.requests[1].resolve(response());await settle();
+  assert.deepEqual(events,['original.spec.json'],'the second export cannot begin writes while the first is open');
+  firstWrite.resolve();await settle();
+  assert.equal(files.get('original.spec.json'),next);assert.equal(files.get('original.ledger.md'),'# After');
+  assert.equal(files.size,4);assert.equal(h.messages.filter(message=>message.startsWith('Exported project:')).length,1);
 });

@@ -1,6 +1,10 @@
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {readFile} from 'node:fs/promises';
 import {test,expect,paste,arrangeChapter,prepareEditorSurface} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
+
+test.beforeEach(useProjectDownloads);
+
 
 const spec=()=>{const raw=editorSpec(),d=raw.page.blocks[0].diagram;
   d.layouts[0].sectionLayout={default:[{x:0,y:0,w:8,h:14},{panel:'home',x:8,y:0,w:4,h:8},{controls:'steps',attachTo:'diagram',x:0,y:14,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:14},{panel:'home',x:0,y:14,w:12,h:8}]};return raw;};
@@ -43,9 +47,9 @@ test('legacy geometry stays exact while24-column fields, pointer and keyboard ge
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeKeyboard);
   await page.screenshot({path:testInfo.outputPath('grid-24-editor.png'),fullPage:true});
   await page.locator('#editor-tab-file').click();await page.locator('#workspace-export-trigger').click();const downloadPromise=page.waitForEvent('download');await page.locator('#file-save').click();const download=await downloadPromise;
-  const exported=JSON.parse(await readFile(await download.path(),'utf8'));expect(exported.page.flowview.features).toContain('layout.grid-24');
+  const exported=JSON.parse(await projectSource(download));expect(exported.page.flowview.features).toContain('layout.grid-24');
   expect(exported.page.blocks[0].diagram.layouts[0].sectionLayout).toEqual(await saved(page));
-  await page.locator('#file-input').setInputFiles(await download.path());await expect.poll(async()=>JSON.parse(await source(page))).toEqual(exported);await prepareEditorSurface(page);await arrangeChapter(page);expect((await saved(page)).default[0].w).toBe(15);expect((await saved(page)).default.find(it=>it.panel==='home').w).toBe(9);
+  await page.locator('#file-input').setInputFiles({name:'reopened.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(exported))});await expect.poll(async()=>JSON.parse(await source(page))).toEqual(exported);await prepareEditorSurface(page);await arrangeChapter(page);expect((await saved(page)).default[0].w).toBe(15);expect((await saved(page)).default.find(it=>it.panel==='home').w).toBe(9);
   await section.evaluate(el=>{el.style.width='400px';el.style.boxSizing='content-box';});
   await expect.poll(()=>grid.evaluate(el=>Number(getComputedStyle(el).zoom))).toBeCloseTo(.4,4);
   const bounds=await grid.evaluate(el=>{const g=el.getBoundingClientRect();return Array.from(el.querySelectorAll('.section-layout-tile:not([hidden])')).map(t=>({right:t.getBoundingClientRect().right,limit:g.right}));});

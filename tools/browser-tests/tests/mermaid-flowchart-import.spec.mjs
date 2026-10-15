@@ -1,5 +1,8 @@
-import {readFile} from 'node:fs/promises';
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+
+test.beforeEach(useProjectDownloads);
+
 
 const chart='flowchart LR\nsubgraph service [Service]\nA["Receive order"] --> B{Ready}\nend\nB -->|yes| C[Dispatch]\nB -->|no| D[Review]\nclassDef ready fill:#cfc\nclass B ready';
 const markdown='# Order flow\n```mermaid\n'+chart+'\n```';
@@ -27,8 +30,8 @@ test('whole Markdown drop and chosen flowchart preview warnings, cancel, confirm
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(converted);await expect(page.locator('#redo-builder')).toBeDisabled();
   const saving=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await saving;
-  const savedText=await readFile(await saved.path(),'utf8');expect(JSON.parse(savedText).page.sections[0].diagram).toEqual(d);
-  await page.locator('#file-input').setInputFiles(await saved.path());await expect(page.locator('#src')).toHaveValue(savedText);await expect(page.locator('#docview [data-dv-node="A"]')).toBeVisible();
+  const savedText=await projectSource(saved);expect(JSON.parse(savedText).page.sections[0].diagram).toEqual(d);
+  await page.locator('#file-input').setInputFiles({name:'reopened.spec.json',mimeType:'application/json',buffer:Buffer.from(savedText)});await expect(page.locator('#src')).toHaveValue(savedText);await expect(page.locator('#docview [data-dv-node="A"]')).toBeVisible();
 });
 
 test('additive flowchart paste targets the current section, keeps locks, cancel and exact single Undo/Redo',async({page,server},info)=>{

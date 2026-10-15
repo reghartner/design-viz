@@ -394,3 +394,21 @@ function buildExportHtml(templateText, specText){
   }
   return {html: out};
 }
+
+/* Exactly these four portable files are exported; live connection and recovery
+   files are neither copied nor removed. Preserve even an empty existing ledger. */
+var FLOWVIEW_PROJECT_README = '# Flowview project\n\n'+
+  '- `*.spec.json`: editable diagram source.\n'+
+  '- `*.html`: rendered viewing snapshot; regenerate it from the source when the project changes.\n'+
+  '- `*.ledger.md`: coverage and evidence notes that accompany the diagram.\n\n'+
+  'Future manual or agent editing requires the JSON and Markdown ledger together. Keep their matching base names. To resume in Flowview, select this diagram folder from the Agent workspace; the spec and ledger are discovered together.\n\n'+
+  'Commit diagram updates with all three project artifacts: JSON, HTML and ledger, so source, rendered output and evidence stay aligned. README.md is a fourth support file and may be committed too.\n\n'+
+  'Connection metadata is created when needed. The hidden .flowview-agent directory, session identity, requests, transcripts, leases and recovery journal are not portable project artifacts and are not part of the three-artifact commit requirement.\n';
+var FLOWVIEW_UNVERIFIED_LEDGER = '# Coverage ledger — unverified\n\n'+
+  'No coverage ledger has been authored for this document yet. This file is an unverified placeholder, not evidence of coverage or validation.\n\n'+
+  'Before relying on this diagram, record its sources, evidence, assumptions, coverage gaps and open questions here.\n';
+function buildProjectExportFiles(base,source,html,ledger){
+  return [{name:base+'.spec.json',text:source},{name:base+'.html',text:html},
+    {name:base+'.ledger.md',text:typeof ledger==='string'?ledger:FLOWVIEW_UNVERIFIED_LEDGER},
+    {name:'README.md',text:FLOWVIEW_PROJECT_README}];
+}

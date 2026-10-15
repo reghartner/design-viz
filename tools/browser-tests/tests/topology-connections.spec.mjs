@@ -1,6 +1,9 @@
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,closeTools,pastePage} from '../helpers/test.mjs';
-import {readFile} from 'node:fs/promises';
 import {digest} from '../../canon/drift.mjs';
+
+test.beforeEach(useProjectDownloads);
+
 const diagram=raw=>raw.page.sections[0].diagram;
 const node=(page,id)=>page.locator('#docview g.node[data-dv-node="'+id+'"]');
 const source=page=>page.locator('#src').inputValue();
@@ -52,7 +55,7 @@ for(const mode of ['file','canon'])for(const view of ['ambient','step','explore'
   const title=page.getByRole('textbox',{name:'title',exact:true});await title.fill('Edited local');await title.press('Enter');
   await roundtrip(page,before);await painted(page);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-  const bytes=await readFile(await(await download).path(),'utf8'),saved=JSON.parse(bytes);
+  const bytes=await projectSource(await download),saved=JSON.parse(bytes);
   expect(diagram(saved).edges).toEqual([{from:'local',to:'shared::api',label:'Request'}]);
   expect(Object.keys(diagram(saved).nodes)).toEqual(['local','other']);expect(bytes).not.toContain('topologyProvenance');
   await page.locator('#file-input').setInputFiles({name:'saved.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
@@ -218,7 +221,7 @@ for(const view of ['ambient','explore'])test('imported node arrangement survives
   await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
   await page.locator('#editor-tab-json').click();await page.locator('#go').click();await closeTools(page);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-  const bytes=await readFile(await(await download).path(),'utf8');expect(diagram(JSON.parse(bytes))).toEqual(movedD);
+  const bytes=await projectSource(await download);expect(diagram(JSON.parse(bytes))).toEqual(movedD);
   await page.locator('#file-input').setInputFiles({name:'arranged.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
   await page.reload();await expect(node(page,'shared::store')).toBeVisible();await closeTools(page);
   expect(await Promise.all(ids.map(center))).toEqual(movedPositions);await painted(page);

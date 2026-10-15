@@ -1,6 +1,7 @@
 /* Bind platform calls at the browser edge. Tests can inject held operations. */
 function createBuilderBrowserIO(document,window){
   return {
+    zipFiles:function(files){return storyBriefZip(files);},
     reader:function(){return new FileReader();},
     fetch:typeof fetch==='function'?function(url,options){return fetch(url,options);}:null,
     abortController:function(){return typeof AbortController==='function'?new AbortController():null;},

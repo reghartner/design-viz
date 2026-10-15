@@ -1,3 +1,4 @@
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
@@ -6,6 +7,8 @@ import path from 'node:path';
 import {publishLibrary} from '../../canon/library.mjs';
 import {prepareCanonSnapshot} from '../../canon/entity-diagrams.mjs';
 import {digest} from '../../canon/drift.mjs';
+
+test.beforeEach(useProjectDownloads);
 
 async function publish(server){
   const root=path.join(server.root,'company'),workbench=path.join(root,'workbench');
@@ -94,7 +97,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#diagram-add')).toBeFocused();
   expect(fixture.requests).toEqual([fixture.specURL('second'),fixture.specURL('first')]);
   await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  const saved=JSON.parse(await projectSource(await download));
   expect(saved.page.blocks).toEqual(raw.page.blocks);expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
   await page.reload();await prepareEditorSurface(page);await expect(page.locator('#src')).toHaveValue(after);
   await expect(page.locator('#docview')).not.toContainText('LATER DEPLOYMENT');
@@ -363,7 +366,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
   await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
   await page.locator('#editor-tab-json').click();await page.locator('#go').click();await prepareEditorSurface(page);
   await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  const saved=JSON.parse(await projectSource(await download));
   expect(saved.page.sections[0].diagram).toEqual(d);
   await page.reload();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
   expect(await Promise.all(['client','platform::api','platform::store'].map(center))).toEqual(placed);
@@ -428,7 +431,7 @@ test('a published topology consumer renders and its imported node inspector is r
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(source);
   await page.locator('#editor-tab-file').click();
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
-  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  const saved=JSON.parse(await projectSource(await download));
   expect(saved.page.sections[0].diagram).toEqual(source.page.sections[0].diagram);
   expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text)).toBe(JSON.stringify(source,null,2));

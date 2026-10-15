@@ -605,27 +605,16 @@
 </dialog>
 <dialog id="folder-agent-guide" class="folder-agent-guide" aria-labelledby="folder-agent-guide-title">
   <header class="folder-agent-guide-header"><span>✧ Your agent · Your conversation</span><button type="button" class="bbtn" id="folder-agent-close-guide" aria-label="Exit setup">×</button></header>
+  <p id="folder-agent-status" class="folder-agent-hint" role="status"></p>
   <h2 id="folder-agent-guide-title">How are you starting?</h2>
   <p><button type="button" class="welcome-text-button" data-open-human-guide="hg-agent" aria-haspopup="dialog">How this works · Agent walkthrough</button></p>
   <div id="folder-agent-guide-folder">
     <div id="folder-agent-new-session">
-    <p class="folder-agent-choice-label">Where will you talk with your agent?</p>
-    <div class="folder-agent-setup-choices" role="group" aria-label="Conversation mode">
-      <button type="button" id="folder-agent-setup-mode-external" data-agent-workflow-choice="external" aria-pressed="true"><b>Copy &amp; paste · Recommended</b><span>Use your own coding agent in its app</span></button>
-      <button type="button" id="folder-agent-setup-mode-embedded" data-agent-workflow-choice="embedded" aria-pressed="false"><b>Inside workbench · Beta</b><span>Use Claude Monitor</span></button>
-    </div>
-    <p id="folder-agent-workflow-note" class="folder-agent-hint">The diagram folder can be anywhere your agent can access. It does not have to be the agent’s working directory.</p>
-    <section class="folder-agent-pilot-choice" aria-labelledby="folder-agent-pilot-title">
-      <h3 id="folder-agent-pilot-title">Pilot capture · Optional</h3>
-      <label><input type="checkbox" id="folder-agent-pilot-capture" aria-describedby="folder-agent-pilot-explanation"> Enable pilot capture for this session</label>
-      <p id="folder-agent-pilot-explanation">Pasting the setup into Claude Code requests optional local capture under normal host permissions. The helper reads matching native Claude Code transcripts and saves raw lines from the consent boundary, observed models, and token usage in your diagram folder. Checkpoints can refresh other already-authorized sessions; a final-response copier may run in the background for up to 45 seconds. No upload or additional model/session. If capture is unavailable or denied, diagram work continues. Dollar cost is collected manually by the pilot owner.</p>
-      <p class="folder-agent-hint">Off by default for each new setup. The browser does not capture the conversation. To enable capture later, type “Use pilot mode for this session” directly in Claude Code, including when using the Beta workbench chat.</p>
-    </section>
-    <p class="folder-agent-choice-label">What are you doing?</p>
+    <p class="folder-agent-choice-label">Choose what you want to open</p>
     <div class="folder-agent-start-choices" role="group" aria-label="How you are starting">
-      <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Add an agent to this open diagram</b><span>Select a diagram folder; saved agent work reconnects automatically.</span></button>
-      <button type="button" id="folder-agent-start-resume" data-agent-start-choice="resume" aria-pressed="false"><b>Continue an existing agent build</b><span>Reopen the diagram folder used by an earlier agent build.</span></button>
-      <button type="button" id="folder-agent-start-new" data-agent-start-choice="new" aria-pressed="false"><b>Start a new diagram with an agent</b><span>Create a new agent-backed diagram in an empty folder.</span></button>
+      <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Update this diagram</b><span>Connect the open diagram to a folder your agent can use.</span></button>
+      <button type="button" id="folder-agent-start-resume" data-agent-start-choice="resume" aria-pressed="false"><b>Resume a project</b><span>Open the diagram and history from an earlier agent folder.</span></button>
+      <button type="button" id="folder-agent-start-new" data-agent-start-choice="new" aria-pressed="false"><b>Create new</b><span>Start an agent-backed diagram in an empty folder.</span></button>
     </div>
     <section class="folder-agent-start-detail" aria-live="polite">
       <h3 id="folder-agent-start-title">Select Diagram Folder</h3>
@@ -639,6 +628,24 @@
       <p class="folder-agent-hint">Flowview found more than one diagram. Choose one from this folder; no filename entry is required.</p>
       <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-file-confirm">Open selected diagram</button></div>
     </section>
+    <section class="folder-agent-connection-options" aria-labelledby="folder-agent-options-title">
+      <h3 id="folder-agent-options-title">Conversation and focus</h3>
+      <p class="folder-agent-choice-label">Where will you talk with your agent?</p>
+      <div class="folder-agent-setup-choices" role="group" aria-label="Conversation mode">
+        <button type="button" id="folder-agent-setup-mode-external" data-agent-workflow-choice="external" aria-pressed="true"><b>Copy &amp; paste · Recommended</b><span>Use your own coding agent in its app</span></button>
+        <button type="button" id="folder-agent-setup-mode-embedded" data-agent-workflow-choice="embedded" aria-pressed="false"><b>Inside workbench · Beta</b><span>Use Claude Monitor</span></button>
+      </div>
+      <p id="folder-agent-workflow-note" class="folder-agent-hint">The diagram folder can be anywhere your agent can access. It does not have to be the agent’s working directory.</p>
+      <div id="folder-agent-setup-focus"></div>
+    </section>
+    <details id="folder-agent-pilot-choice" class="folder-agent-pilot-choice">
+      <summary><b>Pilot capture · Optional</b><span>Off for each setup</span></summary>
+      <div class="folder-agent-pilot-disclosure">
+        <p id="folder-agent-pilot-explanation">Pasting the setup into Claude Code requests optional local capture under normal host permissions. The helper reads matching native Claude Code transcripts and saves raw lines from the consent boundary, observed models, and token usage in your diagram folder. Checkpoints can refresh other already-authorized sessions; a final-response copier may run in the background for up to 45 seconds. No upload or additional model/session. If capture is unavailable or denied, diagram work continues. Dollar cost is collected manually by the pilot owner.</p>
+        <p class="folder-agent-hint">Off by default for each new setup. The browser does not capture the conversation. To enable capture later, type “Use pilot mode for this session” directly in Claude Code, including when using the Beta workbench chat.</p>
+        <label><input type="checkbox" id="folder-agent-pilot-capture" aria-describedby="folder-agent-pilot-explanation"> Enable pilot capture for this session</label>
+      </div>
+    </details>
     <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command" id="folder-agent-launch-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep'</pre><p id="folder-agent-launch-help">Use your own account and normal permission prompts. Copy and paste does not start Monitor or a background watcher. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
     </div>
   </div>
@@ -662,7 +669,6 @@
     <div class="folder-agent-guide-actions"><button type="button" class="welcome-button" id="folder-agent-help-back">Back</button><button type="button" class="welcome-button welcome-button-primary" data-agent-change-folder>Choose a different folder</button></div>
   </div>
   <button type="button" class="bbtn" id="folder-agent-disconnect-guide" hidden>Disconnect shared folder</button>
-  <p id="folder-agent-status" class="folder-agent-hint" role="status"></p>
 </dialog>
 
 <dialog id="topology-picker" class="catalog-picker topology-picker" aria-labelledby="topology-heading" aria-describedby="topology-intro">

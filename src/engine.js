@@ -1429,6 +1429,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var btnAmb = termbar.btnAmb, btnStep = termbar.btnStep;
   var bar = termbar.bar, chipsBox = termbar.chips, stepN = termbar.stepN,
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
+  var pathLabelWidth=230;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
   /* Sticky path labels sit above the horizontal scrollport. Native focus
@@ -1476,6 +1477,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function paintChipContent(){
     paintStepCoins();
+    chipsBox.style.setProperty('--path-label-width',pathLabelWidth+'px');
     if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
@@ -1529,7 +1531,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         else if(pathId!==selectedPath.id)selectPath(pathId,index);
         else setStep(index);
         if(restart || changedPath)secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
-      });
+      },pathLabelWidth);
       pathTimeline.sync(selectedPath.id,cur);
       return;
     }
@@ -1543,10 +1545,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         (row.start > row.end ? ', all steps shared' : row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
-      choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
+      var label=document.createElement('span');label.className='path-chip-label';label.textContent=path.label;choice.appendChild(label); choice.setAttribute('data-dv-path',path.id);
       choice.title=path.label;
       choice.disabled=!path.indices.length;
-      if(choice.disabled)choice.title='No steps from this path are shown in this view.';
+      if(choice.disabled)choice.title=path.label+' — No steps from this path are shown in this view.';
       choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
       choice.addEventListener('click',function(ev){
         ev.stopPropagation();clearEditingPreview();chipsBox.scrollLeft=0;selectPath(path.id,0);paintPathOverview();
@@ -1886,6 +1888,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     path: function(){ return selectedPath.id; },
     paths: function(){ return filteredPaths(); },
     selectPath: selectPath,
+    setPathLabelWidth:function(value){
+      var next=sectionPathLabelWidth(value);if(next===pathLabelWidth)return;
+      pathLabelWidth=next;paintChips();syncPathControls();
+    },
     setViewFilter:function(pathIds,stepIds){
       var filter=sectionViewFilter(source,pathIds,stepIds),nextPaths=filter.paths,nextSteps=filter.steps;
       if(JSON.stringify(nextPaths)===JSON.stringify(visiblePathIds) && JSON.stringify(nextSteps)===JSON.stringify(visibleStepIds) && editingStep===null && editingPathId===null)return;
@@ -2365,7 +2371,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
     grid.hidden=false;active=true;grid.setAttribute('data-layout-id',layoutId);
-    if(stepper){var activeDefinition=sectionLayoutDefinition(d,layoutId);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
+    if(stepper){var activeDefinition=sectionLayoutDefinition(d,layoutId);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed',String(id===layoutId));});
     paintFlow();
     viewport.setView(sectionLayoutDefinition(d,layoutId),items);
@@ -2380,7 +2386,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
     }
-    if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
+    if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     activate();
   }
   group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]')){restore();if(stepper)stepper.setViewFilter(null,null);}},true);

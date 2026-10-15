@@ -6,11 +6,16 @@ test('floating preferences migrate the selected tool, reject invalid values, and
   const prefs=context.workspacePrefs('{"tool":"steps","windows":{"steps":{"x":200,"y":100,"w":400,"h":500,"open":true},"evil":{"open":true},"file":null}}');
   assert.deepEqual(JSON.parse(JSON.stringify(prefs)),{tool:'steps',windows:{steps:{x:200,y:100,w:400,h:500,open:true}}});
 });
+test('docking is a validated browser preference alongside preserved floating geometry',()=>{
+  const prefs=context.workspacePrefs('{"windows":{"inspect":{"docked":true,"x":420,"w":500},"agent":{"docked":"true"}}}');
+  assert.equal(prefs.windows.inspect.docked,true);assert.equal(prefs.windows.inspect.x,420);assert.equal(prefs.windows.inspect.w,500);
+  assert.equal(prefs.windows.agent.docked,undefined);
+});
 test('offscreen or oversized saved panels stay reachable after a smaller viewport',()=>{
   const r=context.workspacePanelRect({x:1600,y:1000,w:700,h:900},800,600);
   assert.ok(r.x>=12);assert.ok(r.y>=72);assert.ok(r.x+r.w<=788);assert.ok(r.y+r.h<=588);
-  const narrow=context.workspacePanelRect({x:-1000,y:-1000,w:-20,h:-30},375,700,224);
-  assert.equal(narrow.x,12);assert.equal(narrow.y,224);assert.equal(narrow.w,300);assert.equal(narrow.h,240);
+  const desktop=context.workspacePanelRect({x:-1000,y:-1000,w:-20,h:-30},1280,720,114,70,374);
+  assert.equal(desktop.x,374);assert.equal(desktop.y,114);assert.equal(desktop.w,300);assert.equal(desktop.h,240);
 });
 test('missing and nonfinite geometry uses usable defaults without rewriting source data',()=>{
   const original={x:Infinity,y:NaN,w:NaN,h:Infinity};

@@ -124,19 +124,17 @@ defaults in the source, so the placement survives HTML export. Standard keeps
 its panels in the authored page arrangement; use **View → Arrange selected section…** to edit
 that arrangement.
 
-Explore panel edits and editor-tool moves/resizes join the same **Undo**/**Redo**
-history as story edits, one entry per completed drag or arrow-key adjustment.
-Editor-tool geometry remains temporary and its Undo does not reopen closed
-tools. Opening or closing a tool does not add history entries.
+Explore data-panel edits use the same **Undo**/**Redo** history as story edits,
+one entry per completed drag or arrow-key adjustment. Editor-tool opening,
+closing, movement, resizing and docking are browser preferences and never enter
+that history or change the document source.
 Source Undo and Redo likewise preserve every open or closed tool and keep the
 current tool active. Their completion status appears beside the history controls;
 an already-open Inspector refreshes to a non-stale history message without
 expanding a collapsed Inspector disclosure.
-A movement that hits an edge
-without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
-panel moves keyboard focus to its handle, so the next keyboard Undo targets the
-panel. Loading another file or resuming a folder starts fresh history; recover
-the previous story through **Earlier drafts**.
+An authored panel movement that hits an edge without changing it leaves
+Undo/Redo unchanged. Loading another file or resuming a folder starts fresh
+history; recover the previous story through **Earlier drafts**.
 Camera and panel state follow matched sections through source edits; new projects
 start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named View
@@ -220,8 +218,22 @@ windows persist in this browser; resizing the browser keeps their handles on
 screen. Escape, pointer cancellation and losing window focus cancel a drag.
 Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** (or **Ctrl Y**) to redo while
 working on the canvas or panel handles. Text fields keep their native text undo.
-Temporary geometry history ends when a different project is opened or the page
-reloads; saved editor-window positions still return on reload.
+
+**Dock** in each tool's title bar reserves canvas space on the right. One tool
+can be docked at a time; docking another restores the previous tool to floating.
+**Float** restores its floating size and position. Closing or hiding docked tools
+returns their space to the canvas. Docking and floating keep the selected object
+in the usable canvas, preserving its screen position where it fits. They never
+automatically fit the diagram; use **Fit diagram** when you want to reframe it.
+
+Tools stay clear of the measured Contents, rail, navigation and canvas controls.
+Inspect temporarily chooses a nearby position away from the selected object when
+space allows, including when the selection changes while it is open. Crowded
+layouts may temporarily narrow or shorten a window to keep controls reachable.
+These adjustments do not replace saved floating preferences or move the camera.
+Very large objects or crowded workspaces may still overlap; close other tools
+or use Dock and Fit.
+Saved editor-window positions and docking return on reload.
 
 Open **Agent** in the left rail to see the current connection. There are no tabs.
 When disconnected, choose **Reopen diagram folder** on a remembered build or

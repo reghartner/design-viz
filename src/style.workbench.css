@@ -1656,3 +1656,9 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 /* Keep the working destination visible in the desktop project toolbar. */
 @media(min-width:900px){.workspace-canvas .workspace-tools>.workspace-more{flex-shrink:0;min-width:max-content;}.workspace-canvas .workspace-tools>.workspace-provenance{display:block;max-width:220px;flex:0 1 220px;min-width:100px;}}
 .workspace-provenance[data-state="failed"],.workspace-provenance[data-state="paused"]{color:var(--danger,#a13b32);}
+/* Editor docking reserves the rendered viewport; floating preferences stay intact. */
+.workspace-window-dock{flex:none;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--card);color:var(--ink);font:12px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.workspace-window[data-docked="true"] .workspace-window-grip{cursor:default;opacity:1;}
+.workspace-window[data-docked="true"] .workspace-window-grip::before{content:'▥';}
+.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{right:calc(12px + var(--workspace-dock-width,0px));}
+.workspace-canvas:not(.workspace-diagram) #workspace-canvas{right:var(--workspace-dock-width,0px);}

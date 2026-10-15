@@ -61,6 +61,15 @@ test('editor shares the Contents, Views and Page shell without covering its auth
  await expect(page.locator('#src')).toHaveValue(source);
 });
 
+test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await open(page,server);const contents=nav(page),sections=id=>contents.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>contents.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
+ await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','true');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','true');
+ await disclosure('engineering').focus();await page.keyboard.press('Enter');await expect(disclosure('engineering')).toBeFocused();await expect(disclosure('engineering')).toHaveAccessibleName('Expand Engineering');await expect(sections('engineering')).toHaveCount(0);await expect(sections('overview')).toHaveCount(2);
+ await chooseNavigation(contents,'View','Overview');await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','false');await disclosure('overview').click();await expect(disclosure('overview')).toHaveAccessibleName('Expand Overview');await expect(sections('overview')).toHaveCount(0);
+ await chooseNavigation(contents,'View','Engineering');await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','false');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','false');
+ await disclosure('engineering').click();await disclosure('overview').click();await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);
+});
+
 test('Add follows prose tabs and deliberate destination changes while stale source remains blocked',async({page,server})=>{
  const original=await open(page,server);await chooseNavigation(nav(page),'Tab','Notes');
  await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeEnabled();await expect(page.locator('#diagram-add-destination')).toContainText('Notes');

@@ -397,8 +397,7 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  .reader-tree-view-row{display:flex;align-items:center;margin:3px 0;border-radius:6px;}
  .reader-tree-view-row:has([aria-current=page]){background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);}
  body .reader-navigation .reader-tree-view{flex:1;min-width:0;padding:10px 8px;overflow-wrap:anywhere;}
- .reader-tree-view:before{content:'▤';margin-right:8px;}.reader-tree-view-row:has(.reader-view-disclosure) .reader-tree-view:before{content:'⛶';}
- .reader-view-mode{font-size:10px;padding-right:8px;color:var(--dfaint);}
+ .reader-tree-view:before{content:'▤';margin-right:8px;}.reader-tree-view[data-explore-view=true]:before{content:'⛶';}
  .reader-tree-sections{margin:4px 0 12px 14px;padding:0 0 0 8px;border-left:1px solid var(--explore-border);list-style:none;}
  body .reader-navigation .reader-tree-section{display:flex;gap:12px;width:100%;padding:10px 8px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
  .reader-tree-section:before{content:attr(data-page-number);min-width:12px;font-variant-numeric:tabular-nums;}

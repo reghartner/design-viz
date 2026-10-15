@@ -38,15 +38,27 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   const raw=story(),tab=raw.page.sections[0].tabs[0];tab.defaultView='standard-subset';tab.views.push({id:'standard-subset',name:'Backstage + Review',presentation:'standard',sections:['backstage','review']});
   const root=await openRaw(page,server,raw,'standard-headlines'),headlines=root.locator('.reader-tree-sections[data-reader-view="standard-subset"]');
   await expect(headlines.getByRole('button')).toHaveText(['Find the right workspace in Backstage','Decide what becomes the accepted diagram']);
-  await expect(root.locator('.reader-tree-sections[data-reader-view="explore"]')).toHaveCount(0);
+  await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
   await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
   await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
   await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
-  const exploreRow=root.locator('.reader-tree-view[data-tab-view="explore"]').locator('..');await exploreRow.getByRole('button',{name:'Expand Explore story',exact:true}).click();await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
   await root.locator('.reader-tree-tab').getByText('Reference',{exact:true}).click();const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');
+});
+
+test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server),sections=id=>root.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>root.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
+  await expect(sections('full')).toHaveCount(3);await expect(sections('explore')).toHaveCount(3);
+  await expect(disclosure('full')).toHaveAttribute('aria-expanded','true');await expect(disclosure('full')).toHaveAccessibleName('Collapse Full story');
+  await expect(disclosure('explore')).toHaveAttribute('aria-expanded','true');await expect(disclosure('explore')).toHaveAccessibleName('Collapse Explore story');
+  await expect(root.locator('.reader-tree-view[data-tab-view="full"]')).not.toHaveAttribute('data-explore-view','true');await expect(root.locator('.reader-tree-view[data-tab-view="explore"]')).toHaveAttribute('data-explore-view','true');
+  await disclosure('full').focus();await page.keyboard.press('Enter');await expect(disclosure('full')).toBeFocused();await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('full')).toHaveAccessibleName('Expand Full story');await expect(sections('full')).toHaveCount(0);await expect(sections('explore')).toHaveCount(3);
+  await disclosure('explore').click();await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');await expect(sections('explore')).toHaveCount(0);
+  await choose(root,'explore');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
+  await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
+  await disclosure('full').click();await disclosure('explore').click();await expect(sections('full')).toHaveCount(3);await expect(sections('explore')).toHaveCount(3);
 });
 
 for(const width of [1440,390,320,286])test('Contents geometry, overlay and bounded theme menu at '+width,async({page,server})=>{

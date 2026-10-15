@@ -1,7 +1,7 @@
 /* Read-only proposed state, separate from the editor's document and history. */
 function workbenchAgentConflictFeedback(review){
   var prefix=review.artifacts && review.artifacts.metadata==='.'?'':'.flowview-agent/';
-  return ['Your proposed Flowview update could not be committed. My current diagram has been preserved.',
+  return ['Your proposed Flowview update could not be accepted. My current diagram has been preserved.',
     'Proposal: '+review.id, 'Starting revision: '+review.baseRevision, 'Current revision: '+review.revision,'',
     'Please resolve these conflicts or validation problems:',
     (review.conflicts || []).map(function(item){return '- '+item.path+': '+item.reason;}).join('\n'),'',
@@ -140,14 +140,14 @@ function workbenchAgentReviewDecorate(root,side,enabled){
 }
 function initWorkbenchAgentReview(opts){
   var doc=opts.document,life=createWorkbenchLifetime(),banner=doc.getElementById('agent-update-banner'),dialog=doc.getElementById('agent-update-dialog');
-  var state=null,shown=null,ctl=null,canvas=null,observer=null,changes=null,viewing='proposed',rendered=false,highlights=true,immersive=false;
+  var state=null,shown=null,ctl=null,canvas=null,observer=null,changes=null,viewing='proposed',rendered=false,highlights=true,details=false,reviewedVersion=null;
   function el(id){return doc.getElementById('agent-update-'+id);}
   function retire(){if(observer)observer.disconnect();observer=null;if(canvas)canvas.destroy();canvas=null;if(ctl)ctl.destroy();ctl=null;el('view').replaceChildren();rendered=false;}
   function displayState(){
-    dialog.classList.toggle('agent-update-immersive',immersive);el('immersive').setAttribute('aria-pressed',String(immersive));
-    el('immersive').textContent=immersive?'Standard preview':'Full preview';
+    el('details-panel').hidden=!details;el('details').setAttribute('aria-expanded',String(details));
     el('highlights').setAttribute('aria-pressed',String(highlights));el('highlights').textContent='Highlights: '+(highlights?'On':'Off');
   }
+  function updateCommit(){el('commit').disabled=!shown || !rendered || !shown.review.ok || viewing!=='proposed' || reviewedVersion!==shown.review.version;}
   function changeStatus(){
     var side=changes && changes[viewing],counts=side && side.counts || {added:0,removed:0,modified:0};
     el('change-added').hidden=viewing==='current';el('change-removed').hidden=viewing==='proposed';
@@ -155,7 +155,7 @@ function initWorkbenchAgentReview(opts){
     el('change-status').setAttribute('aria-label',(highlights?'Highlights on: ':'Highlights off: ')+(viewing==='current'?counts.removed+' removed, ':counts.added+' added, ')+counts.modified+' modified');
   }
   function decorate(){changeStatus();workbenchAgentReviewDecorate(el('view'),changes && changes[viewing],highlights);}
-  function close(){if(dialog.open)dialog.close();retire();shown=null;changes=null;immersive=false;highlights=true;displayState();}
+  function close(){if(dialog.open)dialog.close();retire();shown=null;changes=null;details=false;highlights=true;reviewedVersion=null;displayState();}
   function draw(){
     retire();if(!shown)return;
     el('commit').disabled=true;
@@ -166,9 +166,9 @@ function initWorkbenchAgentReview(opts){
     el('ledger-summary').textContent='Coverage ledger · '+(viewing==='current'?'Current state':shown.ledger!==shown.currentLedger?'Changed in this update':'Unchanged');
     if(!source){el('view').textContent='Resolve the issues above with your agent to get a complete, valid preview.';return;}
     try{
-      // Resolve a fresh render copy; source, change highlights and commit keep
+      // Resolve a fresh render copy; source, change highlights and acceptance keep
       // the authored declarations. A prepared review may have additional pinned
-      // providers that are not published into the session until Commit.
+      // providers that are not published into the session until acceptance.
       var raw=JSON.parse(source),resolved=opts.resolve?(shown.topologyContext?opts.resolve(raw,shown.topologyContext):opts.resolve(raw)):raw;
       var page=normalize(resolved),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});
@@ -177,21 +177,26 @@ function initWorkbenchAgentReview(opts){
       canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll'),initialContentsOpen:false,presentation:{panelsHiddenWhenGraphVisible:true,overlayScale:.5},forceFit:true,refitOnResize:true,fitInsets:{left:24,right:24,top:20,bottom:24}});rendered=true;decorate();
       var Observer=doc.defaultView && doc.defaultView.MutationObserver;
       if(Observer){observer=new Observer(function(records){if(records.some(function(record){return record.type==='childList';}))decorate();});observer.observe(el('view'),{childList:true,subtree:true});}
-      el('commit').disabled=!shown.review.ok || viewing!=='proposed';
+      updateCommit();
     }catch(ex){el('view').textContent='Could not render this preview: '+ex.message;changeStatus();}
   }
   function refresh(){
     var next=opts.snapshot();if(!next){close();return;}
-    var changed=shown && shown.review.version!==next.review.version;shown=next;
+    var first=!shown,changed=shown && shown.review.version!==next.review.version;shown=next;
+    if(first)reviewedVersion=next.review.version;
+    if(changed)reviewedVersion=null;
     el('summary').textContent=next.review.summary;
-    el('note').textContent=!next.review.ok?'Your current story is unchanged. Share this feedback so your agent can revise the update.':
-      (changed?'The diagram changed, so this preview has been refreshed. Review it again. ':next.review.merged?'Your changes and the agent’s separate changes are combined below. ':'')+'Commit updates the spec and ledger in your diagram folder as one undoable change. A Git commit is a separate step in your agent.';
+    el('note').hidden=!!next.review.ok && !changed && !next.review.merged;
+    el('review-refresh').hidden=!changed;
+    el('note-text').textContent=!next.review.ok?'Your current story is unchanged. Share this feedback so your agent can revise the update.':
+      changed?'The proposal changed while this preview was open. Review the refreshed version before accepting it.':
+      'Your changes and the agent’s separate changes are combined in this preview.';
     el('issues').hidden=!!next.review.ok;el('feedback').value=workbenchAgentConflictFeedback(next.review);
     changes=null;
     try{var current=normalize(JSON.parse(next.current)),proposed=normalize(JSON.parse(next.source));if(current && proposed)changes=workbenchAgentReviewChanges(current,proposed);}catch(ex){}
     draw();
   }
-  function open(){if(!state)return;if(!dialog.open)dialog.showModal();el('ledger-panel').open=false;viewing='proposed';highlights=true;immersive=false;displayState();refresh();el('close').focus();}
+  function open(){if(!state)return;if(!dialog.open)dialog.showModal();viewing='proposed';highlights=true;details=false;reviewedVersion=state.version;displayState();refresh();el('close').focus();}
   function update(review){
     state=review;banner.hidden=!review;
     if(review){
@@ -203,12 +208,16 @@ function initWorkbenchAgentReview(opts){
     if(dialog.open && (!shown || shown.review.version!==review.version))refresh();
   }
   life.listen(el('open'),'click',open);life.listen(el('close'),'click',close);
-  life.listen(dialog,'cancel',function(event){event.preventDefault();close();});life.listen(dialog,'close',retire);
+  life.listen(dialog,'cancel',function(event){event.preventDefault();if(details){details=false;displayState();el('details').focus();}else close();});life.listen(dialog,'close',retire);
   life.listen(el('current'),'click',function(){viewing='current';draw();});life.listen(el('proposed'),'click',function(){viewing='proposed';draw();});
   life.listen(el('highlights'),'click',function(){highlights=!highlights;displayState();decorate();});
-  life.listen(el('immersive'),'click',function(){immersive=!immersive;displayState();});
+  life.listen(el('details'),'click',function(){details=!details;displayState();if(details)el('details-close').focus();});
+  life.listen(el('details-close'),'click',function(){details=false;displayState();el('details').focus();});
+  life.listen(el('review-refresh'),'click',function(){if(!shown)return;reviewedVersion=shown.review.version;el('review-refresh').hidden=true;el('note-text').textContent='You are reviewing the refreshed proposal.';updateCommit();el('view').focus();});
   life.listen(el('commit'),'click',async function(){
-    if(!shown || !rendered || !shown.review.ok || viewing!=='proposed')return;
+    var latest=opts.snapshot();
+    if(!shown || !latest || latest.review.version!==shown.review.version || reviewedVersion!==shown.review.version){refresh();return;}
+    if(!rendered || !shown.review.ok || viewing!=='proposed')return;
     var version=shown.review.version;close();await opts.accept(version);
     if(state)open();
   });
@@ -216,7 +225,7 @@ function initWorkbenchAgentReview(opts){
   life.listen(el('copy-feedback'),'click',async function(){
     if(!shown)return;var version=shown.review.version,text=el('feedback').value;
     try{await navigator.clipboard.writeText(text);if(shown && shown.review.version===version){close();await opts.reject(text,version);}}
-    catch(ex){el('feedback').focus();el('feedback').select();el('note').textContent='Press ⌘C / Ctrl+C to copy the feedback. Use Return for revision to release this proposal when you are ready.';}
+    catch(ex){el('feedback').focus();el('feedback').select();el('note').hidden=false;el('review-refresh').hidden=true;el('note-text').textContent='Press ⌘C / Ctrl+C to copy the feedback. Use Return for revision to release this proposal when you are ready.';}
   });
   life.listen(el('return'),'click',async function(){if(!shown)return;var version=shown.review.version,text=el('feedback').value;close();await opts.reject(text,version);});
   life.own(close);return {update:update,open:open,destroy:life.destroy};

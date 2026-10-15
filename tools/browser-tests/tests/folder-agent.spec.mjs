@@ -910,7 +910,7 @@ test('external branch copies context without dispatch, accepts native followups 
   }finally{watcher?.kill();native?.kill();await page.close();await h.cleanup();}
 });
 
-test('copy and paste Explore review keeps comparison, ledger and commit reachable',async({page},info)=>{
+test('copy and paste Explore review fills the desktop and keeps comparison, details and decisions reachable',async({page},info)=>{
   const h=await setup(page);
   try{
     await page.setViewportSize({width:1280,height:720});
@@ -931,7 +931,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the service in Explore');
     await page.locator('#agent-update-open').click();
     const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage'),board=view.locator('.explore-board');
-    async function contained(supporting=true){
+    async function contained(){
       await expect(stage).toBeVisible();
       const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox(),surface=await board.boundingBox();
       if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify(await page.locator('#agent-update-scroll').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,scrollHeight:el.scrollHeight,area:el.getBoundingClientRect().toJSON(),nav:el.querySelector('.reader-navigation').getBoundingClientRect().toJSON(),canvas:el.querySelector('.viewer-diagram-canvas').getBoundingClientRect().toJSON()}))),contentType:'application/json'});
@@ -940,7 +940,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
       expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
       expect(canvas.width).toBeGreaterThan(400);expect(canvas.height).toBeGreaterThan(260);
       expect(surface.width).toBeGreaterThan(400);expect(surface.height).toBeGreaterThan(260);
-      for(const id of ['close','current','proposed','commit'].concat(supporting?['ledger-summary']:[])){
+      for(const id of ['close','current','proposed','highlights','details','discard','commit']){
         const control=page.locator('#agent-update-'+id);await expect(control).toBeInViewport();
         if(await control.isEnabled())await control.click({trial:true});
       }
@@ -950,8 +950,11 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
       await expect.poll(()=>node.evaluate(el=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=80 && r.height>=28 && label.height>=8 && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);})).toBe(true);
       await expect(label).toBeVisible();
     }
-    await page.screenshot({path:info.outputPath('explore-review.png')});await contained();
-    await expect(page.locator('#agent-update-note')).toBeVisible();await expect(page.locator('#agent-update-note')).toContainText('Commit updates the spec and ledger');
+    const fullDialog=await page.locator('#agent-update-dialog').boundingBox(),viewport=page.viewportSize();
+    expect(fullDialog).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+    await expect(page.locator('#agent-update-title')).toHaveText('Preview — changes not applied');
+    await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-note')).toBeHidden();
+    await page.screenshot({path:info.outputPath('explore-review-default-1280x720.png')});await contained();
     await expect(view.locator('.reader-top>.reader-button').first()).toHaveAttribute('aria-expanded','false');await changedNodeVisible('Delivery service');
     await expect(view.locator('.explore-window:visible')).toHaveCount(0);await view.locator('.explore-panel-menu summary').click();
     await expect(view.getByRole('button',{name:'Restore panels',exact:true})).toBeVisible();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
@@ -961,13 +964,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await page.locator('#agent-update-highlights').click();await expect(view).not.toHaveAttribute('data-agent-highlights','');
     await expect(view.locator('[data-dv-node="b"]')).not.toHaveAttribute('data-agent-change');
     await page.locator('#agent-update-highlights').click();await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
-    const standardStage=await stage.boundingBox();await page.locator('#agent-update-immersive').click();
-    await expect(page.locator('#agent-update-dialog')).toHaveClass(/agent-update-immersive/);
-    const fullDialog=await page.locator('#agent-update-dialog').boundingBox(),viewport=page.viewportSize();
-    expect(fullDialog).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});await expect(page.locator('#agent-update-note')).toBeHidden();
-    await expect.poll(async()=> (await stage.boundingBox()).height).toBeGreaterThan(standardStage.height);
-    for(const id of ['close','current','proposed','highlights','immersive','discard','commit'])await expect(page.locator('#agent-update-'+id)).toBeInViewport();
-    await contained(false);await page.locator('#agent-update-immersive').click();await expect(page.locator('#agent-update-dialog')).not.toHaveClass(/agent-update-immersive/);
+    await contained();
     await view.locator('.explore-legend-menu>summary').click();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeVisible();
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
@@ -984,20 +981,27 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
     await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
     await view.locator('.explore-panel-menu>summary').click();
-    const collapsed=await stage.boundingBox();
-    await page.locator('#agent-update-ledger-summary').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
-    await contained();await changedNodeVisible('Delivery service');expect((await stage.boundingBox()).height).toBeGreaterThanOrEqual(collapsed.height);
-    await page.screenshot({path:info.outputPath('explore-review-with-ledger.png')});
+    const reviewStage=await stage.boundingBox(),reviewZoom=await zoom.innerText();
+    await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-details-panel')).toBeVisible();
+    await expect(page.locator('#agent-update-summary')).toHaveText('Rename the service in Explore');
+    await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await expect(page.locator('#agent-update-source')).toHaveValue(proposed);
+    expect(await stage.boundingBox()).toEqual(reviewStage);expect(await zoom.innerText()).toBe(reviewZoom);
+    await page.screenshot({path:info.outputPath('explore-review-details-1280x720.png')});
+    await page.locator('#agent-update-details-close').click();await expect(page.locator('#agent-update-details-panel')).toBeHidden();expect(await stage.boundingBox()).toEqual(reviewStage);expect(await zoom.innerText()).toBe(reviewZoom);
+    await page.locator('#agent-update-details').click();await page.keyboard.press('Escape');await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-dialog')).toBeVisible();expect(await zoom.innerText()).toBe(reviewZoom);
+    await contained();await changedNodeVisible('Delivery service');
     await page.locator('#agent-update-current').click();await changedNodeVisible('Backend');
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
     await expect(page.locator('#agent-update-commit')).toBeDisabled();await contained();
-    await page.locator('#agent-update-proposed').click();await contained();await changedNodeVisible('Delivery service');
-    await page.locator('#agent-update-ledger-summary').click();
+    await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Current state');await expect(page.locator('#agent-update-ledger')).toHaveText('No coverage ledger yet.');
+    await page.locator('#agent-update-proposed').click();await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service');
     await view.locator('.reader-top-view[data-tab-view$="-brief"]').click();await expect(stage).toBeHidden();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
     await view.locator('.reader-top-view[data-tab-view$="-explore"]').click();await contained();
     await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+    await page.locator('#agent-update-open').click();await contained();
+    await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeHidden();await expect(page.locator('#agent-update-open')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
     await page.locator('#agent-update-open').click();await contained();
     await page.screenshot({path:info.outputPath('explore-review-ready.png')});
     await page.setViewportSize({width:1024,height:800});await contained();
@@ -1005,7 +1009,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeInViewport();
     await page.screenshot({path:info.outputPath('explore-review-narrow-desktop.png')});
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
-    await page.setViewportSize({width:1440,height:1000});
+    await page.setViewportSize({width:1440,height:900});await contained();await page.screenshot({path:info.outputPath('explore-review-default-1440x900.png')});
     await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
     await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
     await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
@@ -1070,8 +1074,34 @@ test('conflicting update preserves local edits and copies actionable feedback fo
     h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json');
     await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent update needs attention');await page.locator('#agent-update-open').click();
     await expect(page.locator('#agent-update-commit')).toBeDisabled();await expect(page.locator('#agent-update-feedback')).toHaveValue(/nodes\/a\/title/);
-    await page.screenshot({path:info.outputPath('agent-conflict-feedback.png')});
+    await expect(page.locator('#agent-update-title')).toHaveText('Preview — changes not applied');await expect(page.locator('#agent-update-issues')).toBeVisible();await expect(page.locator('#agent-update-return')).toBeInViewport();
+    await page.screenshot({path:info.outputPath('agent-review-conflict.png')});
     await page.locator('#agent-update-copy-feedback').click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('Reread .flowview-agent/state.json');
+    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');
+    await expect(page.locator('#src')).toHaveValue(human);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('an open review refreshes visibly and cannot accept the new version as the old review',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await copyRequest(page,'Rename Backend while preserving my other edits.');
+    const request=await h.read('request.json'),state=await h.read('state.json'),proposal=source.replace('"Backend"','"Delivery service"');
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposal);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nRenamed the delivery service and preserved the rest of the story.\n');
+    h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the delivery service');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    const human=source.replace('"Doorbell"','"Human camera"');
+    await page.evaluate(text=>{const src=document.getElementById('src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('go').click();},human);
+    await expect(page.locator('#agent-update-note')).toContainText('proposal changed while this preview was open');
+    await expect(page.locator('#agent-update-review-refresh')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeDisabled();
+    await expect(page.locator('#agent-update-view')).toContainText('Human camera');await expect(page.locator('#agent-update-view')).toContainText('Delivery service');
+    await page.screenshot({path:info.outputPath('agent-review-refreshed-1440x900.png')});
+    await page.locator('#agent-update-review-refresh').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).toBeHidden();await expect(page.locator('#agent-update-open')).toBeVisible();
+    await page.locator('#agent-update-open').click();await page.locator('#agent-update-discard').click();
     await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');
     await expect(page.locator('#src')).toHaveValue(human);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -1313,30 +1343,24 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review evidence without changing the diagram');
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
     await expect(page.locator('#agent-update-ledger')).toBeHidden();
+    const canvas=await page.locator('#agent-update-scroll').boundingBox();
+    await page.screenshot({path:info.outputPath('ledger-details-closed-preview.png')});
+    await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
     await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Changed in this update');
-    const collapsed=await page.locator('#agent-update-scroll').boundingBox();
-    await page.screenshot({path:info.outputPath('ledger-collapsed-preview.png')});
-    await page.locator('#agent-update-ledger-summary').focus();await page.keyboard.press('Enter');
-    await expect(page.locator('#agent-update-ledger')).toBeVisible();
-    const expanded=await page.locator('#agent-update-scroll').boundingBox(),ledger=await page.locator('#agent-update-ledger').boundingBox();
-    expect(expanded.height).toBeLessThan(collapsed.height);expect(expanded.height).toBeGreaterThan(200);
-    expect(ledger.height).toBeLessThanOrEqual(page.viewportSize().height*.24+1);
+    expect(await page.locator('#agent-update-scroll').boundingBox()).toEqual(canvas);
+    const ledger=await page.locator('#agent-update-ledger').boundingBox();
+    expect(ledger.height).toBeLessThanOrEqual(page.viewportSize().height*.42+1);
     await page.locator('#agent-update-ledger').focus();await page.keyboard.press('PageDown');
     await expect.poll(()=>page.locator('#agent-update-ledger').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
-    await page.mouse.move(ledger.x+ledger.width-3,ledger.y+ledger.height-3);await page.mouse.down();await page.mouse.move(ledger.x+ledger.width-3,ledger.y+ledger.height-63,{steps:5});await page.mouse.up();
-    await expect.poll(async()=> (await page.locator('#agent-update-ledger').boundingBox()).height).toBeLessThan(ledger.height-30);
     expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
     await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-ledger')).toHaveText(beforeLedger.trim());
     await expect(page.locator('#agent-update-ledger')).toBeVisible();
     await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Current state');
-    await page.locator('#agent-update-proposed').click();await page.screenshot({path:info.outputPath('paired-diagram-ledger-preview.png')});
+    await page.locator('#agent-update-proposed').click();await page.screenshot({path:info.outputPath('paired-diagram-ledger-details.png')});
     await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
-    await page.setViewportSize({width:640,height:600});
-    await page.locator('#agent-update-ledger-summary').focus();await page.keyboard.press('Enter');
-    await expect(page.locator('#agent-update-ledger')).toBeHidden();
+    await page.locator('#agent-update-details-close').click();await expect(page.locator('#agent-update-ledger')).toBeHidden();
     await expect(page.locator('#agent-update-commit')).toBeInViewport();
-    await page.screenshot({path:info.outputPath('ledger-collapsed-narrow-preview.png')});
-    await page.setViewportSize({width:1440,height:1000});
+    await page.setViewportSize({width:1440,height:900});
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
     await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
     const handwritten=source.replace('Doorbell','Handwritten after approval');await page.locator('#editor-tab-json').click();await page.locator('#src').fill(handwritten);await page.locator('#editor-tab-json').focus();

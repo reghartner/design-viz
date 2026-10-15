@@ -220,7 +220,9 @@ into the existing agent conversation; Copy never dispatches it through Monitor.
 If clipboard access is denied, select the prepared text and copy manually.
 **Send to Claude** in the Beta connection requires a connected folder and a live listener.
 Both modes review spec/ledger proposals through **Preview Agent Updates**.
-**Commit update** saves both artifacts as one Undo action; a Git commit remains
+The review fills the browser workspace, keeps Current/Proposed and decisions in a
+pinned bar, and puts its summary, ledger and JSON in **Details**. **Accept changes**
+saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).
 
 While a connected, registered request is active, an **Agent working** pill stays

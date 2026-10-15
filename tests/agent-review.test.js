@@ -59,20 +59,20 @@ test('review decoration can be disabled and reapplied after rendered content is 
   node.parent=sectionNode;c.workbenchAgentReviewDecorate(root,side,true);assert.equal(node.attrs['data-agent-change'],'added');
 });
 function uiHarness(options={}){
-  const ids=['banner','dialog','view','scroll','commit','current','proposed','source','ledger','ledger-summary','summary','note','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','highlights','immersive','change-added','change-removed','change-modified','change-status'];
+  const ids=['banner','dialog','view','scroll','commit','current','proposed','source','ledger','ledger-summary','summary','note','note-text','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','highlights','details','details-panel','details-close','review-refresh','change-added','change-removed','change-modified','change-status'];
   function element(id){
     const listeners={},classes=new Set(),attrs={};return {id,hidden:false,open:false,textContent:'',value:'',disabled:false,attrs,listeners,
       classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},
       addEventListener(type,fn){(listeners[type]||(listeners[type]=[])).push(fn);},removeEventListener(type,fn){listeners[type]=(listeners[type]||[]).filter(v=>v!==fn);},
       fire(type,event={preventDefault(){}}){(listeners[type]||[]).slice().forEach(fn=>fn.call(this,event));},setAttribute(k,v){attrs[k]=String(v);},getAttribute(k){return attrs[k]??null;},
-      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},replaceChildren(){},querySelectorAll(){return [];},focus(){},
+      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},replaceChildren(){},querySelectorAll(){return [];},focus(){},select(){},
       showModal(){this.open=true;},close(){this.open=false;}};
   }
   const elements={};ids.forEach(id=>elements['agent-update-'+id]=element(id));
   const observers=[];class Observer{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(){this.observed=true;}disconnect(){this.disconnected=true;}}
   const doc={defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
-  const pages=[],accepted=[];
-  const c={document:doc,navigator:{clipboard:{}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {destroy(){destroyed++;}};},
+  const pages=[],accepted=[],rejected=[];
+  const c={document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {destroy(){destroyed++;}};},
     initViewerExploreCanvas(ctl,view,opts){canvasOptions=opts;return {destroy(){canvasDestroyed++;}};}};
   vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
   let session;
@@ -86,19 +86,39 @@ function uiHarness(options={}){
   snapshot={current,source,currentLedger:'old',ledger:'new',review:{version:1,id:'p',requestId:'r',ok:true,summary:'Changed A',conflicts:[]}};
   if(options.current)snapshot.current=options.current;if(options.source)snapshot.source=options.source;
   if(options.ok===false)snapshot.review.ok=false;
-  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async()=>{}});
-  return {c,ui,elements,observers,pages,accepted,snapshot,session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
+  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async(message,version)=>rejected.push({message,version})});
+  return {c,ui,elements,observers,pages,accepted,rejected,get snapshot(){return snapshot;},replaceSnapshot(next){snapshot=next;},session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
 }
-test('review UI keeps highlight state through redraws, resets on reopen, and retires observers and renderers',()=>{
+test('review UI opens full-window with supporting details optional and retires redraws',()=>{
   const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
   assert.equal(h.counts().rendered,1);assert.equal(h.canvasOptions().initialContentsOpen,false);assert.deepEqual(plain(h.canvasOptions().presentation),{panelsHiddenWhenGraphVisible:true,overlayScale:.5});assert.equal(h.canvasOptions().forceFit,true);assert.equal(h.canvasOptions().refitOnResize,true);assert.deepEqual(plain(h.canvasOptions().fitInsets),{left:24,right:24,top:20,bottom:24});assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true');assert.equal(e['agent-update-commit'].disabled,false);
-  e['agent-update-immersive'].fire('click');assert.equal(e['agent-update-dialog'].classList.contains('agent-update-immersive'),true);
+  assert.equal(e['agent-update-details-panel'].hidden,true);e['agent-update-details'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);assert.equal(e['agent-update-details'].getAttribute('aria-expanded'),'true');assert.equal(h.counts().rendered,1,'opening details preserves the rendered review');
+  e['agent-update-dialog'].fire('cancel');assert.equal(e['agent-update-details-panel'].hidden,true);assert.equal(e['agent-update-dialog'].open,true,'Escape dismisses Details before closing the review');assert.equal(h.counts().rendered,1);
   e['agent-update-highlights'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'false');
   const firstObserver=h.observers[0];e['agent-update-current'].fire('click');assert.equal(firstObserver.disconnected,true);assert.equal(h.counts().rendered,2);
   assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'false','redraw preserves the user toggle');assert.equal(e['agent-update-commit'].disabled,true);
-  e['agent-update-close'].fire('click');assert.equal(h.observers.at(-1).disconnected,true);assert.equal(e['agent-update-dialog'].classList.contains('agent-update-immersive'),false);
-  e['agent-update-open'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true','each review opens with useful highlights');
+  e['agent-update-close'].fire('click');assert.equal(h.observers.at(-1).disconnected,true);
+  e['agent-update-open'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true','each review opens with useful highlights');assert.equal(e['agent-update-details-panel'].hidden,true,'details starts closed');
   h.ui.destroy();assert.equal(h.observers.at(-1).disconnected,true);assert.ok(h.counts().destroyed>=3);assert.ok(h.counts().canvasDestroyed>=3);
+});
+test('close and Escape keep a proposal pending, decline rejects it, and a refreshed version needs fresh review',()=>{
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();
+  e['agent-update-close'].fire('click');assert.deepEqual(h.rejected,[]);h.ui.open();
+  e['agent-update-dialog'].fire('cancel');assert.deepEqual(h.rejected,[]);h.ui.open();
+  e['agent-update-details'].fire('click');h.replaceSnapshot({...h.snapshot,review:{...h.snapshot.review,version:2},source:h.snapshot.source.replace('Changed','Refreshed')});h.ui.update(h.snapshot.review);
+  assert.equal(e['agent-update-details-panel'].hidden,false,'refresh preserves the open details drawer');
+  assert.equal(e['agent-update-review-refresh'].hidden,false);assert.equal(e['agent-update-commit'].disabled,true);
+  e['agent-update-commit'].fire('click');assert.deepEqual(h.accepted,[],'the newly refreshed version cannot be accepted as the old review');
+  e['agent-update-review-refresh'].fire('click');assert.equal(e['agent-update-commit'].disabled,false);e['agent-update-commit'].fire('click');
+  assert.deepEqual(h.accepted,[{version:2,source:h.snapshot.source}]);h.ui.destroy();
+  const decline=uiHarness();decline.ui.update(decline.review);decline.ui.open();decline.elements['agent-update-discard'].fire('click');
+  assert.deepEqual(decline.rejected,[{message:null,version:1}]);decline.ui.destroy();
+});
+test('clipboard denial keeps conflict revision actions mounted and exposes manual-copy help',async()=>{
+  const h=uiHarness({ok:false,clipboard:{writeText:()=>Promise.reject(Error('denied'))}}),e=h.elements;h.ui.update(h.review);h.ui.open();
+  e['agent-update-copy-feedback'].fire('click');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(e['agent-update-note'].hidden,false);assert.match(e['agent-update-note-text'].textContent,/Press .*C .* to copy the feedback/);
+  assert.equal(e['agent-update-review-refresh'].hidden,true);assert.deepEqual(h.rejected,[]);h.ui.destroy();
 });
 function topologySpec(id,diagram){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[section('main','Main',diagram)]}};}
 function topologyFixture(){
@@ -133,7 +153,7 @@ test('review resolves local exports without a Canon context and still requires a
     assert.equal(h.elements['agent-update-source'].value,source);h.ui.destroy();
   }
 });
-test('invalid topology, missing frozen context and missing resolver fail visibly without enabling Commit',()=>{
+test('invalid topology, missing frozen context and missing resolver fail visibly without enabling Accept',()=>{
   const f=topologyFixture(),invalid=plain(f.provider);invalid.page.sections[0].diagram.topologyExports.public.nodes.push('missing');
   for(const options of [
     {current:JSON.stringify(invalid),source:JSON.stringify(invalid)},

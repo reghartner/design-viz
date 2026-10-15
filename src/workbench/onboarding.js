@@ -55,7 +55,7 @@ function createWorkbenchPracticeAgent(example){
           if(!review || review.review.version!==version)return;
           var result=opts.apply(review.source,review.expected,{id:'practice-update',summary:review.review.summary,ledger:review.ledger});
           if(!result.ok)throw Error(result.error || 'Practice update could not be applied');
-          review=null;paint({review:null,pending:null,status:'Practice update committed. Undo restores the diagram and ledger together.'});
+          review=null;paint({review:null,pending:null,status:'Practice update accepted. Undo restores the diagram and ledger together.'});
         },
         rejectReview:async function(){review=null;paint({review:null,pending:null});},
         send:async function(){return {id:'practice-request',sessionId:'practice',connectionId:'practice'};},
@@ -196,8 +196,8 @@ function workbenchPracticeLessons(chapter){
       step('instructions','#folder-agent-guide-review','Review, then copy the instructions','Read the connection instructions before copying them into your agent. The real instructions identify your folder and files. This practice copy stays inside the tour.'),
       step('conversation','#practice-agent-window','Continue in your agent’s app','This is an illustrative second window, representing your own agent. Paste the setup instructions, explain the story, answer questions, and ask it to submit an update. Flowview does not supply or launch the agent.'),
       step('pending','#agent-update-banner','A proposed update arrives','The workbench has a pending update. Your accepted diagram is unchanged. Preview Agent Updates opens the proposed diagram and its coverage ledger.'),
-      step('preview','#agent-update-dialog','Compare the current and proposed story','Switch Current state and Proposed state, use the change highlights and counts, or open Full preview for a large diagram. Inspect the coverage ledger and rendered story. Commit update accepts the diagram and ledger together; a Git commit is separate.'),
-      step('commit','#agent-update-dialog','Commit when the story is right','Try Commit update, or choose Next to commit this practice update. The spec and coverage ledger become one undoable change. Nothing is written to a real folder.'),
+      step('preview','#agent-update-dialog','Compare the current and proposed story','The preview fills the browser workspace. Switch Current and Proposed, use the change highlights and counts, and open Details for the summary, coverage ledger and JSON. Accept changes saves the diagram and ledger together; a Git commit is separate.'),
+      step('commit','#agent-update-dialog','Accept when the story is right','Try Accept changes, or choose Next to accept this practice update. The spec and coverage ledger become one undoable change. Nothing is written to a real folder.'),
       step('undo','#undo-builder','You remain in control','Undo restores the spec and coverage ledger together. Redo reapplies the accepted update. Review each proposal before accepting it.'),
       step('refine','#practice-agent-window','Ask for the next change','Keep working in the same agent conversation: “Show what the resident sees when the internet is down.” You can make that request more precise with selections in the workbench.'),
       step('selection','#workbench-workspace','Select exactly what you mean','Select a node, connection, step, or panel. Use Shift to select several items. The selection gives your agent precise references alongside the active view and step.'),

@@ -3,8 +3,12 @@
 Choose **Add → Text** for a plain canvas text box in Diagram or Explore. Double-click
 the text, or focus it and press Enter, to edit using the normal text caret,
 selection and clipboard. Enter inserts a newline, Ctrl/Command+Enter saves,
-Escape cancels, and clicking away saves. Inspect offers bundled font families,
-font size, bold, italic, underline, text color, alignment and width. Drag the box
+Escape cancels, and clicking away saves. Select a text box for the compact
+font, size, Bold and Italic toolbar beside it; Inspect can stay closed. Formatting
+applies to the whole box. While typing, toolbar controls keep your caret and
+selection; text and formatting save together as one Undo, or Escape cancels both.
+Tab from the text reaches the toolbar. Inspect offers the same formatting plus
+underline, text color, alignment and width. Drag the box
 to move it or its selected bottom-right corner to resize. Text wraps and the
 box grows vertically so all lines remain visible. Each edit or gesture has one
 Undo. Copy, duplicate, save and reopen preserve the text and formatting.

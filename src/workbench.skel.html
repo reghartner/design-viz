@@ -145,7 +145,7 @@
       <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
       <button type="button" role="tab" id="editor-tab-layers" aria-controls="editor-layers" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>Layers</button>
       <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
-      <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
+      <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Find objects</button>
       <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">{}</span>JSON</button>
       <button type="button" role="tab" id="editor-tab-file" aria-controls="editor-file" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>File</button>
     </nav>
@@ -255,12 +255,12 @@
       </details>
       </div>
       <div class="editor-pane" id="editor-outline" role="tabpanel" aria-labelledby="editor-tab-outline" hidden>
-        <div class="editor-pane-heading"><h2>Document outline</h2><p>Find an element, then inspect its properties.</p><button class="bbtn" id="outline-document-settings" type="button">Document settings</button> <button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
+        <div class="editor-pane-heading"><h2>Find objects</h2><p>Search names or IDs across all tabs and sections, then Inspect selection. Contents navigates sections and Views; Layers shows graph placement and controls position locks in the active section.</p><button class="bbtn" id="outline-document-settings" type="button">Document settings</button> <button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
       <details class="ssec" id="sec-outline" open>
-        <summary>document outline <small>⌘/Ctrl K</small></summary>
-        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
+        <summary>search objects <small>⌘/Ctrl K</small></summary>
+        <input class="fctl" type="search" id="outline-search" aria-label="Find objects" placeholder="Find a node, panel, step, or section…">
         <div class="outline-status" id="outline-status" role="status"></div>
-        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
+        <nav class="outline-results" id="outline-results" aria-label="Object search results"></nav>
       </details>
       </div>
       <div class="editor-pane" id="editor-json" role="tabpanel" aria-labelledby="editor-tab-json" hidden>

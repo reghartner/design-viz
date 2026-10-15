@@ -4,7 +4,7 @@ import {editorSpec} from '../fixtures/editor-spec.mjs';
 function story(title){const raw=editorSpec();raw.page.title=title;raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');return JSON.stringify(raw,null,2);}
 async function rename(page,value){
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
-  await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill(value);await title.press('Enter');
 }
 async function openFile(page,source){await page.locator('#file-input').setInputFiles({name:'story.json',mimeType:'application/json',buffer:Buffer.from(source)});await expect(page.locator('#src')).toHaveValue(source);}

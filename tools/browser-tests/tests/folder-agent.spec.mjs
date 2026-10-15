@@ -650,7 +650,7 @@ test('byte-identical Resume clears old history and a late owner change refuses w
     await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await disconnect(page);
     await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
-    await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+    await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
     const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Edit before identical Resume');await title.press('Enter');
     await expect(page.locator('#undo-builder')).toBeEnabled();await page.locator('#undo-builder').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#redo-builder')).toBeEnabled();

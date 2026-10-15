@@ -95,7 +95,7 @@ test('first prose from Add or section inspector creates visible notes and keeps 
   for(const [route,kind] of [['add','paragraph'],['section','paragraph'],['add','bullet'],['section','bullet']]){
     await closeTools(page);await expect(notes(page)).toHaveCount(0);await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
     if(route==='section'){
-      await prepareEditorSurface(page);await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Delivery explained');await page.locator('#outline-results .outline-item').filter({hasText:'section · Delivery explained'}).click();await page.locator('#outline-inspect').click();
+      await prepareEditorSurface(page);await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Delivery explained');await page.locator('#outline-results .outline-item').filter({hasText:'Delivery explained'}).click();await page.locator('#outline-inspect').click();
       await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
       await page.locator('#guide').getByRole('button',{name:kind==='paragraph'?'Add an introduction':'Add first point',exact:true}).click();
     }else{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();}

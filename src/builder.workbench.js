@@ -27,37 +27,38 @@ function builderOutline(raw, query){
     var ti = rec.section.indexOf('tabs');
     var tab = ti >= 0 ? {block: rec.section[ti - 1], tab: rec.section[ti + 1]} : null;
     var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
-    var context = (parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1));
-    function add(kind, label, extra){
+    var context = (parent ? (parent.label || 'Tab ' + (tab.tab + 1)) + ' / ' : '') + (sec.heading || 'Untitled section') + ' · Section ' + (section + 1);
+    function add(kind, label, extra, detail){
       var target = Object.assign({section: section, kind: kind}, extra || {});
       var path = builderTargetPath(raw, target);
-      var haystack = (kind + ' ' + label + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
+      detail = kind + (detail ? ' · ' + detail : '');
+      var haystack = (kind + ' ' + label + ' ' + detail + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
       if (terms.every(function(term){ return haystack.indexOf(term) >= 0; }))
-        entries.push({label: label, context: context, target: target, path: path, tab: tab});
+        entries.push({label: label, detail: detail, context: context, target: target, path: path, tab: tab});
     }
     add('section', sec.heading || 'Section ' + (section + 1));
     function bulletEntries(items,ancestry){
       (Array.isArray(items)?items:[]).forEach(function(item,i){
         var address=ancestry.concat([i]),label=typeof item==='string'?item:item && item.text;
         if(item==null)return;
-        add('bullet',address.map(function(n){return n+1;}).join('.')+' · '+(label || 'Untitled point'),{index:address[0],bulletPath:address});
+        add('bullet',label || 'Untitled point',{index:address[0],bulletPath:address},address.map(function(n){return n+1;}).join('.'));
         if(item && Array.isArray(item.sub))bulletEntries(item.sub,address);
       });
     }
     bulletEntries(sec.bullets,[]);
     sectionContracts(sec).forEach(function(rec){
-      add('contract',rec.value.title || 'On the wire',{card:rec.key});
+      add('contract',rec.value.title || 'On the wire',{card:rec.key},(rec.key === 'legacy' ? 'legacy card' : 'card ' + (Number(rec.key)+1)) + (rec.value.id ? ' · ' + rec.value.id : ''));
     });
-    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || (d.nodes[id] || {}).text || id) + ' · ' + id, {id: id}); });
-    Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    Object.keys(d.nodes || {}).forEach(function(id){ add('node', (d.nodes[id] || {}).title || (d.nodes[id] || {}).text || id, {id: id}, id); });
+    Object.keys(d.groups || {}).forEach(function(id){ add('group', (d.groups[id] || {}).title || id, {id: id}, id); });
     (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
-      if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
+      if (e) add('edge', e.label || e.from + ' → ' + e.to, {index: index}, (index + 1) + ' · ' + e.from + ' → ' + e.to);
     });
     (Array.isArray(d.panels) ? d.panels : []).forEach(function(p, index){
-      if (p) add('panel', (p.title || p.id) + ' · ' + p.type + ' · ' + p.id, {index: index});
+      if (p) add('panel', p.title || p.id || 'Untitled panel', {index: index}, p.type + ' · ' + p.id);
     });
     (Array.isArray(d.steps) ? d.steps : []).forEach(function(s, index){
-      if (s) add('step', (index + 1) + '. ' + (s.text || s.id || 'Untitled step'), {index: index});
+      if (s) add('step', s.text || s.id || 'Untitled step', {index: index}, (index + 1) + (s.id ? ' · ' + s.id : ''));
     });
   });
   return entries;
@@ -957,13 +958,22 @@ function initWorkbenchBuilder(opts){
     var indexedText = session.text();
     var entries;
     try { entries = builderOutline(JSON.parse(session.text()), outlineSearch.value); }
-    catch (ex){ outlineStatus.textContent = 'Fix the JSON source to browse its outline.'; return; }
+    catch (ex){ outlineStatus.textContent = 'Fix the JSON source to find objects.'; return; }
     outlineStatus.textContent = entries.length ? Math.min(entries.length, 200) + ' of ' + entries.length + ' items' : 'No matching items';
+    var group, groupSection;
     entries.slice(0, 200).forEach(function(entry){
+      if (groupSection !== entry.target.section){
+        groupSection = entry.target.section;
+        group = document.createElement('section'); group.className = 'outline-group';
+        var heading = document.createElement('h3');
+        heading.id = 'outline-section-' + groupSection; heading.textContent = entry.context;
+        group.setAttribute('aria-labelledby', heading.id); group.appendChild(heading);
+        outlineResults.appendChild(group);
+      }
       var button = document.createElement('button');
       button.type = 'button'; button.className = 'outline-item';
-      var title = document.createElement('span'); title.textContent = entry.target.kind + ' · ' + entry.label;
-      var sub = document.createElement('small'); sub.textContent = entry.context;
+      var title = document.createElement('span'); title.textContent = entry.label;
+      var sub = document.createElement('small'); sub.textContent = entry.detail;
       button.appendChild(title); button.appendChild(sub);
       button.title = builderPathString(entry.path);
       outlineLife.listen(button,'click', function(){
@@ -993,14 +1003,15 @@ function initWorkbenchBuilder(opts){
         }
         if (el) el.scrollIntoView({block: 'nearest', behavior: 'auto'});
       });
-      outlineResults.appendChild(button);
+      group.appendChild(button);
     });
   }
   if (outlineSearch){
     life.listen(outlineSearch,'input', refreshOutline);
     life.listen(outlineSearch,'keydown', function(ev){
-      if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && outlineResults.firstChild){
-        ev.preventDefault(); outlineResults.firstChild.focus();
+      var firstResult = outlineResults.querySelector('.outline-item');
+      if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && firstResult){
+        ev.preventDefault(); firstResult.focus();
       }
     });
     var outlineTimer;

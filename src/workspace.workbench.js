@@ -111,12 +111,12 @@ function initWorkbenchReaderPreview(opts){
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;
-  var names=['agent','brief','inspect','layers','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',layers:'Layers',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
+  var names=['agent','brief','inspect','layers','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',layers:'Layers',steps:'Story steps',outline:'Find objects',json:'JSON source',file:'Project files'};
   var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false,placements={},selectionFrame=0,selectionKey=null,dockFrame=0,dockRevision=0;
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
   var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0,revealFreshInspect=!hasSaved;
   document.body.classList.add('workspace-canvas');
-  document.querySelector('.workbench-header').addEventListener('keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){var detail=ev.target.closest('details[open]');if(detail){ev.preventDefault();detail.open=false;detail.querySelector('summary').focus();}}});
+  document.querySelector('.workbench-header').addEventListener('keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ['z','k'].includes(ev.key.toLowerCase())))ev.stopPropagation();if(ev.key==='Escape'){var detail=ev.target.closest('details[open]');if(detail){ev.preventDefault();detail.open=false;detail.querySelector('summary').focus();}}});
   document.addEventListener('toggle',function(ev){
     var selector='.workbench-header details,#workspace-canvas-tools,#docview .explore-navigation details';
     if(!ev.target.matches(selector))return;

@@ -154,10 +154,10 @@ test('window resize preserves the JSON draft and the live preview DOM',async({pa
   await sourceHandle.dispose();await preview.dispose();
 });
 
-test('outline shortcut and selection stay in Outline; explicit inspection opens the selected object',async({page,server})=>{
+test('object search shortcut and selection stay in Find objects; explicit inspection opens the selected object',async({page,server})=>{
   await open(page,server);await page.locator('#editor-tab-json').click();
   await page.keyboard.press('ControlOrMeta+k');await expect(page.locator('#editor-outline')).toBeVisible();await expect(page.locator('#outline-search')).toBeFocused();
-  await page.locator('#outline-search').fill('Doorbell');await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();
+  await page.locator('#outline-search').fill('Doorbell');await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();
   await expect(page.locator('#editor-outline')).toBeVisible();await page.locator('#outline-inspect').click();
   const title=page.locator('#guide').getByLabel('Name',{exact:true});await expect(title).toHaveValue('Doorbell');
   await title.fill('Front camera');await title.press('Enter');await expect(title).toBeFocused();

@@ -53,7 +53,7 @@ test('panel history survives source rerenders and follows source edits in both d
   const movedSource=await page.locator('#src').inputValue();expect(movedSource).not.toBe(source);
   const oldPanel=await panel.elementHandle();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
-  await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Renamed camera');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);expect(await oldPanel.evaluate(el=>el.isConnected)).toBe(false);
   await closeTools(page);await expect.poll(()=>geometry(panel)).toEqual(moved);
@@ -95,7 +95,7 @@ test('drill-down panel geometry survives child refresh and stays scoped when clo
   await page.keyboard.press('ControlOrMeta+Shift+z');await expect.poll(()=>geometry(panel)).toEqual(resized);
   const oldPanel=await panel.elementHandle();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
-  await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Updated overview camera');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(original);expect(await oldPanel.evaluate(el=>el.isConnected)).toBe(false);
   await closeTools(page);await expect(detail).toBeVisible();await expect.poll(()=>geometry(panel)).toEqual(resized);

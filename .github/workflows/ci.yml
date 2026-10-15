@@ -181,7 +181,20 @@ jobs:
         run: python3 tools/build.py
       # *.test.js glob keeps local (any node >=20) and CI invocations identical;
       # a bare directory arg behaves differently across node majors.
-      - run: node --test tests/*.test.js
+      - name: Node tests with structured diagnostics
+        run: >-
+          node --test
+          --test-reporter=tap --test-reporter-destination=stdout
+          --test-reporter=junit --test-reporter-destination="${{ runner.temp }}/node-test-results.xml"
+          tests/*.test.js
+      - name: Upload Node test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: node-test-results
+          path: ${{ runner.temp }}/node-test-results.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
   examples-build:
     runs-on: ubuntu-latest

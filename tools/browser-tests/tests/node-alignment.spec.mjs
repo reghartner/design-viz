@@ -115,7 +115,7 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await expect(toolbarFit).toBeDisabled();await expect(toolbarFit).toHaveAttribute('title',/only in Explore/);await expect(inspectorFit).toBeDisabled();await expect(inspectorFit).toHaveAttribute('title',/only in Explore/);
   await expect(page.locator('#guide').getByRole('button',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(0);
   await node(page,'b').click({button:'right'});await expect(menu(page)).toBeVisible();await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
-  for(const name of ['Inspect','Delete','Duplicate','Align horizontally','Align vertically'])await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeVisible();
+  for(const name of ['Inspect','Lock selected positions','Delete','Duplicate','Align horizontally','Align vertically'])await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeVisible();
   await expect(menu(page).getByRole('menuitem',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(2);
   const menuFit=menu(page).getByRole('menuitem',{name:/^Fit selection/});await expect(menuFit).toHaveAttribute('aria-disabled','true');await expect(menuFit).toContainText('only in Explore');
   await page.screenshot({path:'/tmp/standard-node-actions-1280.png'});await info.attach('Standard node actions 1280',{body:await page.screenshot(),contentType:'image/png'});
@@ -126,7 +126,7 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await closeTools(page);await node(page,'c').click({button:'right'});await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);await expect(node(page,'c')).toHaveClass(/dv-sel/);
   await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Stay');
   await node(page,'c').focus();await page.keyboard.press('Shift+F10');await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();
-  await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Duplicate',exact:true})).toBeFocused();await page.keyboard.press('Enter');
+  for(const name of ['Lock position','Delete','Duplicate']){await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeFocused();}await page.keyboard.press('Enter');
   changed=await source(page);expect(Object.keys((await diagram(page)).nodes)).toHaveLength(5);await history(page,aligned,changed);const duplicated=changed;
 
   await closeTools(page);await node(page,'c').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();changed=await source(page);expect((await diagram(page)).nodes.c).toBeUndefined();await history(page,duplicated,changed);

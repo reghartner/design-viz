@@ -39,6 +39,16 @@ function repositoryUrl(value, file) {
     throw companyError(file, 'repository must be an https:// repository root such as ' + EXAMPLE_REPOSITORY);
   return url.origin + '/' + segments.join('/');
 }
+function backstageBaseUrl(value, file) {
+  const message = 'backstage.baseUrl must be an absolute http(s) URL without credentials, query, fragment, whitespace or control characters';
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value) || /[\s\u0000-\u001f\u007f-\u009f\\?#]/.test(value))
+    throw companyError(file, message);
+  let url;
+  try { url = new URL(value); } catch { throw companyError(file, message); }
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password)
+    throw companyError(file, message);
+  return url.origin + url.pathname.replace(/\/+$/, '');
+}
 function inside(directory, file) {
   const relative = path.relative(directory, file);
   return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -92,7 +102,7 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
@@ -103,6 +113,13 @@ function companyConfig(root = sourceRoot) {
     if (typeof raw.revision !== 'string' || !raw.revision.trim() || /[\s?#]/.test(raw.revision) || raw.revision.length > 200)
       throw companyError(file, 'revision must be a branch, tag or commit without spaces, ? or #');
     config.revision = raw.revision;
+  }
+  if (Object.hasOwn(raw, 'backstage')) {
+    if (!raw.backstage || typeof raw.backstage !== 'object' || Array.isArray(raw.backstage))
+      throw companyError(file, 'backstage must be an object with baseUrl');
+    const extra = Object.keys(raw.backstage).filter(key => key !== 'baseUrl');
+    if (extra.length) throw companyError(file, 'unknown backstage field ' + extra.join(', ') + '; allowed: baseUrl');
+    config.backstage = {baseUrl: backstageBaseUrl(raw.backstage.baseUrl, file)};
   }
   if (raw.brand != null) {
     if (typeof raw.brand !== 'string' || !raw.brand.trim()) throw companyError(file, 'brand must be a path relative to company.json');
@@ -124,6 +141,10 @@ function companyConfig(root = sourceRoot) {
     }
   }
   return config;
+}
+// Only public authoring context travels into prompts and the offline kit.
+function companyAgentContext(config = companyConfig()) {
+  return config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {};
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,
@@ -187,6 +208,8 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
       source = source.replace('/* @auto-arrange-worker */ ""', () => JSON.stringify(worker).replace(/</g, '\\u003c'));
     }
     if (substitute) source = companyText(source, file, company);
+    if (file === 'workbench/agent-chat.js' && substitute)
+      source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
     if (file === 'company-brand.config.js' && company && company.brand) source = companyBrandSource(company.brand);
     if (file === 'compatibility.js' && substitute) {
       const marker = '/* @panel-features */ {}';
@@ -329,12 +352,13 @@ function entrypointAssets(name, root = sourceRoot) {
   }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
-module.exports = { companyDir, companyConfig, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
+module.exports = { companyDir, companyConfig, companyAgentContext, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
   panelAssets, readStyles, fontAssets, fontCss, entrypointAssets };
 if (require.main === module) {
   const [mode, ...names] = process.argv.slice(2);
   if (mode === '--assets') process.stdout.write(JSON.stringify(panelAssets()));
   else if (mode === '--company' && !names.length) process.stdout.write(JSON.stringify(companyConfig()));
+  else if (mode === '--agent-context' && !names.length) process.stdout.write(JSON.stringify(companyAgentContext()));
   else if (mode === '--styles' && names.length === 1) process.stdout.write(readStyles(names[0]));
   else if (mode === '--sources' && names.length) process.stdout.write(composeSources(names));
   else if (mode === '--files' && names.length === 1) process.stdout.write(JSON.stringify(sourceFiles(names[0])));
@@ -342,5 +366,5 @@ if (require.main === module) {
   else if (mode === '--entry-assets' && names.length === 1) process.stdout.write(JSON.stringify(entrypointAssets(names[0])));
   else if (mode === '--font-css' && names.length === 1) process.stdout.write(fontCss(names[0]));
   else if (mode === '--module' && names.length === 2) process.stdout.write(moduleSource(names[0],names[1]));
-  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --styles STYLESHEET');
+  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --agent-context | --styles STYLESHEET');
 }

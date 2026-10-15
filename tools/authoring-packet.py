@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
-from company_overlay import contract_text
+from company_overlay import company_agent_context, contract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -176,6 +176,13 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         if expanded == features: break
         features = expanded
     parts, provenance, loaded = [], [], {}
+    company_context = company_agent_context(ROOT)
+    if company_context.get('backstage'):
+        parts.append('## Company Backstage context\n\nBackstage base URL: ' +
+                     json.dumps(company_context['backstage']['baseUrl']) +
+                     '\n\nThis is the public Backstage UI base URL, including any deployment subpath. '
+                     'Use it as link context; it does not identify a catalog entity, supply authentication '
+                     'or grant access. Preserve explicit entity references and source URLs.')
     def add(path, heading=None, content=None):
         if path not in loaded: loaded[path] = read_document(path)
         text = content if content is not None else section(loaded[path], heading) if heading else loaded[path].strip()
@@ -227,6 +234,8 @@ def generate(panel_names, feature_names, mode='new', raw=None):
                 'selected': {'panels': sorted(panels), 'features': sorted(features)}, 'provenance': provenance,
                 'size': {'unit': 'document size, not model tokens or cost savings', 'characters': len(document), 'bytes': len(document.encode()),
                          'baselinePaths': baseline_paths, 'baselineCharacters': len(baseline), 'baselineBytes': len(baseline.encode())}}
+    if company_context:
+        metadata['companyContext'] = company_context
     return document, metadata
 
 

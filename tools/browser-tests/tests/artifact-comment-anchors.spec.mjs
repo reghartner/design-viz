@@ -38,9 +38,9 @@ function stubClaude(){
  const comments=Object.freeze({customAnchors(callbacks){log.callbacks=callbacks;return Promise.resolve(controller);}});
  window.claude=Object.freeze({use:name=>Promise.resolve(name==='comments'?comments:null)});
 }
-async function open(page,server){
+async function open(page,server,spec=raw){
  const input=path.join(server.root,'artifact-comments.json'),output=path.join(server.root,'artifact-comments.html');
- await writeFile(input,JSON.stringify(raw));
+ await writeFile(input,JSON.stringify(spec));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
  await page.goto(server.origin+'/artifact-comments.html');
  return page.locator('#docview');
@@ -134,6 +134,41 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
  await expect(page.locator('html')).not.toHaveClass(/dv-commenting/);
  await ringLine.click();
  expect(await composeCount(page)).toBe(2);
+});
+
+// (g) One section shown by two Views, in a different position in each: a
+// comment made in one View is saved with a path naming that View, so it pins
+// only there and "Go to" switches back to it.
+test('a section shared by two Views keeps separate comments per View',async({page,server})=>{
+ await page.addInitScript(stubClaude);
+ const shared=JSON.parse(JSON.stringify(raw)),overview=shared.page.blocks[0].tabs[0];
+ overview.views=[{id:'sequence',name:'Sequence',presentation:'standard',sections:['ring']},{id:'both',name:'Both',presentation:'standard',sections:['reply','ring']}];
+ const root=await open(page,server,shared),viewStrip=root.locator('.explore-navigation').first().locator('.reader-view-strip');
+ const bullet=root.locator('#section-ring li[data-dv-bullet="2"]'),viewTab=name=>viewStrip.getByRole('tab',{name,exact:true});
+ await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);
+ await page.evaluate(()=>window.__comments.callbacks.mode(true));
+ await bullet.click();
+ await expect.poll(()=>composeCount(page)).toBe(1);
+ await viewTab('Both').click();
+ await expect(root.locator('#section-reply')).toBeVisible();
+ await bullet.click();
+ await expect.poll(()=>composeCount(page)).toBe(2);
+ const [inSequence,inBoth]=[(await composed(page,0)).anchor,(await composed(page,1)).anchor];
+ expect(inSequence).not.toBe(inBoth);
+ expect((await composed(page,0)).opts.label).toMatch(/^Tab: Overview › View: Sequence › /);
+ expect((await composed(page,1)).opts.label).toMatch(/^Tab: Overview › View: Both › /);
+ await page.evaluate(([a,b])=>window.__comments.callbacks.threads([{id:'v-sequence',anchor:a,resolved:false,active:false},{id:'v-both',anchor:b,resolved:false,active:false}]),[inSequence,inBoth]);
+ await expect.poll(()=>placedKeys(page)).toEqual(['v-both']);
+ await page.evaluate(()=>window.__comments.callbacks.reveal('v-sequence'));
+ await expect(viewTab('Sequence')).toHaveAttribute('aria-selected','true');
+ await expect(root.locator('#section-reply')).toBeHidden();
+ await expect(bullet).toBeInViewport();
+ await expect.poll(()=>placedKeys(page)).toEqual(['v-sequence']);
+ // "Go to" on the other comment switches back to its View.
+ await page.evaluate(()=>window.__comments.callbacks.reveal('v-both'));
+ await expect(viewTab('Both')).toHaveAttribute('aria-selected','true');
+ await expect(root.locator('#section-reply')).toBeVisible();
+ await expect.poll(()=>placedKeys(page)).toEqual(['v-both']);
 });
 
 // (f) Without the capability the page is unchanged (step-comment-anchor.spec.mjs covers the caption).

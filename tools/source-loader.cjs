@@ -40,8 +40,8 @@ function repositoryUrl(value, file) {
   return url.origin + '/' + segments.join('/');
 }
 function backstageBaseUrl(value, file) {
-  const message = 'backstage.baseUrl must be an absolute http(s) URL without credentials, query, fragment or whitespace';
-  if (typeof value !== 'string' || !/^https?:\/\//i.test(value) || /[\s\u0000-\u001f\u007f\\?#]/.test(value))
+  const message = 'backstage.baseUrl must be an absolute http(s) URL without credentials, query, fragment, whitespace or control characters';
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value) || /[\s\u0000-\u001f\u007f-\u009f\\?#]/.test(value))
     throw companyError(file, message);
   let url;
   try { url = new URL(value); } catch { throw companyError(file, message); }

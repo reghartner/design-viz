@@ -121,6 +121,10 @@ test('Backstage context validates URL structure, preserves subpaths and reaches 
     write('company.json',{version:1,backstage:value});
     assert.throws(()=>loader.companyConfig(),/backstage/,JSON.stringify(value));
   }
+  for(let code=0x80;code<=0x9f;code++){
+    write('company.json',{version:1,backstage:{baseUrl:'https://portal.example/'+String.fromCharCode(code)+'team'}});
+    assert.throws(()=>loader.companyConfig(),/backstage\.baseUrl.*control characters/,'C1 control U+'+code.toString(16));
+  }
   const identity={sessionId:'session',connectionId:'connection'};
   for(const [input,expected] of [
     ['https://PORTAL.example/','https://portal.example'],

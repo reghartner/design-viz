@@ -225,7 +225,7 @@ test('Canon edit and browser Back retain the canonical owner View and its select
   const data={version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
   const reader=page.locator('#canon-reader'),navigation=reader.locator(':scope>.explore-navigation');
-  await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await navigation.getByRole('button',{name:'Section C',exact:true}).click();
+  await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await navigation.locator('.reader-tree-sections[data-reader-view="explore-bc"]').getByRole('button',{name:'Section C',exact:true}).click();
   await expect(reader.locator('#section-c')).toBeVisible();await expect(reader.locator('#section-b')).toBeHidden();
   expect(await page.evaluate(()=>history.state.flowviewWorkbenchEntry.readerTarget)).toMatchObject({d:'c',v:'explore-bc'});
   await page.locator('#canon-reader-edit').click();

@@ -54,7 +54,7 @@ test('reader canvas follows same-view hash navigation and diagram button target'
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 0');
   await page.evaluate(()=>{location.hash='d=story1&v=service-flow';});
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 1');
-  await page.getByRole('button',{name:'Story 0',exact:true}).click();
+  await nav(page).locator('.reader-tree-sections[data-reader-view="service-flow"]').getByRole('button',{name:'Story 0',exact:true}).click();
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 0');
   await expect.poll(()=>new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('story0');
   await nav(page).getByRole('button',{name:'Home story',exact:true}).click();

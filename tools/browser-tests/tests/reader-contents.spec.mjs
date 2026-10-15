@@ -9,8 +9,11 @@ function story(skin='pastel'){
   return {page:{title:'Contents acceptance',skin,sections:[{tabs:[{label:'Product journey',defaultView:'full',views:[{id:'full',name:'Full story',presentation:'standard',sections:['build','review','backstage']},{id:'explore',name:'Explore story',presentation:'explore',sections:['build','review','backstage']},{id:'subset',name:'Review + Backstage',presentation:'explore',sections:['backstage','review']}],sections:[section('build','Turn a doorbell story into a reviewable draft'),section('review','Decide what becomes the accepted diagram'),section('backstage','Find the right workspace in Backstage')]},{label:'Reference',sections:[section('reference','Reference material')]}]}]}};
 }
 async function open(page,server,skin='pastel'){
-  const input=path.join(server.root,'contents.json'),output=path.join(server.root,'contents.html');await writeFile(input,JSON.stringify(story(skin)));
-  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);await page.goto(server.origin+'/contents.html');return page.locator('#docview');
+  return openRaw(page,server,story(skin));
+}
+async function openRaw(page,server,raw,name='contents'){
+  const input=path.join(server.root,name+'.json'),output=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);await page.goto(server.origin+'/'+name+'.html');return page.locator('#docview');
 }
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
@@ -29,6 +32,21 @@ test('Contents preserves Standard stacks, ordered Explore members and state thro
   await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:'Zoom in',exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-page-label')).toHaveText('Page 3 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+});
+
+test('Standard Contents exposes ordered section headlines and routes mouse and keyboard without collapsing the stack',async({page,server})=>{
+  const raw=story(),tab=raw.page.sections[0].tabs[0];tab.defaultView='standard-subset';tab.views.push({id:'standard-subset',name:'Backstage + Review',presentation:'standard',sections:['backstage','review']});
+  const root=await openRaw(page,server,raw,'standard-headlines'),headlines=root.locator('.reader-tree-sections[data-reader-view="standard-subset"]');
+  await expect(headlines.getByRole('button')).toHaveText(['Find the right workspace in Backstage','Decide what becomes the accepted diagram']);
+  await expect(root.locator('.reader-tree-sections[data-reader-view="explore"]')).toHaveCount(0);
+  await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
+  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
+  const exploreRow=root.locator('.reader-tree-view[data-tab-view="explore"]').locator('..');await exploreRow.getByRole('button',{name:'Expand Explore story',exact:true}).click();await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
+  await root.locator('.reader-tree-tab').getByText('Reference',{exact:true}).click();const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');
 });
 
 for(const width of [1440,390,320,286])test('Contents geometry, overlay and bounded theme menu at '+width,async({page,server})=>{
@@ -55,7 +73,9 @@ test('native Contents themes and destruction are isolated between sibling hosts'
   await writeFile(path.join(server.root,'contents-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'contents-native.html'),'<style>body{margin:0;display:flex}.host{width:50vw;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><div id="two" class="host"></div><script type="module">import {mountNativeViewer} from "./contents-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/contents-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.one=mount(document.querySelector('#one'),raw);window.two=mount(document.querySelector('#two'),raw);},story());
-  const one=page.locator('#one'),two=page.locator('#two');await choose(one,'explore');await one.locator('.reader-theme-menu>summary').click();await one.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(one.locator('.docview')).toHaveClass(/sk-rose/);await expect(two.locator('.docview')).not.toHaveClass(/sk-rose/);
+  const one=page.locator('#one'),two=page.locator('#two'),standard=one.locator('.reader-tree-sections[data-reader-view="full"]');await expect(standard.getByRole('button')).toHaveCount(3);await standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true})).toHaveAttribute('aria-current','page');await expect(one.locator('.doc-sec:visible')).toHaveCount(3);
+  const nativeHeading=await one.locator('#section-backstage .sec-h').boundingBox(),nativeNav=await one.locator('.reader-navigation').boundingBox(),nativeHost=await one.boundingBox();expect(await one.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(nativeHeading.y).toBeGreaterThanOrEqual(nativeHost.y+nativeNav.height);expect(nativeHeading.y).toBeLessThanOrEqual(nativeHost.y+nativeHost.height*.6);expect(nativeHeading.y+nativeHeading.height).toBeLessThanOrEqual(nativeHost.y+nativeHost.height);
+  await choose(one,'explore');await one.locator('.reader-theme-menu>summary').click();await one.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(one.locator('.docview')).toHaveClass(/sk-rose/);await expect(two.locator('.docview')).not.toHaveClass(/sk-rose/);
   const canvas=await one.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.x+canvas.width).toBeLessThanOrEqual(900);
   const nativeRoot=await one.locator('flowview-root').boundingBox(),sidebar=await one.locator('.reader-contents').boundingBox();expect(sidebar.y+sidebar.height).toBe(nativeRoot.y+nativeRoot.height);
   await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next Page',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(one.locator('.reader-navigation')).toHaveCount(0);
@@ -152,6 +172,7 @@ test('reader metadata wraps within narrow content under wider fallback font metr
 test('embedded top Views only offer memberships containing the embedded Section',async({page,server})=>{
   const root=await open(page,server);await page.goto(server.origin+'/contents.html#embed=build&v=explore');
   const strip=root.getByRole('tablist',{name:'Views in selected Tab'});await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story']);
+  await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section')).toHaveText(['Turn a doorbell story into a reviewable draft']);
   for(const name of ['Full story','Explore story']){await strip.getByRole('tab',{name,exact:true}).click();await expect(root.locator('.doc-sec .board:visible')).toHaveCount(1);await expect(root.locator('#section-build .board')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');}
 });
 

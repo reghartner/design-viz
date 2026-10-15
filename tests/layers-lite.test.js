@@ -88,5 +88,5 @@ test('locked validates as boolean and lock affordance is Workbench/export scoped
  const raw=fixture();diagram(raw).nodes.a.locked='yes';
  const findings=C.validate(C.normalize(raw));assert.ok(findings.warnings.some(w=>w.includes('.nodes.a.locked: must be true or false')));
  const repo=path.join(__dirname,'..'),engine=fs.readFileSync(path.join(repo,'src/engine.js'),'utf8'),interactions=fs.readFileSync(path.join(repo,'src/workbench/interactions.js'),'utf8'),exporter=fs.readFileSync(path.join(repo,'src/workbench/svg-export.js'),'utf8');
- assert.doesNotMatch(engine,/dv-position-lock/);assert.match(interactions,/dv-position-lock-badge/);assert.match(interactions,/setAttribute\('aria-label','Position locked'\)/);assert.match(exporter,/dv-position-lock-badge/);assert.match(exporter,/position-locked/);
+ assert.doesNotMatch(engine,/dv-position-lock/);assert.match(interactions,/dv-position-lock-badge/);assert.match(interactions,/setAttribute\('aria-label','Position locked'\)/);assert.match(interactions,/dv-position-lock-feedback/);assert.match(exporter,/dv-position-lock-badge/);assert.match(exporter,/lock-feedback/);
 });

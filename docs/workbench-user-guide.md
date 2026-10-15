@@ -126,7 +126,10 @@ Workbench Standard and Explore views support Alt/Option-drag marquee selection
 of nodes and a shared right-click action menu. Explore also includes on-canvas
 panels and step controls. The Nodes & connections chapter explains mixed
 selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap
-distribution, Fit selection, Free placement, and Undo.
+distribution, Fit selection, Free placement, position locks, and Undo. A node's
+right-click menu locks or unlocks its position; selected-node menus name the bulk
+actions explicitly. Locked members stay selected and fixed during a mixed drag,
+with a local lock cue instead of an Inspector error.
 
 In Explore, **Panels → Placement for Section notes** chooses **Floating** or
 **On canvas** independently of other panels and step controls. Notes retain a

@@ -857,6 +857,17 @@ function createBuilderInteractions(opts){
     (nd.edgeGhosts || []).forEach(function(pair){pair.source.classList.remove('dv-free-edge-source');pair.ghost.remove();});
     (nd.topologyBoundaries || []).forEach(function(boundary){boundary.removeAttribute('transform');boundary.classList.remove('dv-topology-boundary-drag');});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
+    (nd.lockFeedback || []).forEach(function(el){el.classList.remove('dv-position-lock-feedback');});
+    if(nd.lockFeedback && spatial)spatial.clearAssistiveAnnouncement();
+  }
+  function showPositionLockFeedback(nd){
+    if(nd.lockFeedback)return;
+    var locked=(nd.members || []).filter(function(member){return member.locked && member.el;}).map(function(member){return member.el;});
+    if(!locked.length && nd.lockBlocked && nd.el)locked=[nd.el];
+    if(!locked.length)return;
+    nd.lockFeedback=locked;locked.forEach(function(el){el.classList.add('dv-position-lock-feedback');});
+    var shell=nd.el && nd.el.closest('.section-viewport');
+    if(shell && spatial)spatial.announceAssistive(locked.length===1?'Position locked; this object stayed fixed.':locked.length+' selected positions are locked and stayed fixed.',shell);
   }
   function cancelGroupDrag(){
     if (!groupDrag) return;
@@ -907,6 +918,7 @@ function createBuilderInteractions(opts){
     var here=svgPointAt(nd.svg,inv,ev.clientX,ev.clientY),start=svgPointAt(nd.svg,inv,nd.x0,nd.y0);
     var dx=here.x-start.x,dy=here.y-start.y;if(!Number.isFinite(dx) || !Number.isFinite(dy))return;
     nd.delta={dx:dx,dy:dy};
+    showPositionLockFeedback(nd);
     (nd.topologyBoundaries || []).forEach(function(boundary){boundary.setAttribute('transform','translate('+dx+' '+dy+')');boundary.classList.add('dv-topology-boundary-drag');});
     var draft=builderClone(nd.diagram);builderFreezeLockedPositions(draft,layout(nd.diagram).pos);
     var ids=nd.members.filter(function(member){return !member.locked;}).map(function(member){return member.id;});
@@ -1386,7 +1398,7 @@ function createBuilderInteractions(opts){
         }
         if(selectedGroup){
           var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel,topologyContext);
-          nodeDrag.selectionError=selected.error || selected.noop && 'Every selected graph node is position-locked; nothing moved.';
+          nodeDrag.selectionError=selected.error;nodeDrag.lockBlocked=!!selected.noop;
           if(!selected.error){
             nodeDrag.selection=multiSel.map(function(t){return {kind:'node',section:t.section,id:t.id};});
             nodeDrag.diagram=selected.effective;
@@ -1399,7 +1411,7 @@ function createBuilderInteractions(opts){
               nodeDrag.selectionError='Render all selected nodes before moving them together.';
           }
         }
-        if(!nodeDrag.topologyImport && !nodeDrag.selection && startDiagram && builderNodePositionLocked(startDiagram,nodeDrag.id))nodeDrag.selectionError='This graph node is position-locked; unlock it in Layers or Inspect to move it.';
+        if(!nodeDrag.topologyImport && !nodeDrag.selection && startDiagram && builderNodePositionLocked(startDiagram,nodeDrag.id))nodeDrag.lockBlocked=true;
         if(!nodeDrag.selectionError && startDiagram && (nodeDrag.selection || (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;}))){
           if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
             cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
@@ -1452,6 +1464,7 @@ function createBuilderInteractions(opts){
       if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
       if (!nodeDrag.moved) return;
       if(nodeDrag.selectionError){var message=nodeDrag.selectionError;cancelNodeDrag();inspectorMessage(message);return;}
+      if(nodeDrag.lockBlocked){showPositionLockFeedback(nodeDrag);return;}
       if(nodeDrag.floating){
         if(session.text()!==nodeDrag.snapshot.text || nodeDrag.contextKey!==undefined && JSON.stringify(session.topologyContext?session.topologyContext():null)!==nodeDrag.contextKey){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
         if(nodeDrag.members){updateSelectedFloatGhosts(ev);return;}

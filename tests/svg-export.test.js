@@ -34,6 +34,6 @@ test('style staging retains only safe custom properties needed to resolve export
 });
 
 test('editor-only state classes are removed without changing rendered state classes',()=>{
-  assert.equal(C.svgExportClassName('node lit dv-sel dv-instep dv-connect-target tint-api'),'node lit tint-api');
+  assert.equal(C.svgExportClassName('node lit dv-sel dv-instep dv-position-lock-feedback dv-connect-target tint-api'),'node lit tint-api');
   assert.equal(C.svgExportClassName('dv-rowgrab'), 'dv-rowgrab');
 });

@@ -17,7 +17,7 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   '.nlink','.nbackref','.nrefs-trigger','.detail-trigger'
   ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit'
 ].join(',');
-var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-locked|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
+var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-(?:locked|lock-feedback)|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
 
 function svgExportSlug(value){
   value=typeof value==='string'?value:'';

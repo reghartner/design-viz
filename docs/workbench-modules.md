@@ -353,8 +353,12 @@ measured bounds to the Workbench canvas owner, which shares the viewer's existin
 fit-region calculation and subtracts editor windows and navigation controls. No
 Fit selection control is mounted in Reader or Backstage. Source handwriting closes
 menus and cancels gestures while preserving Inspector selection with stale-source
-feedback. View changes and preview
-replacement retain their existing selection-retirement policy.
+feedback. Node-only menus reuse `planSetNodesLocked` for single and bulk position
+commands. `interactions.js` filters locked members from selected drags and owns the
+temporary object-local lock cue and visually hidden status announcement; cancellation and release
+remove both without publishing an Inspector message or session transaction.
+View changes and preview replacement retain their existing selection-retirement
+policy.
 
 Imported topology boundaries also expose an editor-only, keyboard-focusable
 reference handle. The reference menu is available on the handle, boundary stroke

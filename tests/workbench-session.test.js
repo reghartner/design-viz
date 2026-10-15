@@ -308,3 +308,12 @@ test('restoring a recovery draft establishes a fresh project boundary even when 
   assert.equal(s.undo(),false);assert.equal(s.redo(),false);assert.equal(s.earlierDrafts()[0].text,'{"title":"temporary editor"}');
   s.accept({text:'{"title":"recovered edited"}'});s.undo();assert.equal(h.text,draft);assert.equal(s.undo(),false);
 });
+
+test('working-file saving remains independent of browser-storage failure for input, commands and history',()=>{
+  let source='{}',timer,working=0;const browserStates=[];
+  const persistence=context.createBuilderPersistence({storage:()=>({getItem(){return null;},setItem(){throw Error('quota');}}),now:()=>1,
+    schedule(fn){timer=fn;return 1;},cancel(){},status:state=>browserStates.push(state)});
+  const session=context.createBuilderSession({source:{read:()=>source,write:value=>source=value},persistence,render(){},saveWorking(){working++;}});
+  source='{ handwritten';session.noteInput();timer();assert.equal(working,1);assert.equal(browserStates.at(-1),'unavailable');
+  session.accept({text:'{"valid":true}'});session.undo();session.redo();assert.equal(working,4);assert.equal(browserStates.at(-1),'unavailable');
+});

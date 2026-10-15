@@ -757,3 +757,28 @@ test('native ledger reads preserve UTF-8 BOM bytes and reject malformed UTF-8 wi
   await assert.rejects(files.readText('bad.ledger.md'),/must contain valid UTF-8.*not been changed/);
   assert.equal((await files.read('state.json')).version,1);
 });
+
+test('flush-only autosave holds Saving until the paired writer completes and never consumes proposals',async()=>{
+  const states=[],h=harness({artifactStatus:(state,detail)=>states.push({state,detail})});
+  let release,reached;
+  h.files.flushArtifacts=async()=>{};await h.client.start();
+  await h.client.send('Pending agent work');h.proposal();
+  const hit=new Promise(resolve=>reached=resolve);
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();reached();await new Promise(resolve=>release=resolve);await guard();};
+  h.type('{"title":"manual edit"}');const flushing=h.client.flush();await hit;
+  assert.equal(states.at(-1).state,'saving');assert.equal(h.writes.length,0);
+  release();await flushing;assert.equal(states.at(-1).state,'saved');assert.equal(h.writes.length,0);assert.equal(h.disk.has('result.json'),false);
+});
+test('a project switch during paired flushing aborts before commit and reports failure',async()=>{
+  const states=[],h=harness({artifactStatus:(state,detail)=>states.push({state,detail})});
+  h.files.flushArtifacts=async()=>{};await h.client.start();let release,reached,commits=0;
+  const hit=new Promise(resolve=>reached=resolve);
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();reached();await new Promise(resolve=>release=resolve);await guard();commits++;};
+  h.type('{"title":"old edit"}');const flushing=h.client.flush();await hit;h.project();release();
+  await assert.rejects(flushing,/Connection changed/);assert.equal(commits,0);assert.equal(states.at(-1).state,'failed');
+});
+
+test('flush-only writer refuses a disconnected owner instead of reporting a silent save',async()=>{
+  const states=[],h=harness({artifactStatus:(state,detail)=>states.push({state,detail})});
+  await h.client.start();await h.client.disconnect();await assert.rejects(h.client.flush(),/disconnected/);assert.equal(states.at(-1).state,'failed');
+});

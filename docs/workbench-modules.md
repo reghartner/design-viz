@@ -669,3 +669,26 @@ registry steps and paths, detached controls, and copyable original diagram JSON.
 The builder binds the pending operation to exact source, project and selected
 panel identity. Source/target changes invalidate it; project retirement and
 destroy close it. Only the final Replace action publishes one session edit.
+
+### Working-file autosave
+
+`workbench/working-file.js` owns a mounted editor's writable association, exact
+single-file baseline, queue shared across remounts, and file status. Session save
+notifies it independently after browser recovery, including when storage fails.
+Native file selection attaches only after validated publication. Import/paste and
+project replacement retire the association; standalone Home/Continue keeps it.
+Reload restores browser text without restoring a writable claim.
+
+Folder associations reuse `createFolderAgentClient().flush()` without polling
+proposals. This claims and renews the existing editor lease and delegates spec and
+ledger writes to `openFolderAgentProject().flushArtifacts()` with its existing
+journal and conflict checks. Agent setup explicitly retires and drains the
+standalone owner before initializing; connected agent folders report the same
+status but remain written exclusively by the agent client's serial queue.
+
+A same-destination export drains that authoritative writer and verifies the raw
+accepted spec/ledger. It skips those matching files and writes HTML/README with
+repeated current-source and disk checks. This path preserves handwritten JSON
+formatting instead of stamping it, and preserves an unknown sibling ledger when
+only the spec had been associated. Other export destinations keep normal snapshot
+stamping. A changed snapshot or external edit refuses the remaining export.

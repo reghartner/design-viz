@@ -1640,3 +1640,7 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-text-toolbar-error{position:absolute;left:0;top:calc(100% + 4px);width:100%;box-sizing:border-box;padding:8px;border:1px solid #b91c1c;border-radius:6px;background:var(--card,#fff);color:#b91c1c;}
 
 .dv-add-menu>strong{display:block;padding:6px 12px;font-size:12px;opacity:.7;}
+
+/* Keep the working destination visible in the desktop project toolbar. */
+@media(min-width:900px){.workspace-canvas .workspace-tools>.workspace-more{flex-shrink:0;min-width:max-content;}.workspace-canvas .workspace-tools>.workspace-provenance{display:block;max-width:220px;flex:0 1 220px;min-width:100px;}}
+.workspace-provenance[data-state="failed"],.workspace-provenance[data-state="paused"]{color:var(--danger,#a13b32);}

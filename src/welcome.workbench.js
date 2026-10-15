@@ -317,7 +317,12 @@ function initWorkbenchWelcome(opts){
   var welcomeImport=createStagedFileImport({document:document,browser:createBuilderBrowserIO(document,window),surface:root,
     active:function(){return !root.hidden;},begin:function(current){return builder.beginFileOpen(current,false);},
     restoreFocusOnConfirm:false,message:function(message){error('welcome-file-error',message);},confirmed:function(){error('welcome-file-error','');enterEditor();}});
-  ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
+  ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', async function(){
+    retireRead();var token=operation;
+    if(builder.supportsWorkingFile && builder.supportsWorkingFile()){
+      if(await builder.chooseWorkingFile(function(){return token===operation && root.isConnected;},function(message){error('welcome-file-error',message);}) && token===operation)enterEditor();
+    }else{file.value='';file.click();}
+  }); });
   el('welcome-paste-form').addEventListener('submit', function(ev){
     ev.preventDefault();
     try { builder.loadText(json.value); error('welcome-paste-error', ''); json.removeAttribute('aria-invalid'); enterEditor(); }

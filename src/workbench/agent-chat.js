@@ -486,11 +486,13 @@ function initWorkbenchAgentChat(opts){
   }
   async function disconnect(){
     var token=++generation;life.cancelDelay(timer);get('pilot-capture').checked=false;
+    var workingDrain=opts.releaseWorking?opts.releaseWorking():Promise.resolve();
     var unlock=releaseLock;releaseLock=null;
     var old=client,message='Disconnected. Reopen your diagram folder or choose New Connection.';client=null;accessLost=false;connecting=true;
     paint({connected:false,pending:null,listening:false,progress:'',review:null});status('Disconnecting from the diagram folder…');
     if(old){try{await old.disconnect();}catch(ex){message='Disconnected. Could not update the folder: '+ex.message;}old.destroy();}
     if(unlock)unlock();
+    await workingDrain;
     if(!life.alive() || token!==generation)return;
     connecting=false;paint({connected:false,pending:null,listening:false,progress:'',review:null});
     stage('folder');status(message);
@@ -535,11 +537,14 @@ function initWorkbenchAgentChat(opts){
     if(projectFolder && opts.setLedger)opts.setLedger(projectFolder.ledger,true);
     if(!kit)kit=JSON.parse(kitNode.textContent);
     var connectionProject=opts.snapshot().project;
-    client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,workflow:workflow,requireLedger:!!files.artifacts,
-      level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject)paint(update);}});
+    var workingBinding=files.artifacts?{name:directory.name+'/'+files.artifacts.spec,paired:true,external:true,handle:directory,artifacts:files.artifacts,flush:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));},retry:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));}}:null;
+    if(workingBinding && opts.workingDestination)opts.workingDestination(workingBinding);
+    client=createFolderAgentClient({files:files,artifactStatus:function(state,detail){if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,state,detail);},snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,workflow:workflow,requireLedger:!!files.artifacts,
+      level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject){paint(update);if(update.connected===false && workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'disconnected');}}});
 
     var connectingClient=client,identity=await connectingClient.start(resume,choice);
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'saved');
     activeFolder=directory;accessLost=false;cacheReady=true;freshProject=null;preparedCopy=null;
     // Store only a browser-owned handle. Access is requested later by a click.
     recovery.remember(directory,identity.sessionId).then(function(saved){if(life.alive() && token===generation && saved)rememberedHandle={handle:directory,sessionId:identity.sessionId};});
@@ -620,6 +625,8 @@ function initWorkbenchAgentChat(opts){
       }
       if(!life.alive() || token!==generation)return;
       checkResumeDraft(opening);
+      if(opts.releaseWorking)await opts.releaseWorking();
+      checkOpening();
       // Serialize setup/recovery writes within this origin before any disk mutation.
       // Release after connecting, so unrelated folders can remain open together.
       if(navigator.locks)unlockSetup=await new Promise(function(resolve,reject){navigator.locks.request('flowview-diagram-folder-setup',function(){return new Promise(function(release){resolve(release);});}).catch(reject);});
@@ -729,6 +736,7 @@ function initWorkbenchAgentChat(opts){
   contextTick();stage('folder');setComposeMode('external');
   return {destroy:life.destroy,openSetup:openSetup,
     practice:opts.practice?{connect:connect,propose:function(){if(client)client.propose();}}:null,
+    releaseWorking:function(){return client?disconnect():Promise.resolve();},
     readLedger:function(){return client && state.connected?client.readLedger():Promise.resolve(null);},
     recoveryInfo:function(){restoreRecoveryForProject(opts.snapshot());return {connected:state.connected,listening:state.listening,folderName:activeFolder?activeFolder.name:cacheReady && remembered?remembered.folderName:null,sessionId:client && client.manifest()?client.manifest().sessionId:null,changes:state.changes.slice(-100)};}};
 }

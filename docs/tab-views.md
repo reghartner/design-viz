@@ -139,3 +139,13 @@ stable section IDs and canonical Views using source splices, retaining every
 existing section and arrangement. It creates one Undo entry. The experimental
 `tab.presentation` field is not authoritative and does not override legacy
 mixed presentations. New files should use the canonical View contract.
+
+A lone `diagram.sectionLayout` is default geometry, never a View definition.
+Saving Arrange does not add Layout/Data flow choices. Named `diagram.layouts`
+remain selectable; explicit canonical Views determine their own names and count.
+Legacy `v=layout` and `v=flow` links first honor an exact authored View ID,
+then an existing legacy arrangement choice. Otherwise they select the opening
+View if it contains the addressed section, or the first View that does. Links
+and navigation snapshots use the actual View ID or authored named-arrangement ID. An exact authored ID belonging
+to a different section is rejected by normal destination validation. Existing
+`{section,layout:"layout"}` (and the old `"default"` alias) members remain accepted for default geometry.

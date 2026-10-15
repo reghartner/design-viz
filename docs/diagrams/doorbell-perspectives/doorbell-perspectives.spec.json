@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "A visitor at the door \u2014 one flow, two perspectives",
+    "title": "A visitor at the door — one flow, two perspectives",
     "skin": "pastel",
     "protocols": {
       "sql": {
@@ -17,73 +17,13 @@
         "heading": "From a doorbell press to a welcomed visitor",
         "text": [
           "Switch between Resident story and Data flow at any step. Both use one timeline, including storage rejection and delayed notification.",
-          "Fictional teaching design v1 \u00b7 source: docs/hlds/doorbell-perspectives.md. Animation is illustrative; the screen shows the recorded porch approach."
+          "Fictional teaching design v1 · source: docs/hlds/doorbell-perspectives.md. Animation is illustrative; the screen shows the recorded porch approach."
         ],
         "diagram": {
           "id": "doorbell-perspectives",
           "view": "step",
           "autoplay": false,
           "primaryPanel": "home",
-          "layoutName": "Resident story",
-          "sectionLayout": {
-            "default": [
-              {
-                "panel": "home",
-                "x": 0,
-                "y": 0,
-                "w": 8,
-                "h": 11
-              },
-              {
-                "panel": "clip",
-                "x": 8,
-                "y": 0,
-                "w": 4,
-                "h": 7
-              },
-              {
-                "panel": "experience",
-                "x": 8,
-                "y": 7,
-                "w": 4,
-                "h": 4
-              },
-              {
-                "controls": "steps",
-                "x": 0,
-                "y": 11,
-                "w": 12,
-                "h": 9
-              },
-              {
-                "panel": "resident-phone",
-                "x": 0,
-                "y": 20,
-                "w": 4,
-                "h": 11
-              },
-              {
-                "panel": "checkpoints",
-                "x": 4,
-                "y": 20,
-                "w": 4,
-                "h": 11
-              },
-              {
-                "panel": "outbox",
-                "x": 8,
-                "y": 20,
-                "w": 4,
-                "h": 11
-              },
-              {
-                "x": 0,
-                "y": 31,
-                "w": 12,
-                "h": 17
-              }
-            ]
-          },
           "nodes": {
             "camera": {
               "title": "Camera",
@@ -287,7 +227,7 @@
               },
               "rooms": [
                 {
-                  "label": "OUTSIDE \u00b7 PORCH",
+                  "label": "OUTSIDE · PORCH",
                   "kind": "outdoor",
                   "x": 6,
                   "y": 16,
@@ -461,7 +401,7 @@
             {
               "id": "outbox",
               "type": "queue",
-              "title": "Notification outbox \u00b7 this event",
+              "title": "Notification outbox · this event",
               "initial": {
                 "state": "empty"
               }
@@ -668,7 +608,7 @@
             },
             {
               "id": "notify-resident",
-              "text": "The phone receives \u201cVisitor at the front door.\u201d The resident starts toward the entry.",
+              "text": "The phone receives “Visitor at the front door.” The resident starts toward the entry.",
               "edge": "push->phone",
               "panels": {
                 "resident-phone": {
@@ -741,7 +681,7 @@
               "edge": "playback->phone",
               "panels": {
                 "clip": {
-                  "banner": "SAVED CLIP \u00b7 RESIDENT VIEW"
+                  "banner": "SAVED CLIP · RESIDENT VIEW"
                 },
                 "checkpoints": {
                   "results": {
@@ -861,7 +801,7 @@
               ],
               "panels": {
                 "clip": {
-                  "banner": "LOCAL ONLY \u00b7 CLOUD REJECTED"
+                  "banner": "LOCAL ONLY · CLOUD REJECTED"
                 }
               }
             },
@@ -914,7 +854,7 @@
                 "outbox": {
                   "state": "held",
                   "label": "Visitor clip ready",
-                  "reason": "Provider rate limit \u00b7 retry time unspecified",
+                  "reason": "Provider rate limit · retry time unspecified",
                   "from": "Notifications",
                   "to": "Push Provider"
                 }
@@ -987,7 +927,138 @@
               ]
             }
           ],
-          "routing": "lanes"
+          "routing": "lanes",
+          "layouts": [
+            {
+              "id": "layout",
+              "name": "Resident story",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 8,
+                    "h": 11
+                  },
+                  {
+                    "panel": "clip",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 7
+                  },
+                  {
+                    "panel": "experience",
+                    "x": 8,
+                    "y": 7,
+                    "w": 4,
+                    "h": 4
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 11,
+                    "w": 12,
+                    "h": 9
+                  },
+                  {
+                    "panel": "resident-phone",
+                    "x": 0,
+                    "y": 20,
+                    "w": 4,
+                    "h": 11
+                  },
+                  {
+                    "panel": "checkpoints",
+                    "x": 4,
+                    "y": 20,
+                    "w": 4,
+                    "h": 11
+                  },
+                  {
+                    "panel": "outbox",
+                    "x": 8,
+                    "y": 20,
+                    "w": 4,
+                    "h": 11
+                  },
+                  {
+                    "x": 0,
+                    "y": 31,
+                    "w": 12,
+                    "h": 17
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 18
+                  },
+                  {
+                    "x": 0,
+                    "y": 18,
+                    "w": 16,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "clip"
+                  },
+                  {
+                    "x": 16,
+                    "y": 8,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "experience"
+                  },
+                  {
+                    "x": 16,
+                    "y": 14,
+                    "w": 8,
+                    "h": 10,
+                    "panel": "resident-phone"
+                  },
+                  {
+                    "x": 16,
+                    "y": 24,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "checkpoints"
+                  },
+                  {
+                    "x": 16,
+                    "y": 30,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "outbox"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 6
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "layout"
         }
       }
     ]

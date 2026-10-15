@@ -1,13 +1,13 @@
 {
   "page": {
-    "title": "When the doorbell gets too hot\u2014or too cold",
+    "title": "When the doorbell gets too hot—or too cold",
     "skin": "pastel",
     "sections": [
       {
         "heading": "Protect the camera. Explain the missed moment.",
         "accent": "amber",
         "text": [
-          "Proposed teaching design \u00b7 not Ring firmware behavior. Temperatures and restart gates are illustrative device-body values, not outdoor-weather limits.",
+          "Proposed teaching design · not Ring firmware behavior. Temperatures and restart gates are illustrative device-body values, not outdoor-weather limits.",
           "The doorbell contains Camera and an always-on Controller. Health telemetry survives camera shutdown in this design, enabling the illustrated notices. Both views follow the same complete steps. Source: docs/hlds/thermal-doorbell.md."
         ],
         "diagram": {
@@ -16,7 +16,6 @@
           "autoplay": false,
           "routing": "lanes",
           "primaryPanel": "home",
-          "layoutName": "At the door",
           "nodes": {
             "controller": {
               "title": "Controller",
@@ -120,7 +119,7 @@
               },
               "rooms": [
                 {
-                  "label": "OUTSIDE \u00b7 PORCH",
+                  "label": "OUTSIDE · PORCH",
                   "kind": "outdoor",
                   "x": 8,
                   "y": 16,
@@ -222,7 +221,7 @@
             {
               "id": "screen",
               "type": "screen",
-              "title": "Camera \u00b7 current availability",
+              "title": "Camera · current availability",
               "scene": "person-at-door-night",
               "initial": {
                 "mode": "active",
@@ -232,8 +231,8 @@
             {
               "id": "temp",
               "type": "thermo",
-              "title": "Device body \u00b7 example thresholds",
-              "unit": "\u00b0C",
+              "title": "Device body · example thresholds",
+              "unit": "°C",
               "min": -30,
               "max": 90,
               "lowCrit": -15,
@@ -304,7 +303,7 @@
             {
               "id": "battery",
               "type": "battery",
-              "title": "Battery \u00b7 charging is separate",
+              "title": "Battery · charging is separate",
               "low": 20,
               "crit": 10,
               "initial": {
@@ -319,7 +318,7 @@
           "steps": [
             {
               "id": "ready",
-              "text": "The porch is quiet. Camera and health telemetry are available; the device reads 22\u00b0C.",
+              "text": "The porch is quiet. Camera and health telemetry are available; the device reads 22°C.",
               "nodes": [
                 "controller"
               ]
@@ -441,7 +440,7 @@
                 },
                 "screen": {
                   "mode": "save",
-                  "banner": "SAVED CLIP \u00b7 VISITOR APPROACH"
+                  "banner": "SAVED CLIP · VISITOR APPROACH"
                 },
                 "cap": {
                   "rows": [
@@ -480,7 +479,7 @@
             },
             {
               "id": "notify",
-              "text": "Clip Service requests a notice; the resident receives \u201cVisitor at the front door.\u201d",
+              "text": "Clip Service requests a notice; the resident receives “Visitor at the front door.”",
               "panels": {
                 "phone": {
                   "notify": {
@@ -528,7 +527,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Recorded \u00b7 resident notified"
+                        "status": "Recorded · resident notified"
                       }
                     }
                   ]
@@ -593,7 +592,7 @@
             },
             {
               "id": "hot-warning",
-              "text": "At 55\u00b0C Camera reduces video capability while staying active.",
+              "text": "At 55°C Camera reduces video capability while staying active.",
               "panels": {
                 "temp": {
                   "value": 55
@@ -648,7 +647,7 @@
             },
             {
               "id": "hot-shutdown",
-              "text": "At 70\u00b0C Controller disables Camera. Health telemetry stays connected; charging is paused.",
+              "text": "At 70°C Controller disables Camera. Health telemetry stays connected; charging is paused.",
               "panels": {
                 "temp": {
                   "value": 70
@@ -661,7 +660,7 @@
                 },
                 "screen": {
                   "mode": "unavailable",
-                  "reason": "Protective shutdown \u00b7 too hot. Video is unavailable while the doorbell cools."
+                  "reason": "Protective shutdown · too hot. Video is unavailable while the doorbell cools."
                 },
                 "battery": {
                   "trend": "idle",
@@ -674,7 +673,7 @@
                       "id": "video",
                       "cells": {
                         "feature": "Camera",
-                        "status": "Unavailable \u00b7 too hot"
+                        "status": "Unavailable · too hot"
                       }
                     },
                     {
@@ -765,7 +764,7 @@
                       "id": "video",
                       "cells": {
                         "feature": "Camera",
-                        "status": "Unavailable \u00b7 too hot"
+                        "status": "Unavailable · too hot"
                       }
                     },
                     {
@@ -786,7 +785,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -802,7 +801,7 @@
             },
             {
               "id": "hot-cooling",
-              "text": "The reading falls to 55\u00b0C. Camera stays off while the device continues cooling.",
+              "text": "The reading falls to 55°C. Camera stays off while the device continues cooling.",
               "panels": {
                 "cap": {
                   "rows": [
@@ -831,7 +830,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -849,7 +848,7 @@
                   }
                 },
                 "screen": {
-                  "reason": "Cooling \u00b7 waiting for the below-40\u00b0C restart gate."
+                  "reason": "Cooling · waiting for the below-40°C restart gate."
                 }
               },
               "nodes": [
@@ -859,7 +858,7 @@
             },
             {
               "id": "hot-safe",
-              "text": "At 35\u00b0C the restart gate is satisfied. Camera remains off until Controller starts it.",
+              "text": "At 35°C the restart gate is satisfied. Camera remains off until Controller starts it.",
               "panels": {
                 "cap": {
                   "rows": [
@@ -888,7 +887,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -902,7 +901,7 @@
                   }
                 },
                 "screen": {
-                  "reason": "Safe temperature reached \u00b7 restart has not begun."
+                  "reason": "Safe temperature reached · restart has not begun."
                 }
               },
               "nodes": [
@@ -950,7 +949,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1009,7 +1008,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1024,7 +1023,7 @@
             },
             {
               "id": "cold-warning",
-              "text": "At -5\u00b0C charging pauses, while Camera remains active.",
+              "text": "At -5°C charging pauses, while Camera remains active.",
               "panels": {
                 "temp": {
                   "value": -5
@@ -1079,7 +1078,7 @@
             },
             {
               "id": "cold-shutdown",
-              "text": "At -18\u00b0C Controller disables Camera. Health telemetry stays connected; charging is paused.",
+              "text": "At -18°C Controller disables Camera. Health telemetry stays connected; charging is paused.",
               "panels": {
                 "temp": {
                   "value": -18
@@ -1092,7 +1091,7 @@
                 },
                 "screen": {
                   "mode": "unavailable",
-                  "reason": "Protective shutdown \u00b7 too cold. Video is unavailable while the doorbell warms."
+                  "reason": "Protective shutdown · too cold. Video is unavailable while the doorbell warms."
                 },
                 "battery": {
                   "trend": "idle",
@@ -1105,7 +1104,7 @@
                       "id": "video",
                       "cells": {
                         "feature": "Camera",
-                        "status": "Unavailable \u00b7 too cold"
+                        "status": "Unavailable · too cold"
                       }
                     },
                     {
@@ -1200,7 +1199,7 @@
                       "id": "video",
                       "cells": {
                         "feature": "Camera",
-                        "status": "Unavailable \u00b7 too cold"
+                        "status": "Unavailable · too cold"
                       }
                     },
                     {
@@ -1221,7 +1220,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1237,7 +1236,7 @@
             },
             {
               "id": "cold-cooling",
-              "text": "The reading is 3\u00b0C: nominal on the gauge, but still below the above-5\u00b0C restart gate.",
+              "text": "The reading is 3°C: nominal on the gauge, but still below the above-5°C restart gate.",
               "panels": {
                 "cap": {
                   "rows": [
@@ -1266,7 +1265,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1284,7 +1283,7 @@
                   }
                 },
                 "screen": {
-                  "reason": "Waiting for the above-5\u00b0C restart gate."
+                  "reason": "Waiting for the above-5°C restart gate."
                 }
               },
               "nodes": [
@@ -1294,7 +1293,7 @@
             },
             {
               "id": "cold-safe",
-              "text": "At 8\u00b0C the restart gate is satisfied. Camera remains off until Controller starts it.",
+              "text": "At 8°C the restart gate is satisfied. Camera remains off until Controller starts it.",
               "panels": {
                 "cap": {
                   "rows": [
@@ -1323,7 +1322,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1337,7 +1336,7 @@
                   }
                 },
                 "screen": {
-                  "reason": "Safe temperature reached \u00b7 restart has not begun."
+                  "reason": "Safe temperature reached · restart has not begun."
                 }
               },
               "nodes": [
@@ -1385,7 +1384,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1444,7 +1443,7 @@
                       "id": "visit",
                       "cells": {
                         "feature": "Visitor outcome",
-                        "status": "Missed \u00b7 no recording"
+                        "status": "Missed · no recording"
                       }
                     }
                   ]
@@ -1507,65 +1506,137 @@
               ]
             }
           ],
-          "sectionLayout": {
-            "default": [
-              {
-                "panel": "home",
-                "x": 0,
-                "y": 0,
-                "w": 8,
-                "h": 13
-              },
-              {
-                "panel": "screen",
-                "x": 8,
-                "y": 0,
-                "w": 4,
-                "h": 7
-              },
-              {
-                "panel": "temp",
-                "x": 8,
-                "y": 7,
-                "w": 4,
-                "h": 6
-              },
-              {
-                "controls": "steps",
-                "x": 0,
-                "y": 13,
-                "w": 12,
-                "h": 7
-              },
-              {
-                "panel": "phone",
-                "x": 0,
-                "y": 20,
-                "w": 4,
-                "h": 10
-              },
-              {
-                "panel": "cap",
-                "x": 4,
-                "y": 20,
-                "w": 4,
-                "h": 10
-              },
-              {
-                "panel": "battery",
-                "x": 8,
-                "y": 20,
-                "w": 4,
-                "h": 10
-              },
-              {
-                "x": 0,
-                "y": 30,
-                "w": 12,
-                "h": 16
+          "layouts": [
+            {
+              "id": "layout",
+              "name": "At the door",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 8,
+                    "h": 13
+                  },
+                  {
+                    "panel": "screen",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 7
+                  },
+                  {
+                    "panel": "temp",
+                    "x": 8,
+                    "y": 7,
+                    "w": 4,
+                    "h": 6
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 13,
+                    "w": 12,
+                    "h": 7
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 0,
+                    "y": 20,
+                    "w": 4,
+                    "h": 10
+                  },
+                  {
+                    "panel": "cap",
+                    "x": 4,
+                    "y": 20,
+                    "w": 4,
+                    "h": 10
+                  },
+                  {
+                    "panel": "battery",
+                    "x": 8,
+                    "y": 20,
+                    "w": 4,
+                    "h": 10
+                  },
+                  {
+                    "x": 0,
+                    "y": 30,
+                    "w": 12,
+                    "h": 16
+                  }
+                ]
               }
-            ]
-          }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 18
+                  },
+                  {
+                    "x": 0,
+                    "y": 18,
+                    "w": 16,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "screen"
+                  },
+                  {
+                    "x": 16,
+                    "y": 8,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "temp"
+                  },
+                  {
+                    "x": 16,
+                    "y": 14,
+                    "w": 8,
+                    "h": 10,
+                    "panel": "phone"
+                  },
+                  {
+                    "x": 16,
+                    "y": 24,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "cap"
+                  },
+                  {
+                    "x": 16,
+                    "y": 30,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "battery"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 6
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "layout"
         }
       }
     ]

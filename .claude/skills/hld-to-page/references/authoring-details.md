@@ -152,6 +152,11 @@ coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
 
 **Arrange for the delivery surface.** For new diagrams, run `tools/compose-page-layout.cjs`
 after writing semantic content; it creates the 24-column panel/control layout.
+`diagram.sectionLayout` saves placement only; it does not add reader Views.
+Use canonical Views or named `diagram.layouts` for deliberate perspectives.
+When updating older diagrams, replace intentional implicit Layout/Data flow
+choices with explicit definitions while retaining geometry; never delete
+placement just to remove an accidental toggle.
 Use `--profile backstage` or `--profile confluence` when requested for that host.
 Preserve existing profiles during ordinary edits. See `docs/auto-arrange.md`
 for supported inputs and estimation limits, and `docs/section-layouts.md` for the schema
@@ -236,8 +241,9 @@ Optional `layouts[].steps:[IDs]` selects playback
 stops while retaining full-path state folding, so a business view can skip
 technical detail. The workbench exposes **Steps shown in this view** and
 **Step controls** attachment. See `src/starters/named-layouts.json`. Saved arrangements
-have only their named view buttons; Data flow can be an ordinary named view. For a legacy single layout, optional `diagram.layoutName` names the arrangement
-(1–40 characters; default Layout), shared across host profiles. Readers can
+have only their named view buttons; Data flow can be an ordinary named view. A legacy `diagram.layoutName` no longer adds or labels a reader choice.
+Migrate intentionally named perspectives to canonical Views or explicit named
+arrangements; retain `sectionLayout` when it is only placement. Readers can
 Hide/Show data flow within that arrangement while keeping panels and playback.
 Visibility is temporary and does not remove diagram tiles from the spec.
 Preserve panel IDs and story state; tile geometry is not evidence. Do not change

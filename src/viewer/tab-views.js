@@ -43,9 +43,14 @@ function createTabViewController(ctl,page){
   function ensure(rec,id,silent){
     var owner=ownerOf(rec);if(!owner || rec.detailOnly)return false;
     var record=owner.records.find(function(record){return record.runtime===rec;}),diagram=record.section.diagram;
-    if(!owner.source.views && id==='home' && diagram && !Array.isArray(diagram.layouts) && diagramLayoutViews(diagram).length)id='layout';
-    var plainFlow=id==='flow' && diagram && !diagramLayoutViews(diagram).length && !diagramFocusPanel(diagram);
-    var view=id?owner.views.find(function(v){return v.id===id || v.legacy && (v.legacyLayout===id || plainFlow && v.id==='standard') && v.members.some(function(m){return m.record.runtime===rec;});}):owner.current;
+    // Exact authored IDs win. Old layout/flow links fall back to a real View
+    // containing the addressed section, including explicit multi-section Views.
+    var view=id?owner.views.find(function(v){return v.id===id;}):owner.current;
+    if(id && !view)view=owner.views.find(function(v){return v.legacy && v.legacyLayout===id && v.members.some(function(m){return m.record.runtime===rec;});});
+    if(!view && (id==='layout' || id==='flow')){
+      var opening=tabViewDefault(owner,owner.views);
+      view=opening && opening.members.some(function(m){return m.record.runtime===rec;})?opening:owner.views.find(function(v){return v.members.some(function(m){return m.record.runtime===rec;});});
+    }
     if(id && (!view || !view.members.some(function(m){return m.record.runtime===rec;})))return false;
     if(!view || !view.members.some(function(m){return m.record.runtime===rec;}))view=owner.views.find(function(v){return v.members.some(function(m){return m.record.runtime===rec;});});
     if(view && owner.current===view && owner.selected===rec)return true;

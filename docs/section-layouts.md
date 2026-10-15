@@ -5,6 +5,17 @@ section arrangements own panel geometry, visibility and path/step filtering.
 See [Tabs, Views, and sections](tab-views.md) for the canonical schema, membership,
 source-preserving legacy migration and navigation.
 
+
+`diagram.sectionLayout` saves panel, diagram and step-control placement only.
+Adding or editing it never creates or renames reader Views in either the page
+header or the section. A plain diagram remains Standard; existing Home/Data flow
+choices remain available, with saved geometry used for Data flow. `layoutName`
+does not create a choice. Use canonical `page.views`/`tab.views` for perspectives,
+or deliberately named `diagram.layouts` for independently selectable arrangements.
+Do not remove placement to suppress an accidental Layout/Data flow toggle.
+For existing files that intentionally relied on that toggle, migrate both choices
+explicitly and retain every host profile; see [migration inventory](section-layout-migration.md).
+
 Use **View → View presentation** for Standard or Explore, and **Sections in this
 View** for membership. **Standard** stacks its members; **Explore** shows one
 member at a time. The same top navigation remains in place. **New View**,
@@ -200,11 +211,12 @@ authored default. The view is applied before the step, so a hidden stop advances
 to the next included stop, or the final included stop if there is no next;
 an excluded path uses an available path. Earlier state still folds normally.
 
-For older specs without named views, `v=home` selects the Home/panel focus and
-`v=flow` selects Data flow. A legacy single `sectionLayout` accepts `v=layout`
-(or `v=home`, canonicalized to `layout`) and `v=flow`. A plain diagram has only
-`flow`. Named IDs take precedence: a named view with ID `home` is that view,
-not a request for a legacy Home presentation.
+Existing Home/panel focus remains addressable with `v=home`. Legacy
+`v=layout` and `v=flow` first select an exact authored View or existing named
+arrangement, then fall back to the opening View containing the addressed
+section (or its first containing View). A plain diagram has one Standard View.
+Navigation and copied links use the resolved real View ID; geometry never
+creates a destination. Exact authored View IDs take precedence.
 
 The GIF exporter uses the same IDs:
 
@@ -274,8 +286,9 @@ The fields below are section arrangements, not Tab View definitions. Their
 legacy presentation is used only when the owner has no canonical Views.
 
 
-A diagram can declare one `sectionLayout`, or a `layouts` array of named
-arrangements. No schema-version switch is needed. Omitting both preserves the
+A diagram can declare default geometry in `sectionLayout`, or a `layouts`
+array of intentionally named arrangements. Only the latter adds arrangement
+choices when canonical Views are absent. No schema-version switch is needed. Omitting both preserves the
 existing presentation.
 
 ```json

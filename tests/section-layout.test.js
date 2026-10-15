@@ -416,10 +416,10 @@ test('choosing Explore preserves the automatic or saved sibling view, default an
     const raw=wrap(d),text=JSON.stringify(raw,null,3)+'\n',original=structuredClone(d);
     const plan=ctx.planSectionViewPresentation(text,raw,0,saved?'default':undefined,'explore');assert.ok(!plan.error,plan.error);
     const next=ctx.builderDiagram(plan.text,JSON.parse(plan.text),0).d;
-    assert.deepEqual(next.layouts.map(v=>v.id),[saved?'layout':'home','flow']);
+    assert.deepEqual(next.layouts.map(v=>v.id),['home','flow']);
     assert.equal(next.defaultLayout,next.layouts[0].id);assert.equal(next.layouts[0].presentation,'explore');
     assert.equal(plan.layoutId,next.layouts[0].id);assert.equal(ctx.sectionLayoutDefinition(next,'flow').presentation,'standard');
-    if(saved){assert.deepEqual(next.layouts[0].sectionLayout,migrated(original.sectionLayout));assert.equal(next.layouts[0].name,original.layoutName);}
+    if(saved){assert.deepEqual(next.layouts[1].sectionLayout,migrated(original.sectionLayout));assert.equal(next.layouts[1].name,'Data flow');}
     for(const key of ['nodes','rows','edges','panels','steps','paths','primaryPanel'])assert.deepEqual(next[key],original[key]);
     assert.equal(next.sectionLayout,undefined);assert.equal(next.layoutName,undefined);
     assert.equal(JSON.stringify(raw,null,3)+'\n',text,'planner does not mutate its input');
@@ -450,12 +450,12 @@ test('saved layout aliases preserve every authored host profile while selected D
   const d=diagram();d.layoutName='Resident view';d.sectionLayout={default:[phone,board],backstage:[board],confluence:[{...board,w:12,h:9}]};
   for(const active of ['layout','home','default','flow']){
     const text=JSON.stringify(d),plan=ctx.planSectionViewPresentation(text,d,0,active,'explore');assert.ok(!plan.error,plan.error);
-    const next=JSON.parse(plan.text),selected=active==='flow'?'flow':'layout';
-    assert.equal(plan.layoutId,selected);assert.equal(next.defaultLayout,'layout');
-    assert.deepEqual(next.layouts[0].sectionLayout,migrated(d.sectionLayout));assert.equal(next.layouts[0].name,'Resident view');
+    const next=JSON.parse(plan.text),selected=['flow','layout'].includes(active)?'flow':'home';
+    assert.equal(plan.layoutId,selected);assert.equal(next.defaultLayout,'home');
+    assert.deepEqual(next.layouts[1].sectionLayout,migrated(d.sectionLayout));assert.equal(next.layouts[1].name,'Data flow');
     assert.equal(ctx.sectionLayoutDefinition(next,selected).presentation,'explore');
-    assert.equal(ctx.sectionLayoutDefinition(next,selected==='flow'?'layout':'flow').presentation,'standard');
-    assert.equal(ctx.sectionLayoutDock(next.layouts[1].sectionLayout.default),'diagram');
+    assert.equal(ctx.sectionLayoutDefinition(next,selected==='flow'?'home':'flow').presentation,'standard');
+    assert.deepEqual(next.layouts.map(v=>v.name),['Home','Data flow']);
     assert.equal(JSON.stringify(d),text);
   }
 });
@@ -478,15 +478,15 @@ test('promotion preserves graph-only, step-free and non-docking focus contracts 
 });
 
 test('explicit legacy Duplicate and Make default target the selected view and preserve its sibling',()=>{
-  for(const saved of [false,true])for(const active of [saved?'layout':'home','flow']){
+  for(const saved of [false,true])for(const active of ['home','flow']){
     const d=diagram();if(saved){d.layoutName='Resident view';d.sectionLayout={default:[board,phone],confluence:[board]};}
-    const text=JSON.stringify(d),first=saved?'layout':'home';
+    const text=JSON.stringify(d),first='home';
     const duplicate=ctx.planDuplicateSectionLayout(text,d,0,active);assert.ok(!duplicate.error,duplicate.error);
     const next=JSON.parse(duplicate.text);assert.deepEqual(next.layouts.map(v=>v.id),[first,'flow',duplicate.layoutId]);assert.equal(next.defaultLayout,first);
     for(const target of Object.keys(next.layouts[2].sectionLayout).filter(key=>key!=='columns'))assert.deepEqual(next.layouts[2].sectionLayout[target],plain(ctx.sectionLayoutItems(next,target,active)));
     const chosen=ctx.planDefaultSectionLayout(text,d,0,active);assert.ok(!chosen.error,chosen.error);
     const named=JSON.parse(chosen.text);assert.deepEqual(named.layouts.map(v=>v.id),[first,'flow']);assert.equal(named.defaultLayout,active);assert.equal(chosen.layoutId,active);
-    if(saved){assert.deepEqual(next.layouts[0].sectionLayout,migrated(d.sectionLayout));assert.deepEqual(named.layouts[0].sectionLayout,migrated(d.sectionLayout));}
+    if(saved){assert.deepEqual(next.layouts[1].sectionLayout,migrated(d.sectionLayout));assert.deepEqual(named.layouts[1].sectionLayout,migrated(d.sectionLayout));}
     assert.equal(JSON.stringify(d),text);
   }
   const graph={...diagram(),panels:[]};delete graph.primaryPanel;
@@ -738,8 +738,8 @@ test('legacy visibility edits promote the selected automatic chapter without los
   for(const view of ['home','flow','layout']){
     const d=diagram();if(view==='layout')d.sectionLayout={default:[board,phone]};
     const text=JSON.stringify(d),plan=ctx.planSectionDiagramVisibility(text,d,0,view,false);assert.ok(!plan.error,plan.error);
-    const next=JSON.parse(plan.text);assert.equal(plan.layoutId,view);assert.equal(next.defaultLayout,view==='layout'?'layout':'home');
-    assert.equal(ctx.sectionLayoutItems(next,'backstage',view).find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
+    const next=JSON.parse(plan.text);assert.equal(plan.layoutId,view==='layout'?'flow':view);assert.equal(next.defaultLayout,'home');
+    assert.equal(ctx.sectionLayoutItems(next,'backstage',view==='layout'?'flow':view).find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
     assert.equal(next.layouts.length,2);assert.deepEqual(next.steps,d.steps);assert.equal(JSON.stringify(d),text);
   }
 });

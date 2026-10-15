@@ -27,8 +27,9 @@ test('the two-perspective teaching seed builds a clean shared story', () => {
   assert.equal(result.errors.length, 0, result.errors.join('\n'));
   assert.equal(result.warnings.length, 0, result.warnings.join('\n'));
   assert.equal(spec.page.sections.length, 1);
-  assert.ok(diagram.sectionLayout.default.some(tile => !tile.panel && !tile.controls));
-  assert.ok(diagram.sectionLayout.default.some(tile => tile.panel === 'home'));
+  assert.ok(diagram.layouts.find(v=>v.id===diagram.defaultLayout).sectionLayout.default.some(tile => !tile.panel && !tile.controls));
+  assert.ok(diagram.layouts.find(v=>v.id===diagram.defaultLayout).sectionLayout.default.some(tile => tile.panel === 'home'));
+  assert.deepEqual(Array.from(diagram.layouts,v=>v.name),['Resident story','Data flow']);
   assert.equal(diagram.autoplay, false);
 });
 

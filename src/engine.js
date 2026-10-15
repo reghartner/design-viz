@@ -2030,7 +2030,7 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed, 
 }
 
 /* Saved section composition moves the existing live widgets, never their state.
-   Its named layout replaces Home; Data flow restores the standard placement. */
+   Named arrangements select a composition; default geometry belongs to Data flow. */
 function sectionLayoutWithoutFlow(items,controlsRows){
   var diagram=items.find(function(it){return sectionLayoutKey(it)==='diagram';});
   var kept=items.filter(function(it){return it!==diagram || controlsRows>0;}).map(function(it){
@@ -2258,7 +2258,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   if(!items)return null;
   var dock=sectionLayoutDock(items),separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
   var named=definition && !definition.legacy;
-  var defaultView=named?layoutId:'layout';
+  var defaultView=named?layoutId:base?base.defaultView():'flow';
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -2275,10 +2275,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   });
   /* Keep authored choices before the standard Data flow button. */
   Object.keys(buttons).reverse().forEach(function(id){group.insertBefore(buttons[id],group.firstChild);});
-  var homeChoice=group.querySelector('[data-view-focus="panel"]');if(homeChoice)homeChoice.remove();
+  var homeChoice=group.querySelector('[data-view-focus="panel"]');if(named && homeChoice)homeChoice.remove();
   if(named)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.remove();});
-  var standard;
-  if(!base && !named){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';standard.setAttribute('data-view-focus','flow');group.appendChild(standard);}
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
@@ -2327,7 +2325,6 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
-    if(standard)standard.setAttribute('aria-pressed','true');
     if(!quiet)viewport.setView({id:'flow',presentation:'standard'},[],layout.grid);
     if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
@@ -2373,10 +2370,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     paintFlow();
     viewport.setView(sectionLayoutDefinition(d,layoutId),items);
     if(changed)changed(viewport.scrollTarget());
-    if(standard)standard.setAttribute('aria-pressed','false');
-    group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
+    group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(!named && b.getAttribute('data-view-focus')==='flow'));});
   }
-  function setMode(value){if(named || value==='layout'||value==='panel')activate();else{restore();if(stepper)stepper.setViewFilter(null,null);if(base)base.setMode(value);}}
+  function setMode(value){if(named || value==='layout' || value==='flow' || !base)activate();else{restore();if(stepper)stepper.setViewFilter(null,null);base.setMode(value);}}
   function setLayout(id){
     if(!views.some(function(v){return v.id===id;}))return;
     if(id!==layoutId){
@@ -2387,26 +2383,27 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     activate();
   }
-  if(standard)standard.addEventListener('click',function(){setMode('flow');});
   group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]')){restore();if(stepper)stepper.setViewFilter(null,null);}},true);
-  activate();
+  group.addEventListener('click',function(ev){var choice=ev.target.closest('[data-view-focus]');if(!named && choice && choice.getAttribute('data-view-focus')==='flow')activate();});
+  if(named || defaultView==='flow')activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
     setLayoutTarget:function(value){
       value=value || 'default';if(value===(target || 'default'))return;
-      restore(true);target=value;items=sectionLayoutItems(d,target,layoutId);
+      var wasActive=active;restore(true);target=value;items=sectionLayoutItems(d,target,layoutId);
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
-      grid.setAttribute('data-layout-target',target);activate();
+      grid.setAttribute('data-layout-target',target);if(wasActive)activate();
     },
     views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
     snapshotReaderState:function(){return {viewport:viewport.snapshotReaderState()};},
     restoreReaderState:function(saved){if(saved)viewport.restoreReaderState(saved.viewport);},
-    viewId:function(){return active?(named?layoutId:'layout'):'flow';},
+    viewId:function(){return active?(named?layoutId:'flow'):base?base.viewId():'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
       if(named){if(!views.some(function(v){return v.id===id;}))return false;setLayout(id);return true;}
-      if(id==='layout' || id==='home'){setMode('layout');return true;}
+      if(id==='layout' || id==='default'){setMode('layout');return true;}
+      if(id==='home' && base){setMode('panel');return true;}
       if(id==='flow'){setMode('flow');return true;}
       return false;
     },
@@ -3540,7 +3537,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   }
   function linkedView(sec){
     var selected=sec && ctl.views && ctl.views.current(sec);
-    return selected && !selected.legacy ? selected.id : sec && sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : sec && sec.hasDiagram ? 'flow' : selected && selected.id;
+    return selected && (!selected.legacy || !selected.legacyLayout) ? selected.id : sec && sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : sec && sec.hasDiagram ? 'flow' : selected && selected.id;
   }
   function stateHash(state){
     var st = {};

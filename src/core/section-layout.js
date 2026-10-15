@@ -175,13 +175,15 @@ function diagramLayoutViews(d){
     used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
       paths:Array.isArray(v.paths)?v.paths:undefined,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
-  if(views.length)return views;
-  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
-    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',presentation:'standard',sectionLayout:d.sectionLayout,legacy:true}] : [];
+  return views;
 }
+/* Default placement is not a reader View. Keep it available to rendering and
+   Arrange without adding a choice to either navigation layer. */
 function sectionLayoutDefinition(d, id){
   var views=diagramLayoutViews(d);
-  return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
+  if(views.length)return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
+  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
+    {id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Standard',presentation:'standard',sectionLayout:d.sectionLayout,legacy:true} : undefined;
 }
 function sectionViewStepsReachable(d,ids,pathIds){
   return diagramPathList(d).some(function(p){return (!Array.isArray(pathIds) || pathIds.indexOf(p.id)>=0) && p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});

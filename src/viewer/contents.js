@@ -3,7 +3,7 @@
    reader zoom and temporary presentation state, never authored source. */
 function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
-  var expandedTabs=new Set(),expandedViews=new Set(),standardZoom=new Map(),moved=[];
+  var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[];
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
     var paths={'☰':'M4 6h16M4 12h16M4 18h16','‹':'m14 6-6 6 6 6','›':'m9 6 6 6-6 6','«':'M9 4H4v16h16V4h-5M14 8l-4 4 4 4','⋯':'M5 12h.01M12 12h.01M19 12h.01'};
@@ -70,7 +70,7 @@ function createReaderContents(ctl,nav,actions,options){
   function choose(item,definition,rec,fromTop){
     rec=embedded() || rec;
     if(item.tabBlock)ctl.tabBlocks[item.tabBlock-1].select(item.tab,false);
-    expandedTabs.add(item.path);expandedViews.clear();if(definition.presentation==='explore')expandedViews.add(item.path+':'+definition.id);
+    expandedTabs.add(item.path);
     ctl.views.select(item.records[0].runtime,definition.id,rec);
     var target=rec || item.selected;if(target && options.selectSection){options.selectSection(target);pinnedTop=target.sectionEl.getBoundingClientRect().top;}
     if(narrow)setOpen(false,!fromTop);
@@ -105,9 +105,8 @@ function createReaderContents(ctl,nav,actions,options){
       item.views.filter(function(definition){return !embed || definition.members.some(function(member){return member.record.runtime===embed;});}).forEach(function(definition){
         var key=item.path+':'+definition.id,selected=item===owner && item.current===definition,explore=definition.presentation==='explore';
         var row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));if(explore){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-        if(explore){var disclosure=button((expandedViews.has(key)?'Collapse ':'Expand ')+definition.name,expandedViews.has(key)?'⌄':'›',row,function(){if(expandedViews.has(key))expandedViews.delete(key);else expandedViews.add(key);drawTree();});disclosure.classList.add('reader-view-disclosure');disclosure.setAttribute('aria-expanded',String(expandedViews.has(key)));disclosure.setAttribute('data-reader-key',key+':disclosure');}
-        else element('span','reader-view-mode','Standard',row);
-        if(!explore || expandedViews.has(key)){
+        var expanded=!collapsedViews.has(key),disclosure=button((expanded?'Collapse ':'Expand ')+definition.name,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});disclosure.classList.add('reader-view-disclosure');disclosure.setAttribute('aria-expanded',String(expanded));disclosure.setAttribute('data-reader-key',key+':disclosure');
+        if(expanded){
           var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);
           definition.members.filter(function(member){return !embed || member.record.runtime===embed;}).forEach(function(member,index){var rec=member.record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-reader-key',key+':'+rec.number);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));});
         }
@@ -129,7 +128,7 @@ function createReaderContents(ctl,nav,actions,options){
     if(owner && owner.current.presentation==='standard')members.forEach(function(section){section.sectionEl.style.zoom=standardZoom.get(owner.current) || 1;});
     nav.setAttribute('data-reader-multiple-views',String(!!(owner && owner.views.length>1)));
     tabLabel.textContent=owner?ownerLabel(owner):'Document';tabLabel.title=tabLabel.textContent;
-    if(owner){expandedTabs.add(owner.path);if(owner.current && owner.current.presentation==='explore')expandedViews.add(owner.path+':'+owner.current.id);}
+    if(owner)expandedTabs.add(owner.path);
     var index=members.indexOf(current);pageLabel.textContent='Page '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
     // Shared utility controls remain live. Ordinary readers surface the hidden
     // Tab bar's real copy control; a host-owned share action consolidates it.
@@ -159,7 +158,7 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   if(opened!==null)setOpen(opened,false,false);
-  var initialFrame=requestAnimationFrame(function(){if(retired)return;expandedTabs.clear();if(owner)expandedTabs.add(owner.path);expandedViews.clear();if(owner && owner.current.presentation==='explore')expandedViews.add(owner.path+':'+owner.current.id);drawTree();});
+  var initialFrame=requestAnimationFrame(function(){if(retired)return;expandedTabs.clear();if(owner)expandedTabs.add(owner.path);drawTree();});
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
   return {refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

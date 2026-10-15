@@ -151,7 +151,7 @@ for(const entry of ['welcome','editor'])test('Open file loads authored topology 
     if(entry==='welcome')await page.locator('#workspace-home').click();
     await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'reopened.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
     await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
-    await page.locator('#docview [data-dv-node="local"]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited local');await title.press('Enter');
+    await page.locator('#docview [data-dv-node="local"]').click();const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Edited local');await title.press('Enter');
     const edited=await page.locator('#src').inputValue();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);text=edited;
     await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
     await expect(page.locator('#guide')).toContainText('Exported project:');
@@ -197,7 +197,7 @@ for(const entry of ['welcome','editor'])for(const change of ['navigation','sourc
 for(const entry of ['welcome','editor'])for(const failure of ['catalog','provider','revision'])test('Open file from '+entry+' preserves the current draft on '+failure+' failure',async({page})=>{
   const h=await topologyFolderFixture(page);
   try{
-    await fileSurface(page,'editor');await page.locator('#docview [data-dv-node="a"]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Retained local');await title.press('Enter');const before=await page.locator('#src').inputValue();
+    await fileSurface(page,'editor');await page.locator('#docview [data-dv-node="a"]').click();const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Retained local');await title.press('Enter');const before=await page.locator('#src').inputValue();
     if(entry==='welcome')await page.locator('#workspace-home').click();
     if(failure==='catalog')h.catalog.version=2;if(failure==='provider')h.catalog.diagrams=[];if(failure==='revision')h.provider.page.title='Later revision';
     const raw=structuredClone(h.consumer);delete raw.page.canon;raw.topologyContext={catalogURL:'https://untrusted.invalid/providers.json',specs:[h.provider]};
@@ -651,7 +651,7 @@ test('byte-identical Resume clears old history and a late owner change refuses w
     await disconnect(page);
     await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
     await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
-    const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edit before identical Resume');await title.press('Enter');
+    const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Edit before identical Resume');await title.press('Enter');
     await expect(page.locator('#undo-builder')).toBeEnabled();await page.locator('#undo-builder').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#redo-builder')).toBeEnabled();
     await page.locator('#editor-tab-agent').click();await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));

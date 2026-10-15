@@ -159,7 +159,7 @@ test('outline shortcut and selection stay in Outline; explicit inspection opens 
   await page.keyboard.press('ControlOrMeta+k');await expect(page.locator('#editor-outline')).toBeVisible();await expect(page.locator('#outline-search')).toBeFocused();
   await page.locator('#outline-search').fill('Doorbell');await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();
   await expect(page.locator('#editor-outline')).toBeVisible();await page.locator('#outline-inspect').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await expect(title).toHaveValue('Doorbell');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await expect(title).toHaveValue('Doorbell');
   await title.fill('Front camera');await title.press('Enter');await expect(title).toBeFocused();
   await page.locator('#editor-tab-file').click();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.a.title).toBe('Front camera');

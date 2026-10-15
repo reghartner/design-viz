@@ -12,7 +12,7 @@ test('builder destruction retires captured gestures and old controls across same
   await expect(src).toHaveValue(source);
   for(let cycle=0;cycle<2;cycle++){
     await page.evaluate(()=>__editorTest.remount());await node('a').click();
-    const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Camera '+cycle);await title.press('Enter');
+    const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Camera '+cycle);await title.press('Enter');
     expect(JSON.parse(await src.inputValue()).page.blocks[0].diagram.nodes.a.title).toBe('Camera '+cycle);
     await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
     await page.locator('#editor-tab-file').click();

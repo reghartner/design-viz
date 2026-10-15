@@ -20,7 +20,7 @@ async function blockDraftArchive(page){
 test('failed Build archive keeps source and Undo, shows recovery, and downloads exact draft',async({page,server},testInfo)=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('[data-dv-node="a"]').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});
   await title.fill('Retained camera');await title.press('Enter');
   const edited=source.replace('"title": "Doorbell"','"title": "Retained camera"');
   await expect(page.locator('#src')).toHaveValue(edited);
@@ -115,7 +115,7 @@ test('browser navigation follows entry screens, retains unfinished input and can
 test('Back and Forward preserve edited source and Undo; editor reload restores an unfinished draft',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('[data-dv-node="a"]').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});
   await title.fill('Retained camera');await title.press('Enter');
   const edited=source.replace('"title": "Doorbell"','"title": "Retained camera"');
   const src=page.locator('#src');await expect(src).toHaveValue(edited);

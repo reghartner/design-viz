@@ -52,7 +52,7 @@ for(const mode of ['file','canon'])for(const view of ['ambient','step','explore'
   diagram(provider).nodes.api.title='Later deployment';diagram(provider).edges=[];
   const before=await source(page);
   await node(page,'local').click();await page.locator('#editor-tab-inspect').click();
-  const title=page.getByRole('textbox',{name:'title',exact:true});await title.fill('Edited local');await title.press('Enter');
+  const title=page.getByRole('textbox',{name:'Name',exact:true});await title.fill('Edited local');await title.press('Enter');
   await roundtrip(page,before);await painted(page);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
   const bytes=await projectSource(await download),saved=JSON.parse(bytes);

@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,openInspectorGroup} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'examples/free-placement/free-placement.spec.json'),'utf8'));
 const diagram=raw=>raw.page.blocks[0].diagram;
@@ -20,7 +20,7 @@ test('new nodes are immediately draggable free nodes with one-step Undo and Redo
  const root=page.locator('#docview'),before=await source(page),d=diagram(JSON.parse(before));
  expect(d.rows).toEqual([[]]);expect(d.floats).toHaveLength(2);
  const f=d.floats[0];await node(root,f.id).click();
- await expect(page.locator('#guide').getByRole('combobox',{name:'float',exact:true})).toHaveValue('free');
+ await expect(page.locator('#guide').getByRole('combobox',{name:'Placement',exact:true})).toHaveValue('free');
  await startDrag(page,root,f.id,90,100);await page.mouse.up();
  const moved=diagram(await raw(page));
  expect(Math.abs(moved.floats[0].x-f.x-90)).toBeLessThan(2);expect(Math.abs(moved.floats[0].y-f.y-100)).toBeLessThan(2);
@@ -81,13 +81,13 @@ test('automatic floats become pinned on drag, with Escape, blur, stale source an
 
 test('inspector places nodes freely, restores row placement, and exposes independent edge sides and percentages',async({page,server},testInfo)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(example));const root=page.locator('#docview'),guide=page.locator('#guide');
- await node(root,'gateway').click();await guide.getByRole('combobox',{name:'float',exact:true}).selectOption('free');
- expect(diagram(await raw(page)).rows).toEqual([['doorbell','recording']]);await expect(guide.getByLabel('Float X',{exact:true})).toBeVisible();
+ await node(root,'gateway').click();await guide.getByRole('combobox',{name:'Placement',exact:true}).selectOption('free');
+ expect(diagram(await raw(page)).rows).toEqual([['doorbell','recording']]);await openInspectorGroup(guide.locator('.node-advanced'));await expect(guide.getByLabel('Float X',{exact:true})).toBeVisible();
  await guide.getByLabel('Float X',{exact:true}).fill('-120');await guide.getByLabel('Float X',{exact:true}).press('Enter');
  expect(diagram(await raw(page)).floats.find(f=>f.id==='gateway').x).toBe(-120);
  let g=await geometry(root,'gateway');expect(g.x+g.w/2).toBe(-120);
  const vb=await node(root,'gateway').evaluate(n=>n.ownerSVGElement.getAttribute('viewBox'));expect(Number(vb.split(' ')[0])).toBeLessThan(-195);
- await guide.getByRole('combobox',{name:'float',exact:true}).selectOption('');expect(diagram(await raw(page)).rows).toEqual([['doorbell','recording'],['gateway']]);
+ await guide.getByRole('combobox',{name:'Placement',exact:true}).selectOption('');expect(diagram(await raw(page)).rows).toEqual([['doorbell','recording'],['gateway']]);
  await root.locator('text.lbl[data-dv-edge="0"]').click();await guide.getByRole('combobox',{name:'Exit side',exact:true}).selectOption('left');
  await guide.getByLabel('Exit position (%)',{exact:true}).fill('25');await guide.getByLabel('Exit position (%)',{exact:true}).press('Enter');
  await guide.getByRole('combobox',{name:'Entry side',exact:true}).selectOption('bottom');await guide.getByLabel('Entry position (%)',{exact:true}).fill('75');await guide.getByLabel('Entry position (%)',{exact:true}).press('Enter');

@@ -1,4 +1,4 @@
-import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openInspectorGroup} from '../helpers/test.mjs';
 
 function fixture(kind){
   const diagram={primaryPanel:'home',view:'step',autoplay:false,nodes:{camera:{title:'Camera'},service:{title:'Service'}},rows:[['camera','service']],edges:[{from:'camera',to:'service'}],
@@ -14,7 +14,11 @@ function fixture(kind){
 }
 const section=page=>page.locator('#docview .doc-sec').first();
 const guide=page=>page.locator('#guide');
-async function change(page,label,value){await page.locator('#editor-tab-inspect').click();const field=guide(page).getByLabel(label,{exact:true});await field.fill(value);await field.press('Enter');}
+async function change(page,label,value){
+  await page.locator('#editor-tab-inspect').click();
+  if(label==='Stable identifier')await openInspectorGroup(guide(page).locator('.node-advanced'));
+  const field=guide(page).getByLabel(label,{exact:true});await field.fill(value);await field.press('Enter');
+}
 async function renderJSON(page,edit){
   const raw=JSON.parse(await page.locator('#src').inputValue());edit(raw);
   await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();
@@ -24,7 +28,7 @@ for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view 
   const flow=kind==='named'?'service-flow':'flow';
   await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true}).click();
   await expect(section(page)).toHaveAttribute('data-view-id',flow);
-  await section(page).locator('[data-dv-node="camera"]').click();await change(page,'id','doorbell');
+  await section(page).locator('[data-dv-node="camera"]').click();await change(page,'Stable identifier','doorbell');
   await expect(section(page)).toHaveAttribute('data-view-id',flow);
   await expect(section(page).locator('[data-dv-node="doorbell"]')).toBeVisible();
   await page.locator('#undo-builder').click();await expect(section(page)).toHaveAttribute('data-view-id',flow);

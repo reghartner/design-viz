@@ -439,7 +439,7 @@ test('two inspectors keep group suggestions in their own DOM and retire those no
 test('same multiselection refresh keeps its active field and scroll, while changed targets start fresh',()=>{
   const e=environment(),h=e.mount({nodes:{a:{},b:{},c:{}},rows:[['a','b','c']]}),before=h.text;
   const targets=['a','b'].map(id=>({kind:'node',section:0,id}));h.session.target=null;
-  const tint=()=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='tint').querySelector('select');
+  const tint=()=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Color').querySelector('select');
   h.inspector.renderMulti(targets);const old=tint();old.focus();h.guide.scrollTop=91;
   old.value='dev';old.fire('change');
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.tint),['dev','dev',undefined]);
@@ -448,6 +448,42 @@ test('same multiselection refresh keeps its active field and scroll, while chang
   h.inspector.renderMulti([targets[0],{kind:'node',section:0,id:'c'}]);
   assert.notEqual(e.doc.activeElement,tint());assert.equal(h.guide.scrollTop,0);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('node inspector leads with plain fields and preserves expert data behind target-scoped Advanced',()=>{
+  const long='Camera responsible for the north entrance and after-hours deliveries';
+  const spec={nodes:{a:{title:long,sub:'Porch',icon:'camera',tint:'legacy',group:'outside',
+    binding:{entityRef:'component:default/camera'},codeRefs:[{url:'https://example.com/camera.js'}]},b:{title:'Receiver'}},
+    rows:[['b']],floats:[{id:'a',x:321,y:123,side:'below'}],groups:{outside:{title:'Outside'}}};
+  const e=environment(),h=e.mount(spec),before=h.text;h.session.target={kind:'node',section:0,id:'a'};h.inspector.render();
+  const labels=h.guide.querySelector('.iform').children.filter(row=>row.matches('.frow')).map(row=>row.querySelector('.flab')?.textContent);
+  assert.deepEqual(labels.slice(0,5),['Name','Subtitle','Icon','Color','Placement']);
+  assert.equal(h.guide.querySelector('.inspector-title').textContent,'Node · '+long);
+  assert.equal(h.text,before,'opening the form must preserve unknown tokens and exact source');
+  const advanced=h.guide.querySelector('.node-advanced');assert.equal(advanced.open,false);
+  assert.ok(advanced.querySelector('.node-source-path').textContent.includes('nodes'));
+  for(const label of ['Stable identifier','Float X','Float Y','Service binding JSON','Code references JSON'])
+    assert.ok(advanced.querySelectorAll('.flab').some(node=>node.textContent===label),label);
+  const color=h.guide.querySelector('[aria-label="Node color"]');
+  assert.equal(color.value,'legacy');assert.equal(color.children.at(-1).textContent,'legacy (unknown)');
+  assert.ok(color.children.some(option=>option.value==='auth' && option.textContent==='Identity & access · amber'));
+  color.value='mqtt';color.fire('change');assert.equal(JSON.parse(h.text).nodes.a.tint,'mqtt');
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+
+  advanced.open=true;advanced.fire('toggle');h.guide.scrollTop=87;
+  const stable=advanced.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Stable identifier').querySelector('input');
+  stable.focus();stable.value='camera';stable.fire('change');
+  const renamedAdvanced=h.guide.querySelector('.node-advanced');
+  const renamedStable=renamedAdvanced.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Stable identifier').querySelector('input');
+  assert.equal(renamedAdvanced.open,true);assert.equal(e.doc.activeElement,renamedStable);
+  assert.equal(h.guide.scrollTop,87);assert.ok(JSON.parse(h.text).nodes.camera);
+  assert.deepEqual(JSON.parse(h.text).floats[0],{id:'camera',x:321,y:123,side:'below'});
+  const placement=h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Placement').querySelector('select');
+  placement.focus();placement.value='above';placement.fire('change');
+  const refreshed=h.guide.querySelector('.node-advanced');assert.equal(refreshed.open,true);
+  assert.equal(e.doc.activeElement,h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Placement').querySelector('select'));
+  assert.equal(h.guide.scrollTop,87);assert.deepEqual(JSON.parse(h.text).floats[0],{id:'camera',side:'above'});
+  h.session.target={kind:'node',section:0,id:'b'};h.inspector.render();assert.equal(h.guide.querySelector('.node-advanced').open,false);
 });
 
 test('replacing a form releases its controls and registered panel resources, without retiring another inspector',()=>{

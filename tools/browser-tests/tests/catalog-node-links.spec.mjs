@@ -1,4 +1,4 @@
-import {test,expect,paste,closeTools,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,inspectPageElement,openInspectorGroup} from '../helpers/test.mjs';
 
 const serviceRef='component:default/recording';
 const catalog={version:1,services:[
@@ -17,8 +17,9 @@ test('catalog selection seeds an empty title, preserves authored names, and undo
   const src=page.locator('#src'),guide=page.locator('#guide');
   const nodes=async()=>JSON.parse(await src.inputValue()).page.blocks[0].diagram.nodes;
   await page.locator('[data-dv-node="a"]').click();
+  await openInspectorGroup(guide.locator('.node-advanced'));
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption(serviceRef);
-  await expect(guide.getByLabel('title',{exact:true})).toHaveValue('Recording service');
+  await expect(guide.getByLabel('Name',{exact:true})).toHaveValue('Recording service');
   expect((await nodes()).a.binding.entityRef).toBe(serviceRef);
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
   await page.locator('#redo-builder').click();
@@ -26,13 +27,15 @@ test('catalog selection seeds an empty title, preserves authored names, and undo
   expect((await nodes()).a.binding.entityRef).toBe(serviceRef);
   // API selection must not refill a title the author deliberately cleared.
   await page.locator('[data-dv-node="a"]').click();
-  await guide.getByLabel('title',{exact:true}).fill('');await guide.getByLabel('title',{exact:true}).press('Enter');
+  await openInspectorGroup(guide.locator('.node-advanced'));
+  await guide.getByLabel('Name',{exact:true}).fill('');await guide.getByLabel('Name',{exact:true}).press('Enter');
   await guide.getByRole('combobox',{name:'Service API',exact:true}).selectOption('api:default/recording');
   await guide.getByRole('combobox',{name:'API operation',exact:true}).selectOption('record');
   expect((await nodes()).a.title).toBeUndefined();
   await inspectPageElement(page,page.locator('[data-dv-node="b"]'));
+  await openInspectorGroup(guide.locator('.node-advanced'));
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption(serviceRef);
-  await expect(guide.getByLabel('title',{exact:true})).toHaveValue('Authored name');
+  await expect(guide.getByLabel('Name',{exact:true})).toHaveValue('Authored name');
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption('component:default/notifications');
   expect((await nodes()).b.title).toBe('Authored name');
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption('');
@@ -66,5 +69,6 @@ test('linked nodes use object actions while the links trigger keeps click and ke
   await trigger.focus();await trigger.press('Shift+F10');await expect(links).toBeVisible();
   await page.keyboard.press('Escape');await expect(links).toBeHidden();await expect(trigger).toBeFocused();
   await trigger.click();await links.getByRole('button',{name:'Close node links'}).click();await expect(links).toBeHidden();
-  await inspectPageElement(page,node);await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
+  await inspectPageElement(page,node);await openInspectorGroup(page.locator('#guide .node-advanced'));
+  await expect(page.locator('#guide').getByLabel('Stable identifier',{exact:true})).toHaveValue('a');
 });

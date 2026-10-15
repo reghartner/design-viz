@@ -124,7 +124,7 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   expect(d.floats.find(f=>f.id==='a').y).toBeCloseTo(d.floats.find(f=>f.id==='b').y,3);await history(page,original,changed);const aligned=changed;
 
   await closeTools(page);await node(page,'c').click({button:'right'});await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);await expect(node(page,'c')).toHaveClass(/dv-sel/);
-  await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Stay');
+  await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Stay');
   await node(page,'c').focus();await page.keyboard.press('Shift+F10');await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();
   for(const name of ['Lock position','Delete','Duplicate']){await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeFocused();}await page.keyboard.press('Enter');
   changed=await source(page);expect(Object.keys((await diagram(page)).nodes)).toHaveLength(5);await history(page,aligned,changed);const duplicated=changed;

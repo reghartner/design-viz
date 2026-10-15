@@ -33,7 +33,7 @@ test('branched parent extraction previews changes, keeps an independent child an
   expect(child.steps).toEqual([]);expect(child.paths).toBeUndefined();expect(child.initial).toBeUndefined();
   // The authored parent node body continues to select its inspector.
   await page.locator('#section-overview [data-dv-node="domain1"]').click();
-  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Orders');
+  await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Orders');
   const extracted=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
   expect(await page.locator('#undo-builder').isDisabled()).toBe(undoWasDisabled);await page.locator('#redo-builder').click();await expect(src).toHaveValue(extracted);
 });

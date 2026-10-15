@@ -46,7 +46,7 @@ for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused pre
   await settled();expect(await position()).toBeCloseTo(before,0);
 
   await section.locator('[data-dv-node="c"]').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});
   await title.fill('Recordings');
   const beforeEdit=await position();
   await title.press('Enter');await expect(title).toBeFocused();

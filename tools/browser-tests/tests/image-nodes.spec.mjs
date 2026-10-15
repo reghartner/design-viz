@@ -35,8 +35,8 @@ test('drop and paste add ordinary image nodes in Standard and Explore with one U
   await expect(image.locator('image.node-image')).toHaveAttribute('href',/^data:image\/png;base64,/);
   await expect(image).toHaveAttribute('aria-label',/Camera capture/);
   await image.click();await page.locator('#editor-tab-inspect').click();
-  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Camera capture');
-  await expect(page.locator('#guide').getByLabel('image alt text',{exact:true})).toHaveValue('Camera capture');
+  await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Camera capture');
+  await expect(page.locator('#guide').getByLabel('Image description',{exact:true})).toHaveValue('Camera capture');
   const afterDrop=await source(page),dropNode=Object.entries(JSON.parse(afterDrop).page.blocks[0].diagram.nodes).find(([,node])=>node.image);
   expect(dropNode[0]).toMatch(/^camera-capture\d+$/);expect(dropNode[1]).toMatchObject({title:'Camera capture',alt:'Camera capture'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();

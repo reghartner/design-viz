@@ -72,6 +72,64 @@ test('nested handoff and detail commits stay above fields and visible while thei
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
 });
 
+test('node inspector keeps ordinary edits clear and expert source data in Advanced',async({page,server},info)=>{
+  const raw=fixture(),diagram=raw.page.sections[0].diagram;
+  const long='North entrance camera responsible for after-hours package deliveries and visitor verification';
+  diagram.nodes.a={title:long,sub:'Porch · east wall',icon:'camera',tint:'auth',group:'outside',
+    link:'https://example.com/cameras/north',binding:{entityRef:'component:default/north-camera'},
+    codeRefs:[{id:'capture',repository:'https://github.com/example/camera',path:'src/camera.js',revision:'a'.repeat(40),anchor:{start:'// camera:start',end:'// camera:end'}}]};
+  diagram.groups={outside:{title:'Outside'}};diagram.rows=[['b']];diagram.floats=[{id:'a',x:180,y:280,side:'below'}];
+  const original=await start(page,server,raw),guide=page.locator('#guide'),src=page.locator('#src');
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
+  await expect(guide.locator('.inspector-title')).toHaveText('Node · '+long);
+  await expect(guide.locator('.iform>.frow>.flab')).toHaveText(['Name','Subtitle','Icon','Color','Placement','Group','Keep position fixed','Link','Show change marker']);
+  const advanced=guide.locator('.node-advanced');await expect(advanced).not.toHaveAttribute('open');
+  await expect(src).toHaveValue(original);
+  const color=guide.getByLabel('Node color',{exact:true});
+  await expect(color.locator('option')).toHaveText(['Default · Command','Command · blue','Identity & access · amber','Data · violet','Messaging · pink','Device · green']);
+  await expect(color).toHaveValue('auth');
+  const titleBox=await guide.locator('.inspector-title').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));
+  expect(titleBox.scroll).toBeLessThanOrEqual(titleBox.client);
+
+  for(const [width,height,name] of [[1280,720,'node-common-1280x720.png'],[1440,900,'node-common-1440x900.png']]){
+    await page.setViewportSize({width,height});await page.screenshot({path:info.outputPath(name)});
+  }
+  await advanced.locator(':scope > summary').focus();await page.keyboard.press('Enter');await expect(advanced).toHaveAttribute('open');
+  for(const label of ['Stable identifier','Float X','Float Y','Service binding JSON','Code references JSON'])
+    await expect(advanced.locator('.frow').filter({has:page.locator('.flab').filter({hasText:new RegExp('^'+label+'$')})})).toHaveCount(1);
+  await expect(advanced.locator('.node-source-path')).toContainText('nodes');
+  for(const [width,height,name] of [[1280,720,'node-advanced-1280x720.png'],[1440,900,'node-advanced-1440x900.png']]){
+    await page.setViewportSize({width,height});await advanced.scrollIntoViewIfNeeded();await page.screenshot({path:info.outputPath(name)});
+  }
+
+  const name=guide.getByLabel('Name',{exact:true});await name.focus();await name.evaluate(el=>el.setSelectionRange(6,6));
+  await page.keyboard.type('entry ');await page.keyboard.press('Tab');await expect(guide.getByLabel('Subtitle',{exact:true})).toBeFocused();
+  const renamed=JSON.parse(await src.inputValue());expect(renamed.page.sections[0].diagram.nodes.a.title).toBe('North entry entrance camera responsible for after-hours package deliveries and visitor verification');
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+  await page.locator('#redo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.title).toContain('North entry entrance');
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"]'));
+  await guide.getByLabel('Node color',{exact:true}).selectOption('mqtt');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('mqtt');
+  await page.locator('#undo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('auth');
+  await page.locator('#redo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('mqtt');
+
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"]'));
+  await openInspectorGroup(guide.locator('.node-advanced'));
+  const stable=guide.getByLabel('Stable identifier',{exact:true});await stable.fill('');await stable.press('Enter');
+  const error=guide.locator('.ierr');await expect(error).toContainText('a node needs an id');
+  const fit=await error.evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));expect(fit.scroll).toBeLessThanOrEqual(fit.client);
+  await stable.fill('camera');await guide.evaluate(el=>{el.scrollTop=61;});const beforeRenameScroll=await guide.evaluate(el=>el.scrollTop);
+  await stable.press('Enter');await expect(error).toBeHidden();
+  await expect(guide.locator('.node-advanced')).toHaveAttribute('open');await expect(guide.getByLabel('Stable identifier',{exact:true})).toBeFocused();
+  await expect.poll(()=>guide.evaluate(el=>el.scrollTop)).toBe(beforeRenameScroll);
+  expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.camera.title).toContain('North entry entrance');
+
+  const placement=guide.getByText('Placement',{exact:true}).locator('..').locator('select');await placement.focus();await guide.evaluate(el=>{el.scrollTop=73;});
+  await placement.selectOption('above');await expect(guide.getByText('Placement',{exact:true}).locator('..').locator('select')).toBeFocused();
+  await expect(guide.locator('.node-advanced')).toHaveAttribute('open');await expect.poll(()=>guide.evaluate(el=>el.scrollTop)).toBe(73);
+  expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.floats[0].side).toBe('above');
+  await page.locator('#section-overview [data-dv-node="b"] .t1').click();await expect(guide.locator('.node-advanced')).not.toHaveAttribute('open');
+});
+
 test('extraction actions remain visible over a long preview and external Apply tracks the current download',async({page,server},info)=>{
   const raw=fixture();delete raw.page.sections[0].diagram.nodes.a.detail;delete raw.page.sections[0].diagram.nodes.b.handoff;
   const original=await start(page,server,raw),guide=page.locator('#guide'),src=page.locator('#src');

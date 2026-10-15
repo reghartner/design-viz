@@ -1314,7 +1314,7 @@ test('node drag threshold preserves click selection and no-op gaps show no line'
 test('node inspector float dropdown commits membership and refreshes its selected side', () => {
   const h = importHarness(null, nodePlacementFixture());
   function floatSelect(){
-    return h.elements.guide.querySelectorAll('.frow').find(row => row.firstChild.textContent === 'float').children[1];
+    return h.elements.guide.querySelectorAll('.frow').find(row => row.firstChild.textContent === 'Placement').children[1];
   }
   h.cards.a.fire('click');
   assert.equal(floatSelect().value, '');

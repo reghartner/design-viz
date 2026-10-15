@@ -231,7 +231,7 @@ for(const settlement of ['resolve','reject'])test('a stale local catalog '+settl
   const fixture=await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
   await page.locator('.welcome-template-card').filter({hasText:'Simple service flow'}).click();await prepareEditorSurface(page);
   const selected=page.locator('#docview g.node[data-dv-node]').first();await inspectPageElement(page,selected.locator('.t1'));
-  const title=page.locator('#guide').getByLabel('title',{exact:true}),before=await page.locator('#src').inputValue();
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),before=await page.locator('#src').inputValue();
   await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
   function deferred(){let release;return {promise:new Promise(resolve=>release=resolve),release};}
   const attempts=[0,1].map(()=>({gate:deferred(),seen:deferred(),done:deferred()}));let request=0;
@@ -408,7 +408,7 @@ test('a published topology consumer renders and its imported node inspector is r
   await page.locator('#docview [data-dv-node="platform::api"]').click();
   await page.locator('#editor-tab-inspect').click();
   await expect(page.locator('#guide')).toContainText('Read-only topology structure from first / core');
-  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveCount(0);
+  await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveCount(0);
   const source=JSON.parse(await page.locator('#src').inputValue());
   expect(source.page.sections[0].diagram.steps[1].edge).toBe('platform::api->platform::store');
   expect(source.page.sections[0].diagram.topologyImports[0].spec).toBe('first');

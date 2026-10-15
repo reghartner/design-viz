@@ -29,7 +29,7 @@ test('human guide is readable, keyboard accessible and isolates the active edito
   expect(await page.evaluate(()=>({url:location.href,length:history.length}))).toEqual(before);
   await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();await expect(page.locator('[data-open-human-guide]').first()).toBeFocused();
   await paste(page,source);await page.locator('#docview [data-dv-node="a"]').click();
-  await page.locator('#guide').getByLabel('title',{exact:true}).fill('My camera');await page.locator('#guide').getByLabel('title',{exact:true}).press('Enter');
+  await page.locator('#guide').getByLabel('Name',{exact:true}).fill('My camera');await page.locator('#guide').getByLabel('Name',{exact:true}).press('Enter');
   const edited=await page.locator('#src').inputValue();const selection=await page.locator('#guide').textContent();
   await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();
   await page.locator('#workspace-focus').click();await page.locator('#editor-tab-inspect').click();await openGuide(page);
@@ -55,7 +55,7 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   await page.setViewportSize({width:offline?760:1440,height:1000});
   await page.goto(offline?pathToFileURL(server.root+'/workbench.html').href:server.origin+'/workbench.html');
   await paste(page,source);await page.locator('#docview [data-dv-node="a"]').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});
   await title.fill('Walkthrough draft');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();
   await page.locator('#workbench-home').click();await page.locator('#welcome-agent').click();

@@ -260,6 +260,25 @@ function selectControl(options, current, commit, allowEmpty, commitUnchanged){
 function iconPickerControl(select){
     return createFlowIconPicker({document:document,select:select,listen:listen,onRetire:function(fn){formLife.own(fn);}});
   }
+function nodeColorControl(value,commit,emptyLabel){
+    var current=value == null ? '' : value;
+    var wrap=document.createElement('div');wrap.className='node-color-control sk-daylight';
+    var target=session.target && session.target.el,skin=target && target.closest && target.closest('.sk-aurora,.sk-daylight');
+    if(skin && skin.classList.contains('sk-aurora'))wrap.className='node-color-control sk-aurora';
+    var swatch=document.createElement('span');swatch.className='node-color-swatch';swatch.setAttribute('aria-hidden','true');
+    function show(token){swatch.className='node-color-swatch'+(TINT_SET.indexOf(token)>=0?' tint-'+token:'');}
+    var select=selectControl(TINT_SET,current,function(next){
+      var token=next || 'cmd',accepted=commit(next);
+      if(accepted!==false)show(token);
+      return accepted;
+    },true);
+    var labels={cmd:'Command · blue',auth:'Identity & access · amber',data:'Data · violet',mqtt:'Messaging · pink',dev:'Device · green'};
+    Array.prototype.forEach.call(select.options,function(option){
+      option.textContent=option.value===''?(emptyLabel || 'Default · Command'):labels[option.value] || option.textContent;
+    });
+    select.setAttribute('aria-label','Node color');show(current || 'cmd');
+    wrap.appendChild(swatch);wrap.appendChild(select);return wrap;
+  }
 function brandControl(val,ctx){
     var target=Object.assign({},session.target),source=session.text();
     return createFlowBrandControl({document:document,global:FlowBrand.global(),shared:ctx.diagram.brand,local:val.brand,
@@ -477,11 +496,11 @@ function nodeForm(val, ctx){
     Array.from(floatControl.children).forEach(function(option){
       if(option.value)option.textContent={free:'Free placement',above:'Auto above',below:'Auto below'}[option.value];
     });
-    var floatRows=[];
+    var geometryRows=[];
     if(floatEntry){
       var position=layout(ctx.diagram).pos[t.id];
       [['x','Float X','cx'],['y','Float Y','cy']].forEach(function(field){
-        floatRows.push(frow(field[1],numberControl(position[field[2]],function(value){
+        geometryRows.push(frow(field[1],numberControl(position[field[2]],function(value){
           return commitCascade(function(raw){
             var got=builderDiagram(session.text(),raw,t.section);if(got.error)return got;
             var p=layout(got.d).pos[t.id];
@@ -491,35 +510,46 @@ function nodeForm(val, ctx){
       });
       var hint=document.createElement('p');hint.className='fnote';
       hint.textContent='Drag anywhere to pin this node. X/Y locate its center in diagram units, independent of zoom. Choose Auto above/below to release the pin, or in rows to restore row placement.';
-      floatRows.push(hint);
+      geometryRows.push(hint);
     }
-    return [
-      frow('id', textControl(t.id, function(v){
+    var advanced=document.createElement('details');advanced.className='node-advanced';
+    var advancedSummary=document.createElement('summary');advancedSummary.textContent='Advanced';advanced.appendChild(advancedSummary);
+    advanced.appendChild(frow('Stable identifier', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
         if (v === t.id){ formError(''); return true; }
         return commitCascade(function(raw){ return planRenameNode(session.text(), raw, t.section, t.id, v); },
-          {after: function(){ t.id = v; renderInspector(); }});
-      }, {required: 'a node needs an id'})),
-      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
-      frow('group', groupControl(val.group, function(v){
+          {after: function(){
+            t.id = v;
+            /* Renaming keeps the same selected card, so carry its live form state
+               forward under the new stable identity before rebuilding the form. */
+            inspectorScrollKey = targetIdentity();
+            renderInspector();
+          }});
+      }, {required: 'a node needs an id'})));
+    if(ctx.sourcePath){ctx.sourcePath.classList.add('node-source-path');advanced.appendChild(ctx.sourcePath);}
+    geometryRows.forEach(function(row){advanced.appendChild(row);});
+    catalogControls(val).forEach(function(row){advanced.appendChild(row);});
+    advanced.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
+    return [
+      frow('Name', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
+      frow('Subtitle', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
+      frow('Icon', iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); }))),
+      frow('Color', nodeColorControl(val.tint,function(v){return commitSimple('tint',v==null?null:JSON.stringify(v));})),
+      frow('Placement', floatControl),
+      frow('Group', groupControl(val.group, function(v){
         return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
       })),
-      frow('position lock', checkboxControl(val.locked === true, function(on){
+      frow('Keep position fixed', checkboxControl(val.locked === true, function(on){
         return commitCascade(function(raw){return planSetNodeLocked(session.text(),raw,t.section,t.id,on);},{after:function(){renderInspector();}});
-      })),
-      frow('float', floatControl)
-    ].concat(floatRows,[
-      frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); }))
-    ],val.image ? [
-      frow('image alt text', textControl(val.alt, function(v){ return commitSimple('alt', v == null ? null : JSON.stringify(v)); }, {required:'Describe the image for readers who cannot see it.'}))
+      }))
+    ].concat(val.image ? [
+      frow('Image description', textControl(val.alt, function(v){ return commitSimple('alt', v == null ? null : JSON.stringify(v)); }, {required:'Describe the image for readers who cannot see it.'}))
     ] : [],[
-      frow('icon', iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); }))),
-      frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
-      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
-      frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
+      frow('Link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
+      frow('Show change marker', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val)
-    ],[handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+    ],[handoffControls(val),detailControls(val,ctx),advanced]);
   }
 
 function textBoxForm(val){
@@ -2365,12 +2395,12 @@ function renderMultiInspector(multiSel){
       });
       ensureGroupDatalist(diagrams);
       var mixed = values.some(function(v){ return v !== values[0]; });
-      form.appendChild(frow('group', groupControl(mixed ? null : values[0], function(v){
+      form.appendChild(frow('Group', groupControl(mixed ? null : values[0], function(v){
         return commitGroup(function(raw){ return planBulkSetGroup(session.text(), raw, multiSel, v); });
       }, {placeholder: mixed ? 'mixed — empty removes' : 'group key — empty removes', commitUnchanged: mixed})));
-      form.appendChild(frow('tint', selectControl(['cmd', 'auth', 'data', 'mqtt', 'dev'], null, function(v){
+      form.appendChild(frow('Color', nodeColorControl(null,function(v){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
-      }, true)));
+      },'Choose a color')));
       var mixedIcons=nodeIcons.some(function(icon){return icon!==nodeIcons[0];});
       var bulkIcon=selectControl(
         ICON_SET, mixedIcons?'':nodeIcons[0], function(v){
@@ -2378,7 +2408,7 @@ function renderMultiInspector(multiSel){
       }, true,true);
       bulkIcon.setAttribute('data-icon-default-label','Use default icons');
       if(mixedIcons)bulkIcon.setAttribute('data-icon-current-label','Mixed icons');
-      form.appendChild(frow('icon',iconPickerControl(bulkIcon)));
+      form.appendChild(frow('Icon',iconPickerControl(bulkIcon)));
     }
     if (kind === 'edge'){
       form.appendChild(frow('kind', textControl(null, function(v){
@@ -2499,6 +2529,7 @@ function renderInspector(){
     var g = BUILDER_GUIDES[t.kind] || {title: t.kind, how: '', fields: []};
 
     var head = document.createElement('b');
+    head.className = 'inspector-title';
     head.textContent = g.title;
     guide.appendChild(head);
 
@@ -2511,6 +2542,7 @@ function renderInspector(){
     var resolvedPath=!parsed.error?builderTargetPath(resolved,t):null;
     var resolvedValue=resolvedPath?specValueAt(resolved,resolvedPath):null;
     if(t.kind==='node' && isTextBoxNode(resolvedValue))head.textContent='Text box';
+    else if(t.kind==='node')head.textContent='Node · '+((resolvedValue && resolvedValue.title) || t.id);
     var resolvedRec=!parsed.error?specSectionPaths(resolved)[t.section]:null;
     var resolvedDiagram=resolvedRec?specValueAt(resolved,resolvedRec.diagram):null;
     var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(resolvedDiagram,
@@ -2562,7 +2594,8 @@ function renderInspector(){
         selectRange(loc, true);
       });
     }
-    guide.appendChild(p);
+    var commonNode=t.kind==='node' && !isTextBoxNode(resolvedValue);
+    if(!commonNode)guide.appendChild(p);
 
     var posText = parsed.error ? null : builderPositionLine(parsed.raw, t);
     if (posText){
@@ -2586,7 +2619,8 @@ function renderInspector(){
       var rec = specSectionPaths(parsed.raw)[t.section];
       var ctx = {
         page: normalize(parsed.raw) || {},
-        diagram: resolvedDiagram
+        diagram: resolvedDiagram,
+        sourcePath: commonNode ? p : null
       };
       if (t.kind === 'step' && ctx.diagram && ctx.diagram.paths){
         var sharing = diagramPathList(ctx.diagram).filter(function(route){return route.indices.indexOf(t.index) >= 0;});

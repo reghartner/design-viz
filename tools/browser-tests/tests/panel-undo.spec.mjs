@@ -57,7 +57,7 @@ test('panel history survives source rerenders and follows source edits in both d
   const oldPanel=await panel.elementHandle();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Renamed camera');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Renamed camera');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);expect(await oldPanel.evaluate(el=>el.isConnected)).toBe(false);
   await closeTools(page);await expect.poll(()=>geometry(panel)).toEqual(moved);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);await expect.poll(()=>geometry(panel)).toEqual(moved);
@@ -104,7 +104,7 @@ test('drill-down panel geometry survives child refresh and stays scoped when clo
   const oldPanel=await panel.elementHandle();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Updated overview camera');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Updated overview camera');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(original);expect(await oldPanel.evaluate(el=>el.isConnected)).toBe(false);
   await closeTools(page);await expect(detail).toBeVisible();await expect.poll(()=>geometry(panel)).toEqual(resized);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect.poll(()=>geometry(panel)).toEqual(resized);
@@ -155,7 +155,7 @@ test('canvas panel drag and resize take keyboard Undo focus from the Inspector',
   await page.goto(server.origin+'/workbench.html');await paste(page,original);await closeTools(page);
   await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
   await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Focused camera');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Focused camera');await title.press('Enter');
   await expect(page.locator('#src')).toHaveValue(/Focused camera/);const edited=await page.locator('#src').inputValue();
   const panel=page.locator('[data-explore-panel=home]'),before=await geometry(panel),grip=panel.locator('.explore-window-grip');
   await title.focus();await drag(page,grip,-350,60);const moved=await geometry(panel);expect(moved).not.toEqual(before);
@@ -181,7 +181,7 @@ test('a clamped canvas arrow movement is a no-op and preserves Redo',async({page
 test('leaving a changed Inspector field cannot start a drag on a retired canvas',async({page,server})=>{
   await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
   await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
-  const title=page.locator('#guide').getByLabel('title',{exact:true}),panel=page.locator('[data-explore-panel=home]');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),panel=page.locator('[data-explore-panel=home]');
   const before=await geometry(panel),old=await panel.elementHandle();await title.fill('Committed on leaving Inspector');
   await drag(page,panel.locator('.explore-window-grip'),-350,60);
   await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
@@ -194,7 +194,7 @@ test('leaving a changed Inspector field cannot start a drag on a retired canvas'
 test('removing an authored Explore view in handwritten JSON preserves the full source history and draft on Redo',async({page,server})=>{
   await open(page,server);const previous=await page.locator('#src').inputValue();
   await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited camera');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Edited camera');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(previous);await closeTools(page);
   await page.locator('[data-explore-panel=home] .explore-window-grip').focus();await page.keyboard.press('Shift+ArrowLeft');
   expect(await page.locator('#src').inputValue()).not.toBe(edited);

@@ -144,19 +144,20 @@ var BUILDER_GUIDES = {
   },
   node: {
     title: 'Node — one service card',
-    how: 'Edit the selected JSON, then click Render. A node renders only if its id appears in rows (or floats).',
+    how: 'Name and style the selected card here. Advanced keeps its stable identity, source location, exact geometry and integration metadata available when needed.',
     fields: [
-      ['title', 'name on the card'],
-      ['sub', 'one-line detail under the name'],
-      ['icon', 'Browse icons to search by name or category; default gear'],
-      ['tint', 'chip color (default cmd)'],
-      ['group', 'containment-boundary id — members get a dashed box'],
-      ['position lock', 'prevents graph placement changes; content, links, playback and deletion remain editable'],
-      ['float', 'Free placement enables arbitrary dragging and Float X/Y; Auto above/below releases the pin; in rows restores row placement'],
-      ['link', 'permalink URL — clickable ↗ on the card corner'],
-      ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']
+      ['Name', 'name on the card'],
+      ['Subtitle', 'one-line detail under the name'],
+      ['Icon', 'Browse icons to search by name or category; default gear'],
+      ['Color', 'semantic chip color; the stored cmd, auth, data, mqtt or dev token is unchanged'],
+      ['Placement', 'Free placement enables dragging; Auto above/below releases the pin; Rows restores row placement'],
+      ['Group', 'containment boundary whose members share a dashed box'],
+      ['Keep position fixed', 'prevents graph placement changes; content, links, playback and deletion remain editable'],
+      ['Link', 'permalink URL — clickable ↗ on the card corner'],
+      ['Domain detail', 'inner flow: choose a section for a focused drilldown with an overview map'],
+      ['Advanced', 'stable identifier, source path, exact X/Y placement, service binding and code references']
     ],
-    tokens: 'icons: use Browse icons for the shared library · tints: cmd auth data mqtt dev'
+    tokens: 'Color meanings: Command · Identity & access · Data · Messaging · Device'
   },
   edge: {
     title: 'Edge — one hop between nodes',

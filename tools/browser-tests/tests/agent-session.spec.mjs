@@ -49,7 +49,7 @@ test('stale and invalid edits are rejected, focused typing waits, disconnect sto
   await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
   const current=await state(server,s=>s.open && s.source===source);
   await page.locator('[data-dv-node="a"]').click();
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Human camera');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Human camera');await title.press('Enter');
   const human=source.replace('"title": "Doorbell"','"title": "Human camera"');
   await expect(page.locator('#src')).toHaveValue(human);
   await propose(server,{id:'stale',baseRevision:current.revision,source});await result(server,'stale','rejected');
@@ -59,7 +59,7 @@ test('stale and invalid edits are rejected, focused typing waits, disconnect sto
   await propose(server,{id:'invalid',baseRevision:fresh.revision,source:'{broken'});await result(server,'invalid','rejected');
   await expect(page.locator('#src')).toHaveValue(human);
   const next=human.replace('Human camera','Agent camera');
-  await page.locator('#guide').getByLabel('title',{exact:true}).focus();
+  await page.locator('#guide').getByLabel('Name',{exact:true}).focus();
   await propose(server,{id:'wait',baseRevision:fresh.revision,source:next});
   await expect(page.locator('#local-agent-toggle')).toHaveAttribute('title',/waiting/);
   await expect(page.locator('#src')).toHaveValue(human);

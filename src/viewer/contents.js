@@ -50,7 +50,7 @@ function createReaderContents(ctl,nav,actions,options){
     // Hidden layouts and browser full-page capture can report a 0–1px viewport.
     // Preserve the last real layout until usable bounds return.
     if(rect.width<=1)return;
-    nav.classList.toggle('reader-wrapped',rect.width<=1100);
+    nav.classList.toggle('reader-wrapped',rect.width<=900);
     var nextNarrow=rect.width<=670;if(nextNarrow!==narrow){narrow=nextNarrow;nav.classList.toggle('reader-narrow',narrow);
       // A desktop push sidebar must not become an unsolicited modal overlay.
       if(narrow && opened){var focused=root.activeElement || doc.activeElement;setOpen(false,sidebar.contains(focused),false);}

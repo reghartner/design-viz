@@ -74,8 +74,13 @@ test('native folder export preserves the ledger, excludes live metadata and reop
   if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
   const recoveredDraft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
   expect(recoveredDraft.ledger).toBe(ledger);
-  await page.locator('#workspace-home').click();await pastePage(page,source.replace('Export choices','Unrelated'));await page.evaluate(()=>window.selectedFolder='unrelated');
-  await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();await expect(page.locator('#guide')).toContainText('Exported project:');
+  await page.locator('#workspace-home').click();await pastePage(page,source.replace('Export choices','Unrelated'));await page.evaluate(()=>{
+    window.selectedFolder='unrelated';const pick=window.showDirectoryPicker;
+    window.showDirectoryPicker=options=>new Promise(resolve=>{window.releaseExportPicker=()=>resolve(pick(options));});
+  });
+  await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();await expect(page.locator('#guide')).toContainText('Exporting project: unrelated…');
+  await expect(page.locator('#guide')).not.toContainText('Exported project:');await page.evaluate(()=>window.releaseExportPicker());
+  await expect(page.locator('#guide')).toContainText('Exported project: unrelated.spec.json, unrelated.html, unrelated.ledger.md, README.md');
   expect(await page.evaluate(async()=>{const dir=await(await navigator.storage.getDirectory()).getDirectoryHandle('unrelated');return (await(await dir.getFileHandle('unrelated.ledger.md')).getFile()).text();})).toContain('unverified placeholder');
 });
 

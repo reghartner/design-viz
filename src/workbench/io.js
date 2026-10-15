@@ -344,6 +344,7 @@ function createBuilderIO(opts){
     if(snapshot.error){inspectorMessage(snapshot.error);return;}
     // Leave suffix room under the shared ZIP writer’s filename limit.
     var base=specFileName(parsed.raw).slice(0,-10).slice(0,100);
+    inspectorMessage('Exporting project: '+base+'…');
     function prepare(tplText){
       var built=buildExportHtml(tplText,snapshot.text.trim());
       if(built.error)throw Error(built.error);
@@ -385,9 +386,9 @@ function createBuilderIO(opts){
     if(browser.pickDirectory){
       var picked;
       try{picked=browser.pickDirectory({mode:'readwrite'});}
-      catch(ex){if(!ex || ex.name!=='AbortError')inspectorMessage('export failed: '+errorText(ex));return;}
+      catch(ex){inspectorMessage(ex && ex.name==='AbortError'?'Export cancelled.':'export failed: '+errorText(ex));return;}
       Promise.resolve(picked).then(function(dir){if(exportCurrent(run))publish(dir);},function(ex){
-        if(exportCurrent(run) && (!ex || ex.name!=='AbortError'))inspectorMessage('export failed: '+errorText(ex));
+        if(exportCurrent(run))inspectorMessage(ex && ex.name==='AbortError'?'Export cancelled.':'export failed: '+errorText(ex));
       });
     }else publish(null);
   }

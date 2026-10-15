@@ -276,13 +276,25 @@ function directory(){
   return {events,gates,writer,handle,dir};
 }
 async function startDirectory(h){h.click('file-export');await settle();h.requests[0].resolve(response());await settle();}
+test('a repeated export replaces prior success while its picker, template and writes are pending',async()=>{
+  const d=directory();let picker;
+  const h=harness({pickDirectory:()=>picker?picker.promise:Promise.resolve(d.dir)});await startDirectory(h);
+  assert.match(h.messages.at(-1),/^Exported project:/);
+  picker=deferred();h.click('file-export');
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  picker.resolve(d.dir);await settle();assert.equal(h.requests.length,2);
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  d.gates.close=deferred();h.requests[1].resolve(response());await settle();
+  assert.equal(h.messages.at(-1),'Exporting project: original…');
+  d.gates.close.resolve();await settle();assert.match(h.messages.at(-1),/^Exported project:/);
+});
 test('retirement at picker, handle or writable boundaries avoids starting a stale disk write',async()=>{
   const pick=deferred(),h=harness({pickDirectory:()=>pick.promise});h.click('file-export');h.session.replaceProject('{}');
   const d=directory();pick.resolve(d.dir);await settle();assert.equal(h.requests.length,0);assert.deepEqual(d.events,[]);
   for(const stage of ['handle','writable']){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
     await startDirectory(h);h.io.retireProject();d.gates[stage].resolve();await settle();
-    assert.deepEqual(d.events.map(e=>e[0]),stage==='handle'?['handle']:['handle','writable','abort']);assert.deepEqual(h.messages,[]);
+    assert.deepEqual(d.events.map(e=>e[0]),stage==='handle'?['handle']:['handle','writable','abort']);assert.deepEqual(h.messages,['Exporting project: original…']);
   }
 });
 
@@ -291,7 +303,7 @@ test('a write already in progress finishes its authorized snapshot and closes, w
   await startDirectory(h);assert.equal(d.events.at(-1)[0],'write');h.session.replaceProject('{"next":true}');
   d.gates.write.resolve();await settle();
   assert.deepEqual(d.events.map(e=>e[0]),['handle','writable','write','close']);assert.equal(d.events[2][1],INITIAL);
-  assert.deepEqual(h.messages,[]);assert.equal(h.text,'{"next":true}');
+  assert.deepEqual(h.messages,['Exporting project: original…']);assert.equal(h.text,'{"next":true}');
 });
 
 test('directory failures abort opened streams and report only current failures; successful export writes all four matching files',async()=>{
@@ -299,7 +311,7 @@ test('directory failures abort opened streams and report only current failures; 
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
     await startDirectory(h);if(retire)h.io.retireProject();d.gates[stage].reject(new Error(stage+' denied'));await settle();
     assert.equal(d.events.at(-1)[0],'abort');assert.equal(d.events.filter(e=>e[0]==='handle').length,1);
-    if(retire)assert.deepEqual(h.messages,[]);else assert.match(h.messages.at(-1),/export failed while writing: .* denied/);
+    if(retire)assert.deepEqual(h.messages,['Exporting project: original…']);else assert.match(h.messages.at(-1),/export failed while writing: .* denied/);
   }
   const d=directory(),h=harness({pickDirectory:()=>Promise.resolve(d.dir)});await startDirectory(h);
   assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html','original.ledger.md','README.md']);
@@ -395,7 +407,7 @@ test('picker and unopened handle failures publish no files; retired failures lea
   for(const retired of [false,true]){
     const pending=deferred(),h=harness({pickDirectory:()=>pending.promise});h.click('file-export');
     if(retired)h.io.retireProject();pending.reject(new Error('permission denied'));await settle();
-    assert.equal(h.requests.length,0);if(retired)assert.deepEqual(h.messages,[]);else assert.match(h.messages.at(-1),/export failed: permission denied/);
+    assert.equal(h.requests.length,0);if(retired)assert.deepEqual(h.messages,['Exporting project: original…']);else assert.match(h.messages.at(-1),/export failed: permission denied/);
   }
   for(const stage of ['handle','writable']){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
@@ -454,7 +466,7 @@ test('new exports, project replacement and destroy retire pending requests; fail
   const denied=harness({anchorClick(){throw Error('denied');}});denied.click('file-save');denied.requests[0].resolve(response());await settle();
   assert.equal(denied.downloads.length,0);assert.equal(denied.revoked.length,1);assert.equal(denied.timers.size,0);
   const cancelled=harness({pickDirectory:()=>Promise.reject(Object.assign(Error('cancelled'),{name:'AbortError'}))});
-  cancelled.click('file-save');await settle();assert.equal(cancelled.requests.length,0);assert.deepEqual(cancelled.messages,[]);
+  cancelled.click('file-save');await settle();assert.equal(cancelled.requests.length,0);assert.deepEqual(cancelled.messages,['Exporting project: original…','Export cancelled.']);
 });
 
 for(const remount of [false,true])test('a newer export waits for a retiring write across '+(remount?'controller remount':'same owner'),async()=>{

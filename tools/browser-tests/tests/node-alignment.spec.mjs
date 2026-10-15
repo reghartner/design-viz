@@ -112,12 +112,18 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
   await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});const original=await source(page);
   const toolbarFit=page.locator('#workspace-fit-selection'),inspectorFit=page.locator('#guide').getByRole('button',{name:'Fit selection',exact:true});
-  await expect(toolbarFit).toBeDisabled();await expect(toolbarFit).toHaveAttribute('title',/only in Explore/);await expect(inspectorFit).toBeDisabled();await expect(inspectorFit).toHaveAttribute('title',/only in Explore/);
+  await expect(toolbarFit).toBeEnabled();await expect(inspectorFit).toBeEnabled();
+  const pageZoom=await page.locator('#docview .doc-sec').evaluate(el=>el.style.zoom),initialWidth=(await node(page,'a').boundingBox()).width;
+  await toolbarFit.click();
+  expect((await node(page,'a').boundingBox()).width).toBeGreaterThan(initialWidth);
+  await inspectorFit.click();
+  for(const id of ['a','b']){const framed=await node(page,id).evaluate(el=>{const r=el.getBoundingClientRect(),b=el.closest('.board').getBoundingClientRect();return {inside:r.left>=b.left && r.right<=b.right && r.top>=b.top && r.bottom<=b.bottom};});expect(framed.inside).toBe(true);}
+  expect(await page.locator('#docview .doc-sec').evaluate(el=>el.style.zoom)).toBe(pageZoom);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await expect(page.locator('#guide').getByRole('button',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(0);
   await node(page,'b').click({button:'right'});await expect(menu(page)).toBeVisible();await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
   for(const name of ['Inspect','Lock selected positions','Delete','Duplicate','Align horizontally','Align vertically'])await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeVisible();
   await expect(menu(page).getByRole('menuitem',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(2);
-  const menuFit=menu(page).getByRole('menuitem',{name:/^Fit selection/});await expect(menuFit).toHaveAttribute('aria-disabled','true');await expect(menuFit).toContainText('only in Explore');
+  const menuFit=menu(page).getByRole('menuitem',{name:'Fit selection',exact:true});await expect(menuFit).not.toHaveAttribute('aria-disabled','true');
   await page.screenshot({path:'/tmp/standard-node-actions-1280.png'});await info.attach('Standard node actions 1280',{body:await page.screenshot(),contentType:'image/png'});
   await menu(page).getByRole('menuitem',{name:'Align horizontally',exact:true}).click();let changed=await source(page),d=await diagram(page);
   expect(d.floats.find(f=>f.id==='b')).toEqual(fixture().page.blocks[0].diagram.floats.find(f=>f.id==='b'));

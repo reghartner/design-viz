@@ -148,7 +148,7 @@ test('graph tile height follows native width scaling and rejects only oversized 
  const source={diagram:A.seed(diagram(),[])},options=E.inputs(source,1920);options.geometry.bounds=bounds;
  const result=S.solve(source,options),graph=M.layout(result.spec).find(t=>!t.panel&&!t.controls);
  assert.ok(graph.w<24,'one oversized candidate must not discard a narrower fit');
- assert.ok(graph.h<=40);assert.ok(graph.h*40-133>=(graph.w*((options.geometry.gridWidth+8)/24)-8)*bounds.h/bounds.w);
+ assert.ok(graph.h<=40);assert.ok(graph.h*40-165>=(graph.w*((options.geometry.gridWidth+8)/24)-8)*bounds.h/bounds.w);
  const short=P.graphWaste(bounds,graph.w,3,pitch,1),tall=P.graphWaste(bounds,graph.w,30,pitch,1);
  assert.equal(short.labelEstimate,tall.labelEstimate,'tile height does not scale a width-sized SVG');
 });

@@ -501,8 +501,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var r=constrain(w,scaledRect(w,w.state));
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
+      // Clear the entire toolbar, which can be wider than a single panel.
       var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
-      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight=Math.min(columnRight,toolRect.left-stageRect.left-gap);width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
       if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
       r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);

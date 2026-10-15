@@ -46,8 +46,11 @@ function controlBands(base, controlHeight=3, minWidth=10, heights={}) {
 }
 // Standard SVGs have width:100%;height:auto. Tile height never scales them down.
 // Reserve the full width-derived viewBox height plus legend/chrome allowance.
+// Narrow 274–277px tiles wrap the sizing row and Diagram zoom/Fit diagram
+// controls: native Chromium measures up to 145px of header. Add 20px for the
+// board/tile inset and rounding; tile height must never clip the width-sized SVG.
 function graphHeight(bounds,w,pitch,minimum=0) {
-  return Math.max(4,Math.ceil(((w*pitch-8)*bounds.h/Math.max(1,bounds.w)+133)/40),minimum);
+  return Math.max(4,Math.ceil(((w*pitch-8)*bounds.h/Math.max(1,bounds.w)+165)/40),minimum);
 }
 function graphWaste(bounds,w,h,pitch,scale) {
   const fit=Math.max(0,(w*pitch-10)/Math.max(1,bounds.w));

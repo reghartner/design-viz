@@ -152,8 +152,8 @@ def prepare(folder):
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         target.write_text(text, encoding='utf-8')
         os.chmod(target, 0o600)
-    # Refreshing an existing session removes retired bundle-owned files without
-    # touching authored files. The arrange entries were the Chromium-backed
+    # Refreshing an existing session removes retired or omitted optional
+    # bundle-owned files without touching authored files. The arrange entries were the Chromium-backed
     # participant tool. Current browser-free composition modules are retained
     # by the kit membership check below, alongside the graph-only CLI.
     for name in ('docs/agent-operations.md', 'docs/agent-intent-testing.md',
@@ -162,7 +162,7 @@ def prepare(folder):
                  'tools/arrange/measure.cjs', 'tools/arrange/model.cjs',
                  'tools/arrange/package-lock.json', 'tools/arrange/package.json',
                  'tools/arrange/packing.cjs', 'tools/arrange/setup.cjs',
-                 'tools/arrange/solver.cjs'):
+                 'tools/arrange/solver.cjs', 'tools/company-agent-context.json'):
         if name in kit['files']:
             continue
         target = destination

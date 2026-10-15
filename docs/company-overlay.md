@@ -117,6 +117,9 @@ value is invalid. Every field except `version` is optional.
   "repository": "https://github.com/acme/design-viz",
   "revision": "main",
   "brand": "brand.json",
+  "backstage": {
+    "baseUrl": "https://backstage.acme.example"
+  },
   "package": {
     "repositoryUrl": "git+https://github.com/acme/design-viz.git",
     "registry": "https://npm.acme.example/"
@@ -131,6 +134,7 @@ value is invalid. Every field except `version` is optional.
 | `revision` | The branch in the authoring-skill and tour-guide links and the welcome form's revision field. | `main` |
 | `brand` | A brand file path inside `company/`, relative to `company.json`, with `companyName`, `logo`, `primaryColor` and `secondaryColor` (the fields of `src/company-brand.config.js`). `logo` is a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative path (inside `company/`) to a PNG/JPEG/WebP file of up to 512 KiB that the build embeds. The brand's `companyName` defaults to the top-level `companyName`. Every viewer, the workbench and the validator runtime use it as the global brand. | The placeholders in `src/company-brand.config.js` |
 | `package` | Backstage package identity; see below. | Upstream `package.json` values |
+| `backstage.baseUrl` | Public Backstage UI base URL included in copied Workbench connection instructions and focused authoring packets, including the offline folder-agent kit. | No company Backstage context |
 
 The values replace marked text at build time: sources mark each literal with
 `/*@company:name*/`, `/*@company:repository*/` or
@@ -141,6 +145,31 @@ viewer, workbench and runtime are byte-identical to a build without this
 feature. `python3 tools/build.py --no-config` ignores `company.json` as well as
 `workbench/site.json`; the browser contracts build that way and set
 `FLOWVIEW_COMPANY_IDENTITY=off` so they keep asserting upstream labels.
+
+## Backstage context for agents
+
+Set `backstage.baseUrl` to your company's public Backstage UI address, such as
+`https://backstage.acme.example` or `https://portal.acme.example/developer`.
+Rebuild with `python3 tools/build.py` to include it in the Workbench and its
+downloaded authoring kit. Repository-local `tools/authoring-packet.py` reads the
+current config when it generates a packet.
+
+The URL must be absolute HTTP or HTTPS, without credentials, a query string,
+fragment, whitespace or control characters. Deployment subpaths are preserved;
+trailing slashes are removed. If `backstage` is present, it must contain
+`baseUrl` and no other fields. Omit `backstage` when it is not needed.
+
+Agents receive this value as link context. It is not a catalog entity identity,
+an API endpoint or an authentication setting, and does not grant access.
+Explicit entity references and source URLs remain authoritative. Use a
+non-secret URL suitable for inclusion in generated Workbench files and prompts.
+The offline kit exports only this normalized context in
+`tools/company-agent-context.json`, without copying `company.json`, brand assets
+or package settings. Packet metadata records it as `companyContext`.
+
+`python3 tools/build.py --no-config` omits this context from the generated
+Workbench and kit. `FLOWVIEW_COMPANY_IDENTITY=off` also disables it for direct
+packet generation, including generation from a previously exported kit.
 
 ## Package identity
 

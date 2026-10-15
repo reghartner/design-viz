@@ -10,12 +10,16 @@ Upstream ships only company/README.md. A fork keeps its additions there:
 
 Nothing here requires a list edit; an absent overlay adds nothing.
 """
+import json
+import os
 import posixpath
 import re
+import subprocess
 from pathlib import Path
 
 CONTRACT = 'contract/authoring-contract.md'
 CONTRACT_ADDITIONS = '## Company contract additions'
+AGENT_CONTEXT = 'tools/company-agent-context.json'
 # Upstream examples join the offline kit by carrying this marker; each line is a
 # file glob, matched in the marker's folder and below, where the nearest marker
 # above a file decides. Company example folders always join: files with no
@@ -29,6 +33,23 @@ MARKDOWN_LINK = re.compile(r'(!?\[[^\n\]]*\]\()(<[^>\n]+>|[^()\s]+)(\s+"[^"\n]*"
 
 def company_dir(root):
     return Path(root) / 'company'
+
+
+def company_agent_context(root):
+    """Canonical validated repo context, or its reduced export in a portable kit."""
+    root = Path(root)
+    if os.environ.get('FLOWVIEW_COMPANY_IDENTITY') == 'off':
+        return {}
+    loader = root / 'tools/source-loader.cjs'
+    if loader.is_file():
+        if not (company_dir(root) / 'company.json').is_file():
+            return {}
+        result = subprocess.run(['node', str(loader), '--agent-context'], capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(result.stderr.strip())
+        return json.loads(result.stdout)
+    exported = root / AGENT_CONTEXT
+    return json.loads(exported.read_text()) if exported.is_file() else {}
 
 
 def contract_fragments(root):

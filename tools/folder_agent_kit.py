@@ -6,14 +6,17 @@ import json
 import subprocess
 from pathlib import Path
 try:
-    from company_overlay import CONTRACT, contract_text, kit_examples
+    from company_overlay import CONTRACT, AGENT_CONTEXT, company_agent_context, contract_text, kit_examples
 except ModuleNotFoundError:
-    from tools.company_overlay import CONTRACT, contract_text, kit_examples
+    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, company_agent_context, contract_text, kit_examples
 
 
 def folder_agent_kit(root, runtime):
     root = Path(root)
     files = {}
+    context = company_agent_context(root)
+    if context:
+        files[AGENT_CONTEXT] = json.dumps(context, sort_keys=True) + '\n'
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
                                  ('cookbook', ('*.md',)), ('docs', ('*.md',)),
                                  ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs'))]:

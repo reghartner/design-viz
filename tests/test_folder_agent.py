@@ -142,6 +142,23 @@ class FolderAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'symlink'):
             helper.prepare(self.folder)
 
+    def test_prepare_replaces_or_removes_company_context_and_preserves_authored_files(self):
+        name = 'tools/company-agent-context.json'
+        destination = self.folder / 'authoring'
+        for url in ['https://old.example', 'https://new.example/developer']:
+            context = {'backstage': {'baseUrl': url}}
+            self.kit({name: json.dumps(context)})
+            helper.prepare(self.folder)
+            self.assertEqual(kit_builder.company_agent_context(destination), context)
+        note = destination / 'operator-notes.md'
+        note.write_text('Keep my notes')
+        # An omitted or --no-config kit has no context export.
+        self.kit({'docs/example.md': 'Upstream kit'})
+        helper.prepare(self.folder)
+        self.assertFalse((destination / name).exists())
+        self.assertEqual(kit_builder.company_agent_context(destination), {})
+        self.assertEqual(note.read_text(), 'Keep my notes')
+
     def test_prepared_real_kit_arranges_graph_and_validates_manual_section_layout(self):
         runtime = subprocess.check_output(
             ['node', str(ROOT/'tools/source-loader.cjs'), '--module', 'backend', 'cjs'], text=True)

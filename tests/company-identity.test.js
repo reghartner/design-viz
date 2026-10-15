@@ -5,10 +5,11 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const {execFileSync}=require('node:child_process');
-const {copyCheckout}=require('./helpers/checkout-copy.js');
+const {copyCheckout,kitFiles}=require('./helpers/checkout-copy.js');
 const ROOT=path.join(__dirname,'..');
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64');
-const CONFIG={version:1,companyName:'Acme',repository:'https://github.com/acme/design-viz.git',revision:'release/2',brand:'brand.json'};
+const CONFIG={version:1,companyName:'Acme',repository:'https://github.com/acme/design-viz.git',revision:'release/2',brand:'brand.json',
+  backstage:{baseUrl:'https://portal.acme.example/developer///'}};
 const BRAND={logo:'acme.png',primaryColor:'#123456',secondaryColor:'#fff'};
 
 // A loader whose own checkout is a scratch copy of src/, so its company/ is ours.
@@ -28,6 +29,7 @@ function brandConfig(source){
 test('without company.json every marked source assembles exactly as upstream text',t=>{
   const {loader}=scratchLoader(t),real=require('../tools/source-loader.cjs');
   assert.equal(loader.companyConfig(),null);
+  assert.deepEqual(loader.companyAgentContext(),{});
   for(const file of ['canon.workbench.js','library.workbench.js','welcome.workbench.js','workbench/inspector.js','workbench/onboarding.js','company-brand.config.js']){
     const source=loader.readSource(file);
     assert.equal(source.includes('/*@company:'),false,file);
@@ -48,6 +50,8 @@ test('company.json replaces the labels, repository links and brand in assembled 
   const config=loader.companyConfig();
   assert.equal(config.repository,'https://github.com/acme/design-viz');
   assert.equal(config.revision,'release/2');
+  assert.deepEqual(config.backstage,{baseUrl:'https://portal.acme.example/developer'});
+  assert.deepEqual(loader.companyAgentContext(),{backstage:config.backstage});
   assert.deepEqual(config.brand,{companyName:'Acme',logo:'data:image/png;base64,'+PNG.toString('base64'),primaryColor:'#123456',secondaryColor:'#fff'});
   const canon=loader.readSource('canon.workbench.js');
   assert.match(canon,/summary\.textContent="Acme repository"/);
@@ -72,6 +76,7 @@ test('company.json replaces the labels, repository links and brand in assembled 
   process.env.FLOWVIEW_COMPANY_IDENTITY='off';
   t.after(()=>{delete process.env.FLOWVIEW_COMPANY_IDENTITY;});
   assert.equal(loader.companyConfig(),null);
+  assert.deepEqual(loader.companyAgentContext(),{});
   assert.match(loader.readSource('workbench/inspector.js'),/frow\('Company service',picker\)/);
 });
 
@@ -103,6 +108,39 @@ test('invalid company identity fails the build with the field to fix',t=>{
   fails({version:1,package:{token:'x'}},undefined,/unknown package field token/);
 });
 
+test('Backstage context validates URL structure, preserves subpaths and reaches both connection modes',t=>{
+  const {loader,write}=scratchLoader(t);
+  for(const value of [null,[],true,'https://portal.example',{}, {baseUrl:null}, {baseUrl:42},
+    {baseUrl:''}, {baseUrl:'/backstage'}, {baseUrl:'//portal.example'}, {baseUrl:'ftp://portal.example'},
+    {baseUrl:'https:portal.example'}, {baseUrl:'https://user:pass@portal.example'},
+    {baseUrl:'https://portal.example?token=secret'}, {baseUrl:'https://portal.example#home'},
+    {baseUrl:'https://portal.example?'}, {baseUrl:'https://portal.example#'},
+    {baseUrl:' https://portal.example'}, {baseUrl:'https://portal.example/a b'},
+    {baseUrl:'https://portal.example/\npath'}, {baseUrl:'https://portal.example/\u0000path'},
+    {baseUrl:'https://portal.example/\\path'}, {baseUrl:'https://portal.example',token:'secret'}]){
+    write('company.json',{version:1,backstage:value});
+    assert.throws(()=>loader.companyConfig(),/backstage/,JSON.stringify(value));
+  }
+  const identity={sessionId:'session',connectionId:'connection'};
+  for(const [input,expected] of [
+    ['https://PORTAL.example/','https://portal.example'],
+    ['http://localhost:7007/backstage/','http://localhost:7007/backstage'],
+    ['https://portal.example/team/backstage','https://portal.example/team/backstage']]){
+    write('company.json',{version:1,backstage:{baseUrl:input}});
+    assert.equal(loader.companyConfig().backstage.baseUrl,expected);
+    const context={};vm.runInNewContext(loader.readSource('workbench/agent-chat.js'),context);
+    for(const mode of ['external','embedded']){
+      const prompt=context.folderAgentInstructions('Story','mixed',false,identity,mode);
+      assert.ok(prompt.includes('Company Backstage base URL: '+JSON.stringify(expected)),mode);
+      assert.match(prompt,/does not identify a catalog entity, supply authentication or grant access/);
+    }
+  }
+  write('company.json',{version:1});
+  assert.deepEqual(loader.companyAgentContext(),{});
+  const context={};vm.runInNewContext(loader.readSource('workbench/agent-chat.js'),context);
+  assert.doesNotMatch(context.folderAgentInstructions('Story','mixed',false,identity,'external'),/Company Backstage base URL/);
+});
+
 test('a marker must name a known placeholder that its literal contains',t=>{
   const {root,loader}=scratchLoader(t);
   fs.writeFileSync(path.join(root,'src/probe.js'),"var a=/*@company:name*/'Our service';");
@@ -123,6 +161,7 @@ test('the built workbench shows configured links, labels and brand; without conf
       .map(file=>[file,fs.readFileSync(path.join(checkout,file),'utf8')]));
   };
   const plain=build();
+  assert.equal(kitFiles(plain['workbench/flowspec.html'])['tools/company-agent-context.json'],undefined);
   const workbench=plain['workbench/flowspec.html'];
   assert.ok(workbench.includes('<a id="welcome-repo-link" href="https://github.com/reghartner/design-viz"'));
   assert.ok(workbench.includes('<input id="welcome-repository" type="url" value="https://github.com/reghartner/design-viz"'));
@@ -146,6 +185,31 @@ test('the built workbench shows configured links, labels and brand; without conf
   const brand='var FLOWVIEW_COMPANY_BRAND_CONFIG = Object.freeze({"companyName":"Acme","logo":"data:image/png;base64,';
   for(const file of ['template/flowview.html','workbench/flowspec.html','tools/canon/generated-runtime.cjs'])
     assert.ok(branded[file].includes(brand),file);
+
+  // The exact kit shipped in the Workbench carries only public authoring context.
+  const files=kitFiles(html),expected={backstage:{baseUrl:'https://portal.acme.example/developer'}};
+  assert.deepEqual(JSON.parse(files['tools/company-agent-context.json']),expected);
+  for(const name of ['company/company.json','company/brand.json','company/acme.png','tools/source-loader.cjs'])
+    assert.equal(files[name],undefined,name);
+  const kit=path.join(checkout,'portable');
+  for(const [name,content] of Object.entries(files)){
+    const destination=path.join(kit,name);fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,content);
+  }
+  const generate=(root,disabled=false)=>{
+    execFileSync('python3',[path.join(root,'tools/authoring-packet.py'),'--mode','edit','--out',path.join(root,'packet.md')],
+      {cwd:root,encoding:'utf8',env:{...process.env,...(disabled?{FLOWVIEW_COMPANY_IDENTITY:'off'}:{})}});
+    return {text:fs.readFileSync(path.join(root,'packet.md'),'utf8'),meta:JSON.parse(fs.readFileSync(path.join(root,'packet.md.json'),'utf8'))};
+  };
+  for(const root of [checkout,kit]){
+    const packet=generate(root);
+    assert.ok(packet.text.includes('Backstage base URL: '+JSON.stringify(expected.backstage.baseUrl)));
+    assert.deepEqual(packet.meta.companyContext,expected);
+    assert.equal(packet.meta.size.bytes,Buffer.byteLength(packet.text));
+    assert.equal(packet.meta.size.characters,[...packet.text].length);
+    const disabled=generate(root,true);
+    assert.doesNotMatch(disabled.text,/## Company Backstage context/);
+    assert.equal(disabled.meta.companyContext,undefined);
+  }
 
   // --no-config ignores company.json; deleting it gives the same bytes.
   assert.deepEqual(build('--no-config'),plain);

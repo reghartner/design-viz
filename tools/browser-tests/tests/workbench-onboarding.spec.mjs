@@ -140,7 +140,7 @@ test('every viewer, agent and manual lesson resolves against a real visible cont
   }
   await expect(heading(practice(page))).toHaveText('Start with your own agent');
   const chapters=[
-    ['Start with your own agent','Choose the diagram folder','Review, then copy the instructions','Continue in your agent’s app','A proposed update arrives','Compare the current and proposed story','Commit when the story is right','You remain in control','Ask for the next change','Select exactly what you mean','Copy for agent, bottom left'],
+    ['Start with your own agent','Choose the diagram folder','Review, then copy the instructions','Continue in your agent’s app','A proposed update arrives','Compare the current and proposed story','Accept when the story is right','You remain in control','Ask for the next change','Select exactly what you mean','Copy for agent, bottom left'],
     ['Start with Add to Diagram','Choose a panel visually','Build with services from your catalog','Select something to edit it','Arrange diagram nodes in rows','Multi-select and align','Bind a node to a real company service','Select a step, then inspect it','Edit what belongs to this step','Add to Step: click on the diagram','Change a panel on this same step','Tell the alternate outcome','Nest a diagram inside a node','Keep the complete story']
   ];
   for(let c=0;c<chapters.length;c++){
@@ -173,7 +173,7 @@ test('practice commit and Undo keep the real draft and storage untouched',async(
   const saved=await page.evaluate(()=>Object.fromEntries(Object.entries(localStorage).filter(([k])=>!k.startsWith('dv_tour'))));
   const before=await frame.locator('#src').inputValue();
   for(let i=0;i<6;i++)await next(frame);
-  await expect(heading(frame)).toHaveText('Commit when the story is right');
+  await expect(heading(frame)).toHaveText('Accept when the story is right');
   await frame.locator('#agent-update-commit').click();
   await expect(frame.locator('#src')).not.toHaveValue(before);
   await expect(frame.locator('.dv-tour-ui')).toBeVisible();
@@ -301,7 +301,7 @@ test('Next commits the practice proposal even after comparing Current state',asy
   for(let i=0;i<5;i++)await next(frame);
   await frame.locator('#agent-update-current').click();
   await expect(frame.locator('#agent-update-commit')).toBeDisabled();
-  await next(frame);await expect(heading(frame)).toHaveText('Commit when the story is right');
+  await next(frame);await expect(heading(frame)).toHaveText('Accept when the story is right');
   await next(frame);await expect(heading(frame)).toHaveText('You remain in control');
   await expect(frame.locator('#undo-builder')).toBeEnabled();
   expect(JSON.parse(await frame.locator('#src').inputValue()).page.sections[0].diagram.nodes.cloud.sub).toContain('Validate event');

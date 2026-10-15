@@ -72,7 +72,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
   let r=await grip().boundingBox();await page.mouse.move(r.x+30,r.y+12);await page.mouse.down();await page.mouse.move(r.x-150,r.y+50,{steps:5});await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(resized);
   await section(page).getByRole('button',{name:'Move step controls; use arrow keys',exact:true}).focus();await page.keyboard.press('Shift+ArrowUp');
   const controls=(await raw(page)).page.sections[0].diagram.layouts[1].exploreLayout.controls;expect(controls.y).toBeLessThan(.9);
-  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
   await chapterOptions(page);await page.locator('#docview .explore-navigation').getByRole('button',{name:'Use current camera as opening view',exact:true}).click();await page.keyboard.press('Escape');
   const beforePanSource=await page.locator('#src').inputValue();await retiredCamera.evaluate(button=>button.click());await expect(page.locator('#src')).toHaveValue(beforePanSource);
@@ -124,7 +124,7 @@ for(const mode of ['default','switched','expanded','fullscreen','arranged','sele
   if(mode!=='default')await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
   if(mode==='arranged')await arrangeChapter(page,section(page));
   if(mode==='selected')await section(page).locator('.schip').nth(2).click();
-  if(mode==='zoomed')await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
+  if(mode==='zoomed')await page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   if(mode==='expanded'){await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(Error('Test fallback'));});await canvasTools(page);await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();}
   if(mode==='fullscreen'){await canvasTools(page);await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(true);}
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();

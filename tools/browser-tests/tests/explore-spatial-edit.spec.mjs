@@ -5,7 +5,7 @@ import {repo} from '../helpers/prepare.mjs';
 import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
 function fixture(row=false){return {page:{title:'Spatial edit',skin:'pastel',sections:[{heading:'Explore objects',diagram:{autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Second'}},rows:row?[['a','b']]:[[]],floats:row?[]:[{id:'a',x:180,y:100},{id:'b',x:500,y:320}],edges:[{from:'a',to:'b'}],panels:[{id:'p',type:'state',title:'Canvas status',states:['Ready'],initial:{state:'Ready'}},{id:'q',type:'state',title:'Floating status',states:['Ready'],initial:{state:'Ready'}}],layouts:[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{panel:'p',x:8,y:0,w:4,h:4},{panel:'q',x:8,y:4,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',panelPlacements:[{panel:'q',placement:'floating'}],canvas:{panels:[{panel:'p',x:700,y:80,w:240,h:400}]}}}]}}]}};}
 const navigation=page=>page.locator('#docview>.explore-navigation');
-async function fit(page){await navigation(page).getByRole('button',{name:'Fit',exact:true}).click();}
+async function fit(page){await navigation(page).getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();}
 async function openRaw(page,server,raw,width=1280){await page.setViewportSize({width,height:width===1280?800:900});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await fit(page);await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
 async function open(page,server,row=false,skin='pastel',customEdge=false){const raw=fixture(row);raw.page.skin=skin;if(customEdge)Object.assign(raw.page.sections[0].diagram.edges[0],{fromPort:{side:'right',offset:.25},curvePoints:[{t:.5,dx:20,dy:-40}],label:'kept',labelDx:9});await openRaw(page,server,raw);}
 const node=page=>page.locator('[data-dv-node=a]');
@@ -167,7 +167,7 @@ async function graphBoxes(page){return page.locator('.explore-board').evaluate(b
 test('keyboard selects and nudges mixed objects in graph units with one Undo per held sequence at different zooms',async({page,server})=>{
  await open(page,server);const original=await source(page);await keyboardSelectAll(page);expect(await source(page)).toBe(original);
  for(const zoom of [false,true]){
-  if(zoom)await navigation(page).getByRole('button',{name:'Zoom out',exact:true}).click();
+  if(zoom)await navigation(page).getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) out$/,exact:true}).click();
   await keyboardSelectAll(page);await node(page).focus();const before=await source(page),boxes=await graphBoxes(page);
   await page.keyboard.down('ArrowRight');await page.keyboard.down('ArrowRight');await page.keyboard.down('ArrowRight');expect(await source(page)).toBe(before);
   await page.keyboard.up('ArrowRight');await expect(node(page)).toBeFocused();const after=await source(page),moved=await graphBoxes(page);
@@ -190,7 +190,7 @@ test('mixed distribution uses equal rendered gaps from menu and Inspector at two
    await page.locator('[data-dv-node=b]').focus();await page.keyboard.press('Enter');for(let i=0;i<5;i++)await page.keyboard.press('Shift+ArrowDown');
    await panel(page).focus();await page.keyboard.press('Enter');for(let i=0;i<16;i++)await page.keyboard.press('Shift+ArrowDown');await fit(page);
   }
-  await keyboardSelectAll(page);if(direction==='vertical')await navigation(page).getByRole('button',{name:'Zoom out',exact:true}).click();
+  await keyboardSelectAll(page);if(direction==='vertical')await navigation(page).getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) out$/,exact:true}).click();
   const before=await source(page),boxes=await graphBoxes(page),axis=direction==='horizontal'?'x':'y',size=direction==='horizontal'?'w':'h',min=Math.min(...boxes.map(r=>r[axis])),max=Math.max(...boxes.map(r=>r[axis]+r[size]));
   await node(page).focus();await page.keyboard.press('Shift+F10');
   if(direction==='horizontal')await menu(page).getByRole('menuitem',{name:'Distribute horizontally',exact:true}).click();

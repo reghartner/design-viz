@@ -1,6 +1,8 @@
 /* The selected View owns the editor surface, just as in the reader. */
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
+  var focusState=null,navigationState=null,focusFrame=0;
+  var focusButton=document.getElementById('workspace-focus-diagram');
   var selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
   var savedSelection=null,savedOwnerSections=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null,contentsOpen=null;
   var fitObserver=new ResizeObserver(function(entries){
@@ -75,12 +77,50 @@ function initWorkbenchCanvas(){
     var definition=rec && rec.viewport && rec.viewport.viewDefinition();
     return !!(rec && rec.viewingMode==='explore' || definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
   }
-  function diagramMode(){return exploreView(current());}
+  function diagramMode(){return !!focusState || exploreView(current());}
   function identity(rec){
     var p=rec && rec.presentation,definition=rec && rec.viewport && rec.viewport.viewDefinition();
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
     return JSON.stringify([section,snapshot && snapshot.frames.map(function(f){return f.node;}),explicitView(rec)?definition.id:p && p.viewId?p.viewId():'flow',exploreView(rec)]);
   }
+  function paintFocus(){focusButton.textContent=focusState?'Return to page':'Focus diagram';focusButton.setAttribute('aria-pressed',String(!!focusState));focusButton.hidden=!viewport();document.body.classList.toggle('workspace-diagram-focused',!!focusState);}
+  function releaseFocus(restore){
+    if(!focusState)return;var state=focusState;focusState=null;cancelAnimationFrame(focusFrame);focusFrame=0;
+    if(activeCanvas && activeCanvas.viewport)activeCanvas.viewport.setWorkbenchFocus(false);
+    document.querySelectorAll('.workspace-focus-tucked').forEach(function(el){el.classList.remove('workspace-focus-tucked');});
+    if(navigation && navigation.contents)navigation.contents.setOpen(state.navigation.opened===true);
+    paintFocus();
+    if(!restore)return;
+    select(section);
+    var rec=current();if(!rec || identity(rec)!==state.key)return;
+    // Restore navigation only. Panel geometry/content edited while focused stays
+    // owned by the current preview and its normal Undo history.
+    var memory=rec.viewport.snapshotCanvasState();
+    var oldViews=diagramLayoutViews(state.diagram),newViews=diagramLayoutViews(sectionRecords(getPage())[section].section.diagram);
+    Object.keys(state.canvas).forEach(function(id){var oldView=oldViews.find(function(v){return v.id===id;}),newView=newViews.find(function(v){return v.id===id;});if(JSON.stringify(oldView && oldView.exploreLayout && oldView.exploreLayout.camera)!==JSON.stringify(newView && newView.exploreLayout && newView.exploreLayout.camera))return;if(memory[id])['scroll','zoom','fitFloor'].forEach(function(key){memory[id][key]=state.canvas[id][key];});});
+    rec.viewport.restoreCanvasState(memory);
+    if(rec.boardSize)rec.boardSize.restore(state.board);
+    if(navigation && navigation.contents)navigation.contents.restore(state.navigation);
+    surface.scrollLeft=state.left;surface.scrollTop=state.top;
+    paintZoom();
+  }
+  function focusedSelection(){
+    var rec=current(),svg=rec && rec.sectionEl.querySelector('.boardcanvas>svg'),matrix=svg && svg.getScreenCTM();if(!matrix)return null;
+    var inverse=matrix.inverse(),rects=Array.from(svg.querySelectorAll('[data-dv-node].dv-sel')).map(function(el){var r=(el.querySelector('.card') || el).getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return {x:a.x,y:a.y,right:b.x,bottom:b.y};});
+    if(!rects.length)return null;var x=Math.min.apply(null,rects.map(function(r){return r.x;})),y=Math.min.apply(null,rects.map(function(r){return r.y;}));
+    return {x:x,y:y,w:Math.max.apply(null,rects.map(function(r){return r.right;}))-x,h:Math.max.apply(null,rects.map(function(r){return r.bottom;}))-y};
+  }
+  function focusDiagram(){
+    if(focusState){releaseFocus(true);focusButton.focus({preventScroll:true});return;}
+    var rec=current();if(!rec || !rec.viewport || !navigation || !navigation.contents)return;
+    focusState={key:identity(rec),navigation:navigation.contents.snapshot(),canvas:rec.viewport.snapshotCanvasState(),diagram:sectionRecords(getPage())[section].section.diagram,board:rec.boardSize && rec.boardSize.snapshot(),left:surface.scrollLeft,top:surface.scrollTop};
+    document.querySelectorAll('.workspace-window:not([hidden]):not(#workspace-window-inspect)').forEach(function(el){el.classList.add('workspace-focus-tucked');});
+    navigation.contents.setOpen(false);select(section);cancelFit();
+    rec.canvasVisited=true;rec.viewport.setWorkbenchFocus(true);paintFocus();
+    focusFrame=requestAnimationFrame(function(){focusFrame=0;if(focusState)fit(focusedSelection());});
+  }
+  focusButton.addEventListener('click',focusDiagram);
+  document.addEventListener('click',function(event){var tab=event.target.closest('[id^="editor-tab-"],#workspace-file');if(!focusState || !tab)return;var name=tab.id==='workspace-file'?'file':tab.id.slice(11),win=document.getElementById('workspace-window-'+name);if(win)win.classList.remove('workspace-focus-tucked');},true);
   function fitIdentity(rec){
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot(),definition=rec && rec.viewport && rec.viewport.viewDefinition();
     return JSON.stringify([rec && rec.reference,snapshot && snapshot.section,snapshot && snapshot.frames.map(function(f){return f.node;}),definition && definition.id]);
@@ -114,11 +154,21 @@ function initWorkbenchCanvas(){
   function paintZoom(){
     var vp=viewport(),value=vp && vp.canvasZoom();
     var percent=(value || 1)*100;document.getElementById('workspace-zoom').textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
-    document.getElementById('workspace-fit').textContent=vp && vp.panelPlacement()==='canvas'?'Fit canvas':'Fit diagram';
+    var scope=vp && vp.panelPlacement()==='canvas'?'Canvas':'Diagram';document.getElementById('workspace-fit').textContent='Fit '+scope.toLowerCase();canvasMenu.parentNode.querySelector('.workspace-zoom-label').textContent=scope+' zoom';document.getElementById('workspace-zoom-out').setAttribute('aria-label',scope+' zoom out');document.getElementById('workspace-zoom-in').setAttribute('aria-label',scope+' zoom in');document.getElementById('workspace-zoom').title='Reset '+scope.toLowerCase()+' to 100%';
   }
   function fit(selection){
     if(!selection || !Number.isFinite(selection.w))selection=null;
-    var vp=viewport();if(!diagramMode() || !vp)return;
+    if(selection && Number.isInteger(selection.section) && selection.section!==section)select(selection.section);
+    var rec=current(),vp=viewport();if(!vp)return;
+    if(!diagramMode()){
+      if(!selection || !rec.boardSize)return;
+      var target=rec.sectionEl.querySelector('.board');if(!target)return;
+      target.scrollIntoView({block:'center',inline:'nearest'});
+      var bounds=target.getBoundingClientRect(),scale=target.offsetWidth?bounds.width/target.offsetWidth:1,insets={left:24,right:24,top:24,bottom:24};
+      document.querySelectorAll('.workspace-window:not([hidden])').forEach(function(win){var r=win.getBoundingClientRect();if(!r.width || r.bottom<=bounds.top || r.top>=bounds.bottom)return;if(r.left<bounds.left+bounds.width/2)insets.left=Math.max(insets.left,(r.right-bounds.left+16)/scale);else insets.right=Math.max(insets.right,(bounds.right-r.left+16)/scale);});
+      if(target.clientWidth-insets.left-insets.right<100)insets.left=insets.right=24;
+      rec.boardSize.fitSelection(selection,insets);return;
+    }
     var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=24,width=bounds?bounds.width:innerWidth;
     var player=current() && current().sectionEl.querySelector('.explore-player'),playerRect=player && !player.hidden && !player.closest('.explore-canvas-objects') && player.getBoundingClientRect();
     if(bounds && playerRect && playerRect.top>=bounds.top+bounds.height/2)bottom=Math.max(bottom,bounds.bottom-playerRect.top+12);
@@ -166,10 +216,11 @@ function initWorkbenchCanvas(){
       });
       rec.inheritedExplore=inherited;all=all.concat(rec);
     }
+    if(focusState && identity(rec)!==focusState.key)releaseFocus(false);
     var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
-    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{contents:true,skipTabShare:true,insetTarget:document.body,initialOpen:contentsOpen,onOpenChange:function(value){contentsOpen=value;},fit:function(){if(!diagramMode())return false;fit();return true;},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
+    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{contents:true,zoomLabels:true,isCanvas:diagramMode,skipTabShare:true,insetTarget:document.body,initialOpen:contentsOpen,onOpenChange:function(value){contentsOpen=value;},fit:function(){if(!diagramMode())return false;fit();return true;},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
     // Measure navigation in its selected, visible section before the viewport
     // restores its camera. Hidden navigation reports zero height and would cause
     // an unnecessary resize (and camera rounding) immediately after restoration.
@@ -179,26 +230,27 @@ function initWorkbenchCanvas(){
       r.sectionEl.classList.toggle('workspace-empty-section',on && !r.viewport);
     });
     if(rec && rec.tabBlock){var tabs=ctl.tabBlocks[rec.tabBlock-1];if(tabs && tabs.active()!==rec.tab)tabs.select(rec.tab,false,false);}
-    if(navigation){navigation.mount(rec);measureChrome();}
+    if(navigation){navigation.mount(rec);if(navigationState && navigation.contents){navigation.contents.restore(navigationState);navigationState=null;}if(focusState && navigation.contents)navigation.contents.setOpen(false);measureChrome();}
     all.forEach(function(r){
       var on=diagramMode() && r===rec;
       if(r.viewport && !on){
         r.viewport.setWorkbenchCanvas(false);
         if(r===rec && exploreView(r) && !r.pageCanvasVisited){r.viewport.restoreInitialCamera(true);r.pageCanvasVisited=true;}
       }
-      if(r.viewport){r.viewport.setWorkbenchCanvas(on);
+      if(r.viewport){r.viewport.setWorkbenchFocus(!!focusState && r===rec);r.viewport.setWorkbenchCanvas(on);
         if(on && (!r.canvasVisited || requestedFit))scheduleFit();}
     });
     // A View can enter Explore before the shared navigation is mounted.
     // Reconcile the camera immediately with the stage space the top bar took.
     if(diagramMode() && rec && rec.viewport){rec.viewport.refresh();if(!rec.canvasVisited)rec.viewport.restoreInitialCamera();}
     document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;b.hidden=b.disabled;});
-    mountCanvasCommand(rec);paintZoom();selecting=false;measureChrome();
+    mountCanvasCommand(rec);paintZoom();paintFocus();selecting=false;measureChrome();
     if(changedSection && rec && !diagramMode())rec.sectionEl.scrollIntoView({block:'start'});
   }
   function capture(){
     cancelFit();
     if(skipCapture){skipCapture=false;saved=null;savedDetail=null;restoreCanvasCommand();if(navigation)navigation.restore();return;}
+    if(navigation && navigation.contents)navigationState=navigation.contents.snapshot();
     saveDetail();
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
     var context=detailContext(snapshot);savedDetail=context?{context:context,navigation:snapshot}:null;
@@ -211,7 +263,7 @@ function initWorkbenchCanvas(){
     restoreCanvasCommand();if(navigation)navigation.restore();
   }
   function rendered(outcome){
-    if(!outcome.ok || !outcome.replaced)return;
+    if(!outcome.ok){if(outcome.replaced)releaseFocus(false);return;}if(!outcome.replaced)return;
     var page=getPage(),matches=saved && page?matchWorkbenchPreviewSections(saved,workbenchPreviewSections(page)):new Map();
     records().forEach(function(rec){
       var prior=matches.get(rec.number-1),d=page && sectionRecords(page)[rec.number-1].section.diagram || {};
@@ -236,6 +288,10 @@ function initWorkbenchCanvas(){
       selectionKey=null;var matched=records().find(function(rec){return matches.get(rec.number-1)===savedSelection;});
       if(!matched && savedOwnerSections){var sibling=records().find(function(rec){return savedOwnerSections.indexOf(matches.get(rec.number-1))>=0;});var owner=sibling && getController().views.owner(sibling);matched=owner && owner.selected;}
       if(matched){section=matched.number-1;view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:section}));}
+    }
+    if(focusState){
+      var match=records().find(function(rec){return matches.get(rec.number-1)===savedSelection;});
+      if(!match)releaseFocus(false);else{section=match.number-1;focusState.key=JSON.stringify([section].concat(JSON.parse(focusState.key).slice(1)));}
     }
     saved=null;savedSelection=null;savedOwnerSections=null;
     var ctl=getController(),resolved=savedDetail && resolveDetail(savedDetail.context);
@@ -310,5 +366,5 @@ function initWorkbenchCanvas(){
   view.addEventListener('workbench-fit-selection',function(event){fit(event.detail);});
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,
-    reset:function(){cancelFit();if(navigation)navigation.restore();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;},fit:fit};
+    reset:function(){releaseFocus(false);navigationState=null;cancelFit();if(navigation)navigation.restore();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;},fit:fit};
 }

@@ -83,7 +83,7 @@ test('Add follows prose tabs and deliberate destination changes while stale sour
 });
 
 test('page preview is isolated and explicit camera commands author one undoable change',async({page,server})=>{
- const original=await open(page,server);await nav(page).getByRole('button',{name:'Zoom in',exact:true}).click();
+ const original=await open(page,server);await nav(page).getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-lilac').click();await page.locator('#layout-preview-target').selectOption('backstage');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const before=await camera(page);await page.locator('#open-page-preview').click();
  await expect(page.locator('#page-preview-surface')).toHaveClass(/viewer-exploring/);await expect(page.locator('#page-preview-view')).toHaveClass(/sk-lilac/);await chooseNavigation(page.locator('#page-preview-view .explore-navigation'),'Tab','Notes');await page.locator('#close-page-preview').click();
  await expect(selected(page)).toHaveAttribute('id','section-primary');expect(await camera(page)).toEqual(before);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();

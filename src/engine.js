@@ -2256,7 +2256,7 @@ function createExploreNavigation(ctl,options){
   function viewChanged(ev){if(ev && ev.type==='navigation-actions-changed')laneLayoutKey='';var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
   ctl.view.addEventListener('tab-view-change',viewChanged);
   ctl.view.addEventListener('navigation-actions-changed',viewChanged);
-  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
+  return {element:nav,mount:mount,restore:restore,contents:contents,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
@@ -2555,9 +2555,10 @@ function createBoardNavigation(board, group, legend, changed){
   var controls=document.createElement('div');controls.className='board-zoom';
   controls.setAttribute('role','group');controls.setAttribute('aria-label','Diagram zoom');
   function button(text,label,action){var b=document.createElement('button');b.type='button';b.className='mbtn';b.textContent=text;b.setAttribute('aria-label',label);b.addEventListener('click',action);controls.appendChild(b);return b;}
-  var out=button('−','Zoom out',function(){scale(.8);});
+  var scope=document.createElement('span');scope.textContent='Diagram zoom';controls.appendChild(scope);
+  var out=button('−','Diagram zoom out',function(){scale(.8);});
   var value=document.createElement('span');value.className='board-zoom-value';controls.appendChild(value);
-  var into=button('+','Zoom in',function(){scale(1.25);});
+  var into=button('+','Diagram zoom in',function(){scale(1.25);});
   button('Fit diagram','Fit diagram',function(){
     var svg=graph();if(!enabled() || !svg)return;
     var box=svg.viewBox.baseVal;
@@ -2668,7 +2669,17 @@ function createBoardNavigation(board, group, legend, changed){
       board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
     }
   }
-  return {refresh:refresh,reset:reset,
+  function fitSelection(extent,insets){
+    if(!enabled() || !graph() || !extent)return;
+    insets=insets || {left:24,right:24,top:24,bottom:24};
+    var width=Math.max(1,board.clientWidth-insets.left-insets.right),height=Math.max(1,board.clientHeight-legend.offsetHeight-insets.top-insets.bottom);
+    zoom(Math.min(width/extent.w,height/extent.h,1.5));
+    var svg=graph(),rect=svg.getBoundingClientRect(),frame=board.getBoundingClientRect(),display=displayScale(),scale=ratio(),origin=svg.viewBox.baseVal;
+    board.scrollLeft+=(rect.left-frame.left)/display+(extent.x-origin.x+extent.w/2)*scale-(insets.left+width/2);
+    board.scrollTop+=(rect.top-frame.top)/display+(extent.y-origin.y+extent.h/2)*scale-(legend.offsetHeight+insets.top+height/2);
+    refresh();
+  }
+  return {refresh:refresh,reset:reset,fitSelection:fitSelection,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
@@ -2755,6 +2766,7 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
   return {mode:function(){ return mode; }, setMode:setMode,
+    fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
     suspend:function(){if(navigation)navigation.suspend();},resume:function(){if(navigation)navigation.resume();},
     destroy:function(){ destroyed = true; if(navigation)navigation.destroy();board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};

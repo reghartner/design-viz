@@ -47,7 +47,7 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   await page.keyboard.press('Escape');await panelMenu.locator('summary').click();
   const panel=panelMenu.getByRole('button',{name:'Shrink panels and controls',exact:true}),overlayValue=panelMenu.locator('.explore-overlay-value');
   const initialScale=Number((await overlayValue.textContent()).replace('%',''));await panel.click();await expect(panel).toBeInViewport();await expect(overlayValue).toHaveText((initialScale-10)+'%');
-  await panelMenu.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();await page.keyboard.press('Escape');await row.getByRole('button',{name:'Fit',exact:true}).click();
+  await panelMenu.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();await page.keyboard.press('Escape');await row.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();
   await info.attach(host+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
  await chooseNavigation(nav,'View','Overview');await expect(row).toBeVisible();if(host!=='native canvas')await expect(root.locator('.explore-board')).toHaveCount(0);
@@ -56,12 +56,12 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
 
 test('Page preview keeps live reader sizing while Workbench retains its own controls',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const source=JSON.stringify(story(),null,2);await paste(page,source);await closeTools(page);
- await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true})).toBeVisible();
+ await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true})).toBeVisible();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),nav=preview.locator('.reader-navigation');await expect(nav.locator('.reader-toolbar')).toBeVisible();
  await nav.locator('.reader-zoom-menu>summary').click();await nav.getByRole('button',{name:'Readable',exact:true}).click();await expect(nav.getByRole('button',{name:'Readable',exact:true})).toHaveAttribute('aria-pressed','true');await page.keyboard.press('Escape');
  await nav.locator('.explore-panel-menu>summary').click();await nav.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(nav.locator('.explore-overlay-value')).toHaveText('90%');
  await expect(preview.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await page.locator('#close-page-preview').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
- await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true})).toBeVisible();
+ await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true})).toBeVisible();
 });

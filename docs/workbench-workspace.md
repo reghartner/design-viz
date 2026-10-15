@@ -77,8 +77,26 @@ actions** contains File, Undo/Redo, Preview, Help, and Export. Content stays in
 sections and may appear in many Views. See [the View contract](tab-views.md) for
 authoring, migration and source ownership.
 
+**Canvas zoom** in Standard scales the page arrangement. **Diagram zoom** stays
+inside the graph frame and changes only its graph; changing either leaves the
+other scale alone. **Fit canvas** resets the Standard page scale, while **Fit
+diagram** frames the graph inside its frame. In Explore, **Canvas zoom / Fit
+canvas** includes objects placed On canvas. When there are no on-canvas objects,
+that control reads **Diagram zoom / Fit diagram**. Floating panels keep their
+independent **Panels** size controls.
+
+Use **Focus diagram** for temporary desktop editing space. It enlarges the active
+diagram, collapses Contents and tucks supporting prose, panels and open tools;
+Inspect stays available. If nodes are selected, Focus frames them around Inspect.
+The rail can reopen a tucked tool while focused. **Return to page** restores the
+previous Contents state, page scale, diagram camera and tucked tools. Focus is
+separate from authored Standard/Explore Views: it changes no source, saved
+presentation, export or Undo history. Editing and Undo can continue while focused.
+Selecting another section or View, or opening another project, ends Focus.
+
 In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
-**Fit selection** beside Fit diagram frames the selected nodes and on-canvas panels
+**Fit selection** works in Standard and Explore. After finding an object in Outline,
+use it to frame the selected nodes and on-canvas panels
 inside the free viewport around Inspect, floating panels, and navigation controls.
 It preserves selection and source. The same action is in Inspect and the object menu.
 Tab to a node or canvas panel, then Enter to select it or Shift+Enter to add/remove

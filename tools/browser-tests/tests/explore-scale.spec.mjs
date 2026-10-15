@@ -40,7 +40,7 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   expect((await size(player(page))).w).toBeGreaterThan(steps.w);
   expect(await graph(page).boundingBox()).toEqual(startGraph);
   const content=await panel(page).locator('.explore-window-body').evaluate(el=>({logical:el.offsetWidth,visual:el.getBoundingClientRect().width}));expect(content.visual/content.logical).toBeCloseTo(.9,2);
-  const ps=await size(panel(page));await page.getByRole('button',{name:'Zoom in',exact:true}).click();expect((await graph(page).boundingBox()).width).toBeGreaterThan(startGraph.width);expect(await size(panel(page))).toEqual(ps);
+  const ps=await size(panel(page));await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();expect((await graph(page).boundingBox()).width).toBeGreaterThan(startGraph.width);expect(await size(panel(page))).toEqual(ps);
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeHidden();
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeVisible();await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
   await chooseView(page,'Home story');await expect(page.locator('.explore-stage')).toBeHidden();

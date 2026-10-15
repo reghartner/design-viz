@@ -24,12 +24,12 @@ test('Contents preserves Standard stacks, ordered Explore members and state thro
   await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');
   await root.getByRole('button',{name:'Previous Page',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
   await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
-  await root.locator('.reader-toolbar').getByRole('button',{name:'Zoom in',exact:true}).click();const zoom=await root.locator('.reader-zoom-menu>summary').innerText();
+  await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();const zoom=await root.locator('.reader-zoom-menu>summary').innerText();
   const board=await root.locator('#section-review .board').elementHandle();
   await root.locator('.reader-theme-menu>summary').click();await expect(root.getByRole('menuitemradio')).toHaveText(['Aurora','Pastel','Blueprint','Terminal','Rose','Lavender','Opus Lilac']);
   await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
   await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();
-  await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:'Zoom in',exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
+  await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-page-label')).toHaveText('Page 3 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
 });

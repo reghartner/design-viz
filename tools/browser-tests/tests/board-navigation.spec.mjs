@@ -30,13 +30,13 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
     await page.goto(server.origin+'/navigation.html');
   }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
   const board=page.locator('.board');await expect(board).toBeVisible();
-  await board.getByRole('button',{name:'Zoom in',exact:true}).focus();
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).focus();
   const before=await width(board),height=(await board.boundingBox()).height,pageY=await page.evaluate(()=>scrollY);
-  await board.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   expect(await width(board)).toBeCloseTo(before*1.25,0);
   expect((await board.boundingBox()).height).toBeCloseTo(height,0);
   expect(await page.evaluate(()=>scrollY)).toBe(pageY);
-  await board.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   const start=await scroll(board),p=await background(board);
   await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x-80,p.y-65,{steps:8});await page.mouse.up();
   const dragged=await scroll(board);expect(dragged.x).toBeGreaterThan(start.x+50);expect(dragged.y).toBeGreaterThan(start.y+40);
@@ -81,13 +81,13 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
     await page.goto(server.origin+'/navigation-views.html');
   }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
   const board=page.locator('.board');
-  await board.getByRole('button',{name:'Zoom in',exact:true}).click();await board.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   await board.evaluate(el=>{el.scrollLeft=120;el.scrollTop=140;});
   const initial={width:await width(board),scroll:await scroll(board)};
   for(const edit of [false,true]){
     await page.getByRole('button',{name:'Explore',exact:true}).click();
     if(surface==='standalone')await page.locator('.reader-zoom-menu>summary').click();
-    await page.getByRole('button',{name:surface==='workbench'?'Fit':'Fit diagram',exact:true}).click();
+    await page.getByRole('button',{name:'Fit diagram',exact:true}).click();
     if(surface==='standalone')await page.keyboard.press('Escape');
     await board.evaluate(el=>{el.scrollLeft+=300;el.scrollTop+=400;});
     if(edit && surface==='workbench'){
@@ -202,7 +202,7 @@ test('workbench Standard board routes vertical-dominant wheel at its boundary to
   const board=page.locator('.board'),workspace=page.locator('.workmain'),panel=page.locator('[data-dv-panel="0"]');
   const workspaceY=()=>workspace.evaluate(el=>el.scrollTop);
   await expect(panel).not.toBeInViewport();
-  for(let i=0;i<4;i++)await board.getByRole('button',{name:'Zoom in',exact:true}).click();
+  for(let i=0;i<4;i++)await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(100);
   await board.evaluate(el=>{el.scrollTop=0;});
   let p=await background(board);await page.mouse.move(p.x,p.y);await page.mouse.wheel(4,80);

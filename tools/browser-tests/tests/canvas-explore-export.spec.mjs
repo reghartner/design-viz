@@ -142,7 +142,7 @@ for(const authoredCamera of [false,true])test('canvas navigation stays temporary
   for(const navigation of ['wheel','ordinary drag','toolbar zoom']){
     const before=await camera(page);
     if(navigation==='toolbar zoom'){
-      await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
+      await page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
       await expect.poll(async()=>(await camera(page)).zoom).toBeGreaterThan(before.zoom);
     }else{
       const point=await emptyBoardPoint(page);await page.mouse.move(point.x,point.y);

@@ -50,7 +50,7 @@ async function openNewBlankExplore(page,server){
  return page.locator('.explore-window[data-explore-panel]').first();
 }
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
-async function fit(page,host){await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();}
+async function fit(page,host){await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
 async function drag(page,locator,dx,dy){const r=await locator.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:5});await page.mouse.up();}
 async function selectCanvas(locator){await locator.focus();await expect(locator).toHaveAttribute('aria-current','true');}
@@ -337,7 +337,7 @@ test('mixed Fit can use a narrow free region beside a large floating panel',asyn
   const r=await loc.boundingBox();expect(overlaps(r,floating)).toBe(false);expect(overlaps(r,player)).toBe(false);expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);
  }
  const fitted=(await graphPoint(page,{x:0,y:0})).scale;expect(fitted).toBeLessThan(.1);
- await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.getByRole('button',{name:'Zoom out',exact:true}).click();expect((await graphPoint(page,{x:0,y:0})).scale).toBeCloseTo(fitted,2);
+ await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) out$/,exact:true}).click();expect((await graphPoint(page,{x:0,y:0})).scale).toBeCloseTo(fitted,2);
 });
 
 test('Workbench Fit uses the free board beside tall top controls',async({page,server})=>{
@@ -412,7 +412,7 @@ test('canvas step controls survive chapter, profile, preview and editor reload; 
  expect(await controlsRect(page)).toEqual(layout.canvas.controls);await expect(page.locator('#src')).toHaveValue(saved);
  if(!await page.locator('#open-page-preview').isVisible())await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),previewPlayer=preview.locator('.explore-canvas-objects>.explore-player');await expect(previewPlayer).toBeVisible();
- await preview.getByRole('button',{name:'Fit',exact:true}).click();await previewPlayer.getByRole('button',{name:'Next step',exact:true}).click();
+ await preview.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();await previewPlayer.getByRole('button',{name:'Next step',exact:true}).click();
  await previewPlayer.focus();await previewPlayer.locator('.explore-player-grip').press('ArrowRight');await expect(page.locator('#src')).toHaveValue(saved);
  await page.locator('#close-page-preview').click();expect(await controlsRect(page)).toEqual(layout.canvas.controls);
  await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);expect(await controlsRect(page)).toEqual(layout.canvas.controls);
@@ -442,8 +442,8 @@ test('Standard chapters remain usable before and after canvas step controls acti
  const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
  await expect(page.locator('.doc-sec[data-view-id=home-story]')).toBeVisible();await expect(page.locator('.explore-stage')).toBeHidden();
- await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();const original=await source(page);
- await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();
+ await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();const original=await source(page);
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
  await expect(page.locator('#src')).toHaveValue(original);
 });

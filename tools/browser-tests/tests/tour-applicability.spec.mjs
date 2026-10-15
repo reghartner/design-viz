@@ -108,7 +108,7 @@ test('planning and completing the built-in tour preserve the reader view, path, 
   await status.locator('.explore-window-resize').press('Shift+ArrowLeft');
   await status.locator('.explore-window-resize').press('Shift+ArrowUp');
   await panel(page,'queue').getByRole('button',{name:'Hide Delivery state',exact:true}).click();
-  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   const geometry=()=>status.evaluate(el=>{
     const a=el.getBoundingClientRect(),b=el.closest('.explore-stage').getBoundingClientRect();
     return {x:a.x-b.x,y:a.y-b.y,width:a.width,height:a.height};

@@ -159,3 +159,46 @@ test('reader preview renderer forwards an explicit host target while restoring r
     ['tabs',snapshot.tabs],['sections',snapshot.sections],
     ['tabs',snapshot.tabs],['sections',snapshot.sections]]);
 });
+
+test('reader comparison remaps the active section by stable identity and restores only camera coordinates',()=>{
+  const c={};vm.createContext(c);for(const file of ['core/navigation.js','core/document.js','workbench/preview.js'])vm.runInContext(readSource(file),c);
+  c.restoreActiveTabs=()=>{};c.restoreWorkbenchPreview=()=>{};
+  const old={sections:[{id:'a',heading:'A',diagram:{}},{id:'b',heading:'B',diagram:{}}]},page={sections:[old.sections[1],old.sections[0]]};
+  const oldSections=c.workbenchPreviewSections(old).map((s,i)=>({...s,number:i+1,reader:{memories:{canvas:{zoom:.75,scroll:{x:.2,y:.3},layout:{panels:['old geometry']}}}}}));
+  const applied=[],newLayout={panels:['proposed geometry']};c.diagramLayoutViews=()=>[{id:'canvas',exploreLayout:newLayout}];
+  const ctl={sections:[1,2].map(number=>({number,viewport:{viewDefinition:()=>({id:'canvas'}),snapshotReaderState:()=>({memories:{canvas:{layout:newLayout}}}),restoreReaderState:state=>applied.push(state)}}))};
+  const restored=c.restoreWorkbenchReaderPreviewSnapshot(page,ctl,{sections:{sections:oldSections},target:{kind:'diagram',section:2}});
+  assert.deepEqual(plain(ctl.activeTarget),{kind:'diagram',section:1});assert.equal(restored.missing,false);
+  c.restoreWorkbenchReaderCameras(ctl,restored);assert.equal(applied[0].memories.canvas.zoom,.75);assert.deepEqual(applied[0].memories.canvas.layout,newLayout);
+  const missing=c.restoreWorkbenchReaderPreviewSnapshot({sections:[old.sections[0]]},{sections:[ctl.sections[0]]},{sections:{sections:oldSections},target:{kind:'diagram',section:2}});assert.equal(missing.missing,true);
+});
+
+test('preview selection survives legacy View migration to authored Views and back through Undo/Redo',()=>{
+  const c={};vm.createContext(c);for(const file of ['validator.js','workbench/preview.js'])vm.runInContext(readSource(file),c);
+  const page={sections:[{id:'story',heading:'Story',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+  const legacy=[{id:'section-1-home',legacy:true,legacyLayout:'home'},{id:'section-1-flow',legacy:true,legacyLayout:'flow'}];
+  const authored=legacy.map(({id})=>({id}));
+  function controller(definitions,selected){
+    const rec={number:1};definitions=definitions.map(view=>({...view,members:[{record:{runtime:rec}}]}));
+    const owner={views:definitions,selected:rec};let current=definitions.find(v=>v.id===selected);
+    const select=(rec,id)=>{const next=definitions.find(v=>v.id===id);if(!next)return false;current=next;return true;};
+    return {sections:[rec],views:{owner:()=>owner,current:()=>current,select,ensure:select}};
+  }
+  let prior=controller(legacy,'section-1-flow');
+  for(const definitions of [authored,legacy,authored]){
+    const saved=c.workbenchPreviewSnapshot(page,prior),next=controller(definitions,'section-1-home');
+    c.restoreWorkbenchPreview(page,next,saved);
+    assert.equal(next.views.current().id,'section-1-flow','the next presentation edit must still target Flow');prior=next;
+  }
+});
+
+
+test('legacy View promotion requires the matched section and ignores reordered generated IDs',()=>{
+  const c={};vm.createContext(c);vm.runInContext(readSource('workbench/preview.js'),c);
+  const rec={number:2},other={number:1},prior={tabView:'section-1-flow',tabViewLegacyLayout:'flow'};
+  const definition=(id,record,legacy=false)=>({id,legacy,members:[{record:{runtime:record}}]});
+  const reference=definitions=>c.workbenchPreviewViewReference({views:{owner:()=>({views:definitions})}},rec,prior);
+  assert.equal(reference([definition('section-1-flow',rec)]),'section-1-flow','promotion retains the authored identity in the matched section');
+  assert.equal(reference([definition('section-1-flow',other)]),'flow','another section cannot claim the generated identity');
+  assert.equal(reference([definition('section-1-flow',other,true),definition('section-2-flow',rec,true)]),'flow','reordered legacy Views resolve by layout within the matched section');
+});

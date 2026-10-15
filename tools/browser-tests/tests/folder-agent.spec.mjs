@@ -1639,3 +1639,80 @@ test('pilot health verifies synthetic helper receipts and retires them across re
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
+
+test('agent change navigation reaches other Views and paths and preserves stable comparison context',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1280,height:720});await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    const raw=JSON.parse(source),alpha=raw.page.blocks[0];alpha.id='alpha';alpha.text=Array.from({length:30},(_,i)=>'Context paragraph '+i+'. This evidence stays with the delivery story.');
+    const beta=structuredClone(alpha);beta.id='beta';beta.heading='Recovery';
+    beta.diagram.layouts.push({...structuredClone(beta.diagram.layouts[0]),id:'explore',name:'Recovery canvas',presentation:'explore'});delete beta.diagram.layouts[1].steps;
+    beta.diagram.nodes.retired={title:'Retired worker'};beta.diagram.rows.push(['retired']);
+    const hidden=structuredClone(alpha);hidden.id='hidden';hidden.heading='Unpublished section';
+    raw.page.blocks.push(beta,hidden);raw.page.views=[{id:'overview',name:'Overview',presentation:'standard',sections:['alpha']},{id:'recovery',name:'Recovery',presentation:'explore',sections:[{section:'beta',layout:'explore'}]}];raw.page.defaultView='overview';
+    const original=JSON.stringify(raw);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await copyRequest(page,'Review changes across the recovery story.');const request=await h.read('request.json'),state=await h.read('state.json');
+    raw.page.title='Updated browser contract';raw.page.views[1].name='Recovery review';beta.diagram.steps=[{...beta.diagram.steps[2],text:'Recovery failed after retry'},beta.diagram.steps[1],beta.diagram.steps[0]];
+    beta.diagram.paths[1].label='Retry failure';delete beta.diagram.nodes.retired;beta.diagram.nodes.replacement={title:'Replacement worker'};beta.diagram.rows[1]=['replacement'];hidden.diagram.nodes.b.title='Unpublished backend';
+    raw.page.blocks=[beta,alpha,hidden];const proposed=JSON.stringify(raw);
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed recovery evidence.\n');
+    h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review recovery changes');
+    await page.locator('#agent-update-open').click();
+    const scroller=page.locator('#agent-update-scroll');await scroller.evaluate(el=>el.scrollTop=240);const priorScroll=await scroller.evaluate(el=>el.scrollTop);expect(priorScroll).toBeGreaterThan(0);
+    await page.locator('#agent-update-current').click();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(priorScroll);
+    await page.locator('#agent-update-proposed').click();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(priorScroll);
+    await page.locator('#agent-update-changes').click();
+    const list=page.locator('#agent-update-change-list'),view=page.locator('#agent-update-view'),position=page.locator('#agent-update-position');
+    await list.getByRole('button',{name:/modified · Delivery · View Recovery/}).click();await expect(view.getByRole('tab',{name:'Recovery review',exact:true})).toHaveAttribute('aria-selected','true');
+    await list.getByRole('button',{name:/modified · Recovery · Path Failure/}).click();await expect(view.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
+    await list.getByRole('button',{name:/modified · Recovery · Step Exact hidden failure/}).click();
+    await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');
+    await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
+    await page.locator('#agent-update-changes-close').click();
+    await view.getByRole('button',{name:'Zoom out',exact:true}).click();
+    const camera=()=>view.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const before=await camera();
+    await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
+    await page.locator('#agent-update-current').click();
+    await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');
+    await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
+    await expect.poll(async()=>{const now=await camera();return now.zoom===before.zoom && Math.abs(now.x-before.x)<8 && Math.abs(now.y-before.y)<8;}).toBe(true);await expect(page.locator('#agent-update-commit')).toBeDisabled();
+    await page.locator('#agent-update-proposed').click();await expect.poll(async()=>{const now=await camera();return now.zoom===before.zoom && Math.abs(now.x-before.x)<8 && Math.abs(now.y-before.y)<8;}).toBe(true);
+    await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
+    await page.locator('#agent-update-changes').click();await list.getByRole('button',{name:/removed · Recovery · Node Retired worker/}).click();
+    await expect(page.locator('#agent-update-current')).toHaveAttribute('aria-pressed','true');await expect(position).toContainText('Current');
+    await expect(view.locator('[data-dv-node="retired"]')).toBeVisible();await page.locator('#agent-update-proposed').click();await expect(position).toContainText('no counterpart');
+    await list.getByRole('button',{name:/modified · Unpublished section · Node Backend/}).click();await expect(position).toContainText('not included in a View');await expect(page.locator('#agent-update-source')).toBeFocused();
+    await page.locator('#agent-update-details-close').click();await page.locator('#agent-update-changes').click();await list.getByRole('button',{name:/Coverage ledger/}).click();await expect(page.locator('#agent-update-ledger')).toBeFocused();
+    await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-details-close').click();
+    await page.setViewportSize({width:1440,height:900});await page.locator('#agent-update-next').click();await page.locator('#agent-update-details-close').click();await page.locator('#agent-update-changes').click();
+    await page.screenshot({path:info.outputPath('change-navigation-list-1440x900.png')});
+    await page.locator('#agent-update-close').click();await expect(page.locator('#src')).toHaveValue(original);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('agent change navigation restores legacy Views after reorder and reveals an offscreen node',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    const raw=JSON.parse(source),alpha=raw.page.blocks[0];alpha.id='alpha';
+    const beta=structuredClone(alpha);beta.id='beta';beta.heading='Recovery';beta.diagram.layouts.push({...structuredClone(beta.diagram.layouts[0]),id:'explore',name:'Recovery canvas',presentation:'explore'});delete beta.diagram.layouts[1].steps;beta.diagram.defaultLayout='explore';raw.page.blocks.push(beta);
+    const original=JSON.stringify(raw);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await copyRequest(page,'Rename the recovery backend.');const request=await h.read('request.json'),state=await h.read('state.json');
+    beta.diagram.nodes.b.title='Recovery backend';raw.page.blocks.reverse();const proposed=JSON.stringify(raw);
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed backend.\n');h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md');
+    await page.locator('#agent-update-open').click();await page.locator('#agent-update-next').click();
+    const view=page.locator('#agent-update-view'),node=view.locator('.explore-active-section [data-dv-node="b"]'),board=view.locator('.explore-active-section .explore-board');
+    await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
+    await board.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;});await expect(node).not.toBeInViewport();
+    await page.locator('#agent-update-changes').click();await page.locator('#agent-update-change-list').getByRole('button',{name:/Recovery · Node Backend/}).click();await page.locator('#agent-update-changes-close').click();await expect(node).toBeInViewport();
+    const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const before=await camera();
+    await page.locator('#agent-update-current').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(node).toContainText('Backend');await expect.poll(camera).toEqual(before);
+    await expect(view.getByRole('tab',{name:'Recovery · Recovery canvas',exact:true})).toHaveAttribute('aria-selected','true');
+    await page.locator('#agent-update-proposed').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');await expect.poll(camera).toEqual(before);
+    await page.screenshot({path:info.outputPath('change-navigation-legacy-camera-1440x900.png')});
+    await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-discard').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});

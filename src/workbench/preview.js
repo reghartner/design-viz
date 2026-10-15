@@ -25,13 +25,14 @@ function matchWorkbenchPreviewSections(previous,next){
   });
   return matches;
 }
-function workbenchPreviewSnapshot(page, ctl){
+function workbenchPreviewSnapshot(page, ctl, options){
   var sections = workbenchPreviewSections(page), saved = [];
   ((ctl && ctl.sections) || []).forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
     if (!section) return;
-    var prior = {sectionId:section.sectionId,context:section.context,content:section.content,
+    var prior = {number:rec.number,sectionId:section.sectionId,context:section.context,content:section.content,
       playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
+    if(options && options.reader && rec.viewport)prior.reader=rec.viewport.snapshotReaderState();
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.boardSize && rec.boardSize.snapshot) prior.boardNavigation = rec.boardSize.snapshot();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
@@ -40,7 +41,7 @@ function workbenchPreviewSnapshot(page, ctl){
       if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
     }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
-    if(ctl.views){var owner=ctl.views.owner(rec),view=ctl.views.current(rec);if(owner && view){prior.tabView=view.id;prior.tabViewSelected=owner.selected===rec;}}
+    if(ctl.views){var owner=ctl.views.owner(rec),view=ctl.views.current(rec);if(owner && view){prior.tabView=view.id;prior.tabViewLegacyLayout=view.legacy?view.legacyLayout:null;prior.tabViewSelected=owner.selected===rec;}}
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
@@ -59,12 +60,19 @@ function workbenchPreviewSnapshot(page, ctl){
   });
   return {sections:saved};
 }
-function restoreWorkbenchPreview(page, ctl, saved){
+/* Authoring a legacy View materializes its generated ID as an explicit ID.
+   That ID remains authoritative through Undo/Redo. Layout identity is needed
+   only while the destination still derives its Views from section positions. */
+function workbenchPreviewViewReference(ctl,rec,prior){
+  var owner=ctl.views && ctl.views.owner(rec),authored=owner && owner.views && owner.views.some(function(view){return !view.legacy && view.id===prior.tabView && view.members.some(function(member){return member.record.runtime===rec;});});
+  return prior.tabViewLegacyLayout && !authored?prior.tabViewLegacyLayout:prior.tabView;
+}
+function restoreWorkbenchPreview(page, ctl, saved, options){
   if (!saved) return;
   var sections = workbenchPreviewSections(page),matches=matchWorkbenchPreviewSections(saved.sections,sections);
   var restoredOwners=new Set();
-  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1),owner=ctl.views && ctl.views.owner(rec);if(prior && owner && !restoredOwners.has(owner) && prior.tabView){if(ctl.views.select(rec,prior.tabView,undefined,true))restoredOwners.add(owner);}});
-  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.tabViewSelected && ctl.views)ctl.views.ensure(rec,prior.tabView,true);});
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1),owner=ctl.views && ctl.views.owner(rec);if(prior && owner && !restoredOwners.has(owner) && prior.tabView){var reference=workbenchPreviewViewReference(ctl,rec,prior);if((reference!==prior.tabView?ctl.views.ensure(rec,reference,true):ctl.views.select(rec,reference,undefined,true)))restoredOwners.add(owner);}});
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.tabViewSelected && ctl.views)ctl.views.ensure(rec,workbenchPreviewViewReference(ctl,rec,prior),true);});
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
     var prior=matches.get(rec.number-1);
@@ -80,7 +88,7 @@ function restoreWorkbenchPreview(page, ctl, saved){
     if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
-    if (!stepper || !prior.mode || prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
+    if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
@@ -138,8 +146,45 @@ function workbenchReaderPreviewSnapshot(page,ctl){
   });
   var target=activeExplore?{kind:'diagram',section:activeExplore.number}:
     ctl.activeTarget && Object.assign({},ctl.activeTarget);
-  return {tabs:activeTabReferences(ctl),sections:workbenchPreviewSnapshot(page,ctl),
+  return {tabs:activeTabReferences(ctl),sections:workbenchPreviewSnapshot(page,ctl,{reader:true}),
     target:target,details:ctl.details && ctl.details.snapshot()};
+}
+/* A target's section number belongs to its old registry. Resolve it through
+   the same stable section match used for playback before selecting a new tab. */
+function restoreWorkbenchReaderPreviewSnapshot(page,ctl,saved){
+  restoreActiveTabs(ctl,saved.tabs);restoreWorkbenchPreview(page,ctl,saved.sections,{comparison:true});
+  var matches=matchWorkbenchPreviewSections(saved.sections.sections,workbenchPreviewSections(page));
+  var oldNumber=saved.target && saved.target.section,rec=null,fallback=null;
+  matches.forEach(function(prior,index){if(prior.number===oldNumber)rec=ctl.sections.find(function(r){return r.number===index+1;});});
+  if(rec){
+    if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
+    if(ctl.views && !ctl.views.ensure(rec,undefined,true)){fallback='Section not included in a View; showing the opening section';rec=null;}
+    if(rec){
+      ctl.activeTarget={kind:'diagram',section:rec.number};
+      var prior=matches.get(rec.number-1),stepper=rec.stepper,currentView=ctl.views && ctl.views.current(rec);
+      var viewReference=workbenchPreviewViewReference(ctl,rec,prior);
+      if(currentView && currentView.id!==viewReference && currentView.legacyLayout!==viewReference)fallback='Matching View unavailable; showing a View containing this section';
+      if(prior.path && (!stepper || stepper.path()!==prior.path))fallback='Matching path unavailable; showing the section’s opening path';
+      else if(prior.mode==='step' && (!stepper || prior.id && stepper.current().id!==prior.id))fallback='Matching step unavailable; showing the section’s opening step';
+    }
+  }
+  if(saved.details && ctl.details)ctl.details.restore(saved.details);
+  return {matches:matches,target:rec,missing:!!oldNumber && !rec,fallback:fallback || (oldNumber && !rec?'Section unavailable; showing the document’s opening section':null),page:page};
+}
+function restoreWorkbenchReaderCameras(ctl,restored){
+  ctl.sections.forEach(function(rec){
+    var prior=restored.matches.get(rec.number-1);if(!prior || !prior.reader || !rec.viewport)return;
+    var fresh=rec.viewport.snapshotReaderState(),record=sectionRecords(restored.page)[rec.number-1],d=record.section.diagram || {};
+    var definitions=diagramLayoutViews(d),active=rec.viewport.viewDefinition();
+    if(active && !definitions.some(function(definition){return definition.id===active.id;}))definitions.push(active);
+    // Carry only viewing coordinates. Old layout/panel geometry must never
+    // conceal the proposed side's authored layout changes.
+    definitions.forEach(function(definition){var old=prior.reader.memories[definition.id];if(!old)return;
+      var memory=fresh.memories[definition.id] || (fresh.memories[definition.id]={panels:{},focus:false,layout:definition.exploreLayout || {}});
+      memory.scroll=old.scroll;memory.zoom=old.zoom;memory.fitFloor=old.fitFloor;
+    });
+    rec.viewport.restoreReaderState(fresh);
+  });
 }
 function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
   options=options || {};

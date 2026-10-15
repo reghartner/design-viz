@@ -74,6 +74,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     active.viewport.restoreInitialCamera();
     if(refitObserver){var board=active.sectionEl.querySelector('.board');if(board)refitObserver.observe(board);}
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
+    if(opts && opts.preserveCamera && opts.preserveCamera(rec,definition))seen.add(key);
     if(!seen.has(key)){
       fitRecord=rec;fitDefinition=definition;fitKey=key;frame=requestAnimationFrame(function(){
         // Boot-time indexing briefly visits other views. Only mark a view after

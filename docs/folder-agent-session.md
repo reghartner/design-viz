@@ -320,16 +320,28 @@ the last saved pair.
 and **Proposed** controls in the pinned decision bar. Change highlights start
 on: Proposed marks added content in green and modified content in amber;
 Current marks removed counterparts in red and modified counterparts in amber.
-The compact legend reports the number of rendered section, node, edge, panel
-and step changes in the selected state. Use **Highlights: On/Off** when the
+The compact legend reports the number of document, section, node, edge, panel,
+step, path, layout and View changes in the selected state. Use **Highlights: On/Off** when the
 unmarked rendering is easier to inspect. Highlights follow redraws, paths and
 contained Explore navigation; they do not become spec data.
+
+Use **Next change** / **Previous change** or open **Changes** for a navigable
+list with added, removed and modified labels. Changes can select another section,
+View or path; removed objects open in Current. Document metadata and coverage
+ledger changes open Details. A section excluded from all Views has a source
+fallback there. These controls never edit or accept the proposal.
+
+Switching Current/Proposed preserves matching section, View, path and step
+identities, reader scroll and camera zoom. Reordered registries do not redirect
+the comparison to another object. Missing counterparts have an explicit fallback.
+A refreshed proposal replaces the list and retires the previous navigation state;
+its separate acceptance guard still requires review of the refreshed version.
 
 Topology exports and imports preview using the same frozen provider context as
 the workbench. The JSON, change comparison and accepted source retain authored
 declarations; previewing does not copy provider nodes into your source.
 
-The rendered document uses all space below the decision bar without a browser
+The rendered document uses all space below the decision and change-navigation bars without a browser
 fullscreen permission. **Details** opens the summary, Markdown ledger and authored
 JSON in a drawer without resetting the selected version, path, playback or zoom.
 Explore stays inside the preview area so you can navigate its paths, zoom and

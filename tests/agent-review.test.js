@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const plain=value=>JSON.parse(JSON.stringify(value));
 function modelContext(){
-  const c={};vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);return c;
+  const c={};vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('core/tab-views.js'),c);vm.runInContext(readSource('core/details.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);return c;
 }
 function section(id,heading,diagram,extra={}){return {id,heading,diagram,...extra};}
 test('review change model uses stable identities across section and item insertion/reordering without mutating specs',()=>{
@@ -59,22 +59,22 @@ test('review decoration can be disabled and reapplied after rendered content is 
   node.parent=sectionNode;c.workbenchAgentReviewDecorate(root,side,true);assert.equal(node.attrs['data-agent-change'],'added');
 });
 function uiHarness(options={}){
-  const ids=['banner','dialog','view','scroll','commit','current','proposed','source','ledger','ledger-summary','summary','note','note-text','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','highlights','details','details-panel','details-close','review-refresh','change-added','change-removed','change-modified','change-status'];
+  const ids=['changes-panel','changes','changes-close','change-list','position','previous','next','banner','dialog','view','scroll','commit','current','proposed','source','ledger','ledger-summary','summary','note','note-text','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','highlights','details','details-panel','details-close','review-refresh','change-added','change-removed','change-modified','change-status'];
   function element(id){
-    const listeners={},classes=new Set(),attrs={};return {id,hidden:false,open:false,textContent:'',value:'',disabled:false,attrs,listeners,
+    const listeners={},classes=new Set(),attrs={};return {id,children:[],hidden:false,open:false,textContent:'',value:'',disabled:false,attrs,listeners,
       classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},
       addEventListener(type,fn){(listeners[type]||(listeners[type]=[])).push(fn);},removeEventListener(type,fn){listeners[type]=(listeners[type]||[]).filter(v=>v!==fn);},
       fire(type,event={preventDefault(){}}){(listeners[type]||[]).slice().forEach(fn=>fn.call(this,event));},setAttribute(k,v){attrs[k]=String(v);},getAttribute(k){return attrs[k]??null;},
-      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},replaceChildren(){},querySelectorAll(){return [];},focus(){},select(){},
+      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},appendChild(node){this.children.push(node);},replaceChildren(){this.children=[];},querySelectorAll(selector){const all=this.children.flatMap(node=>[node,...node.querySelectorAll(selector)]);return all.filter(node=>selector==='[data-change-index]' && node.getAttribute('data-change-index')!==null);},focus(){},select(){},
       showModal(){this.open=true;},close(){this.open=false;}};
   }
   const elements={};ids.forEach(id=>elements['agent-update-'+id]=element(id));
   const observers=[];class Observer{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(){this.observed=true;}disconnect(){this.disconnected=true;}}
-  const doc={defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
+  const doc={createElement:element,defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
   const pages=[],accepted=[],rejected=[];
-  const c={document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {destroy(){destroyed++;}};},
+  const c={workbenchReaderPreviewSnapshot:()=>({}),restoreWorkbenchReaderPreviewSnapshot:()=>({matches:new Map()}),restoreWorkbenchReaderCameras:()=>{},document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {sections:[],destroy(){destroyed++;}};},
     initViewerExploreCanvas(ctl,view,opts){canvasOptions=opts;return {destroy(){canvasDestroyed++;}};}};
-  vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
+  vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('core/tab-views.js'),c);vm.runInContext(readSource('core/details.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
   let session;
   if(options.topology){
     vm.runInContext(readSource('canon.js'),c);vm.runInContext(readSource('validator.js'),c);vm.runInContext(readSource('workbench/session.js'),c);
@@ -167,4 +167,34 @@ test('invalid topology, missing frozen context and missing resolver fail visibly
     }
     assert.equal(h.counts().rendered,0);assert.deepEqual(h.accepted,[]);h.ui.destroy();
   }
+});
+
+test('change list pairs reordered stable targets, includes alternate paths, Views, removals and ledger',()=>{
+  const c=modelContext(),a=section('a','Main',{nodes:{a:{title:'A'},gone:{title:'Removed worker'}},steps:[{id:'one',text:'One'},{id:'two',text:'Two'}],paths:[{id:'failure',label:'Failure',steps:['two']}],layouts:[{id:'wide',name:'Wide'}]});
+  const current={title:'Before',sections:[a,section('b','Other',{})],views:[{id:'all',name:'All',sections:['a','b']}]};
+  const proposed=plain(current);proposed.title='After';proposed.sections.reverse();const d=proposed.sections[1].diagram;
+  d.steps=[{id:'two',text:'Changed two'},{id:'one',text:'One'}];d.paths[0].label='Retry failure';d.layouts[0].name='Wider';delete d.nodes.gone;proposed.views[0].name='Updated View';
+  const changes=c.workbenchAgentReviewChanges(current,proposed),entries=plain(c.workbenchAgentReviewEntries(changes,{current,proposed},true));
+  const step=entries.find(entry=>entry.label.includes('Step Two'));
+  assert.deepEqual(step.current,{section:0,kind:'steps',key:'1'});assert.deepEqual(step.proposed,{section:1,kind:'steps',key:0});
+  assert.equal(entries.filter(entry=>entry.label.includes('Step')).length,1,'modified counterparts are one change');
+  assert.equal(entries.find(entry=>entry.label.includes('Removed worker')).proposed,undefined);
+  for(const name of ['Document metadata','Path Failure','Layout Wide','View All','Coverage ledger'])assert.ok(entries.some(entry=>entry.label.includes(name)),name);
+});
+test('ledger navigation is read-only and stale replacement retires its targets',()=>{
+  const h=uiHarness({source:JSON.stringify({sections:[section('one','One',{nodes:{a:{title:'A'}},rows:[['a']]})]})}),e=h.elements;
+  h.ui.update(h.review);h.ui.open();assert.equal(e['agent-update-changes'].textContent,'Changes (1)');assert.equal(e['agent-update-change-list'].children.length,1);
+  e['agent-update-next'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);assert.match(e['agent-update-position'].textContent,/Coverage ledger/);
+  assert.deepEqual(h.accepted,[]);assert.deepEqual(h.rejected,[]);
+  h.replaceSnapshot({...h.snapshot,ledger:h.snapshot.currentLedger,review:{...h.review,version:2}});h.ui.update(h.snapshot.review);
+  assert.equal(e['agent-update-changes'].textContent,'Changes (0)');assert.equal(e['agent-update-change-list'].children.length,0);assert.equal(e['agent-update-next'].disabled,true);assert.equal(e['agent-update-commit'].disabled,true);
+  assert.doesNotMatch(e['agent-update-position'].textContent,/evidence and decisions/);h.ui.destroy();
+});
+
+
+test('tab metadata changes have a meaningful containing-section destination',()=>{
+  const c=modelContext(),current={blocks:[{tabs:[{label:'Journey',defaultView:'before',views:[{id:'before',name:'Before',sections:['a']},{id:'after',name:'After',sections:['a']}],sections:[section('a','Main',{})]}]}]},proposed=plain(current);
+  proposed.blocks[0].tabs[0].defaultView='after';
+  const changes=c.workbenchAgentReviewChanges(current,proposed),entries=plain(c.workbenchAgentReviewEntries(changes,{current,proposed},false));
+  assert.equal(entries.length,1);assert.match(entries[0].label,/Tab settings: defaultView/);assert.equal(entries[0].current.section,0);assert.equal(entries[0].proposed.section,0);
 });

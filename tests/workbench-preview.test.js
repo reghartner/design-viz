@@ -159,3 +159,16 @@ test('reader preview renderer forwards an explicit host target while restoring r
     ['tabs',snapshot.tabs],['sections',snapshot.sections],
     ['tabs',snapshot.tabs],['sections',snapshot.sections]]);
 });
+
+test('reader comparison remaps the active section by stable identity and restores only camera coordinates',()=>{
+  const c={};vm.createContext(c);for(const file of ['core/navigation.js','core/document.js','workbench/preview.js'])vm.runInContext(readSource(file),c);
+  c.restoreActiveTabs=()=>{};c.restoreWorkbenchPreview=()=>{};
+  const old={sections:[{id:'a',heading:'A',diagram:{}},{id:'b',heading:'B',diagram:{}}]},page={sections:[old.sections[1],old.sections[0]]};
+  const oldSections=c.workbenchPreviewSections(old).map((s,i)=>({...s,number:i+1,reader:{memories:{canvas:{zoom:.75,scroll:{x:.2,y:.3},layout:{panels:['old geometry']}}}}}));
+  const applied=[],newLayout={panels:['proposed geometry']};c.diagramLayoutViews=()=>[{id:'canvas',exploreLayout:newLayout}];
+  const ctl={sections:[1,2].map(number=>({number,viewport:{viewDefinition:()=>({id:'canvas'}),snapshotReaderState:()=>({memories:{canvas:{layout:newLayout}}}),restoreReaderState:state=>applied.push(state)}}))};
+  const restored=c.restoreWorkbenchReaderPreviewSnapshot(page,ctl,{sections:{sections:oldSections},target:{kind:'diagram',section:2}});
+  assert.deepEqual(plain(ctl.activeTarget),{kind:'diagram',section:1});assert.equal(restored.missing,false);
+  c.restoreWorkbenchReaderCameras(ctl,restored);assert.equal(applied[0].memories.canvas.zoom,.75);assert.deepEqual(applied[0].memories.canvas.layout,newLayout);
+  const missing=c.restoreWorkbenchReaderPreviewSnapshot({sections:[old.sections[0]]},{sections:[ctl.sections[0]]},{sections:{sections:oldSections},target:{kind:'diagram',section:2}});assert.equal(missing.missing,true);
+});

@@ -55,7 +55,7 @@ test('skipping new-topic tips records only the displayed topic and offers the re
   await page.goto(server.origin+'/workbench.html?diagram=rich');
   await expect(prompt(page)).toContainText('2');await prompt(page).click();
   await expect(heading(page)).toHaveText('Flows can split');await expect(page.locator('.dv-tour-ui')).toBeVisible();
-  await page.getByRole('button',{name:'Skip the tour',exact:true}).click();
+  await page.getByRole('button',{name:'Skip tour',exact:true}).click();
   await expect(prompt(page)).toHaveText('New features to explore · 1');
   const seen=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).seen,key);
   expect(seen).toContain('branching-split');expect(seen).not.toContain('branching-rejoin');

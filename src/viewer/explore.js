@@ -27,6 +27,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
+  var workbenchFocus=false;
   var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
   var fitFrame=0,cameraRevision=0;
   var shell=document.createElement('div');shell.className='section-viewport';
@@ -327,7 +328,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     moved.push({node:node,anchor:anchor});host.appendChild(node);
   }
   function available(w){if(w===playerWindow)return !!bar || !!player.querySelector('.playback-mode-rail');return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
-  function visible(w){if(w===playerWindow)return available(w);return available(w) && !w.state.hidden && !memory.focus;}
+  function visible(w){if(workbenchFocus)return false;if(w===playerWindow)return available(w);return available(w) && !w.state.hidden && !memory.focus;}
   function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
   function bounds(){return {w:stage.clientWidth,h:stage.clientHeight};}
   function fitHeight(){
@@ -500,8 +501,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var r=constrain(w,scaledRect(w,w.state));
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
+      // Clear the entire toolbar, which can be wider than a single panel.
       var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
-      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight=Math.min(columnRight,toolRect.left-stageRect.left-gap);width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
       if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
       r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
@@ -516,7 +518,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(canvasWindow(w) && previous && ['x','y','w','h'].some(function(key){return Math.abs(previous[key]-r[key])>.01;}))canvasGeometryChanged=true;
       apply(w,r);
     });
-    player.hidden=!bar && !player.querySelector('.playback-mode-rail');
+    player.hidden=workbenchFocus || !bar && !player.querySelector('.playback-mode-rail');
     player.classList.toggle('player-ambient',!!bar && bar.hidden);
     var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
     var automaticControls=!controls;
@@ -704,7 +706,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // The canvas also owns panels and playback. Hide only its graph while
     // Explore is active, leaving those authored objects and navigation usable.
     board.hidden=active?false:canvasBoardHidden;
-    board.classList.toggle('authored-diagram-hidden',active && canvasBoardHidden);
+    board.classList.toggle('authored-diagram-hidden',active && canvasBoardHidden && !workbenchFocus);
   }
   function enter(){
     cancelDeferredFit();
@@ -855,6 +857,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   return {
     isWorkbenchCanvas:function(){return workbenchCanvas;},
+    setWorkbenchFocus:function(value){if(workbenchFocus===!!value)return;workbenchFocus=!!value;paintBoardVisibility();paint();},
     setBoardHidden:function(hidden){canvasBoardHidden=hidden;paintBoardVisibility();},
     isExplore:function(){return active;},
     revealProse:function(){
@@ -878,7 +881,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       enter();
     },
     currentCamera:function(){return camera();},
-    panelPlacement:function(){return onCanvas()?'canvas':'floating';},
+    panelPlacement:function(){return onCanvas() && !workbenchFocus?'canvas':'floating';},
     canvasCommand:function(){return expand;},
     navigationKeydown:keydown,
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();cancelDeferredFit();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},

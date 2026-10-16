@@ -49,7 +49,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  expect(Math.min(...rights)).toBeLessThan(rightmost-100);
  for(const r of stacked)expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);
  const play=page.getByRole('button',{name:'Next step',exact:true}),pos=await rect(play);
- await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+ await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
  await page.locator('.explore-board').evaluate(el=>{el.scrollLeft=1000;el.scrollTop=900;});
  const after=await rect(play);expect(after.x).toBeCloseTo(pos.x,0);expect(after.y).toBeCloseTo(pos.y,0);
  await play.click();await expect(floats(page)).toHaveCount(4);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeLessThanOrEqual(pos.y);
@@ -61,7 +61,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
- await page.getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
+ await page.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
 });
 test('right and top-right remain free placement; Stack at edge preserves size and wraps left',async({page,server})=>{
  const url=await build(server,{unstacked:true});await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -151,7 +151,7 @@ test('automatic panels follow richer step content while authored and manual geom
  const controls=await rect(page.locator('.explore-player'));for(const panel of visible)expect(overlaps(panel,controls)).toBe(false);
  await info.attach('dynamic-panels-1280x800',{body:await page.screenshot(),contentType:'image/png'});
 });
-for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and arranges every panel without overlap',async({page,server})=>{
+for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and arranges every panel without overlap',async({page,server},info)=>{
  const url=await build(server,{unstacked:true,oversized:true});
  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
@@ -174,6 +174,7 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
  for(let a=0;a<arranged.length;a++)for(let b=a+1;b<arranged.length;b++)expect(overlaps(arranged[a],arranged[b])).toBe(false);
  if(surface==='workbench'){const canvasTools=await rect(page.locator('#workspace-canvas-controls'));for(const panel of arranged)expect(overlaps(panel,canvasTools)).toBe(false);}
  else for(const panel of arranged)for(const control of utilityControls)expect(overlaps(panel,control)).toBe(false);
+ await page.screenshot({path:info.outputPath('stacked-panels.png')});
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');

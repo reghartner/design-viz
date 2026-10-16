@@ -48,7 +48,7 @@ test('homepage names the practice destination and keeps the System flow View thr
   await expect(section.locator('.explore-zoom')).toHaveText('52%');
   await fits();expect((await example.boundingBox()).height).not.toBe(defaultHeight);
   const zoom=await section.locator('.explore-zoom').innerText();
-  await section.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await section.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   await expect(section.locator('.explore-zoom')).not.toHaveText(zoom);
   await section.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();
   const caption=await section.locator('.stepline').innerText();

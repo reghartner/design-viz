@@ -168,7 +168,16 @@ jobs:
           node-version: 24
       - name: Rebuild HTML before tests
         run: python3 tools/build.py
-      - run: python3 -m unittest discover -s tests -v
+      - name: Run Python tests with structured diagnostics
+        run: python3 tools/run_python_tests.py --report "${{ runner.temp }}/python-test-results.json"
+      - name: Upload Python test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-test-results
+          path: ${{ runner.temp }}/python-test-results.json
+          if-no-files-found: warn
+          retention-days: 14
 
   node-tests:
     runs-on: ubuntu-latest

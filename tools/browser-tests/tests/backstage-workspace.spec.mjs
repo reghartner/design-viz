@@ -51,7 +51,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
   expect(desktop.actions.y).toBe(desktop.nav.y);expect(desktop.nav.x).toBe(0);
   expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
-  const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
+  const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   await expect.poll(async()=>(await canvasCamera(dialog)).zoom).toBeGreaterThan(fittedCamera.zoom);
   await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=80;el.scrollTop+=20;});const savedCamera=await canvasCamera(dialog);
   await info.attach('backstage-expanded-desktop',{body:await page.screenshot(),contentType:'image/png'});
@@ -268,7 +268,7 @@ test('an inline Explore camera survives the live expanded portal and return with
  await graphInView(alpha);const opening=await camera(alpha),sibling=await beta.locator('.stepid').textContent();
  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});await graphInView(dialog);await closeCamera(dialog,opening);
  expect(await dialog.locator('[data-flowview-native]').evaluate((el,prior)=>el===prior,native)).toBe(true);
- await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=40;el.scrollTop+=25;});const customized=await camera(dialog);
+ await dialog.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=40;el.scrollTop+=25;});const customized=await camera(dialog);
  await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();await closeCamera(alpha,customized);
  // Growing the board can clamp scrollLeft against its old canvas extent before ResizeObserver runs.
  // The second expansion must preserve the manually panned center, not that clamped left edge.

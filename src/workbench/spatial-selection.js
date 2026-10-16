@@ -112,11 +112,11 @@ function createBuilderSpatialSelection(opts){
     var geometry=rects(targets,shell);if(geometry.length!==targets.length || geometry.some(function(r){return !r || r.w<=0 || r.h<=0;}))return null;
     return {targets:targets,shell:shell,s:s,id:layoutId(shell),geometry:geometry};
   }
-  function fitReason(c){return !c?'Select visible nodes, canvas panels or canvas step controls to fit.':c.shell.classList.contains('viewport-explore')?null:'Fit selection is available only in Explore.';}
+  function fitReason(c){return !c?'Select visible nodes, canvas panels or canvas step controls to fit.':null;}
   function fitSelection(){
     var c=context();if(!active() || fitReason(c))return;
     var rs=c.geometry,x=Math.min.apply(null,rs.map(function(r){return r.x;})),y=Math.min.apply(null,rs.map(function(r){return r.y;}));
-    view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
+    view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{section:c.targets[0].section,x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
   function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null,reason=fitReason(c);fitButton.disabled=!!reason;fitButton.title=reason || 'Frame selected canvas objects';}}
   function distribute(direction){var c=context();if(!active() || !c)return;var plan=planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry);if(plan.noop){announce('Every selected graph node is position-locked; nothing moved.',c.shell);return;}opts.apply(plan,null,c.s);}
@@ -124,7 +124,7 @@ function createBuilderSpatialSelection(opts){
     var c=context();sync();if(!c)return;
     var box=doc.createElement('div');box.className='iactions dv-spatial-actions';host.appendChild(box);
     var fit=doc.createElement('button');fit.type='button';fit.className='bbtn';fit.textContent='Fit selection';box.appendChild(fit);lifetime.listen(fit,'click',fitSelection);
-    if(!c.shell.classList.contains('viewport-explore')){fit.disabled=true;fit.title=fitReason(c);return;}
+    if(!c.shell.classList.contains('viewport-explore'))return;
     var entries=[];
     ['horizontal','vertical'].forEach(function(direction){var button=doc.createElement('button');button.type='button';button.className='bbtn';button.textContent='Distribute '+(direction==='horizontal'?'horizontally':'vertically');box.appendChild(button);entries.push({button:button,direction:direction});lifetime.listen(button,'click',function(){distribute(direction);});});
     var note=doc.createElement('p');note.className='fnote';box.appendChild(note);

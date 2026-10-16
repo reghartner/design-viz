@@ -98,7 +98,7 @@ test('workbench entering Explore through an ordinary document tab frames its dia
  await expect(page.locator('#section-explore [data-dv-node="x6"]')).toBeInViewport();
  await expect(navigation.locator('.reader-contents')).toBeVisible();await expect(navigation.getByRole('tab',{name:'Explore',exact:true})).toBeVisible();
  const board=page.locator('#section-explore .explore-board'),box=await board.boundingBox();
- await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();await page.locator('#workspace-pan').click();
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await page.locator('#workspace-pan').click();
  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
  await page.mouse.move(box.x+box.width/2-70,box.y+box.height/2-45,{steps:6});await page.mouse.up();
  await page.locator('#workspace-pan').click();
@@ -121,7 +121,7 @@ test('workbench entering Explore through an ordinary document tab frames its dia
  await expect(page.locator('#section-explore [data-dv-node="x6"]')).toBeInViewport();
  await afterTwoFrames(page);
  const freshCamera=await board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop})),freshZoom=await zoomControl.textContent();
- await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();await expect(zoomControl).toHaveText(freshZoom);
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();await expect(zoomControl).toHaveText(freshZoom);
  await expect.poll(()=>board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop}))).toEqual(freshCamera);
  await page.getByRole('button',{name:'Authored',exact:true}).click();
  await expect(zoomControl).toContainText('55%');

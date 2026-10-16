@@ -94,10 +94,10 @@ for(const width of [800,1200,1440,1920])test('width-sized graph SVG fits its til
  await measurer.close();
  const initial=await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d),observations=[];
  for(const state of initial.states){const o=await page.evaluate(s=>arrangementNative.observe(s),state);observations.push(o);expect(o.graph.clipped).toBe(0);expect(o.graph.minimumLabelPx).toBeGreaterThanOrEqual(8);}
- const geometry=await page.evaluate(()=>{const svg=document.querySelector('[data-layout-key="diagram"] .boardcanvas>svg'),board=svg.closest('.board');return {svgBottom:svg.getBoundingClientRect().bottom,boardBottom:board.getBoundingClientRect().bottom};});
- expect(geometry.svgBottom).toBeLessThanOrEqual(geometry.boardBottom+2);
+ const geometry=await page.evaluate(()=>{const svg=document.querySelector('[data-layout-key="diagram"] .boardcanvas>svg'),board=svg.closest('.board'),header=board.querySelector('.lg'),zoom=board.querySelector('.board-zoom');return {svgBottom:svg.getBoundingClientRect().bottom,svgHeight:svg.getBoundingClientRect().height,boardBottom:board.getBoundingClientRect().bottom,boardWidth:board.getBoundingClientRect().width,boardHeight:board.getBoundingClientRect().height,headerHeight:header.getBoundingClientRect().height,zoomHeight:zoom.getBoundingClientRect().height};});
  await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,observations,geometry},null,2));
  await page.screenshot({path:info.outputPath('composed.png'),fullPage:true});
+ expect(geometry.svgBottom).toBeLessThanOrEqual(geometry.boardBottom+2);
 });
 
 function documentFixture(){

@@ -156,7 +156,7 @@ for(const width of [870,1280])for(const authored of [false,true])test(`reader Vi
  await expect(node).toBeInViewport({ratio:1});await page.evaluate(()=>document.fonts.ready);
  const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,width:el.querySelector('.boardcanvas>svg').getBoundingClientRect().width}));
  if(authored)expect(await board.evaluate(el=>el.querySelector('.boardcanvas>svg').getBoundingClientRect().width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width)).toBeCloseTo(.5,3);
- await navigation.locator('.reader-toolbar').getByRole('button',{name:'Zoom in',exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
+ await navigation.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
  await expect(node).toBeInViewport();
  for(let cycle=0;cycle<3;cycle++){
   await chooseView(root,'Full story');await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);

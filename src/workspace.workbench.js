@@ -241,7 +241,10 @@ function initWorkbenchWorkspace(){
   // A fresh editor has no selection, so keep the authored controls and panels
   // available until the user chooses a tool. Saved open windows still restore.
   front(prefs.tool);paintAll();
-  var canvas=initWorkbenchCanvas();
+  var canvas=initWorkbenchCanvas({
+    snapshotTools:function(){return {hidden:hidden,tool:prefs.tool,open:names.map(function(name){return prefs.windows[name].open;})};},
+    restoreTools:function(state){if(!state)return;finish(true);names.forEach(function(name,index){prefs.windows[name].open=state.open[index];});front(state.tool);setHidden(state.hidden);persist();}
+  });
   var controls=document.getElementById('workspace-canvas-controls');
   if(controls && typeof ResizeObserver!=='undefined'){var controlsObserver=new ResizeObserver(paintAll);controlsObserver.observe(controls);}
   var preset=document.getElementById('workspace-preset');

@@ -1319,6 +1319,10 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 #workspace-appearance-body #skinbtns{display:flex;flex-wrap:wrap;gap:4px;}
 #workspace-appearance-body .layout-preview-tools{flex-wrap:wrap;}
 .workspace-canvas-controls{position:fixed;bottom:14px;right:14px;z-index:190;display:flex;gap:4px;align-items:center;padding:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244214;}
+.workspace-diagram-focused .workspace-focus-tucked{display:none!important;}
+.workspace-diagram-focused #workspace-focus-diagram{color:var(--accent);border-color:var(--accent);font-weight:600;}
+.workspace-canvas #docview .reader-zoom-options{z-index:166;}
+.workspace-canvas .reader-zoom-scope{font-size:11px;font-weight:600;white-space:nowrap;margin-right:4px;}
 .workspace-zoom-label{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;padding:0 4px;}
 #workspace-pan[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 .canvas-hand,.canvas-hand *{cursor:grab!important;}

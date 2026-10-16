@@ -8,9 +8,9 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
   const {digest}=await import('../tools/canon/drift.mjs'),leaf=provider('leaf'),nested=provider('nested');
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
-  const disk=new Map(),hits=[],updates=[];let gate=null,text=JSON.stringify({page:{title:'Draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']]}}]}}),ledger='Before',saved,number=0,applies=0;
+  const disk=new Map(),hits=[],hosts=[],updates=[];let gate=null,text=JSON.stringify({page:{title:'Draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']]}}]}}),ledger='Before',saved,number=0,applies=0;
   const c={TextEncoder,URL,Response,SyntaxError,location:new URL(origin),window:{crypto:webcrypto},fetch:async url=>{
-    const name=new URL(url).pathname.slice(1);hits.push(name);if(gate)await gate(name);
+    const name=new URL(url).pathname.slice(1);hits.push(name);hosts.push(new URL(url).host);if(gate)await gate(name);
     if(missingIndex && name==='diagrams.json')return new Response('',{status:404});
     return new Response(JSON.stringify(name==='diagrams.json'?catalog:providers.find(spec=>name===spec.page.canon.id+'.json')));
   }};
@@ -26,7 +26,7 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
   await client.start();await client.send('Import nested provider');
   const original=text,raw=JSON.parse(text);diagram(raw).topologyImports=[{spec:'nested',export:'public',as:'shared'}];
   const proposal={...client.manifest(),id:'proposal',requestId:disk.get('request.json').id,baseRevision:disk.get('state.json').revision,source:JSON.stringify(raw),ledger:'After'};disk.set('proposal.json',proposal);
-  return {c,client,session,disk,hits,providers,catalog,proposal,original,updates,get saved(){return saved;},get applies(){return applies;},gate:fn=>gate=fn,
+  return {c,client,session,disk,hits,hosts,providers,catalog,proposal,original,updates,get saved(){return saved;},get applies(){return applies;},gate:fn=>gate=fn,
     connect:async()=>session.connectTopology(await c.connectTopologyRepository(JSON.parse(session.text())),session.snapshot())};
 }
 /* #592 contract matrix (agent proposals on a deployed site)
@@ -41,7 +41,7 @@ test('a folder proposal on a deployed site pins the catalog automatically and st
   h.proposal.topologyContext={catalogURL:'https://evil.invalid/diagrams.json'};
   assert.equal(h.session.topologyContext(),null);
   await h.client.poll();const review=h.client.reviewSnapshot();assert.equal(review.review.ok,true,JSON.stringify(review.review.conflicts));
-  assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);
+  assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);assert.deepEqual(new Set(h.hosts),new Set(['test.invalid']),'only this site is ever asked');
   assert.equal(h.session.topologyContext(),null,'review acquisition must not publish context');
   assert.equal(h.session.canUndo(),false);assert.equal(h.session.text(),h.original);
   assert.ok(diagram(h.session.resolve(JSON.parse(review.source),review.topologyContext)).nodes['shared::inner::api']);

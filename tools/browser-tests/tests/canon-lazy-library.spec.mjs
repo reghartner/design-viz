@@ -219,7 +219,8 @@ test('Add to step gives imported nodes and edges the same emphasis as local memb
    C2 JSON edit | blank draft, typed topologyImports in #src | board renders the imported node; source unchanged | the Topology editor error with no acquisition
    E1 redeploy | provider republished after pin | status names revision mismatch; #topology-refresh visible; after click providers load and insertion works | a dead end that only offers "reopen"
    U1 no library | diagrams.json answers 404 | #topology-connect absent; #topology-refresh hidden; status says no published diagram library and names no control; provider select disabled; no spec request | a Connect/Retry/refresh control or an instruction aimed at a human
-   U2 offline | workbench opened from file:// | #topology-connect absent; #topology-refresh hidden; status explains the offline editor has no published library; zero http(s) requests | guessing a network path offline */
+   U2 offline | workbench opened from file:// | #topology-connect absent; #topology-refresh hidden; status explains the offline editor has no published library; zero http(s) requests | guessing a network path offline
+   U3 legacy | version 1 index (existing test below, "explains unavailable legacy catalogs") | #topology-connect absent; #topology-refresh hidden; status names version 3 and no control; provider select disabled; no spec request | keeping the Connect gate for v1/v2 deployments */
 test('a brand-new local diagram on a deployed site browses providers automatically and persists only its reference',async({page,server})=>{
   const indexRequests=[];page.on('request',request=>{if(request.url().endsWith('/diagrams.json'))indexRequests.push(request.url());});
   await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
@@ -387,6 +388,10 @@ test('reference picker explains unavailable legacy catalogs without fetching inv
   const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
   await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-status')).toContainText('unavailable');
+  // #592 (row U3): a legacy index gets the same control-free explanation as a missing one.
+  await expect(page.locator('#topology-connect')).toHaveCount(0);await expect(page.locator('#topology-refresh')).toBeHidden();
+  await expect(page.locator('#topology-status')).toContainText('version 3');await expect(page.locator('#topology-status')).not.toContainText(/Connect|button/);
+  await expect(page.locator('#topology-provider')).toBeDisabled();
   await expect(page.locator('#topology-add')).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(before);expect(requests).toEqual([]);
 });
 

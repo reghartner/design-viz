@@ -1500,10 +1500,12 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
     await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
     h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Import approved provider');
-    await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
+    // The banner first announces the proposal and only later reports a blocked
+    // review, so judge it after the review has rendered the imported provider.
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view [data-dv-node="shared::api"]')).toBeVisible();
     await expect(page.locator('#agent-update-issues')).toBeHidden();await expect(page.locator('#src')).toHaveValue(source);
-    await expect(page.locator('#agent-update-feedback')).not.toHaveValue(/Connect/);
+    await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
+    await expect(page.locator('#agent-update-feedback')).toBeHidden();
     expect(hits).toEqual(['submitted']);
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect(staged.topologyContext.specs.map(spec=>spec.page.canon.id)).not.toContain('submitted');

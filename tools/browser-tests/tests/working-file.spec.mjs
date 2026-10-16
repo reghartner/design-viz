@@ -13,7 +13,7 @@ async function setup(page){
 }
 async function disk(page,name='chosen.spec.json'){
   // OPFS may invalidate a File snapshot when the native buffered close replaces it.
-  return page.evaluate(async name=>{try{const root=await navigator.storage.getDirectory();return await(await(await root.getFileHandle(name)).getFile()).text();}catch(error){if(error.name==='NotFoundError')return null;throw error;}},name);
+  return page.evaluate(async name=>{try{const root=await navigator.storage.getDirectory();return await(await(await root.getFileHandle(name)).getFile()).text();}catch(error){if(error.name==='NotFoundError' || error.name==='NotReadableError')return null;throw error;}},name);
 }
 async function edit(page,text){await page.locator('#editor-tab-json').click();await page.locator('#src').fill(text);}
 async function filePanel(page){await closeTools(page);await page.locator('#editor-tab-file').click();}
@@ -33,6 +33,22 @@ test('native chosen file saves handwritten and structured edits plus Undo/Redo, 
   await page.locator('#workspace-home').click();await page.goBack();await expect(page.locator('#src')).toHaveValue(structured);
   const returned=structured.replace('Handwritten disk edit','After Home');await edit(page,returned);await expect.poll(()=>disk(page)).toBe(returned);
   await page.reload();await expect(page.locator('#workspace-provenance')).toHaveText('Browser only');await filePanel(page);await page.locator('#working-file-open').click();await expect(page.locator('#src')).toHaveValue(returned);
+});
+
+test('native snapshot invalidation retries exact disk bytes while persistent unreadability still fails',async({page,server})=>{
+  await setup(page);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-open').click();await expect(page.locator('#src')).toHaveValue(source);
+  await page.evaluate(()=>{
+    const text=File.prototype.text;window.diskReadFailure='once';
+    File.prototype.text=function(...args){
+      if(this.name==='chosen.spec.json' && window.diskReadFailure){const mode=window.diskReadFailure;if(mode==='once')window.diskReadFailure='';return Promise.reject(new DOMException('Injected invalidated snapshot','NotReadableError'));}
+      return text.apply(this,args);
+    };
+  });
+  await expect.poll(()=>disk(page)).toBe(source);expect(await page.evaluate(()=>window.diskReadFailure)).toBe('');
+  await page.evaluate(()=>{window.diskReadFailure='persistent';});let failure;
+  try{await expect.poll(()=>disk(page),{timeout:500,intervals:[50]}).toBe(source);}catch(error){failure=error;}
+  expect(failure).toBeTruthy();expect(String(failure)).toContain('Timeout 500ms exceeded');
+  await page.evaluate(()=>{window.diskReadFailure='';});expect(await disk(page)).toBe(source);
 });
 
 test('invalid drafts remain in recovery, disk pauses and resumes; external modification produces a visible failure',async({page,server},info)=>{

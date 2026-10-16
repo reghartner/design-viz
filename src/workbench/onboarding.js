@@ -209,7 +209,7 @@ function workbenchPracticeLessons(chapter){
       step('undo','#undo-builder','You remain in control','Undo restores the spec and coverage ledger together. Redo reapplies the accepted update. Review each proposal before accepting it.'),
       step('refine','#practice-agent-window','Ask for the next change','Keep working in the same agent conversation: “Show what the resident sees when the internet is down.” You can make that request more precise with selections in the workbench.'),
       step('selection','#workbench-workspace','Select exactly what you mean','Select a node, connection, step, or panel. Use Shift to select several items. The selection gives your agent precise references alongside the active view and step.'),
-      step('copy-agent','#folder-agent-selection','Copy for agent, bottom left','Try Copy for agent. It prepares the selected references and context without replacing your message. Paste that context beside your request in the same agent conversation. Next, try editing directly in the workbench.')
+      step('copy-agent','#folder-agent-selection','Copy for agent, bottom left','Try Copy for agent. It copies the selected references and context only; it does not start a request. Paste that context beside your request in the same agent conversation. Next, try editing directly in the workbench.')
     ],
     manual:[
       step('add','#diagram-add','Start with Add to Diagram','This large button is your entry to nodes, connections, steps, panels, and services from your catalog. Choose a destination section, then add the part your story needs.'),

@@ -249,23 +249,22 @@ Open **Agent** in the left rail to see the current connection. There are no tabs
 When disconnected, choose **Reopen diagram folder** on a remembered build or
 **New Connection** to launch setup and choose **Copy & paste** or
 **In workbench — Beta**. Once connected, the panel shows its status, folder and
-files, and only the active method's controls. The composer follows the current
-canvas selection: nodes, edges, steps, panels and other editor targets.
-There is no separate toolbar message composer.
+files, and only the active method's controls. Only the Beta connection has a
+message composer; its messages carry the current canvas selection.
 
 Once connected, the bottom-left **Copy for agent · N selected** button copies selection context
 in one click, without opening Agent or requiring a message. It briefly shows
-**Copied**. It preserves the current draft and any active request, and is disabled
-when nothing is selected. Clipboard denial opens the manual-copy fallback in Agent.
+**Copied**. It never starts or replaces a request, and is disabled when nothing
+is selected. Clipboard denial opens the manual-copy fallback in Agent.
 
-**Copy request** includes your message, selected item identifiers and evidence
-references, and view context. It omits the full JSON and selected containers'
-contents. A connected diagram folder is required; the agent reads the spec and
-ledger from that folder. Copy registers the request for the preview-and-approval workflow. Paste the copied text
-into the existing agent conversation; Copy never dispatches it through Monitor.
-If clipboard access is denied, select the prepared text and copy manually.
+In **Copy & paste**, ask your agent for changes in its own conversation; it
+registers each request with the folder helper's `begin` command and reads the
+spec and ledger from the connected folder.
 **Send to Claude** in the Beta connection requires a connected folder and a live listener.
-Both modes review spec/ledger proposals through **Preview Agent Updates**.
+**Re-establish session** releases a stuck request and hands your agent new session
+and connection IDs; the accepted diagram and ledger stay unchanged.
+Both modes review spec/ledger proposals through **Preview Agent Updates** in the
+update banner.
 The review fills the browser workspace, keeps Current/Proposed and decisions in a
 pinned bar, and puts its summary, ledger and JSON in **Details**. **Accept changes**
 saves both artifacts as one Undo action; a Git commit remains

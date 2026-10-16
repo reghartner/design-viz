@@ -1338,10 +1338,6 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 #folder-agent-pairing{border-bottom:1px solid var(--line);padding-bottom:12px;}
 #folder-agent-pairing>summary{font-size:13px;font-weight:600;cursor:pointer;}
 #folder-agent-pairing[open]>:not(summary){margin-top:12px;}
-.folder-agent-context-card{padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--codebg);}
-.folder-agent-context-card>b{display:block;margin-bottom:7px;font-size:12px;color:var(--sub);}
-#folder-agent-context{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.5;}
-.folder-agent-context-card p{margin-top:8px;}
 .folder-agent-sent-context{margin-top:8px;padding:8px;border-radius:6px;background:var(--codebg);font-size:12px;}
 .folder-agent-sent-context summary{cursor:pointer;color:var(--sub);}
 .folder-agent-sent-context div{margin-top:6px;white-space:pre-wrap;}

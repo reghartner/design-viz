@@ -170,8 +170,7 @@
             <p id="folder-agent-progress" class="folder-agent-hint"></p>
             <ol id="folder-agent-activity-log" role="log" aria-label="Updates from Claude" aria-live="polite" aria-relevant="additions"></ol>
           </section>
-          <section class="folder-agent-context-card" aria-label="Context for your next message"><b id="folder-agent-context-heading">Your next message includes</b><div id="folder-agent-context" aria-live="polite"></div><p class="folder-agent-hint">The whole story is shared. Your selection tells Claude where to focus.</p></section>
-          <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
+          <select id="folder-agent-level" class="fctl" aria-label="Story detail" hidden><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
           <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
           <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your diagram folder keeps the spec and ledger, with workbench conversation data in .flowview-agent/.</p>
         </div>

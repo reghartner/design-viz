@@ -44,6 +44,13 @@ async function mount(page,{stored,denied=false,chrome=false}={}){
 
 }
 async function connect(page){await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await expect(page.locator('#folder-agent-setup-mode-embedded')).toHaveAttribute('aria-pressed','true');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));}
+async function enablePilot(page){
+  const details=page.locator('#folder-agent-pilot-choice');
+  if(!await details.evaluate(node=>node.open))await details.locator('summary').click();
+  await expect(page.locator('#folder-agent-pilot-explanation')).toBeVisible();
+  await expect(details.locator('.folder-agent-hint')).toContainText('Off by default');
+  await page.locator('#folder-agent-pilot-capture').check();
+}
 async function composerVisible(page){
   for(const id of ['folder-agent-input','folder-agent-send','folder-agent-focus-summary']){
     const box=await page.locator('#'+id).boundingBox();const size=page.viewportSize();expect(box).not.toBeNull();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(size.height);
@@ -96,21 +103,33 @@ test('denied remembered permission is explicit and preserves draft with a picker
   expect(await page.evaluate(()=>permissionCalls)).toBe(0);await page.locator('#folder-agent-continue').click();
   await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
   expect(await page.evaluate(()=>({permissionCalls,pickerCalls,starts:starts.length}))).toEqual({permissionCalls:0,pickerCalls:0,starts:0});
-  await page.locator('#folder-agent-pilot-capture').check();await page.locator('#folder-agent-connect').click();
-  await expect(page.locator('#folder-agent-status')).toContainText('Folder access was not granted');expect(await page.evaluate(()=>permissionCalls)).toBe(1);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
+  await enablePilot(page);await page.locator('#folder-agent-connect').click();
+  const failure=page.locator('#folder-agent-status');await expect(failure).toContainText('Folder access was not granted');await expect(failure).toContainText('open diagram is unchanged');await expect(failure).toBeVisible();
+  const failureBox=await failure.boundingBox();expect(failureBox.y).toBeGreaterThanOrEqual(0);expect(failureBox.y+failureBox.height).toBeLessThanOrEqual(page.viewportSize().height);
+  await expect(page.locator('#folder-agent-connect')).toBeEnabled();expect(await page.evaluate(()=>permissionCalls)).toBe(1);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
   await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
   await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
   expect(await page.evaluate(()=>({pickerCalls,permissionCalls}))).toEqual({pickerCalls:1,permissionCalls:1});
   await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: OFF/);
 });
-test('setup separates conversation mode from adopt, resume and new-folder intent',async({page})=>{
-  await mount(page);await page.locator('#folder-agent-open-setup').click();
+test('setup leads with the diagram choice and visible folder action at desktop sizes',async({page},info)=>{
+  await page.setViewportSize({width:1280,height:720});await mount(page);await page.locator('#folder-agent-open-setup').click();
   await expect(page.locator('.folder-agent-guide-steps')).toHaveCount(0);await expect(page.getByText('Connect later',{exact:true})).toHaveCount(0);
   await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Diagram Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('restores its saved diagram, ledger, and workbench history');
-  await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Existing Diagram Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('.flowview-agent');
+  const ordered=await page.locator('#folder-agent-new-session').evaluate(node=>{const y=id=>node.querySelector(id).getBoundingClientRect().top;return {choices:y('.folder-agent-start-choices'),action:y('#folder-agent-connect'),options:y('.folder-agent-connection-options'),pilot:y('#folder-agent-pilot-choice')};});
+  expect(ordered.choices).toBeLessThan(ordered.action);expect(ordered.action).toBeLessThan(ordered.options);expect(ordered.options).toBeLessThan(ordered.pilot);
+  await expect(page.locator('#folder-agent-connect')).toBeFocused();
+  const primary=await page.locator('#folder-agent-connect').boundingBox();expect(primary.y+primary.height).toBeLessThanOrEqual(720);
+  await page.screenshot({path:info.outputPath('agent-setup-1280x720.png')});
+  await expect.poll(()=>page.locator('#folder-agent-pilot-choice').evaluate(node=>node.open)).toBe(false);await expect(page.locator('#folder-agent-pilot-capture')).not.toBeVisible();
+  await page.keyboard.press('Shift+Tab');await expect(page.locator('#folder-agent-start-new')).toBeFocused();await page.keyboard.press('Enter');await expect(page.locator('#folder-agent-connect')).toHaveText('Select Empty Folder');await page.locator('#folder-agent-start-adopt').click();
+  await expect(page.locator('#folder-agent-start-adopt')).toHaveText(/Update this diagram/);await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#folder-agent-start-title')).toHaveText('Choose a folder for this diagram');await expect(page.locator('#folder-agent-start-note')).toContainText('denying access leaves the open diagram unchanged');
+  await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-start-resume')).toHaveText(/Resume a project/);await expect(page.locator('#folder-agent-start-title')).toHaveText('Choose the earlier project folder');await expect(page.locator('#folder-agent-start-description')).toContainText('.flowview-agent');
   await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-connect')).toHaveText('Select Empty Folder');
   await page.locator('#folder-agent-setup-mode-external').click();await expect(page.locator('#folder-agent-workflow-note')).toContainText('does not have to be the agent’s working directory');
+  await page.setViewportSize({width:1440,height:900});await page.locator('#folder-agent-start-adopt').click();
+  const largePrimary=await page.locator('#folder-agent-connect').boundingBox();expect(largePrimary.y+largePrimary.height).toBeLessThanOrEqual(900);
+  await page.screenshot({path:info.outputPath('agent-setup-1440x900.png')});
 });
 test('multiple specs are chosen from a generated picker without filename entry',async({page})=>{
   await mount(page);await page.evaluate(()=>{
@@ -418,6 +437,7 @@ for(const method of ['external','embedded'])test('Agent panel follows the '+meth
   const startsBeforeRecovery=await page.evaluate(()=>starts.length);
   await page.locator('#folder-agent-continue').click();
   await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
+  await expect(page.locator('#folder-agent-pilot-capture')).not.toBeVisible();await expect(page.locator('#folder-agent-connect')).toBeFocused();
   expect(await page.evaluate(()=>starts.length)).toBe(startsBeforeRecovery);
   await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();

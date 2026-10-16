@@ -66,17 +66,20 @@ Missing catalogs, unavailable providers and revision mismatches leave the draft
 and saved artifacts unchanged. Reopening a folder preserves the current frozen
 provider revisions; it never silently refreshes them from a later deployment.
 
-The setup first asks whether you are adding an agent to the open diagram,
-continuing an existing agent build, or starting a new diagram with an agent.
-Adding an agent selects the folder containing the existing spec and ledger, or
-where an agent-working copy should live. If the selected folder contains
-`.flowview-agent`, Flowview reconnects that saved build in the same selection and
-restores its accepted spec, ledger, and workbench messages. Continuing remains an
+The setup leads with **Update this diagram**, **Resume a project**, and **Create
+new**, followed immediately by the folder action and a description of what will
+be opened or created. Updating selects the folder containing the existing spec
+and ledger, or where an agent-working copy should live. If the selected folder
+contains `.flowview-agent`, Flowview reconnects that saved build in the same
+selection and restores its accepted spec, ledger, and workbench messages. Continuing remains an
 explicit route to the same saved-session recovery. Both routes refuse an active
 editor owner, rotate the connection identity on a successful reopen, and do not
 replay a previously pending request. Starting new still requires an empty folder.
 A different current draft is preserved in **Earlier drafts**. Opening an existing
-spec starts fresh Undo/Redo history.
+spec starts fresh Undo/Redo history. Cancelling or denying folder access leaves
+the open diagram unchanged and keeps the folder action available for a retry.
+Conversation mode and visualization focus follow the folder action. Pilot capture
+and setup troubleshooting stay collapsed until requested.
 
 One existing `*.spec.json` is detected automatically. Its matching `*.ledger.md`
 is used; for example `payments.spec.json` and `payments.ledger.md`. If several
@@ -115,7 +118,8 @@ reusable [story/layout scorecard](pilot-scorecard.md). They define the common
 task, measures, proposed targets, normal review handoff, authorized research
 transfer, and identity-checked capture closeout.
 
-In agent setup, select **Enable pilot capture for this session** to opt in.
+In agent setup, expand **Pilot capture · Optional**, read the disclosure, then
+select **Enable pilot capture for this session** to opt in.
 It is off by default for each new setup, including a reopened diagram folder.
 Setup explains the scope and the review screen repeats your choice. The browser
 does not capture a transcript: after you paste the setup instructions into

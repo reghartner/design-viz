@@ -72,6 +72,13 @@ async function closeGuide(page){
     await expect(guide).not.toBeVisible();
   }
 }
+async function enablePilot(page){
+  const details=page.locator('#folder-agent-pilot-choice');
+  if(!await details.evaluate(node=>node.open))await details.locator('summary').click();
+  await expect(page.locator('#folder-agent-pilot-explanation')).toBeVisible();
+  await expect(details.locator('.folder-agent-hint')).toContainText('Off by default');
+  await page.locator('#folder-agent-pilot-capture').check();
+}
 async function openAgent(page){
   if(!await page.locator('#editor-agent').isVisible())await page.locator('#editor-tab-agent').click();
   await closeGuide(page);
@@ -329,6 +336,37 @@ async function disconnect(page){
   if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();
   await page.locator('#folder-agent-disconnect').click();
 }
+test('production setup keeps project intent, folder action and next handoff visible on desktop',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1280,height:720});await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();
+    const guide=page.locator('#folder-agent-guide'),primary=page.locator('#folder-agent-connect'),next=page.locator('#folder-agent-start-next');
+    await expect(guide).toBeVisible();await expect(primary).toBeFocused();
+    await expect(page.locator('#folder-agent-start-adopt')).toHaveText(/Update this diagram/);
+    await expect(page.locator('#folder-agent-start-resume')).toHaveText(/Resume a project/);
+    await expect(page.locator('#folder-agent-start-new')).toHaveText(/Create new/);
+    for(const locator of [primary,next]){const box=await locator.boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(720);}
+    await expect.poll(()=>page.locator('#folder-agent-pilot-choice').evaluate(node=>node.open)).toBe(false);
+    expect(await guide.evaluate(node=>getComputedStyle(node).fontFamily)).toContain('IBM Plex Sans');
+    await page.screenshot({path:info.outputPath('production-agent-setup-update-1280x720.png')});
+
+    await page.locator('#folder-agent-start-resume').click();await expect(primary).toHaveText('Select Project Folder');
+    await expect(page.locator('#folder-agent-start-description')).toContainText('.flowview-agent');
+    await page.screenshot({path:info.outputPath('production-agent-setup-resume-1280x720.png')});
+
+    await page.setViewportSize({width:1440,height:900});await page.locator('#folder-agent-start-new').click();
+    await expect(primary).toHaveText('Select Empty Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('non-empty diagram folder is refused');
+    await page.screenshot({path:info.outputPath('production-agent-setup-new-1440x900.png')});
+
+    await page.setViewportSize({width:1280,height:720});await page.locator('#folder-agent-start-adopt').click();await page.evaluate(()=>window.cancelPicker=true);await primary.click();
+    const failure=page.locator('#folder-agent-status');await expect(failure).toContainText('open diagram is unchanged');await expect(failure).toBeVisible();await expect(primary).toBeEnabled();
+    for(const locator of [failure,primary,next]){const box=await locator.boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(720);}
+    const failedGuide=await guide.boundingBox(),retry=await primary.boundingBox();expect(retry.y+retry.height).toBeLessThanOrEqual(failedGuide.y+failedGuide.height-10);
+    await page.screenshot({path:info.outputPath('production-agent-setup-cancelled-1280x720.png')});
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 test('editor conversation uses real local files and helper; changes render with one Undo/Redo',async({page},info)=>{
   const h=await setup(page);
   try{
@@ -384,9 +422,10 @@ test('pilot capture is an explicit session choice and resets when changing or re
     await mkdir(path.join(h.folder,'.flowview-pilot'));
     await writeFile(path.join(h.folder,'.flowview-pilot/config.json'),'{}');
     await page.locator('#welcome-agent').click();
-    const choice=page.locator('#folder-agent-pilot-capture');
-    await expect(choice).not.toBeChecked();
+    const details=page.locator('#folder-agent-pilot-choice'),choice=page.locator('#folder-agent-pilot-capture');
+    await expect(choice).not.toBeChecked();await expect(choice).not.toBeVisible();await details.locator('summary').click();
     const explanation=page.locator('#folder-agent-pilot-explanation');
+    await expect(explanation).toBeVisible();
     await expect(explanation).toContainText('normal host permissions');
     await expect(explanation).toContainText('background for up to 45 seconds');
     await expect(explanation).toContainText('If capture is unavailable or denied, diagram work continues');
@@ -398,7 +437,7 @@ test('pilot capture is an explicit session choice and resets when changing or re
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('overrides any existing .flowview-pilot/config.json');
     await page.locator('[data-agent-change-folder]').first().click();
     await expect(choice).not.toBeChecked();
-    await choice.check();
+    await enablePilot(page);
     await page.locator('#folder-agent-start-resume').click();
     await page.locator('#folder-agent-setup-mode-embedded').click();
     await page.locator('#folder-agent-connect').click();
@@ -422,9 +461,10 @@ test('pilot capture is an explicit session choice and resets when changing or re
     await page.locator('[data-agent-change-folder]').first().click();
     await expect(choice).not.toBeChecked();
     // Leaving an unfinished setup and reopening it must also discard an old opt-in.
-    await choice.check();await closeGuide(page);await page.locator('#folder-agent-open-setup').click();
-    await expect(choice).not.toBeChecked();
+    await enablePilot(page);await closeGuide(page);await page.locator('#folder-agent-open-setup').click();
+    await expect(choice).not.toBeChecked();await expect(choice).not.toBeVisible();
     await page.setViewportSize({width:640,height:800});
+    await details.locator('summary').click();
     await choice.scrollIntoViewIfNeeded();
     await expect(choice).toBeVisible();
     await expect(page.locator('#folder-agent-setup-mode-embedded')).not.toHaveCSS('background-color','rgba(0, 0, 0, 0)');
@@ -449,9 +489,9 @@ test('pilot capture is an explicit session choice and resets when changing or re
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('Pilot capture: OFF for this session');
     await closeGuide(page);await disconnect(page);
     await page.locator('#folder-agent-continue').click();
-    await expect(choice).toBeVisible();await expect(choice).not.toBeChecked();
+    await expect(choice).not.toBeVisible();await expect(choice).not.toBeChecked();
     await expect(page.locator('#folder-agent-guide-folder')).toBeVisible();
-    await choice.check();await page.locator('#folder-agent-connect').click();
+    await enablePilot(page);await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: ON for this session/);
     expect(h.writes.some(name=>/story\.agent\.(transcript|usage)/.test(name))).toBe(false);
@@ -497,7 +537,7 @@ test('new-story entry, picker cancellation and unsupported browser have useful s
     await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await expect(page.locator('#editor-agent')).toBeVisible();
     await page.evaluate(()=>window.cancelPicker=true);await chooseFolder(page);
-    await expect(page.locator('#folder-agent-status')).toHaveText('Folder selection cancelled.');
+    await expect(page.locator('#folder-agent-status')).toContainText('Folder selection cancelled.');await expect(page.locator('#folder-agent-status')).toContainText('open diagram is unchanged');
     await page.evaluate(()=>window.showDirectoryPicker=undefined);await chooseFolder(page);
     await expect(page.locator('#folder-agent-status')).toContainText('Chrome or Edge');expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -1543,7 +1583,7 @@ test('Start new clears a connected story, preserves it, and refuses to reopen it
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     const oldSession=h.session,oldSpec=await readFile(path.join(h.folder,'story.spec.json'),'utf8');
     // Return to setup, then choose the explicit new-diagram path.
-    await page.getByRole('button',{name:'Change folder',exact:true}).click();await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-start-description')).toContainText('Choose where Flowview should create');
+    await page.getByRole('button',{name:'Change folder',exact:true}).click();await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-start-description')).toContainText('where Flowview should create');
     await expect(page.locator('#folder-agent-copy')).toBeDisabled();await expect(page.locator('#folder-agent-instructions')).toHaveValue('');
     await expect.poll(async()=>JSON.parse(await readFile(path.join(oldSession,'editor.json'),'utf8')).connected).toBe(false);
     const writes=h.writes.length;await page.locator('#folder-agent-connect').click();
@@ -1567,17 +1607,17 @@ test('home explicitly starts new from a saved draft and Continue still restores 
     await page.reload();await page.locator('#welcome-agent').click();await expect(page.locator('#src')).toHaveValue(source);
     await page.screenshot({path:info.outputPath('agent-starting-point.png')});
     await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();await page.locator('#welcome-new-agent').click();
-    await expect(page.locator('#folder-agent-start-description')).toContainText('Choose where Flowview should create');
+    await expect(page.locator('#folder-agent-start-description')).toContainText('where Flowview should create');
     expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes).toEqual({});
     expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(d=>d.text))).toContain(source);
     // Cancelling New and explicitly choosing Continue also clears the new-folder
     // restriction when the current draft itself has not changed.
     await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();
-    await expect(page.locator('#folder-agent-start-description')).toContainText('Choose the folder containing its existing');
+    await expect(page.locator('#folder-agent-start-description')).toContainText('folder that contains this diagram’s .spec.json file');
     await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
     await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).first().click();
     await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();
-    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#folder-agent-start-description')).toContainText('Choose the folder containing its existing');
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#folder-agent-start-description')).toContainText('folder that contains this diagram’s .spec.json file');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
@@ -1601,7 +1641,7 @@ test('pilot health verifies synthetic helper receipts and retires them across re
   const h=await setup(page);
   const nativeId='12345678-1234-1234-1234-123456789abc';
   try{
-    await page.locator('#welcome-agent').click();await page.locator('#folder-agent-pilot-capture').check();
+    await page.locator('#welcome-agent').click();await enablePilot(page);
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await closeGuide(page);
     const health=page.locator('#folder-agent-pilot-health');

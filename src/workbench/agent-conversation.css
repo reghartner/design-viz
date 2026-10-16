@@ -153,12 +153,28 @@
 .folder-agent-header>.folder-agent-folder{overflow-wrap:anywhere;margin:4px 0 8px;font-size:12px;}
 .folder-agent-header>#folder-agent-connection{margin:4px 0;font-size:12px;color:var(--sub);}
 
-.folder-agent-pilot-choice{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--card);}
-.folder-agent-pilot-choice h3{margin:0 0 10px;font-size:15px;}
-.folder-agent-pilot-choice label{display:flex;align-items:flex-start;gap:8px;font-weight:600;cursor:pointer;}
+.folder-agent-guide{width:min(680px,calc(100vw - 32px));}
+.folder-agent-guide .folder-agent-guide-header{margin-bottom:12px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-guide-header{margin-bottom:2px;}
+.folder-agent-guide>h2{margin-top:14px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty))>h2{margin-top:4px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-choice-label{margin:12px 0 6px!important;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-choices{gap:6px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-choices button{padding:8px 13px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-detail{margin-top:12px;padding-top:12px;}
+.folder-agent-guide:has(#folder-agent-status:not(:empty)) .folder-agent-start-detail p{margin:8px 0;}
+.folder-agent-connection-options{margin:20px 0 8px;padding-top:18px;border-top:1px solid var(--line);}
+.folder-agent-connection-options>.folder-agent-choice-label{margin-top:10px!important;}
+.folder-agent-setup-detail{margin:12px 0 0;}
+.folder-agent-pilot-choice{margin:14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);}
+.folder-agent-pilot-choice>summary{display:flex;justify-content:space-between;gap:12px;color:var(--ink);}
+.folder-agent-pilot-choice>summary span{color:var(--sub);}
+.folder-agent-pilot-disclosure{padding-top:4px;}
+.folder-agent-pilot-choice label{display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:14px;color:var(--ink);font-weight:600;cursor:pointer;}
 .folder-agent-pilot-choice input{flex:0 0 auto;margin-top:3px;}
 .folder-agent-pilot-choice p{margin:10px 0 0;}
 .folder-agent-pilot-review{padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);}
+#folder-agent-status:not(:empty){position:sticky;top:-1px;z-index:2;margin:0 -8px 2px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);}
 
 /* Desktop comparison navigation stays outside the contained reader canvas. */
 .agent-update-navigation{flex:none;min-height:38px;padding:4px 12px;border-bottom:1px solid var(--line);background:var(--card);z-index:3;}

@@ -403,6 +403,17 @@ Mixed alignment uses visible centers (horizontal = same Y, vertical = same X),
 anchored to the first selection; each edit is one Undo action. Floating panels,
 prose and Floating playback controls are excluded from marquee selection.
 
+## Diagram continuation destinations
+
+External `node.handoff` requires `spec`, with optional `revision`, `section`,
+`view`, `path`, `step`, `siteBaseUrl`, `claudeUrl` and matching `claudeArtifactId`.
+`handoff.url` is removed and rejected. Use the configured website viewer entry
+URL for `siteBaseUrl`, and the target's actual Claude artifact URL for `claudeUrl`.
+GO TO follows the runtime host: Claude artifact, website route, or internal
+Backstage loader. Unavailable hosts offer deliberate alternatives. Local
+`{localSection}` handoffs and external details retain their own contracts.
+See the [migration recipe](../../../../cookbook/diagram-handoffs.md#continue-in-a-separate-document).
+
 ## Human handoff in the workbench
 
 Inspector actions sit above the form; paragraph and bullet structure actions

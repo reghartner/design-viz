@@ -32,7 +32,7 @@
               "handoff": {
                 "spec": "doorbell-push",
                 "section": "push",
-                "url": "https://diagrams.example.com/diagram-handoffs/push.html"
+                "siteBaseUrl": "https://diagrams.example.com/view.html"
               }
             },
             "lake": {
@@ -41,7 +41,7 @@
               "handoff": {
                 "spec": "doorbell-lake",
                 "section": "lake",
-                "url": "https://diagrams.example.com/diagram-handoffs/lake.html"
+                "siteBaseUrl": "https://diagrams.example.com/view.html"
               }
             },
             "action": {
@@ -50,7 +50,7 @@
               "handoff": {
                 "spec": "doorbell-action",
                 "section": "action",
-                "url": "https://diagrams.example.com/diagram-handoffs/action.html"
+                "siteBaseUrl": "https://diagrams.example.com/view.html"
               }
             }
           },

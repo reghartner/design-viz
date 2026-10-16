@@ -264,7 +264,7 @@ function nodeReferenceLinks(diagram,id,options){
     });
   }
   sourceDiagramReferences(diagram,id).forEach(function(ref){documentDestinations(ref,options && options.resolveDiagramLink).forEach(function(item){add('Source diagrams',ref.spec+' · '+(item.kind==='site'?'Internal site':item.kind==='claude'?'Claude':'Source'),item.url,'Open source diagram · '+ref.spec+' · '+item.label);});});
-  if(node.handoff || node.detail)documentDestinations(node.handoff || node.detail,options && options.resolveDiagramLink).forEach(function(item){add('Diagram destinations',item.label,item.url);});
+  if(node.handoff || node.detail)documentDestinations(node.handoff?diagramHandoffReference(node.handoff):node.detail,options && options.resolveDiagramLink).forEach(function(item){add('Diagram destinations',item.label,item.url);});
   add('Node links','Source',node.link);
   add('Node links','Backstage · '+label(binding.label,label(binding.entityRef,id)),binding.catalogUrl);
   var api=binding.api || {};
@@ -3021,6 +3021,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
 function renderPage(view, page, skin, backlinks, options){
   options=Object.assign({},options,{localHandoffTarget:function(value){return localHandoffTarget(page,value);}});
+  options.handoffHost=diagramHandoffHost(options.handoffHost,typeof window==='undefined'?null:window,(page.documentLinks || {}).siteBaseUrl || options.siteBaseUrl || FLOWVIEW_SITE_BASE_URL);
   var hostResolver=options.resolveDiagramLink;
   options.resolveDiagramLink=function(ref){
     if(hostResolver)return hostResolver(ref);
@@ -3080,6 +3081,7 @@ function renderPage(view, page, skin, backlinks, options){
     view.removeEventListener('navigation-mounted',paintTabExploreIndicators);
     if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();
     if(ctl.handoffs)ctl.handoffs.destroy();
+    if(ctl.externalHandoffs)ctl.externalHandoffs.destroy();
     if(ctl.details)ctl.details.destroy();
     if(ctl.views)ctl.views.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
@@ -3251,6 +3253,7 @@ function renderPage(view, page, skin, backlinks, options){
     ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);
   if(records.some(function(r){return Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.handoff && n.handoff.localSection!=null;});}))
     ctl.handoffs=wireLocalHandoffs(ctl,page);
+  ctl.externalHandoffs=wireExternalHandoffs(ctl,options);
   return ctl;
 }
 

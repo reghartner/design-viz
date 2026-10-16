@@ -6,7 +6,8 @@ import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'src/starters/diagram-handoffs.json'),'utf8'));
 function localSpec(origin){
  const raw=structuredClone(example);
- for(const [key,node] of Object.entries(raw.page.sections[0].diagram.nodes))if(node.handoff)node.handoff.url=origin+'/'+key+'.html';
+ raw.page.documentLinks={id:'overview',siteBaseUrl:origin+'/index.html'};
+ for(const [key,node] of Object.entries(raw.page.sections[0].diagram.nodes))if(node.handoff)node.handoff.siteBaseUrl=origin+'/'+key+'.html';
  return raw;
 }
 async function destinations(server){for(const name of ['push','lake','action'])await writeFile(path.join(server.root,name+'.html'),'<h1>'+name+' destination</h1>');}
@@ -29,15 +30,16 @@ test('standalone handoffs are real keyboard links to separate documents and reta
  }
 });
 
-test('native handoffs route through the host, safely fall back and never request details',async({page,server})=>{
+test('native site handoffs route through the host and offer rejected targets as explicit alternatives',async({page,server})=>{
  await destinations(server);
  await writeFile(path.join(server.root,'handoff-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'handoff-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./handoff-native.js";window.mountHandoffs=mountNativeViewer;</script>');
  await page.goto(server.origin+'/handoff-native.html');await page.waitForFunction(()=>!!window.mountHandoffs);
  await page.evaluate(({raw,origin})=>{
-  delete raw.page.sections[0].diagram.nodes.action.handoff.url;
+  delete raw.page.sections[0].diagram.nodes.action.handoff.siteBaseUrl;
+  raw.page.sections[0].diagram.nodes.lake.handoff.claudeUrl='https://claude.ai/artifact/lake';
   window.detailLoads=0;
-  window.viewer=mountHandoffs(document.querySelector('#host'),raw,{loadDetail(){detailLoads++;throw Error('Must not load');},resolveDiagramLink(ref){
+  window.viewer=mountHandoffs(document.querySelector('#host'),raw,{handoffHost:'site',loadDetail(){detailLoads++;throw Error('Must not load');},resolveDiagramLink(ref){
    if(ref.spec==='doorbell-push')return origin+'/push.html?from=host';
    if(ref.spec==='doorbell-lake')return 'javascript:alert(1)';
    throw Error('Unknown destination');
@@ -45,7 +47,9 @@ test('native handoffs route through the host, safely fall back and never request
  },{raw:localSpec(server.origin),origin:server.origin});
  const host=page.locator('#host');
  await expect(host.locator('[data-dv-node="push"] a')).toHaveAttribute('href',server.origin+'/push.html?from=host');
- await expect(host.locator('[data-dv-node="lake"] a')).toHaveAttribute('href',server.origin+'/lake.html');
+ await expect(host.locator('[data-dv-node="lake"] .handoff-link')).not.toHaveAttribute('href');
+ await host.locator('[data-dv-node="lake"] .handoff-link').click();
+ await expect(host.getByRole('dialog',{name:'Diagram destinations'}).getByRole('link',{name:'Open in Claude'})).toHaveAttribute('href','https://claude.ai/artifact/lake');
  await expect(host.locator('[data-dv-node="action"] a')).toHaveCount(0);
  await expect(host.locator('[data-dv-node="action"]')).toContainText('DESTINATION UNAVAILABLE');
  expect(await page.evaluate(()=>detailLoads)).toBe(0);
@@ -58,8 +62,8 @@ test('workbench handoff body selects for editing, fields apply atomically and Un
  await inspectPageElement(page,page.locator('[data-dv-node="push"] .t1'));
  await openInspectorGroup(page.locator('#guide .node-handoff-editor'));
  await expect(page.getByRole('button',{name:'Apply handoff',exact:true})).toBeVisible();
- await page.getByLabel('Destination URL',{exact:true}).fill(server.origin+'/push.html#d=delivery');
+ await page.getByLabel('Internal site base URL',{exact:true}).fill(server.origin+'/delivery.html');
  await page.getByRole('button',{name:'Apply handoff',exact:true}).click();
- await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.nodes.push.handoff.url).toBe(server.origin+'/push.html#d=delivery');
+ await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.nodes.push.handoff.siteBaseUrl).toBe(server.origin+'/delivery.html');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
 });

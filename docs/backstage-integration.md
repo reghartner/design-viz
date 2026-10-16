@@ -302,3 +302,20 @@ snapshots retain inert source destinations, without provider source context.
 Continue supplying `resolveDiagramLink` for company routing and the existing
 pinned-revision `loadDetail` transport. Reference URLs are links only; this
 change does not add Claude embedding or fetch arbitrary reference URLs.
+
+## Diagram continuation in 2.0.0
+
+Upgrade the package to use context-aware handoff nodes. In Backstage they load
+and render the target through the existing authenticated Git `SpecLoader`, with
+Back restoring the retained parent view. Website and Claude destinations remain
+explicit alternatives; a failed internal load never silently opens another host.
+This does not change Claude comment navigation or external detail drill-downs.
+
+For unpinned references to other services, wire optional
+`FlowviewEntityDiagrams.resolveHandoffDiagram(reference, signal)` to the existing
+approved company index and return `AssociatedDiagram` metadata, or null. The
+metadata must preserve any requested ID/revision. Without this callback, only
+IDs in the current association list have a default revision; pinned out-of-list
+references still use `loadSpec`. Do not invent revisions or fetch handoff URLs.
+See the [public API and example](../apps/backstage/README.md#diagram-handoffs-in-200).
+Company authentication and installed-host acceptance remain company-side checks.

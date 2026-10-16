@@ -23,7 +23,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
   return true;
 }
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, prose){
-  var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
+  var retired=false, active=false, expanded=false, pendingFullscreen=0,fullscreenRequest=null,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
@@ -768,7 +768,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
     try{
       var host=fullscreenHost();if(!host.requestFullscreen){failed();return;}
-      var promise=host.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
+      var request=Promise.resolve(host.requestFullscreen()).then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)return document.exitFullscreen();}},failed);
+      fullscreenRequest=request;request.then(function(){if(fullscreenRequest===request)fullscreenRequest=null;},function(){if(fullscreenRequest===request)fullscreenRequest=null;});
     }catch(_){failed();}
   }
   function fullscreenChanged(){if(!isFullscreen() && expanded){setExpanded(false);status.textContent='';}}
@@ -856,6 +857,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       fitFrame=requestAnimationFrame(function(){fitFrame=requestAnimationFrame(function(){fitFrame=0;placeFit();});});
   }
   return {
+    deactivate:function(){
+      if(!expanded && !fullscreenRequest)return Promise.resolve();
+      pendingFullscreen++;setExpanded(false);status.textContent='';
+      return Promise.resolve(fullscreenRequest).then(function(){
+        if(!retired && isFullscreen() && document.exitFullscreen)return document.exitFullscreen();
+      });
+    },
     isWorkbenchCanvas:function(){return workbenchCanvas;},
     setWorkbenchFocus:function(value){if(workbenchFocus===!!value)return;workbenchFocus=!!value;paintBoardVisibility();paint();},
     setBoardHidden:function(hidden){canvasBoardHidden=hidden;paintBoardVisibility();},

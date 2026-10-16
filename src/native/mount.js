@@ -6,7 +6,7 @@ function mountNativeSpec(environment, spec, options){
   var skin=resolveSkin('',options.skin || page.skin), view=document.createElement('div');
   environment.body.appendChild(view);applySkinClasses(environment.body,view,skin);
   var records=sectionRecords(page), controller=renderPage(view,page,skin,options.backlinks || {},
-    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink,siteBaseUrl:options.siteBaseUrl});
+    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink,siteBaseUrl:options.siteBaseUrl,handoffHost:options.handoffHost,onDiagramHandoff:options.onDiagramHandoff});
   function protectLinks(){
     view.querySelectorAll('a[href]').forEach(function(link){
       var url=FlowCanon.http(link.getAttribute('href'));
@@ -20,7 +20,7 @@ function mountNativeSpec(environment, spec, options){
     if(!FlowCanon.http(link.getAttribute('href'))){event.preventDefault();return;}
     link.setAttribute('target','_blank');link.setAttribute('rel','noopener noreferrer');
   }
-  var navigating=false;
+  var navigating=false,deactivation=null;
   var canvas=false;
   function tabPrimary(target){return target && controller.views.primary(target.tabBlock,target.tab);}
   function canvasSync(){environment.body.classList.toggle('native-canvas',canvas);}
@@ -80,6 +80,16 @@ function mountNativeSpec(environment, spec, options){
         if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
         if(!canvas && options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
       }finally{navigating=false;changed();view.dispatchEvent(new CustomEvent('tab-view-change'));}
+    },
+    deactivate:function(){
+      if(environment.disposed)return Promise.resolve();
+      if(deactivation)return deactivation;
+      if(controller.details)controller.details.pause();
+      controller.steppers.forEach(function(s){s.stepper.pause();});
+      var sections=controller.sections.concat(controller.details?controller.details.activeSections():[]),seen=[];
+      var exits=sections.map(function(rec){var viewport=rec.viewport;if(!viewport || !viewport.deactivate || seen.indexOf(viewport)>=0)return null;seen.push(viewport);return viewport.deactivate();});
+      deactivation=Promise.all(exits).then(function(){deactivation=null;},function(error){deactivation=null;throw error;});
+      return deactivation;
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
     destroy:function(){if(environment.disposed)return;reader.destroy();try{controller.destroy();}finally{environment.destroy();}}

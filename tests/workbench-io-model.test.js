@@ -5,7 +5,7 @@ const ROOT=path.join(__dirname,'..'),B={};
 for(const name of ['document','window','navigator','FileReader','fetch'])
   Object.defineProperty(B,name,{get(){throw new Error('Pure I/O model accessed '+name);}});
 vm.runInNewContext(readSource('workbench/io-model.js'),B);
-const V={};vm.runInNewContext(readSource('validator.js'),V);
+const V={URL};vm.runInNewContext(readSource('validator.js'),V);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const MERMAID_SEQ='sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\n'+
   'A->>B: POST /things\nB-->>A: created\n';
@@ -183,7 +183,7 @@ test('buildExportHtml leaves the title alone when the spec has none', () => {
 });
 
 test('HTML snapshot preparation removes topology metadata across wrapped, bare and tabbed diagrams without changing source',()=>{
-  const context={};vm.createContext(context);
+  const context={URL};vm.createContext(context);
   for(const file of ['canon.js','validator.js','workbench/io-model.js'])vm.runInContext(readSource(file),context);
   const diagram=name=>({nodes:{[name]:{title:name}},rows:[[name]],topologyExports:{[name]:{nodes:[name],edges:[]}}});
   const shapes=[diagram('bare'),{sections:[{diagram:diagram('barepage')}]},

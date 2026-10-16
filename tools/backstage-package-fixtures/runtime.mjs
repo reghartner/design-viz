@@ -83,7 +83,7 @@ try {
   assert.equal(listCalls[0].signal.aborted, false);
   assert.equal(document.querySelector('[role="alert"]')?.textContent, undefined,
     'The real viewer reported an error while rendering the installed package.');
-  const nativeHost = document.querySelector('[data-flowview-native]');
+  const nativeHost = document.querySelector('[data-flowview-native]')?.firstElementChild;
   assert.ok(nativeHost?.shadowRoot, 'The published React component must mount the real native shadow viewer.');
   assert.ok(nativeHost.shadowRoot.querySelector('.docview'));
   assert.ok(nativeHost.shadowRoot.getElementById('i-cloud'));

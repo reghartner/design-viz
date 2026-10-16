@@ -27,9 +27,12 @@ it('forwards optional host diagram routing through the entity component', async 
   };
   const loadDiagrams = vi.fn().mockResolvedValue(data), loadSpec = vi.fn();
   const resolveDiagramLink = vi.fn().mockReturnValue('https://designs.test/doorbell');
+  const resolveHandoffDiagram=vi.fn().mockResolvedValue(null);
   const view = render(<FlowviewEntityDiagrams entityRef={data.entityRef}
-    loadDiagrams={loadDiagrams} loadSpec={loadSpec} resolveDiagramLink={resolveDiagramLink}/>);
+    loadDiagrams={loadDiagrams} loadSpec={loadSpec} resolveDiagramLink={resolveDiagramLink} resolveHandoffDiagram={resolveHandoffDiagram}/>);
   await waitFor(() => expect(vi.mocked(InlineFlowview).mock.calls.at(-1)?.[0].resolveDiagramLink).toBe(resolveDiagramLink));
+  expect(vi.mocked(InlineFlowview).mock.calls.at(-1)?.[0].resolveHandoffDiagram).toBe(resolveHandoffDiagram);
+  expect(vi.mocked(InlineFlowview).mock.calls.at(-1)?.[0].handoffDiagrams).toBe(data.diagrams);
   view.rerender(<FlowviewEntityDiagrams entityRef={data.entityRef}
     loadDiagrams={loadDiagrams} loadSpec={loadSpec}/>);
   expect(vi.mocked(InlineFlowview).mock.calls.at(-1)![0].resolveDiagramLink).toBeUndefined();

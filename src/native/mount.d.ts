@@ -20,12 +20,11 @@ export interface DetailNavigation {
   }>;
 }
 export interface DetailReference {spec: string; revision?: string; section?: string}
-/** Another document to open. A spec or URL is required; revision/section accompany a spec. */
+/** Another registered document to open. Destination metadata never replaces its ID. */
 export interface DiagramHandoffReference {
-  spec?: string;
+  spec: string;
   revision?: string;
   section?: string;
-  url?: string;
   view?: string;
   path?: string;
   step?: string;
@@ -33,6 +32,8 @@ export interface DiagramHandoffReference {
   claudeUrl?: string;
   claudeArtifactId?: string;
 }
+/** Shared site router input; external details may retain an explicit URL fallback. */
+export interface DiagramLinkReference extends DiagramHandoffReference {url?: string}
 export interface NativeViewerTarget {
   section: string;
   /** Named view ID. Applied before path/step; omission keeps the current view. */
@@ -42,12 +43,17 @@ export interface NativeViewerTarget {
   step?: string;
 }
 export interface NativeViewerOptions {
+  /** Runtime host for diagram handoffs only. Saved destinations do not imply a host. */
+  handoffHost?: 'claude' | 'site' | 'backstage' | 'unknown';
+  /** Backstage continuation owned by the host. Keep the current viewer usable
+   * until loading/navigation succeeds; retire requests when signal aborts. */
+  onDiagramHandoff?: (reference: DiagramHandoffReference, signal: AbortSignal) => Promise<void>;
   /** Published website base, including deployment subpath. No query or fragment. */
   siteBaseUrl?: string;
   /** Synchronous host routing only. Return an absolute, credential-free HTTP(S) URL.
    * Null, undefined, invalid URLs or thrown errors fall back to the authored URL.
-   * Handoffs open as links and never use loadDetail or fetch a diagram. */
-  resolveDiagramLink?: (reference: DiagramHandoffReference) => string | null | undefined;
+   * Explicit links/details retain this fallback; handoffs follow handoffHost. */
+  resolveDiagramLink?: (reference: DiagramLinkReference) => string | null | undefined;
   /** Consumer-owned approved-spec transport. Renderer never fetches remote URLs. */
   loadDetail?: (reference: DetailReference, signal: AbortSignal) => Promise<unknown>;
   /** Host may store this state in its own router; Flowview does not change host history. */
@@ -71,6 +77,9 @@ export interface NativeViewer {
   /** Transient diagram canvas. The host must supply a full-window surface and exit control. */
   setCanvas(active: boolean): void;
   pause(): void;
+  /** Pause and release this viewer's expanded/fullscreen surface before hiding
+   * a retained mount. Does not exit another viewer's fullscreen or erase state. */
+  deactivate(): Promise<void>;
   destroy(): void;
 }
 /** Mount trusted bundled renderer code around inert spec data in a dedicated host.

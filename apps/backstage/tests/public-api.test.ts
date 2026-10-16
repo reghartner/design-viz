@@ -3,7 +3,7 @@ import path from 'node:path';
 import {build} from 'esbuild';
 import {describe, expect, expectTypeOf, it} from 'vitest';
 import * as api from '../src/index';
-import type {DiagramHandoffReference, NativeViewerOptions, NativeViewerTarget, ViewerTarget, DetailViewState} from '../src/index';
+import type {DiagramLinkReference, DiagramHandoffReference, NativeViewerOptions, NativeViewerTarget, ViewerTarget, DetailViewState} from '../src/index';
 
 const app=fileURLToPath(new URL('../',import.meta.url));
 
@@ -19,11 +19,11 @@ describe('loader-injected public API',()=>{
     expect(target.view).toBe('operations');expect(detail.view).toBe('business');
   });
   it('exports a synchronous optional host resolver with portable handoff metadata',()=>{
-    const reference: DiagramHandoffReference = {spec:'recording',revision:'r1',section:'storage',url:'https://designs.test/fallback'};
+    const reference: DiagramHandoffReference = {spec:'recording',revision:'r1',section:'storage',claudeUrl:'https://claude.ai/artifact/recording'};
     expectTypeOf<NonNullable<NativeViewerOptions['resolveDiagramLink']>>()
-      .toEqualTypeOf<(reference: DiagramHandoffReference) => string | null | undefined>();
-    const options: NativeViewerOptions = {resolveDiagramLink: handoff => handoff.url};
-    expect(options.resolveDiagramLink?.(reference)).toBe('https://designs.test/fallback');
+      .toEqualTypeOf<(reference: DiagramLinkReference) => string | null | undefined>();
+    const options: NativeViewerOptions = {resolveDiagramLink: handoff => handoff.spec ? `https://diagrams.example/view?diagram=${encodeURIComponent(handoff.spec)}` : null};
+    expect(options.resolveDiagramLink?.(reference)).toBe('https://diagrams.example/view?diagram=recording');
   });
   it('loads the core facade without a browser or a Backstage host',()=>{
     expect(typeof api.FlowviewEntityDiagrams).toBe('function');

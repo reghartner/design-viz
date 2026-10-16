@@ -15,7 +15,7 @@ python3 examples/diagram-handoffs/build.py \
 python3 -m http.server 8765 --directory /tmp/flowview-demo
 ```
 
-Open `http://localhost:8765/diagram-handoffs/overview.html`. Each arrow opens
+Open `http://localhost:8765/diagram-handoffs/overview.html`. The generated index routes known diagram IDs. Each arrow opens
 another document in a new tab. The build changes only generated output;
 committed specs retain clearly fictional placeholder URLs. For another device,
 use the server's reachable address as `--base-url`.

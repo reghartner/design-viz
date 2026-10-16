@@ -5,10 +5,11 @@ function handoffNodeContent(node, position, id, prefix, options){
   var w=position.w,h=position.h,tip=19;
   var local=node.handoff && node.handoff.localSection!=null;
   var destination=local && options.localHandoffTarget && options.localHandoffTarget(node.handoff);
-  var href=local?null:diagramHandoffURL(node.handoff,options.resolveDiagramLink);
-  var title=node.title || id, available=!!(href || destination);
-  var hint=available?'Open '+title+' diagram'+(local?' in this spec':' (new tab)'):local?'Diagram destination unavailable. Choose an existing diagram section.':'Diagram destination unavailable. Add a URL or configure the host diagram-link resolver.';
-  var caption=available?(local?'CONTINUE →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
+  var action=local?null:diagramHandoffAction(node.handoff,options),href=action && action.kind==='link'?action.url:null;
+  var interactive=action && (action.kind==='internal' || action.kind==='choose');
+  var title=node.title || id, available=!!(href || destination || interactive);
+  var hint=available?(action && action.kind==='choose'?'Choose destination for '+title:'Open '+title+' diagram'+(local?' in this spec':action && action.kind==='internal'?' in Backstage':' (new tab)')):local?'Diagram destination unavailable. Choose an existing diagram section.':'Diagram destination unavailable. Set a spec ID with known destinations or configure the host diagram resolver.';
+  var caption=available?(local?'CONTINUE →':action.kind==='choose'?'CHOOSE DESTINATION':action.kind==='internal'?'OPEN DIAGRAM →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
   var max=Math.max(10,Math.floor((w-tip-22)/6.6));
   var chars=Array.from(title),shown=chars.length>max?chars.slice(0,max-1).join('')+'…':title;
   var outline='M10 0H'+(w-tip)+'L'+w+' '+(h/2)+'L'+(w-tip)+' '+h+'H10Q0 '+h+' 0 '+(h-10)+'V10Q0 0 10 0Z';
@@ -18,8 +19,8 @@ function handoffNodeContent(node, position, id, prefix, options){
     '<text class="t2 handoff-caption" x="12" y="'+(h/2+14)+'">'+caption+'</text>';
   var tooltip=esc(title+(node.sub?' · '+node.sub:'')+' — '+hint);
   if(!available)return '<g class="handoff-unavailable" role="img" aria-label="'+esc(title+' — '+hint)+'"><title>'+tooltip+'</title>'+body+'</g>';
-  var tag=local?'g':'a';
-  var attrs=' class="handoff-link" '+(local?'role="button" tabindex="0" data-dv-handoff="'+esc(destination.reference)+'"':'href="'+esc(href)+'" target="_blank" rel="noopener noreferrer"')+' aria-label="'+esc(hint)+'"';
+  var tag=local || interactive?'g':'a';
+  var attrs=' class="handoff-link" '+(local?'role="button" tabindex="0" data-dv-handoff="'+esc(destination.reference)+'"':interactive?'role="button" tabindex="0" data-dv-external-handoff="'+esc(JSON.stringify(diagramHandoffReference(node.handoff)))+'"':'href="'+esc(href)+'" target="_blank" rel="noopener noreferrer"')+' aria-label="'+esc(hint)+'"';
   // In the builder, the body remains selectable; the arrow tip is the preview link.
   if(options.authoring)return '<title>'+tooltip+'</title>'+body+'<'+tag+attrs+'><title>'+esc(hint)+'</title><path class="handoff-hit" d="M'+(w-tip-7)+' 0H'+(w-tip)+'L'+w+' '+h/2+'L'+(w-tip)+' '+h+'H'+(w-tip-7)+'Z"/></'+tag+'>';
   return '<'+tag+attrs+'><title>'+tooltip+'</title>'+body+'</'+tag+'>';
@@ -136,4 +137,42 @@ function wireLocalHandoffs(ctl, page){
     },
     destroy:function(){disposed=true;trail=[];checkpoints.clear();back.remove();back.removeEventListener('click',goBack);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);}
   };
+}
+
+/* One owner per rendered page, including handoff nodes in detail previews.
+   Host callbacks receive a fresh abortable request; alternate links are always
+   a separate, deliberate user action. */
+function wireExternalHandoffs(ctl,options){
+  var disposed=false,pending=null,panel=null,trigger=null;
+  function close(focus){
+    if(pending)pending.abort();pending=null;
+    if(panel)panel.remove();panel=null;
+    if(focus && trigger && trigger.isConnected)trigger.focus();trigger=null;
+  }
+  function show(action,message){
+    if(panel)panel.remove();
+    panel=document.createElement('div');panel.className='handoff-destinations';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Diagram destinations');panel.tabIndex=-1;
+    var status=document.createElement('p');status.setAttribute('role','status');status.textContent=message;panel.appendChild(status);
+    action.destinations.forEach(function(item){var link=document.createElement('a');link.className='mbtn';link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.label+' ↗';panel.appendChild(link);});
+    var dismiss=document.createElement('button');dismiss.type='button';dismiss.className='mbtn';dismiss.textContent='Close';dismiss.addEventListener('click',function(){close(true);});panel.appendChild(dismiss);
+    ctl.view.appendChild(panel);panel.focus({preventScroll:true});
+  }
+  function follow(event){
+    var target=event.target.closest && event.target.closest('[data-dv-external-handoff]');
+    if(!target || !ctl.view.contains(target) || disposed)return;
+    if(event.type==='keydown' && event.key!=='Enter' && event.key!==' ')return;
+    event.preventDefault();event.stopPropagation();close(false);trigger=target;
+    var action=diagramHandoffAction(JSON.parse(target.getAttribute('data-dv-external-handoff')),options);
+    if(action.kind!=='internal'){show(action,'This diagram is unavailable in the current host. Choose a destination.');return;}
+    var request=pending=new AbortController();
+    show(action,'Loading diagram in Backstage…');
+    Promise.resolve().then(function(){if(!request.signal.aborted)return options.onDiagramHandoff(action.reference,request.signal);}).then(function(){
+      if(!disposed && pending===request && !request.signal.aborted)close(false);
+    },function(error){
+      if(!disposed && pending===request && !request.signal.aborted){pending=null;show(action,(error && error.message || 'Unable to open diagram in Backstage.')+' Choose an available destination or close to continue.');}
+    });
+  }
+  function escape(event){if(panel && event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);}}
+  ctl.view.addEventListener('click',follow);ctl.view.addEventListener('keydown',follow);ctl.view.addEventListener('keydown',escape);
+  return {destroy:function(){disposed=true;close(false);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);ctl.view.removeEventListener('keydown',escape);}};
 }

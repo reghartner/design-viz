@@ -5,6 +5,7 @@ export type {
   AssociatedDiagram,
   EntityDiagrams,
   DiagramLoader,
+  DiagramHandoffResolver,
   SpecLoader,
 } from './api/types';
 export {

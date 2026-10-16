@@ -25,7 +25,8 @@ test.before(()=>{
   before=inventory(checkout);
   fs.cpSync(FIXTURE,path.join(checkout,'company'),{recursive:true});
   fs.writeFileSync(path.join(checkout,'company/company.json'),JSON.stringify({
-    version:1,companyName:'Fixture Co',repository:'https://github.com/fixture/design-viz',brand:'brand.json'
+    version:1,companyName:'Fixture Co',repository:'https://github.com/fixture/design-viz',brand:'brand.json',
+    site:{baseUrl:'https://company.example/team/workbench/flowspec.html'}
   }));
   fs.writeFileSync(path.join(checkout,'company/brand.json'),JSON.stringify({
     companyName:'Fixture Flow',logo:'FF',primaryColor:'#2463EB',secondaryColor:'#FFFFFF'

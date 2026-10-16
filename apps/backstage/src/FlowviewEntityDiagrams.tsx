@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DiagramLoader, SpecLoader } from './api/types';
+import type { DiagramLoader, SpecLoader, DiagramHandoffResolver } from './api/types';
 import type { NativeViewerOptions } from './generated/nativeViewer';
 import { InlineFlowview, type ViewerTarget } from './InlineFlowview';
 import { EvidenceLink } from './components/EvidenceLink';
@@ -10,12 +10,14 @@ export function FlowviewEntityDiagrams({
   loadDiagrams,
   loadSpec,
   resolveDiagramLink,
+  resolveHandoffDiagram,
   refreshMs = 60000,
 }: {
   entityRef: string;
   loadDiagrams: DiagramLoader;
   loadSpec: SpecLoader;
   resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink'];
+  resolveHandoffDiagram?: DiagramHandoffResolver;
   refreshMs?: number;
 }) {
   const [selection, setSelection] = useState<{
@@ -94,7 +96,7 @@ export function FlowviewEntityDiagrams({
       {selected && (
         <>
           <label style={{ display: 'block', marginBottom: 16 }}>
-            Diagram{' '}
+            Associated diagram{' '}
             <select
               aria-label="Diagram"
               value={selected.id}
@@ -115,6 +117,8 @@ export function FlowviewEntityDiagrams({
               key={entityRef + '|' + selected.id + '|' + selected.revision}
               diagram={selected}
               loadSpec={loadSpec}
+              handoffDiagrams={data?.diagrams}
+              resolveHandoffDiagram={resolveHandoffDiagram}
               resolveDiagramLink={resolveDiagramLink}
               target={target}
               entityRef={entityRef}

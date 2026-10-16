@@ -9,6 +9,7 @@ import type {
   AssociatedDiagram,
   CompatibilityReport,
   DiagramLoader,
+  DiagramHandoffResolver,
   DiagramSection,
   DiagramStep,
   EntityDiagrams,
@@ -40,6 +41,9 @@ const data: EntityDiagrams = {
 export const loadDiagrams: DiagramLoader = async (entityRef, signal) => {
   signal.throwIfAborted();
   return parseEntityDiagrams(data, entityRef);
+};
+export const resolveHandoffDiagram: DiagramHandoffResolver = async (reference, signal) => {
+  signal.throwIfAborted();return data.diagrams.find(item=>item.id===reference.spec && (!reference.revision || item.revision===reference.revision)) ?? null;
 };
 export const loadSpec: SpecLoader = async (requested, signal) => {
   signal.throwIfAborted();

@@ -26,7 +26,7 @@ function sessionFor(initial){let text=initial,renders=0;const session=B.createBu
 test('handoff assignment and removal preserve source documentation and unrelated bytes as single Undo/Redo actions',()=>{
   const raw=fixture();parent(raw).nodes.domain.link='https://example.com/source';parent(raw).nodes.domain.codeRefs=[{file:'orders.ts',line:8}];
   const text=' \n'+JSON.stringify(raw,null,3).replace('Domain map','Domain \\u006dap')+'\n ';
-  const value={spec:'orders-flow',revision:'abc123',section:'process',url:'https://example.com/orders#process'},before=JSON.stringify(raw),given=JSON.stringify(value);
+  const value={spec:'orders-flow',revision:'abc123',section:'process',siteBaseUrl:'https://example.com/view.html'},before=JSON.stringify(raw),given=JSON.stringify(value);
   const plan=B.planSetNodeHandoff(text,raw,0,'domain',value);assert.equal(plan.error,undefined);
   assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(value),given);
   const next=JSON.parse(plan.text),node=parent(next).nodes.domain;
@@ -44,8 +44,8 @@ test('handoff assignment and removal preserve source documentation and unrelated
   assert.equal(h.session.redo(),true);assert.equal(h.text,removed.text);
 });
 
-test('handoff authoring accepts URL-only or spec-only destinations and rejects invalid drafts atomically',()=>{
-  for(const value of [{url:'https://example.com/orders'},{spec:'orders-flow'},{spec:'orders-flow',revision:'v2',section:'process'}]){
+test('handoff authoring accepts ID-based destinations and rejects invalid drafts atomically',()=>{
+  for(const value of [{spec:'orders-flow',claudeUrl:'https://claude.ai/artifact/orders'},{spec:'orders-flow'},{spec:'orders-flow',revision:'v2',section:'process'}]){
     const next=run('planSetNodeHandoff',fixture(),0,'domain',value).raw;
     assert.deepEqual(parent(next).nodes.domain.handoff,value);
   }
@@ -274,11 +274,11 @@ test('handoff inspector stages its destination fields, applies once and exposes 
   const h=ui(raw),initial=h.text;h.inspector.render();
   const fold=h.guide.querySelector('.node-handoff-editor'),field=label=>h.field(label,fold);
   assert.equal(fold.querySelector('summary').textContent,'Diagram handoff');assert.equal(fold.open,false);
-  field('Destination URL').value=' https://example.com/orders ';field('Destination URL').fire('change');
-  field('Spec ID (optional)').value=' orders-flow ';field('Spec ID (optional)').fire('keydown',{key:'Enter'});
+  field('Internal site base URL').value=' https://example.com/orders ';field('Internal site base URL').fire('change');
+  field('Spec ID').value=' orders-flow ';field('Spec ID').fire('keydown',{key:'Enter'});
   field('Revision (optional)').value=' v2 ';field('Section (optional)').value=' process ';
   assert.equal(h.text,initial);assert.equal(h.renders,0);h.button('Apply handoff').fire('click');
-  const saved=h.text;assert.deepEqual(parent(JSON.parse(saved)).nodes.domain.handoff,{url:'https://example.com/orders',spec:'orders-flow',revision:'v2',section:'process'});
+  const saved=h.text;assert.deepEqual(parent(JSON.parse(saved)).nodes.domain.handoff,{siteBaseUrl:'https://example.com/orders',spec:'orders-flow',revision:'v2',section:'process'});
   assert.equal(parent(JSON.parse(saved)).nodes.domain.link,'https://example.com/source');assert.equal(h.renders,1);
   assert.equal(h.session.undo(),true);assert.equal(h.text,initial);assert.equal(h.session.canUndo(),false);
   assert.equal(h.session.redo(),true);assert.equal(h.text,saved);h.session.target={kind:'node',section:0,id:'domain'};h.inspector.render();
@@ -289,20 +289,20 @@ test('handoff inspector stages its destination fields, applies once and exposes 
 });
 
 test('handoff inspector keeps invalid drafts and source intact with visible validation feedback',()=>{
-  const raw=fixture();parent(raw).nodes.domain.handoff={url:'https://example.com/old'};
+  const raw=fixture();parent(raw).nodes.domain.handoff={spec:'orders-flow',siteBaseUrl:'https://example.com/old'};
   const h=ui(raw),initial=h.text;h.inspector.render();
   const fold=h.guide.querySelector('.node-handoff-editor'),field=label=>h.field(label,fold);
-  field('Destination URL').value='https://user:pass@example.com/orders';h.button('Apply handoff').fire('click');
+  field('Internal site base URL').value='https://user:pass@example.com/orders';h.button('Apply handoff').fire('click');
   assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/URL/);
-  assert.equal(field('Destination URL').value,'https://user:pass@example.com/orders');assert.equal(h.renders,0);assert.equal(h.session.canUndo(),false);
-  field('Destination URL').value='https://example.com/orders';field('Section (optional)').value='process';h.button('Apply handoff').fire('click');
+  assert.equal(field('Internal site base URL').value,'https://user:pass@example.com/orders');assert.equal(h.renders,0);assert.equal(h.session.canUndo(),false);
+  field('Spec ID').value='';field('Internal site base URL').value='https://example.com/orders';field('Section (optional)').value='process';h.button('Apply handoff').fire('click');
   assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/spec/i);assert.equal(h.session.canUndo(),false);
 });
 
 test('inspector conflict feedback preserves details until explicit removal and blocks applying details to handoffs',()=>{
-  const h=ui(linked()),initial=h.text;h.inspector.render();h.field('Destination URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
+  const h=ui(linked()),initial=h.text;h.inspector.render();h.field('Spec ID').value='orders-flow';h.field('Internal site base URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
   assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/Remove.*domain detail/);assert.equal(h.session.canUndo(),false);
-  h.button('Remove detail').fire('click');h.inspector.render();h.field('Destination URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
+  h.button('Remove detail').fire('click');h.inspector.render();h.field('Spec ID').value='orders-flow';h.field('Internal site base URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
   const assigned=h.text;h.inspector.render();assert.equal(h.button('Create detail flow'),undefined);
   h.field('Local section').value='inside';h.field('Local section').fire('change');h.button('Apply detail').fire('click');
   assert.equal(h.text,assigned);assert.match(h.guide.querySelector('.ierr').textContent,/Remove.*diagram handoff/);
@@ -391,7 +391,7 @@ function extractionUI(options={}){
     download(name,text,mime){if(options.failDownload)throw new Error('Download denied');const item={name,text,mime};downloads.push(item);return ()=>released.push(item);}});
   h.inspector.renderMulti(selected);h.button('Create domain from selected nodes').fire('click');
   return Object.assign(h,{downloads,released,change(label,value){h.field(label).value=value;h.field(label).fire('input');h.field(label).fire('change');},
-    select(value){selected=value;},external(){this.change('Destination','external');this.change('Destination URL','https://example.com/orders');}});
+    select(value){selected=value;},external(){this.change('Destination','external');this.change('Spec ID','orders-flow');this.change('Internal site base URL','https://example.com/orders');}});
 }
 
 test('extraction preview displays every affected link, reference and note without publishing title edits',()=>{
@@ -431,9 +431,9 @@ test('external extraction accepts approved spec IDs, rejects unsafe URLs, and pr
   const settings={failDownload:true},h=extractionUI(settings),before=h.session.text();
   h.change('Destination','external');assert.equal(h.button('Download destination JSON').disabled,true);
   h.change('Spec ID','approved-orders');h.change('Revision','v3');assert.equal(h.button('Download destination JSON').disabled,false);
-  h.change('Destination URL','javascript:alert(1)');assert.equal(h.button('Download destination JSON').disabled,true);
+  h.change('Internal site base URL','javascript:alert(1)');assert.equal(h.button('Download destination JSON').disabled,true);
   h.button('Download destination JSON').fire('click');assert.equal(h.downloads.length,0);
-  h.change('Destination URL','');h.button('Download destination JSON').fire('click');
+  h.change('Internal site base URL','');h.button('Download destination JSON').fire('click');
   assert.match(h.guide.querySelector('.ierr').textContent,/Download denied/);assert.equal(h.button('Apply extraction').disabled,true);assert.equal(h.session.text(),before);
   settings.failDownload=false;h.button('Download destination JSON').fire('click');assert.equal(h.guide.querySelector('.ierr').hidden,true);
   const expected=JSON.parse(h.downloads[0].text).page.sections[0].id;h.button('Apply extraction').fire('click');

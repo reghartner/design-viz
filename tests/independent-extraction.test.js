@@ -356,3 +356,16 @@ test('extraction carries local handoff dependencies as visible diagrams with rew
   assert.ok(target);assert.equal(target.detailOnly,undefined);assert.equal(target.heading,'Delivery');valid(child);
  }
 });
+
+test('JSON contracts survive boundary extraction and refuse losing internal step replacements',()=>{
+ const raw=fixture(),d=diagram(raw);
+ d.edges[0].contract={json:{event:'order'}};d.edges[1].contract={json:{stored:true}};
+ d.steps[0].contracts={'client->accept':{json:{event:'step order'}}};
+ const result=extract(raw),parent=result.parent,child=childOf(result),key=parent.steps[0].edge;
+ assert.deepEqual(parent.steps[0].contracts,{[key]:{json:{event:'step order'}}});
+ assert.deepEqual(parent.edges.find(e=>edgeKey(e)===key).contract,{json:{event:'order'}});
+ assert.deepEqual(child.edges[0].contract,{json:{stored:true}});
+ d.steps[1].contracts={'accept->store':{json:null}};
+ const refused=B.planExtractIndependentDiagram(JSON.stringify(raw),raw,0,['accept','store'],{mode:'local'});
+ assert.match(refused.error,/Internal connections have step JSON contract overrides/);
+});

@@ -246,6 +246,7 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
   var r = builderRewrite(text, raw, got.path, function(st){
     var failures = stepFailures(st);
     if (has) delete failures[key];
+    if(has && st.contracts){delete st.contracts[key];if(!Object.keys(st.contracts).length)delete st.contracts;}
     if (has && Array.isArray(st.packets)) st.packets = st.packets.filter(function(pk){return pk.edge !== key;});
     var delivered = next.filter(function(k){return !Object.prototype.hasOwnProperty.call(failures,k);});
     delete st.edge; delete st.edges;

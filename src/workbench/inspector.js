@@ -739,6 +739,25 @@ function visibilityControl(val,ctx){
       },{after:refreshFormSoon});}});
   }
 
+function edgeJsonContractControl(value,key,inherited){
+    var target=Object.assign({},session.target),box=document.createElement('div');
+    function save(next){return commitCascade(function(raw){return planEdgeJsonContract(session.text(),raw,target,key,next);},{after:refreshFormSoon});}
+    var hint=document.createElement('p');hint.className='fnote';
+    hint.textContent=key?(value===undefined?'Inherited from connection':value===null?'Hidden on this step':'Override for this step'):'Default payload for this connection';box.appendChild(hint);
+    var resolved=value===undefined?inherited:value;
+    var input=textControl(validJsonContract(resolved)?JSON.stringify(resolved.json,null,2):'',function(source){
+      if(source==null)return save(undefined);
+      var parsed;try{parsed=JSON.parse(source);}catch(error){formError('Contract JSON: '+error.message);return false;}
+      var next={json:parsed};if(resolved && typeof resolved.title==='string')next.title=resolved.title;
+      return save(next);
+    },{textarea:true,placeholder:'Enter JSON (including null)'});
+    input.setAttribute('aria-label',key?'Contract JSON for '+key:'Contract JSON');box.appendChild(input);
+    box.appendChild(actionButton(key?'Inherit connection contract':'Remove contract',function(){return save(undefined);}));
+    if(key && value===undefined && validJsonContract(inherited))box.appendChild(actionButton('Override connection contract',function(){return save(builderClone(inherited));}));
+    if(key)box.appendChild(actionButton('Hide contract on this step',function(){return save(null);}));
+    return box;
+  }
+
 function edgeForm(val, ctx){
     var t = session.target, expected = session.snapshot(), staleSource = false;
     invalidateEdgeEndpoints=function(){staleSource=true;};
@@ -798,6 +817,7 @@ function edgeForm(val, ctx){
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
+      frowBlock('Contract JSON',edgeJsonContractControl(val.contract)),
       frowBlock('Curve',curveControls),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); })),
@@ -904,7 +924,12 @@ function stepForm(val, ctx){
       });
       return input;
     }
-    builderStepHops(val).forEach(function(key){rows.push(frow('Delivery · ' + key,outcomeSelect(key)));});
+    builderStepHops(val).forEach(function(key){
+      rows.push(frow('Delivery · ' + key,outcomeSelect(key)));
+      var edge=(ctx.diagram.edges || []).find(function(e){return builderEdgeKey(e)===key;});
+      var value=val.contracts && Object.prototype.hasOwnProperty.call(val.contracts,key)?val.contracts[key]:undefined;
+      rows.push(frowBlock('Contract JSON · '+key,edgeJsonContractControl(value,key,edge && edge.contract)));
+    });
     var addFailure = document.createElement('select'); addFailure.className = 'fctl';
     var placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose an edge…'; addFailure.appendChild(placeholder);
     (ctx.diagram.edges || []).forEach(function(edge){

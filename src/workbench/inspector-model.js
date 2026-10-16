@@ -167,6 +167,7 @@ var BUILDER_GUIDES = {
       ['fromPort, toPort', 'Exit/Entry side and position (%) pin the arrow on each card; Auto restores routing'],
       ['kind', 'protocol: https | int | mqtt, or a key declared in page.protocols'],
       ['ret', 'true = response/ack, drawn as a fine dash'],
+      ['contract', '{json: any JSON, title?: string} — hover the notepad to read and copy the connection payload'],
       ['label', 'short verb or topic on the arrow (POST /x, PUBLISH a/b/c)'],
       ['curveControls', 'Native cubic controls from Auto arrange; drag handles to edit or Reset curve to clear'],
       ['curvePoints', 'Drag an arrow or handle to shape it; Reset curve restores automatic routing'],
@@ -180,6 +181,7 @@ var BUILDER_GUIDES = {
     fields: [
       ['id', 'stable step identity used by paths and detail mappings; renaming updates those references'],
       ['edge', '"from->to" — the hop this step fires (or edges: [..] for hops that fire together)'],
+      ['contracts', 'per-edge JSON replacements; absent inherits, null hides; edit Contract JSON per hop'],
       ['failures', 'edge outcomes: {"from->to":"dropped"}; use dropped for lost in transit or blocked for never sent'],
       ['text', 'caption shown in the step bar'],
       ['time', 'story time: +45m from the previous step, 06:50 (next 6:50) or 2026-09-25T06:50; empty keeps the previous time. Needs the section\'s story start'],

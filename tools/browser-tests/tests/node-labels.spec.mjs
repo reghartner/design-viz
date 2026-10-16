@@ -98,22 +98,28 @@ for(const skin of ['pastel','aurora'])test(`dense ${skin} lane titles stay bound
    2 truncated title: AT | same | cut title ⇒ that node's .t1 aria-label == authored title and shown text ends in … | silent clipping; label lost to screen readers
    3 subtitle inside card | long subs, link + detail trigger, small float card | .t2 rect within its own .card rect | subtitle drawn past the card edge (Backstage "hosted by Flowview service")
    4 truncated subtitle exposed | same | .t2 aria-label and .t2>title == authored sub | subtitle cut without full text
-   5 link icon clear of title | link/backref/drill controls on every card | each title line rect ∩ that node's control rects = ∅ | ↗ over the title; titles fitted while the Tab was hidden
+   5 link icon clear of title | link/backref/drill controls on every card | authored link ⇒ that node's .nlink exists; each title line rect ∩ that node's control rects = ∅ | ↗ over the title; titles fitted while the Tab was hidden; icons dropped to make room
+   0 roster | every authored node | each authored id renders a shown card with .t1 (and .t2 when sub is authored) | a node's label or subtitle silently removed
    6 subtitle clear of controls | detail trigger on a subtitled card | .t2 rect ∩ detail/link rects = ∅ | subtitle under ⊞
    7 hidden Tab | lane board in a second Tab, hidden at load | rows 1-6 after a real Tab click | measuring at display:none (zero widths)
    8 fixture discriminates | per board | ≥1 wrapped title, ≥1 truncated title, ≥1 truncated subtitle | vacuous pass on short labels
-   9 Backstage example | committed docs/diagrams/backstage/backstage.html, every Tab | rows 1-6, truncated titles < 3 (3 on its Overview board today) | stale generated page; regressions in the shipped example */
+   9 Backstage example | committed docs/diagrams/backstage/backstage.html, every Tab, 1440 and 1280 | rows 1-6, truncated titles < 3 (3 on its Overview board today) | stale generated page; regressions in the shipped example */
 async function expectBoundedLabels(board,authored){
   return board.locator('.node').evaluateAll((nodes,authored)=>{
     const overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
     const inside=(a,b)=>a.left>=b.left-1&&a.right<=b.right+1&&a.top>=b.top-1&&a.bottom<=b.bottom+1;
     const shown=el=>Array.from(el.childNodes).filter(n=>n.nodeName!=='title').map(n=>n.textContent).join('');
     const report={failures:[],wrapped:0,truncatedTitles:0,truncatedSubs:0};
+    // Every authored card is checked: a missing card, label, subtitle or link fails.
+    const seen=new Set(nodes.map(node=>node.dataset.dvNode));
+    Object.keys(authored).forEach(id=>{if(!seen.has(id))report.failures.push(id+': not rendered');});
     nodes.forEach(node=>{
-      const cardEl=node.querySelector(':scope>.card'),t1=node.querySelector(':scope>.t1'),id=node.dataset.dvNode;
-      if(!cardEl||!t1)return;const card=cardEl.getBoundingClientRect();if(!card.width)return;
-      const want=authored[id];if(!want){report.failures.push(id+': not authored');return;}
+      const id=node.dataset.dvNode,want=authored[id];if(!want){report.failures.push(id+': not authored');return;}
       const fail=msg=>report.failures.push(id+': '+msg);
+      const cardEl=node.querySelector(':scope>.card'),t1=node.querySelector(':scope>.t1');
+      if(!cardEl||!t1){fail('card or title missing');return;}
+      const card=cardEl.getBoundingClientRect();if(!card.width){fail('card not shown');return;}
+      if(want.link&&!node.querySelector(':scope>.nlink circle'))fail('link icon missing');
       // Full text is required once the title is cut; when present it must never be stale.
       const tip=node.querySelector(':scope>title'),label=t1.getAttribute('aria-label'),text=shown(t1),cut=text!==want.title;
       if(cut||tip)if(!tip||tip.textContent!==want.title)fail('hover title is '+JSON.stringify(tip&&tip.textContent));
@@ -121,6 +127,7 @@ async function expectBoundedLabels(board,authored){
       if(cut){if(!/…$/.test(text))fail('title cut without ellipsis: '+text);else report.truncatedTitles++;}
       const controls=Array.from(node.querySelectorAll('.nlink circle,.nbackref circle,.detail-trigger rect'),el=>el.getBoundingClientRect());
       const sub=node.querySelector(':scope>.t2'),subBox=sub&&shown(sub)?sub.getBoundingClientRect():null;
+      if(want.sub&&!subBox)fail('subtitle missing');
       const lines=Array.from(t1.querySelectorAll('tspan'));if(lines.length>1)report.wrapped++;if(!lines.length)lines.push(t1);
       lines.forEach(line=>{const box=line.getBoundingClientRect();
         if(!inside(box,card))fail('title line outside card: '+line.textContent);
@@ -140,7 +147,7 @@ async function expectBoundedLabels(board,authored){
     return report;
   },authored);
 }
-const authoredOf=diagram=>Object.fromEntries(Object.entries(diagram.nodes).map(([id,n])=>[id,{title:n.title||id,sub:n.sub||''}]));
+const authoredOf=diagram=>Object.fromEntries(Object.entries(diagram.nodes).map(([id,n])=>[id,{title:n.title||id,sub:n.sub||'',link:!!n.link}]));
 
 const overflowNodes={
   a:{title:'Notification delivery coordinator service',sub:'hosted by Flowview service with retries',link:'https://example.test/a'},
@@ -183,11 +190,11 @@ for(const width of [1440,1280])test(`standalone node labels stay inside cards an
   }
 });
 
-test('the shipped Backstage example keeps labels inside cards on every Tab',async({page,server},info)=>{
-  await page.setViewportSize({width:1440,height:900});
+for(const width of [1440,1280])test(`the shipped Backstage example keeps labels inside cards on every Tab at ${width}px`,async({page,server},info)=>{
+  await page.setViewportSize({width,height:900});
   const spec=JSON.parse(await readFile(path.join(repo,'docs/diagrams/backstage/backstage.spec.json'),'utf8'));
-  await copyFile(path.join(repo,'docs/diagrams/backstage/backstage.html'),path.join(server.root,'backstage-example.html'));
-  await page.goto(server.origin+'/backstage-example.html');await page.evaluate(()=>document.fonts.ready);
+  await copyFile(path.join(repo,'docs/diagrams/backstage/backstage.html'),path.join(server.root,`backstage-example-${width}.html`));
+  await page.goto(server.origin+`/backstage-example-${width}.html`);await page.evaluate(()=>document.fonts.ready);
   const root=page.locator('#docview'),nav=root.locator('.explore-navigation').first();
   let truncated=0;
   for(const [index,tab] of spec.page.blocks[0].tabs.entries()){
@@ -196,7 +203,7 @@ test('the shipped Backstage example keeps labels inside cards on every Tab',asyn
       const board=root.locator('.doc-sec:visible .boardcanvas>svg').filter({has:page.locator(`[data-dv-node="${Object.keys(section.diagram.nodes)[0]}"]`)}).first();
       await expect(board).toBeVisible();
       const report=await expectBoundedLabels(board,authoredOf(section.diagram));
-      await board.screenshot({path:info.outputPath(`backstage-${index}.png`)});
+      await board.screenshot({path:info.outputPath(`backstage-${width}-${index}.png`)});
       expect(report.failures,tab.label+' labels fit their cards and expose full text').toEqual([]);
       truncated+=report.truncatedTitles;
     }

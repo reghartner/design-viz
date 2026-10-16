@@ -1,7 +1,9 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
-import {readFile,mkdtemp,mkdir,cp,rm} from 'node:fs/promises';
+import {readFile,writeFile,mkdtemp,mkdir,cp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 
@@ -303,29 +305,40 @@ for(const [width,height] of [[1280,800],[1440,900],[1920,1080]])for(const draft 
   });
 }
 
-// #547 — Welcome and the template picker link the examples gallery only when a
-// served workbench (…/workbench/flowspec.html) has ../examples/index.html beside
-// it, and the gallery itself renders its UTF-8 text.
-// row | fixture                                                   | assertion (scoped)                                                         | rejects
-// 1   | site/workbench/flowspec.html + site/examples/index.html     | #welcome-home #welcome-gallery visible; its href resolves to site/examples/index.html | no Welcome link, or one pointing elsewhere
-// 2   | same, real click on #welcome-new                            | #welcome-new-screen #welcome-new-gallery visible with the same resolved href | a link on only one surface
-// 3   | same, real click on #welcome-gallery                        | the opened tab has doctype html, characterSet UTF-8, .sub reads "N pages · every diagram", the Auralis card .t reads "Auralis Presence — mmWave …", no "â€"/"Â·" in its text | the generated page without doctype/charset (mojibake)
-// 4   | site/workbench/flowspec.html with no site/examples/          | exactly one HEAD probe gets the server's real 404; then #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | a link shown whether or not the gallery is reachable
-// 5   | row 4                                                      | the probe's 404 and its console line are the only audit entries (spliced explicitly) | a probe failure surfacing as a page error
-// 6   | /workbench.html (not a workbench/ folder, as in agent kits) | no request for any examples/index.html; #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | an unconditional probe adding network noise to hosts without the repo layout
-async function gallerySite(server,withGallery){
+// #547 — Welcome and the template picker link the examples gallery only when the
+// build's site config names it ("examples" in site.json). No runtime request decides it.
+// row | fixture                                                        | assertion (scoped)                                                         | rejects
+// 1   | site/workbench/flowspec.html built with --config {examples:"../examples/index.html"}, gallery beside it | #welcome-home #welcome-gallery visible; its href resolves to site/examples/index.html | no Welcome link, or one pointing elsewhere
+// 2   | same, real click on #welcome-new                                 | #welcome-new-screen #welcome-new-gallery visible with the same resolved href | a link on only one surface
+// 3   | same, real click on #welcome-gallery                             | the opened tab has doctype html, characterSet UTF-8, .sub reads "N pages · every diagram", the Auralis card .t reads "Auralis Presence — mmWave …", no "â€"/"Â·" in its text | the generated page without doctype/charset (mojibake)
+// 4   | row 1–2 loads                                                    | the workbench itself requests nothing under examples/ before the click  | a runtime probe kept alongside the config
+// 5   | unconfigured build (--no-config) at site/workbench/flowspec.html with the gallery present beside it | zero requests under examples/ through Welcome and the picker; #welcome-gallery and #welcome-new-gallery hidden | a link shown, or a probe sent, without config
+async function gallerySite(server,html){
   const root=await mkdtemp(path.join(server.root,'gallery-site-')),workbench=path.join(root,'workbench');
-  await mkdir(workbench);
-  for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])
-    await cp(path.join(server.root,from),path.join(workbench,to));
-  if(withGallery){await mkdir(path.join(root,'examples'));await cp(path.join(repo,'examples/index.html'),path.join(root,'examples/index.html'));}
+  await mkdir(workbench);await writeFile(path.join(workbench,'flowspec.html'),html);
+  for(const name of ['catalog.json','starters.json'])await cp(path.join(server.root,name),path.join(workbench,name));
+  await mkdir(path.join(root,'examples'));await cp(path.join(repo,'examples/index.html'),path.join(root,'examples/index.html'));
   const base=server.origin+'/'+path.basename(root);
   return {url:base+'/workbench/flowspec.html',gallery:base+'/examples/index.html',cleanup:()=>rm(root,{recursive:true,force:true})};
 }
-
-test('the examples gallery is linked from Welcome and the template picker and renders UTF-8 text',async({page,server})=>{
-  const site=await gallerySite(server,true);
+// Build with a site config naming the gallery; restore the shared build output after.
+async function configuredWorkbench(){
+  const dir=await mkdtemp(path.join(tmpdir(),'flowview-gallery-config-')),target=path.join(repo,'workbench/flowspec.html'),original=await readFile(target);
   try{
+    await writeFile(path.join(dir,'site.json'),JSON.stringify({version:1,landing:{spec:path.join(repo,'src/starters/onboarding.json')},examples:'../examples/index.html'}));
+    execFileSync('python3',[path.join(repo,'tools/build.py'),'--config',path.join(dir,'site.json')],{cwd:dir,stdio:'pipe'});
+    return await readFile(target,'utf8');
+  }finally{await writeFile(target,original);await rm(dir,{recursive:true,force:true});}
+}
+function examplesRequests(page){
+  const seen=[];page.on('request',request=>{if(new URL(request.url()).pathname.includes('/examples/'))seen.push(request.method()+' '+request.url());});
+  return seen;
+}
+
+test('a configured examples gallery is linked from Welcome and the template picker and renders UTF-8 text',async({page,server})=>{
+  const site=await gallerySite(server,await configuredWorkbench());
+  try{
+    const requests=examplesRequests(page);
     await page.goto(site.url);await expect(home(page)).toBeVisible();
     const homeLink=home(page).locator('#welcome-gallery');
     await expect(homeLink).toBeVisible();
@@ -334,6 +347,7 @@ test('the examples gallery is linked from Welcome and the template picker and re
     const pickerLink=screen(page,'new').locator('#welcome-new-gallery');
     await expect(pickerLink).toBeVisible();
     expect(await pickerLink.evaluate(link=>link.href)).toBe(site.gallery);
+    await page.waitForLoadState('networkidle');expect(requests).toEqual([]);
     await page.locator('#welcome-new-screen [data-welcome-back]').click();await expect(homeLink).toBeVisible();
     const opened=page.waitForEvent('popup');await homeLink.click();
     const tab=await opened;await tab.waitForLoadState();
@@ -347,28 +361,18 @@ test('the examples gallery is linked from Welcome and the template picker and re
   }finally{await site.cleanup();}
 });
 
-test('the examples gallery links stay hidden when the gallery is not served beside the workbench',async({page,server,audit})=>{
-  const site=await gallerySite(server,false);
+test('without site config the examples gallery links stay hidden and nothing is requested',async({page,server})=>{
+  const site=await gallerySite(server,await readFile(path.join(server.root,'workbench.html'),'utf8'));
   try{
-    const probes=[];page.on('response',response=>{if(response.url()===site.gallery)probes.push(response.request().method()+' '+response.status());});
+    const requests=examplesRequests(page);
     await page.goto(site.url);
-    await expect.poll(()=>probes,'the workbench probes its sibling gallery once').toEqual(['HEAD 404']);
-    await page.waitForLoadState('networkidle');
     await expect(home(page)).toBeVisible();await expect(page.locator('#welcome-library')).toBeVisible();
+    await page.waitForLoadState('networkidle');
     await expect(home(page).locator('#welcome-gallery')).toBeHidden();
     await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
     await expect(page.locator('#welcome-templates .welcome-template-card').first()).toBeVisible();
     await expect(screen(page,'new').locator('#welcome-new-gallery')).toBeHidden();
-    const expected=['HTTP 404: '+site.gallery,'console: Failed to load resource: the server responded with a status of 404 (Not Found)'];
-    for(const message of expected){expect(audit).toContain(message);audit.splice(audit.indexOf(message),1);}
+    await page.waitForLoadState('networkidle');
+    expect(requests).toEqual([]);
   }finally{await site.cleanup();}
-  const requests=[];page.on('request',request=>{if(request.url().includes('examples/index.html'))requests.push(request.url());});
-  await page.goto(server.origin+'/workbench.html');await expect(home(page)).toBeVisible();
-  await page.waitForLoadState('networkidle');
-  expect(requests).toEqual([]);
-  await expect(home(page).locator('#welcome-gallery')).toBeHidden();
-  await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
-  await expect(page.locator('#welcome-templates .welcome-template-card').first()).toBeVisible();
-  await expect(screen(page,'new').locator('#welcome-new-gallery')).toBeHidden();
-  expect(requests).toEqual([]);
 });

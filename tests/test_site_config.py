@@ -71,6 +71,45 @@ class SiteConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
             self.load()
 
+    # #547 — the examples-gallery link is build-time site config, never a runtime probe.
+    # row | fixture                                         | assertion (scoped)                                         | rejects
+    # 1   | site.json with "examples": "../examples/index.html" | workbench_examples() embeds exactly that string            | a field that is accepted but dropped
+    # 2   | "/examples/index.html", "gallery/index.html?x=1"   | same-site absolute and relative URLs are embedded unchanged | over-strict validation
+    # 3   | no site.json, --no-config, config without examples | workbench_examples() embeds null                           | a default that shows the link everywhere
+    # 4   | javascript:, https://, //host, \\host, "", "  ", non-string, control char | build fails with "Invalid site config" | off-site or script URLs in the Welcome link
+    # 5   | examples set, landing still validated             | an unknown sibling field still fails                       | loosening the field allow-list wholesale
+    # 6   | CLI build with --config                           | flowspec.html carries var WORKBENCH_EXAMPLES = "<url>"; --no-config carries null | config read but never embedded
+    def examples(self, **kwargs):
+        return json.loads(build.workbench_examples(self.config, **kwargs))
+
+    def test_examples_gallery_url_is_embedded_only_when_configured(self):
+        for url in ['../examples/index.html', '/examples/index.html', 'gallery/index.html?x=1']:
+            with self.subTest(url=url):
+                self.config.write_text(json.dumps({**self.data, 'examples': url}))
+                self.assertEqual(self.examples(), url)
+                self.assertEqual(json.loads(self.load())['spec'], self.raw)
+        self.config.write_text(json.dumps(self.data))
+        self.assertIsNone(self.examples())
+        self.assertIsNone(json.loads(build.workbench_examples(no_config=True)))
+        (self.directory / 'workbench').mkdir()
+        with patch.object(build, 'ROOT', self.directory):
+            self.assertIsNone(json.loads(build.workbench_examples()))
+            (self.directory / 'workbench/site.json').write_text(json.dumps(
+                {'version': 1, 'landing': {'spec': '../story.json'}, 'examples': '../examples/index.html'}))
+            self.assertEqual(json.loads(build.workbench_examples()), '../examples/index.html')
+            self.assertIsNone(json.loads(build.workbench_examples(no_config=True)))
+
+    def test_examples_gallery_url_must_be_same_site(self):
+        for url in ['javascript:alert(1)', 'https://example.com/examples/', 'HTTP://example.com/', '//example.com/x',
+                    '\\\\host\\x', '', '   ', 'a b.html', 'ok\n.html', ['../examples/index.html'], None, 1]:
+            with self.subTest(url=url):
+                self.config.write_text(json.dumps({**self.data, 'examples': url}))
+                with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
+                    self.examples()
+        self.config.write_text(json.dumps({**self.data, 'examples': '../examples/index.html', 'exampels': 'x'}))
+        with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
+            self.load()
+
     def test_invalid_spec_or_no_featured_diagram_fails(self):
         for raw in [None, [], {'page': {'sections': [{'heading': 'Prose only'}]}},
                     {'nodes': {}, 'rows': [['missing']]},
@@ -98,7 +137,15 @@ class SiteConfigTests(unittest.TestCase):
         custom = outputs[0].read_bytes()
         payload = re.search(rb'var WORKBENCH_LANDING = ([^\n]*);\n', custom).group(1)
         self.assertEqual(json.loads(payload)['spec'], self.raw)
+        self.assertEqual(re.search(rb'var WORKBENCH_EXAMPLES = ([^\n]*);\n', custom).group(1), b'null')
+        self.config.write_text(json.dumps({**self.data, 'examples': '../examples/index.html'}))
+        gallery = run('--config', 'site.json')
+        self.assertEqual(gallery.returncode, 0, gallery.stdout + gallery.stderr)
+        self.assertEqual(json.loads(re.search(rb'var WORKBENCH_EXAMPLES = ([^\n]*);\n', outputs[0].read_bytes()).group(1)),
+                         '../examples/index.html')
+        self.config.write_text(json.dumps(self.data))
         self.assertEqual(run('--no-config').returncode, 0)
+        self.assertEqual(re.search(rb'var WORKBENCH_EXAMPLES = ([^\n]*);\n', outputs[0].read_bytes()).group(1), b'null')
         self.assertNotEqual(outputs[0].read_bytes(), custom)
         self.assertEqual(run('--config', str(self.config)).returncode, 0)
         self.assertEqual(outputs[0].read_bytes(), custom)

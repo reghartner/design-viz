@@ -109,15 +109,15 @@ test('Preview opens the page preview in one click and Appearance is the only edi
 
 /* #560 — insert-target badge, save-status badge and Home tooltip (desktop editor only).
  row | fixture | assertion (scoped) | rejects
- 1 badge wording | editor at 1440; insert target starts on #section-primary (asserted) | #section-primary.dv-inserttarget has exactly one child .dv-inserttarget-tag whose own text is exactly Adding here; the section's ::before content is none/normal | old "insert target" corner text kept, or both labels shown
+ 1 badge wording | editor at 1440, Overview (Standard) View chosen through Contents, where sections show their insert frame; insert target starts on #section-primary (asserted) | #section-primary.dv-inserttarget has exactly one child .dv-inserttarget-tag whose own text is exactly Adding here; the section's ::before content is none/normal | old "insert target" corner text kept, or both labels shown
  2 badge tooltip is reachable | same | the tag is visible, its title names Add and says how to change the section; a real hover reaches it (document.elementFromPoint at the tag's centre is the tag) | tooltip on an element with pointer-events:none, or no title
  3 badge follows the target | Add → destination picker chooses section 2 (real select) | the tag moves to #section-secondary; #docview holds exactly one .dv-inserttarget-tag | stale or duplicated tags left behind
- 4 save status is a status badge, not a button | same editor | #workspace-provenance keeps role=status, is not a button/link, has text Browser only, computed cursor is default, it has a non-transparent background and a pill radius (≥ half its height), and a status dot (::before content not none); its background, border radius and font family differ from both the File .bbtn and the Preview header button | plain text that reads as a header action, or styled as another button
+ 4 save status is a status badge, not a button | same editor | #workspace-provenance keeps role=status, is not a button/link, has text Browser only, computed cursor is default, it has a non-transparent background and a pill radius (≥ half its height), and a visible round status dot (its ::before is 4–10px square, round, with a non-transparent fill); its background colour and its border radius each differ from both the File .bbtn and the Preview header button | plain text that reads as a header action, a button-styled pill, or a dot that is not drawn
  5 Home has a tooltip that is true | same editor | #workspace-home title names Home and says the draft stays available; a real click on Home shows the welcome screen with #welcome-resume visible, and clicking it returns to the editor with #src unchanged | no tooltip, or a tooltip promising a draft that Home loses
  6 user guide | Help → User guide | #hg-workspace has <b> Adding here and a <b> Browser only, and the sentences explaining the badge and that Home keeps the draft | stale guide
 */
 test('#560 insert target says Adding here, save status is a badge and Home explains the kept draft',async({page,server})=>{
- await page.setViewportSize({width:1440,height:900});const source=await open(page,server);
+ await page.setViewportSize({width:1440,height:900});const source=await open(page,server);await chooseNavigation(nav(page),'View','Overview');
  const view=page.locator('#docview'),primary=view.locator('#section-primary'),secondary=view.locator('#section-secondary');
  await expect(primary).toHaveClass(/\bdv-inserttarget\b/);await expect(secondary).not.toHaveClass(/\bdv-inserttarget\b/);
  const tag=primary.locator(':scope>.dv-inserttarget-tag');await expect(tag).toHaveCount(1);await expect(tag).toBeVisible();await expect(tag).toHaveText('Adding here');
@@ -129,10 +129,10 @@ test('#560 insert target says Adding here, save status is a badge and Home expla
 
  const status=page.locator('.workbench-header #workspace-provenance');await expect(status).toBeVisible();await expect(status).toHaveText('Browser only');await expect(status).toHaveAttribute('role','status');
  expect(await status.evaluate(el=>el.tagName)).toBe('SPAN');expect(await status.evaluate(el=>!!el.closest('button,a,summary'))).toBe(false);
- const look=el=>{const c=getComputedStyle(el),b=getComputedStyle(el,'::before');return {cursor:c.cursor,background:c.backgroundColor,radius:parseFloat(c.borderTopLeftRadius),height:el.getBoundingClientRect().height,font:c.fontFamily,dot:b.content};};
+ const look=el=>{const c=getComputedStyle(el),b=getComputedStyle(el,'::before');return {cursor:c.cursor,background:c.backgroundColor,radius:parseFloat(c.borderTopLeftRadius),height:el.getBoundingClientRect().height,dot:{content:b.content,display:b.display,width:parseFloat(b.width),height:parseFloat(b.height),radius:b.borderTopLeftRadius,fill:b.backgroundColor}};};
  const badge=await status.evaluate(look),file=await page.locator('#workspace-file').evaluate(look),previewButton=await page.locator('.workbench-header #open-page-preview').evaluate(look);
- expect(badge.cursor).toBe('default');expect(badge.background).not.toBe('rgba(0, 0, 0, 0)');expect(badge.radius).toBeGreaterThanOrEqual(badge.height/2-0.5);expect(badge.dot).not.toMatch(/^(none|normal)$/);
- for(const button of [file,previewButton]){expect(badge.background===button.background && badge.radius===button.radius && badge.font===button.font).toBe(false);expect(badge.radius).not.toBe(button.radius);}
+ expect(badge.cursor).toBe('default');expect(badge.background).not.toBe('rgba(0, 0, 0, 0)');expect(badge.radius).toBeGreaterThanOrEqual(badge.height/2-0.5);expect(badge.dot.content).not.toMatch(/^(none|normal)$/);expect(badge.dot.display).not.toBe('none');expect(badge.dot.width).toBeGreaterThanOrEqual(4);expect(badge.dot.width).toBeLessThanOrEqual(10);expect(badge.dot.height).toBe(badge.dot.width);expect(badge.dot.radius).toBe('50%');expect(badge.dot.fill).not.toBe('rgba(0, 0, 0, 0)');
+ for(const button of [file,previewButton]){expect(badge.background).not.toBe(button.background);expect(badge.radius).not.toBe(button.radius);}
 
  const home=page.locator('.workbench-header #workspace-home');await expect(home).toBeVisible();await expect(home).toHaveAttribute('title',/Home/);await expect(home).toHaveAttribute('title',/draft stays/);
  await home.hover();await home.click();await expect(page.locator('#workbench-welcome')).toBeVisible();const resume=page.locator('#welcome-resume');await expect(resume).toBeVisible();

@@ -21,7 +21,7 @@ async function expectContainedTitles(reader){
       const card=node.querySelector('.card').getBoundingClientRect();
       const title=node.querySelector('.t1');
       const lines=Array.from(title.querySelectorAll('tspan'));if(!lines.length)lines.push(title);
-      const controls=Array.from(node.querySelectorAll('.nlink circle,.nbackref circle,.detail-trigger rect,.t2'),el=>el.getBoundingClientRect());
+      const controls=Array.from(node.querySelectorAll('.nlink :is(circle,.nhit),.nbackref :is(circle,.nhit),.detail-trigger rect,.t2'),el=>el.getBoundingClientRect());
       return lines.flatMap(line=>{
         const box=line.getBoundingClientRect();
         return box.left<card.left||box.right>card.right+1||box.top<card.top||box.bottom>card.bottom+1||controls.some(c=>overlap(box,c))?[{node:node.dataset.dvNode,text:line.textContent}]:[];
@@ -119,13 +119,13 @@ async function expectBoundedLabels(board,authored){
       const cardEl=node.querySelector(':scope>.card'),t1=node.querySelector(':scope>.t1');
       if(!cardEl||!t1){fail('card or title missing');return;}
       const card=cardEl.getBoundingClientRect();if(!card.width){fail('card not shown');return;}
-      if(want.link&&!node.querySelector(':scope>.nlink circle'))fail('link icon missing');
+      if(want.link&&!node.querySelector(':scope>.nlink :is(circle,.nhit)'))fail('link icon missing');
       // Full text is required once the title is cut; when present it must never be stale.
       const tip=node.querySelector(':scope>title'),label=t1.getAttribute('aria-label'),text=shown(t1),cut=text!==want.title;
       if(cut||tip)if(!tip||tip.textContent!==want.title)fail('hover title is '+JSON.stringify(tip&&tip.textContent));
       if(cut||label!==null)if(label!==want.title)fail('t1 aria-label is '+JSON.stringify(label));
       if(cut){if(!/…$/.test(text))fail('title cut without ellipsis: '+text);else report.truncatedTitles++;}
-      const controls=Array.from(node.querySelectorAll('.nlink circle,.nbackref circle,.detail-trigger rect'),el=>el.getBoundingClientRect());
+      const controls=Array.from(node.querySelectorAll('.nlink :is(circle,.nhit),.nbackref :is(circle,.nhit),.detail-trigger rect'),el=>el.getBoundingClientRect());
       const sub=node.querySelector(':scope>.t2'),subBox=sub&&shown(sub)?sub.getBoundingClientRect():null;
       if(want.sub&&!subBox)fail('subtitle missing');
       const lines=Array.from(t1.querySelectorAll('tspan'));if(lines.length>1)report.wrapped++;if(!lines.length)lines.push(t1);
@@ -215,7 +215,7 @@ for(const width of [1440,1280])test(`the shipped Backstage example keeps labels 
    so titles get the full width beside the icon column.
    row | fixture | assertion (scoped) | rejects
    10 short titles stay on one line | cumulus v2 "Command path" board at 1440: Nimbus API, Ops Console, Sentinel Auth (short float card), Edge Gateway, Ack Topic | that node's .t1 has no second tspan and shows exactly the authored title | ⋯/↗ still reserving the right edge, so "Nimbus API" wraps and "Sentinel Auth" is cut
-   11 controls left of the title | same nodes, each with a link and a references control | every .nlink/.nbackref circle rect is left of that node's .t1 rect | controls kept at the top-right over/beside the title
+   11 controls left of the title | same nodes, each with a link and a references control | every .nlink/.nbackref hit area (circle or .nhit) is left of that node's .t1 rect | controls kept at the top-right over/beside the title
    12 controls above the icon | same | every control rect's bottom ≤ that node's .icbg top, and no control intersects the .icbg or .t1 rect | controls overlapping the icon
    13 title inside the card | same | .t1 rect inside that node's .card rect | a widened title running past the card
    14 controls still work | Nimbus API | a real click on its ⋯ opens "Links for Nimbus API"; Escape returns focus to ⋯, Enter reopens it, Shift+Tab focuses its ↗ (href kept) and Tab returns to ⋯ | a moved control that no longer receives clicks or keyboard focus
@@ -233,13 +233,13 @@ test('cumulus Command path cards keep short titles on one line beside left-side 
   const ids=['nimbus','console','sentinel','gateway','acktopic'];
   for(const id of ids){
     const node=board.locator(`[data-dv-node="${id}"]`);
-    await expect(node.locator(':scope>.nlink circle').first()).toBeAttached();
+    await expect(node.locator(':scope>.nlink :is(circle,.nhit)').first()).toBeAttached();
     const geometry=await node.evaluate(el=>{
       const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
       const t1=el.querySelector(':scope>.t1');
       return {lines:t1.querySelectorAll('tspan').length,text:Array.from(t1.childNodes).filter(n=>n.nodeName!=='title').map(n=>n.textContent).join(''),
         title:box(t1),card:box(el.querySelector(':scope>.card')),icon:box(el.querySelector(':scope>.icbg')),
-        controls:Array.from(el.querySelectorAll(':scope>.nlink circle,:scope>.nbackref circle'),box)};
+        controls:Array.from(el.querySelectorAll(':scope>.nlink :is(circle,.nhit),:scope>.nbackref :is(circle,.nhit)'),box)};
     });
     const want=diagram.nodes[id].title,overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
     expect.soft(geometry.lines,`${want} stays on one line`).toBeLessThanOrEqual(1);
@@ -267,4 +267,52 @@ test('cumulus Command path cards keep short titles on one line beside left-side 
   const report=await expectBoundedLabels(board,authoredOf(diagram));
   await board.screenshot({path:info.outputPath('cumulus-command-path.png')});
   expect.soft(report.failures,'every Command path card keeps labels bounded').toEqual([]);
+});
+
+/* #549 follow-up (Chuck): icons stay put and full size while the controls sit above them.
+   row | fixture | assertion (scoped) | rejects
+   16 same-row icons align | doorbell first board at 1440: Relay Broker and Herald Push (no controls) beside Pulse Events (link + references) in one row | each card's .icbg top and centre equal Pulse Events' (±0.5 px) | dropping only the icons of cards with controls
+   17 icons keep their size | every card on the doorbell and cumulus Command path boards, including the short float Sentinel Auth | that card's .icbg is 26×26 board units (getBBox) and its glyph <use> width/height are 16 | shrinking icons to make room for the controls
+   18 controls still above the icon | Sentinel Auth (short float) and Pulse Events | every control hit area's bottom ≤ that card's .icbg top, no overlap | aligning icons by letting the controls cover them */
+test('card icons keep their size and share a row height with or without controls at 1440px',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});
+  async function open(file,name,first){
+    const input=path.join(server.root,name+'.json'),output=path.join(server.root,name+'.html');
+    await writeFile(input,await readFile(path.join(repo,file),'utf8'));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+    await page.goto(server.origin+'/'+name+'.html');await page.evaluate(()=>document.fonts.ready);
+    const board=page.locator('#docview .doc-sec:visible .boardcanvas>svg').filter({has:page.locator(`[data-dv-node="${first}"]`)}).first();
+    await expect(board).toBeVisible();await board.scrollIntoViewIfNeeded();return board;
+  }
+  const icon=node=>node.evaluate(el=>{
+    const bg=el.querySelector(':scope>.icbg'),glyph=el.querySelector(':scope>use'),r=bg.getBoundingClientRect(),b=bg.getBBox(),g={width:Number(glyph.getAttribute('width')),height:Number(glyph.getAttribute('height'))};
+    return {top:r.top,centre:r.top+r.height/2,bottom:r.bottom,left:r.left,right:r.right,w:b.width,h:b.height,gw:g.width,gh:g.height,
+      controls:Array.from(el.querySelectorAll(':scope>.nlink :is(circle,.nhit),:scope>.nbackref :is(circle,.nhit)'),c=>{const q=c.getBoundingClientRect();return {left:q.left,right:q.right,top:q.top,bottom:q.bottom};})};
+  });
+  const overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
+  async function sizes(board,label){
+    const ids=await board.evaluate(svg=>Array.from(svg.children).filter(n=>n.matches('.node')&&n.querySelector(':scope>.icbg')).map(n=>n.dataset.dvNode));
+    expect(ids.length,label+' has icon cards').toBeGreaterThan(3);
+    for(const id of ids){const i=await icon(board.locator(`:scope>[data-dv-node="${id}"]`));
+      expect.soft([i.w,i.h],`${label} ${id} icon stays 26×26`).toEqual([26,26]);
+      expect.soft([i.gw,i.gh],`${label} ${id} glyph stays 16×16`).toEqual([16,16]);}
+  }
+  const doorbell=await open('examples/doorbell/doorbell.spec.json','icons-doorbell','pulse');
+  const pulse=await icon(doorbell.locator(':scope>[data-dv-node="pulse"]'));
+  expect(pulse.controls.length,'Pulse Events has its controls').toBeGreaterThanOrEqual(2);
+  for(const id of ['relay','herald']){
+    const other=await icon(doorbell.locator(`:scope>[data-dv-node="${id}"]`));
+    expect(other.controls.length,id+' has no controls').toBe(0);
+    expect.soft(Math.abs(other.top-pulse.top),id+' icon top matches Pulse Events').toBeLessThanOrEqual(0.5);
+    expect.soft(Math.abs(other.centre-pulse.centre),id+' icon centre matches Pulse Events').toBeLessThanOrEqual(0.5);
+  }
+  for(const c of pulse.controls){expect.soft(c.bottom,'Pulse Events control above its icon').toBeLessThanOrEqual(pulse.top+1);expect.soft(overlap(c,pulse),'Pulse Events control clears its icon').toBe(false);}
+  await sizes(doorbell,'doorbell');
+  await doorbell.screenshot({path:info.outputPath('doorbell-icons.png')});
+  const cumulus=await open('examples/cumulus/cumulus-page.spec.v2.json','icons-cumulus','sentinel');
+  const sentinel=await icon(cumulus.locator(':scope>[data-dv-node="sentinel"]'));
+  expect(sentinel.controls.length,'Sentinel Auth has its controls').toBeGreaterThanOrEqual(2);
+  for(const c of sentinel.controls){expect.soft(c.bottom,'Sentinel Auth control above its icon').toBeLessThanOrEqual(sentinel.top+1);expect.soft(overlap(c,sentinel),'Sentinel Auth control clears its icon').toBe(false);}
+  await sizes(cumulus,'cumulus');
+  await cumulus.screenshot({path:info.outputPath('cumulus-icons.png')});
 });

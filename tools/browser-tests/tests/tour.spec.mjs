@@ -667,6 +667,9 @@ test('a malformed page.tour fails open: page renders, no stuck scrim',async({pag
 // 6 Tour is separately labelled | same | the tour replay control (.dv-tour-replay) inside the reader page actions: textContent exactly "Tour", accessible name contains "tour"; it is not the row-1 button | tour replay still "?"
 // 7 Tour still replays | same | real click on row 6's control shows .dv-tour-chooser | relabel drops the handler
 // 8 User guide labelled (canon) | canon reader | #canon-reader-guide textContent AND accessible name exactly "User guide"; real click opens #human-guide | guide entry still "?" or removed
+// 9 linking untouched | same | page.url() and history.length after opening/closing the sheet by button AND by key equal the values before (no hash/query write, no history entry) | a "?" handler that writes #?/?help or pushes history, breaking the copied/position link
+//   Cross-document link following (Claude artifact, hosted site, Backstage) stays with its own specs, which CI runs unchanged:
+//   document-links.spec.mjs, handoffs.spec.mjs, local-handoffs.spec.mjs, drilldown.spec.mjs, backstage-*.spec.mjs.
 const READER_KEYS=[
   ['?','Open this shortcut sheet'],
   ['Esc','Close this sheet, an open menu or a popover'],
@@ -678,9 +681,11 @@ const READER_KEYS=[
   ['Home / End','First or last tab'],
 ];
 async function readerShortcutContract(page,chrome,extra={}){
-  const questions=chrome.locator('button:visible').filter({hasText:/^\s*\?\s*$/});
-  await expect(questions).toHaveCount(1);
-  const help=questions.first();
+  const ownQuestionMarks=()=>chrome.locator('button').evaluateAll(buttons=>buttons.filter(b=>b.getClientRects().length && getComputedStyle(b).visibility!=='hidden' && b.textContent.trim()==='?').length);
+  await expect.poll(ownQuestionMarks).toBe(1);
+  const help=chrome.locator('button:visible').filter({hasText:/^\s*\?\s*$/});
+  await expect(help).toHaveCount(1);expect(await help.evaluate(b=>b.textContent.trim())).toBe('?');
+  const url=page.url(),history=await page.evaluate(()=>window.history.length);
   await expect(help).toHaveAccessibleName('Keyboard shortcuts');
   const sheetId=await help.getAttribute('aria-controls');
   expect(sheetId).toBeTruthy();
@@ -704,6 +709,7 @@ async function readerShortcutContract(page,chrome,extra={}){
   await expect(page.locator('dialog[open]')).toHaveAttribute('id',sheetId);
   await quiet();
   await page.keyboard.press('Escape');await expect(sheet).not.toHaveAttribute('open','');
+  expect(page.url()).toBe(url);expect(await page.evaluate(()=>window.history.length)).toBe(history);
   const tour=chrome.locator('.reader-page-actions .dv-tour-replay');
   await expect(tour).toBeVisible();await expect(tour).toHaveText('Tour');
   await expect(tour).toHaveAccessibleName(/tour/i);

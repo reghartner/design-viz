@@ -40,6 +40,8 @@ function createReaderContents(ctl,nav,actions,options){
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
   SELECTABLE_SKINS.forEach(function(skin){var choice=button(skinLabel(skin),skinLabel(skin),themeOptions,function(){if(typeof window.dvSetSkin==='function')window.dvSetSkin(skin);applySkinClasses(document.body,view,skin);themeMenu.open=false;themeSummary.focus();});choice.setAttribute('role','menuitemradio');choice.setAttribute('data-reader-skin',skin);});
+  // The editor has one skin control (header Appearance); only readers get this picker.
+  if(options.themePicker===false)footer.remove();
   function updateTheme(ev){
     var skin=ev && ev.detail && ev.detail.skin || SKIN_NAMES.slice().reverse().find(function(name){return view.classList.contains('sk-'+name);}) || DEFAULT_SKIN;
     themeSummary.textContent=skinLabel(skin)+'　⌃';themeSummary.setAttribute('data-current-skin',skin);

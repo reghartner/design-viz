@@ -24,7 +24,7 @@ each save one Undo operation. **Independent section arrangement** makes geometry
 independent for the selected section without copying its content.
 
 For a host preview, select **Responsive**, **Backstage**, or **Confluence** in
-**Preview → Open page preview**. Host previews use adjustable content widths (1080 and 760
+**Appearance → Preview host**, then choose **Preview**. Host previews use adjustable content widths (1080 and 760
 pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
@@ -109,7 +109,7 @@ section arrangement, never View membership or content.
 
 Select the View and choose **View presentation → Explore**. The editor opens the same
 full-browser presentation used by exported HTML. Move and resize its panels
-there to save their floating defaults. View mode remains authoritative while arranging. **Preview → Open page preview** provides a separate reader without changing the editor.
+there to save their floating defaults. View mode remains authoritative while arranging. **Preview** provides a separate reader without changing the editor.
 **Legend** beside the panel controls shows the diagram's protocol colors,
 line samples and response/ack key. It works in the editor, exported viewers and
 agent update previews. Press Escape to close it; opening it does not edit the story.

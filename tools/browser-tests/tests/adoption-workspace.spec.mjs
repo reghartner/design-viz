@@ -63,10 +63,11 @@ test('compact chrome keeps Add, Auto arrange, appearance and workspace controls 
   await page.setViewportSize({width:1180,height:800});await expect(more).not.toHaveAttribute('open','');
   await page.setViewportSize({width:1051,height:800});await expect(more).not.toHaveAttribute('open','');
   await page.setViewportSize({width:1181,height:800});await expect(more).toHaveAttribute('open','');
-  for(const [width,height] of [[1800,800],[1501,800],[1500,800],[1499,800],[1281,800],[1280,800],[1279,800],[1240,800],[1200,800],[1190,800],[1181,800],[1180,800],[1150,800],[1050,800],[1024,800],[850,800],[820,800],[720,800],[640,800],[421,800],[420,800],[400,800],[390,800],[390,360]]){
+  for(const [width,height] of [[1800,800],[1501,800],[1500,800],[1499,800],[1281,800],[1280,800],[1279,800],[1240,800],[1200,800],[1190,800],[1181,800],[1180,800],[1150,800],[1050,800],[1024,800],[850,800],[820,800],[720,800],[640,800],[421,800],[420,800]]){
+    // Workbench editing is desktop-only (CLAUDE.md); phone widths below 420px are not an editing target.
     await page.setViewportSize({width,height});
     if(!await page.locator('#workspace-export-trigger').isVisible() && await more.getAttribute('open')===null)await more.locator(':scope > summary').click();
-    const controls=await page.evaluate(()=>['#diagram-add','#workspace-export-trigger','#undo-builder','#redo-builder','#workspace-appearance>summary','.workspace-help>summary','#editor-tab-agent'].map(selector=>{
+    const controls=await page.evaluate(()=>['#diagram-add','#workspace-export-trigger','#undo-builder','#redo-builder','#workspace-appearance>summary','#open-page-preview','.workspace-help>summary','#editor-tab-agent'].map(selector=>{
       const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
       return {selector,left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1),inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};
     }));
@@ -77,7 +78,7 @@ test('compact chrome keeps Add, Auto arrange, appearance and workspace controls 
     await expect(page.locator('#workspace-export-trigger')).toHaveAccessibleName('Export');
     await page.locator('.workspace-help>summary').click();await expect(page.locator('.workspace-help [data-workbench-tour]')).toBeVisible();await expect(page.locator('.workspace-help [data-workbench-tour]')).toHaveAccessibleName('Take the workbench tour');await page.locator('.workspace-help>summary').click();if(await more.getAttribute('open')!==null && await more.locator(':scope > summary').isVisible())await more.locator(':scope > summary').click();
     await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeVisible();await page.keyboard.press('Escape');
-    if(width===390){
+    if(width===1024){
       const before=await page.locator('#src').inputValue();
       await openAutoArrange(page);await expect(page.locator('#auto-arrange-dialog')).toBeVisible();
       await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();

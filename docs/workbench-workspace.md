@@ -73,7 +73,7 @@ stacks its member sections; **Explore** shows one member at a time. The editor a
 reader share the same shell: Views across the top, centered Page controls below,
 and a collapsible **Contents** sidebar for Tabs, Views, and Explore members. The
 compact app bar keeps the document title visible; on phones, **More project
-actions** contains File, Undo/Redo, Preview, Help, and Export. Content stays in
+actions** contains File, Undo/Redo, Appearance, Preview, Help, and Export. Content stays in
 sections and may appear in many Views. See [the View contract](tab-views.md) for
 authoring, migration and source ownership.
 
@@ -155,9 +155,9 @@ published page; it then reads **Opening View**. Merely selecting another View
 does not edit the source or change that default. View presentation, name, duplication
 and default changes use the normal source Undo/Redo history.
 
-The selected View owns its Standard or Explore surface. **View → Arrange selected section…** opens the detailed arranger for placement, saved visibility, paths and steps. Its **Arrangement profile** selector edits Responsive, Backstage, or Confluence arrangements independently; moving, resizing, hiding, optimizing, or resetting Standard tiles changes only that profile. **Panels** owns temporary Hide/Restore, Stack at edge and panel/control scale; **Legend** owns protocol keys. These popovers overlay the canvas. **Preview → Open page preview** renders a separate reader. It opens the last usable document with the current skin, tab, View, path and step. Host and width choices apply there. The editor tree is suspended while reader controls remain interactive; Close preview or Escape restores the same source (including an invalid draft), history, editing selection, playback and camera.
+The selected View owns its Standard or Explore surface. **View → Arrange selected section…** opens the detailed arranger for placement, saved visibility, paths and steps. Its **Arrangement profile** selector edits Responsive, Backstage, or Confluence arrangements independently; moving, resizing, hiding, optimizing, or resetting Standard tiles changes only that profile. **Panels** owns temporary Hide/Restore, Stack at edge and panel/control scale; **Legend** owns protocol keys. These popovers overlay the canvas. **Preview** renders a separate reader. It opens the last usable document with the current skin, tab, View, path and step. Host and width choices apply there. The editor tree is suspended while reader controls remain interactive; Close preview or Escape restores the same source (including an invalid draft), history, editing selection, playback and camera.
 
-**Home**, **File**, **Add**, **Undo/Redo**, **Preview**, **Help**, and download share one project band. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
+**Home**, **File**, **Add**, **Undo/Redo**, **Appearance**, **Preview**, **Help**, and download share one project band. **Appearance** is the editor's only skin control (the Contents sidebar has no theme picker while editing; readers and the page preview keep theirs), and **Preview** opens the read-only page preview in one click. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
 
 Each card in **Add to diagram** opens its next step immediately. **Node** opens
 presets; click a preset to add it and customize it in the inspector. **All additions**

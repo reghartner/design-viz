@@ -226,7 +226,7 @@ function initWorkbenchCanvas(options){
     var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
-    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{contents:true,zoomLabels:true,isCanvas:diagramMode,skipTabShare:true,insetTarget:document.body,initialOpen:contentsOpen,onOpenChange:function(value){contentsOpen=value;requestAnimationFrame(measureChrome);},fit:function(){if(!diagramMode())return false;fit();return true;},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
+    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{contents:true,themePicker:false,zoomLabels:true,isCanvas:diagramMode,skipTabShare:true,insetTarget:document.body,initialOpen:contentsOpen,onOpenChange:function(value){contentsOpen=value;requestAnimationFrame(measureChrome);},fit:function(){if(!diagramMode())return false;fit();return true;},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
     // Measure navigation in its selected, visible section before the viewport
     // restores its camera. Hidden navigation reports zero height and would cause
     // an unnecessary resize (and camera rounding) immediately after restoration.

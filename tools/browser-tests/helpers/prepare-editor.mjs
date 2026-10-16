@@ -13,7 +13,6 @@ export default async function prepare(){
   execFileSync('python3',[path.join(repo,'tools/browser-tests/fixtures/build-editor.py'),repo,path.join(output,'lifetime')],{stdio:'inherit'});
   for(const dir of [output,path.join(output,'lifetime')]){
     await cp(path.join(repo,'workbench/catalog.json'),path.join(dir,'catalog.json'));await writeFile(path.join(dir,'starters.json'),'[]');
-    await writeFile(path.join(dir,'diagrams.json'),'{"version":3,"diagrams":[]}');
   }
   return ()=>rm(output,{recursive:true,force:true});
 }

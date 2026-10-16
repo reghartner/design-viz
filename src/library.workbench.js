@@ -80,7 +80,8 @@ async function readCanonLibraryJSON(response,label){
 }
 
 /* One read of this site's diagrams.json per page, shared by Browse, the
-   reference picker, agent proposals and file opening. Only a successful read
+   reference picker, agent proposals and file opening, made on first need (a
+   page that already browsed or read a diagram has it). Only a successful read
    is kept; a 404, a transport failure or a bad body is retried on demand, so
    nothing is ever cached as "unavailable". `fresh` re-reads for Browse, and
    only Browse may `follow` a redirect (as it always has); every other read

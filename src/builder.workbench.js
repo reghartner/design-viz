@@ -1336,9 +1336,6 @@ function initWorkbenchBuilder(opts){
       refreshProvenance();return true;
     }
   });
-  // Prefetch this site's small index once per page so the first reference,
-  // proposal or paste that needs providers does not wait for it (#592).
-  if(typeof siteRepositoryIndex==='function' && /^https?:$/.test(location.protocol))siteRepositoryIndex().catch(function(){});
   var topologyBtn=document.getElementById('add-topology');
   if(topologyBtn)life.listen(topologyBtn,'click',function(){confirmAddition(function(){if(topologyPicker)topologyPicker.open();});});
   var diagramImportBtn=document.getElementById('add-diagram-import');

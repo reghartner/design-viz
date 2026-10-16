@@ -145,7 +145,7 @@ function initWorkbenchStepList(opts){
   function invalidate(message){
     stale = true; rowsLife.destroy();rowsLife=createWorkbenchLifetime();list.innerHTML = ''; paging.hidden = true;
     select.disabled = true; search.disabled = true;
-    status.textContent = message || 'Source changed. Click Render before editing story steps.';
+    status.textContent = message || 'Source changed. Click Render before editing steps.';
     controls();
   }
   function ready(){
@@ -207,7 +207,7 @@ function initWorkbenchStepList(opts){
     if (opts.renderedText && opts.renderedText() !== opts.src.value){ invalidate(); return; }
     if (indexedText === opts.src.value && !stale){ sync(); return; }
     try { raw = JSON.parse(opts.src.value); sections = builderStorySections(raw); }
-    catch (ex){ invalidate('Fix the JSON source and click Render to browse story steps.'); return; }
+    catch (ex){ invalidate('Fix the JSON source and click Render to browse steps.'); return; }
     var previous = chosen, target = opts.selection();
     chosen = sections.find(function(section){ return target && target.section === section.section; }) ||
       sections.find(function(section){ return previous && section.label === previous.label && JSON.stringify(section.path) === JSON.stringify(previous.path); }) || sections[0] || null;

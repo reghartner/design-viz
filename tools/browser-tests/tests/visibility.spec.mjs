@@ -46,5 +46,5 @@ test('full path positions drive shared events, filtered views and routed edge un
  await root.locator('button.schip[data-step-source="3"]').click();await hidden(true);
  await root.locator('button.schip[data-step-source="4"]').click();await hidden(false);
  await root.locator('button.schip[data-step-source="2"]').click();await hidden(true);
- await closeTools(page);await root.getByRole('button',{name:'AMBIENT',exact:true}).click();await hidden(false);
+ await closeTools(page);await root.getByRole('button',{name:'Ambient',exact:true}).click();await hidden(false);
 });

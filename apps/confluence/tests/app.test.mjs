@@ -185,8 +185,8 @@ test('default Confluence geometry keeps its live board and controls without addi
   assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'24');assert.equal(grid.firstChild.style.getPropertyValue('--tile-h'),'16');
   assert.equal(view.querySelectorAll('[data-view-layout],[data-view-focus]').length,0,'geometry never adds section choices');
   for(let i=0;i<2;i++){
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();assert.equal(bar.hidden,true);
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Ambient').click();assert.equal(bar.hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Step').click();assert.equal(bar.hidden,false);
     assert.equal(grid.querySelector('.board'),board);assert.equal(grid.querySelector('[data-layout-key="steps"]>.termbar'),bar);
     assert.equal(view.querySelectorAll('.termbar').length,1);
   }
@@ -216,8 +216,8 @@ test('detached step controls retain one live transport across layout focus, alte
       assert.equal(grid.hidden,false);assert.equal(grid.dataset.layoutId,'flow');assert.equal(grid.querySelector('[data-layout-key="diagram"] .termbar'),bar);assert.equal(bar.querySelector('.stepline').textContent,caption);
       view.querySelector('[data-view-layout][data-layout-id="detached"]').click();detached();assert.equal(bar.querySelector('.stepline').textContent,caption);
     }
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();assert.equal(bar.hidden,true);
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);detached();
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Ambient').click();assert.equal(bar.hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Step').click();assert.equal(bar.hidden,false);detached();
     bar.querySelector('[aria-label="Next step"]').click();assert.match(bar.querySelector('.stepline').textContent,/STEP 2\/4/);
   }
 });
@@ -279,9 +279,9 @@ test('authored chapter visibility hides only the diagram, retains playback, and 
     if(detached)assert.equal(grid.querySelector('[data-layout-key="steps"]').style.getPropertyValue('--tile-y'),'1');
     shown.click();assert.equal(board.hidden,false);
     layout.click();assert.equal(board.hidden,true);assert.equal(view.querySelector('.termbar'),bar);
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();await settle();assert.equal(bar.hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Ambient').click();await settle();assert.equal(bar.hidden,true);
     if(!detached)assert.equal(grid.querySelector('[data-layout-key="diagram"]').hidden,true);
-    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();await settle();assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='Step').click();await settle();assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);
     shown.click();assert.equal(board.hidden,false);assert.deepEqual([...grid.children].map(el=>el.getAttribute('style')),positions);
     assert.equal(view.querySelector('.board'),board);assert.equal(view.querySelectorAll('.termbar').length,1);assert.equal(s.calls.submits.length,0);
     assert.equal(JSON.stringify(raw),specJson);

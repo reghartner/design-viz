@@ -15,7 +15,7 @@ rows and chevrons identify them; click a header or focus it and press Enter to
 expand it. Open sections stay open through edits to the same selected object.
 
 For a captioned, searchable list with duplicate and reorder controls, see
-[Story steps](workbench-steps.md).
+[Steps](workbench-steps.md).
 
 Click-through previews start paused. Use **Play** to run a story; switching
 tabs, selecting an element, or focusing the inspector or JSON source pauses

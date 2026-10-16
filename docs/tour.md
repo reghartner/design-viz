@@ -298,9 +298,9 @@ controls; workbench actions such as Arrange section do not belong here.
   Claims of clickability are true: spotlit chips really are clickable.
   A rejoin lesson describes the demonstrated paths meeting again; it must
   not claim every path shares a final sequence based on `@rejoin` alone.
-- The mode pair is the lesson "map, then sequence": AMBIENT (everything lit
-  at once) immediately before STEP (one call at a time). The ux track drops
-  AMBIENT entirely — its controls step is play/pause/arrows only.
+- The mode pair is the lesson "map, then sequence": Ambient (everything lit
+  at once) immediately before Step (one call at a time). The ux track drops
+  Ambient entirely — its controls step is play/pause/arrows only.
 - The done card is a recap WITH a task: choose a numbered step and follow
   the story with playback or manual arrows. Engineering tracks also point
   to node source menus where available. Include the ?-replay line and a

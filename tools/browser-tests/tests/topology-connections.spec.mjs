@@ -120,7 +120,7 @@ test('an endpoint dropdown cannot write after unrendered topology source changes
 
 test('consumer story activates saved cross and provider edges without changing ownership',async({page,server})=>{
   await fixture(page,server,'file','step');const before=await source(page);
-  await page.getByRole('button',{name:'STEP',exact:true}).click();
+  await page.getByRole('button',{name:'Step',exact:true}).click();
   for(const index of [0,1]){
     await page.locator('#docview .coin[data-dv-step="'+index+'"]').click();
     await expect(page.locator('#docview path.edge[data-dv-edge="'+index+'"]')).toHaveClass(/lit/);await painted(page);

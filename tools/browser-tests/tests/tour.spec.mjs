@@ -89,7 +89,7 @@ test('the default tour omits unavailable lessons and numbers the available contr
   const heading=page.locator('.dv-tour-ui .dv-tour-heading');
   // eng track opens on the mode pair: the map (AMBIENT really on) ...
   await expect(heading).toHaveText('The big picture');
-  await expect(page.locator('.mtoggle .mbtn[aria-pressed=true]').first()).toHaveText('AMBIENT');
+  await expect(page.locator('.mtoggle .mbtn[aria-pressed=true]').first()).toHaveText('Ambient');
   // the reveal lands after settle: the SVG dim mask gains one black rounded
   // rect per hole (same rect and radius as its ring)
   await expect.poll(()=>page.evaluate(()=>document.querySelectorAll('.dv-tour-dim mask rect[fill="#000"]').length)).toBeGreaterThanOrEqual(1);

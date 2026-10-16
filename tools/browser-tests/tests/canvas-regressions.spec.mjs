@@ -13,8 +13,8 @@ test('Explore keeps the graph through playback and Standard restores authored vi
   const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);
   const section=page.locator('#docview .doc-sec').first(),board=section.locator('.explore-board');
   await expect(board).toBeVisible();
-  await section.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(board).toBeVisible();
-  await section.getByRole('button',{name:'STEP',exact:true}).click();await expect(board).toBeVisible();
+  await section.getByRole('button',{name:'Ambient',exact:true}).click();await expect(board).toBeVisible();
+  await section.getByRole('button',{name:'Step',exact:true}).click();await expect(board).toBeVisible();
   await nav(page).getByRole('button',{name:'Home story',exact:true}).click();
   await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(board).toBeHidden();
   await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);

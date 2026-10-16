@@ -2901,7 +2901,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   }
   if (hasDelta){
     btnDelta = document.createElement('button');
-    btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ ONLY';
+    btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ only';
     btnDelta.setAttribute('aria-pressed', 'false');
     btnDelta.addEventListener('click', function(){
       var on = btnDelta.getAttribute('aria-pressed') !== 'true';
@@ -2921,8 +2921,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   /* mode toggle in the legend bar */
   var tog = document.createElement('span'); tog.className = 'mtoggle';
-  var btnAmb = document.createElement('button'); btnAmb.className = 'mbtn'; btnAmb.textContent = 'AMBIENT';
-  var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'STEP';
+  var btnAmb = document.createElement('button'); btnAmb.className = 'mbtn'; btnAmb.textContent = 'Ambient';
+  var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'Step';
   btnAmb.setAttribute('aria-pressed', 'true'); btnStep.setAttribute('aria-pressed', 'false');
   tog.appendChild(btnAmb); tog.appendChild(btnStep); (boardLayout.modesHost || lg).appendChild(tog);
   if (btnDelta) tog.appendChild(btnDelta);
@@ -3821,26 +3821,30 @@ function wirePresenter(ctl, view, win){
   var doc = win.document;
   var btn = doc.createElement('button');
   btn.className = 'tbtn presentbtn';
-  btn.textContent = 'PRESENT';
-  btn.setAttribute('aria-label', 'Enter presenter mode (fullscreen)');
   readerPageActions(view,ctl).appendChild(btn);
+  function label(on){
+    btn.textContent = on ? 'Exit' : 'Present';
+    btn.title = on ? 'Exit full screen' : 'Present full screen';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  label(false);
   function presenting(){ return doc.body.classList.contains('presenting'); }
   function enter(){
     doc.body.classList.add('presenting');
-    btn.textContent = 'EXIT';
+    label(true);
     var root = doc.documentElement;
     if (root.requestFullscreen) root.requestFullscreen().catch(function(){});
   }
   function exit(){
     doc.body.classList.remove('presenting');
-    btn.textContent = 'PRESENT';
+    label(false);
     if (doc.fullscreenElement && doc.exitFullscreen) doc.exitFullscreen().catch(function(){});
   }
   btn.addEventListener('click', function(){ presenting() ? exit() : enter(); });
   doc.addEventListener('fullscreenchange', function(){
     if (!doc.fullscreenElement && presenting()){
       doc.body.classList.remove('presenting');
-      btn.textContent = 'PRESENT';
+      label(false);
     }
   });
   function stepKey(sp, ev){

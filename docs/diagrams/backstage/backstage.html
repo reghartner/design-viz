@@ -35446,17 +35446,21 @@ function refreshLaneTitles(svg){
   svg._fitLaneTitles();
   /* Font loading and host skin changes can alter widths after the first
      render. A replaced/destroyed board must not receive delayed updates. */
-  if (svg.ownerDocument && svg.ownerDocument.fonts) svg.ownerDocument.fonts.ready.then(function(){
+  var fonts = svg.ownerDocument && svg.ownerDocument.fonts;
+  if (fonts && fonts.ready) fonts.ready.then(function(){
     if (svg.isConnected && svg.parentNode && svg.parentNode.firstChild === svg) svg._fitLaneTitles();
   });
 }
 /* Boards in hidden Tabs or views render at display:none, where text measures
-   zero wide. Fit those again once the board has a size. */
+   zero wide. Fit those again when the board is shown, not on every resize. */
 function watchLaneTitles(svg){
   if (typeof ResizeObserver !== 'function') return;
+  var shown = false;
   var observer = new ResizeObserver(function(entries){
     if (!svg.isConnected){ observer.disconnect(); return; }
-    if (svg._titlesPending && entries.some(function(entry){ return entry.contentRect.width > 0; })) svg._fitLaneTitles();
+    var wasShown = shown;
+    shown = entries[entries.length - 1].contentRect.width > 0;
+    if (shown && !wasShown && svg._titlesPending) svg._fitLaneTitles();
   });
   observer.observe(svg);
   svg._titleObserver = observer;
@@ -35499,6 +35503,8 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   }
   text.setAttribute('aria-label', title);
   text.setAttribute('y', titleY);
+  var fitTitle = node.querySelector('title[data-dv-fit-title]');
+  if (fitTitle) fitTitle.remove();
   if (sub){
     sub.setAttribute('y', subY);
     sub.removeAttribute('aria-label');
@@ -35523,6 +35529,13 @@ function fitLaneNodeTitle(node, title, width, subtitle){
     target = text;
   }
   if (fits(title, firstRight - x)) return true;
+  /* A cut title shows its full text on hover; lane and image cards render one. */
+  if (!Array.prototype.some.call(node.children, function(child){ return child.tagName.toLowerCase() === 'title'; })){
+    var full = document.createElementNS(SVGNS,'title');
+    full.setAttribute('data-dv-fit-title','');
+    full.textContent = title;
+    node.insertBefore(full, node.firstChild);
+  }
   if (!twoLines){
     text.textContent = take(title, firstRight - x, true).trimEnd() + '…';
     return true;
@@ -35649,7 +35662,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
-         (L.routing === 'lanes' || !n.handoff ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
+         (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          (nodeImage ?

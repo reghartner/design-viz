@@ -217,3 +217,43 @@ test('downloaded workbench files support Back and Forward without a server',asyn
   await page.goForward();await expect(screen(page,'new')).toBeVisible();
   await page.goForward();await expect(editor(page)).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
 });
+
+// #544 — the Welcome page's way back in sits inside the first desktop viewport.
+// row | fixture                         | assertion (scoped)                                              | rejects
+// 1   | 1280×800, no draft               | #welcome-open rect inside 0..innerWidth × 0..innerHeight at scrollY 0 | action cards left below the hero (top≈1020 on main)
+// 2   | 1280×800, no draft               | #welcome-library rect inside the viewport                        | Canon entry left under the action grid
+// 3   | 1440×900, no draft               | rows 1–2 at this size                                           | a fix tuned for one viewport only
+// 4   | 1280×800 + saved draft           | #welcome-resume visible, rect inside the viewport, its title names the draft, its cue says Continue | resume card pushed under the fold, or a generic unnamed card
+// 5   | 1280×800 + saved draft           | #welcome-open and #welcome-library still inside the viewport     | the resume card displacing Open/Browse below the fold
+// 6   | 1440×900 + saved draft           | rows 4–5 at this size                                           | a fix tuned for one viewport only
+// 7   | 1920×1080, with and without draft | rows 1–5 at this size                                           | a large-screen regression
+// 8   | every row                        | precondition: no draft → #welcome-resume hidden; draft → visible | a vacuous pass from the wrong state
+const draftTitle=JSON.parse(source).page.title;
+for(const [width,height] of [[1280,800],[1440,900],[1920,1080]])for(const draft of [false,true]){
+  test(`Welcome keeps Open file, Canon diagrams${draft?' and the draft Continue card':''} above the fold at ${width}×${height}`,async({page,server})=>{
+    await page.setViewportSize({width,height});
+    if(draft)await page.addInitScript(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:1})),source);
+    await page.goto(server.origin+'/workbench.html');
+    await expect(home(page)).toBeVisible();
+    // The example preview sizes itself after it renders; measure the settled layout.
+    await expect(page.locator('#welcome-example-stage')).toBeAttached();
+    await expect.poll(()=>page.locator('#welcome-example-view').evaluate(view=>view.style.height)).not.toBe('');
+    const resume=page.locator('#welcome-resume');
+    if(draft){
+      await expect(resume).toBeVisible();
+      await expect(page.locator('#welcome-resume-title')).toContainText(draftTitle);
+      await expect(resume.locator(':scope>span:last-child')).toHaveText(/Continue/);
+    }else await expect(resume).toBeHidden();
+    const ids=['welcome-open','welcome-library',...(draft?['welcome-resume']:[])];
+    const placement=await page.evaluate(ids=>({scrollY:window.scrollY,width:window.innerWidth,height:window.innerHeight,
+      rects:Object.fromEntries(ids.map(id=>{const r=document.getElementById(id).getBoundingClientRect();return [id,{top:Math.round(r.top),bottom:Math.round(r.bottom),left:Math.round(r.left),right:Math.round(r.right)}];}))}),ids);
+    expect(placement.scrollY).toBe(0);
+    for(const id of ids){
+      const r=placement.rects[id];
+      expect.soft(r.top,`${id} top`).toBeGreaterThanOrEqual(0);
+      expect.soft(r.left,`${id} left`).toBeGreaterThanOrEqual(0);
+      expect.soft(r.right,`${id} right`).toBeLessThanOrEqual(placement.width);
+      expect.soft(r.bottom,`${id} bottom inside the ${width}×${height} viewport`).toBeLessThanOrEqual(placement.height);
+    }
+  });
+}

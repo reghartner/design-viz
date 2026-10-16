@@ -224,12 +224,12 @@ test('workbench Standard board routes vertical-dominant wheel at its boundary to
    R1 focused diagram ArrowRight | real click on board background, STEP 1/3, not presenting | board focused; STEP 2/3 | handler still gated on presenting()
    R2 focused diagram ArrowLeft | after R1 | STEP 1/3 | Right-only wiring
    R3 focused diagram Space plays | paused, autoplay off, motion allowed | data-playback=playing; keydown defaultPrevented (no page scroll) | Space left to scroll the page
-   R4 Space again pauses | after R3 | data-playback=paused, STEP unchanged | Space that only starts play
+   R4 Space again pauses | after R3 | data-playback=paused, STEP unchanged; keydown defaultPrevented | Space that only starts play, or scrolls the page when pausing
    R5 text input in the section | denied clipboard makes the in-section "Copy this link manually" field | ArrowLeft/ArrowRight/Space reach the field un-prevented (native caret keys); field keeps focus; STEP and playback unchanged | text fields hijacked
    R6 tab strip | "Views in selected Tab" Standard tab focused | ArrowRight focuses Explore tab; STEP unchanged | tabs hijacked
    R7 zoomed Standard board | Zoom in, board focused | ArrowRight scrolls board right; STEP unchanged | pan keys hijacked on a pannable board
    R8 Explore board | Explore View, zoomed, board keyboard-focused | ArrowRight scrolls board right; STEP unchanged | Explore arrow panning hijacked
-   R9 focus outside any diagram | PRESENT button focused, not presenting | ArrowRight: STEP unchanged, not defaultPrevented | page-wide hijack
+   R9 focus outside any diagram | real click on the page title (body focused), then PRESENT button focused; not presenting | Space and ArrowRight/ArrowLeft not defaultPrevented, the page scrolls down on Space, STEP and playback unchanged | page-wide Space/arrow hijack
    R10 Present unchanged | PRESENT clicked, EXIT button (outside the section) focused | ArrowRight/ArrowLeft step, Space toggles play, Escape exits | Present path narrowed to focused diagrams */
 function stepKeysSpec(){
   const layout=(id,name)=>({id,name,presentation:id,sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}});
@@ -254,7 +254,7 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   await page.keyboard.press('ArrowRight');await expect(step).toHaveText('STEP 2/3');
   await page.keyboard.press('ArrowLeft');await expect(step).toHaveText('STEP 1/3');
   await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','playing');expect(await lastKey()).toBe(' :true');
-  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','paused');await expect(step).toHaveText('STEP 1/3');
+  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','paused');await expect(step).toHaveText('STEP 1/3');expect(await lastKey()).toBe(' :true');
   // R5: a text field inside the section keeps its keys.
   await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw Error('Denied');};document.execCommand=()=>false;});
   await section.getByRole('button',{name:'Copy link to this diagram step',exact:true}).click();
@@ -279,6 +279,12 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   await strip.getByRole('tab',{name:'Standard',exact:true}).click();
   // R9: focus outside every diagram leaves the keys to the page.
   const present=page.getByRole('button',{name:'Enter presenter mode (fullscreen)',exact:true});
+  await page.evaluate(()=>scrollTo(0,0));await page.getByRole('heading',{name:'Step keys',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>document.activeElement===document.body)).toBe(true);
+  await page.keyboard.press('Space');expect(await lastKey()).toBe(' :false');await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(0);
+  for(const key of ['ArrowRight','ArrowLeft']){await page.keyboard.press(key);expect(await lastKey()).toBe(key+':false');}
+  await expect(step).toHaveText('STEP 1/3');await expect(bar).toHaveAttribute('data-playback','paused');
+  await page.evaluate(()=>scrollTo(0,0));
   await present.focus();await page.keyboard.press('ArrowRight');expect(await lastKey()).toBe('ArrowRight:false');await expect(step).toHaveText('STEP 1/3');
   // R10: Present keeps stepping whatever is focused.
   await present.click();await expect(page.locator('body')).toHaveClass(/presenting/);await expect(present).toBeFocused();

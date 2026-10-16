@@ -121,10 +121,10 @@ test('short floating tools keep their close buttons and rail reachable above can
    row | fixture | assertion (scoped) | rejects
    R1 distinct rail icons | editorSpec | each .workspace-rail .editor-tool-icon text is unique; Layers icon != File icon | Layers and File sharing ▱ (or any two tools sharing a glyph)
    R2 ⌘K listed | same | #keyboard-shortcuts dt "⌘/Ctrl + K" paired with dd "Find objects" | dialog without Find objects
-   R3 Redo listed | same | dt "⌘/Ctrl + Shift + Z" and dt "⌘/Ctrl + Y" each paired with a Redo dd | dialog without Redo, or only one of its two bindings
+   R3 Redo listed once | same | exactly one dd starts with Redo and its dt is "⌘/Ctrl + Shift + Z"; no "⌘/Ctrl + Y" row (Chuck 2026-10-16: Redo is only ⌘/Ctrl+Shift+Z) | dialog without Redo, or a second Redo binding
    R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection Shift+F10/ContextMenu, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
    R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
-   R6 Redo implemented | Storage row lock, then Undo | real ControlOrMeta+Shift+Z and ControlOrMeta+Y each re-apply nodes.c.locked from a canvas-focused node | listing Redo bindings that do nothing
+   R6 Redo is ⌘/Ctrl+Shift+Z only | Storage row lock, then Undo | from a canvas-focused node a real ControlOrMeta+Y leaves nodes.c.locked false and #redo-builder enabled, then ControlOrMeta+Shift+Z re-applies it | a Y alias that still redoes, or a listed Redo that does nothing
    R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Sections in selected View" | "Page 1 of 2" or Page-named arrows
    R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
 /* Static rows use soft assertions so one RED run reports every unmet row. */
@@ -141,8 +141,9 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   const rows=await sheet.locator('dl').evaluateAll(lists=>lists.flatMap(list=>[...list.querySelectorAll(':scope > dt')].map(dt=>[dt.textContent.replace(/\s+/g,' ').trim(),dt.nextElementSibling.textContent.trim()])));
   const described=keys=>rows.filter(row=>row[0]===keys).map(row=>row[1]);
   expect.soft(described('⌘/Ctrl + K')).toEqual(['Find objects']);
-  for(const keys of ['⌘/Ctrl + Shift + Z','⌘/Ctrl + Y'])expect.soft(described(keys)).toEqual([expect.stringMatching(/^Redo\b/)]);
-  expect.soft(rows.map(row=>row[0])).toEqual(['?','F','Shift + F','F2','⌘/Ctrl + K','⌘/Ctrl + A','Enter','Shift + Enter','Arrow','Shift + F10 or Menu','⌘/Ctrl + C','⌘/Ctrl + V','⌘/Ctrl + D','Delete or Backspace','Esc','Space + drag','Alt/Option + click','Alt/Option + drag','⌘/Ctrl + Z','⌘/Ctrl + Shift + Z','⌘/Ctrl + Y']);
+  expect.soft(rows.filter(row=>/^Redo\b/.test(row[1])).map(row=>row[0])).toEqual(['⌘/Ctrl + Shift + Z']);
+  expect.soft(described('⌘/Ctrl + Y')).toEqual([]);
+  expect.soft(rows.map(row=>row[0])).toEqual(['?','F','Shift + F','F2','⌘/Ctrl + K','⌘/Ctrl + A','Enter','Shift + Enter','Arrow','Shift + F10 or Menu','⌘/Ctrl + C','⌘/Ctrl + V','⌘/Ctrl + D','Delete or Backspace','Esc','Space + drag','Alt/Option + click','Alt/Option + drag','⌘/Ctrl + Z','⌘/Ctrl + Shift + Z']);
   await page.locator('#keyboard-shortcuts-close').click();await expect(sheet).toBeHidden();
 
   const canvasNode=page.locator('#docview [data-dv-node="a"] .t1'),find=page.locator('#outline-search');
@@ -151,13 +152,12 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
 
   const locked=async()=>JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.c.locked===true;
   await page.locator('#editor-tab-layers').click();const lock=page.locator('#workspace-window-layers .layer-row').filter({hasText:'Storage'}).locator('.layer-lock');
-  for(const redo of ['ControlOrMeta+Shift+z','ControlOrMeta+y']){
-    if(!await locked())await lock.click();
-    await expect.poll(locked).toBe(true);
-    await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
-    await canvasNode.click();await page.keyboard.press(redo);await expect.poll(locked).toBe(true);
-    await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
-  }
+  await lock.click();await expect.poll(locked).toBe(true);
+  await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);await expect(page.locator('#redo-builder')).toBeEnabled();
+  await canvasNode.click();await page.keyboard.press('ControlOrMeta+y');
+  expect.soft(await locked()).toBe(false);await expect.soft(page.locator('#redo-builder')).toBeEnabled();
+  await page.keyboard.press('ControlOrMeta+Shift+z');await expect.poll(locked).toBe(true);
+  await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
 
   const pager=page.locator('#docview .explore-navigation .reader-page-index');
   await expect(pager).toHaveAttribute('aria-label','Sections in selected View');

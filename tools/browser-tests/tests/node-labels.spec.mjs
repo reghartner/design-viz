@@ -174,10 +174,11 @@ for(const width of [1440,1280])test(`standalone node labels stay inside cards an
     await expect(board.locator('.node')).toHaveCount(Object.keys(diagram.nodes).length);
     const report=await expectBoundedLabels(board,authoredOf(diagram));
     await board.screenshot({path:info.outputPath(`overflow-${name}-${width}.png`)});
-    expect(report.failures,name+' labels fit their cards and expose full text').toEqual([]);
-    expect(report.wrapped,name+' fixture wraps a title').toBeGreaterThan(0);
-    expect(report.truncatedTitles,name+' fixture truncates a title').toBeGreaterThan(0);
-    expect(report.truncatedSubs,name+' fixture truncates a subtitle').toBeGreaterThan(0);
+    // Soft: one red board must not hide the other routing's result.
+    expect.soft(report.failures,name+' labels fit their cards and expose full text').toEqual([]);
+    expect.soft(report.wrapped,name+' fixture wraps a title').toBeGreaterThan(0);
+    expect.soft(report.truncatedTitles,name+' fixture truncates a title').toBeGreaterThan(0);
+    expect.soft(report.truncatedSubs,name+' fixture truncates a subtitle').toBeGreaterThan(0);
   }
 });
 

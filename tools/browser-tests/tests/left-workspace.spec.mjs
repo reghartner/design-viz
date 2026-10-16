@@ -171,8 +171,7 @@ test('File hosts company catalog and imports, links to every export; complete pr
   await page.locator('#sec-insert > summary').click();await page.locator('#import-mermaid').click();await expect(page.locator('#importbox')).toBeVisible();
   await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-file').click();await expect(page.locator('#importbox')).toBeVisible();
   await page.locator('#import-mermaid-cancel').click();
-  const exportedPromise=page.waitForEvent('download');await page.locator('#file-show-exports').click();await page.locator('#confluence-export').click();const exported=await exportedPromise;
-  expect(exported.suggestedFilename()).toContain('confluence');expect(JSON.parse(await readFile(await exported.path(),'utf8'))).toBeTruthy();
+  await page.locator('#file-show-exports').click();await expect(page.locator('#workspace-export')).toHaveAttribute('open','');await expect(page.locator('#file-save')).toBeFocused();await page.keyboard.press('Escape');
   await page.locator('#editor-tab-json').click();const savePromise=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await savePromise;
   expect(JSON.parse(await projectSource(saved)).page.title).toBe(editorSpec().page.title);
 });

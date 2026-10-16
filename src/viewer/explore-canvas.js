@@ -60,7 +60,19 @@ function initViewerExploreCanvas(ctl,view,opts){
       var anchor=container===document.body && view.querySelector('.dv-hash-target');
       if(anchor!==document.activeElement)anchor=null;
       var top=anchor && anchor.getBoundingClientRect().top;
+      // A #t= link scrolled to the in-page tab bar before this first mount
+      // collapsed it; land on the tab's section the way a tab click does,
+      // after boot has added the reader page actions above it. Web fonts can
+      // still reflow the page; re-land once unless the reader has moved.
+      var tabArrival=!anchor && rec && container===document.body && !contained && !navigation.current() && ctl.activeTarget && ctl.activeTarget.kind==='tab';
       navigation.mount(rec);
+      if(tabArrival){
+        var moved=false,inputs=['wheel','keydown','pointerdown','touchstart'];
+        var stop=function(){moved=true;inputs.forEach(function(type){window.removeEventListener(type,stop,true);});};
+        var land=function(){if(moved || navigation.current()!==rec || !ctl.activeTarget || ctl.activeTarget.kind!=='tab')return;rec.sectionEl.scrollIntoView({block:'start'});};
+        inputs.forEach(function(type){window.addEventListener(type,stop,true);});
+        requestAnimationFrame(function(){land();(document.fonts && document.fonts.ready || Promise.resolve()).then(function(){requestAnimationFrame(function(){land();stop();});});});
+      }
       if(contained && previous && standardScroll){container.scrollLeft=standardScroll.x;container.scrollTop=standardScroll.y;standardScroll=null;}
       if(anchor && anchor.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
       return;

@@ -4,13 +4,14 @@ const {composeSources,readSource}=require('../tools/source-loader.cjs');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const diagram=spec=>spec.page.sections[0].diagram;
 function provider(id){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};}
-async function harness(origin='https://test.invalid/flowspec.html'){
+async function harness(origin='https://test.invalid/flowspec.html',{missingIndex=false}={}){
   const {digest}=await import('../tools/canon/drift.mjs'),leaf=provider('leaf'),nested=provider('nested');
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   const disk=new Map(),hits=[],updates=[];let gate=null,text=JSON.stringify({page:{title:'Draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']]}}]}}),ledger='Before',saved,number=0,applies=0;
   const c={TextEncoder,URL,Response,SyntaxError,location:new URL(origin),window:{crypto:webcrypto},fetch:async url=>{
     const name=new URL(url).pathname.slice(1);hits.push(name);if(gate)await gate(name);
+    if(missingIndex && name==='diagrams.json')return new Response('',{status:404});
     return new Response(JSON.stringify(name==='diagrams.json'?catalog:providers.find(spec=>name===spec.page.canon.id+'.json')));
   }};
   vm.createContext(c);vm.runInContext(composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/session.js','workbench/agent-merge.js','workbench/agent-session.js','workbench/folder-agent.js']),c);
@@ -28,21 +29,25 @@ async function harness(origin='https://test.invalid/flowspec.html'){
   return {c,client,session,disk,hits,providers,catalog,proposal,original,updates,get saved(){return saved;},get applies(){return applies;},gate:fn=>gate=fn,
     connect:async()=>session.connectTopology(await c.connectTopologyRepository(JSON.parse(session.text())),session.snapshot())};
 }
-test('the same blocked folder proposal becomes reviewable after catalog-only Connect and stages transitive providers until Commit',async()=>{
+/* #592 contract matrix (agent proposals on a deployed site)
+   row | fixture | assertion (scoped) | rejects
+   P1 auto pin | local draft with no context, proposal adds nested import | review ok with no Connect; hits are index + closure | the "Connect repository catalog in Add → …" refusal
+   P2 staged only | same | session context stays null until Commit | publishing context during review
+   P3 proposal context ignored | proposal carries catalogURL | no request to that host | trusting proposal-supplied catalog addresses
+   P4 no library | index answers 404 (local transport) | message names "no published diagram library", never a UI control; one index request, no provider request | the old UI instruction sent to an agent */
+test('a folder proposal on a deployed site pins the catalog automatically and stages transitive providers until Commit',async()=>{
   const h=await harness();
   // An untrusted proposal context must not grant network access.
   h.proposal.topologyContext={catalogURL:'https://evil.invalid/diagrams.json'};
-  await h.client.poll();assert.equal(h.client.reviewSnapshot().review.ok,false);
-  assert.match(h.client.reviewSnapshot().review.conflicts[0].reason,/Connect repository catalog/);assert.deepEqual(h.hits,[]);
-  await h.connect();assert.equal(h.session.canUndo(),false);assert.equal(h.session.text(),h.original);
-  const connected=JSON.stringify(h.session.topologyContext());assert.equal(h.saved.topologyContext.specs.length,1);
-  await h.client.poll();const review=h.client.reviewSnapshot();assert.equal(review.review.ok,true);
+  assert.equal(h.session.topologyContext(),null);
+  await h.client.poll();const review=h.client.reviewSnapshot();assert.equal(review.review.ok,true,JSON.stringify(review.review.conflicts));
   assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);
-  assert.equal(JSON.stringify(h.session.topologyContext()),connected,'review acquisition must not publish context');
+  assert.equal(h.session.topologyContext(),null,'review acquisition must not publish context');
+  assert.equal(h.session.canUndo(),false);assert.equal(h.session.text(),h.original);
   assert.ok(diagram(h.session.resolve(JSON.parse(review.source),review.topologyContext)).nodes['shared::inner::api']);
-  assert.equal(h.session.text(),h.original);assert.equal(h.applies,0);
+  assert.equal(review.topologyContext.ephemeral,true);assert.equal(h.applies,0);
   await h.client.acceptReview(review.review.version);assert.equal(h.applies,1);assert.equal(h.disk.get('result.json').status,'applied');
-  assert.equal(h.session.text(),h.proposal.source);assert.equal(h.session.topologyContext().specs.length,3);
+  assert.equal(h.session.text(),h.proposal.source);assert.equal(h.session.topologyContext().specs.length,3);assert.equal(h.session.topologyContext().ephemeral,true);
   assert.equal(diagram(JSON.parse(h.session.text())).nodes['shared::api'],undefined);
   assert.equal(h.session.undo(),true);assert.equal(h.session.text(),h.original);assert.equal(h.session.redo(),true);
   assert.ok(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api']);
@@ -95,8 +100,8 @@ test('context changes after preview require a fresh explicit approval, while an 
   assert.equal(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api'].title,'leaf API');
 });
 
-async function localHarness({connect=true,providerGate}={}){
-  const h=await harness('http://127.0.0.1/flowspec.html');h.client.destroy();if(connect)await h.connect();
+async function localHarness({connect=true,providerGate,missingIndex=false}={}){
+  const h=await harness('http://127.0.0.1/flowspec.html',{missingIndex});h.client.destroy();if(connect)await h.connect();
   if(providerGate)h.gate(providerGate);
   class Element extends EventTarget{constructor(){super();this.children=[];this.style={};this.textContent='';}appendChild(child){this.children.push(child);}remove(){}setAttribute(){}click(){this.dispatchEvent(new Event('click'));}}
   const host=new Element(),company=new Element(),config=new Element(),timers=new Map();let clock=0,applied=0,open=true,busy=false,receipt,arrived;
@@ -177,7 +182,14 @@ test('local transport initialization prepares and validates a pinned provider be
   assert.equal(h.session.redo(),true);assert.equal(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api'].title,'leaf API');h.local.destroy();
 });
 test('local transport rejects a missing catalog without trusting proposal context or fetching providers',async()=>{
-  const h=await localHarness({connect:false});assert.match(await h.done(),/Connect repository catalog/);assert.equal(h.applied,0);assert.deepEqual(h.hits,[]);h.local.destroy();
+  const h=await localHarness({connect:false,missingIndex:true}),message=await h.done();
+  assert.match(message,/no published diagram library/);assert.doesNotMatch(message,/Connect/);
+  assert.equal(h.applied,0);assert.deepEqual(h.hits,['diagrams.json']);h.local.destroy();
+});
+test('local transport pins the catalog automatically for a draft that never connected',async()=>{
+  const h=await localHarness({connect:false});await h.done();assert.equal(h.applied,1);
+  assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);assert.equal(h.session.topologyContext().ephemeral,true);
+  assert.ok(h.hits.every(hit=>!hit.includes('untrusted')));h.local.destroy();
 });
 for(const change of ['disconnect','pagehide','destroy','source','project','context','closed','busy'])test('local transport retires prepared providers after '+change,async()=>{
   // Hold the preparation callback before any provider can finish. This also

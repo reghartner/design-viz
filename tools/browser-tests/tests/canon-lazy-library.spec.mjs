@@ -209,13 +209,25 @@ test('Add to step gives imported nodes and edges the same emphasis as local memb
   expect(step.edges).toContain('first::dispatch->first::push');expect(step.nodes).toEqual(expect.arrayContaining(['c','first::dispatch']));expect(raw.page.blocks[0].diagram.nodes['first::dispatch']).toBeUndefined();
 });
 
-test('a brand-new local diagram explicitly connects to the repository catalog and persists only its reference',async({page,server})=>{
+/* #592 contract matrix (deployed site: referenced topology is preloaded, no connect step)
+   row | fixture | assertion (scoped) | rejects
+   B1 blank draft | deployed library, Home → New → Blank | #topology-connect absent; #topology-search enabled; #topology-add enabled; no extra diagrams.json request | the Connect gate, or a picker that refetches the index
+   B2 reference only | add from blank draft | saved JSON holds topologyImports only; recovery keeps ephemeral context; reload re-renders | writing provider hardcopy or canon identity
+   S1 in-flight index | index response held across close/reopen/Escape | picker shows loading, selection and source untouched, no second request while pending | duplicate fetches or a stale settlement corrupting the picker
+   S2 settlement | held response resolves / rejects | resolve: providers listed without a new request; reject: next open requests again and lists providers | caching a failed index
+   C1 paste | Welcome paste of a consumer with topologyImports | editor renders notify::dispatch; source stays authored | "open this authored spec from Canon" refusal
+   C2 JSON edit | blank draft, typed topologyImports in #src | board renders the imported node; source unchanged | the Topology editor error with no acquisition
+   E1 redeploy | provider republished after pin | status names revision mismatch; #topology-refresh visible; after click providers load and insertion works | a dead end that only offers "reopen" */
+test('a brand-new local diagram on a deployed site browses providers automatically and persists only its reference',async({page,server})=>{
+  const indexRequests=[];page.on('request',request=>{if(request.url().endsWith('/diagrams.json'))indexRequests.push(request.url());});
   await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
   const before=JSON.parse(await page.locator('#src').inputValue());expect(before.page.canon).toBeUndefined();
-  await openTopology(page);await expect(page.locator('#topology-connect')).toBeVisible();await expect(page.locator('#topology-search')).toBeDisabled();
-  await expect(page.locator('#topology-connect')).toBeFocused();
-  await page.locator('#topology-connect').click();await expect(page.locator('#topology-connect')).toBeHidden();await expect(page.locator('#topology-add')).toBeEnabled();
+  const requestsBefore=indexRequests.length;
+  await openTopology(page);await expect(page.locator('#topology-connect')).toHaveCount(0);
+  await expect(page.locator('#topology-search')).toBeEnabled();await expect(page.locator('#topology-add')).toBeEnabled();
+  await expect(page.locator('#topology-provider')).toHaveValue('first');
+  expect(indexRequests.length).toBe(requestsBefore);
   await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const authored=JSON.parse(await page.locator('#src').inputValue()),d=authored.page.blocks[0].diagram;
   expect(authored.page.canon).toBeUndefined();expect(JSON.stringify(authored)).not.toContain('workbench-draft');
@@ -227,12 +239,8 @@ test('a brand-new local diagram explicitly connects to the repository catalog an
   expect(JSON.parse(await page.locator('#src').inputValue()).page.canon).toBeUndefined();
 });
 
-for(const settlement of ['resolve','reject'])test('a stale local catalog '+settlement+' cannot corrupt a reopened reference picker or clear its selection',async({page,server})=>{
-  const fixture=await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
-  await page.locator('.welcome-template-card').filter({hasText:'Simple service flow'}).click();await prepareEditorSurface(page);
-  const selected=page.locator('#docview g.node[data-dv-node]').first();await inspectPageElement(page,selected.locator('.t1'));
-  const title=page.locator('#guide').getByLabel('Name',{exact:true}),before=await page.locator('#src').inputValue();
-  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+for(const settlement of ['resolve','reject'])test('a held repository index '+settlement+' cannot corrupt a reopened reference picker or clear its selection',async({page,server})=>{
+  const fixture=await publish(server);
   function deferred(){let release;return {promise:new Promise(resolve=>release=resolve),release};}
   const attempts=[0,1].map(()=>({gate:deferred(),seen:deferred(),done:deferred()}));let request=0;
   const catalogURL=new URL('diagrams.json',fixture.url).href,catalog=await readFile(path.join(fixture.root,'workbench/diagrams.json'),'utf8');
@@ -240,21 +248,65 @@ for(const settlement of ['resolve','reject'])test('a stale local catalog '+settl
     const index=request++,attempt=attempts[index];attempt.seen.release();await attempt.gate.promise;
     await route.fulfill({status:200,contentType:'application/json',body:index===0 && settlement==='reject'?'{':catalog});attempt.done.release();
   });
-  await openTopology(page);await page.locator('#topology-connect').click();await attempts[0].seen.promise;
-  await expect(page.locator('#topology-connect')).toBeDisabled();await page.locator('#topology-cancel').click();
-  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
-  await page.locator('#topology-connect').click();await attempts[1].seen.promise;await expect(page.locator('#topology-connect')).toBeDisabled();
-  attempts[0].gate.release();await attempts[0].done.promise;
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await expect(page.locator('#topology-connect')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('Connecting to the deployed repository catalog');
-  await page.locator('#topology-cancel').click();await openTopology(page);
-  await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.goto(fixture.url);await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Simple service flow'}).click();await prepareEditorSurface(page);
+  const selected=page.locator('#docview g.node[data-dv-node]').first();await inspectPageElement(page,selected.locator('.t1'));
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),before=await page.locator('#src').inputValue();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+  await openTopology(page);await attempts[0].seen.promise;
+  await expect(page.locator('#topology-connect')).toHaveCount(0);await expect(page.locator('#topology-status')).toContainText('Loading');
+  await expect(page.locator('#topology-add')).toBeDisabled();await page.locator('#topology-cancel').click();
+  await openTopology(page);await expect(page.locator('#topology-status')).toContainText('Loading');expect(request).toBe(1);
   await page.keyboard.press('Escape');await expect(page.locator('#topology-picker')).not.toBeVisible();
   await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
-  attempts[1].gate.release();await attempts[1].done.promise;
+  attempts[0].gate.release();await attempts[0].done.promise;
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
-  await page.keyboard.press('Escape');await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+  if(settlement==='reject'){attempts[1].gate.release();}
+  await openTopology(page);
+  if(settlement==='reject'){await attempts[1].seen.promise;await attempts[1].done.promise;}
+  await expect(page.locator('#topology-add')).toBeEnabled();expect(request).toBe(settlement==='reject'?2:1);
+  await page.keyboard.press('Escape');await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+});
+
+test('pasting a consumer that references topology on a deployed site loads its providers automatically',async({page,server})=>{
+  const fixture=await pickerFixture(page,server);await page.locator('#workspace-home').click();
+  const consumer=structuredClone(fixture.specs.second);consumer.page.blocks[0].diagram.topologyImports=[{spec:'first',export:'channels',as:'notify'}];
+  const text=JSON.stringify(consumer,null,2);
+  await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(text);await page.locator('#welcome-paste-form button[type=submit]').click();
+  await prepareEditorSurface(page);await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
+  await expect(page.locator('#welcome-paste-error')).toBeHidden();
+  const authored=JSON.parse(await page.locator('#src').inputValue());
+  expect(authored.page.blocks[0].diagram.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify'}]);
+  expect(authored.page.blocks[0].diagram.nodes['notify::dispatch']).toBeUndefined();expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
+});
+
+test('typing a topology reference into the JSON source of a local draft loads the provider on a deployed site',async({page,server})=>{
+  await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
+  await page.locator('#editor-tab-json').click();const raw=JSON.parse(await page.locator('#src').inputValue());
+  raw.page.blocks[0].diagram.topologyImports=[{spec:'first',export:'channels',as:'notify'}];const typed=JSON.stringify(raw,null,2);
+  await page.locator('#src').fill(typed);
+  await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
+  await expect(page.locator('#src')).toHaveValue(typed);
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+  expect(recovered.topologyContext.ephemeral).toBe(true);expect(recovered.topologyContext.specs.map(spec=>spec.page.canon.id)).toContain('first');
+});
+
+test('a later deployment of a provider can be adopted from the picker when frozen providers are unchanged',async({page,server})=>{
+  const fixture=await pickerFixture(page,server),later=structuredClone(fixture.provider);later.page.title='Notification platform v2';
+  await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(later));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  await openTopology(page);await expect(page.locator('#topology-status')).toContainText('revision mismatch');
+  await expect(page.locator('#topology-add')).toBeDisabled();await expect(page.locator('#topology-refresh')).toBeVisible();
+  await page.locator('#topology-refresh').click();
+  await expect(page.locator('#topology-refresh')).toBeHidden();await expect(page.locator('#topology-add')).toBeEnabled();
+  await expect(page.locator('#topology-provider')).toContainText('Notification platform v2');
+  await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+  expect(recovered.topologyContext.catalog.diagrams.find(entry=>entry.id==='first').title).toBe('Notification platform v2');
+  expect(recovered.topologyContext.specs.map(spec=>spec.page.canon.id).sort()).toEqual(['first','second']);
 });
 
 test('reference picker cancels stale async work and leaves source/history untouched',async({page,server})=>{

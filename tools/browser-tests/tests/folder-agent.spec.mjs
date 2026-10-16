@@ -1481,7 +1481,11 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
   }finally{native?.kill();await page.close();await h.cleanup();}
 });
 
-for(const connectWhen of ['before submission','after blocked submission'])test('folder proposal loads a new pinned topology provider with Connect '+connectWhen+', then commits and undoes the authored pair',async({page})=>{
+/* #592 contract matrix (folder proposals on a deployed site)
+   row | fixture | assertion (scoped) | rejects
+   F1 no connect | local draft never opened the picker; proposal adds a provider import | banner reads "Agent updates are ready"; review renders shared::api; provider requests = ['submitted'] | the "needs attention" refusal asking the human to Connect
+   F2 staged | same | recovery context lacks 'submitted' until Commit; feedback never mentions a UI control | publishing during review */
+test('folder proposal loads a new pinned topology provider without a connect step, then commits and undoes the authored pair',async({page})=>{
   const h=await setup(page),{digest}=await import('../../../tools/canon/drift.mjs');
   const providers=['browsed','submitted'].map(id=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}}));
   const catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
@@ -1492,24 +1496,15 @@ for(const connectWhen of ['before submission','after blocked submission'])test('
     await writeFile(path.join(h.folder,'story.spec.json'),source);await writeFile(path.join(h.folder,'story.ledger.md'),beforeLedger);
     await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
-    async function connect(){
-      await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await page.locator('#topology-connect').click();
-      await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-cancel').click();
-      await expect(page.locator('#src')).toHaveValue(source);expect(hits[0]).toBe('browsed');
-    }
-    if(connectWhen==='before submission')await connect();
     await copyRequest(page,'Import the submitted provider.');const request=await h.read('request.json'),candidate=request.candidate;
     const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
     await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
     h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Import approved provider');
-    if(connectWhen==='after blocked submission'){
-      await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-feedback')).toHaveValue(/Connect repository catalog/);
-      expect(hits).toEqual([]);await page.locator('#agent-update-close').click();await connect();
-      await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
-    }
+    await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view [data-dv-node="shared::api"]')).toBeVisible();
     await expect(page.locator('#agent-update-issues')).toBeHidden();await expect(page.locator('#src')).toHaveValue(source);
-    expect(hits).toEqual(['browsed','submitted']);
+    await expect(page.locator('#agent-update-feedback')).not.toHaveValue(/Connect/);
+    expect(hits).toEqual(['submitted']);
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect(staged.topologyContext.specs.map(spec=>spec.page.canon.id)).not.toContain('submitted');
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');

@@ -90,7 +90,15 @@ test('catalog loader verifies frozen revisions, acquires only explicit closure, 
   await assert.rejects(client.load('missing'),/Missing authored provider/);
   assert.throws(()=>c.createTopologyCatalogLoader({version:1,specs:[]}),/unavailable/);
 });
-test('an unsaved local consumer explicitly pins repository providers without persisting its ephemeral identity',async()=>{
+/* #592 contract matrix (acquisition without a connect step)
+   row | fixture | assertion (scoped) | rejects
+   A1 one index fetch | two pins on one page | hits lists diagrams.json once | a pin that refetches the index every time
+   A2 no library | index answers 404 | rejects /no published diagram library/, text never names a UI control | the old "Connect repository catalog in Add → …" instruction
+   A3 legacy library | index version 2 | rejects /version 3/ | silently pinning a v2 index
+   A4 offline | file:// page | rejects without any fetch | guessing a network path offline
+   R1 compatible refresh | later index adds a diagram, frozen providers unchanged | refreshTopologyRepository returns same specs + new catalog; session accepts it | a refresh that replaces frozen bytes
+   R2 incompatible refresh | later index changes a frozen provider's revision | refresh rejects /reopen/i; session rejects the swapped catalog | adopting a catalog that invalidates frozen providers */
+test('an unsaved local consumer automatically pins repository providers once per page without persisting its ephemeral identity',async()=>{
   const {digest}=await import('../tools/canon/drift.mjs'),provider=fixtures()[0],raw={page:{title:'New draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']],edges:[]}}]}};
   const catalog={version:3,diagrams:[{id:'provider',title:'Provider',canon:provider.page.canon,counts:{nodes:4,steps:0,panels:0},revision:digest(provider),specUrl:'provider.json'}]};
   const hits=[],c=harness({fetch:async url=>{hits.push(String(url));return new Response(JSON.stringify(String(url).endsWith('diagrams.json')?catalog:provider));}});
@@ -101,7 +109,42 @@ test('an unsaved local consumer explicitly pins repository providers without per
   session.replaceProject(text);const snapshot=session.snapshot();assert.equal(session.accept(plan,{snapshot,topologyContext:loaded.context}),true);
   const authored=JSON.parse(current);assert.deepEqual(diagram(authored).topologyImports,[reference]);assert.equal(authored.page.canon,undefined);
   assert.equal(saved.artifacts.topologyContext.ephemeral,true);assert.deepEqual(hits.map(url=>url.split('/').pop()),['diagrams.json','provider.json']);
-  await assert.rejects(harness({location:{href:'file:///tmp/flowspec.html'}}).connectTopologyRepository(raw),/deployed repository catalog/);
+  // A1: a second pin on the same page reuses the index already fetched.
+  const again=await c.connectTopologyRepository(raw);assert.equal(again.ephemeral,true);assert.deepEqual(hits.map(url=>url.split('/').pop()),['diagrams.json','provider.json']);
+  // A4: offline pages make no request at all.
+  const offlineHits=[],offline=harness({location:{href:'file:///tmp/flowspec.html'},fetch:async url=>{offlineHits.push(String(url));return new Response('{}');}});
+  await assert.rejects(offline.connectTopologyRepository(raw),/deployed/);assert.deepEqual(offlineHits,[]);
+  // A2: a site without a published library explains itself in words an agent can act on.
+  const missingHits=[],missing=harness({fetch:async url=>{missingHits.push(String(url));return new Response('',{status:404});}});
+  await assert.rejects(missing.connectTopologyRepository(raw),error=>/no published diagram library/.test(error.message) && !/Connect/.test(error.message));
+  assert.deepEqual(missingHits.map(url=>url.split('/').pop()),['diagrams.json']);
+  await assert.rejects(missing.connectTopologyRepository(raw),/no published diagram library/);
+  assert.equal(missingHits.length,2,'an unavailable index is retried on the next request, never cached');
+  // A3: a version 2 index is not a topology catalog.
+  await assert.rejects(harness({fetch:async()=>new Response(JSON.stringify({...catalog,version:2}))}).connectTopologyRepository(raw),/version 3/);
+});
+test('a pinned catalog adopts a later deployment only when every frozen provider is unchanged',async()=>{
+  const {digest}=await import('../tools/canon/drift.mjs'),specs=fixtures(),[provider,consumer]=specs;
+  const entry=spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'});
+  const catalog={version:3,diagrams:[entry(provider),entry(consumer)]};
+  let served=catalog;const hits=[],c=harness({fetch:async url=>{hits.push(String(url).split('/').pop());return new Response(JSON.stringify(served));}});
+  const context={version:1,id:'consumer',specs:clone(specs),catalog,catalogURL:'https://test.invalid/workbench/diagrams.json'};
+  let current='',saved;const session=c.createBuilderSession({source:{read:()=>current,write:value=>current=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(value,baseline,artifacts)=>saved={value,artifacts}},render(){session.resolve(JSON.parse(current));}});
+  session.replaceProject(JSON.stringify(consumer,null,2),null,{topologyContext:context});
+  // R1: a new diagram appears, frozen providers keep their revisions.
+  const other=clone(provider);other.page.canon.id='other';other.page.title='Other';
+  served={version:3,diagrams:[entry(provider),entry(consumer),entry(other)]};
+  const refreshed=await c.refreshTopologyRepository(context);
+  assert.deepEqual(hits,['diagrams.json']);assert.equal(refreshed.catalog.diagrams.length,3);assert.deepEqual(refreshed.specs,context.specs);assert.equal(refreshed.catalogURL,context.catalogURL);
+  assert.equal(session.connectTopology(refreshed,session.snapshot()),true);assert.equal(session.topologyContext().catalog.diagrams.length,3);
+  assert.equal(saved.artifacts.topologyContext.catalog.diagrams.length,3);assert.equal(session.canUndo(),false);
+  // R2: a frozen provider was republished; the draft must be reopened instead.
+  const changed=clone(provider);diagram(changed).nodes.a.title='Later deployment';
+  served={version:3,diagrams:[entry(changed),entry(consumer),entry(other)]};
+  await assert.rejects(c.refreshTopologyRepository(session.topologyContext()),/reopen/i);
+  const swapped={...session.topologyContext(),catalog:served};
+  assert.throws(()=>session.connectTopology(swapped,session.snapshot()),/frozen/);
+  assert.equal(session.topologyContext().catalog.diagrams.find(item=>item.id==='provider').revision,digest(provider));
 });
 test('catalog acquisition loads nested dependencies once, fails transport safely, and refuses offline or foreign catalogs',async()=>{
   const {digest}=await import('../tools/canon/drift.mjs');const specs=fixtures(),nested=clone(specs[1]);

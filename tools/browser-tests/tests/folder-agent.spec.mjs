@@ -1509,9 +1509,12 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await expect(page.locator('#agent-update-feedback')).toBeHidden();
     expect(await page.locator('#agent-update-feedback').inputValue()).not.toMatch(/Connect repository catalog|Referenced topology/);
     expect(hits).toEqual(['submitted']);
+    // Nothing is persisted during review: the draft never pinned a context, so none is stored yet.
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
-    expect(staged.topologyContext.specs.map(spec=>spec.page.canon.id)).not.toContain('submitted');
+    expect((staged.topologyContext?.specs || []).map(spec=>spec.page.canon.id)).not.toContain('submitted');
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    const committed=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+    expect(committed.topologyContext.ephemeral).toBe(true);expect(committed.topologyContext.specs.map(spec=>spec.page.canon.id)).toContain('submitted');
     await expect(page.locator('#src')).toHaveValue(edited);expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
     await expect.poll(()=>readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(edited);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);

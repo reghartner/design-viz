@@ -49,11 +49,11 @@ test('Layers syncs selection, row and node lock history, source lifecycle, keybo
 
  await search.fill('back');await expect(rows).toHaveCount(1);await expect(rows.first()).toContainText('Backend');await search.fill('');
  const navigation=page.locator('#docview .explore-navigation');
- await navigation.getByRole('button',{name:'Next Page',exact:true}).click();
- await expect(navigation.locator('.reader-page-label')).toHaveText('Page 2 of 2');
+ await navigation.getByRole('button',{name:'Next section',exact:true}).click();
+ await expect(navigation.locator('.reader-page-label')).toHaveText('Section 2 of 2');
  await expect(win.locator('.layers-empty')).toContainText('no diagram');
- await navigation.getByRole('button',{name:'Previous Page',exact:true}).click();
- await expect(navigation.locator('.reader-page-label')).toHaveText('Page 1 of 2');
+ await navigation.getByRole('button',{name:'Previous section',exact:true}).click();
+ await expect(navigation.locator('.reader-page-label')).toHaveText('Section 1 of 2');
  await expect(rows).toHaveCount(3);
 
  await page.locator('#src').evaluate(el=>{const raw=JSON.parse(el.value);delete raw.page.blocks[0].diagram;el.value=JSON.stringify(raw,null,2);el.dispatchEvent(new Event('input',{bubbles:true}));});

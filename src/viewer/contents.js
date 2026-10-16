@@ -23,8 +23,8 @@ function createReaderContents(ctl,nav,actions,options){
   var zoomOptions=element('div','reader-zoom-options',null,zoomMenu);
   [50,75,100,125,150,200].forEach(function(percent){button('Zoom '+percent+'%',percent+'%',zoomOptions,function(){setZoom(percent/100);zoomMenu.open=false;zoomSummary.focus();});});
   var plus=button('Zoom in','+',zoomGroup,function(){zoomBy(1.25);});
-  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');pager.setAttribute('aria-label','Pages in selected View');
-  var previous=button('Previous Page','‹',pager,function(){pageBy(-1);}),pageLabel=element('span','reader-page-label',null,pager),next=button('Next Page','›',pager,function(){pageBy(1);});pageLabel.setAttribute('aria-live','polite');
+  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');pager.setAttribute('aria-label','Sections in selected View');
+  var previous=button('Previous section','‹',pager,function(){pageBy(-1);}),pageLabel=element('span','reader-page-label',null,pager),next=button('Next section','›',pager,function(){pageBy(1);});pageLabel.setAttribute('aria-live','polite');
   var fit=button('Fit','Fit',toolbar,function(){var handled=options.fit && options.fit(current,viewportRecord,owner)!==false;if(!handled && viewportRecord && viewportRecord.viewport && viewportRecord.viewport.isExplore())viewportRecord.viewport.fitCanvas();else if(!handled)setZoom(1);updateZoom();});
   var scrim=button('Close Contents','',nav,function(){setOpen(false,true,true);});scrim.classList.add('reader-scrim');scrim.tabIndex=-1;
   var sidebar=element('aside','reader-contents',null,nav);sidebar.setAttribute('aria-label','Contents');
@@ -148,7 +148,7 @@ function createReaderContents(ctl,nav,actions,options){
     else{detailSeparator.remove();detailLabel.remove();}
     top.classList.toggle('reader-detail-open',!!deepest);
     if(owner)expandedTabs.add(owner.path);
-    var index=members.indexOf(current);pageLabel.textContent='Page '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
+    var index=members.indexOf(current);pageLabel.textContent='Section '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
     // Shared utility controls remain live. Ordinary readers surface the hidden
     // Tab bar's real copy control; a host-owned share action consolidates it.
     release();

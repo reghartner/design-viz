@@ -70,7 +70,7 @@ its block. Node/edge labels and panel values remain plain text. See
 
 Each Tab defines **Views** over ordered subsets of its sections. **Standard**
 stacks its member sections; **Explore** shows one member at a time. The editor and
-reader share the same shell: Views across the top, centered Page controls below,
+reader share the same shell: Views across the top, centered Section controls below,
 and a collapsible **Contents** sidebar for Tabs, Views, and Explore members. The
 compact app bar keeps the document title visible; on phones, **More project
 actions** contains File, Undo/Redo, Appearance, Preview, Help, and Export. Content stays in
@@ -224,7 +224,7 @@ visibility uses the diagram's **Panels** menu. **File → Workspace preferences 
 Reset panel layout** restores initial positions and sizes. Geometry and open
 windows persist in this browser; resizing the browser keeps their handles on
 screen. Escape, pointer cancellation and losing window focus cancel a drag.
-Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** (or **Ctrl Y**) to redo while
+Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** to redo while
 working on the canvas or panel handles. Text fields keep their native text undo.
 
 **Dock** in each tool's title bar reserves canvas space on the right. One tool

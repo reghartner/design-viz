@@ -9,16 +9,16 @@ View has an ordered subset of section references and one presentation:
   active playback group. The section controls list only that View’s members.
 
 The reader keeps a stable two-row header: a Contents toggle, active Tab label, visible View choices
-and utilities above centered **‹ Page n of m ›** controls.
+and utilities above centered **‹ Section n of m ›** controls.
 View choices remain available when Contents is closed; on narrow screens they
 wrap within the first header bar. Arrow keys move between View choices, and
 Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**; full section titles appear
-under Standard Views and under expanded Explore Views. In Standard, a section title or Page arrow scrolls through the intact stack;
+under Standard Views and under expanded Explore Views. In Standard, a section title or Section arrow scrolls through the intact stack;
 in Explore they select only the current View’s ordered members. Desktop Contents
 pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
 Escape closes an open menu first, then Contents, returning focus to its trigger.
 The tree scrolls independently of its pinned theme footer. Zoom is separate from
-Page navigation; phones use the percentage menu at left and Fit at right. In
+Section navigation; phones use the percentage menu at left and Fit at right. In
 Explore, the Zoom menu also retains Auto, Fit width, and Readable diagram sizing.
 
 The theme picker offers Aurora, Pastel, Blueprint, Terminal, Rose, Lavender, and

@@ -1018,7 +1018,7 @@ function initWorkbenchBuilder(opts){
     life.listen(src,'input', function(){ life.cancelDelay(outlineTimer); outlineTimer = life.delay(refreshOutline, 200); });
     life.listen(document,'keydown', function(ev){
       if (opts.isActive && !opts.isActive()) return;
-      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
+      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
       ev.preventDefault();
       if(opts.workspace)opts.workspace.showTool('outline');
       outline.open = true; outlineSearch.focus(); outlineSearch.select();
@@ -1221,8 +1221,9 @@ function initWorkbenchBuilder(opts){
   life.listen(document,'keydown', function(ev){
     if (ev.defaultPrevented || opts.isActive && !opts.isActive()) return;
     if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
-    var key=ev.key.toLowerCase(),redo=key==='z' && ev.shiftKey || key==='y' && !ev.shiftKey;
-    if (key!=='z' && !redo || interactions.adding()) return;
+    /* Redo is Shift+Z only; Ctrl+Y is not a Redo alias. */
+    var redo=ev.shiftKey;
+    if (ev.key.toLowerCase()!=='z' || interactions.adding()) return;
     var ae = document.activeElement;
     if(ae && ae.closest('dialog[open]'))return;
     if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable))return;

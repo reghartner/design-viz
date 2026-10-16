@@ -218,7 +218,7 @@ for(const width of [1440,1280])test(`the shipped Backstage example keeps labels 
    11 controls left of the title | same nodes, each with a link and a references control | every .nlink/.nbackref circle rect is left of that node's .t1 rect | controls kept at the top-right over/beside the title
    12 controls above the icon | same | every control rect's bottom ≤ that node's .icbg top, and no control intersects the .icbg or .t1 rect | controls overlapping the icon
    13 title inside the card | same | .t1 rect inside that node's .card rect | a widened title running past the card
-   14 controls still work | Nimbus API | a real click on its ⋯ opens "Links for Nimbus API"; its ↗ keeps its href | a moved control that no longer receives clicks
+   14 controls still work | Nimbus API | a real click on its ⋯ opens "Links for Nimbus API"; Escape returns focus to ⋯, Enter reopens it, Shift+Tab focuses its ↗ (href kept) and Tab returns to ⋯ | a moved control that no longer receives clicks or keyboard focus
    15 board-wide bounds | whole board | rows 0-6 helper over every card | the move breaking any other card */
 test('cumulus Command path cards keep short titles on one line beside left-side controls at 1440px',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:900});
@@ -255,9 +255,15 @@ test('cumulus Command path cards keep short titles on one line beside left-side 
   }
   const nimbus=board.locator('[data-dv-node="nimbus"]');
   await expect(nimbus.locator(':scope>a.nlink')).toHaveAttribute('href',diagram.nodes.nimbus.link);
-  await nimbus.locator(':scope>.nrefs-trigger').click();
-  await expect(page.getByRole('dialog',{name:'Links for Nimbus API',exact:true})).toBeVisible();
-  await page.keyboard.press('Escape');
+  const refs=nimbus.locator(':scope>.nrefs-trigger'),source=nimbus.locator(':scope>a.nlink'),links=page.getByRole('dialog',{name:'Links for Nimbus API',exact:true});
+  await expect(links).toBeHidden();
+  await refs.click();await expect(links).toBeVisible();
+  await page.keyboard.press('Escape');await expect(links).toBeHidden();await expect(refs).toBeFocused();
+  // Keyboard: Enter reopens ⋯; Shift+Tab reaches ↗ and Tab returns to ⋯.
+  await page.keyboard.press('Enter');await expect(links).toBeVisible();
+  await page.keyboard.press('Escape');await expect(links).toBeHidden();
+  await page.keyboard.press('Shift+Tab');await expect(source).toBeFocused();
+  await page.keyboard.press('Tab');await expect(refs).toBeFocused();
   const report=await expectBoundedLabels(board,authoredOf(diagram));
   await board.screenshot({path:info.outputPath('cumulus-command-path.png')});
   expect.soft(report.failures,'every Command path card keeps labels bounded').toEqual([]);

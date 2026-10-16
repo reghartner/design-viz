@@ -3853,20 +3853,37 @@ function wirePresenter(ctl, view, win){
       btn.textContent = 'PRESENT';
     }
   });
+  function stepKey(sp, ev){
+    if (!sp) return;
+    if (sp.mode() !== 'step') sp.enterStep(false);
+    if (ev.key === ' ') sp.toggleAuto();
+    else sp.advance(sp.current().n + (ev.key === 'ArrowRight' ? 1 : -1));
+    ev.preventDefault();
+  }
+  /* Outside Present, step keys belong to a focused diagram section. Controls
+     with their own keys and pannable boards (Explore, zoomed or overflowing)
+     keep native behaviour; elsewhere the page scrolls as usual. */
+  function focusedStepper(ev){
+    var target = ev.target;
+    if (ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || !target || !target.closest) return null;
+    if (target.closest('input,textarea,select,button,a[href],summary,[contenteditable]:not([contenteditable="false"]),[role="tab"],[role="slider"],[role="button"],[role="menuitem"],[role="menuitemradio"],[role="option"],.prose-code')) return null;
+    var board = target.closest('.board');
+    if (board && (board.classList.contains('explore-board') || board.classList.contains('board-zoomed') ||
+                  board.scrollWidth > board.clientWidth + 1)) return null;
+    var section = target.closest('.doc-sec');
+    var rec = section && ctl.sections.find(function(r){ return r.sectionEl === section; });
+    return rec && rec.stepper && !section.hidden ? rec.stepper : null;
+  }
   doc.addEventListener('keydown', function(ev){
-    if (!presenting()) return;
+    var stepping = ev.key === 'ArrowRight' || ev.key === 'ArrowLeft' || ev.key === ' ';
+    if (!presenting()){
+      if (stepping) stepKey(focusedStepper(ev), ev);
+      return;
+    }
     if (ev.key !== 'Escape' && ev.target && ev.target.closest && ev.target.closest('.prose-code')) return;
     var sp = ctl.activeStepper ? ctl.activeStepper() : null;
-    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'){
-      if (!sp) return;
-      if (sp.mode() !== 'step') sp.enterStep(false);
-      sp.advance(sp.current().n + (ev.key === 'ArrowRight' ? 1 : -1));
-      ev.preventDefault();
-    } else if (ev.key === ' '){
-      if (!sp) return;
-      if (sp.mode() !== 'step') sp.enterStep(false);
-      sp.toggleAuto();
-      ev.preventDefault();
+    if (stepping){
+      stepKey(sp, ev);
     } else if (/^[1-9]$/.test(ev.key) && ctl.tabBlock){
       var ti = parseInt(ev.key, 10) - 1;
       if (ti < ctl.tabBlock.count){ ctl.tabBlock.select(ti, false); ev.preventDefault(); }

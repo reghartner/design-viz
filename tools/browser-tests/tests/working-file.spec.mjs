@@ -47,7 +47,15 @@ test('invalid drafts remain in recovery, disk pauses and resumes; external modif
   await page.screenshot({path:info.outputPath('working-file-failed.png')});
 });
 
-test('standalone folder preserves an unknown ledger and renews the existing lease without agent setup',async({page,server})=>{
+for(const heldStartup of [false,true])test('standalone folder preserves an unknown ledger and renews the existing lease without agent setup'+(heldStartup?' with autosave queued during startup':''),async({page,server})=>{
+  if(heldStartup)await page.route('**/workbench.html',async route=>{
+    // Expose only the mounted binding in this test response, never in shipped
+    // code. Its real flush gives an observable completion for the held save.
+    const response=await route.fetch(),html=await response.text();
+    const marker="workingStatus({state:'browser',detail:workingBrowser.pickFile?";
+    expect(html.split(marker)).toHaveLength(2);
+    await route.fulfill({response,body:html.replace(marker,'window.workingFileTest={flush:function(){return workingFile.attached().flush();}};'+marker)});
+  });
   await page.setViewportSize({width:1440,height:900});await setup(page);await page.goto(server.origin+'/workbench.html');await paste(page,source);
   const ledger='\ufeff# Handwritten coverage\r\nKeep unknown content exactly.\r\n';
   await page.evaluate(async({source,ledger})=>{const root=await navigator.storage.getDirectory();for(const [name,text] of [['actual.spec.json',source],['actual.ledger.md',ledger]]){const handle=await root.getFileHandle(name,{create:true}),stream=await handle.createWritable();await stream.write(text);await stream.close();}},{source,ledger});
@@ -62,7 +70,30 @@ test('standalone folder preserves an unknown ledger and renews the existing leas
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(changed);
   await page.locator('#folder-agent-close-guide').click();await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
   await filePanel(page);await expect(page.locator('#workbench-working-status')).toContainText('Browser-only');
-  await page.locator('#working-folder-open').click();await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
+  if(heldStartup)await page.evaluate(()=>{
+    const read=FileSystemFileHandle.prototype.getFile;
+    FileSystemFileHandle.prototype.getFile=async function(...args){
+      // Earlier project inspection precedes association publication. Hold only
+      // the client's first session read after the destination reports Saving.
+      if(this.name==='session.json' && !window.startupHeld && document.getElementById('workbench-working-status').dataset.state==='saving'){
+        window.startupHeld=true;await new Promise(resolve=>window.releaseStartup=resolve);
+      }
+      return read.apply(this,args);
+    };
+  });
+  await page.locator('#working-folder-open').click();
+  if(heldStartup){
+    await expect.poll(()=>page.evaluate(()=>window.startupHeld)).toBe(true);
+    // Exercise the same save boundary used by autosave and lease renewal,
+    // while retaining startup's exact source snapshot.
+    await page.evaluate(()=>{window.queuedStartupSave=window.workingFileTest.flush().then(()=>({ok:true}),error=>({error:error.message}));});
+    await page.evaluate(()=>window.releaseStartup());
+    expect(await page.evaluate(()=>window.queuedStartupSave)).toEqual({ok:true});
+  }
+  await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
+  const reconnected=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent');return JSON.parse(await(await(await meta.getFileHandle('editor.json')).getFile()).text());});expect(reconnected.connected).toBe(true);
+  // Verify the queued flush did not poison the otherwise connected lease.
+  await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
   const afterHandoff=changed.replace('Folder edit','After handoff');await edit(page,afterHandoff);await expect.poll(()=>disk(page,'actual.spec.json')).toBe(afterHandoff);
 });
 

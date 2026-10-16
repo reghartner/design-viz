@@ -122,7 +122,7 @@ test('short floating tools keep their close buttons and rail reachable above can
    R1 distinct rail icons | editorSpec | each .workspace-rail .editor-tool-icon text is unique; Layers icon != File icon | Layers and File sharing ▱ (or any two tools sharing a glyph)
    R2 ⌘K listed | same | #keyboard-shortcuts dt "⌘/Ctrl + K" paired with dd "Find objects" | dialog without Find objects
    R3 Redo listed | same | dt "⌘/Ctrl + Shift + Z" and dt "⌘/Ctrl + Y" each paired with a Redo dd | dialog without Redo, or only one of its two bindings
-   R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
+   R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection Shift+F10/ContextMenu, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
    R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
    R6 Redo implemented | Storage row lock, then Undo | real ControlOrMeta+Shift+Z and ControlOrMeta+Y each re-apply nodes.c.locked from a canvas-focused node | listing Redo bindings that do nothing
    R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Sections in selected View" | "Page 1 of 2" or Page-named arrows
@@ -142,7 +142,7 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   const described=keys=>rows.filter(row=>row[0]===keys).map(row=>row[1]);
   expect.soft(described('⌘/Ctrl + K')).toEqual(['Find objects']);
   for(const keys of ['⌘/Ctrl + Shift + Z','⌘/Ctrl + Y'])expect.soft(described(keys)).toEqual([expect.stringMatching(/^Redo\b/)]);
-  expect.soft(rows.map(row=>row[0])).toEqual(['?','F','Shift + F','F2','⌘/Ctrl + K','⌘/Ctrl + A','Enter','Shift + Enter','Arrow','Shift + F10','⌘/Ctrl + C','⌘/Ctrl + V','⌘/Ctrl + D','Delete or Backspace','Esc','Space + drag','Alt/Option + click','Alt/Option + drag','⌘/Ctrl + Z','⌘/Ctrl + Shift + Z','⌘/Ctrl + Y']);
+  expect.soft(rows.map(row=>row[0])).toEqual(['?','F','Shift + F','F2','⌘/Ctrl + K','⌘/Ctrl + A','Enter','Shift + Enter','Arrow','Shift + F10 or Menu','⌘/Ctrl + C','⌘/Ctrl + V','⌘/Ctrl + D','Delete or Backspace','Esc','Space + drag','Alt/Option + click','Alt/Option + drag','⌘/Ctrl + Z','⌘/Ctrl + Shift + Z','⌘/Ctrl + Y']);
   await page.locator('#keyboard-shortcuts-close').click();await expect(sheet).toBeHidden();
 
   const canvasNode=page.locator('#docview [data-dv-node="a"] .t1'),find=page.locator('#outline-search');

@@ -65,11 +65,12 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
       if(button)button.focus();
     }
   }
+  function label(frame){return (frame.section.heading || frame.section.id || 'Detail').split(' · ')[0];}
   function breadcrumb(frame){
     var nav=document.createElement('nav');nav.className='detail-breadcrumb';nav.setAttribute('aria-label','Diagram drill-down');
     session.stack.forEach(function(item,i){
       if(i){var arrow=document.createElement('span');arrow.textContent='›';arrow.setAttribute('aria-hidden','true');nav.appendChild(arrow);}
-      var button=document.createElement('button');button.type='button';button.textContent=i===0?'Overview':(item.section.heading || item.section.id || 'Detail').split(' · ')[0];button.title=item.section.heading || item.section.id || 'Overview';
+      var button=document.createElement('button');button.type='button';button.textContent=i===0?'Overview':label(item);button.title=item.section.heading || item.section.id || 'Overview';
       if(item===frame){button.setAttribute('aria-current','page');button.disabled=true;}
       else button.addEventListener('click',function(){back(i);});
       nav.appendChild(button);
@@ -241,6 +242,8 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   return {snapshot:snapshot,restore:restore,close:close,
     showSection:function(reference){var frame=liveRoots.get(reference);if(!frame || ctl.views && !ctl.views.ensure(frame.rec,undefined,true))return false;close(true);liveRoots.forEach(function(f){restoreOriginal(f);});if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
+    // Reader chrome (header, Contents) names each open level below the root.
+    activeTrail:function(){return session?session.stack.slice(1).map(function(frame){return {label:label(frame),title:frame.section.heading || frame.section.id || 'Detail'};}):[];},
     activeSections:function(){return session?session.stack.map(function(frame){return frame.rec;}):[];},
     activeStepper:function(){return current() && current().rec.stepper;},
     pause:function(){if(session)session.stack.forEach(pause);},

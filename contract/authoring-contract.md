@@ -1768,7 +1768,7 @@ perspectives" of one timeline). Types:
   means app, preserving existing diagrams. The screen choice carries forward.
   Home shows a wallpaper, clock, notification cards and an illustrative app dock.
   Patch `{"phoneScreen":"app"}` to enter the app or `{"phoneScreen":"home"}` to
-  return home. Story steps control navigation; the app icons are decorative.
+  return home. Steps control navigation; the app icons are decorative.
   Switching screens never clears notifications, tile values or visibility.
   `sources` is optional (0–6 objects) with unique
   `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.

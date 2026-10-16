@@ -396,11 +396,12 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 // 5   | ?diagram=team%2Edelivery%5Fv2 (percent-encoded)      | #canon-reader-title "Team delivery v2"                                                                    | matching the raw query bytes instead of the decoded value
 // 6   | ?layout=backstage&diagram=delivery#d=delivery&p=failed (other query + deep-link fragment) | #canon-reader-title "Reviewed delivery"; #welcome-link-error hidden                  | extra parameters or a fragment breaking the link
 // 7   | row 2, real click on #canon-reader-edit              | #workbench-workspace visible                                                                              | a reader with a dead Edit action
-// 8   | ?diagram=never-published                             | #welcome-home visible; #welcome-link-error visible and names “never-published”; #canon-reader-title hidden; body not .canon-reader-active; #workbench-workspace hidden | the old reader error screen; an error that does not name the value; an editor opened
+// 8   | ?diagram=never-published                             | #welcome-home visible; #welcome-link-error visible and names “never-published”; #canon-reader-title hidden; body not .canon-reader-active; #workbench-workspace hidden; #welcome-{paste,new,agent,library,reader}-screen each hidden | the old reader error screen; an error that does not name the value; an editor opened
 // 9   | row 8, every Welcome home action (#welcome-agent, tour, #welcome-example-expand, #welcome-catalog, #welcome-paste, #welcome-open, #welcome-new, #welcome-library, #welcome-agent-prompt) | each is visible, enabled and the top element at its own centre (not covered by the message); real clicks on #welcome-paste, #welcome-new, #welcome-library, #welcome-agent-prompt each open their own screen | an error state that hides, disables or covers any Welcome action
 // 10  | ?diagram=https://evil.example/x.spec.json            | as row 8, and #welcome-link-error text equals row 8's text with the value substituted                    | a separate refusal path that looks different from unknown
 // 11  | ?diagram=//evil.example/x.spec.json                  | as row 10                                                                                                 | protocol-relative addresses handled differently
 // 12  | ?diagram=diagrams/delivery/delivery.spec.json        | as row 10                                                                                                 | same-origin paths handled differently
+// 12b | ?diagram= (empty value)                              | as row 10 (message names “”)                                                                              | an empty value silently treated as a plain Welcome visit
 // 13  | rows 10–12                                           | 0 requests to evil.example; 0 requests whose path ends in delivery.spec.json                              | values used as a spec transport
 // 14  | in-app user guide §09 (#hg-evidence)                 | exactly one <code> in #hg-evidence contains "?diagram="                                                    | the parameter left undocumented in the guide
 // 15  | docs/workbench-user-guide.md                         | exactly one paragraph names `?diagram=<diagram ID>`; it says published diagram, read-only, Edit in Workbench, home page | the written guide left without the parameter or its error behaviour
@@ -433,6 +434,7 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
     await page.goto(server.origin+'/workbench.html?diagram='+encodeURIComponent(value));
     await expect(home).toBeVisible();await expect(linkError).toBeVisible();await expect(linkError).toContainText('“'+value+'”');
     await expect(title).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/canon-reader-active/);await expect(workspace).toBeHidden();
+    for(const other of ['paste','new','agent','library','reader'])await expect(page.locator('#welcome-'+other+'-screen')).toBeHidden();
     return await linkError.textContent();
   }
   const unknown=await landsOnWelcome('never-published');
@@ -444,7 +446,7 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
     if(action!=='#welcome-paste')await landsOnWelcome('never-published');
     await page.locator(action).click();await expect(page.locator(target)).toBeVisible();await expect(home).toBeHidden();
   }
-  for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json'])
+  for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json',''])
     expect(await landsOnWelcome(value)).toBe(unknown.replace('never-published',value));
   expect(foreign).toEqual([]);expect(specFetches).toEqual([]);
   await openGuide(page);

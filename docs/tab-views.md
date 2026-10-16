@@ -18,7 +18,7 @@ in Explore they select only the current View’s ordered members. Desktop Conten
 pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
 Escape closes an open menu first, then Contents, returning focus to its trigger.
 The tree scrolls independently of its pinned theme footer. Zoom is separate from
-Page navigation; phones use the percentage menu at left and Fit at right. In
+Section navigation; phones use the percentage menu at left and Fit at right. In
 Explore, the Zoom menu also retains Auto, Fit width, and Readable diagram sizing.
 
 The theme picker offers Aurora, Pastel, Blueprint, Terminal, Rose, Lavender, and

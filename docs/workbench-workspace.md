@@ -224,7 +224,7 @@ visibility uses the diagram's **Panels** menu. **File → Workspace preferences 
 Reset panel layout** restores initial positions and sizes. Geometry and open
 windows persist in this browser; resizing the browser keeps their handles on
 screen. Escape, pointer cancellation and losing window focus cancel a drag.
-Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** (or **Ctrl Y**) to redo while
+Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** to redo while
 working on the canvas or panel handles. Text fields keep their native text undo.
 
 **Dock** in each tool's title bar reserves canvas space on the right. One tool

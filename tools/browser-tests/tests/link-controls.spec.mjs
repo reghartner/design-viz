@@ -87,3 +87,29 @@ test('canon reader keeps one position-aware share action across tabs and diagram
  await restoredShare.click();const restored=new URL(await copied(restoredPage));for(const field of ['d=delivery','v=page','s=done'])expect(restored.hash).toContain(field);
  await restoredCopy.contract.click();const contextual=new URL(await copied(restoredPage));expect(contextual.search).toBe('?diagram=links');for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(contextual.hash).toContain(field);await restoredPage.close();
 });
+
+/* #579 contract matrix — a #t= deep link lands like a tab click (fixture: docs/diagrams/backstage/backstage.spec.json, Deployment tab)
+ row | fixture | assertion (scoped) | rejects
+ 1 heading below bar 1440x900 | fresh load url#t=deployment | first shown .doc-sec .sec-h top in the Deployment tabpanel >= #docview > .explore-navigation bottom | scrolling the collapsed in-page tab button to the top (heading under the 102px bar)
+ 2 heading below bar 1280x800 | same at 1280x800 | same as row 1 | an offset tuned for one viewport only
+ 3 lands where a tab click lands | fresh load url, Deployment panel hidden + scrollY 0, real click through the reader Tab menu | hash-arrival section top equals click-arrival section top (±1px) | not scrolling at all, or a different offset than the click path
+ 4 tab click unchanged | same click | click section top = bar bottom + 12 and heading >= bar bottom | a fix that shifts tab clicks too
+ 5 deep link still selects the tab | url#t=deployment | Deployment role=tab aria-selected=true, Deployment tabpanel visible, location.hash keeps t=deployment | a fix that rewrites or drops the fragment */
+for(const [width,height] of [[1440,900],[1280,800]])test(`#t= deep link lands the tab's first heading below the navigation bar like a tab click at ${width}x${height}`,async({page,server})=>{
+ const output=path.join(server.root,'backstage-579.html');
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'docs/diagrams/backstage/backstage.spec.json'),path.join(repo,'template/flowview.html'),output]);
+ const url=server.origin+'/backstage-579.html',root=page.locator('#docview'),nav=root.locator(':scope > .explore-navigation'),tab=root.getByRole('tab',{name:'Deployment',exact:true,includeHidden:true});
+ const landing=()=>page.evaluate(()=>{const view=document.querySelector('#docview'),bar=view.querySelector(':scope > .explore-navigation').getBoundingClientRect(),button=[...view.querySelectorAll('.tabbtn')].find(b=>b.textContent==='Deployment'),tabPanel=view.querySelector('[aria-labelledby="'+button.id+'"]'),sec=[...tabPanel.querySelectorAll('.doc-sec')].find(s=>s.getClientRects().length>0),head=sec && sec.querySelector('.sec-h').getBoundingClientRect();return {barBottom:bar.bottom,section:sec && sec.id,sectionTop:sec && sec.getBoundingClientRect().top,headingTop:head && head.top,panelHidden:tabPanel.hidden,scrollY:window.scrollY};});
+ await page.setViewportSize({width,height});
+ await page.goto(url+'#t=deployment');await expect(nav).toBeVisible();await expect(tab).toHaveAttribute('aria-selected','true');
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const linked=await landing();expect(linked.panelHidden).toBe(false);expect(new URL(page.url()).hash).toContain('t=deployment');
+ expect(linked.barBottom).toBeGreaterThan(48);expect(linked.headingTop).toBeGreaterThanOrEqual(linked.barBottom);
+ await page.goto('about:blank');await page.goto(url);await expect(nav).toBeVisible();
+ const before=await landing();expect(before.panelHidden).toBe(true);expect(before.scrollY).toBe(0);
+ await chooseNavigation(nav,'Tab','Deployment');await expect(tab).toHaveAttribute('aria-selected','true');
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const clicked=await landing();expect(clicked.section).toBe(linked.section);
+ expect(Math.abs(clicked.sectionTop-(clicked.barBottom+12))).toBeLessThanOrEqual(1);expect(clicked.headingTop).toBeGreaterThanOrEqual(clicked.barBottom);
+ expect(Math.abs(linked.sectionTop-clicked.sectionTop)).toBeLessThanOrEqual(1);
+});

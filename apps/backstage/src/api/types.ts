@@ -36,3 +36,10 @@ export type SpecLoader = (
   diagram: Pick<AssociatedDiagram, 'id' | 'revision'>,
   signal: AbortSignal
 ) => Promise<unknown>;
+
+/** Resolve IDs through the consumer's approved catalog/Git index; this is metadata,
+ * not a second spec transport. A supplied revision must be preserved exactly. */
+export type DiagramHandoffResolver = (
+  reference: import('../generated/nativeViewer').DiagramHandoffReference,
+  signal: AbortSignal
+) => Promise<AssociatedDiagram | null>;

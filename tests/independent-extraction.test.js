@@ -168,7 +168,7 @@ function nestedFixture(){
 
 test('external extraction carries custom protocols and transitive nested details while preserving original sections',()=>{
   const raw=nestedFixture();valid(raw);
-  const handoff={spec:'orders-flow',revision:'v7',section:'orders',url:'https://flows.example/orders#orders'};
+  const handoff={spec:'orders-flow',revision:'v7',section:'orders',siteBaseUrl:'https://flows.example/view.html'};
   const {plan,parent,next}=extract(raw,['accept','store'],{mode:'external',title:'Orders',handoff});
   assert.deepEqual(parent.nodes[plan.id].handoff,handoff);assert.equal(parent.nodes[plan.id].detail,undefined);
   assert.equal(plan.detailSection,undefined);assert.equal(B.specSectionPaths(next).length,B.specSectionPaths(raw).length);
@@ -187,8 +187,8 @@ test('external extraction carries custom protocols and transitive nested details
   assert.deepEqual(exported.page.protocols.orders,raw.page.protocols.orders);assert.deepEqual(exported.page.protocols.deep,raw.page.protocols.deep);
 });
 
-test('URL-only and ID-only external destinations are accepted without requiring catalog registration',()=>{
-  for(const handoff of [{url:'https://elsewhere.example/my-flow?mode=diagram#entry'},{spec:'team-custom-flow'}]){
+test('ID-based external destinations retain known links without enrolling in a catalog',()=>{
+  for(const handoff of [{spec:'team-custom-flow',claudeUrl:'https://claude.ai/artifact/my-flow?share=1#entry'},{spec:'team-custom-flow'}]){
     const {plan,parent}=extract(fixture(),['accept','store'],{mode:'external',handoff});
     for(const key of Object.keys(handoff))assert.equal(parent.nodes[plan.id].handoff[key],handoff[key]);
     if(handoff.spec)assert.equal(parent.nodes[plan.id].handoff.section,section(plain(plan.childSpec),0).id);
@@ -350,7 +350,7 @@ test('extraction carries local handoff dependencies as visible diagrams with rew
  raw.page.blocks.push({id:'delivery',heading:'Delivery',diagram:{nodes:{next:{title:'Next'}},rows:[['next']]}});
  diagram(raw).nodes.accept.handoff={localSection:'delivery'};
  for(const mode of ['local','external']){
-  const result=extract(raw,['accept','store'],{mode,title:'Orders',handoff:{url:'https://example.com/orders'}});
+  const result=extract(raw,['accept','store'],{mode,title:'Orders',handoff:{spec:'orders',siteBaseUrl:'https://example.com/view.html'}});
   const child=result.plan.childSpec,local=child.page.sections[0].diagram.nodes.accept.handoff;
   const target=child.page.sections.find(s=>s.id===local.localSection);
   assert.ok(target);assert.equal(target.detailOnly,undefined);assert.equal(target.heading,'Delivery');valid(child);

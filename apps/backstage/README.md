@@ -253,46 +253,55 @@ uses the same rules to generate `workbench/diagrams.json`. Its existing
 `?diagram=<id>` URLs remain read-only; the reader offers **Edit in Workbench**.
 The legacy `?canon=<id>` backend-review route is unchanged.
 
-### Links to another diagram
+### Diagram handoffs in 2.0.0
 
-A node's `handoff` opens another document through an ordinary link. Supply the
-optional `resolveDiagramLink` prop to `FlowviewEntityDiagrams` to map its logical
-reference to your company's viewer route. The same option is available to
-`mountNativeViewer`; `DiagramHandoffReference` and `NativeViewerOptions` are
-exported from the root package.
+This is a breaking handoff contract: `DiagramHandoffReference.spec` is required
+and `url` is removed. Migrate node handoffs to `{spec:"orders",siteBaseUrl:"https://internal.example/team/view.html",claudeUrl:"https://claude.ai/artifact/orders"}`
+with real known destinations. Ordinary source URLs and external detail URL
+fallbacks are unchanged. Existing documents containing `handoff.url` fail validation.
+
+
+A node's `handoff` opens its target **inside Backstage** through the existing
+`loadSpec({id, revision}, signal)` transport. Unpinned IDs use the approved
+association list. To follow IDs outside that list, supply optional
+`resolveHandoffDiagram(reference, signal): Promise<AssociatedDiagram | null>`
+on `FlowviewEntityDiagrams`. Exported type `DiagramHandoffResolver` describes it.
+Reuse the company’s approved Git/catalog index; no new transport is required:
 
 ```tsx
-import type {DiagramHandoffReference} from '@flowview/backstage-plugin';
-
-// Use your existing approved document routes; this callback performs no reads.
-const resolveDiagramLink = (reference: DiagramHandoffReference) => {
-  if (!reference.spec) return undefined;
-  const url = new URL(encodeURIComponent(reference.spec), 'https://designs.example.test/diagrams/');
-  if (reference.revision) url.searchParams.set('revision', reference.revision);
-  if (reference.section) url.hash = new URLSearchParams({section: reference.section}).toString();
-  return url.href;
+const resolveHandoffDiagram: DiagramHandoffResolver = async (reference, signal) => {
+  const entries = await approvedGitIndex(signal); // company-owned authenticated read
+  return entries.find(entry => entry.id === reference.spec &&
+    (!reference.revision || entry.revision === reference.revision)) ?? null;
 };
-
-// Add to the company component above:
-// <FlowviewEntityDiagrams ... resolveDiagramLink={resolveDiagramLink} />
+// <FlowviewEntityDiagrams ... resolveHandoffDiagram={resolveHandoffDiagram} />
 ```
 
-`DiagramHandoffReference` has optional `spec`, `revision`, `section` and `url`
-strings. Authored handoffs require `spec` or `url`; `revision` and `section`
-require `spec`. The host owns the route and how its destination interprets the
-revision and section. Return the complete absolute HTTP(S) URL, including any
-fragment, with no embedded credentials. The callback is synchronous. An absent
-callback, `null`/`undefined`, an unsafe result or an exception falls back to the
-authored `url`; without a usable URL, the viewer shows the destination as
-unavailable. Valid links open a new tab with `noopener noreferrer`.
+Explicit revisions are passed unchanged to `loadSpec`, including targets outside
+the association list. A resolver cannot substitute another ID or pin. Without
+approved metadata or an authored pin, an unassociated ID cannot be loaded.
+Missing targets and failed loads leave the parent usable and offer saved external
+destinations for deliberate selection. URLs are never fetched as specs.
 
-This callback only supplies a link: handoffs never call `loadSpec` or `loadDetail`,
-fetch the destination, or replace the current diagram. Keep the callback identity
-stable between renders (for example, declare it outside the component or use
-`useCallback`). Changing it rebuilds the viewer from the loaded spec and reapplies
-the selected service/step target without another source request. The internal
-`InlineFlowview` and `useInlineViewer` layers forward the same optional resolver;
-no Backstage API or reference proxy is required.
+Targets apply section/view/path/step before switching. **Back to previous diagram**
+restores the paused parent mount, including reader state. A continuation exits
+only its parent’s owned expanded/fullscreen surface before hiding it; Back does
+not re-enter fullscreen automatically. History keeps the root
+plus at most nineteen continuations. Revision/entity changes and unmount retire
+pending requests and all retained mounts. The association selector and service
+hits remain rooted; clicking a service hit returns to that root before navigating.
+The heading, accessible region, compatibility message and Edit/viewer links
+follow the displayed target. Unknown target URLs suppress those links.
+
+`resolveDiagramLink` remains an optional synchronous URL resolver for explicit
+website links and detail fallback. Keep its identity stable; changing it rebuilds
+the root viewer from loaded data. It does not replace the metadata resolver.
+
+Direct `mountNativeViewer` consumers can set `handoffHost:'backstage'` and supply
+`onDiagramHandoff(reference, signal): Promise<void>` to own their navigation.
+Other explicit hosts are `site`, `claude`, and `unknown`. These runtime options
+are never persisted in the spec. Local-section handoffs and external detail
+loading retain their existing behavior.
 
 ## Reference proxy adapter
 

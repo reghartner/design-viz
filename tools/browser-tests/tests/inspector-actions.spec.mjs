@@ -2,7 +2,7 @@ import {test,expect,paste,inspectPageElement,openInspectorGroup} from '../helper
 
 const fixture=()=>({page:{title:'Inspector actions',sections:[
   {id:'overview',heading:'Overview',diagram:{autoplay:false,
-    nodes:{a:{title:'Domain',detail:{section:'child',mode:'focus',future:'keep'}},b:{title:'Receiver',handoff:{url:'https://example.com/child'}}},
+    nodes:{a:{title:'Domain',detail:{section:'child',mode:'focus',future:'keep'}},b:{title:'Receiver',handoff:{spec:'child',siteBaseUrl:'https://example.com/view.html'}}},
     rows:[['a','b']],edges:[{from:'a',to:'b'}],
     panels:[{id:'home',type:'homemap',title:'Shared home',outline:{w:300,h:164,future:'keep'}}],
     steps:Array.from({length:6},(_,i)=>({id:'p'+i,text:'Parent event '+i,edge:'a->b'}))}},
@@ -52,11 +52,11 @@ test('nested handoff and detail commits stay above fields and visible while thei
   const handoff=guide.locator('.node-handoff-editor');
   await expect(handoff).not.toHaveAttribute('open');await handoff.locator('summary').click();
   await before(handoff.getByRole('group',{name:'Diagram handoff actions'}),handoff.locator('.frow').first());
-  await handoff.getByLabel('Destination URL',{exact:true}).fill('https://example.com/revised');
+  await handoff.getByLabel('Internal site base URL',{exact:true}).fill('https://example.com/revised');
   await expect(src).toHaveValue(original);
   await expect(handoff.getByRole('button',{name:'Apply handoff',exact:true})).toBeInViewport();
   await handoff.getByRole('button',{name:'Apply handoff',exact:true}).click();
-  expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.b.handoff.url).toBe('https://example.com/revised');
+  expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.b.handoff.siteBaseUrl).toBe('https://example.com/revised');
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
   const detail=guide.locator('.node-detail-editor');

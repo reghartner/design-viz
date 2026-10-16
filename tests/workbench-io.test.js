@@ -27,6 +27,14 @@ function exportedFiles(h){
   return files;
 }
 
+function assertOriginalHtmlSnapshot(html){
+  const match=html.match(/<script type="application\/json" id="flowspec">([\s\S]*?)<\/script>/);
+  assert.ok(match,'export contains the complete frozen spec');
+  const expected=JSON.parse(INITIAL);
+  if(C.FLOWVIEW_SITE_BASE_URL)expected.page.documentLinks={siteBaseUrl:C.FLOWVIEW_SITE_BASE_URL};
+  assert.deepEqual(JSON.parse(match[1]),expected);
+}
+
 function harness(adapters={},options={}){
   const messages=[],downloads=[],revoked=[],readers=[],requests=[],timers=new Map(),saved=[],elements={},all=[];
   let serial=0,io,renderCount=0;
@@ -257,7 +265,7 @@ test('transport and invalid-template fallbacks retain the frozen export snapshot
   h.requests[0].reject(new Error('404'));await settle();h.requests[1].resolve(response('not a template'));await settle();
   h.requests[2].resolve(response());await settle();
   assert.equal(exportedFiles(h)['original.spec.json'],INITIAL);
-  assert.ok(exportedFiles(h)['original.html'].includes(INITIAL.trim()));assert.equal(h.text,'new invalid handwriting');
+  assertOriginalHtmlSnapshot(exportedFiles(h)['original.html']);assert.equal(h.text,'new invalid handwriting');
   assert.equal(h.session.canUndo(),false);assert.equal(h.session.baseline(),INITIAL);
   const failed=harness();failed.click('file-export');
   for(let i=0;i<3;i++){failed.requests[i].reject(new Error('offline'));await settle();}
@@ -315,7 +323,7 @@ test('directory failures abort opened streams and report only current failures; 
   }
   const d=directory(),h=harness({pickDirectory:()=>Promise.resolve(d.dir)});await startDirectory(h);
   assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html','original.ledger.md','README.md']);
-  const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes[0][1],INITIAL);assert.ok(writes[1][1].includes(INITIAL.trim()));
+  const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes[0][1],INITIAL);assertOriginalHtmlSnapshot(writes[1][1]);
   assert.equal(d.events.filter(e=>e[0]==='close').length,4);assert.match(h.messages.at(-1),/Exported project: original/);
 });
 
@@ -427,7 +435,7 @@ test('folder and single-download fallback carry the identical complete snapshot 
   assert.deepEqual(fallback.downloads.map(d=>d.name),['original.zip']);
   const files=exportedFiles(fallback);assert.deepEqual(Object.keys(files),names);assert.deepEqual(Object.values(files),texts);
   assert.equal(files['original.ledger.md'],expectedLedger);assert.equal(files['original.spec.json'],INITIAL);
-  assert.ok(files['original.html'].includes(INITIAL.trim()));assert.match(files['README.md'],/JSON and Markdown ledger together/);
+  assertOriginalHtmlSnapshot(files['original.html']);assert.match(files['README.md'],/JSON and Markdown ledger together/);
   assert.match(files['README.md'],/all three project artifacts: JSON, HTML and ledger/);
   assert.equal(folder.text,'new unfinished draft');assert.equal(folder.session.baseline(),INITIAL);
 });

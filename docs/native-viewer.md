@@ -19,7 +19,7 @@ viewer.pause();
 viewer.destroy();
 ```
 
-The handle exposes `root`, validation `warnings`, `navigate`, `pause` and
+The handle exposes `root`, validation `warnings`, `navigate`, `pause`, asynchronous `deactivate` and
 idempotent `destroy`. `skin` selects a supported skin; an omitted skin uses the
 spec/default. Optional `backlinks` supplies already-derived evidence data.
 `onChange(target)` reports the canonical section reference, active view ID and,
@@ -103,7 +103,7 @@ re-adds a retired face. No global font/style element or body class is installed.
 Shadow DOM provides ownership, **not a security sandbox**. This pinned package is
 trusted host code. It has no renderer request transport, remote script loading,
 `eval`, or `new Function`. Embedded image validation allows bounded PNG/JPEG/WebP
-data only. Text is escaped. HTTP(S) links without credentials open separate tabs
+data only. Text is escaped. Explicit HTTP(S) links without credentials open separate tabs
 on explicit action; capture guards also cover menus created after initial render.
 The company host supplies its normal script policy plus required inline styles
 and data fonts/images. No iframe or generated Flowview script hash is required.
@@ -149,3 +149,28 @@ React instances, host CSS conflicts, Home/attached controls, nondefault skins,
 SVG symbols and visible motion, keyboard menus, host scroll, reduced motion,
 revision races and unmount/remount. Test real browser layout and resource cleanup;
 jsdom cannot establish those visual properties.
+
+## Host-aware diagram handoffs
+
+`NativeViewerOptions.handoffHost` selects `site`, `claude`, `backstage`, or
+`unknown` for this mount only. `onDiagramHandoff(reference, signal)` owns internal
+Backstage continuation and returns a Promise. Abort retires the request; the
+consumer must not replace the parent on failure or commit late results. The React
+integration supplies this callback and bounded retained-view history. It uses
+approved metadata plus the existing pinned `SpecLoader`, never `loadDetail` or a
+reference URL. See [Backstage wiring](../apps/backstage/README.md#diagram-handoffs-in-200).
+
+A missing current-host destination opens a chooser of saved alternatives. Reader
+Contents links remain explicit. Unknown standalone pages offer known destinations
+for deliberate selection. External handoffs require `spec`; `handoff.url` is rejected.
+Standalone boot accepts `window.flowviewHandoffHost` set before boot. Otherwise,
+positive Claude bridge/current-origin evidence or an exact Claude ancestor/referrer
+in an embedded page identifies Claude; a configured site origin identifies the
+website. A top-level visit from Claude does not identify the new page as Claude.
+Native mounts use explicit options, with no host globals or cross-mount inference.
+
+Before hiding a retained native mount, await `viewer.deactivate()`. It pauses
+playback and releases only that viewer's expanded/browser-fullscreen surface,
+including pending fullscreen entry. It retains section, view, camera and step.
+Back reveals that retained view in the normal surface; fullscreen requires a
+new explicit user action. `pause()` alone does not change fullscreen ownership.

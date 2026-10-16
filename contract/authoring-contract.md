@@ -563,13 +563,13 @@ with no `title` shows its id:
   A local target must differ from its source section and cannot be `detailOnly`;
   a local detail may target its ordinary overview. Do not mix `localSection` with external
   fields. Section rename/delete edits maintain local references.
-  For another document, use `{url:"https://…", spec?:"external-spec-id", revision?, section?, view?, path?, step?, siteBaseUrl?, claudeUrl?, claudeArtifactId?}` or
-  a spec-only reference resolved by the host. Requires `url` or `spec`;
-  `revision`/`section` require `spec`. URLs are absolute HTTP(S), without
-  credentials, and include the complete route/hash. The native host may supply
-  `resolveDiagramLink(reference)`; its safe URL takes precedence over the fallback.
-  An unresolved spec-only handoff stays visibly unavailable. It never invokes
-  `loadDetail`, imports a timeline, or fetches remote specs. Mutually exclusive
+  For another document, use `{spec:"external-spec-id", revision?, section?, view?, path?, step?, siteBaseUrl?, claudeUrl?, claudeArtifactId?}`.
+  `spec` is required; `handoff.url` is removed and rejected. Store the configured
+  viewer entry URL in `siteBaseUrl` and the target's actual artifact share URL
+  in `claudeUrl`. The current host chooses its
+  destination: Claude URL, website route, or Backstage's approved spec loader.
+  Unavailable targets offer explicit alternatives. Handoffs never invoke
+  `loadDetail` or fetch reference URLs as specs. Mutually exclusive
   with `detail`; ordinary `link` remains a source reference. Short titles fit
   best; the usual subtitle/icon gives way to the continuation caption.
   See [diagram handoffs](../cookbook/diagram-handoffs.md) for authoring and a

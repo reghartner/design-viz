@@ -1,4 +1,4 @@
-import type { AssociatedDiagram, SpecLoader } from './api/types';
+import type { AssociatedDiagram, SpecLoader, DiagramHandoffResolver } from './api/types';
 import { FlowviewCompatibility } from './generated/compatibility';
 import type { NativeViewerOptions } from './generated/nativeViewer';
 import { useInlineViewer } from './hooks/useInlineViewer';
@@ -15,17 +15,21 @@ export function InlineFlowview({
   target,
   resolveDiagramLink,
   entityRef,
+  handoffDiagrams,
+  resolveHandoffDiagram,
 }: {
   diagram: AssociatedDiagram;
   loadSpec: SpecLoader;
   target?: ViewerTarget;
   resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink'];
   entityRef?: string;
+  /** Approved list supplies revisions for unpinned diagram handoffs. */
+  handoffDiagrams?: AssociatedDiagram[];
+  resolveHandoffDiagram?: DiagramHandoffResolver;
 }) {
   const [expandedRevision, setExpandedRevision] = useState<string>();
   const identity = diagram.id + '|' + diagram.revision;
   const expanded = expandedRevision === identity;
-  const [position, setPosition] = useState<{identity: string; target: ViewerTarget | null}>();
   const toggle = useRef<HTMLButtonElement>(null);
   const canvasActions = useRef<HTMLDivElement>(null);
   const close = () => { setExpandedRevision(undefined); requestAnimationFrame(() => toggle.current?.focus()); };
@@ -34,9 +38,9 @@ export function InlineFlowview({
     renderError,
     rendered,
     host,
-    retry,
+    retry, activeDiagram, activeSpec, activeTarget, canGoBack, goBack,
   } = useInlineViewer(diagram, loadSpec, target, resolveDiagramLink, expanded,
-    next => setPosition({identity, target: next}));
+    undefined, handoffDiagrams, resolveHandoffDiagram);
   useLayoutEffect(() => {
     const actions = canvasActions.current, canvas = host.current;
     if (!expanded || !rendered || !actions || !canvas) return;
@@ -54,11 +58,11 @@ export function InlineFlowview({
       canvas.style.removeProperty('--flowview-host-actions-block-offset');
     };
   }, [expanded, rendered, host]);
-  const address = position?.identity === identity ? position.target : target;
+  const address = activeTarget || (!canGoBack ? target : undefined);
   const compatibility =
-    state.spec === undefined
+    activeSpec === undefined
       ? undefined
-      : FlowviewCompatibility.check(state.spec);
+      : FlowviewCompatibility.check(activeSpec);
   return (
     <div aria-label="Inline diagram viewer">
       <style>{`
@@ -73,23 +77,25 @@ export function InlineFlowview({
         .flowview-inline-actions .flowview-inline-more{position:absolute;right:8px;top:calc(100% + 6px);z-index:120;width:220px;max-width:calc(100vw - 24px);box-sizing:border-box;display:grid;gap:4px;padding:6px;border:1px solid #dce1f1;border-radius:9px;background:#fff;box-shadow:0 6px 20px #14244220;}
         .flowview-inline-more a{justify-content:flex-start;border-color:transparent;white-space:normal;}
       `}</style>
-      <CanvasFrame expanded={expanded} onClose={close} title={diagram.title}>
+      <CanvasFrame expanded={expanded} onClose={close} title={activeDiagram.title}>
       <div style={expanded ? {position:'absolute',top:0,left:0,right:0,zIndex:100,
         display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'none'} :
         {display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
-        {!expanded && <h3 style={{margin:0,fontSize:22}}>{diagram.title}</h3>}
+        {!expanded && <h3 style={{margin:0,fontSize:22}}>{activeDiagram.title}</h3>}
         <div className="flowview-inline-actions" ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{position:'relative',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',pointerEvents:'auto',maxWidth:'100%',boxSizing:'border-box',
           background:'#fff',border:'1px solid #dce1f1',borderRadius:expanded?0:10,padding:expanded?'6px 12px':8}}>
+          {canGoBack && <button onClick={goBack}>← Back to previous diagram</button>}
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Expand canvas'}
           </button>
-          <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in Workbench</EvidenceLink>
-          <details><summary>More</summary><div className="flowview-inline-more">
-            <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
-          </div></details>
+          {activeDiagram.editUrl && <EvidenceLink url={workspaceLink(activeDiagram.editUrl, activeDiagram, address, entityRef, 'edit')}>Edit in Workbench</EvidenceLink>}
+          {activeDiagram.viewerUrl && <details><summary>More</summary><div className="flowview-inline-more">
+            <EvidenceLink url={workspaceLink(activeDiagram.viewerUrl, activeDiagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
+          </div></details>}
         </div>
       </div>
       <div style={expanded ? {position:'absolute',left:12,bottom:12,zIndex:110,maxWidth:540,maxHeight:'35vh',overflow:'auto',background:'#fff',borderRadius:8} : undefined}>
+      {canGoBack && <p>Following {activeDiagram.title} from associated diagram {diagram.title}.</p>}
       {state.loading && <p role="status">Loading diagram…</p>}
       {(state.error || renderError) && (
         <div role="alert">
@@ -133,8 +139,8 @@ export function InlineFlowview({
           <div
             ref={host}
             role="region"
-            aria-label={'Flowview: ' + diagram.title}
-            title={'Flowview: ' + diagram.title}
+            aria-label={'Flowview: ' + activeDiagram.title}
+            title={'Flowview: ' + activeDiagram.title}
             data-flowview-native=""
             style={{ display: 'block', width: '100%', minWidth: 0, borderRadius: 8 }}
           />

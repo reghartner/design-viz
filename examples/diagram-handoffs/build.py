@@ -22,11 +22,13 @@ def main():
     if url.scheme not in ('http', 'https') or not url.netloc or url.username or url.password or url.query or url.fragment:
         parser.error('--base-url must be an HTTP(S) directory URL without credentials, query or fragment')
     args.out.mkdir(parents=True, exist_ok=True)
+    routes = {'doorbell-overview': 'overview.html', 'doorbell-push': 'push.html', 'doorbell-lake': 'lake.html', 'doorbell-action': 'action.html'}
+    args.out.joinpath('index.html').write_text('<!doctype html><title>Diagram destination</title><script>const routes=' + json.dumps(routes) + ';const target=routes[new URLSearchParams(location.search).get("diagram")];if(target)location.replace(target+location.hash);</script><p>Choose a registered diagram from the overview.</p>')
     with tempfile.TemporaryDirectory(prefix='flowview-handoffs-') as tmp:
         for name in ('overview', 'push', 'lake', 'action'):
             def relocate(value):
                 if isinstance(value, str):
-                    return value.replace(PLACEHOLDER, base)
+                    return value.replace(PLACEHOLDER, base).replace('https://diagrams.example.com/view.html', base + 'index.html')
                 if isinstance(value, dict):
                     return {key: relocate(item) for key, item in value.items()}
                 if isinstance(value, list):
@@ -34,7 +36,9 @@ def main():
                 return value
             spec = Path(tmp) / (name + '.json')
             source = ROOT / 'src/starters/diagram-handoffs.json' if name == 'overview' else HERE / (name + '.spec.json')
-            spec.write_text(json.dumps(relocate(json.loads(source.read_text()))))
+            raw = relocate(json.loads(source.read_text()))
+            raw['page']['documentLinks'] = {'id': 'doorbell-' + name, 'siteBaseUrl': base + 'index.html'}
+            spec.write_text(json.dumps(raw))
             subprocess.run(['node', str(ROOT / 'tools/validate.js'), str(spec)], check=True)
             subprocess.run(['python3', str(ROOT / 'tools/inject.py'), str(spec), str(ROOT / 'template/flowview.html'), str(args.out / (name + '.html'))], check=True)
 

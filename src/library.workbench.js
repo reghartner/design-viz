@@ -269,7 +269,7 @@ function initWorkbenchLibrary(opts){
   }
   function readerOptions(){
     var frozen=entries.slice(),site=new URL(location.href);site.search='';site.hash='';
-    return {autoplay:false,resolveDiagramLink:function(reference){
+    return {autoplay:false,handoffHost:'site',siteBaseUrl:site.href,resolveDiagramLink:function(reference){
       var entry=frozen.find(function(item){return item.id===reference.spec;});
       if(!entry || reference.revision && reference.revision!==entry.revision)return null;
       return documentSiteURL(site.href,reference);

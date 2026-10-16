@@ -606,14 +606,15 @@ function handoffControls(val){
     destination.setAttribute('aria-label','Destination section');localFields.appendChild(frow('Destination section',destination));fold.appendChild(localFields);fold.appendChild(externalFields);
     function showDestination(){local=kind.value==='This spec';localFields.hidden=!local;externalFields.hidden=local;}
     listen(kind,'change',showDestination);showDestination();
-    [['url','Destination URL','https://…'],['spec','Spec ID (optional)','stable-spec-id'],
-      ['revision','Revision (optional)','pinned revision; requires a spec ID'],['section','Section (optional)','section ID; requires a spec ID']].forEach(function(field){
+    [['spec','Spec ID','stable-spec-id'],['siteBaseUrl','Internal site base URL','https://…/view.html'],['claudeUrl','Claude artifact URL','https://claude.ai/artifact/…'],['claudeArtifactId','Claude artifact ID (optional)','Must match the artifact URL'],
+      ['revision','Revision (optional)','pinned revision; requires a spec ID'],['section','Section (optional)','section ID; requires a spec ID'],['view','View (optional)','view ID'],['path','Path (optional)','path ID'],['step','Step (optional)','step ID']].forEach(function(field){
       var control=document.createElement('input');control.type='text';control.className='fctl';
       control.value=draft[field[0]]==null?'':String(draft[field[0]]);control.placeholder=field[2];fields[field[0]]=control;
       externalFields.appendChild(frow(field[1],control));
     });
     actions.appendChild(actionButton('Apply handoff',function(){
-      var handoff={};
+      var handoff=Object.assign({},draft);
+      ['localSection','url','spec','revision','section','view','path','step','siteBaseUrl','claudeUrl','claudeArtifactId'].forEach(function(key){delete handoff[key];});
       if(local)handoff.localSection=destination.value;
       else Object.keys(fields).forEach(function(key){var value=fields[key].value.trim();if(value)handoff[key]=value;});
       var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,handoff);});
@@ -2214,12 +2215,13 @@ function renderExtractionPreview(multiSel){
     });
     mode.value='local';form.appendChild(frow('Destination',mode));listen(mode,'change',updatePreview);
     var destination=document.createElement('div');destination.className='extraction-destination';form.appendChild(destination);
-    var url=field('Destination URL','','https://example.com/flow',destination);
-    var spec=field('Spec ID','','Optional when a URL is supplied',destination);
+    var siteBaseUrl=field('Internal site base URL','','https://example.com/view.html',destination);
+    var claudeUrl=field('Claude artifact URL','','https://claude.ai/artifact/…',destination);
+    var spec=field('Spec ID','','Required approved diagram ID',destination);
     var revision=field('Revision','','Optional with a spec ID',destination);
     var section=field('Section ID','','With a spec ID; leave empty to generate',destination);
     var destinationHelp=document.createElement('p');destinationHelp.className='extraction-help';
-    destinationHelp.textContent='Provide a URL or an approved spec ID. Revision and section ID require a spec ID, which needs a host resolver. Download this JSON, then save or publish it at that destination. Apply adds the parent handoff; it does not publish the child.';
+    destinationHelp.textContent='Provide an approved spec ID and any known site base or Claude artifact URL. The current host opens its own destination; unavailable targets offer explicit alternatives. Download this JSON, then save or publish it at that destination. Apply adds the parent handoff; it does not publish the child.';
     destination.appendChild(destinationHelp);
     var localHelp=paragraph('Local zoom adds a focused detail section in this document. Parent playback does not drive the child.','extraction-help');
     var error=document.createElement('div');error.className='gerr ierr';error.hidden=true;error.setAttribute('role','alert');panel.appendChild(error);
@@ -2259,7 +2261,7 @@ function renderExtractionPreview(multiSel){
     function options(){
       var out={title:title.value.trim(),mode:mode.value};
       if(out.mode==='external'){
-        out.handoff={};[['url',url],['spec',spec],['revision',revision],['section',section]].forEach(function(pair){
+        out.handoff={};[['siteBaseUrl',siteBaseUrl],['claudeUrl',claudeUrl],['spec',spec],['revision',revision],['section',section]].forEach(function(pair){
           var value=pair[1].value.trim();if(value)out.handoff[pair[0]]=value;
         });
       }

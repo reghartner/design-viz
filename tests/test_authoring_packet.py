@@ -38,6 +38,16 @@ class AuthoringPacketTests(unittest.TestCase):
             count += 1
         self.assertGreater(count, 20)
 
+    def test_handoff_contract_and_migration_travel_in_packets_and_folder_kit(self):
+        text, _ = packet.generate([], [])
+        self.assertIn('`spec` is required; `handoff.url` is removed and rejected', text)
+        kit = json.loads(folder_agent_kit(ROOT, '// test runtime'))
+        files = json.loads(gzip.decompress(base64.b64decode(kit['gzip'])))['files']
+        for name in ('contract/authoring-contract.md', 'cookbook/diagram-handoffs.md',
+                     '.claude/skills/hld-to-page/references/authoring-details.md'):
+            self.assertIn('`handoff.url` is removed', files[name])
+        self.assertIn('Backstage 2.0.0', files['.claude/skills/hld-to-page/references/integrations.md'])
+
     def test_all_emitted_links_resolve_from_viz_and_preserve_anchors_and_external_urls(self):
         types = packet.load_sections(packet.read_document(packet.CONTRACT))[3]
         text, _ = packet.generate(types, packet.FEATURES)

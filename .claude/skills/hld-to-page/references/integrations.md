@@ -111,3 +111,9 @@ canon IDs stable when moving spec files. Links show the latest published
 snapshot at the document’s initial view/step; use standalone viewer links for a
 specific playback position. `?canon=` is the legacy backend editing route, not
 the public reader link. See [the publishing guide](../../../../docs/workbench-canon-library.md).
+
+Diagram handoffs in Backstage 2.0.0 require `spec`; `handoff.url` is removed.
+Use `siteBaseUrl` and `claudeUrl` for known target destinations. GO TO stays in
+Backstage through `loadSpec`; unpinned IDs outside the association list need
+`resolveHandoffDiagram` backed by the company's approved index. Never invent a
+revision. See [the handoff migration recipe](../../../../cookbook/diagram-handoffs.md#continue-in-a-separate-document).

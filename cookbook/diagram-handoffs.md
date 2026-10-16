@@ -89,7 +89,8 @@ Try [the reciprocal two-tab example](../examples/tab-handoffs/tab-handoffs.spec.
             "handoff": {
               "spec": "notification-delivery",
               "section": "delivery",
-              "url": "https://diagrams.example.com/notifications.html#d=delivery"
+              "siteBaseUrl": "https://diagrams.example.com/view.html",
+              "claudeUrl": "https://claude.ai/artifact/notification-delivery"
             }
           }
         },
@@ -108,19 +109,34 @@ For an event fan-out, put the three consumer endpoints in one stacked slot:
 `[["event", "bus", ["push", "lake", "action"]]]`. Author actual transport
 edges and outcomes; the links themselves do not imply delivery or ordering.
 
-The destination requires an absolute HTTP(S) `url` or a stable external `spec`
-ID. `revision` and `section` are optional selectors requiring `spec`; they
-belong to the other document and are not rewritten when local sections change.
-Revisions identify content snapshots, not renderer versions. Use an approved
-revision when the host requires one. A URL must include its complete route and
-any desired hash; the renderer does not append section selectors to it.
+The destination requires a stable external `spec` ID. Add known `siteBaseUrl`
+and `claudeUrl` destinations, plus a matching `claudeArtifactId` if stored.
+Optional `revision`, `section`, `view`, `path` and `step` address the other
+document. Revisions identify content snapshots, not renderer versions. A site
+base is the viewer entry URL, with no query or fragment; the renderer adds
+`?diagram=<spec>` and supported selectors. Claude URLs remain unchanged.
 
-A native host can provide `resolveDiagramLink(reference)` to map the spec ID,
-revision and section to an authorized destination URL. Resolution is synchronous
-and does not fetch a spec. An invalid, absent or failing resolver uses `url` as
-the fallback. Spec-only destinations without a resolver display **Destination
-unavailable**. They do not silently open a different diagram. The reader gets
-a real new-tab link with keyboard and standard browser link behavior.
+Migration: `handoff.url` is removed and rejected, including alongside `spec`.
+Replace `{url:"https://old.example/orders.html"}` with
+`{spec:"orders",siteBaseUrl:"https://internal.example/team/view.html"}` using
+the actual configured viewer entry URL, and add the target's saved `claudeUrl`
+when known. Do not reinterpret an arbitrary old page URL as a site base.
+
+The node action follows the current host: the target’s saved Claude artifact URL
+in Claude, the published diagram route on the website, and the existing approved
+spec loader inside Backstage. If that host cannot open the target, the reader
+chooses from available destination links; it never silently switches hosts.
+Claude URLs retain their own query/fragment without appending diagram selectors.
+Backstage has a Back action that restores the paused parent diagram. Unpinned
+IDs outside its association list require a company metadata resolver; see
+[Backstage handoffs](../apps/backstage/README.md#diagram-handoffs-in-200).
+
+Host context is runtime configuration, not authored JSON. A standalone integration
+can set `window.flowviewHandoffHost` before boot; native callers use `handoffHost`.
+Reader Contents **Open on internal site** and **Open in Claude** always open the
+explicit destination. Local continuations and external detail drill-downs are
+separate behaviors. An unknown runtime host offers available destinations for
+deliberate selection.
 
 In the workbench, select a node → **Diagram handoff**, enter its destination,
 and choose **Apply handoff**. **Remove handoff** restores an ordinary card.
@@ -154,7 +170,8 @@ Set the internal site base once in `company/company.json` as
 
 A cross-document `handoff` or external `detail` can carry `spec`, `revision`,
 `section`, `view`, `path`, `step`, `siteBaseUrl`, `claudeUrl`, and
-`claudeArtifactId`, plus the existing fallback `url`. Known destinations travel
+`claudeArtifactId`. Only external `detail` retains a fallback `url`; handoffs
+require `spec` and reject `url`. Known destinations travel
 with the reference. The published reader resolves catalog IDs to its local
 `?diagram=` route. Its detail loader validates the catalog revision and renders
 the target interactively with Back navigation; it never fetches a reference URL

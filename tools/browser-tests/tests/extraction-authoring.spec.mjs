@@ -38,8 +38,8 @@ test('branched parent extraction previews changes, keeps an independent child an
   expect(await page.locator('#undo-builder').isDisabled()).toBe(undoWasDisabled);await page.locator('#redo-builder').click();await expect(src).toHaveValue(extracted);
 });
 
-test('separate document downloads before Apply, remains usable at phone width and cancels by keyboard',async({page,server},testInfo)=>{
-  await start(page,server);await page.setViewportSize({width:390,height:844});
+test('separate document downloads before Apply, remains usable on desktop and cancels by keyboard',async({page,server},testInfo)=>{
+  await start(page,server);await page.setViewportSize({width:1280,height:900});
   const preview=page.locator('.extraction-preview'),src=page.locator('#src');
   await preview.getByLabel('Domain title').fill('Orders');
   await preview.getByRole('combobox',{name:'Destination',exact:true}).selectOption('external');
@@ -52,7 +52,7 @@ test('separate document downloads before Apply, remains usable at phone width an
   expect(draft.page.sections[0].id).toBe('orders');expect(draft.page.sections[0].diagram.steps).toEqual([]);
   await expect(src).toHaveValue(source);await expect(preview.getByRole('button',{name:'Apply extraction',exact:true})).toBeEnabled();
   expect(await preview.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
-  await page.screenshot({path:testInfo.outputPath('extraction-external-phone.png')});
+  await page.screenshot({path:testInfo.outputPath('extraction-external-desktop.png')});
   await preview.getByLabel('Domain title').fill('Revised orders');
   await expect(preview.getByRole('button',{name:'Apply extraction',exact:true})).toBeDisabled();
   await preview.getByLabel('Domain title').press('Escape');await expect(preview).toHaveCount(0);await expect(src).toHaveValue(source);

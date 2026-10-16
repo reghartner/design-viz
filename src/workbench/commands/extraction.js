@@ -80,7 +80,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     if(mode==='external'){
       handoff=builderClone(options.handoff || {});
       var errors=[];validateHandoff(handoff,null,'Destination',errors);
-      if(handoff.localSection!=null)errors.push('Separate document requires an external spec ID or URL.');
+      if(handoff.localSection!=null)errors.push('Separate document requires an external spec ID.');
       if(errors.length)return {error:errors.join('\n')};
       if(handoff.section){
         if(!/^[a-zA-Z][\w.-]*$/.test(handoff.section))return {error:'The destination section ID must begin with a letter and use letters, digits, _, . or -.'};

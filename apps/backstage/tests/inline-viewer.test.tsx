@@ -14,7 +14,7 @@ const owners:Array<{navigate:ReturnType<typeof vi.fn>;pause:ReturnType<typeof vi
 beforeEach(()=>{
   owners.length=0;mount.mockReset();
   mount.mockImplementation(host=>{
-    const owner={root:host.shadowRoot || host.attachShadow({mode:'open'}),warnings:[],snapshot:vi.fn(()=>null),setCanvas:vi.fn(),navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
+    const owner={root:host.shadowRoot || host.attachShadow({mode:'open'}),warnings:[],snapshot:vi.fn(()=>null),setCanvas:vi.fn(),navigate:vi.fn(),pause:vi.fn(),deactivate:vi.fn().mockResolvedValue(undefined),destroy:vi.fn()};
     owners.push(owner);return owner;
   });
 });
@@ -109,7 +109,7 @@ it('owns a native host, recovers from navigation errors, and destroys the mount 
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   const host=await screen.findByRole('region',{name:'Flowview: Doorbell'});
   await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
-  expect(host.shadowRoot).toBeTruthy();expect(document.querySelector('iframe')).toBeNull();
+  expect(host.firstElementChild?.shadowRoot).toBeTruthy();expect(document.querySelector('iframe')).toBeNull();
   const owner=owners[0],target={section:'front-door',path:'cold',step:'shutdown'};
   owner.navigate.mockImplementationOnce(()=>{throw new Error('This step is no longer in the published diagram.');});
   view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
@@ -180,4 +180,84 @@ it('loads a revision through Backstage FetchApi, refuses stale/wrong/oversized s
   fetchApi.fetch.mockResolvedValue({ok:true,text:async()=>JSON.stringify({page:{canon:{id:'another'}}})});await expect(loader(diagram,signal)).rejects.toThrow('different');
   fetchApi.fetch.mockResolvedValue({ok:true,text:async()=>' '.repeat(2*1024*1024+1)});await expect(loader(diagram,signal)).rejects.toThrow('2 MiB');
   await expect(loader({...diagram,id:'../secret'},signal)).rejects.toThrow('Invalid');
+});
+
+it('follows approved revisions inside Backstage and returns to the retained parent',async()=>{
+ const target={...diagram,id:'delivery',revision:'d1',title:'Delivery',editUrl:'https://flows.test/delivery/edit'};
+ const load=vi.fn().mockImplementation(d=>Promise.resolve(d.id==='doorbell'?spec:{page:{title:'Delivery',canon:{id:'delivery'}}}));
+ const view=render(<InlineFlowview diagram={diagram} loadSpec={load} handoffDiagrams={[diagram,target]}/>);
+ await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
+ const root=owners[0],follow=mount.mock.calls[0][2]!.onDiagramHandoff!;
+ await act(async()=>follow({spec:'delivery',section:'destination',view:'flow',path:'alternate',step:'done'},new AbortController().signal));
+ expect(load.mock.calls.at(-1)![0]).toEqual({id:'delivery',revision:'d1'});
+ expect(owners[1].navigate).toHaveBeenCalledWith({section:'destination',view:'flow',path:'alternate',step:'done'});
+ expect(mount.mock.results[0].value.deactivate).toHaveBeenCalled();expect(root.destroy).not.toHaveBeenCalled();
+ expect(screen.getByRole('region',{name:'Flowview: Delivery'})).toBeTruthy();
+ expect(screen.getByRole('link',{name:'Edit in Workbench'}).getAttribute('href')).toContain('/delivery/edit');
+ fireEvent.click(screen.getByRole('button',{name:/Back to previous diagram/}));
+ expect(owners[1].destroy).toHaveBeenCalledOnce();expect(root.destroy).not.toHaveBeenCalled();
+ expect(screen.getByRole('region',{name:'Flowview: Doorbell'})).toBeTruthy();
+ await act(async()=>follow({spec:'delivery',section:'destination'},new AbortController().signal));
+ view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} handoffDiagrams={[diagram,target]} target={{section:'root-hit',step:'root-step'}}/>);
+ expect(owners[2].destroy).toHaveBeenCalledOnce();expect(root.navigate).toHaveBeenLastCalledWith({section:'root-hit',step:'root-step'});
+ view.unmount();expect(root.destroy).toHaveBeenCalledOnce();
+});
+it('keeps parents usable on unknown, stale, invalid navigation and raced handoffs',async()=>{
+ let resolveSlow:(v:unknown)=>void=()=>{};
+ const load=vi.fn().mockImplementation(d=>d.id==='slow'?new Promise(resolve=>resolveSlow=resolve):d.revision==='stale'?Promise.reject(new Error('Stale revision')):Promise.resolve(d.id==='doorbell'?spec:{page:{title:d.id,canon:{id:d.id}}}));
+ const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+ await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));const root=owners[0],follow=mount.mock.calls[0][2]!.onDiagramHandoff!;
+ await expect(follow({spec:'missing'},new AbortController().signal)).rejects.toThrow('pinned revision');
+ await expect(follow({spec:'delivery',revision:'stale'},new AbortController().signal)).rejects.toThrow('Stale revision');
+ const slow=follow({spec:'slow',revision:'s1'},new AbortController().signal);
+ await act(async()=>follow({spec:'fast',revision:'f1'},new AbortController().signal));
+ await act(async()=>{resolveSlow({page:{title:'STALE'}});await slow;});expect(mount).toHaveBeenCalledTimes(2);
+ expect(screen.queryByRole('link',{name:'Edit in Workbench'})).toBeNull();expect(screen.getByRole('region',{name:'Flowview: fast'})).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:/Back to previous diagram/}));
+ const real=mount.getMockImplementation()!;mount.mockImplementationOnce((...args)=>{const viewer=real(...args);viewer.navigate=vi.fn(()=>{throw Error('Missing target section');});return viewer;});
+ await act(async()=>{await expect(follow({spec:'bad',revision:'b1',section:'missing'},new AbortController().signal)).rejects.toThrow('Missing target section');});
+ expect(owners[2].destroy).toHaveBeenCalledOnce();expect(root.destroy).not.toHaveBeenCalled();
+ const aborted=new AbortController(),late=follow({spec:'slow',revision:'s1'},aborted.signal);view.unmount();
+ expect(load.mock.calls.at(-1)![1].aborted).toBe(true);
+ await act(async()=>{resolveSlow({page:{title:'AFTER UNMOUNT'}});await late;});expect(mount).toHaveBeenCalledTimes(3);
+});
+it('uses an approved host index for unassociated IDs without replacing authored pins',async()=>{
+ const target={...diagram,id:'other-service',revision:'approved',title:'Other service'};
+ const resolveHandoffDiagram=vi.fn().mockResolvedValue(target);
+ const load=vi.fn().mockImplementation(d=>Promise.resolve(d.id==='doorbell'?spec:{page:{canon:{id:d.id}}}));
+ render(<InlineFlowview diagram={diagram} loadSpec={load} resolveHandoffDiagram={resolveHandoffDiagram}/>);
+ await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));const follow=mount.mock.calls[0][2]!.onDiagramHandoff!;
+ await act(async()=>follow({spec:'other-service'},new AbortController().signal));
+ expect(load.mock.calls.at(-1)![0]).toEqual({id:'other-service',revision:'approved'});
+ await expect(follow({spec:'other-service',revision:'different'},new AbortController().signal)).rejects.toThrow('requested diagram and revision');
+ expect(load).toHaveBeenCalledTimes(2);
+});
+it('bounds retained handoff mounts and retires every viewer on unmount',async()=>{
+ const load=vi.fn().mockImplementation(d=>Promise.resolve(d.id==='doorbell'?spec:{page:{canon:{id:d.id}}}));
+ const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
+ for(let i=0;i<23;i++)await act(async()=>mount.mock.calls.at(-1)![2]!.onDiagramHandoff!({spec:'next-'+i,revision:'r1'},new AbortController().signal));
+ expect(owners.filter(o=>o.destroy.mock.calls.length===0)).toHaveLength(20);
+ expect(owners[0].destroy).not.toHaveBeenCalled();view.unmount();
+ expect(owners.every(o=>o.destroy.mock.calls.length===1)).toBe(true);
+});
+
+it('stages targets invisibly until deactivation settles and destroys aborted candidates without reveal',async()=>{
+ const load=vi.fn().mockImplementation(d=>Promise.resolve(d.id==='doorbell'?spec:{page:{canon:{id:d.id}}}));
+ const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+ await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
+ const root=mount.mock.results[0].value,follow=mount.mock.calls[0][2]!.onDiagramHandoff!;
+ let release:()=>void=()=>{};root.deactivate.mockImplementation(()=>new Promise<void>(resolve=>release=resolve));
+ const abort=new AbortController(),pending=follow({spec:'next',revision:'r1'},abort.signal);
+ await waitFor(()=>expect(mount).toHaveBeenCalledTimes(2));
+ const staged=mount.mock.calls[1][0];expect(staged.hidden).toBe(true);expect(staged.inert).toBe(true);expect(staged.style.display).toBe('none');
+ expect(mount.mock.calls[0][0].hidden).toBe(false);expect(screen.queryByRole('button',{name:/Back to previous diagram/})).toBeNull();
+ abort.abort();expect(owners[1].destroy).toHaveBeenCalledOnce();expect(staged.isConnected).toBe(false);
+ await act(async()=>{release();await pending;});expect(owners[1].destroy).toHaveBeenCalledOnce();
+ const next=follow({spec:'next',revision:'r1'},new AbortController().signal);await waitFor(()=>expect(mount).toHaveBeenCalledTimes(3));
+ const committed=mount.mock.calls[2][0];expect(committed.hidden).toBe(true);
+ await act(async()=>{release();await next;});expect(committed.hidden).toBe(false);expect(committed.inert).toBe(false);expect(mount.mock.calls[0][0].hidden).toBe(true);
+ fireEvent.click(screen.getByRole('button',{name:/Back to previous diagram/}));
+ const retired=follow({spec:'last',revision:'r1'},new AbortController().signal);await waitFor(()=>expect(mount).toHaveBeenCalledTimes(4));view.unmount();
+ expect(owners[3].destroy).toHaveBeenCalledOnce();expect(mount.mock.calls[3][0].isConnected).toBe(false);
+ await act(async()=>{release();await retired;});expect(owners[3].destroy).toHaveBeenCalledOnce();
 });

@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const B={URL};vm.createContext(B);
 for(const file of ['canon.js','validator.js','engine.js','workbench/io-model.js','workbench/source-edit.js','workbench/commands/common.js','workbench/commands/document.js'])vm.runInContext(readSource(file),B);
+const configuredSiteBase=B.FLOWVIEW_SITE_BASE_URL;
 const plain=v=>JSON.parse(JSON.stringify(v));
 const claude='https://claude.ai/public/artifacts/abc-123';
 const doc=(id,diagram)=>({page:{documentLinks:{id,claudeUrl:claude,claudeArtifactId:'abc-123'},sections:[{id:'overview',diagram:diagram || {nodes:{a:{title:'A'}},rows:[['a']]}}]}});
@@ -12,7 +13,7 @@ test('site destinations retain subpaths and supported targets; Claude is the exa
  assert.equal(destinations[0].url,'https://intranet.example/diagrams/?diagram=existing_diagram#d=overview&v=flow&m=step&p=happy&s=send');
  assert.equal(destinations[1].url,claude);
  for(const url of ['https://claude.ai/artifacts/team-123','https://claude.site/artifacts/legacy-123','https://claude.ai/public/artifacts/abc-123?shared=true'])assert.equal(B.claudeArtifact(url).url,url);
- assert.equal(B.diagramHandoffURL(ref),claude);
+ assert.equal(B.diagramHandoffURL(ref),B.documentSiteURL(configuredSiteBase,ref) || claude);
  assert.equal(B.diagramHandoffURL({...ref,url:'https://legacy.example/'}),'https://legacy.example/');
  assert.equal(B.documentReference(doc('existing_diagram').page).spec,'existing_diagram');
  assert.equal(B.documentReference({canon:{id:'registered'},documentLinks:{id:'wrong'}}).spec,'registered');
@@ -29,10 +30,10 @@ for(const [route,id] of [['artifact','diagram_123'],['code/artifact','f57e291a-a
   const saved=JSON.parse(plan.text);assert.deepEqual(saved.page.documentLinks,links);
   assert.deepEqual(plain(B.validate(saved.page).errors),[]);
   const snapshot=B.prepareExportSnapshot(plan.text,()=>saved);assert.equal(snapshot.error,undefined);
-  assert.deepEqual(JSON.parse(snapshot.text).page.documentLinks,links);
+  assert.deepEqual(JSON.parse(snapshot.text).page.documentLinks,{...links,...(configuredSiteBase?{siteBaseUrl:configuredSiteBase}:{})});
   const ref=plain(B.documentReference(saved.page));
-  assert.deepEqual(plain(B.documentDestinations(ref)),[{kind:'claude',label:'Open in Claude',url}]);
-  assert.equal(B.diagramHandoffURL({...ref,section:'overview',step:'send'}),url);
+  assert.deepEqual(plain(B.documentDestinations(ref,()=>null)),[{kind:'claude',label:'Open in Claude',url}]);
+  assert.equal(B.diagramHandoffURL({...ref,section:'overview',step:'send'},()=>null),url);
   saved.page.documentLinks.claudeArtifactId='another-artifact';
   assert.match(B.validate(saved.page).errors.join('\n'),/claudeArtifactId: must match/);
   assert.match(B.planDocumentSetting(plan.text,JSON.parse(plan.text),'documentLinks',saved.page.documentLinks).error,/must match/);
@@ -67,7 +68,7 @@ test('nested topology snapshots retain only inert origin links and strip all pro
  const refs=plain(B.sourceDiagramReferences(diagram,'m::p::a'));assert.deepEqual(refs.map(ref=>ref.spec),['middle','provider']);
  assert.ok(refs.every(ref=>ref.claudeUrl===claude && ref.section==='overview'));
  const links=plain(B.nodeReferenceLinks(diagram,'m::p::a'));assert.ok(links.some(link=>link.url.includes('?diagram=provider#d=overview')));
- assert.deepEqual(plain(B.validate(snapshot.page).errors),[]);B.FLOWVIEW_SITE_BASE_URL=null;
+ assert.deepEqual(plain(B.validate(snapshot.page).errors),[]);B.FLOWVIEW_SITE_BASE_URL=configuredSiteBase;
 });
 
 test('ordinary document identity survives temporary topology membership and local exports',()=>{
@@ -93,5 +94,5 @@ test('host rejection never downgrades a pin or overrides an explicit fallback wi
  assert.equal(B.documentSiteURL(B.FLOWVIEW_SITE_BASE_URL,{spec:'test',revision:'opaque-pin'}),null);
  const pinned=new URL(B.documentSiteURL(B.FLOWVIEW_SITE_BASE_URL,{spec:'test',revision:ref.revision,section:'overview'}));
  assert.equal(JSON.parse(new URLSearchParams(pinned.hash.slice(1)).get('fv')).revision,ref.revision);
- B.FLOWVIEW_SITE_BASE_URL=null;
+ B.FLOWVIEW_SITE_BASE_URL=configuredSiteBase;
 });

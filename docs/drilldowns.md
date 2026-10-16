@@ -48,7 +48,7 @@ Try the [branched doorbell extraction example](../examples/independent-extractio
 Shift-click at least two nodes in the same section and choose **Create domain
 from selected nodes**. The preview offers **Local zoom** (a focused detail in
 this document) or **Separate document** (an arrow-shaped handoff to another
-spec or URL). Set its title and review the affected steps, connections and
+spec). Set its title and review the affected steps, connections and
 reference changes before **Apply extraction**. Cancel leaves the source alone;
 Apply is one **Undo** action.
 
@@ -76,14 +76,15 @@ routing are supported. The preview explains the mechanical changes:
   routing without the parent's reveal/hide step windows. Parent lane rows remain
   unstacked and split at five cards when interface nodes require more room.
 
-For **Separate document**, enter an approved spec ID or an absolute HTTP(S)
-URL. Revision and section selectors require a spec ID. **Download destination
+For **Separate document**, enter an approved spec ID and any known internal site
+base or Claude artifact URL. Revision and section selectors address that spec. **Download destination
 JSON** must succeed before Apply becomes available; changing the title or
 address requires a fresh download. The file is a complete page, including any
 local nested details needed by the moved nodes. Store it in the destination
 repository and register or publish it using your normal workflow. Extraction
 does not publish a file, create an approved revision or make a URL live.
-URL-only destinations open their supplied URL exactly, including any hash.
+`handoff.url` is removed. Use `spec` with `siteBaseUrl` and/or `claudeUrl`;
+see the [migration recipe](../cookbook/diagram-handoffs.md#continue-in-a-separate-document).
 
 Invalid source references and duplicate edges with identical endpoints must
 be resolved first. Errors leave the source unchanged. Changing source, project
@@ -225,8 +226,8 @@ status, tone, and notification state separately.
 ## Continue in another document
 
 For a visible endpoint that continues a process in a separate document, author
-`node.handoff` instead of `detail`. It draws an arrow-shaped card and opens a
-real destination link; see [diagram handoffs](../cookbook/diagram-handoffs.md).
+`node.handoff` instead of `detail`. It draws an arrow-shaped card and follows the current host
+(Claude, website or Backstage), offering alternatives when unavailable; see [diagram handoffs](../cookbook/diagram-handoffs.md).
 Keep `detail` for focused exploration. Existing external details below remain
 supported and keep their existing loading behavior.
 

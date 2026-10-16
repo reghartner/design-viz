@@ -55,11 +55,11 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   const both=plain(context.tourStepsForPersona(config,'both').map(s=>s.id));
   // eng: the mode pair (map, then sequence), branching, links, its recap
   assert.deepEqual(eng,['welcome','views','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','explore-panels','explore-recovery','expand','finish-eng']);
-  // ux: one simple controls step, no AMBIENT anywhere in its copy
+  // ux: one simple controls step, no Ambient anywhere in its copy
   assert.deepEqual(ux,['welcome','views','controls','branching-split','branching-rejoin','panels','expand','finish-ux']);
   context.tourStepsForPersona(config,'ux').forEach(s=>{
     const text=(s.copy&&(s.copy.heading+' '+s.copy.body))||'';
-    assert.ok(!text.includes('AMBIENT'),'ux copy never mentions AMBIENT: '+s.id);
+    assert.ok(!/ambient/i.test(text),'ux copy never mentions Ambient: '+s.id);
   });
   // both: the eng mode pair plus the ux story/panels — an authored union
   assert.deepEqual(both,['welcome','views','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','panels','explore-panels','explore-recovery','expand','finish-eng']);

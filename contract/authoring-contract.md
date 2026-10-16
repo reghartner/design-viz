@@ -452,7 +452,7 @@ diagram in that same section:
 ### view
 
 How the board opens. `"ambient"` (default — live animation, with an
-AMBIENT/STEP toggle whenever `steps` exist), `"step"` (opens as the
+Ambient/Step toggle whenever `steps` exist), `"step"` (opens as the
 click-through at step 1, paused by default), or `"ambient-only"` (no toggle; use
 for boards without a meaningful sequence). One diagram spec always supports
 both modes — repeating the same diagram in another tab with `"view": "step"`
@@ -597,7 +597,7 @@ with no `title` shows its id:
 
 ### Delta markers — nodes, edges, and steps
 
-Set `delta: true` to show a green change triangle and enable **Δ ONLY**.
+Set `delta: true` to show a green change triangle and enable **Δ only**.
 Optional `deltaText` supplies a note with prose markup (line breaks are preserved).
 Optional `deltaLinks` supplies an array of `{ "label": "Design decision",
 "url": "https://example.com/decision" }`; labels may be omitted. Only absolute
@@ -2183,7 +2183,7 @@ You do not author these, but they shape what ids are worth writing:
   `#d=4&m=step&s=ota.3` link remains valid, while newly emitted links use the
   explicit section ID or heading slug. Write `steps[n].id` values people can
   say out loud.
-- **Presenter mode.** A PRESENT button goes fullscreen; arrow keys step,
+- **Presenter mode.** A **Present** button (tooltip "Present full screen") goes fullscreen and becomes **Exit** while presenting; arrow keys step,
   space plays/pauses, digits 1–9 switch tabs, Esc exits.
 - **Adjacent-file specs.** An http(s)-served template page still holding the
   built-in demo accepts `?spec=relative/path.json` and fetches the spec from

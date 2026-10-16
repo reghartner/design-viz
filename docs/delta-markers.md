@@ -2,7 +2,7 @@
 
 Set `delta: true` on a node, edge, or step to mark a change with a bright green
 triangle outline and a soft glow. The same marker appears in the step controls.
-The **Δ ONLY** control dims unchanged diagram elements. Existing boolean-only
+The **Δ only** control dims unchanged diagram elements. Existing boolean-only
 markers remain visual indicators and do not open empty popovers.
 
 Add an optional Markdown note with `deltaText` and links with `deltaLinks`:

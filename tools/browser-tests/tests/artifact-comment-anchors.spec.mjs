@@ -62,9 +62,9 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
  await expect(ringLine).toContainText(/STEP 2\/5\s*Chime plays/);
  await ring.getByRole('button',{name:'Next step'}).click();
  await expect(ringLine).toContainText(/STEP 3\/5\s*Camera wakes/);
- await ring.locator('.mtoggle .mbtn',{hasText:'AMBIENT'}).click();
+ await ring.locator('.mtoggle .mbtn',{hasText:'Ambient'}).click();
  await expect(ring.locator('.termbar')).toBeHidden();
- await ring.locator('.mtoggle .mbtn',{hasText:'STEP'}).click();
+ await ring.locator('.mtoggle .mbtn',{hasText:'Step'}).click();
  await expect(ringLine).toBeVisible();
  await chip(2).click();
  await expect(ringLine).toContainText('Chime plays');
@@ -99,8 +99,8 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
  for(const [key,c] of [['h-step',centers.chip],['h-bullet',centers.bullet]]){
   expect(Math.abs(placed[key].x-c.x)).toBeLessThanOrEqual(1);expect(Math.abs(placed[key].y-c.y)).toBeLessThanOrEqual(1);
  }
- // AMBIENT hides the step buttons, so the step thread is unplaced.
- await ring.locator('.mtoggle .mbtn',{hasText:'AMBIENT'}).click();
+ // Ambient hides the step buttons, so the step thread is unplaced.
+ await ring.locator('.mtoggle .mbtn',{hasText:'Ambient'}).click();
  await expect.poll(()=>placedKeys(page)).toEqual(['h-bullet']);
  // Hidden-Tab thread: reveal switches Tab and places it.
  await page.evaluate(()=>window.__comments.callbacks.reveal('h-vault'));

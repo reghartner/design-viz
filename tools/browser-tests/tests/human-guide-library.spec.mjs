@@ -240,15 +240,15 @@ test('Canon edit and browser Back preserve Ambient mode while stale modes use th
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
   await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
   const reader=page.locator('#canon-reader'),editor=page.locator('#docview');
-  await reader.getByRole('button',{name:'AMBIENT',exact:true}).click();
-  await expect(reader.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await reader.getByRole('button',{name:'Ambient',exact:true}).click();
+  await expect(reader.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(reader.locator('.termbar')).toBeHidden();
 
   await page.locator('#canon-reader-edit').click();
-  await expect(editor.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(editor.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(editor.locator('.termbar')).toBeHidden();
   await page.goBack();await expect(page.locator('#welcome-reader-screen')).toBeVisible();
-  await expect(reader.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(reader.locator('.termbar')).toBeHidden();
 
   await page.evaluate(()=>{
@@ -256,11 +256,11 @@ test('Canon edit and browser Back preserve Ambient mode while stale modes use th
     state.flowviewWorkbenchEntry.readerTarget.m='retired-mode';history.replaceState(state,'');
   });
   await page.reload();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
-  await expect(reader.getByRole('button',{name:'STEP',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.getByRole('button',{name:'Step',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(reader.locator('.termbar')).toBeVisible();
   expect((await page.evaluate(()=>history.state.flowviewWorkbenchEntry.readerTarget)).m).toBeUndefined();
   await page.locator('#canon-reader-edit').click();
-  await expect(editor.getByRole('button',{name:'STEP',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(editor.getByRole('button',{name:'Step',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(editor.locator('.termbar')).toBeVisible();
 });
 

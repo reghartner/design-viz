@@ -1,4 +1,4 @@
-# Story steps
+# Steps
 
 Open the **Steps** tab in the workbench editor. Choose a section, including one
 in a hidden tab, then search by caption, step ID, lane, node, hop or panel ID.

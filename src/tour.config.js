@@ -44,8 +44,8 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The big picture',
-        body: 'AMBIENT shows the calls together, with activity looping across the diagram.',
-        reducedMotionBody: 'AMBIENT shows the calls together. Animation stays off with reduced motion.'
+        body: 'Ambient shows the calls together, with activity looping across the diagram.',
+        reducedMotionBody: 'Ambient shows the calls together. Animation stays off with reduced motion.'
       }
     },
     {
@@ -57,13 +57,13 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'One call at a time',
-        body: 'STEP follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
-        reducedMotionBody: 'STEP follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
+        body: 'Step follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
+        reducedMotionBody: 'Step follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
       },
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'PRESENT gives a room the full-page presentation.'
+          note: 'Present goes full screen for a room.'
         }
       ]
     },
@@ -80,7 +80,7 @@ var TOUR_DEFAULT_CONFIG = {
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'PRESENT gives a room the full-page presentation.'
+          note: 'Present goes full screen for a room.'
         }
       ]
     },

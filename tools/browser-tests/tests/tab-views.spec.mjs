@@ -132,14 +132,14 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
   expect(metrics.height).toBeGreaterThan(34);expect(metrics.content).toBeLessThanOrEqual(metrics.height);expect(metrics.box.bottom).toBeLessThanOrEqual(p.y+p.height);
  }
  await readable();const initial=await camera();await info.attach('dense-step-phone',{body:await page.screenshot(),contentType:'image/png'});
- await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();expect(await camera()).toEqual(initial);
- await expect(player.getByRole('button',{name:'STEP',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
- await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();expect(await camera()).toEqual(initial);
+ await player.getByRole('button',{name:'Ambient',exact:true}).click();await expect(bar).toBeHidden();await separated();expect(await camera()).toEqual(initial);
+ await expect(player.getByRole('button',{name:'Step',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
+ await player.getByRole('button',{name:'Step',exact:true}).click();await readable();expect(await camera()).toEqual(initial);
  // Wrapped utility rows and a shorter viewport must reserve their actual space.
  await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await readable();
  await page.setViewportSize({width:390,height:740});await readable();
- await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();
- await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();
+ await player.getByRole('button',{name:'Ambient',exact:true}).click();await expect(bar).toBeHidden();await separated();
+ await player.getByRole('button',{name:'Step',exact:true}).click();await readable();
 });
 
 for(const width of [870,1280])for(const authored of [false,true])test(`reader View reordering preserves the ${authored?'authored':'default'} camera before Fit at ${width}px`,async({page,server},info)=>{

@@ -17,9 +17,9 @@ diagram the full width; **Diagram + panels** puts the supporting state alongside
 it. Chapters 1, 3 and 6 also offer **Backstage close-up** for the actual screenshots.
 The image is static reference material; the flow and its step controls remain live.
 
-Choose **PRESENT** for fullscreen. Arrow keys advance/reverse steps, Space toggles
-play/pause, 1–8 select chapters, and Escape exits. **AMBIENT** shows the complete
-topology; **STEP** returns to the guided story. Alternate chips start at the same
+Choose **Present** ("Present full screen") for fullscreen. Arrow keys advance/reverse steps, Space toggles
+play/pause, 1–8 select chapters, and Escape exits. **Ambient** shows the complete
+topology; **Step** returns to the guided story. Alternate chips start at the same
 shared lead-in and branch at the first different beat.
 
 For a roughly 12-minute talk, use the sequence below. Timings are suggested

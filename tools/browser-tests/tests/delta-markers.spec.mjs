@@ -54,7 +54,7 @@ test('delta details support notes, multiple links, keyboard and independent step
   await page.keyboard.press('Escape');
   await root.locator('.delta-chip-wrap:has([data-step-source="0"]) .dvdelta').press('Space');
   await expect(root.getByRole('dialog',{name:'Change details for prepare'})).toBeVisible();
-  await root.getByRole('button',{name:'Δ ONLY',exact:true}).click();
+  await root.getByRole('button',{name:'Δ only',exact:true}).click();
   await expect(root.locator('.delta-popover:visible')).toHaveCount(0);
   await expect(marker).toHaveCSS('opacity','1');
   await page.setViewportSize({width:420,height:850});

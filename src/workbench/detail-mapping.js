@@ -57,7 +57,7 @@ function createDetailMappingControl(options){
   }
   Object.keys(map).forEach(function(key){row(key,map[key],false);});
   if(parents.some(function(s){return !Object.prototype.hasOwnProperty.call(map,s.id);})){row(null,{},true);}
-  else if(!parents.length){var empty=doc.createElement('p');empty.className='fnote';empty.textContent='Give parent story steps IDs to create mappings.';root.appendChild(empty);}
+  else if(!parents.length){var empty=doc.createElement('p');empty.className='fnote';empty.textContent='Give parent steps IDs to create mappings.';root.appendChild(empty);}
   var advanced=doc.createElement('details'),summary=doc.createElement('summary');summary.textContent='Advanced mapping JSON';advanced.appendChild(summary);
   var raw=doc.createElement('textarea');raw.className='fctl';raw.setAttribute('aria-label','Advanced mapping JSON');raw.value=detail.stepMap==null?'':JSON.stringify(detail.stepMap,null,2);advanced.appendChild(raw);
   advanced.appendChild(c.action('Apply mapping JSON',function(){var value;try{value=raw.value.trim()?JSON.parse(raw.value):null;}catch(_){options.error('Mapping JSON must be valid JSON.');return;}options.change({action:'replace',value:value});}));root.appendChild(advanced);

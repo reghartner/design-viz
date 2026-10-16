@@ -6,7 +6,7 @@ function createVisibilityControl(options){
   var heading=doc.createElement('summary');heading.textContent='Visibility by path position';wrap.appendChild(heading);
   var note=doc.createElement('p');note.className='fnote';
   note.textContent='Applies to the same position in every path, including steps hidden in this view. Show is inclusive; Hide starts at that position. Ambient mode shows everything. Reordering steps keeps these positions.';wrap.appendChild(note);
-  if(!max){note.textContent='Add story steps to this section to preview visibility timing. Ambient mode shows everything.';}
+  if(!max){note.textContent='Add steps to this section to preview visibility timing. Ambient mode shows everything.';}
   var active=options.current(),route=paths.find(function(p){return active && p.id===active.path;}) || paths[0];
   var path=c.select(paths.map(function(p){return p.id;}),route.id,function(id){route=paths.find(function(p){return p.id===id;});draw();return true;});
   path.setAttribute('aria-label','Caption path');

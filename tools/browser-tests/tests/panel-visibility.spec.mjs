@@ -42,7 +42,7 @@ for(const host of ['workbench','standalone','native'])test(host+' whole panels h
  await root.locator('[data-dv-path="happy"]').first().click();await root.getByRole('button',{name:'Summary',exact:true}).click();
  await next.click();await expect(phone).not.toHaveClass(/panel-step-hidden/);await expect(phone).toContainText('Visitor');
  await expect(root.locator('[data-layout-key="panel:camera"]')).toBeHidden();
- await root.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(phone).not.toHaveClass(/panel-step-hidden/);await expect(camera).not.toHaveClass(/panel-step-hidden/);
+ await root.getByRole('button',{name:'Ambient',exact:true}).click();await expect(phone).not.toHaveClass(/panel-step-hidden/);await expect(camera).not.toHaveClass(/panel-step-hidden/);
  await expect(root.locator('[data-layout-key="panel:camera"]')).toBeHidden();
  await page.screenshot({path:info.outputPath(host+'-panel-visibility.png')});
  if(host==='native'){await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();}

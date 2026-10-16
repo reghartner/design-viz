@@ -44,7 +44,12 @@ export const test=base.extend({
     failures.allowAbort=request=>allowedAborts.add(request);
     function watch(page){
       page.on('pageerror',error=>failures.push('page: '+error.message));
-      page.on('console',message=>{if(message.type()==='error')failures.push('console: '+message.text());});
+      page.on('console',message=>{
+        if(message.type()!=='error')return;
+        const url=message.location()?.url || '';
+        if(allowedStatuses.some(allowed=>url && allowed.matches(url)))return;
+        failures.push('console: '+message.text());
+      });
     }
     context.on('page',watch);
     context.on('request',request=>{
@@ -54,6 +59,8 @@ export const test=base.extend({
     context.on('requestfailed',request=>{
       const reason=request.failure()?.errorText;
       if(allowedAborts.has(request) && reason==='net::ERR_ABORTED'){allowedAborts.delete(request);expectedAborts.push(request.url());return;}
+      // A deliberately served HTTP error is reported by Chromium as a failed resource load.
+      if(allowedStatuses.some(allowed=>allowed.matches(request.url())))return;
       failures.push('request failed: '+request.url()+' '+reason);
     });
     context.on('response',response=>{if(response.status()>=400 && !allowedStatuses.some(allowed=>allowed.status===response.status() && allowed.matches(response.url())))failures.push('HTTP '+response.status()+': '+response.url());});

@@ -29,12 +29,15 @@ async function publish(server){
 }
 test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recursive:true,force:true});});
 
-async function pickerFixture(page,server){
-  const fixture=await publish(server);
-  fixture.provider={page:{title:'Notification platform',protocols:{delivery:{label:'Provider delivery',color:'#667788'}},sections:[
+function providerSpec(){
+  return {page:{title:'Notification platform',protocols:{delivery:{label:'Provider delivery',color:'#667788'}},sections:[
     {id:'channels',heading:'Notification channels',diagram:{nodes:{dispatch:{title:'Dispatcher'},push:{title:'Push'},email:{title:'Email'},sms:{title:'SMS'},private:{title:'Never exported'}},rows:[['dispatch'],['push','email','sms','private']],edges:['push','email','sms'].map(to=>({from:'dispatch',to,kind:'delivery'})),topologyExports:{channels:{nodes:['dispatch','push','email','sms'],edges:['dispatch->push','dispatch->email','dispatch->sms']}}}},
     {id:'archive',heading:'Archive section',diagram:{nodes:{archive:{title:'Archive'}},rows:[['archive']],edges:[],topologyExports:{archive:{nodes:['archive'],edges:[]}}}}
   ]}};
+}
+async function pickerFixture(page,server){
+  const fixture=await publish(server);
+  fixture.provider=providerSpec();
   await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.provider));
   fixture.specs.second.page.blocks.push({id:'destination',heading:'Another destination',diagram:{nodes:{local:{title:'Second local'}},rows:[['local']],edges:[]}});
   await writeFile(path.join(fixture.root,'diagrams/second/second.spec.json'),JSON.stringify(fixture.specs.second));
@@ -246,6 +249,9 @@ test('a brand-new local diagram on a deployed site browses providers automatical
 
 for(const settlement of ['resolve','reject'])test('a held repository index '+settlement+' cannot corrupt a reopened reference picker or clear its selection',async({page,server})=>{
   const fixture=await publish(server);
+  // Publish a real provider so the settled index lists something to add.
+  await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(providerSpec()));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
   function deferred(){let release;return {promise:new Promise(resolve=>release=resolve),release};}
   const attempts=[0,1].map(()=>({gate:deferred(),seen:deferred(),done:deferred()}));let request=0;
   const catalogURL=new URL('diagrams.json',fixture.url).href,catalog=await readFile(path.join(fixture.root,'workbench/diagrams.json'),'utf8');

@@ -74,7 +74,11 @@ def main() -> int:
     for p in pages:
         families.setdefault(p.get("family", "other"), []).append(p)
 
-    out = [f"<title>{html.escape(a.title)}</title>",
+    # Declare the encoding up front: static servers often omit a charset header,
+    # and the browser would otherwise misread "—" and "·" as mojibake.
+    out = ["<!doctype html>",
+           '<meta charset="utf-8">',
+           f"<title>{html.escape(a.title)}</title>",
            '<meta name="viewport" content="width=device-width, initial-scale=1">',
            f"<style>{CSS}</style>",
            '<div class="wrap">',
@@ -113,9 +117,9 @@ def main() -> int:
         out.append("</div>")
     out.append("</div>")
     html_text = "\n".join(out) + "\n"
-    (root / "index.html").write_text(html_text)
+    (root / "index.html").write_text(html_text, encoding="utf-8")
     crossref_text = json.dumps(crossref, indent=2, ensure_ascii=False) + "\n"
-    (root / "crossref.json").write_text(crossref_text)
+    (root / "crossref.json").write_text(crossref_text, encoding="utf-8")
     print(f"built {root / 'index.html'} ({len(html_text)} bytes, {len(pages)} pages, "
           f"{len(families)} families, {len(shared)} shared services); "
           f"wrote {root / 'crossref.json'}")

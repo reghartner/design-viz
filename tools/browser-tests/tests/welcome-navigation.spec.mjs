@@ -1,7 +1,11 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdtemp,mkdir,cp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
 
 const home=page=>page.locator('#welcome-home');
 const editor=page=>page.locator('#workbench-workspace');
@@ -300,3 +304,75 @@ for(const [width,height] of [[1280,800],[1440,900],[1920,1080]])for(const draft 
     }
   });
 }
+
+// #547 — Welcome and the template picker link the examples gallery only when the
+// build's site config names it ("examples" in site.json). No runtime request decides it.
+// row | fixture                                                        | assertion (scoped)                                                         | rejects
+// 1   | site/workbench/flowspec.html built with --config {examples:"../examples/index.html"}, gallery beside it | #welcome-home #welcome-gallery visible; its href resolves to site/examples/index.html | no Welcome link, or one pointing elsewhere
+// 2   | same, real click on #welcome-new                                 | #welcome-new-screen #welcome-new-gallery visible with the same resolved href | a link on only one surface
+// 3   | same, real click on #welcome-gallery                             | the opened tab has doctype html, characterSet UTF-8, .sub reads "N pages · every diagram", the Auralis card .t reads "Auralis Presence — mmWave …", no "â€"/"Â·" in its text | the generated page without doctype/charset (mojibake)
+// 4   | row 1–2 loads                                                    | the workbench itself requests nothing under examples/ before the click  | a runtime probe kept alongside the config
+// 5   | unconfigured build (--no-config) at site/workbench/flowspec.html with the gallery present beside it | zero requests under examples/ through Welcome and the picker; #welcome-gallery and #welcome-new-gallery hidden | a link shown, or a probe sent, without config
+async function gallerySite(server,html){
+  const root=await mkdtemp(path.join(server.root,'gallery-site-')),workbench=path.join(root,'workbench');
+  await mkdir(workbench);await writeFile(path.join(workbench,'flowspec.html'),html);
+  for(const name of ['catalog.json','starters.json'])await cp(path.join(server.root,name),path.join(workbench,name));
+  await mkdir(path.join(root,'examples'));await cp(path.join(repo,'examples/index.html'),path.join(root,'examples/index.html'));
+  const base=server.origin+'/'+path.basename(root);
+  return {url:base+'/workbench/flowspec.html',gallery:base+'/examples/index.html',cleanup:()=>rm(root,{recursive:true,force:true})};
+}
+// Build with a site config naming the gallery; restore the shared build output after.
+async function configuredWorkbench(){
+  const dir=await mkdtemp(path.join(tmpdir(),'flowview-gallery-config-')),target=path.join(repo,'workbench/flowspec.html'),original=await readFile(target);
+  try{
+    await writeFile(path.join(dir,'site.json'),JSON.stringify({version:1,landing:{spec:path.join(repo,'src/starters/onboarding.json')},examples:'../examples/index.html'}));
+    execFileSync('python3',[path.join(repo,'tools/build.py'),'--config',path.join(dir,'site.json')],{cwd:dir,stdio:'pipe'});
+    return await readFile(target,'utf8');
+  }finally{await writeFile(target,original);await rm(dir,{recursive:true,force:true});}
+}
+function examplesRequests(page){
+  const seen=[];page.on('request',request=>{if(new URL(request.url()).pathname.includes('/examples/'))seen.push(request.method()+' '+request.url());});
+  return seen;
+}
+
+test('a configured examples gallery is linked from Welcome and the template picker and renders UTF-8 text',async({page,server})=>{
+  const site=await gallerySite(server,await configuredWorkbench());
+  try{
+    const requests=examplesRequests(page);
+    await page.goto(site.url);await expect(home(page)).toBeVisible();
+    const homeLink=home(page).locator('#welcome-gallery');
+    await expect(homeLink).toBeVisible();
+    expect(await homeLink.evaluate(link=>link.href)).toBe(site.gallery);
+    await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
+    const pickerLink=screen(page,'new').locator('#welcome-new-gallery');
+    await expect(pickerLink).toBeVisible();
+    expect(await pickerLink.evaluate(link=>link.href)).toBe(site.gallery);
+    await page.waitForLoadState('networkidle');expect(requests).toEqual([]);
+    await page.locator('#welcome-new-screen [data-welcome-back]').click();await expect(homeLink).toBeVisible();
+    const opened=page.waitForEvent('popup');await homeLink.click();
+    const tab=await opened;await tab.waitForLoadState();
+    expect(tab.url()).toBe(site.gallery);
+    expect(await tab.evaluate(()=>({doctype:document.doctype&&document.doctype.name,charset:document.characterSet}))).toEqual({doctype:'html',charset:'UTF-8'});
+    await expect(tab.locator('.sub')).toHaveText(/^\d+ pages · every diagram /);
+    await expect(tab.locator('a.card .t').filter({hasText:'Auralis Presence'})).toHaveText('Auralis Presence — mmWave room sensing, fall safety, offline autonomy');
+    const text=await tab.locator('body').innerText();
+    expect(text).not.toContain('â€');expect(text).not.toContain('Â·');
+    await tab.close();
+  }finally{await site.cleanup();}
+});
+
+test('without site config the examples gallery links stay hidden and nothing is requested',async({page,server})=>{
+  const site=await gallerySite(server,await readFile(path.join(server.root,'workbench.html'),'utf8'));
+  try{
+    const requests=examplesRequests(page);
+    await page.goto(site.url);
+    await expect(home(page)).toBeVisible();await expect(page.locator('#welcome-library')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(home(page).locator('#welcome-gallery')).toBeHidden();
+    await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
+    await expect(page.locator('#welcome-templates .welcome-template-card').first()).toBeVisible();
+    await expect(screen(page,'new').locator('#welcome-new-gallery')).toBeHidden();
+    await page.waitForLoadState('networkidle');
+    expect(requests).toEqual([]);
+  }finally{await site.cleanup();}
+});

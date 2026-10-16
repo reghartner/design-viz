@@ -433,6 +433,11 @@ function initWorkbenchWelcome(opts){
       el('welcome-manifest-status').hidden = false;
     });
   }
+  /* The build's site config names the examples gallery ("examples" in site.json);
+     without it the links stay hidden. No runtime request decides this. */
+  if (typeof WORKBENCH_EXAMPLES === 'string' && WORKBENCH_EXAMPLES){
+    document.querySelectorAll('[data-examples-gallery]').forEach(function(link){ link.href = WORKBENCH_EXAMPLES; link.hidden = false; });
+  }
   var repositoryInput = el('welcome-repository'), revisionInput = el('welcome-revision');
   var repositoryKey = 'dv-workbench-authoring-repository-v1', config;
   try { config = JSON.parse(localStorage.getItem(repositoryKey)); } catch (ex){}

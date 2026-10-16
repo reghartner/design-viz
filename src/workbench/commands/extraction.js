@@ -116,6 +116,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
         var group=collapse.get(collapsed) || [];group.push(edge);collapse.set(collapsed,group);
       }else edgeMap.set(key,key);
     }
+    if((d.steps || []).some(function(step){return Object.keys(step.contracts || {}).some(function(key){return internal.has(key);});}))return {error:'Internal connections have step JSON contract overrides. Move or remove those overrides before extracting a diagram without steps.'};
     report.internalEdges=child.edges.length;
     collapse.forEach(function(edges){
       if(edges.length<2)return;
@@ -197,6 +198,11 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
         }else{var next=edgeMap.has(key)?edgeMap.get(key):key;failures[next]=step.failures[key];if(next!==key)affected=true;}
       });
       if(step.failures)extractionSetMap(step,'failures',failures);
+      if(step.contracts){
+        var contracts=Object.create(null);
+        Object.keys(step.contracts).forEach(function(key){var next=edgeMap.has(key)?edgeMap.get(key):key;if(next)contracts[next]=step.contracts[key];});
+        extractionSetMap(step,'contracts',contracts);
+      }
       if(step.nodes)step.nodes=Array.from(new Set(step.nodes.map(function(id){if(selected.has(id)){affected=true;return domainId;}return id;})));
       if(step.tone){
         var tone=Object.create(null);Object.keys(step.tone).forEach(function(id){if(selected.has(id)){affected=true;toneCount++;}else tone[id]=step.tone[id];});

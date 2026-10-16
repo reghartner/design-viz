@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
     'document.tab-views':['Tab-owned Views and section membership','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
@@ -128,6 +129,7 @@ var FlowviewCompatibility = (function(){
           if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
         });
       });
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && e.contract!=null;}) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.contracts!=null;}))used['content.edge-json-contracts']=true;
       if(d.storyTime!=null)used['flow.story-time']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || p.type!=='battery')return;

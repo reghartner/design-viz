@@ -1439,7 +1439,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function clearWireContracts(){if(wireContracts)wireContracts.destroy();wireContracts=null;}
   function paintWireContracts(){
     clearWireContracts();
-    if(options && options.section && mode==='step' && !hidden)wireContracts=wireStepContracts(secBox,board,stepWireContracts(options.section,d.steps[cur],selectedPath.id),prefix,cur,stopAuto);
+    if(!hidden){
+      var step=mode==='step'?d.steps[cur]:null;
+      var entries=mode==='step' && !step?[]:edgeJsonContracts(d,step);
+      if(step && options && options.section)entries=entries.concat(stepWireContracts(options.section,step,selectedPath.id));
+      wireContracts=wireStepContracts(secBox,board,entries,prefix,cur,stopAuto);
+    }
   }
 
   var btnAmb = termbar.btnAmb, btnStep = termbar.btnStep;
@@ -1846,6 +1851,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     renderRuntimeConditions(board,termbar.runtimeStatus,[]);
     bar.hidden = true;
     setFragmentStep(secBox, 0, false);
+    paintWireContracts();
     syncToggle();
     if (panelCtl) panelCtl.setStep(0, false, true);
     if (onChange) onChange();
@@ -2858,8 +2864,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
-  var standardViewport=null;
-  result.destroy=function(){if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
+  var standardViewport=null,staticWireContracts=null;
+  result.destroy=function(){if(staticWireContracts)staticWireContracts.destroy();if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 
@@ -2929,6 +2935,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       deltaTog.appendChild(btnDelta); (boardLayout.modesHost || lg).appendChild(deltaTog);
     }
     addFocusControl();
+    staticWireContracts=wireStepContracts(box,board,edgeJsonContracts(activeDiagram),prefix,0);
     return result;
   }
 

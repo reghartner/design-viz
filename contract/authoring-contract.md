@@ -384,24 +384,20 @@ and upgrade the packaged viewer to use it. No schema-major change is needed.
 
 ### Step wire contract previews
 
-A section contract may declare `wires: [{step, edge, path?}]`. `step` is a unique,
-stable ID in that section's diagram; `edge` is an existing `from->to` edge used
-by that step. Optional `path` is an explicit path ID containing the step. Without
-`path`, shared occurrences all use the binding. A malformed or stale binding
-warns and is skipped. Duplicate bindings to the same contract/edge collapse to
-one marker. Delivered visible edges alone show markers in Step mode; unrelated
-edges, failed communications, and Ambient mode do not.
+Set `edge.contract: {json: <any JSON value>, title?: string}` for a wire payload
+without a section block. `step.contracts["from->to"]` replaces that envelope for
+one step; absent inherits, `null` hides it, `{json:null}` displays JSON null.
+Defaults appear in Ambient; Step mode uses only delivered visible active edges.
+Desktop inspectors edit **Contract JSON** and per-edge step overrides/inheritance.
+Hover/focus previews; click/Enter/Space pins and pauses playback. **Copy JSON**
+copies the formatted payload. Close/Escape or step/path/mode/section changes dismiss.
 
-```json
-{"title":"Request", "wires":[{"step":"send","edge":"doorbell->cloud","path":"happy"}],
- "fields":[{"k":"event","v":"button_press"}]}
-```
-
-Hover/focus previews the shared card presentation. Click/Enter/Space pins it and
-pauses playback; Close/Escape or leaving the step/path/section dismisses it.
-Links remain usable in the preview. Row reveal/hide thresholds follow the current
-path step. Workbench's contract inspector adds/removes bindings with one Undo.
-The capability is `content.wire-contracts`. See [contract blocks](../docs/contract-blocks.md#preview-a-contract-on-a-step-wire).
+Existing section cards bind via `wires:[{step,edge,path?}]`: unique stable step ID,
+declared active edge, optional containing path ID. Shared steps use all paths
+unless scoped. Invalid bindings warn and skip; multiple cards keep separate
+markers. Card bindings appear only in Step mode and retain links/row reveals.
+Capabilities: `content.edge-json-contracts` (payloads), `content.wire-contracts`
+(cards). Rebuild exports/upgrade viewers. See [recipe and examples](../docs/contract-blocks.md).
 
 ### fragment-level reveals
 

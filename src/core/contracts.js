@@ -53,3 +53,26 @@ function stepWireContracts(section, step, pathId){
   });
   return out;
 }
+
+/* JSON wire contracts are independent of section cards. Null suppresses a
+   contract; {json:null} is a real JSON payload. Invalid overrides fail closed. */
+function validJsonContract(value){
+  return !!value && typeof value==='object' && !Array.isArray(value) &&
+    Object.prototype.hasOwnProperty.call(value,'json') && value.json!==undefined &&
+    (value.title==null || typeof value.title==='string');
+}
+function edgeJsonContracts(diagram,step){
+  var out=[],seen=Object.create(null),edges=diagram && Array.isArray(diagram.edges)?diagram.edges:[];
+  var keys=step?stepDeliveredKeys(step):null;
+  edges.forEach(function(edge){
+    if(!edge)return;
+    var key=edge.from+'->'+edge.to;
+    // Duplicate edge declarations have ambiguous ownership: never show a payload.
+    if(seen[key] || edges.filter(function(e){return e && e.from+'->'+e.to===key;}).length!==1)return;
+    seen[key]=true;if(keys && keys.indexOf(key)<0)return;
+    var overrides=step && step.contracts,value=edge.contract;
+    if(overrides && typeof overrides==='object' && !Array.isArray(overrides) && Object.prototype.hasOwnProperty.call(overrides,key))value=overrides[key];
+    if(validJsonContract(value))out.push({edge:key,jsonContract:value,overridden:!!(overrides && Object.prototype.hasOwnProperty.call(overrides,key)),record:{key:'edge-json',value:value}});
+  });
+  return out;
+}

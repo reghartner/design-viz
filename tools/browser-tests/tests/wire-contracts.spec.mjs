@@ -129,3 +129,81 @@ test('native Canvas keeps the full preview above its toolbar when no adjacent ca
  await page.keyboard.press('Escape');await expect(preview(root)).toBeHidden();await expect(marker(root).first()).toBeFocused();
  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });
+
+function jsonFixture(){
+ const raw=fixture(),sec=raw.page.blocks[0].tabs[0].sections[0];delete sec.contract;delete sec.contracts;
+ sec.diagram.edges[0].contract={title:'Doorbell request',json:{event:'button_press',deviceId:'doorbell-7',unsafe:'</pre><img src=x onerror=alert(1)>'}};
+ sec.diagram.edges[1].contract={json:null};
+ sec.diagram.steps[0].contracts={'a->b':{title:'Step request',json:{event:'button_press',retry:true,nested:[1,false,null]}}};
+ sec.diagram.steps[1].contracts={'a->b':{json:'done'}};
+ return raw;
+}
+for(const native of [false,true])test('edge JSON hover, exact clipboard, defaults and step replacement in '+(native?'native':'standalone'),async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1400,height:1000});await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+ const root=await open(page,server,jsonFixture(),native),marks=marker(root),pop=preview(root);
+ await expect(root.locator('.contract-grid')).toHaveCount(0);await expect(marks).toHaveCount(2);
+ await page.screenshot({path:testInfo.outputPath('before-hover.png')});
+ await marks.first().hover();await pop.getByRole('button',{name:'Copy JSON',exact:true}).hover();await expect(pop).toBeVisible();
+ const expected=JSON.stringify({event:'button_press',retry:true,nested:[1,false,null]},null,2);
+ await expect(pop.locator('pre')).toHaveText(expected);
+ await page.screenshot({path:testInfo.outputPath('after-hover.png')});
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await expect(pop.getByRole('status')).toHaveText('JSON copied.');
+ expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(expected);
+ await root.getByRole('button',{name:'Play',exact:true}).click();await marks.first().click();await expect(root.locator('.playback-status')).toContainText('Paused');await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(pop).toBeHidden();await expect(marks).toHaveCount(1);
+ await marks.first().focus();await marks.first().press('Space');await expect(pop.getByRole('button',{name:'Copy JSON',exact:true})).toBeFocused();await expect(pop.locator('pre')).toHaveText('"done"');
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe('"done"');
+ await pop.getByRole('button',{name:'Close wire contract'}).click();await expect(pop).toBeHidden();await expect(marks.first()).toBeFocused();
+ await root.getByRole('button',{name:'Ambient',exact:true}).click();await expect(marks).toHaveCount(2);
+ await marks.first().hover();await expect(pop.locator('pre')).toContainText('</pre><img src=x onerror=alert(1)>');await expect(pop.locator('img')).toHaveCount(0);
+ await marks.nth(1).click();await expect(pop.locator('pre')).toHaveText('null');
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe('null');
+ if(native){
+  await page.evaluate(()=>{window.oldCopyStatus=document.querySelector('#host').shadowRoot.querySelector('.wire-contract-preview [role=status]');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(){return new Promise(resolve=>window.finishDestroyedCopy=resolve);}}});});
+  await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await expect(pop.getByRole('status')).toHaveText('Copying…');
+  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();await page.evaluate(()=>finishDestroyedCopy());expect(await page.evaluate(()=>oldCopyStatus.textContent)).toBe('Copying…');
+ }
+});
+
+test('clipboard failure, unavailability and late completion cannot mutate a retired JSON preview',async({page,server})=>{
+ const root=await open(page,server,jsonFixture()),marks=marker(root),pop=preview(root);
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(){return Promise.reject(new Error('denied'));}}}));
+ await marks.first().click();await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await expect(pop.getByRole('status')).toContainText('Copy unavailable.');
+ await expect(pop.locator('pre')).toBeVisible();
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined}));
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await expect(pop.getByRole('status')).toContainText('copy it manually');
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(){return new Promise(resolve=>window.finishCopy=resolve);}}}));
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await expect(pop.getByRole('status')).toHaveText('Copying…');
+ await page.keyboard.press('Escape');await marks.first().click();await page.evaluate(()=>finishCopy());await expect(pop.getByRole('status')).toBeEmpty();await expect(pop.getByRole('button',{name:'Copy JSON',exact:true})).toBeEnabled();
+ await pop.getByRole('button',{name:'Copy JSON',exact:true}).click();await root.getByRole('button',{name:'Next step',exact:true}).click();await marks.first().click();await page.evaluate(()=>finishCopy());await expect(pop.getByRole('status')).toBeEmpty();await expect(pop.locator('pre')).toHaveText('"done"');
+});
+
+test('desktop inspector edits connection JSON, invalid drafts, per-hop overrides and Undo/Redo',async({page,server})=>{
+ const raw=jsonFixture(),sec=raw.page.blocks[0].tabs[0].sections[0];delete sec.diagram.edges[0].contract;delete sec.diagram.edges[1].contract;delete sec.diagram.steps[0].contracts;delete sec.diagram.steps[1].contracts;
+ await page.goto(server.origin+'/workbench.html');await pastePage(page,JSON.stringify(raw,null,2));const root=page.locator('#docview'),guide=page.locator('#guide');
+ await root.locator('[data-dv-edge="0"]').first().click({force:true});
+ const field=guide.getByRole('textbox',{name:'Contract JSON',exact:true});await expect(field).toBeVisible();
+ const initial=await page.locator('#src').inputValue();await field.fill('{broken');await field.press('Tab');await expect(field).toHaveValue('{broken');expect(await page.locator('#src').inputValue()).toBe(initial);
+ await field.fill('{"hello":"world"}');await field.press('Tab');await expect(marker(root)).toHaveCount(1);
+ await page.locator('#undo-builder').click();await expect(marker(root)).toHaveCount(0);await page.locator('#redo-builder').click();await expect(marker(root)).toHaveCount(1);
+ await root.locator('.schip').first().dblclick();
+ const override=guide.getByRole('textbox',{name:'Contract JSON for a->b',exact:true});await expect(override).toBeVisible();await expect(guide).toContainText('Inherited from connection');
+ const inheritedSource=await page.locator('#src').inputValue();await override.focus();await override.press('Tab');expect(await page.locator('#src').inputValue()).toBe(inheritedSource);
+ await override.fill('{"hello":"step"}');await override.press('Tab');await expect(guide).toContainText('Override for this step');
+ await marker(root).first().click();await expect(preview(root).locator('pre')).toHaveText(JSON.stringify({hello:'step'},null,2));await page.keyboard.press('Escape');await root.locator('.schip').first().dblclick();
+ await guide.getByRole('textbox',{name:'Contract JSON for b->c',exact:true}).fill('null');await guide.getByRole('textbox',{name:'Contract JSON for b->c',exact:true}).press('Tab');await expect(marker(root)).toHaveCount(2);
+ await guide.getByRole('button',{name:'Inherit connection contract',exact:true}).first().click();
+ const saved=JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].tabs[0].sections[0].diagram;
+ expect(saved.steps[0].contracts).toEqual({'b->c':{json:null}});
+ await guide.getByRole('button',{name:'Hide contract on this step',exact:true}).first().click();await expect(marker(root)).toHaveCount(1);
+ await page.locator('#undo-builder').click();await expect(marker(root)).toHaveCount(2);
+});
+
+test('Ambient JSON markers need neither steps nor section blocks and Step respects hidden or failed edges',async({page,server})=>{
+ const raw=jsonFixture(),d=raw.page.blocks[0].tabs[0].sections[0].diagram;d.steps=[];delete d.paths;d.view='ambient';
+ let root=await open(page,server,raw);await expect(marker(root)).toHaveCount(2);await marker(root).first().hover();await expect(preview(root).locator('pre')).toContainText('deviceId');
+ await chooseNavigation(root.locator('.reader-navigation'),'Tab','Other');await expect(preview(root)).toBeHidden();await chooseNavigation(root.locator('.reader-navigation'),'Tab','Flow');await expect(marker(root)).toHaveCount(2);
+ d.view='step';d.steps=[{edges:['a->b','b->c'],failures:{'a->b':'dropped'}}];d.edges[1].revealAt=1;
+ root=await open(page,server,raw);await expect(marker(root)).toHaveCount(0);
+ await root.getByRole('button',{name:'Ambient',exact:true}).click();await expect(marker(root)).toHaveCount(2);
+});

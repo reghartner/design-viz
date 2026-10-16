@@ -1,0 +1,66 @@
+{
+  "page": {
+    "title": "JSON on a wire",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Doorbell request",
+        "text": "Hover the notepad to inspect and copy the payload. Step forward to see the retry replacement.",
+        "diagram": {
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "device": {
+              "title": "Doorbell"
+            },
+            "cloud": {
+              "title": "Cloud"
+            }
+          },
+          "rows": [
+            [
+              "device",
+              "cloud"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "device",
+              "to": "cloud",
+              "contract": {
+                "title": "Doorbell request",
+                "json": {
+                  "event": "button_press",
+                  "deviceId": "doorbell-7",
+                  "retry": false
+                }
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "send",
+              "edge": "device->cloud",
+              "text": "First request inherits the connection payload."
+            },
+            {
+              "id": "retry",
+              "edge": "device->cloud",
+              "text": "Retry replaces the payload for this step.",
+              "contracts": {
+                "device->cloud": {
+                  "title": "Retry request",
+                  "json": {
+                    "event": "button_press",
+                    "deviceId": "doorbell-7",
+                    "retry": true
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

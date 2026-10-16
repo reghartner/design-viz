@@ -421,6 +421,11 @@ function builderRetargetStepKeys(steps, oldKey, newKey){
                          .filter(function(k){ return typeof k === 'string'; });
       if (!st.edges.length) delete st.edges;
     }
+    if(st.contracts && typeof st.contracts==='object' && !Array.isArray(st.contracts)){
+      var contracts=Object.create(null);
+      Object.keys(st.contracts).forEach(function(key){var next=key===oldKey?newKey:key;if(next)contracts[next]=st.contracts[key];});
+      if(Object.keys(contracts).length)st.contracts=contracts;else delete st.contracts;
+    }
     if (st.failures && typeof st.failures === 'object' && !Array.isArray(st.failures)){
       var failures = Object.create(null);
       Object.keys(st.failures).forEach(function(key){
@@ -448,7 +453,9 @@ function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId, reso
   if (known.error) return known;
   if (!known.d.nodes || !Object.prototype.hasOwnProperty.call(known.d.nodes, nodeId))
     return {error: 'unknown node id "' + nodeId + '"'};
-  var oldKey = builderEdgeKey(e);
+  var oldKey = builderEdgeKey(e),nextKey=(field==='from'?nodeId:e.from)+'->'+(field==='to'?nodeId:e.to);
+  if(nextKey!==oldKey && (known.d.edges || []).some(function(edge){return builderEdgeKey(edge)===nextKey;}))return {error:'A connection with those endpoints already exists.'};
+  if(nextKey!==oldKey && (got.d.steps || []).some(function(step){return step && step.contracts && Object.prototype.hasOwnProperty.call(step.contracts,nextKey);}))return {error:'A contract already references the new edge key. Resolve it before changing endpoints.'};
   return builderRewrite(text, raw, got.path, function(d){
     d.edges[edgeIdx][field] = nodeId;
     builderRetargetStepKeys(d.steps, oldKey, builderEdgeKey(d.edges[edgeIdx]));
@@ -468,6 +475,11 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
   if (newId === oldId) return {error: 'same id'};
   if (Object.prototype.hasOwnProperty.call(got.d.nodes, newId))
     return {error: 'id "' + newId + '" is already taken'};
+  var conflictingContract=(got.d.edges || []).some(function(edge){
+    var oldKey=builderEdgeKey(edge),nextKey=(edge.from===oldId?newId:edge.from)+'->'+(edge.to===oldId?newId:edge.to);
+    return nextKey!==oldKey && (got.d.steps || []).some(function(step){return step && step.contracts && Object.prototype.hasOwnProperty.call(step.contracts,nextKey);});
+  });
+  if(conflictingContract)return {error:'A contract already references the renamed edge key. Resolve it before renaming the node.'};
   var plan=builderRewrite(text, raw, got.path, function(d){
     /* null-prototype map: a plain {} would route an id like "__proto__"
        through the prototype setter and silently drop the node */

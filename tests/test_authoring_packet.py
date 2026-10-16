@@ -135,6 +135,14 @@ class AuthoringPacketTests(unittest.TestCase):
             text, _ = packet.generate([], [], mode=mode)
             self.assertLessEqual(len(text.encode()), maximum)
 
+    def test_edge_json_contracts_infer_the_wire_contract_reference(self):
+        raw = {'page': {'sections': [{'diagram': {
+            'nodes': {'a': {}, 'b': {}}, 'rows': [['a', 'b']],
+            'edges': [{'from': 'a', 'to': 'b', 'contract': {'json': None}}]}}]}}
+        text, meta = packet.generate([], [], mode='edit', raw=raw)
+        self.assertIn('contracts', meta['inferred']['features'])
+        self.assertIn('step.contracts', text)
+
     def test_no_node_story_does_not_require_technical_source_questions(self):
         raw = {'page': {'sections': [{'id': 'story', 'heading': 'Story',
                                       'text': ['A business narrative.']}]}}

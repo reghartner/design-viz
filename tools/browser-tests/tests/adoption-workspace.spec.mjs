@@ -116,3 +116,55 @@ test('short floating tools keep their close buttons and rail reachable above can
     }
   }
 });
+
+/* #561 contract matrix (desktop editor; editing on phones is out of scope).
+   row | fixture | assertion (scoped) | rejects
+   R1 distinct rail icons | editorSpec | each .workspace-rail .editor-tool-icon text is unique; Layers icon != File icon | Layers and File sharing ▱ (or any two tools sharing a glyph)
+   R2 ⌘K listed | same | #keyboard-shortcuts dt "⌘/Ctrl + K" paired with dd "Find objects" | dialog without Find objects
+   R3 Redo listed | same | dt "⌘/Ctrl + Shift + Z" and dt "⌘/Ctrl + Y" each paired with a Redo dd | dialog without Redo, or only one of its two bindings
+   R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
+   R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
+   R6 Redo implemented | Storage row lock, then Undo | real ControlOrMeta+Shift+Z and ControlOrMeta+Y each re-apply nodes.c.locked from a canvas-focused node | listing Redo bindings that do nothing
+   R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Sections in selected View" | "Page 1 of 2" or Page-named arrows
+   R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
+/* Static rows use soft assertions so one RED run reports every unmet row. */
+test('editor rail icons are distinct, the shortcut sheet lists every global key, and the pager counts sections',async({page,server})=>{
+  const raw=spec();raw.page.blocks.push({heading:'Notes only',text:'No diagram in this section.'});
+  await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+  const icons=page.locator('.workspace-rail .editor-tool-icon');await expect(icons).toHaveCount(8);
+  const glyphs=(await icons.allTextContents()).map(text=>text.trim());
+  expect.soft(new Set(glyphs).size).toBe(glyphs.length);
+  expect.soft(await page.locator('#editor-tab-layers .editor-tool-icon').textContent()).not.toBe(await page.locator('#editor-tab-file .editor-tool-icon').textContent());
+
+  const sheet=page.locator('#keyboard-shortcuts');await expect(sheet).toBeHidden();
+  await page.locator('.workspace-help>summary').click();await page.locator('#workspace-shortcuts').click();await expect(sheet).toBeVisible();
+  const rows=await sheet.locator('dl').evaluateAll(lists=>lists.flatMap(list=>[...list.querySelectorAll(':scope > dt')].map(dt=>[dt.textContent.replace(/\s+/g,' ').trim(),dt.nextElementSibling.textContent.trim()])));
+  const described=keys=>rows.filter(row=>row[0]===keys).map(row=>row[1]);
+  expect.soft(described('⌘/Ctrl + K')).toEqual(['Find objects']);
+  for(const keys of ['⌘/Ctrl + Shift + Z','⌘/Ctrl + Y'])expect.soft(described(keys)).toEqual([expect.stringMatching(/^Redo\b/)]);
+  expect.soft(rows.map(row=>row[0])).toEqual(['?','F','Shift + F','F2','⌘/Ctrl + K','⌘/Ctrl + A','Enter','Shift + Enter','Arrow','Shift + F10','⌘/Ctrl + C','⌘/Ctrl + V','⌘/Ctrl + D','Delete or Backspace','Esc','Space + drag','Alt/Option + click','Alt/Option + drag','⌘/Ctrl + Z','⌘/Ctrl + Shift + Z','⌘/Ctrl + Y']);
+  await page.locator('#keyboard-shortcuts-close').click();await expect(sheet).toBeHidden();
+
+  const canvasNode=page.locator('#docview [data-dv-node="a"] .t1'),find=page.locator('#outline-search');
+  await expect(find).not.toBeFocused();
+  await canvasNode.click();await page.keyboard.press('ControlOrMeta+k');await expect(find).toBeVisible();await expect(find).toBeFocused();
+
+  const locked=async()=>JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.c.locked===true;
+  await page.locator('#editor-tab-layers').click();const lock=page.locator('#workspace-window-layers .layer-row').filter({hasText:'Storage'}).locator('.layer-lock');
+  for(const redo of ['ControlOrMeta+Shift+z','ControlOrMeta+y']){
+    if(!await locked())await lock.click();
+    await expect.poll(locked).toBe(true);
+    await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
+    await canvasNode.click();await page.keyboard.press(redo);await expect.poll(locked).toBe(true);
+    await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
+  }
+
+  const pager=page.locator('#docview .explore-navigation .reader-page-index');
+  await expect(pager).toHaveAttribute('aria-label','Sections in selected View');
+  await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await pager.getByRole('button',{name:'Next section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 2 of 2');
+  await pager.getByRole('button',{name:'Previous section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await page.locator('#open-page-preview').click();
+  await expect(page.locator('#page-preview-view .reader-page-label')).toHaveText('Section 1 of 2');
+  await page.locator('#close-page-preview').click();
+});

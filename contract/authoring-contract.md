@@ -1481,12 +1481,26 @@ perspectives" of one timeline). Types:
   restores the original prose and its collapse state. Notes use the same move,
   resize, zoom and temporary visibility controls as panels.
   `layouts[].exploreLayout.overlayScale` optionally
-  sets their content size from 0.5 to 1.25 (default 1), independently of diagram
-  zoom. Panel width/height and control height describe the size at 100%; control
+  sets panel content and control frame size from 0.5 to 1.25 (default 1),
+  independently of diagram zoom. Explore notes and control text keep their
+  independent text sizes. Panel width/height and control height describe the size at 100%; control
   width keeps its chosen horizontal span at every scale. Floating positions stay
   in viewport coordinates. The **Panels & controls** zoom saves this value
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
+
+  Use `layouts[].exploreLayout.textScale:{prose:1.25,controls:1.5}` for 125% notes
+  and 150% playback text. Each optional multiplier accepts 0.75–1.75 and defaults
+  to 1; malformed values warn and independently render at 1. In desktop Inspect,
+  select Section notes or empty space in the step controls and edit **Text size
+  (%)**. Clear the field or choose **Reset text size** for 100%. At 100%, notes
+  use 18px logical text, captions 16px, and path/transport labels 13px, at every
+  desktop width. Frame resize and overlay scale preserve those sizes; canvas
+  text follows graph zoom. The notes setting includes its 10px window heading;
+  shared navigation and widget typography remain independent. Text wraps or
+  scrolls inside constrained frames. Arrangement reset retains these settings,
+  and duplication, Undo/Redo, JSON, standalone HTML and native export preserve
+  them. A Tab-owned Explore View uses the selected section arrangement's values.
 
   An Explore chapter can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
   or `"floating"` (default). Preserve the separate Floating rectangles when authoring

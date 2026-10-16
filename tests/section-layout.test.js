@@ -803,3 +803,44 @@ test('path label width is bounded, arrangement-local, duplicated and reset witho
     assert.equal(JSON.parse(plan.text).layouts.find(v=>v.id===plan.layoutId).pathLabelWidth,300);
   }
 });
+
+test('Explore surface text scales normalize independently and preserve frame geometry and sibling settings',()=>{
+  const d=diagram(),layout={overlayScale:.8,steps:{textPosition:'right'},controls:{x:.05,y:.7,w:.8,h:.2},prose:{hidden:false},canvas:{prose:{x:120,y:40,w:400,h:180}}};
+  d.layouts=[{id:'eng',name:'Explore',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:layout},{id:'standard',name:'Standard',sectionLayout:{default:[board]}}];
+  const before=JSON.stringify(d);
+  for(const surface of ['prose','controls'])for(const value of [.75,1,1.25,1.75]){
+    const plan=ctx.planSectionExploreTextScale(before,d,0,'eng',surface,value);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text),expected=value===1?layout:{...layout,textScale:{[surface]:value}};
+    assert.deepEqual(next.layouts[0].exploreLayout,expected);assert.deepEqual(next.layouts[1],d.layouts[1]);
+    const duplicate=ctx.planDuplicateSectionLayout(plan.text,next,0,'eng');assert.deepEqual(JSON.parse(duplicate.text).layouts[2].exploreLayout,expected);
+    const reset=ctx.planSectionExploreTextScale(plan.text,next,0,'eng',surface,null);assert.deepEqual(JSON.parse(reset.text),d);
+  }
+  const both=ctx.planSectionExploreTextScale(before,d,0,'eng','prose',1.25),raw=JSON.parse(both.text);
+  const edited=ctx.planSectionExploreTextScale(both.text,raw,0,'eng','controls',1.5);
+  assert.deepEqual(JSON.parse(edited.text).layouts[0].exploreLayout.textScale,{prose:1.25,controls:1.5});
+  const reset=ctx.planSectionExploreTextScale(edited.text,JSON.parse(edited.text),0,'eng','prose',null);assert.deepEqual(JSON.parse(reset.text).layouts[0].exploreLayout.textScale,{controls:1.5});
+  assert.ok(ctx.planSectionExploreTextScale(before,d,0,'standard','prose',1.25).error);
+  for(const value of [.74,1.76,'1.25',null,{},[],Infinity,NaN]){
+    const warnings=[],normalized=ctx.sectionExploreLayout(d,{textScale:{prose:value,controls:1.5}},warnings,'explore');
+    assert.equal(normalized.textScale.prose,1);assert.equal(normalized.textScale.controls,1.5);assert.equal(warnings.length,1);
+    if(value!==null)assert.ok(ctx.planSectionExploreTextScale(before,d,0,'eng','controls',value).error);
+  }
+  for(const value of [true,'large',[],null]){
+    const warnings=[];assert.equal(ctx.sectionExploreLayout(d,{textScale:value},warnings).textScale,undefined);assert.equal(warnings.length,1);
+  }
+  assert.equal(JSON.stringify(d),before);
+});
+
+test('Explore text sizing honors a Tab presentation without rewriting View membership or raw sibling metadata',()=>{
+  for(const named of [true,false]){
+    const d=diagram();
+    if(named)d.layouts=[{id:'arrangement',name:'Arrangement',sectionLayout:{default:[board]},exploreLayout:{prose:{hidden:true},textScale:{prose:1.25},custom:'retain'}}];
+    const raw={page:{defaultView:'canvas',views:[{id:'canvas',name:'Canvas',presentation:'explore',sections:[named?{section:'story',layout:'arrangement'}:'story']}],sections:[{id:'story',diagram:d}]}},text=JSON.stringify(raw),id=named?'arrangement':'flow';
+    const plan=ctx.planSectionExploreTextScale(text,raw,0,id,'controls',1.5,true);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text),layout=next.page.sections[0].diagram.layouts.find(v=>v.id===id);
+    assert.deepEqual(next.page.views,raw.page.views);assert.equal(layout.presentation,undefined);
+    assert.deepEqual(layout.exploreLayout.textScale,named?{prose:1.25,controls:1.5}:{controls:1.5});
+    if(named){assert.equal(layout.exploreLayout.custom,'retain');assert.deepEqual(layout.exploreLayout.prose,{hidden:true});}
+    assert.ok(ctx.planSectionExploreTextScale(text,raw,0,'stale','controls',1.5,true).error);
+  }
+});

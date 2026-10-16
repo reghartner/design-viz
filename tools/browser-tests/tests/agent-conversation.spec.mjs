@@ -30,7 +30,7 @@ async function mount(page,{stored,denied=false,chrome=false}={}){
     window.inspectFolderAgentSession=async()=>{window.inspectCalls++;if(window.inspectFailure)throw Error(window.inspectFailure);return structuredClone({identity:window.savedIdentity,savedSource:window.savedSource || window.testSource,savedRevision:window.savedRevision,sourceMatches:!window.savedSource || window.savedSource===window.testSource,transcript:window.savedTranscript,changes:[],lease:{active:!!window.activeOwner}});};
     window.createFolderAgentClient=options=>{
       window.publish=update=>{if('review' in update)window.testReview=update.review;options.changed(update);};window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
-      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewSnapshot:()=>window.testReview?{review:window.testReview,source:null,current:window.testSource}:null,acceptReview:async()=>{window.reviewAccepted=true;window.publish({review:null});},rejectReview:async()=>{window.reviewRejected=true;window.publish({review:null});},readLedger:async()=>null};
+      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,pending:null,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},flush:async()=>{},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewSnapshot:()=>window.testReview?{review:window.testReview,source:null,current:window.testSource}:null,acceptReview:async()=>{window.reviewAccepted=true;window.publish({review:null});},rejectReview:async()=>{window.reviewRejected=true;window.publish({review:null});},readLedger:async()=>null};
     };
   },{skeleton:await read('workbench.skel.html'),chrome});
   for(const file of ['style.core.css','style.workbench.css','workbench/agent-conversation.css'])await page.addStyleTag({content:await read(file)});
@@ -52,7 +52,7 @@ async function enablePilot(page){
   await page.locator('#folder-agent-pilot-capture').check();
 }
 async function composerVisible(page){
-  for(const id of ['folder-agent-input','folder-agent-send','folder-agent-focus-summary']){
+  for(const id of ['folder-agent-input','folder-agent-send']){
     const box=await page.locator('#'+id).boundingBox();const size=page.viewportSize();expect(box).not.toBeNull();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(size.height);
   }
 }
@@ -87,14 +87,18 @@ test('twenty exchanges keep composer reachable and do not force an older-message
   await page.locator('#folder-agent-latest').click();await expect(page.locator('#folder-agent-latest')).toBeHidden();
   await page.setViewportSize({width:640,height:360});await composerVisible(page);
   await page.locator('#folder-agent-input').focus();await page.keyboard.press('Control+Enter');await expect.poll(()=>page.evaluate(()=>lastSent)).toBe('My next question');
-  await expect(page.locator('#folder-agent-cancel')).toBeVisible();await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
-  await expect(page.locator('#folder-agent-panel-status')).toContainText('interrupt it in its session');
+  // Re-establish replaces Stop accepting: it releases the turn and offers a hand-off.
+  await page.setViewportSize({width:1280,height:720});
+  await expect(page.locator('#folder-agent-cancel')).toHaveCount(0);await page.locator('#folder-agent-reestablish').click();
+  await expect(page.locator('#folder-agent-handoff')).toBeVisible();await expect(page.locator('#folder-agent-panel-status')).toContainText('hand-off');
+  await page.evaluate(()=>publish({listening:true}));await expect(page.locator('#folder-agent-send')).toBeEnabled();
 });
 test('reload keeps draft/detail and a visible disconnected recovery without accessing the folder',async({page})=>{
   const draft='Keep this long unsent request. '.repeat(1000);
-  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-input').fill(draft);
+  await mount(page);await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-level').selectOption('engineering');
+  await page.locator('#folder-agent-close-guide').click();await connect(page);await page.locator('#folder-agent-input').fill(draft);
   await page.evaluate(()=>publish({transcript:[{role:'assistant',text:'A saved answer',requestId:'r1'}]}));
-  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue(draft);await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
+  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue(draft);await expect(page.locator('#folder-agent-setup-level')).toHaveValue('engineering');
   await expect(page.locator('#folder-agent-messages')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();await expect(page.locator('#folder-agent-recovery')).toContainText('Interrupted requests will not replay');
   expect(await page.evaluate(()=>({pickerCalls,permissionCalls,starts:starts.length}))).toEqual({pickerCalls:0,permissionCalls:0,starts:0});
 });
@@ -259,37 +263,31 @@ test('receipts remain inert, reviewable and honest when undo is no longer safe',
 test('proposal feedback stays inert and refreshes when proposal version changes',async({page})=>{
   await mount(page);await connect(page);
   await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:1,ok:false,summary:'Needs a revision',baseRevision:'c1-1',revision:'c1-2',conflicts:[{path:'/title',reason:'<script>unsafe()</script>'}]}}));
-  await page.locator('#folder-agent-review-accept').click();
+  await page.locator('#agent-update-open').click();
   await expect(page.locator('#agent-update-feedback')).toHaveValue(/<script>unsafe/);await expect(page.locator('#agent-update-dialog script')).toHaveCount(0);
   await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:2,ok:false,summary:'Changed while reviewing',conflicts:[{path:'/title',reason:'The latest conflict'}]}}));
   await expect(page.locator('#agent-update-summary')).toHaveText('Changed while reviewing');await expect(page.locator('#agent-update-feedback')).toHaveValue(/latest conflict/);
   await page.locator('#agent-update-return').click();expect(await page.evaluate(()=>window.reviewRejected)).toBe(true);expect(await page.evaluate(()=>window.reviewAccepted)).toBeUndefined();
 });
 
-test('context stays concise and expandable; setup and next-message detail preserve the sent context',async({page})=>{
-  await page.setViewportSize({width:390,height:844});await mount(page);
+test('setup detail and the live selection reach the sent request without Focus or Detail disclosures',async({page})=>{
+  await page.setViewportSize({width:1280,height:720});await mount(page);
   await page.evaluate(()=>{
     window.testSelection=Array.from({length:30},(_,i)=>({id:'n'+i,label:'Customer journey '+i+' '+('full selection label '.repeat(12)),kind:'node',section:0,sectionLabel:'Customer story'}));
     window.testViews=[{section:0,view:'explore',viewLabel:'Full canvas',path:'normal',pathLabel:'Normal route',mode:'step',sourceStep:3}];
   });
-  await expect(page.locator('#folder-agent-focus-summary')).toHaveText('Focus: 30 items selected');
-  await expect(page.locator('#folder-agent-context')).toBeHidden();await expect(page.locator('#folder-agent-level')).toBeHidden();
+  for(const id of ['focus-summary','detail-summary','detail-settings'])await expect(page.locator('#folder-agent-'+id)).toHaveCount(0);
   await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await expect(page.locator('#folder-agent-setup-level')).toBeVisible();
   await page.locator('#folder-agent-setup-level').selectOption('engineering');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));
-  await expect(page.locator('#folder-agent-detail-summary')).toHaveText('Detail: Engineering');
-  await page.locator('#folder-agent-focus-summary').click();
-  expect(await page.locator('#folder-agent-context').textContent()).toBe(await page.evaluate(()=>folderAgentContextLines({selection:testSelection,views:testViews,technicalLevel:'engineering'}).join('\n')));
-  await page.locator('#folder-agent-focus-summary').click();await composerVisible(page);
-  await page.locator('#folder-agent-input').fill('Explain this selection');await page.locator('#folder-agent-send').click();
+  await expect(page.locator('#folder-agent-level')).toBeHidden();await composerVisible(page);
+  await page.locator('#folder-agent-input').fill('Explain this selection');await page.locator('#folder-agent-input').press('Control+Enter');
   const sent=await page.evaluate(()=>lastSentRequest);expect(sent.selection).toHaveLength(30);expect(sent.technicalLevel).toBe('engineering');expect(sent.views[0].sourceStep).toBe(3);
-  await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('story');
   await page.evaluate(()=>{testSelection=[{id:'replacement',label:'Different next target',kind:'node'}];});
-  await expect(page.locator('#folder-agent-focus-summary')).toHaveText('Focus: Different next target');
   expect(await page.evaluate(()=>lastSentRequest)).toEqual(sent);
   await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Detail: engineering');await expect(page.locator('.folder-agent-sent-context')).toContainText('Customer journey 29');
-  await page.evaluate(()=>publish({pending:null}));await page.locator('#folder-agent-input').fill('Now use the new focus');await page.locator('#folder-agent-send').click();
-  expect(await page.evaluate(()=>({level:lastSentRequest.technicalLevel,ids:lastSentRequest.selection.map(x=>x.id)}))).toEqual({level:'story',ids:['replacement']});
-  await expect(page.locator('#folder-agent-level')).toBeHidden();await composerVisible(page);
+  await page.evaluate(()=>publish({pending:null}));await page.locator('#folder-agent-input').fill('Now use the new selection');await page.locator('#folder-agent-input').press('Control+Enter');
+  expect(await page.evaluate(()=>({level:lastSentRequest.technicalLevel,ids:lastSentRequest.selection.map(x=>x.id)}))).toEqual({level:'engineering',ids:['replacement']});
+  await composerVisible(page);
 });
 
 for(const viewport of [{width:1280,height:720},{width:390,height:844},{width:640,height:360}])test(`streamed output follows until the reader scrolls up at ${viewport.width}×${viewport.height}`,async({page},info)=>{
@@ -325,14 +323,9 @@ for(const viewport of [{width:1280,height:720},{width:390,height:844},{width:640
   await page.evaluate(()=>publish({review:null,pending:null,activityPhase:'complete',transcript:[{role:'assistant',text:'Please check the new path.',requestId:'live'}]}));await expect(page.locator('#folder-agent-stage')).toHaveText('Reply received');
   await composerVisible(page);await stageVisible(page);await page.screenshot({path:info.outputPath('chat-reply.png')});
   await page.evaluate(()=>publish({pending:null,activityPhase:'idle',activity:[],transcript:[{role:'user',text:'Cancelled request',requestId:'cancelled',cancelled:true}]}));
-  await expect(page.locator('#folder-agent-stage')).toHaveText('Stopped accepting this turn');
-  // Expanded controls share a bounded settings area, not the message editor.
-  await page.locator('#folder-agent-detail-summary').focus();await page.keyboard.press('Enter');
-  await page.locator('#folder-agent-focus-summary').focus();await page.keyboard.press('Enter');
-  await composerVisible(page);await stageVisible(page);
-  await page.locator('#folder-agent-level').selectOption('engineering');
+  await expect(page.locator('#folder-agent-stage')).toHaveText('Turn released');
   await page.locator('#folder-agent-input').fill('The composer is still reachable');
-  await composerVisible(page);await stageVisible(page);await page.screenshot({path:info.outputPath('chat-expanded-controls.png')});
+  await composerVisible(page);await stageVisible(page);await page.screenshot({path:info.outputPath('chat-composer.png')});
 });
 
 // Deferred peers model I/O already in flight. The project opener is a fixture
@@ -423,12 +416,14 @@ for(const method of ['external','embedded'])test('Agent panel follows the '+meth
   await expect(page.locator('#folder-agent-folder')).toBeVisible();
   await expect(page.locator('#folder-agent-folder')).toContainText('flowview-session-test');
   await expect(page.locator('#folder-agent-connection')).toBeVisible();
-  await expect(page.locator('#folder-agent-send')).toHaveText(method==='external'?'Copy request':'Send to Claude');
-  await page.locator('#folder-agent-input').fill('My next request');
-  if(method==='embedded'){
+  if(method==='external'){
+    // Copy & paste requests start in the agent's own conversation.
+    await expect(page.locator('#folder-agent-send')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();
+  }else{
+    await expect(page.locator('#folder-agent-send')).toHaveText('Send to Claude');await page.locator('#folder-agent-input').fill('My next request');
     await expect(page.locator('#folder-agent-send')).toBeDisabled();await page.evaluate(()=>publish({listening:true}));
+    await expect(page.locator('#folder-agent-send')).toBeEnabled();
   }
-  await expect(page.locator('#folder-agent-send')).toBeEnabled();
   await expect(page.locator('#folder-agent-selection')).toBeVisible();
   await page.locator('#folder-agent-pairing summary').click();await page.locator('#folder-agent-disconnect').click();
   for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();

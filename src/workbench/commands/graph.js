@@ -454,7 +454,9 @@ function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId, reso
   if (!known.d.nodes || !Object.prototype.hasOwnProperty.call(known.d.nodes, nodeId))
     return {error: 'unknown node id "' + nodeId + '"'};
   var oldKey = builderEdgeKey(e),nextKey=(field==='from'?nodeId:e.from)+'->'+(field==='to'?nodeId:e.to);
-  if(nextKey!==oldKey && (known.d.edges || []).some(function(edge){return builderEdgeKey(edge)===nextKey;}))return {error:'A connection with those endpoints already exists.'};
+  var duplicate=(known.d.edges || []).find(function(edge){return builderEdgeKey(edge)===nextKey;});
+  var hasContract=!!(e.contract || duplicate && duplicate.contract) || (got.d.steps || []).some(function(step){return step && step.contracts && (Object.prototype.hasOwnProperty.call(step.contracts,oldKey) || Object.prototype.hasOwnProperty.call(step.contracts,nextKey));});
+  if(nextKey!==oldKey && duplicate && hasContract)return {error:'Connections with JSON contracts need distinct endpoints.'};
   if(nextKey!==oldKey && (got.d.steps || []).some(function(step){return step && step.contracts && Object.prototype.hasOwnProperty.call(step.contracts,nextKey);}))return {error:'A contract already references the new edge key. Resolve it before changing endpoints.'};
   return builderRewrite(text, raw, got.path, function(d){
     d.edges[edgeIdx][field] = nodeId;

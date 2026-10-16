@@ -20,7 +20,7 @@ It covers workflow choice, diagram folders, selected message context and explici
 review of spec/ledger updates. These editor actions do not belong in `page.tour`
 or the built-in reader lessons, whose targets must exist in the read-only viewer.
 
-Opening **Canon diagrams → View diagram** on the launch page offers the tour
+Opening **Browse diagrams → View diagram** on the launch page offers the tour
 on the first visit. Published `?diagram=<id>` links and the offline bundled
 example behave the same way. Skip or finish once to dismiss automatic offers;
 the **?** button replays it. Add `#tour=1` before opening a diagram to force it,

@@ -311,7 +311,7 @@ function initWorkbenchLibrary(opts){
       }
       if(opts.shareable() && !published)throw new Error('No published diagram library is available at this address. Publish the site’s diagrams.json and retry.');
       var selected=entries.find(function(entry){return entry.id===id;});
-      if(!selected)throw new Error('This diagram is no longer in the published library. Return to Canon diagrams to choose another.');
+      if(!selected)throw new Error('This diagram is no longer in the published library. Return to Browse diagrams to choose another.');
       var loaded=await loadSpec(selected);if(token!==sequence)return;
       current=Object.assign({},selected,loaded);
       var handoff=opts.handoff && (opts.handoff.error || opts.handoff.id===id)?opts.handoff:null;
@@ -361,7 +361,7 @@ function initWorkbenchLibrary(opts){
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;copy.disabled=true;retireViewer();reader.replaceChildren();
-      if(screen==='library'){grid.replaceChildren();status.textContent='Could not load canon diagrams. '+ex.message;retry.hidden=false;}
+      if(screen==='library'){grid.replaceChildren();status.textContent='Could not load published diagrams. '+ex.message;retry.hidden=false;}
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
   }

@@ -24,7 +24,7 @@ history intact. Working-file opens require a valid diagram. Import/paste and bro
 remain separate from working-file association.
 
 **User guide** opens the bundled human walkthrough, including alternates and
-shared-step editing. **Canon diagrams** opens the [published library](workbench-canon-library.md)
+shared-step editing. **Browse diagrams** opens the [published library](workbench-canon-library.md)
 read-only; choose **Edit in Workbench** to start a local edit at the reader's
 current chapter, playback mode, path, and step. Browser navigation also covers
 the library and its reader, including that reading position when you return from the editor.

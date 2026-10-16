@@ -86,7 +86,7 @@ is unknown, not a failure. Agent suggestions require review before publication.
 
 ## Browse the static published library
 
-The workbench home page exposes **Canon diagrams** as a read-only library with
+The workbench home page exposes **Browse diagrams** as a read-only library with
 an explicit **Edit in Workbench** handoff. Root `canon.json` selects reviewed
 folders under `diagrams/`; the normal Python build and nginx image build generate
 `workbench/diagrams.json`, a metadata index with relative spec URLs, from that

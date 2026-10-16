@@ -1963,7 +1963,7 @@ function documentForm(){
     }
     var identity=textControl(val.canon && val.canon.id || links.id,function(v){return linkSetting('id',v);},{placeholder:'existing_diagram_id'});
     identity.disabled=!!(val.canon && val.canon.id);rows.push(frow('Diagram ID',identity));
-    rows.push(frow('Claude artifact share URL',textControl(links.claudeUrl,function(v){return linkSetting('claudeUrl',v);},{placeholder:'https://claude.ai/public/artifacts/…'})));
+    rows.push(frow('Claude artifact share URL',textControl(links.claudeUrl,function(v){return linkSetting('claudeUrl',v);},{placeholder:'https://claude.ai/artifact/…'})));
     rows.push(note('Use the existing diagram ID. This does not add the document to Canon. Paste the Claude artifact share URL once; the URL and artifact ID are saved with the document.'));
 
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));

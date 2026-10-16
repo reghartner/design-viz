@@ -144,8 +144,10 @@ specs advertise `flow.handoff` for compatibility checks.
 
 ## Persistent destinations and source diagrams
 
-Set the existing **Diagram ID** and paste the published **Claude artifact share
-URL** in desktop **Document settings**. Registered documents keep the ID from
+Set the existing **Diagram ID** and paste the **Claude artifact share
+URL** in desktop **Document settings**. Claude links may use `/artifact/<id>`,
+`/code/artifact/<id>`, `/artifacts/<id>`, or `/public/artifacts/<id>` on `claude.ai`;
+legacy `claude.site/artifacts/<id>` links also work. Registered documents keep the ID from
 repository membership. Ordinary documents can save an ID without joining Canon.
 Set the internal site base once in `company/company.json` as
 `"site":{"baseUrl":"https://diagrams.example.com/team/flowspec.html"}`.
@@ -164,5 +166,5 @@ Imported nodes expose **Open source diagram**, including nested providers.
 HTML snapshots retain these inert source references as `diagram.sourceDiagrams`
 while removing topology declarations, edit provenance and provider source context.
 Website links carry supported section/view/path/step fragments. Claude links use
-the actual published artifact URL unchanged; this does not enable live native
+the actual artifact URL unchanged; this does not enable live native
 Claude embedding. Missing destinations produce no placeholder links.

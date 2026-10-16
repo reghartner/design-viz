@@ -433,6 +433,18 @@ function initWorkbenchWelcome(opts){
       el('welcome-manifest-status').hidden = false;
     });
   }
+  /* The examples gallery is linked only where it is served beside the workbench
+     (…/workbench/flowspec.html next to …/examples/index.html). Other hosts send no probe. */
+  function probeGallery(){
+    if (typeof fetch !== 'function' || !/^https?:$/.test(window.location.protocol) || !/\/workbench\/flowspec\.html$/.test(window.location.pathname)) return;
+    // Drain the empty HEAD body; an unread response is reported as an aborted request.
+    fetch('../examples/index.html', {method:'HEAD', cache:'no-cache'}).then(function(response){
+      return response.text().then(function(){ return response.ok; });
+    }).then(function(ok){
+      if (ok) document.querySelectorAll('[data-examples-gallery]').forEach(function(link){ link.hidden = false; });
+    }).catch(function(){});
+  }
+  probeGallery();
   var repositoryInput = el('welcome-repository'), revisionInput = el('welcome-revision');
   var repositoryKey = 'dv-workbench-authoring-repository-v1', config;
   try { config = JSON.parse(localStorage.getItem(repositoryKey)); } catch (ex){}

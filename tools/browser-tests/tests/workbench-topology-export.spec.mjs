@@ -26,6 +26,8 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
       const workspace=path.join(root,'workbench');await mkdir(workspace);
       for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])
         await cp(path.join(server.root,from),path.join(workspace,to));
+      // A served workbench/ folder probes its sibling examples gallery (#547).
+      await mkdir(path.join(root,'examples'),{recursive:true});await writeFile(path.join(root,'examples/index.html'),'<!doctype html><meta charset="utf-8"><title>Examples</title>');
       await mkdir(path.join(root,'template'));
       await cp(path.join(repo,'template/flowview.html'),path.join(root,'template/flowview.html'));
       const source=fixtures(),url=server.origin+'/'+path.basename(root)+'/workbench/flowspec.html';

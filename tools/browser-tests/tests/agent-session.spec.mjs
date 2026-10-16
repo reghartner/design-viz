@@ -19,6 +19,13 @@ const test=base.extend({server:[async({},use)=>{
     finally{disconnecting=false;}
   });}finally{page.off('request',started);page.off('requestfinished',ended);page.off('requestfailed',ended);}
 }});
+// The helper serves only the workbench, so the workbench's sibling-gallery
+// probe (#547) gets a quiet 404 here. Keep every other failure audited.
+test.afterEach(({audit,server})=>{
+  const probe='HTTP 404: '+server.origin+'/examples/index.html',line='console: Failed to load resource: the server responded with a status of 404 (Not Found)';
+  if(!audit.includes(probe))return;audit.splice(audit.indexOf(probe),1);
+  if(audit.includes(line))audit.splice(audit.indexOf(line),1);
+});
 const read=(server,name)=>readFile(path.join(server.scratch,name+'.json'),'utf8').then(JSON.parse);
 async function state(server,predicate){let value;await expect.poll(async()=>{value=await read(server,'state');return predicate(value);}).toBe(true);return value;}
 async function propose(server,value){const temp=path.join(server.scratch,'proposal.tmp');await writeFile(temp,JSON.stringify(value));await rename(temp,path.join(server.scratch,'proposal.json'));}

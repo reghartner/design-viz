@@ -1019,14 +1019,19 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     /* Card controls sit in a row above the icon so the title keeps the full
        width beside it; handoff cards keep them at the top-right corner. */
     var controlCount=(hasNodeLink?1:0)+(hasReferences?1:0)+(siblingPages.length?1:0),slot=0;
-    var controlY=n.handoff?14:(small?9:10),controlR=n.handoff?0:9;
+    /* Cards: an 18-wide hit area per control from the top edge down to the
+       icon, which keeps one position on every card of a size. */
+    var iconY=small?12:14,hitH=iconY,controlY=n.handoff?14:hitH/2;
     function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
     var linkX=hasNodeLink?controlX(p.w-15):0;
     var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
     var backlinkX=siblingPages.length?controlX(p.w-15-(hasNodeLink?23:0)-(hasReferences?23:0)):0;
-    var textX=Math.max(nodeImage?52:46,controlCount?18+18*(controlCount-1)+controlR+1:0);
-    var iconY=controlCount?(small?18:20):(small?9:14),iconSize=controlCount && small?22:26,glyph=iconSize-10;
-    var imageY=controlCount?(small?18:20):7;
+    var textX=Math.max(nodeImage?52:46,controlCount?9+18*controlCount+1:0);
+    var imageY=controlCount?hitH+1:7;
+    function controlHit(cx,cornerR){
+      return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
+        '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
+    }
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
@@ -1036,21 +1041,21 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="' + imageY + '" width="38" height="' + (p.h-imageY-7) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
            '<text class="t1" x="' + textX + '" y="' + (small?19:23) + '">' + esc(nodeTitle) + '</text>' +
            '<text class="t2" x="' + textX + '" y="' + (small?34:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
-           '<rect class="icbg" x="12" y="' + iconY + '" width="' + iconSize + '" height="' + iconSize + '" rx="8"/>' +
-           '<use href="#i-' + icon + '" x="17" y="' + (iconY+5) + '" width="' + glyph + '" height="' + glyph + '"/>' +
+           '<rect class="icbg" x="12" y="' + iconY + '" width="26" height="26" rx="8"/>' +
+           '<use href="#i-' + icon + '" x="17" y="' + (iconY+5) + '" width="16" height="16"/>' +
            '<text class="t1" x="' + textX + '" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
            '<text class="t2" x="' + textX + '" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>')) +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
-           '<circle cx="' + linkX + '" cy="' + controlY + '" r="' + (controlR || 9) + '" fill="transparent"/>' +
+           controlHit(linkX,9) +
            '<text x="' + linkX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8599;</text></a>' : '') +
          (hasReferences ?
            '<g class="nlink nrefs-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Links for ' + esc(nodeTitle) + '">' +
-           '<title>Links · right-click this node or open here</title><circle cx="' + referenceX + '" cy="' + controlY + '" r="' + (controlR || 10) + '" fill="transparent"/>' +
+           '<title>Links · right-click this node or open here</title>' + controlHit(referenceX,10) +
            '<text x="' + referenceX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8943;</text></g>' : '') +
          (siblingPages.length ?
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
-           '<circle cx="' + backlinkX + '" cy="' + controlY + '" r="' + (controlR || 9) + '" fill="transparent"/>' +
+           controlHit(backlinkX,9) +
            '<text x="' + backlinkX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8599;</text></g>' : '') +
          (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
          '</g>';

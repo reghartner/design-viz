@@ -240,7 +240,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .nlink text,.sk-daylight .nbackref text{fill:#4956C9;}
 .sk-daylight .nlink:hover text,.sk-daylight .nbackref:hover text,.sk-daylight .nbackref:focus text{fill:#2A33A0;}
 .nbackref:focus{outline:none;}
-.nbackref:focus-visible circle{stroke:currentColor;stroke-width:1.5;}
+.nbackref:focus-visible circle,.nbackref:focus-visible .nhit{stroke:currentColor;stroke-width:1.5;}
 .nbackpop{position:fixed;z-index:1000;box-sizing:border-box;width:max-content;max-width:min(360px,calc(100vw - 16px));
   display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:7px 8px;border-radius:8px;
   font:600 9px/1.4 'IBM Plex Mono',monospace;box-shadow:0 8px 24px rgba(0,0,0,.24);}
@@ -253,7 +253,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .nbackpop{color:#6B6F7A;background:#FFFFFF;border:1px solid #C9CDE9;}
 .sk-daylight .nbacklink{color:#4956C9;border-color:#C9CDE9;background:#EEF0FB;}
 .sk-daylight .nbacklink:hover,.sk-daylight .nbacklink:focus{color:#2A33A0;border-color:#4956C9;}
-.nrefs-trigger:focus-visible circle{stroke:currentColor;stroke-width:1.5;}
+.nrefs-trigger:focus-visible circle,.nrefs-trigger:focus-visible .nhit{stroke:currentColor;stroke-width:1.5;}
 .node-link-menu{inset:auto;margin:0;width:280px;max-height:min(420px,calc(100dvh - 16px));overflow:auto;flex-direction:column;align-items:stretch;gap:5px;padding:10px;font-size:11px;font-weight:500;}
 .node-link-menu .node-link-title{padding-right:26px;font-size:12px;overflow-wrap:anywhere;}
 .node-link-menu .nbacklabel{margin-top:5px;font-size:10px;}

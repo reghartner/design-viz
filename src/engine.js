@@ -859,8 +859,10 @@ function fitLaneNodeTitle(node, title, width, subtitle){
      Preserve the authored name when there is no geometry to fit against. */
   text.textContent = title;
   if (typeof text.getComputedTextLength !== 'function') return true;
-  /* Display:none measures zero: keep the authored text until it is shown. */
-  if (title && !text.getComputedTextLength()) return false;
+  /* Hidden boards (display:none) have no boxes and measure zero: keep the
+     authored text until the board is shown. Checking boxes first also lays
+     the text out before it is measured. */
+  if (!text.getClientRects().length) return false;
   if (hasSub){
     target = sub;
     if (!fits(subtitle, subRight - x)){

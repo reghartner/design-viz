@@ -1,6 +1,6 @@
 import {test,expect,pastePage} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
-import {writeFile,readFile} from 'node:fs/promises';
+import {writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 
 const source=JSON.stringify({page:{title:'Export choices',sections:[{diagram:{nodes:{a:{title:'Start'}},rows:[['a']]}}]}},null,2);
@@ -100,36 +100,32 @@ test('browser recovery exports its saved ledger and keeps later projects indepen
 });
 
 /* #558 — one complete export list (desktop editor only).
+ Chuck ruling 2026-10-16: hide Confluence for now. The two Confluence actions stay in the
+ Export menu markup but carry `hidden`. Confluence browser rows excluded — Chuck ruling
+ 2026-10-16: hide Confluence for now, drop browser clicks (io.js copy/retire paths stay covered
+ by tests/workbench-io.test.js; payload building by tests/confluence.test.js).
  | row | fixture | assertion (scoped) | rejects |
- | 1 menu lists every export | Export choices, 1440×900 | #workspace-export .workspace-export-body buttons, in order: Export project, Download SVG, Copy SVG, Export for Confluence, Copy JSON for Confluence | Confluence actions left only in File |
- | 2 menu is keyboard complete | trigger opened by a real click | Tab from the trigger focuses every menu entry in that order, each in viewport | entries added but unreachable/out of order |
- | 3 Export for Confluence from menu | same | download export-choices.confluence.json whose page.title is Export choices; menu closes | moved button left unwired |
- | 4 Copy JSON for Confluence from menu | stubbed navigator.clipboard.writeText | clipboard got the same payload; #confluence-handoff visible as a dialog with that JSON; Close returns focus to the Export trigger | handoff left inside the hidden File panel |
- | 5 File has no partial list | File panel open (asserted visible) | inside #editor-file no button or link named Export project / Export for Confluence / Copy JSON for Confluence / Download SVG / Copy SVG | partial list kept in File (as buttons or links) |
- | 6 File links to the full list | Export menu asserted closed first | #editor-file button "All exports in the Export menu" opens #workspace-export with #file-save focused | static text, or a link that does not open the menu |
- | 7 user guide | in-app guide | #hg-save glossary terms include Export → Export for Confluence and Export → Copy JSON for Confluence; no term starts with File → | stale guide still pointing at File |
+ | 1 menu lists every visible export | Export choices, 1440×900 | visible buttons of #workspace-export .workspace-export-body, in order: Export project, Download SVG, Copy SVG | partial list, or Confluence still shown |
+ | 2 Confluence present-but-hidden | same | inside the menu body, the Export for Confluence and Copy JSON for Confluence buttons exist, carry `hidden`, and are not visible | items removed outright, or shown |
+ | 3 menu is keyboard complete and skips hidden items | trigger opened by a real click | real Tab from the trigger focuses Export project, Download SVG, Copy SVG in order (each in viewport); the next Tab leaves the menu body without focusing a Confluence item | entries unreachable/out of order; hidden items still in Tab order |
+ | 4 File has no partial list | File panel open (asserted visible) | inside #editor-file no button or link named Export project / Download SVG / Copy SVG / Export for Confluence / Copy JSON for Confluence | partial list kept in File (as buttons or links) |
+ | 5 File links to the full list | Export menu asserted closed first | #editor-file button "All exports in the Export menu" opens #workspace-export with #file-save focused | static text, or a link that does not open the menu |
+ | 6 user guide | in-app guide | #hg-save glossary terms include Export → Export project and Export → Download SVG / Copy SVG; no term mentions Confluence; no term starts with File → | stale guide still listing Confluence or pointing at File |
 */
 test('#558 Export menu holds every export and File links to it',async({page,server})=>{
-  await page.addInitScript(()=>{window.__copied=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.__copied.push(text);}},configurable:true});});
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await pastePage(page,source);
   const trigger=page.locator('#workspace-export-trigger'),menu=page.locator('#workspace-export'),body=menu.locator('.workspace-export-body');
-  const all=['Export project','Download SVG','Copy SVG','Export for Confluence','Copy JSON for Confluence'];
+  const visible=['Export project','Download SVG','Copy SVG'],confluence=['Export for Confluence','Copy JSON for Confluence'];
   await expect(menu).not.toHaveAttribute('open','');await trigger.click();await expect(body).toBeVisible();await expect(trigger).toBeFocused();
-  await expect(body.getByRole('button')).toHaveText(all.map(name=>new RegExp('^'+name)));
-  for(const name of all){await page.keyboard.press('Tab');const item=body.getByRole('button',{name:new RegExp('^'+name)});await expect(item).toBeFocused();await expect(item).toBeInViewport();}
-  await page.keyboard.press('Escape');await expect(menu).not.toHaveAttribute('open','');
-  const handoff=page.locator('#confluence-handoff');await expect(handoff).toBeHidden();
-  await trigger.click();await body.getByRole('button',{name:'Copy JSON for Confluence'}).click();
-  await expect.poll(()=>page.evaluate(()=>window.__copied.length)).toBe(1);const copied=await page.evaluate(()=>window.__copied[0]);
-  expect(JSON.parse(copied).page.title).toBe('Export choices');
-  await expect(handoff).toBeVisible();expect(await handoff.evaluate(el=>el.tagName==='DIALOG' && el.open)).toBe(true);
-  await expect(handoff.locator('#confluence-json')).toHaveValue(copied);await expect(handoff.locator('#confluence-status')).toContainText('Copied');
-  await handoff.getByRole('button',{name:'Close'}).click();await expect(handoff).toBeHidden();await expect(trigger).toBeFocused();
-  const download=page.waitForEvent('download');await trigger.click();await body.getByRole('button',{name:'Export for Confluence'}).click();const file=await download;
-  expect(file.suggestedFilename()).toBe('export-choices.confluence.json');expect(JSON.parse(await readFile(await file.path(),'utf8')).page.title).toBe('Export choices');
-  await expect(menu).not.toHaveAttribute('open','');
+  await expect(body.getByRole('button')).toHaveText(visible.map(name=>new RegExp('^'+name)));
+  for(const name of confluence){const item=body.locator('button').filter({hasText:name});await expect(item).toHaveCount(1);await expect(item).toHaveAttribute('hidden','');await expect(item).toBeHidden();}
+  for(const name of visible){await page.keyboard.press('Tab');const item=body.getByRole('button',{name:new RegExp('^'+name)});await expect(item).toBeFocused();await expect(item).toBeInViewport();}
+  await page.keyboard.press('Tab');
+  for(const name of confluence)await expect(body.locator('button').filter({hasText:name})).not.toBeFocused();
+  expect(await body.evaluate(node=>node.contains(document.activeElement))).toBe(false);
+  if(await menu.getAttribute('open')!==null)await trigger.click();await expect(menu).not.toHaveAttribute('open','');
   const filePanel=page.locator('#editor-file');await page.locator('#editor-tab-file').click();await expect(filePanel).toBeVisible();
-  for(const name of all)for(const role of ['button','link'])await expect(filePanel.getByRole(role,{name:new RegExp('^'+name)})).toHaveCount(0);
+  for(const name of [...visible,...confluence])for(const role of ['button','link'])await expect(filePanel.getByRole(role,{name:new RegExp('^'+name)})).toHaveCount(0);
   await expect(menu).not.toHaveAttribute('open','');
   await filePanel.getByRole('button',{name:'All exports in the Export menu'}).click();
   await expect(menu).toHaveAttribute('open','');await expect(page.locator('#file-save')).toBeFocused();await expect(body).toBeVisible();
@@ -137,6 +133,7 @@ test('#558 Export menu holds every export and File links to it',async({page,serv
   await page.locator('.workspace-help>summary').click();await page.locator('[data-open-human-guide]:visible').first().click();
   const terms=page.locator('#human-guide #hg-save dl.human-guide-glossary > dt');await expect(terms.first()).toBeAttached();
   const names=await terms.allTextContents();
-  expect(names).toEqual(expect.arrayContaining(['Export → Export for Confluence','Export → Copy JSON for Confluence']));
+  expect(names).toEqual(expect.arrayContaining(['Export → Export project','Export → Download SVG / Copy SVG']));
+  expect(names.filter(name=>/Confluence/.test(name))).toEqual([]);
   expect(names.filter(name=>name.startsWith('File →'))).toEqual([]);
 });

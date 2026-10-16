@@ -431,7 +431,8 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
   await page.goto(server.origin+'/workbench.html?diagram=delivery');await expect(title).toHaveText('Reviewed delivery');
   await edit.click();await expect(workspace).toBeVisible();
   async function landsOnWelcome(value){
-    await page.goto(server.origin+'/workbench.html?diagram='+encodeURIComponent(value));
+    // Raw query bytes, as a person would paste them (none of these values contains & # + or %).
+    await page.goto(server.origin+'/workbench.html?diagram='+value);
     await expect(home).toBeVisible();await expect(linkError).toBeVisible();await expect(linkError).toContainText('“'+value+'”');
     await expect(title).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/canon-reader-active/);await expect(workspace).toBeHidden();
     for(const other of ['paste','new','agent','library','reader'])await expect(page.locator('#welcome-'+other+'-screen')).toBeHidden();

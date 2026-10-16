@@ -7,12 +7,12 @@ Confluence.
 
 ## Export or copy
 
-In the workbench's file actions, choose:
+In the workbench toolbar's **Export** menu, choose:
 
 - **Export for Confluence**: download `<title>.confluence.json`.
-- **Copy JSON for Confluence**: put the same JSON on the clipboard. A selectable
-  text field remains available when the Clipboard API is unavailable, including
-  some phone browsers and LAN HTTP connections.
+- **Copy JSON for Confluence**: put the same JSON on the clipboard. A dialog
+  shows the JSON selected for manual copying when the Clipboard API is
+  unavailable, such as on LAN HTTP connections.
 
 Both validate the current editor text, including edits not yet rendered. They
 produce compact, ordinary Flowview spec JSON, preserving all authored fields,

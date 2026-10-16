@@ -64,7 +64,7 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
         expect(Object.keys(bundle)).toEqual([name+'.spec.json',name+'.html',name+'.ledger.md','README.md']);
         expect(await page.evaluate(()=>window.exportPickerActive)).toBeUndefined();
       }else{
-        if(action==='file'){await page.locator('#editor-tab-file').click();await page.locator('#file-export').click();}
+        if(action==='file'){await page.locator('#editor-tab-file').click();await page.locator('#file-show-exports').click();await page.locator('#file-save').click();}
         else{await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();}
         await expect.poll(()=>page.evaluate(async name=>{
           try{const root=await navigator.storage.getDirectory();return (await(await root.getFileHandle(name+'.html')).getFile()).size;}catch{return 0;}

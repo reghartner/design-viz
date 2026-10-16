@@ -58,7 +58,7 @@ function harness(adapters={},options={}){
   }
   Object.assign(doc,element('document'),{createElement:tag=>element(tag),getElementById:id=>elements[id]||null});
   doc.body=element('body');
-  const ids=['src','msgs','file-input','file-open','file-save','file-export','confluence-handoff','confluence-json',
+  const ids=['src','msgs','file-input','file-open','file-save','confluence-handoff','confluence-json',
     'file-export-svg','file-copy-svg','svg-handoff','svg-copy-text','svg-copy-status','svg-copy-close',
     'confluence-status','confluence-copy','confluence-export','confluence-close','import-mermaid','importbox','import-mermaid-text',
     'import-mermaid-convert','import-mermaid-cancel','import-trace','tracebox','trace-text','trace-feedback','trace-file','trace-scope',
@@ -183,7 +183,7 @@ test('destroy releases listeners/readers/timers/URLs and held callbacks cannot r
 });
 
 test('complete project export refuses unfinished source without modifying its recovery baseline',()=>{
-  for(const action of ['file-save','file-export']){
+  for(const action of ['file-save']){
     const h=harness();h.type('src',' \r\n{ invalid');h.click(action);
     assert.equal(h.downloads.length,0);assert.equal(h.requests.length,0);
     assert.equal(h.session.baseline(),INITIAL);assert.match(h.messages.at(-1),/Copy unfinished text/);
@@ -250,27 +250,27 @@ test('retired clipboard rejection does not select or focus fallback, and current
 });
 
 test('new exports and project retirement block held response and body completions without fallback requests',async()=>{
-  const h=harness();h.click('file-export');const old=h.requests[0];h.session.replaceProject('{"page":{"title":"New"}}');
+  const h=harness();h.click('file-save');const old=h.requests[0];h.session.replaceProject('{"page":{"title":"New"}}');
   assert.equal(old.options.signal.aborted,true);let bodies=0;old.resolve({ok:true,text(){bodies++;return TEMPLATE;}});await settle();
   assert.equal(bodies,0);assert.equal(h.downloads.length,0);assert.equal(h.requests.length,1);
-  h.click('file-export');const body=deferred();h.requests[1].resolve({ok:true,text:()=>body.promise});await settle();
-  h.click('file-export');body.resolve(TEMPLATE);await settle();assert.equal(h.downloads.length,0);
+  h.click('file-save');const body=deferred();h.requests[1].resolve({ok:true,text:()=>body.promise});await settle();
+  h.click('file-save');body.resolve(TEMPLATE);await settle();assert.equal(h.downloads.length,0);
   h.requests[2].resolve(response());await settle();
   assert.deepEqual(h.downloads.map(d=>d.name),['new.zip']);
   h.flush();assert.equal(h.revoked.length,1);assert.equal(h.doc.body.children.length,0);
 });
 
 test('transport and invalid-template fallbacks retain the frozen export snapshot; exhaustion and failure publish no downloads',async()=>{
-  const h=harness();h.click('file-export');h.type('src','new invalid handwriting');
+  const h=harness();h.click('file-save');h.type('src','new invalid handwriting');
   h.requests[0].reject(new Error('404'));await settle();h.requests[1].resolve(response('not a template'));await settle();
   h.requests[2].resolve(response());await settle();
   assert.equal(exportedFiles(h)['original.spec.json'],INITIAL);
   assertOriginalHtmlSnapshot(exportedFiles(h)['original.html']);assert.equal(h.text,'new invalid handwriting');
   assert.equal(h.session.canUndo(),false);assert.equal(h.session.baseline(),INITIAL);
-  const failed=harness();failed.click('file-export');
+  const failed=harness();failed.click('file-save');
   for(let i=0;i<3;i++){failed.requests[i].reject(new Error('offline'));await settle();}
   assert.equal(failed.downloads.length,0);assert.match(failed.messages.at(-1),/could not load the page template/);
-  const denied=harness({anchorClick(){throw new Error('denied');}});denied.click('file-export');denied.requests[0].resolve(response());await settle();
+  const denied=harness({anchorClick(){throw new Error('denied');}});denied.click('file-save');denied.requests[0].resolve(response());await settle();
   assert.equal(denied.requests.length,1,'publication failure does not retry template transport');
   assert.equal(denied.revoked.length,1);assert.match(denied.messages.at(-1),/export failed: denied/);
 });
@@ -283,12 +283,12 @@ function directory(){
   const dir={async getFileHandle(name,options){events.push(['handle',name,options.create]);if(gates.handle)await gates.handle.promise;return handle;}};
   return {events,gates,writer,handle,dir};
 }
-async function startDirectory(h){h.click('file-export');await settle();h.requests[0].resolve(response());await settle();}
+async function startDirectory(h){h.click('file-save');await settle();h.requests[0].resolve(response());await settle();}
 test('a repeated export replaces prior success while its picker, template and writes are pending',async()=>{
   const d=directory();let picker;
   const h=harness({pickDirectory:()=>picker?picker.promise:Promise.resolve(d.dir)});await startDirectory(h);
   assert.match(h.messages.at(-1),/^Exported project:/);
-  picker=deferred();h.click('file-export');
+  picker=deferred();h.click('file-save');
   assert.equal(h.messages.at(-1),'Exporting project: original…');
   picker.resolve(d.dir);await settle();assert.equal(h.requests.length,2);
   assert.equal(h.messages.at(-1),'Exporting project: original…');
@@ -297,7 +297,7 @@ test('a repeated export replaces prior success while its picker, template and wr
   d.gates.close.resolve();await settle();assert.match(h.messages.at(-1),/^Exported project:/);
 });
 test('retirement at picker, handle or writable boundaries avoids starting a stale disk write',async()=>{
-  const pick=deferred(),h=harness({pickDirectory:()=>pick.promise});h.click('file-export');h.session.replaceProject('{}');
+  const pick=deferred(),h=harness({pickDirectory:()=>pick.promise});h.click('file-save');h.session.replaceProject('{}');
   const d=directory();pick.resolve(d.dir);await settle();assert.equal(h.requests.length,0);assert.deepEqual(d.events,[]);
   for(const stage of ['handle','writable']){
     const d=directory();d.gates[stage]=deferred();const h=harness({pickDirectory:()=>Promise.resolve(d.dir)});
@@ -345,7 +345,7 @@ function assertPageOnly(raw){
 test('local exports without Canon context write authored JSON and a page-only HTML snapshot',async()=>{
   const h=harness(),{provider}=topologyFixture();delete provider.page.canon;
   const original=JSON.stringify(provider,null,3)+'\n';h.session.replaceProject(original);
-  h.click('file-export');h.requests[0].resolve(response());await settle();
+  h.click('file-save');h.requests[0].resolve(response());await settle();
   assert.equal(h.downloads.length,1);assert.equal(exportedFiles(h)['provider.spec.json'],original);
   const html=exportedFiles(h)['provider.html'],snapshot=htmlSpec(html);assertPageOnly(snapshot);
   assert.doesNotMatch(html,/flowview-topology/);assert.deepEqual(snapshot.page.sections[0].diagram.nodes,provider.page.sections[0].diagram.nodes);
@@ -360,7 +360,7 @@ test('direct and nested imports freeze the stamped click revision and safely esc
     fixture.provider.page.sections[0].diagram.nodes.api.title='API </ScRiPt><script>injected()</script>';
     const original=JSON.stringify(fixture.consumer,null,3)+'\n';h.session.replaceProject(original,null,{topologyContext:fixture.context});
     const expected=C.FlowviewCompatibility.stampText(original);
-    h.click('file-export');await settle();
+    h.click('file-save');await settle();
     h.session.resolve=()=>{throw Error('must not resolve after click');};h.type('src','later unfinished handwriting');
     h.requests[0].resolve(response());await settle();
     const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes.length,4);assert.equal(writes[0][1],expected);
@@ -373,7 +373,7 @@ test('direct and nested imports freeze the stamped click revision and safely esc
 });
 
 test('missing or broken frozen providers refuse all HTML exports before any writes or template fetch',()=>{
-  for(const action of ['file-export','file-save'])for(const directoryMode of [false,true])for(const broken of [false,true]){
+  for(const action of ['file-save'])for(const directoryMode of [false,true])for(const broken of [false,true]){
     const d=directory(),h=harness(directoryMode?{pickDirectory:()=>{throw Error('picker must not open');}}:{}),fixture=topologyFixture();
     if(broken)fixture.provider.page.sections[0].diagram.rows=[['api']];
     h.session.replaceProject(JSON.stringify(fixture.consumer),null,broken?{topologyContext:fixture.context}:null);
@@ -413,7 +413,7 @@ test('failed readers leave source/history intact and later current reads remain 
 
 test('picker and unopened handle failures publish no files; retired failures leave UI alone',async()=>{
   for(const retired of [false,true]){
-    const pending=deferred(),h=harness({pickDirectory:()=>pending.promise});h.click('file-export');
+    const pending=deferred(),h=harness({pickDirectory:()=>pending.promise});h.click('file-save');
     if(retired)h.io.retireProject();pending.reject(new Error('permission denied'));await settle();
     assert.equal(h.requests.length,0);if(retired)assert.deepEqual(h.messages,['Exporting project: original…']);else assert.match(h.messages.at(-1),/export failed: permission denied/);
   }
@@ -463,7 +463,7 @@ test('partial folder failure reports the count and never claims complete export'
 });
 
 test('new exports, project replacement and destroy retire pending requests; failures release resources',async()=>{
-  for(const retire of ['file-save','file-export','project','destroy']){
+  for(const retire of ['file-save','project','destroy']){
     const h=harness();h.click('file-save');const pending=h.requests[0];
     if(retire==='project')h.session.replaceProject('{}');else if(retire==='destroy')h.io.destroy();else h.click(retire);
     assert.equal(pending.options.signal.aborted,true);pending.resolve(response());await settle();assert.equal(h.downloads.length,0,retire);

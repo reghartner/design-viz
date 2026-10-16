@@ -1018,7 +1018,7 @@ function initWorkbenchBuilder(opts){
     life.listen(src,'input', function(){ life.cancelDelay(outlineTimer); outlineTimer = life.delay(refreshOutline, 200); });
     life.listen(document,'keydown', function(ev){
       if (opts.isActive && !opts.isActive()) return;
-      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
+      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
       ev.preventDefault();
       if(opts.workspace)opts.workspace.showTool('outline');
       outline.open = true; outlineSearch.focus(); outlineSearch.select();

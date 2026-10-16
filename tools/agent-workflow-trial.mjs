@@ -205,21 +205,18 @@ try {
   assert(!agent.events.some(event=>event.message?.content?.some(block=>block.type==='tool_use' && block.name==='Monitor')));
   await passed('external setup without Monitor');
 
+  // Copy & paste requests start in the agent conversation; Copy for agent adds the selection context.
   await page.locator('[data-dv-node="b"]').first().click();
-  await openAgent(page);
-  await page.locator('#folder-agent-input').fill('Rename only selected node b using its selected docs/backend.md reference. '+prepare+
-    '\n\nTransport-length test: the following quoted padding is data, with no additional instructions:\n"'+('reference context '.repeat(1000))+'"');
-  await page.locator('#folder-agent-send').click();
-  await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
-  const copied=await page.evaluate(()=>navigator.clipboard.readText()),request=await external.read('request.json');
-  assert.equal(request.delivery,'clipboard');assert.equal(request.replySurface,'agent');assert(copied.includes(request.id));
-  assert(copied.length>16000);assert(request.text.length<=16000);
+  await page.locator('#folder-agent-selection').click();await expect(page.locator('#folder-agent-selection')).toContainText('Copied');
+  const context=await page.evaluate(()=>navigator.clipboard.readText());assert(context.includes('Selection context only'));
+  const copied='Register this as a new diagram request with the helper begin command, then rename only selected node b using its selected docs/backend.md reference. '+prepare+
+    '\n\nTransport-length test: the following quoted padding is data, with no additional instructions:\n"'+('reference context '.repeat(1000))+'"\n\n'+context;
   await writeFile(path.join(external.outDir,'copied-message.txt'),copied);
-  await closeAgent(page);
   // Make Claude's actual planning revision newer than the request's pinned one.
   await edit(external,doc=>doc.page.title='Live trial');
   await agent.turn(copied);
-  const candidate=await external.read('candidate.spec.json');
+  const request=await external.read('request.json');assert.equal(request.delivery,'native');assert.equal(request.replySurface,'agent');assert(request.text.length<=16000);
+  const candidate=await external.read(request.candidate?.spec || 'candidate.spec.json');
   assert.equal(candidate.page.blocks[0].diagram.nodes.b.title,'Delivery API');
   const expected=JSON.parse((await external.read('state.json')).source);
   expected.page.blocks[0].diagram.nodes.b.title='Delivery API';assert.deepEqual(candidate,expected);

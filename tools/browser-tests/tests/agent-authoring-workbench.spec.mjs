@@ -19,7 +19,7 @@ test('authoring broker connects the real editor, sends once, applies helper outp
     const read = async name => JSON.parse(await readFile(path.join(session.sessionPath, name), 'utf8'));
     const helper = (...args) => JSON.parse(execFileSync('python3', [path.join(session.sessionPath, 'folder-agent.py'), ...args], {cwd: session.sessionPath, encoding: 'utf8'}));
     const control = {seq: 1, text: 'Set the page title to Customer onboarding.', technicalLevel: 'story'};
-    await expect(page.locator('#folder-agent-detail-summary')).toBeVisible();
+    await expect(page.locator('#folder-agent-detail-summary')).toHaveCount(0);
     await expect(page.locator('#folder-agent-level')).toBeHidden();
     await writeFile(path.join(outDir, 'control.json'), JSON.stringify(control));
     const sent = await session.pollControl();
@@ -106,15 +106,10 @@ print(json.dumps({'replyId': captured['reply']['id'], 'source': captured['source
                   'receipts': captured['receipts'], 'proposal': captured['proposal']}))
 `, runner, outDir, session.sessionPath, sent.requestId], {encoding: 'utf8', timeout: 5000}));
     expect(captured).toEqual({replyId: reply.id, source: defaultSource, receipts: [], proposal: null});
-    // Sending collapses Detail again. The next turn must reopen the real UI
-    // and publish the newly selected level, while an already open control
-    // remains usable as well.
+    // The Agent window has no per-message Detail control; the broker sets the
+    // hidden level that setup fills, and each turn publishes it.
     for (const [index, technicalLevel] of ['engineering', 'mixed'].entries()) {
       await expect(page.locator('#folder-agent-level')).toBeHidden();
-      if (technicalLevel === 'mixed') {
-        await page.locator('#folder-agent-detail-summary').click();
-        await expect(page.locator('#folder-agent-level')).toBeVisible();
-      }
       const text = 'Keep the story unchanged and discuss it at ' + technicalLevel + ' detail.';
       const next = await session.sendControl({seq: index + 2, text, technicalLevel});
       expect(JSON.parse(await readFile(path.join(session.sessionPath, 'request.json'), 'utf8')))

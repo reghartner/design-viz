@@ -586,7 +586,7 @@ function handoffControls(val){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
     fold.className='node-handoff-editor';summary.textContent='Diagram handoff';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
-    note.textContent='Continue to another diagram in this spec or a separate document. This spec switches to the destination’s tab and offers a return button. Apply saves the destination.';
+    note.textContent='Continue to another diagram in this spec or a separate document. This spec switches to the destination’s tab and offers a return breadcrumb. Apply saves the destination.';
     fold.appendChild(note);
     if(val.detail!=null){
       var conflict=document.createElement('p');conflict.className='fnote';

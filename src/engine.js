@@ -2121,7 +2121,7 @@ function createExploreNavigation(ctl,options){
     // Measure the widest presentation state, including its Tab badge and panel
     // count. A separate normal-layout probe also includes Tab copy buttons that
     // are positioned outside the flow in compact mode.
-    var back=actions.querySelector('.handoff-back'),key=JSON.stringify([width,tabPicker.value,tabChoices.map(function(button){return button.textContent;}),viewButtons.map(function(button){return button.textContent;}),hasSectionChoices,back && back.textContent]);
+    var key=JSON.stringify([width,tabPicker.value,tabChoices.map(function(button){return button.textContent;}),viewButtons.map(function(button){return button.textContent;}),hasSectionChoices]);
     if(key!==laneLayoutKey){
       laneLayoutKey=key;
       var owner=ctl.views && ctl.views.owner(current),panelCount=0;
@@ -2218,7 +2218,6 @@ function createExploreNavigation(ctl,options){
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
     if(!options.singleShareAction)move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
-    move(host && host.querySelector('.handoff-back'),actions);
     move(host && host.querySelector('.section-view-settings'),actions);
     move(host && host.querySelector('.viewport-actions'),actions);
     actions.hidden=false;
@@ -2258,10 +2257,9 @@ function createExploreNavigation(ctl,options){
     });
   }
   window.addEventListener('scroll',scrolled,true);
-  function viewChanged(ev){if(ev && ev.type==='navigation-actions-changed')laneLayoutKey='';var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
+  function viewChanged(){var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
   ctl.view.addEventListener('tab-view-change',viewChanged);
-  ctl.view.addEventListener('navigation-actions-changed',viewChanged);
-  return {element:nav,mount:mount,restore:restore,contents:contents,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
+  return {element:nav,mount:mount,restore:restore,contents:contents,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;

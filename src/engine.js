@@ -1019,12 +1019,12 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     /* Card controls sit in a row above the icon so the title keeps the full
        width beside it; handoff cards keep them at the top-right corner. */
     var controlCount=(hasNodeLink?1:0)+(hasReferences?1:0)+(siblingPages.length?1:0),slot=0;
-    var controlY=n.handoff?14:(small?8:10),controlR=n.handoff?0:7;
-    function controlX(cornerX){return n.handoff?cornerX:19+15*slot++;}
+    var controlY=n.handoff?14:(small?9:10),controlR=n.handoff?0:9;
+    function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
     var linkX=hasNodeLink?controlX(p.w-15):0;
     var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
     var backlinkX=siblingPages.length?controlX(p.w-15-(hasNodeLink?23:0)-(hasReferences?23:0)):0;
-    var textX=Math.max(nodeImage?52:46,controlCount?19+15*(controlCount-1)+controlR+5:0);
+    var textX=Math.max(nodeImage?52:46,controlCount?18+18*(controlCount-1)+controlR+1:0);
     var iconY=controlCount?(small?18:20):(small?9:14),iconSize=controlCount && small?22:26,glyph=iconSize-10;
     var imageY=controlCount?(small?17:19):7;
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
@@ -1070,7 +1070,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var node = document.getElementById(prefix + '-n-' + id);
     if (node){
       nodeEls[id] = node;
-      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
+      /* Cards with controls above the icon carry the marker at the other corner. */
+      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, !d.nodes[id].handoff && node.querySelector && node.querySelector('.nlink,.nbackref') ? L.pos[id].w - 4 : 4, -6);
     }
   });
   /* Fit this board's own cards: another board may reuse the same prefix. */

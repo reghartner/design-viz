@@ -393,6 +393,8 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 // 2   | ?diagram=delivery                                    | #canon-reader-title "Reviewed delivery"; #canon-reader-edit enabled "Edit in Workbench →"; workspace hidden; #welcome-link-error hidden | the plain ID form broken, or opening straight into the editor
 // 3   | ?diagram=team.delivery_v2 (dots/underscore)          | #canon-reader-title "Team delivery v2"; Edit enabled; #welcome-link-error hidden                          | a stricter ID check that drops legal canon/document-link IDs
 // 4   | ?diagram=Ops.Delivery-2 (mixed case, hyphen)         | #canon-reader-title "Ops delivery 2"; Edit enabled; #welcome-link-error hidden                            | case-folding or lower-case-only checks
+// 4b  | ?diagram=2024.q3-review_1 (digit-leading)            | #canon-reader-title "Q3 review"; Edit enabled; #welcome-link-error hidden                                 | a letter-first shape check
+// 4c  | ?diagram=<200-character ID> (library maximum)        | #canon-reader-title "Longest ID"; Edit enabled; #welcome-link-error hidden                                | a length cap below the library's 200
 // 5   | ?diagram=team%2Edelivery%5Fv2 (percent-encoded)      | #canon-reader-title "Team delivery v2"                                                                    | matching the raw query bytes instead of the decoded value
 // 6   | ?layout=backstage&diagram=delivery#d=delivery&p=failed (other query + deep-link fragment) | #canon-reader-title "Reviewed delivery"; #welcome-link-error hidden                  | extra parameters or a fragment breaking the link
 // 7   | row 2, real click on #canon-reader-edit              | #workbench-workspace visible                                                                              | a reader with a dead Edit action
@@ -407,10 +409,11 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 // 15  | docs/workbench-user-guide.md                         | exactly one paragraph names `?diagram=<diagram ID>`; it says published diagram, read-only, Edit in Workbench, home page | the written guide left without the parameter or its error behaviour
 // Cross-document link compatibility (Claude artifacts, hosted site, Backstage) stays
 // owned by document-links, handoffs, context-handoffs, canon-lazy-library and
-// backstage-workspace specs; rows 2–6 pin the ?diagram= forms that open today.
+// backstage-workspace specs; rows 2–6 (with 4b, 4c) pin the ?diagram= forms that open today.
 test('a ?diagram= link opens one published diagram read-only, and unknown values land on Welcome with a message naming them',async({page,server})=>{
   const data=library();
-  for(const [id,title] of [['team.delivery_v2','Team delivery v2'],['Ops.Delivery-2','Ops delivery 2']]){
+  const longId='L'+'o'.repeat(198)+'9';
+  for(const [id,title] of [['team.delivery_v2','Team delivery v2'],['Ops.Delivery-2','Ops delivery 2'],['2024.q3-review_1','Q3 review'],[longId,'Longest ID']]){
     const entry=library().diagrams[0];entry.id=id;entry.title=title;entry.spec.page.title=title;entry.spec.page.canon.id=id;data.diagrams.push(entry);
   }
   await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
@@ -423,7 +426,7 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
   await page.goto(server.origin+'/workbench.html');
   await expect(home).toBeVisible();await expect(linkError).toBeHidden();await expect(title).toBeHidden();
   for(const [query,expected] of [['?diagram=delivery','Reviewed delivery'],['?diagram=team.delivery_v2','Team delivery v2'],['?diagram=Ops.Delivery-2','Ops delivery 2'],
-    ['?diagram=team%2Edelivery%5Fv2','Team delivery v2'],['?layout=backstage&diagram=delivery#d=delivery&p=failed','Reviewed delivery']]){
+    ['?diagram=2024.q3-review_1','Q3 review'],['?diagram='+longId,'Longest ID'],['?diagram=team%2Edelivery%5Fv2','Team delivery v2'],['?layout=backstage&diagram=delivery#d=delivery&p=failed','Reviewed delivery']]){
     await page.goto(server.origin+'/workbench.html'+query);
     await expect(title).toHaveText(expected);await expect(edit).toBeEnabled();await expect(edit).toHaveText('Edit in Workbench →');
     await expect(workspace).toBeHidden();await expect(linkError).toBeHidden();

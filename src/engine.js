@@ -1205,7 +1205,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     frameShown=shown;
   }):null;
   if(frameObserver)frameObserver.observe(svg);
-  if(svg.ownerDocument && svg.ownerDocument.fonts)svg.ownerDocument.fonts.ready.then(function(){if(!frameRetired && svg.isConnected)refreshFrame();});
+  var frameFonts=svg.ownerDocument && svg.ownerDocument.fonts;
+  if(frameFonts && frameFonts.ready && typeof frameFonts.ready.then==='function')frameFonts.ready.then(function(){if(!frameRetired && svg.isConnected)refreshFrame();});
   el._frameWatch={destroy:function(){frameRetired=true;if(frameObserver)frameObserver.disconnect();}};
 
   function makeDot(info, cls){

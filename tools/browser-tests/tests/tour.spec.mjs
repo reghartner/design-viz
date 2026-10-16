@@ -363,14 +363,13 @@ test('Skip returns focus to where the reader was',async({page,server})=>{
 // 4 step label | same | name AND textContent exactly "Skip tour" | the ✕ glyph or a different step-card wording
 // 5 same control, same style | chooser vs step | the skip control on both is the same node class with identical computed font/colour/background | a chooser-only restyle
 // 6 it still exits | step | real click on the control hides .dv-tour (visible before) | a relabel that drops the handler
-// 7 no other exit, whatever its label | chooser, step | every visible button inside .dv-tour other than the persona choices (chooser) or Back/Next/Done/Replay example/Try the controls (step) is that one .dv-tour-exit | a retained chooser/card exit relabelled "Dismiss" or "End tour"
+// 7 no other exit, whatever its label | chooser, step | the EXACT inventory (class|text, DOM order) of visible buttons inside .dv-tour: the exit plus the three persona choices (chooser); the exit, Try the controls, Back, Next (first engineering step) | a retained chooser/card exit under any label or class, e.g. "Dismiss", "End tour", a second "Back"
 const skipControls=page=>page.locator('.dv-tour button').filter({visible:true,hasText:/skip/i})
   .or(page.locator('.dv-tour').getByRole('button',{name:/skip/i}));
-// label-independent inventory: visible overlay buttons that are not the known non-exit controls
-const otherButtons=(page,known)=>page.locator('.dv-tour button').evaluateAll((els,known)=>els
+// label-independent inventory: every visible overlay button, class|text, in DOM order
+const visibleButtons=page=>page.locator('.dv-tour button').evaluateAll(els=>els
   .filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden')
-  .filter(e=>!(known.classes.some(c=>e.classList.contains(c))||known.texts.includes(e.textContent.trim())))
-  .map(e=>e.className+'|'+e.textContent.trim()),known);
+  .map(e=>e.className+'|'+e.textContent.trim()));
 const skipLook=loc=>loc.evaluate(e=>{const s=getComputedStyle(e);return [e.className,s.font,s.color,s.backgroundColor,s.borderTopStyle].join('|');});
 test('every skip control reads "Skip tour": one control on the chooser and on steps',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
@@ -382,8 +381,10 @@ test('every skip control reads "Skip tour": one control on the chooser and on st
   await expect(atChooser).toHaveAccessibleName('Skip tour');
   await expect(atChooser).toHaveText('Skip tour');
   const chooserLook=await skipLook(atChooser);
-  expect(await page.locator('.dv-tour-chooser .dv-tour-choice').count()).toBeGreaterThan(0);
-  expect(await otherButtons(page,{classes:['dv-tour-choice'],texts:[]})).toEqual(['dv-tour-exit|Skip tour']);
+  await expect.poll(()=>visibleButtons(page)).toEqual(['dv-tour-exit|Skip tour',
+    'dv-tour-choice|The user experienceReading views, story steps, and live panels.',
+    'dv-tour-choice|The engineeringCalls, branching paths, source links, and room to explore.',
+    'dv-tour-choice|Show me bothThe full walkthrough, at your pace.']);
   await page.locator('.dv-tour-choice').nth(1).click();
   await expect(page.locator('.dv-tour-ui')).toBeVisible();
   const atStep=skipControls(page);
@@ -393,7 +394,8 @@ test('every skip control reads "Skip tour": one control on the chooser and on st
   await expect(atStep).toHaveText('Skip tour');
   expect(await skipLook(atStep)).toBe(chooserLook);
   await expect(page.locator('.dv-tour-next')).toBeVisible();
-  expect(await otherButtons(page,{classes:[],texts:['Back','Next','Done','Replay example','Try the controls']})).toEqual(['dv-tour-exit|Skip tour']);
+  await expect.poll(()=>visibleButtons(page)).toEqual(['dv-tour-exit|Skip tour',
+    'dv-tour-skip dv-tour-try|Try the controls','dv-tour-btn dv-tour-back|Back','dv-tour-btn dv-tour-next|Next']);
   await expect(page.locator('.dv-tour')).toBeVisible();
   await atStep.click();
   await expect(page.locator('.dv-tour')).toBeHidden();

@@ -198,8 +198,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the ? button.',
-        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the Tour button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the Tour button.'
       }
     },
     {
@@ -208,8 +208,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.',
-        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.'
       }
     }
   ]

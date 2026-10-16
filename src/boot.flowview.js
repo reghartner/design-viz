@@ -157,6 +157,8 @@ function boot(raw){
              {request: tourRequest, deepLink: tourDeferredByLink,
               autostart: !artifactHost, tourButton: artifactHost});
   }
+  /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
+  if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);
 }
 
 var raw = null, parseErr = null;

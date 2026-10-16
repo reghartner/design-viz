@@ -1322,7 +1322,7 @@ function wireTour(ctl, view, win, config, options){
   var replay = doc.createElement('button');
   replay.type = 'button';
   replay.className = 'tbtn dv-tour-replay';
-  replay.textContent = '?';
+  replay.textContent = 'Tour';
   replay.setAttribute('aria-label', 'Replay the tour');
   replay.addEventListener('click', function(){ disabled = false; guarded(start); });
   var pageActions=readerPageActions(view,ctl);

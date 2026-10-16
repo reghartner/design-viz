@@ -258,7 +258,7 @@ function initWorkbenchLibrary(opts){
   var copy=document.getElementById('canon-reader-copy');
   var search=document.getElementById('welcome-library-search'),empty=document.getElementById('welcome-library-empty');
   var specRequests=new Map(),headerObserver=null;
-  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
     if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
     headerTitle.hidden=true;title.removeAttribute('title');
@@ -271,6 +271,7 @@ function initWorkbenchLibrary(opts){
     if(positionChange && ctl && ctl.onChange===positionChange.wrapped)ctl.onChange=positionChange.prior;
     positionChange=null;
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
+    if(shortcuts)shortcuts.destroy();shortcuts=null;
     if(tour)tour.destroy();tour=null;
     if(deepLinks)deepLinks.destroy();deepLinks=null;
     if(ctl)ctl.destroy();ctl=null;
@@ -444,6 +445,7 @@ function initWorkbenchLibrary(opts){
       headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}
       exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy],singleShareAction:true});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
+      shortcuts=wireReaderShortcuts(ctl,reader,window);
       if(opts.savePosition){
         var priorChange=ctl.onChange,wrapped=function(){
           if(priorChange)priorChange.apply(ctl,arguments);

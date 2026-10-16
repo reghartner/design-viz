@@ -8,7 +8,7 @@ agent owns registration, installation, real-platform validation and rollout.
 Do not interpret a local preview as a deployed Forge app.
 
 Keep editing outside Confluence. The macro imports a snapshot from JSON or a file;
-the workbench offers **Export for Confluence** and **Copy JSON for Confluence**.
+the workbench's **Export** menu offers **Export for Confluence** and **Copy JSON for Confluence**.
 Do not add direct publishing, an embedded workbench, an attachment synchronizer,
 or external storage as part of this integration.
 

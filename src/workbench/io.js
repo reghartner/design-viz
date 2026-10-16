@@ -169,7 +169,7 @@ function createBuilderIO(opts){
     if(stagedImport)stagedImport.retire('Import cancelled because the project changed.');
     if(importBox)importBox.hidden=true;
     retireTraceUI();
-    if(confluenceBox)confluenceBox.hidden=true;
+    closeConfluenceHandoff();
   }
   /* ---- open a .spec.json / save the editor to disk ---- */
   var fileReadVersion=0,fileReader=null;
@@ -289,8 +289,9 @@ function createBuilderIO(opts){
       throw ex;
     }
   }
-  /* Manual handoff: download and clipboard share exactly the same snapshot.
-     Keep a selectable fallback for phones/LAN HTTP without Clipboard API. */
+  /* Manual handoff from the Export menu: download and clipboard share exactly
+     the same snapshot. Copy keeps a selectable fallback dialog for browsers
+     without the Clipboard API. */
   var confluenceBox = document.getElementById('confluence-handoff');
   var confluenceText = document.getElementById('confluence-json');
   var confluenceStatus = document.getElementById('confluence-status');
@@ -298,22 +299,27 @@ function createBuilderIO(opts){
   var confluenceExport = document.getElementById('confluence-export');
   var confluenceClose = document.getElementById('confluence-close');
   var confluenceCopyRun=0;
+  function closeConfluenceHandoff(){
+    if(!confluenceBox)return;
+    if(confluenceBox.open && confluenceBox.close)confluenceBox.close();confluenceBox.hidden=true;
+  }
   function confluenceHandoff(copy){
+    closeExportMenu(true);
     var run = ++confluenceCopyRun;
     var handoffText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
     var built = buildConfluenceExport(handoffText);
-    if (built.error){
-      if (confluenceBox) confluenceBox.hidden = true;
-      inspectorMessage('Confluence export: ' + built.error); return;
-    }
-    if (confluenceBox && confluenceText && confluenceStatus){
-      confluenceBox.hidden = false; confluenceText.value = built.text;
-      confluenceStatus.textContent = 'Import this file or paste this JSON in the Flowview macro configuration.';
-    }
+    closeConfluenceHandoff();
+    if (built.error){inspectorMessage('Confluence export: ' + built.error); return;}
     if (!copy){
       try{downloadTextFile(built.name,built.text,'application/json');}
-      catch(ex){inspectorMessage('Confluence export failed: '+errorText(ex));}
+      catch(ex){inspectorMessage('Confluence export failed: '+errorText(ex));return;}
+      inspectorMessage('Downloaded '+built.name+'. Import this file in the Flowview macro configuration in Confluence.');
       return;
+    }
+    if (confluenceBox && confluenceText && confluenceStatus){
+      confluenceText.value = built.text;
+      confluenceStatus.textContent = 'Copying JSON for the Flowview macro configuration…';
+      confluenceBox.hidden = false; if(confluenceBox.showModal && !confluenceBox.open)confluenceBox.showModal();
     }
     function result(ok){
       if(disposed || run!==confluenceCopyRun || !confluenceStatus || confluenceBox.hidden || confluenceText.value!==built.text)return;
@@ -337,9 +343,26 @@ function createBuilderIO(opts){
   if (confluenceExport) listen(confluenceExport,'click',function(){confluenceHandoff(false);});
   if (confluenceCopy) listen(confluenceCopy,'click',function(){confluenceHandoff(true);});
   if (confluenceClose) listen(confluenceClose,'click',function(){
-    confluenceCopyRun++; confluenceBox.hidden = true; confluenceCopy.focus();
+    confluenceCopyRun++; closeConfluenceHandoff(); if(exportTrigger)exportTrigger.focus();
   });
-  var exportBtn = document.getElementById('file-export');
+  if (confluenceBox) listen(confluenceBox,'close',function(){
+    if(confluenceBox.hidden)return;confluenceCopyRun++;confluenceBox.hidden=true;if(exportTrigger)exportTrigger.focus();
+  });
+  /* File keeps no partial export list: it hands off to the one complete menu. */
+  var showExports = document.getElementById('file-show-exports');
+  var focusExportsOnOpen=false;
+  if (showExports && exportMenu){
+    listen(showExports,'click',function(){
+      // Narrow desktop headers tuck the menu under More; reveal its ancestors too.
+      for(var host=exportMenu.parentElement && exportMenu.parentElement.closest('details');host;host=host.parentElement && host.parentElement.closest('details'))host.open=true;
+      if(exportMenu.open){if(saveBtn)saveBtn.focus();return;}
+      focusExportsOnOpen=true;exportMenu.open=true;
+    });
+    // The workspace shows the menu body as a popover on toggle; focus after that.
+    listen(exportMenu,'toggle',function(){
+      if(focusExportsOnOpen && exportMenu.open && saveBtn)saveBtn.focus();focusExportsOnOpen=false;
+    });
+  }
   function exportFiles(){
     closeExportMenu(true);
     cancelExport();var run=exportVersion;
@@ -405,7 +428,6 @@ function createBuilderIO(opts){
       });
     }else publish(null);
   }
-  if(exportBtn)listen(exportBtn,'click',exportFiles);
   if(saveBtn)listen(saveBtn,'click',exportFiles);
 
   /* ---- diagram-only SVG: serialize the live active graph, never the source ---- */

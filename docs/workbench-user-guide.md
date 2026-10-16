@@ -88,11 +88,12 @@ operating-system editor from changing the file between the last check and commit
 the file API has no atomic compare-and-swap, and that race can overwrite an outside
 edit. Avoid editing the same file simultaneously in another application.
 
-The toolbar **Export** menu offers **Export project**, **Download SVG**, and
-**Copy SVG**. **Export project** saves matching `.spec.json`, `.html` and
-`.ledger.md` files plus `README.md` to a chosen folder, or downloads one ZIP with
-the same four files when no folder picker is available. **File → Export project**
-is the same action. Keep JSON and Markdown ledger together for future editing;
+The toolbar **Export** menu is the one complete list of exports: **Export
+project**, **Download SVG**, and **Copy SVG**. The File workspace has no separate export buttons; its
+**All exports in the Export menu** button opens that menu. **Export project** saves
+matching `.spec.json`, `.html` and `.ledger.md` files plus `README.md` to a chosen
+folder, or downloads one ZIP with the same four files when no folder picker is
+available. Keep JSON and Markdown ledger together for future editing;
 commit JSON, HTML and ledger together. README is a fourth support file. A missing
 ledger is exported as an explicitly unverified placeholder, never invented evidence.
 

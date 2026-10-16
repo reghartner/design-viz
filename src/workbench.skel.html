@@ -25,7 +25,7 @@
     <details class="workspace-more" id="workspace-more" open><summary aria-label="More project actions" title="More project actions">•••</summary><div class="workspace-more-body">
       <button class="bbtn" id="workspace-file" type="button" aria-controls="workspace-window-file">File</button>
       <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-      <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" id="workspace-shortcuts" aria-haspopup="dialog" aria-controls="keyboard-shortcuts">Keyboard shortcuts <kbd>?</kbd></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><details id="workspace-export" class="workspace-export"><summary id="workspace-export-trigger" class="rbtn">Export</summary><div class="workspace-help-body workspace-export-body" role="group" aria-label="Export options"><button class="bbtn" type="button" id="file-save" title="Save JSON, offline HTML, coverage ledger and README together">Export project</button><hr><button class="bbtn" type="button" id="file-export-svg" title="Download only the active section’s rendered diagram graph">Download SVG <small>· diagram only</small></button><button class="bbtn" type="button" id="file-copy-svg" title="Copy only the active section’s rendered diagram graph">Copy SVG <small>· diagram only</small></button></div></details></div>
+      <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" id="workspace-shortcuts" aria-haspopup="dialog" aria-controls="keyboard-shortcuts">Keyboard shortcuts <kbd>?</kbd></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><details id="workspace-export" class="workspace-export"><summary id="workspace-export-trigger" class="rbtn">Export</summary><div class="workspace-help-body workspace-export-body" role="group" aria-label="Export options"><button class="bbtn" type="button" id="file-save" title="Save JSON, offline HTML, coverage ledger and README together">Export project</button><hr><button class="bbtn" type="button" id="file-export-svg" title="Download only the active section’s rendered diagram graph">Download SVG <small>· diagram only</small></button><button class="bbtn" type="button" id="file-copy-svg" title="Copy only the active section’s rendered diagram graph">Copy SVG <small>· diagram only</small></button><hr hidden><button class="bbtn" type="button" id="confluence-export" hidden title="Download the payload for the Flowview Confluence integration">Export for Confluence</button><button class="bbtn" type="button" id="confluence-copy" hidden title="Copy the same payload to paste into the Flowview macro configuration">Copy JSON for Confluence</button></div></details></div>
     </div></details>
   </div>
 </header>
@@ -272,23 +272,15 @@
         <div class="specrow editor-json-actions"><button class="rbtn" id="go">Render</button><button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">Diff</button></div>
       </div>
       <div class="editor-pane" id="editor-file" role="tabpanel" aria-labelledby="editor-tab-file" hidden>
-        <div class="editor-pane-heading"><h2>Project files</h2><p>Import, export, and connect this project to your company catalog. Export → Export project keeps JSON, HTML, coverage ledger and README together on your computer.</p><p id="workbench-working-status" role="status">Browser-only editing. Choose a working file or folder for autosave.</p><p id="workbench-recovery-status" role="status">Browser recovery has not been saved yet.</p></div>
+        <div class="editor-pane-heading"><h2>Project files</h2><p>Import, choose working files, and connect this project to your company catalog. Every export lives in the toolbar Export menu; Export project keeps JSON, HTML, coverage ledger and README together on your computer.</p><p id="workbench-working-status" role="status">Browser-only editing. Choose a working file or folder for autosave.</p><p id="workbench-recovery-status" role="status">Browser recovery has not been saved yet.</p></div>
         <div class="specrow editor-file-tools">
         <button class="bbtn" id="working-file-open">Open working file…</button>
         <button class="bbtn" id="working-folder-open">Choose working folder…</button>
         <button class="bbtn" id="working-file-retry" hidden>Retry file save</button>
         <button class="bbtn" id="file-import">import Flowview / Mermaid / draw.io&#8230;</button>
-        <button class="bbtn" id="file-export" title="Save JSON, offline HTML, coverage ledger and README together">Export project</button>
-        <button class="bbtn" id="confluence-export">Export for Confluence</button>
-        <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
+        <button class="bbtn" type="button" id="file-show-exports" aria-controls="workspace-export">All exports in the Export menu</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <input type="file" id="file-import-input" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,.drawio,.xml,application/json,application/xml,text/plain,text/markdown,text/xml" hidden>
-        <div id="confluence-handoff" class="confluence-handoff" hidden>
-          <label for="confluence-json">Confluence JSON</label>
-          <textarea id="confluence-json" readonly spellcheck="false"></textarea>
-          <p id="confluence-status" role="status"></p>
-          <button class="bbtn" id="confluence-close">Close</button>
-        </div>
         </div>
       <details class="ssec" id="sec-insert">
         <summary>import</summary>
@@ -487,6 +479,13 @@
 
 
 </main>
+<dialog id="confluence-handoff" class="object-clipboard-dialog" hidden aria-labelledby="confluence-title">
+  <h2 id="confluence-title">Copy JSON for Confluence</h2>
+  <p id="confluence-status" role="status"></p>
+  <label for="confluence-json">Confluence JSON</label>
+  <textarea id="confluence-json" readonly spellcheck="false"></textarea>
+  <button class="bbtn" type="button" id="confluence-close">Close</button>
+</dialog>
 <dialog id="svg-handoff" class="object-clipboard-dialog" hidden aria-labelledby="svg-copy-title">
   <h2 id="svg-copy-title">Copy diagram-only SVG</h2>
   <p id="svg-copy-status"></p>

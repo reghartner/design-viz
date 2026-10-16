@@ -155,7 +155,7 @@ async function workingExport(page,server,single=false){
   },{source,single});
   await filePanel(page);await page.locator(single?'#working-file-open':'#working-folder-open').click();await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','saved');
 }
-async function exportCurrent(page){await filePanel(page);await page.locator('#file-export').click();}
+async function exportCurrent(page){await filePanel(page);await page.locator('#file-show-exports').click();await page.locator('#file-save').click();}
 async function exported(page){await expect(page.locator('#guide')).toContainText('working artifacts verified; HTML and README exported');}
 
 test('same working folder exports four files without rewriting raw source or its ledger, and waits for autosave',async({page,server})=>{

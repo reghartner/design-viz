@@ -1195,6 +1195,19 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     }
   }
   refreshFrame();
+  /* Ink measured before webfonts settle, or skipped while an inactive tab
+     hid the board, is stale. Re-measure once fonts are ready and each time the
+     board is shown again, so a later refresh (a Step/Ambient switch) cannot
+     grow the viewBox and move the Explore drawing. */
+  if(svg.ownerDocument && svg.ownerDocument.fonts)svg.ownerDocument.fonts.ready.then(function(){if(svg.isConnected)refreshFrame();});
+  if(typeof ResizeObserver!=='undefined'){
+    var frameShown=false,frameObserver=new ResizeObserver(function(entries){
+      var rect=entries[entries.length-1].contentRect,shown=rect.width>0 && rect.height>0;
+      if(shown && !frameShown && svg.isConnected)refreshFrame();
+      frameShown=shown;
+    });
+    frameObserver.observe(svg);
+  }
 
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));

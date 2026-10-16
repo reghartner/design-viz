@@ -12,6 +12,7 @@ function createReaderContents(ctl,nav,actions,options){
   nav.classList.add('reader-navigation');view.classList.add('has-reader-contents');
   var top=element('div','reader-top',null,nav),toggle=button('Open Contents','☰',top,function(){setOpen(!opened,true,true);});
   var breadcrumb=element('div','reader-breadcrumb',null,top),tabLabel=element('span','reader-tab-label',null,breadcrumb);
+  var detailSeparator=element('span','reader-detail-separator','/'),detailLabel=element('span','reader-detail-label');detailSeparator.setAttribute('aria-hidden','true');
   var viewStrip=element('div','reader-view-strip',null,top);viewStrip.setAttribute('role','tablist');viewStrip.setAttribute('aria-label','Views in selected Tab');top.appendChild(actions);
   var utilities=element('details','reader-utilities',null,actions),utilitySummary=element('summary','reader-button','⋯',utilities);utilitySummary.setAttribute('aria-label','More actions');
   var utilityBody=element('div','reader-utility-options',null,utilities);
@@ -72,6 +73,8 @@ function createReaderContents(ctl,nav,actions,options){
     themeOptions.style.maxHeight=Math.max(70,bottom-rect.bottom-110)+'px';
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
+  // An open drill-down stays inside its root section; name each open level.
+  function detailTrail(){var open=ctl.details && ctl.details.activeSections();return open && open[0]===current?ctl.details.activeTrail():[];}
   function ownerLabel(item){return item.source.label || item.source.title || 'Document';}
   function embedded(){return ctl.sections.find(function(section){return section.sectionEl.classList.contains('dv-embed-target');});}
   function choose(item,definition,rec,fromTop){
@@ -115,7 +118,8 @@ function createReaderContents(ctl,nav,actions,options){
         var expanded=!collapsedViews.has(key),disclosure=button((expanded?'Collapse ':'Expand ')+definition.name,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});disclosure.classList.add('reader-view-disclosure');disclosure.setAttribute('aria-expanded',String(expanded));disclosure.setAttribute('data-reader-key',key+':disclosure');
         if(expanded){
           var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);
-          definition.members.filter(function(member){return !embed || member.record.runtime===embed;}).forEach(function(member,index){var rec=member.record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-reader-key',key+':'+rec.number);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));});
+          definition.members.filter(function(member){return !embed || member.record.runtime===embed;}).forEach(function(member,index){var rec=member.record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-reader-key',key+':'+rec.number);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));
+            if(selected && current===rec){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,li);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}});
         }
       });
     });
@@ -137,6 +141,10 @@ function createReaderContents(ctl,nav,actions,options){
     if(owner && owner.current.presentation==='standard' && !(options.isCanvas && options.isCanvas()))members.forEach(function(section){section.sectionEl.style.zoom=standardZoom.get(owner.current) || 1;});
     nav.setAttribute('data-reader-multiple-views',String(!!(owner && owner.views.length>1)));
     tabLabel.textContent=owner?ownerLabel(owner):'Document';tabLabel.title=tabLabel.textContent;
+    var trail=detailTrail(),deepest=trail[trail.length-1];
+    if(deepest){detailLabel.textContent=deepest.label;detailLabel.title=trail.map(function(level){return level.title;}).join(' › ');breadcrumb.append(detailSeparator,detailLabel);}
+    else{detailSeparator.remove();detailLabel.remove();}
+    top.classList.toggle('reader-detail-open',!!deepest);
     if(owner)expandedTabs.add(owner.path);
     var index=members.indexOf(current);pageLabel.textContent='Page '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
     // Shared utility controls remain live. Ordinary readers surface the hidden

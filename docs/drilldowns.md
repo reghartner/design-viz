@@ -23,7 +23,9 @@ Set `detailOnly: true` on sections that should appear only when opened as a
 detail. This hides them from the initial reader view and the Explore **Story**
 selector; it does not remove their content or create another file. Story switches
 between top-level diagram sections and appears only when there is more than one.
-Use the drill-down breadcrumb to return to an ancestor or the overview. A target can also be an ordinary visible
+Use the drill-down breadcrumb to return to an ancestor or the overview. While a detail is open, the reader
+header shows its name after the document label, and Contents lists each open level under the parent
+section; both return to the parent on breadcrumb Back or browser Back. A target can also be an ordinary visible
 section. Do not put a second diagram inside a node or duplicate a child flow
 inside each parent that references it.
 

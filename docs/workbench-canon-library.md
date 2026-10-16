@@ -1,6 +1,6 @@
 # Browse canon diagrams in the workbench
 
-Choose **Canon diagrams** on the welcome page. Each card opens a **read-only**
+Choose **Browse diagrams** on the welcome page. Each card opens a **read-only**
 viewer. Readers can walk the steps, select an alternate, switch views, drill
 into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
@@ -28,7 +28,7 @@ Every published diagram has a read-only URL using its stable folder-derived ID:
 https://your-diagrams-site/workbench/flowspec.html?diagram=doorbell
 ```
 
-Open **Canon diagrams → a diagram → Copy link**. The library cards are also
+Open **Browse diagrams → a diagram → Copy link**. The library cards are also
 normal links: right-click to copy one or open it in a new tab. Adjust the path
 above if your deployment gives the workbench a different address. These links
 work before Backstage is integrated, using the static site's published

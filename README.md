@@ -475,7 +475,7 @@ field or agent-authored cross-reference data is required.
 For human authoring instructions, open **User guide** in the workbench header or
 workspace toolbar. The [bundled guide](docs/workbench-user-guide.md) includes
 a first-diagram walkthrough, alternate paths, shared steps, Home animation,
-layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
+layouts, catalogs, and sharing. **Browse diagrams** on welcome opens the
 [read-only repository library](docs/workbench-canon-library.md), with an explicit
 **Edit in Workbench** handoff. Keep maintained JSON under `diagrams/<name>/` and
 optionally add a portable HTML export. Add the folder and owner to root

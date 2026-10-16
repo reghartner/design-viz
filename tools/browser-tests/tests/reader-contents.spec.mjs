@@ -1,4 +1,4 @@
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,activeCompanyBrand} from '../helpers/test.mjs';
 import {writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -164,20 +164,42 @@ for(const width of [1440,1120,768,390,320,286])test('all top Views wrap without 
   await info.attach('wrapped-top-'+width,{body:await page.screenshot(),contentType:'image/png'});
 });
 
-test('reader metadata wraps within narrow content under wider fallback font metrics',async({page,server})=>{
-  await page.setViewportSize({width:286,height:1000});const root=await open(page,server,'lavender');
-  const subtitle=root.locator(':scope > .doc-sub');
-  // Linux monospace metrics exposed an intrinsic-width metadata badge beneath
-  // the fixed Explore canvas. Force wider metrics so this reproduces everywhere.
-  await subtitle.evaluate(el=>el.style.font='500 13px monospace');
+/* #554 exported reader chrome. Chuck's ruling: remove the build line, keep the theme picker.
+   row | fixture | assertion (scoped) | rejects
+   1 no build line on load | exported contents.html (pastel), Full + Explore views | #docview has no [data-dv-skin-label] and no direct-child <p> reading "generated from spec" | CSS-only hiding; dropping only the data attribute
+   2 no build line after theme change | real clicks Theme -> each skin | same scoped check after every skin | applySkinClasses re-inserting or rewriting the line
+   3 theme picker kept | .reader-theme-footer in exported page | footer visible; choosing a theme via real clicks flips #docview's sk-* class and the summary | hiding the picker per the issue's original recommendation
+   4 header company name >= 4.5:1 | global placeholder brand, every SELECTABLE skin | .doc-heading .doc-company-brand .fv-brand-name color vs composited ancestor background-color | white brand fg (#FFFFFF) inherited onto light skins; fixing only one skin
+   5 monogram text >= 4.5:1 | same | .fv-brand-monogram color vs its own background | a fix that recolors the mark text onto its accent fill
+   The brand must render (company-brand-header.test.js and shared-icons.spec.mjs require it), so "not rendered" is not taken here. */
+test('exported reader omits the build line, keeps the theme picker and renders a legible company placeholder',async({page,server})=>{
+  const root=await open(page,server,'pastel'),themes=['aurora','pastel','blueprint','terminal','rose','lavender','lilac'];
+  const footer=root.locator('.reader-theme-footer'),summary=footer.locator('.reader-theme-menu>summary');
+  const brand=root.locator(':scope > .doc-heading .doc-company-brand'),name=brand.locator('.fv-brand-name'),mark=brand.locator('.fv-brand-monogram');
+  async function noBuildLine(){
+    await expect(root.locator('[data-dv-skin-label]')).toHaveCount(0);
+    await expect(root.locator(':scope > p').filter({hasText:/generated from spec/i})).toHaveCount(0);
+  }
+  const contrast=locator=>locator.evaluate((el,own)=>{
+    const rgba=v=>{const m=v.match(/[\d.]+/g).map(Number);return{r:m[0],g:m[1],b:m[2],a:m.length>3?m[3]:1};};
+    const over=(top,base)=>({r:top.r*top.a+base.r*(1-top.a),g:top.g*top.a+base.g*(1-top.a),b:top.b*top.a+base.b*(1-top.a),a:1});
+    const layers=[];for(let node=own?el:el.parentElement;node;node=node.parentElement){const c=rgba(getComputedStyle(node).backgroundColor);if(c.a>0)layers.push(c);if(c.a>=1)break;}
+    let bg={r:255,g:255,b:255,a:1};for(const layer of layers.reverse())bg=over(layer,bg);
+    const fg=over(rgba(getComputedStyle(el).color),bg);
+    const lum=c=>{const ch=[c.r,c.g,c.b].map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2];};
+    const a=lum(fg),b=lum(bg);return(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+  },locator===mark);
+  await expect(root).toHaveClass(/sk-pastel/);await expect(summary).toHaveAttribute('data-current-skin','pastel');
   const strip=root.getByRole('tablist',{name:'Views in selected Tab'});
-  for(const name of ['Full story','Explore story','Full story']){
-    await strip.getByRole('tab',{name,exact:true}).click();
-    await expect(subtitle).toHaveText('generated from spec · skin: lavender');
-    const bounds=await subtitle.evaluate(el=>{const r=el.getBoundingClientRect(),parent=el.parentElement.getBoundingClientRect(),s=getComputedStyle(el.parentElement);return{left:r.left,right:r.right,availableRight:parent.right-parseFloat(s.paddingRight),height:r.height,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};});
-    expect(bounds.left).toBeGreaterThanOrEqual(0);expect(bounds.right).toBeLessThanOrEqual(bounds.availableRight);expect(bounds.height).toBeGreaterThan(32);expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.clientHeight);
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(286);
-    if(name==='Full story'){await expect(subtitle).toBeVisible();await subtitle.scrollIntoViewIfNeeded();}
+  for(const view of ['Full story','Explore story']){await strip.getByRole('tab',{name:view,exact:true}).click();await noBuildLine();}
+  await expect(footer).toBeVisible();await expect(summary).toHaveAttribute('aria-label','Choose theme');
+  await expect(name).toHaveText(activeCompanyBrand.app);await expect(name).toBeVisible();await expect(mark).toBeVisible();
+  for(const skin of themes){
+    await summary.click();await footer.locator('[data-reader-skin="'+skin+'"]').click();
+    await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));await expect(summary).toHaveAttribute('data-current-skin',skin);
+    await noBuildLine();
+    expect(await contrast(name),'company name contrast in '+skin).toBeGreaterThanOrEqual(4.5);
+    expect(await contrast(mark),'monogram contrast in '+skin).toBeGreaterThanOrEqual(4.5);
   }
 });
 

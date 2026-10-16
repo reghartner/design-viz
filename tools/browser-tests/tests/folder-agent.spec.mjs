@@ -1399,6 +1399,7 @@ test('Beta conversation has no Stop accepting; Re-establish releases a pending t
 });
 
 test('clipboard failure offers manual copy and invalid source cannot create context',async({page},info)=>{
+  test.setTimeout(120000); // Ten desktop viewport cycles, each reopening the manual copy.
   const h=await setup(page);
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>Promise.reject(Error('denied'))}}));

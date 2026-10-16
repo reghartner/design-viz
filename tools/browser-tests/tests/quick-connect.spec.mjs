@@ -34,6 +34,8 @@ test('visible Connect action and the Add menu share cancellation and invalid-tar
   await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial());await pastePage(page,original);
   await page.locator('#workspace-window-inspect .workspace-window-close').click();
   await node(page,'c').click();await page.locator('#editor-tab-inspect').click();const button=page.getByRole('button',{name:'Connect from this node',exact:true});
+  // Keep the form available while reserving the canvas for connection targets.
+  await page.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
   await button.focus();await page.keyboard.press('Enter');await expect(page.locator('.dv-connect-hint')).toContainText('Recording');
   await page.getByRole('button',{name:'Cancel connection',exact:true}).click();await clean(page);
   await button.click();await node(page,'a').click();expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'c',to:'a'});
@@ -77,8 +79,8 @@ test('source changes, blur, remount and stale inspector actions cannot publish p
   await clean(page);await closeTools(page);await node(page,'c').click();await expect(page.locator('#src')).toHaveValue(changed);
   await start(page);await clean(page);await expect(page.locator('#guide')).toContainText('Render it before connecting');
   await page.evaluate(()=>__editorTest.builder.loadSpec(JSON.parse(document.querySelector('#src').value)));
-  await node(page,'a').click();await page.evaluate(()=>window.oldConnect=document.querySelector('.node-connect-button'));
-  const baseline=await source(page);await start(page);await page.evaluate(()=>__editorTest.builder.destroy());await clean(page);
+  await closeTools(page);await node(page,'a').click();await page.locator('#editor-tab-inspect').click();await page.evaluate(()=>window.oldConnect=document.querySelector('.node-connect-button'));
+  const baseline=await source(page);await closeTools(page);await start(page);await page.evaluate(()=>__editorTest.builder.destroy());await clean(page);
   await page.evaluate(()=>{__editorTest.remount();oldConnect.click();});await clean(page);await expect(page.locator('#src')).toHaveValue(baseline);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await closeTools(page);await start(page);await page.evaluate(()=>{document.querySelector('#src').value+=' ';});const candidate=await node(page,'c').boundingBox();await page.mouse.move(candidate.x+candidate.width/2,candidate.y+candidate.height/2);await clean(page);
   await expect(page.locator('#src')).toHaveValue(baseline+' ');

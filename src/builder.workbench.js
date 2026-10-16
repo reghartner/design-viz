@@ -510,6 +510,7 @@ function initWorkbenchBuilder(opts){
     var status=document.getElementById('workbench-working-status');if(status)el.title=status.textContent+' Browser recovery is reported separately in File.';
   }
   function workingStatus(value){
+    if(!value.connected && workingHeartbeat!==null){life.cancelDelay(workingHeartbeat);workingHeartbeat=null;}
     workingView=value;
     var el=document.getElementById('workbench-working-status'),retry=document.getElementById('working-file-retry');
     if(!el)return;
@@ -567,7 +568,7 @@ function initWorkbenchBuilder(opts){
   }
   async function chooseWorkingFolder(){
     if(!workingBrowser.pickDirectory){inspectorMessage('Writable folder access requires desktop Chrome or Edge over HTTPS. Browser recovery remains available.');return;}
-    var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,unlock=null;
+    var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,startup=null,unlock=null;
     function check(){var now=session.snapshot();if(!life.alive() || token!==workingOperation || now.project!==expected.project || now.text!==expected.text)throw Error('The document changed while choosing its folder. Choose it again.');}
     try{
       var directory=await workingBrowser.pickDirectory({mode:'readwrite',id:'flowview-working'});check();
@@ -584,7 +585,9 @@ function initWorkbenchBuilder(opts){
       agentOptions.setLedger(project.hasLedger?project.ledger:found.source===null?previousLedger || '':'',true);
       var documentId=session.snapshot().project;
       binding={name:directory.name+'/'+found.spec,paired:true,handle:directory,artifacts:project.files.artifacts,
-        flush:function(){return client.flush();},close:function(){var closing=client.disconnect();client.destroy();return closing;}};
+        // Startup establishes this client's epoch. Saves queued while it is
+        // opening must capture that epoch only after its own startup finishes.
+        flush:async function(){await startup;return client.flush();},close:function(){var closing=client.disconnect();client.destroy();return closing;}};
       // Home retires UI operations but keeps this same document association.
       // Replacement synchronously clears it before another source is published.
       client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',
@@ -593,10 +596,10 @@ function initWorkbenchBuilder(opts){
         artifactStatus:function(state,detail){workingFile.report(binding,state,detail);},
         changed:function(update){if(update.connected===false){binding.reconnectOnly=true;workingFile.report(binding,'failed',update.status || 'The folder is disconnected. Reopen it to resume file saving.');}}});
       workingFile.attach(binding);workingFile.report(binding,'saving');
-      try{await client.start(found.hasSession);}catch(ex){binding.reconnectOnly=true;throw ex;}
+      try{startup=client.start(found.hasSession);await startup;}catch(ex){binding.reconnectOnly=true;throw ex;}
       if(workingFile.attached()!==binding)return;
       workingFile.report(binding,'saved');
-      if(workingHeartbeat===null)workingHeartbeat=life.delay(renewWorkingFolder,1000);
+      workingHeartbeat=life.delay(function(){renewWorkingFolder(binding);},1000);
     }catch(ex){if(binding && workingFile.attached()===binding)workingFile.report(binding,'failed',ex.message);
       else if(life.alive() && ex.name!=='AbortError')inspectorMessage('Could not open the working folder. '+ex.message);
     }finally{if(unlock)unlock();}
@@ -605,11 +608,11 @@ function initWorkbenchBuilder(opts){
   if(workingOpen)life.listen(workingOpen,'click',function(){if(workingBrowser.pickFile)chooseWorkingFile();else document.getElementById('file-input').click();});
   if(workingFolder)life.listen(workingFolder,'click',chooseWorkingFolder);
   if(workingRetry)life.listen(workingRetry,'click',function(){workingFile.retry();});
-  function renewWorkingFolder(){
-    workingHeartbeat=null;if(!life.alive())return;
-    var binding=workingFile.attached();if(!binding || !binding.flush)return;
+  function renewWorkingFolder(binding){
+    if(!life.alive() || workingFile.attached()!==binding)return;
+    workingHeartbeat=null;
     if(!binding.failed)workingFile.save();
-    workingHeartbeat=life.delay(renewWorkingFolder,1000);
+    workingHeartbeat=life.delay(function(){renewWorkingFolder(binding);},1000);
   }
   if(opts.workspace && opts.workspace.setHistory){
     opts.workspace.setHistory(life.guard(session.rememberView));

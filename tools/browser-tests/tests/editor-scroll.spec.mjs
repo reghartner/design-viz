@@ -20,7 +20,8 @@ for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused pre
   await page.evaluate(()=>document.fonts.ready);
   if(focus){
     await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();
-    await page.locator('#workspace-focus').click();await page.locator('#editor-tab-inspect').click();
+    await page.locator('#workspace-focus').click();
+    // Focus hides the tools; keep them hidden for the row drag below.
   }
   const position=()=>page.evaluate(()=>document.querySelector('.workmain').scrollTop,focus);
   const settled=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
@@ -46,6 +47,7 @@ for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused pre
   await settled();expect(await position()).toBeCloseTo(before,0);
 
   await section.locator('[data-dv-node="c"]').click();
+  await page.locator('#editor-tab-inspect').click();
   const title=page.locator('#guide').getByLabel('Name',{exact:true});
   await title.fill('Recordings');
   const beforeEdit=await position();

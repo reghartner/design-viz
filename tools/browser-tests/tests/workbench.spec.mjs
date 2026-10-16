@@ -1,4 +1,4 @@
-import {test,expect,paste,pointerTo} from '../helpers/test.mjs';
+import {test,expect,paste,pointerTo,closeTools} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 
 for(const canvas of [false,true])test(`Undo and Redo preserve closed and open Inspector state in ${canvas?'Canvas':'Standard'}`,async({page,server})=>{
@@ -19,7 +19,9 @@ for(const canvas of [false,true])test(`Undo and Redo preserve closed and open In
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
   await expect(inspect).toBeHidden();await expect(json).toBeVisible();await expect(disclosure).not.toHaveAttribute('open','');await expect(page.locator('#builder-history-status')).toHaveText('Redo complete');
 
-  await page.locator('#editor-tab-inspect').click();await disclosure.evaluate(el=>el.open=false);await expect(disclosure).not.toHaveAttribute('open','');
+  // Keep Inspect open during history replay with canvas space reserved for reselection.
+  await json.locator('.workspace-window-close').click();
+  await page.locator('#editor-tab-inspect').click();await inspect.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();await disclosure.evaluate(el=>el.open=false);await expect(disclosure).not.toHaveAttribute('open','');
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await expect(disclosure).not.toHaveAttribute('open','');
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);await expect(disclosure).not.toHaveAttribute('open','');
   await disclosure.evaluate(el=>el.open=true);await node.click();await expect(disclosure).toHaveAttribute('open','');
@@ -48,7 +50,8 @@ test('committed editor preserves exact source, focused edits, hidden paths, poin
   await expect(src).toHaveValue(edited);await expect(title).toBeFocused();
   await page.locator('#editor-tab-json').click();const handwritten=edited+'\n  ';await src.fill(handwritten);
   await undo.click();await expect(src).toHaveValue(source);await redo.click();await expect(src).toHaveValue(handwritten);
-  await page.locator('#editor-tab-inspect').click();
+  // Source editing is complete; expose the row before its pointer reorder.
+  await closeTools(page);
   await pointerTo(page,node('b'),node('c'));
   expect(JSON.parse(await src.inputValue()).page.blocks[0].diagram.rows).toEqual([['a','c','b']]);
   await undo.click();await expect(src).toHaveValue(handwritten);

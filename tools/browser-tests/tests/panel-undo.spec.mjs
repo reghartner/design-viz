@@ -14,16 +14,13 @@ async function drag(page,handle,dx,dy){
   await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:6});await page.mouse.up();
 }
 
-test('editor tool moves and resizes share toolbar and keyboard history without touching source',async({page,server})=>{
+test('editor tool moves and resizes preserve source and history and persist on reload',async({page,server})=>{
   await open(page,server);await page.locator('#editor-tab-json').click();
   const win=page.locator('#workspace-window-json'),before=await geometry(win);
   const preview=await page.locator('#docview .doc-sec').first().elementHandle();
   await drag(page,win.locator('.workspace-window-grip'),-160,40);const moved=await geometry(win);expect(moved).not.toEqual(before);
-  await page.locator('#undo-builder').click();await expect.poll(()=>geometry(win)).toEqual(before);await expect(page.locator('#src')).toHaveValue(source);
-  await win.locator('.workspace-window-grip').focus();await page.keyboard.press('ControlOrMeta+Shift+z');await expect.poll(()=>geometry(win)).toEqual(moved);
   await drag(page,win.locator('.workspace-window-resize'),80,-60);const resized=await geometry(win);expect(resized[2]).toBeGreaterThan(moved[2]);
-  await page.keyboard.press('ControlOrMeta+z');await expect.poll(()=>geometry(win)).toEqual(moved);
-  await page.locator('#redo-builder').click();await expect.poll(()=>geometry(win)).toEqual(resized);
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();await expect(page.locator('#src')).toHaveValue(source);
   expect(await preview.evaluate(el=>el.isConnected)).toBe(true);
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-floating-v1')).windows.json);expect(Math.round(saved.w)).toBe(resized[2]);
   await page.reload();await page.locator('#editor-tab-json').click();await expect.poll(()=>geometry(win)).toEqual(resized);
@@ -69,19 +66,14 @@ test('panel history survives source rerenders and follows source edits in both d
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await expect.poll(()=>geometry(panel)).toEqual(moved);
 });
 
-test('cancelled drags and tool visibility add no history; geometry undo keeps closed tools closed',async({page,server})=>{
-  await open(page,server);await page.locator('#editor-tab-json').click();const win=page.locator('#workspace-window-json'),before=await geometry(win);
-  const grip=win.locator('.workspace-window-grip');await drag(page,grip,-150,40);const first=await geometry(win);
-  await drag(page,grip,-90,30);const second=await geometry(win);expect(second).not.toEqual(first);
+test('cancelled tool drags restore placement and visibility never adds history',async({page,server})=>{
+  await open(page,server);await page.locator('#editor-tab-json').click();const win=page.locator('#workspace-window-json');
+  const grip=win.locator('.workspace-window-grip');await drag(page,grip,-150,40);const before=await geometry(win);
   await grip.hover();const r=await grip.boundingBox();await page.mouse.move(r.x+40,r.y+12);await page.mouse.down();await page.mouse.move(r.x-60,r.y+70,{steps:5});
-  await page.keyboard.press('Escape');await page.mouse.up();await expect.poll(()=>geometry(win)).toEqual(second);
-  await win.locator('.workspace-window-close').click();await page.locator('#undo-builder').click();await expect(win).toBeHidden();
-  await page.locator('#editor-tab-json').click();await expect.poll(()=>geometry(win)).toEqual(first);
-  await page.locator('#undo-builder').click();await expect.poll(()=>geometry(win)).toEqual(before);await expect(page.locator('#src')).toHaveValue(source);
-  await page.locator('#redo-builder').click();await expect.poll(()=>geometry(win)).toEqual(first);
-  await grip.focus();await page.keyboard.press('ArrowLeft');await expect(page.locator('#redo-builder')).toBeDisabled();
-  const typed=source+'\n{ unfinished';await page.locator('#src').fill(typed);
-  await page.locator('#undo-builder').click();await expect.poll(()=>geometry(win)).toEqual(first);await expect(page.locator('#src')).toHaveValue(typed);
+  await page.keyboard.press('Escape');await page.mouse.up();await expect.poll(()=>geometry(win)).toEqual(before);
+  await win.locator('.workspace-window-close').click();await expect(win).toBeHidden();
+  await page.locator('#editor-tab-json').click();await expect.poll(()=>geometry(win)).toEqual(before);
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();await expect(page.locator('#src')).toHaveValue(source);
 });
 
 

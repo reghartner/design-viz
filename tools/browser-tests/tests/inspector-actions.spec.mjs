@@ -58,7 +58,7 @@ test('nested handoff and detail commits stay above fields and visible while thei
   await handoff.getByRole('button',{name:'Apply handoff',exact:true}).click();
   expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.b.handoff.url).toBe('https://example.com/revised');
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
-  await page.locator('#section-overview [data-dv-node="a"] .t1').click();
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
   const detail=guide.locator('.node-detail-editor');
   await expect(detail).not.toHaveAttribute('open');await detail.locator(':scope > summary').click();
   await before(detail.getByRole('group',{name:'Domain detail actions'}),detail.getByRole('combobox',{name:'Detail target',exact:true}));

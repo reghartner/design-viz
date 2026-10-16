@@ -13,7 +13,7 @@ async function setup(page){
 }
 async function disk(page,name='chosen.spec.json'){
   // OPFS may invalidate a File snapshot when the native buffered close replaces it.
-  return page.evaluate(async name=>{try{const root=await navigator.storage.getDirectory();return await(await(await root.getFileHandle(name)).getFile()).text();}catch(error){if(error.name==='NotFoundError')return null;throw error;}},name);
+  return page.evaluate(async name=>{try{const root=await navigator.storage.getDirectory();return await(await(await root.getFileHandle(name)).getFile()).text();}catch(error){if(error.name==='NotFoundError' || error.name==='NotReadableError')return null;throw error;}},name);
 }
 async function edit(page,text){await page.locator('#editor-tab-json').click();await page.locator('#src').fill(text);}
 async function filePanel(page){await closeTools(page);await page.locator('#editor-tab-file').click();}
@@ -35,6 +35,22 @@ test('native chosen file saves handwritten and structured edits plus Undo/Redo, 
   await page.reload();await expect(page.locator('#workspace-provenance')).toHaveText('Browser only');await filePanel(page);await page.locator('#working-file-open').click();await expect(page.locator('#src')).toHaveValue(returned);
 });
 
+test('native snapshot invalidation retries exact disk bytes while persistent unreadability still fails',async({page,server})=>{
+  await setup(page);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-open').click();await expect(page.locator('#src')).toHaveValue(source);
+  await page.evaluate(()=>{
+    const text=File.prototype.text;window.diskReadFailure='once';
+    File.prototype.text=function(...args){
+      if(this.name==='chosen.spec.json' && window.diskReadFailure){const mode=window.diskReadFailure;if(mode==='once')window.diskReadFailure='';return Promise.reject(new DOMException('Injected invalidated snapshot','NotReadableError'));}
+      return text.apply(this,args);
+    };
+  });
+  await expect.poll(()=>disk(page)).toBe(source);expect(await page.evaluate(()=>window.diskReadFailure)).toBe('');
+  await page.evaluate(()=>{window.diskReadFailure='persistent';});let failure;
+  try{await expect.poll(()=>disk(page),{timeout:500,intervals:[50]}).toBe(source);}catch(error){failure=error;}
+  expect(failure).toBeTruthy();expect(String(failure)).toContain('Timeout 500ms exceeded');
+  await page.evaluate(()=>{window.diskReadFailure='';});expect(await disk(page)).toBe(source);
+});
+
 test('invalid drafts remain in recovery, disk pauses and resumes; external modification produces a visible failure',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:900});await setup(page);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-open').click();
   await edit(page,'{ unfinished');await filePanel(page);await expect(page.locator('#workbench-working-status')).toHaveAttribute('data-state','paused');
@@ -47,7 +63,15 @@ test('invalid drafts remain in recovery, disk pauses and resumes; external modif
   await page.screenshot({path:info.outputPath('working-file-failed.png')});
 });
 
-test('standalone folder preserves an unknown ledger and renews the existing lease without agent setup',async({page,server})=>{
+for(const heldStartup of [false,true])test('standalone folder preserves an unknown ledger and renews the existing lease without agent setup'+(heldStartup?' with autosave queued during startup':''),async({page,server})=>{
+  if(heldStartup)await page.route('**/workbench.html',async route=>{
+    // Expose only the mounted binding in this test response, never in shipped
+    // code. Its real flush gives an observable completion for the held save.
+    const response=await route.fetch(),html=await response.text();
+    const marker="workingStatus({state:'browser',detail:workingBrowser.pickFile?";
+    expect(html.split(marker)).toHaveLength(2);
+    await route.fulfill({response,body:html.replace(marker,'window.workingFileTest={flush:function(){return workingFile.attached().flush();}};'+marker)});
+  });
   await page.setViewportSize({width:1440,height:900});await setup(page);await page.goto(server.origin+'/workbench.html');await paste(page,source);
   const ledger='\ufeff# Handwritten coverage\r\nKeep unknown content exactly.\r\n';
   await page.evaluate(async({source,ledger})=>{const root=await navigator.storage.getDirectory();for(const [name,text] of [['actual.spec.json',source],['actual.ledger.md',ledger]]){const handle=await root.getFileHandle(name,{create:true}),stream=await handle.createWritable();await stream.write(text);await stream.close();}},{source,ledger});
@@ -62,7 +86,30 @@ test('standalone folder preserves an unknown ledger and renews the existing leas
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(changed);
   await page.locator('#folder-agent-close-guide').click();await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
   await filePanel(page);await expect(page.locator('#workbench-working-status')).toContainText('Browser-only');
-  await page.locator('#working-folder-open').click();await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
+  if(heldStartup)await page.evaluate(()=>{
+    const read=FileSystemFileHandle.prototype.getFile;
+    FileSystemFileHandle.prototype.getFile=async function(...args){
+      // Earlier project inspection precedes association publication. Hold only
+      // the client's first session read after the destination reports Saving.
+      if(this.name==='session.json' && !window.startupHeld && document.getElementById('workbench-working-status').dataset.state==='saving'){
+        window.startupHeld=true;await new Promise(resolve=>window.releaseStartup=resolve);
+      }
+      return read.apply(this,args);
+    };
+  });
+  await page.locator('#working-folder-open').click();
+  if(heldStartup){
+    await expect.poll(()=>page.evaluate(()=>window.startupHeld)).toBe(true);
+    // Exercise the same save boundary used by autosave and lease renewal,
+    // while retaining startup's exact source snapshot.
+    await page.evaluate(()=>{window.queuedStartupSave=window.workingFileTest.flush().then(()=>({ok:true}),error=>({error:error.message}));});
+    await page.evaluate(()=>window.releaseStartup());
+    expect(await page.evaluate(()=>window.queuedStartupSave)).toEqual({ok:true});
+  }
+  await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
+  const reconnected=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent');return JSON.parse(await(await(await meta.getFileHandle('editor.json')).getFile()).text());});expect(reconnected.connected).toBe(true);
+  // Verify the queued flush did not poison the otherwise connected lease.
+  await expect(page.locator('#workbench-working-status')).toContainText('Saved to');
   const afterHandoff=changed.replace('Folder edit','After handoff');await edit(page,afterHandoff);await expect.poll(()=>disk(page,'actual.spec.json')).toBe(afterHandoff);
 });
 

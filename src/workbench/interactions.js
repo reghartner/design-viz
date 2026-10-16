@@ -37,7 +37,7 @@ function createBuilderInteractions(opts){
       session.target={section:section,kind:'node',id:id};rehighlight();renderInspector();
     }});
   life.own(function(){textEditor.destroy();});
-  function selectionChanged(){if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
+  function selectionChanged(){if(opts.workspace && opts.workspace.selectionChanged)opts.workspace.selectionChanged();if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;

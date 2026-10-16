@@ -695,6 +695,10 @@ ledger writes to `openFolderAgentProject().flushArtifacts()` with its existing
 journal and conflict checks. Agent setup explicitly retires and drains the
 standalone owner before initializing; connected agent folders report the same
 status but remain written exclusively by the agent client's serial queue.
+Each standalone binding waits for its own startup before queuing a flush, so
+startup establishes the connection epoch before autosave captures it. Its lease
+heartbeat starts after startup, belongs to that binding, and retires when the
+association clears; handoff cannot carry an old timer into a new connection.
 
 A same-destination export drains that authoritative writer and verifies the raw
 accepted spec/ledger. It skips those matching files and writes HTML/README with

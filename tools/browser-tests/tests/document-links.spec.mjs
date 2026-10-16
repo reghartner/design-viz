@@ -17,22 +17,26 @@ async function standalone(server,name,raw){
 }
 async function clipboard(page){await page.evaluate(()=>{window.copied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copied.push(text);}}});});}
 
-test('desktop settings persist identity and Claude URL through undo, redo and JSON/HTML export',async({page,server,context},info)=>{
+for(const [route,artifactId] of [['public/artifacts','shared-artifact-123'],['artifact','diagram_123'],['code/artifact','f57e291a-a2b8-48ca-a872-3f8f9c3db600']]){
+const artifactURL='https://claude.ai/'+route+'/'+artifactId+'?source=shared&mode=preview#artifact';
+test('desktop settings persist '+route+' identity and URL through undo, redo and JSON/HTML export',async({page,server,context},info)=>{
  await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));await prepareEditorSurface(page);
  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();
  async function field(label,value){const input=page.locator('#guide').getByLabel(label,{exact:true});await input.fill(value);await input.press('Enter');}
  await field('Diagram ID','existing_diagram');const before=await page.locator('#src').inputValue();
- await field('Claude artifact share URL',claude);
- await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.documentLinks).toEqual({id:'existing_diagram',claudeUrl:claude,claudeArtifactId:'shared-artifact-123'});
+ await field('Claude artifact share URL',artifactURL);
+ await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.documentLinks).toEqual({id:'existing_diagram',claudeUrl:artifactURL,claudeArtifactId:artifactId});
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();
  await page.locator('#document-settings').click();await expect(page.locator('#guide').getByLabel('Diagram ID',{exact:true})).toHaveValue('existing_diagram');
  await page.locator('#guide').screenshot({path:info.outputPath('document-link-settings.png')});
  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await download);
- const saved=JSON.parse(files['document-destinations.spec.json']);expect(saved.page.canon).toBeUndefined();expect(saved.page.documentLinks.claudeArtifactId).toBe('shared-artifact-123');
+ const saved=JSON.parse(files['document-destinations.spec.json']);expect(saved.page.canon).toBeUndefined();expect(saved.page.documentLinks).toEqual({id:'existing_diagram',claudeUrl:artifactURL,claudeArtifactId:artifactId});
  await writeFile(path.join(server.root,'exported-links.html'),files['document-destinations.html']);const reader=await context.newPage();await reader.goto(server.origin+'/exported-links.html');
- await expect(reader.locator('.reader-document-links').getByRole('link',{name:'Open in Claude'})).toHaveAttribute('href',claude);
+ await expect(reader.locator('.reader-document-links').getByRole('link',{name:'Open in Claude'})).toHaveAttribute('href',artifactURL);
  await expect(reader.locator('.reader-document-links').getByRole('link',{name:'Open on internal site'})).toHaveCount(0);await reader.close();
 });
+
+}
 
 test('standalone snapshot keeps nested source destinations and copy actions without provider context',async({page,server},info)=>{
  const base=server.origin+'/internal/flowspec.html';

@@ -17,9 +17,31 @@ test('site destinations retain subpaths and supported targets; Claude is the exa
  assert.equal(B.documentReference(doc('existing_diagram').page).spec,'existing_diagram');
  assert.equal(B.documentReference({canon:{id:'registered'},documentLinks:{id:'wrong'}}).spec,'registered');
 });
+
+for(const [route,id] of [['artifact','diagram_123'],['code/artifact','f57e291a-a2b8-48ca-a872-3f8f9c3db600']]){
+ test('singular Claude '+route+' URLs retain identity and destinations through settings and export',()=>{
+  const url='https://claude.ai/'+route+'/'+id+'?source=shared&mode=preview#artifact';
+  assert.deepEqual(plain(B.claudeArtifact(url)),{url,id});
+  const links={id:'existing_diagram',claudeUrl:url,claudeArtifactId:id};
+  const raw=doc('existing_diagram');delete raw.page.documentLinks;
+  const plan=B.planDocumentSetting(JSON.stringify(raw),raw,'documentLinks',links);
+  assert.equal(plan.error,undefined);
+  const saved=JSON.parse(plan.text);assert.deepEqual(saved.page.documentLinks,links);
+  assert.deepEqual(plain(B.validate(saved.page).errors),[]);
+  const snapshot=B.prepareExportSnapshot(plan.text,()=>saved);assert.equal(snapshot.error,undefined);
+  assert.deepEqual(JSON.parse(snapshot.text).page.documentLinks,links);
+  const ref=plain(B.documentReference(saved.page));
+  assert.deepEqual(plain(B.documentDestinations(ref)),[{kind:'claude',label:'Open in Claude',url}]);
+  assert.equal(B.diagramHandoffURL({...ref,section:'overview',step:'send'}),url);
+  saved.page.documentLinks.claudeArtifactId='another-artifact';
+  assert.match(B.validate(saved.page).errors.join('\n'),/claudeArtifactId: must match/);
+  assert.match(B.planDocumentSetting(plan.text,JSON.parse(plan.text),'documentLinks',saved.page.documentLinks).error,/must match/);
+ });
+}
+
 test('unsafe bases, non-share artifact URLs and conflicting artifact IDs are rejected',()=>{
  for(const base of ['javascript:alert(1)','https://user:pw@site.example/','https://site.example/?q=1','https://site.example/#','https://site.example/\\evil',' https://site.example/','https://site.example/\n'])assert.equal(B.documentSiteBase(base),null,base);
- for(const url of ['https://evil.example/public/artifacts/abc','https://claude.ai/chat/abc','https://user@claude.ai/public/artifacts/abc'])assert.equal(B.claudeArtifact(url),null,url);
+ for(const url of ['https://evil.example/public/artifacts/abc','https://claude.ai/chat/abc','https://user@claude.ai/public/artifacts/abc','http://claude.ai/artifact/abc','javascript:alert(1)','https://claude.ai.evil.example/artifact/abc','https://claude.ai@evil.example/artifact/abc','https://user:secret@claude.ai/code/artifact/abc','https://claude.ai:444/artifact/abc','https://claude.site/artifact/abc','https://claude.site/code/artifact/abc','https://claude.ai/code/artifacts/abc','https://claude.ai/public/artifact/abc','https://claude.ai/artifact/','https://claude.ai/artifact/abc/extra','https://claude.ai/artifact/abc%2Fextra','https://claude.ai/chat/artifact/abc'])assert.equal(B.claudeArtifact(url),null,url);
  const raw=doc('test');raw.page.documentLinks.claudeArtifactId='wrong';assert.match(B.validate(raw.page).errors.join('\n'),/must match/);
  raw.page.documentLinks.claudeArtifactId='abc-123';raw.page.canon={version:1,id:'different',kind:'design',owner:'group:default/test'};assert.match(B.validate(raw.page).errors.join('\n'),/repository diagram ID/);
 });

@@ -8,6 +8,7 @@ function documentSiteBase(value){
 function claudeArtifact(value){
   if(typeof value!=='string' || /[\s\\]/.test(value))return null;
   try{var u=new URL(value),match=u.pathname.match(/^\/(?:public\/)?artifacts\/([a-zA-Z0-9_-]+)\/?$/);
+    if(!match && u.hostname==='claude.ai')match=u.pathname.match(/^\/(?:code\/)?artifact\/([a-zA-Z0-9_-]+)\/?$/);
     return u.protocol==='https:' && (u.hostname==='claude.ai' || u.hostname==='claude.site') && !u.port && !u.username && !u.password && match?{url:u.href,id:match[1]}:null;
   }catch(_){return null;}
 }
@@ -19,7 +20,7 @@ function validateDocumentLinks(value,canonId,at,errors){
   if(canonId && value.id!=null && value.id!==canonId)errors.push(at+'.id: must match the repository diagram ID '+canonId);
   if(value.siteBaseUrl!=null && !documentSiteBase(value.siteBaseUrl))errors.push(at+'.siteBaseUrl: use an absolute HTTP(S) site URL without credentials, query or fragment');
   var artifact=claudeArtifact(value.claudeUrl);
-  if(value.claudeUrl!=null && !artifact)errors.push(at+'.claudeUrl: paste a Claude artifact share URL (claude.ai/artifacts/… or claude.ai/public/artifacts/…)');
+  if(value.claudeUrl!=null && !artifact)errors.push(at+'.claudeUrl: paste a Claude artifact URL (claude.ai/artifact/…, claude.ai/code/artifact/…, or an artifacts/… share URL)');
   if(value.claudeArtifactId!=null && (!artifact || value.claudeArtifactId!==artifact.id))errors.push(at+'.claudeArtifactId: must match the artifact share URL');
 }
 function documentReference(page){

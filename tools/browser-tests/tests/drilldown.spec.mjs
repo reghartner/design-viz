@@ -51,7 +51,7 @@ test('standalone details support native Back/Forward and shareable reloadable de
    C1 Contents marks the parent with the open detail | depth 1 | root row [data-reader-section=doorbell-domains] aria-current=page AND its own <li> holds .reader-tree-detail ["Connectivity"] with aria-current=location; no other row holds one | no indicator; indicator under the wrong row or tree-wide
    C2 Contents shows the full open trail | depth 2 | root row still aria-current=page; its <li> .reader-tree-detail = ["Connectivity","Cloud handoff"], last carries aria-current=location | only the first level; current level unmarked; parent row losing its current mark
    R1 in-card breadcrumb partial Back | click "Connectivity" crumb at depth 2 | header "Connectivity"; root row aria-current=page; tree trail ["Connectivity"] with aria-current=location | stale depth-2 labels after Back
-   R2 in-card breadcrumb Back to Overview | click "Overview" crumb | header label count 0; tree detail count 0 | labels left behind after closing
+   R2 in-card breadcrumb Back to Overview | click the first (Overview) crumb | header label count 0; tree detail count 0 | labels left behind after closing
    R3 browser Back | page.goBack() from depth 2, then again | depth 1 header/tree (root row aria-current=page, sole trail entry aria-current=location), then both cleared with root row still current | history restore that skips the reader refresh */
 test('an open drilldown is named in the reader header and marked under its parent in Contents, and both restore on Back',async({page,server})=>{
  await page.setViewportSize({width:1440,height:900});
@@ -81,7 +81,7 @@ test('an open drilldown is named in the reader header and marked under its paren
  await expect(active(page).locator('[data-dv-detail="handoff"]')).toBeVisible();
  await expect(detailLabel).toHaveText('Connectivity');await expect(parentRow).toHaveAttribute('aria-current','page');await expect(trail).toHaveText(['Connectivity']);await expect(trail).toHaveAttribute('aria-current','location');
  // R2
- await active(page).locator('.detail-breadcrumb').getByRole('button',{name:'Overview',exact:true}).click();await expect(root(page)).toBeVisible();
+ await active(page).locator('.detail-breadcrumb button').first().click();await expect(root(page)).toBeVisible();
  await expect(detailLabel).toHaveCount(0);await expect(allTrail).toHaveCount(0);await expect(parentRow).toHaveAttribute('aria-current','page');
  // R3
  await root(page).locator('[data-dv-detail="connectivity"]').click();await expect(detailLabel).toHaveText('Connectivity');

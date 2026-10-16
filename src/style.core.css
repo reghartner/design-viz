@@ -3,6 +3,8 @@
 /* @panel-style-order:1 */
 /* style.core.css — shared doc/board/widget styles for both built pages. */
 :root{--delta:#2FBF71;}
+/* Buttons take their context's UI font, never the browser's Arial default; class rules still win. */
+:where(button,input[type=button],input[type=submit],input[type=reset]){font-family:inherit;}
 .tabbar{display:flex; gap:6px; flex-wrap:wrap; margin-top:24px;}
 .tabunit{display:inline-flex; align-items:stretch; gap:3px;}
 .tabbtn{font:600 12px 'IBM Plex Mono',monospace; padding:7px 14px; border-radius:8px; cursor:pointer;}

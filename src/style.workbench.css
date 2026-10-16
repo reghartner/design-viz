@@ -264,7 +264,7 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .file-import-dialog h2{margin:0 0 12px;font-size:22px;}.file-import-detail{font-weight:650;overflow-wrap:anywhere;}.file-import-summary{color:var(--sub);}.file-import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
 .workwrap .workspace-rail,.workwrap .specbox{position:sticky;top:calc(var(--workspace-toolbar,60px) + 12px);margin-top:12px;height:calc(100dvh - var(--workspace-toolbar,60px) - 24px);box-sizing:border-box;min-height:240px;min-width:0;}
 .workwrap .workspace-rail{display:flex;flex-direction:column;gap:7px;padding:12px 5px;background:var(--codebg);border:1px solid var(--line);border-radius:12px 0 0 12px;overflow:auto;}
-.workspace-rail [role="tab"]{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:61px;padding:8px 2px;border:0;border-radius:7px;background:transparent;color:var(--sub);font:500 11px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.workspace-rail [role="tab"]{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:61px;padding:8px 2px;border:0;border-radius:7px;background:transparent;color:var(--sub);font-weight:500;font-size:11px;line-height:normal;font-family:inherit;cursor:pointer;}
 .workspace-rail [aria-selected="true"]{color:var(--ink);background:var(--card);box-shadow:inset 3px 0 var(--accent);font-weight:600;}
 .workspace-rail [role="tab"]:hover{background:var(--card);}
 .workspace-rail [role="tab"]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
@@ -512,7 +512,7 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .effective-json{margin-top:9px;}
 .effective-json textarea{box-sizing:border-box;width:100%;font:11px/1.45 'IBM Plex Mono',monospace;}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
-.skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
+.skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font-weight:600; font-size:11px; line-height:normal; font-family:inherit;
   padding:6px 12px; border-radius:8px; cursor:pointer;}
 .skbtn[aria-pressed="true"]{border-color:var(--accent); color:var(--accent);}
 .skbtn:focus-visible, .rbtn:focus-visible, .cbtn:focus-visible, .tabbtn:focus-visible,
@@ -556,14 +556,14 @@ body.workspace-focus .workspace-tools{margin-top:0;}
    a thin rule between clusters makes the grouping read at a glance */
 .bgroup{display:flex; align-items:center; gap:6px;}
 .bgroup + .bgroup{padding-left:10px; border-left:1px solid var(--line);}
-.bbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
+.bbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font-weight:600; font-size:11px; line-height:normal; font-family:inherit;
   padding:5px 10px; border-radius:7px; cursor:pointer;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 /* One persistent insertion entry point above the editor tools. */
 .editor-add-button{display:flex;align-items:center;justify-content:center;gap:9px;box-sizing:border-box;
   min-height:46px;padding:11px 18px;border:1px solid var(--accent);border-radius:10px;
-  background:var(--accent);color:var(--accent-ink);font:600 14px/1.4 'Sora',sans-serif;cursor:pointer;}
+  background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;line-height:1.4;font-family:inherit;cursor:pointer;}
 .editor-add-button:hover:not(:disabled){box-shadow:0 3px 12px var(--selglow);filter:brightness(1.06);}
 .editor-add-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
 .editor-add-button:disabled{opacity:.5;cursor:default;}
@@ -634,7 +634,7 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .extraction-actions .bbtn:disabled{opacity:.5;cursor:default;}
 /* the always-visible escape hatch from ADD TO STEP mode: a solid accent
    pill so the way out is never in doubt, in the app's own callout colour */
-.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font:700 11px 'IBM Plex Mono',monospace;
+.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font-weight:700; font-size:11px; line-height:normal; font-family:inherit;
   padding:5px 12px; border-radius:7px; cursor:pointer; margin-left:auto;}
 .bexit:hover{box-shadow:0 0 0 3px var(--selglow);}
 .bexit:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
@@ -900,7 +900,7 @@ section.doc-sec>.dv-inserttarget-tag{position:absolute; top:-10px; left:10px;
 .playback-settings>label,.path-settings>label{display:block;margin-top:8px;}
 .playback-settings .playback-setting-check{display:flex;align-items:center;gap:6px;}
 .playback-settings .fnote{margin:8px 0 0;line-height:1.5;}
-.rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
+.rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font-weight:600; font-size:12.5px; line-height:normal; font-family:inherit;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}
 .msgs{list-style:none; margin:0; padding:0; font:500 12px 'IBM Plex Mono',monospace; flex:1; min-width:260px;}
@@ -1297,7 +1297,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-canvas .workspace-tools{flex-wrap:nowrap;gap:10px;}
 .workspace-canvas .workspace-create{flex-basis:auto;order:0;}
 .workspace-canvas .workspace-rail{position:fixed;left:12px;top:84px;width:56px;height:auto;min-height:0;margin:0;padding:5px;gap:3px;border:1px solid var(--line);border-radius:12px;z-index:130;background:var(--card);box-shadow:0 4px 18px #14244212;max-height:calc(100dvh - 96px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;}
-.workspace-canvas .workspace-rail [role="button"]{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:48px;padding:6px 2px;border:0;border-radius:7px;background:transparent;color:var(--sub);font:500 10px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.workspace-canvas .workspace-rail [role="button"]{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:48px;padding:6px 2px;border:0;border-radius:7px;background:transparent;color:var(--sub);font-weight:500;font-size:10px;line-height:normal;font-family:inherit;cursor:pointer;}
 .workspace-canvas .workspace-rail [aria-pressed="true"]{color:var(--accent);background:var(--codebg);box-shadow:inset 2px 0 var(--accent);}
 .workspace-canvas .workspace-rail [role="button"]:hover{background:var(--codebg);}
 .workspace-canvas .workspace-rail [role="button"]:focus-visible{outline:2px solid var(--accent);}

@@ -1569,6 +1569,8 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 .welcome-active:not(.canon-reader-active) #workbench-reader-title,.canon-reader-active #workbench-editor-title{display:none!important;}
 .workspace-help{position:relative;font-size:12px;}
 .workspace-help>summary{cursor:pointer;padding:7px;}
+/* Preview is a direct action but sits among the header menus; match their text style. */
+.workspace-preview{font:inherit;font-size:12px;color:inherit;background:none;border:0;padding:7px;cursor:pointer;white-space:nowrap;}
 .workspace-help-body{position:absolute;right:0;top:100%;width:210px;background:var(--card);padding:12px;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 24px #14244225;}
 
 .workspace-canvas .workspace-history{position:static;padding:0;border:0;background:none;}

@@ -92,7 +92,12 @@ var siteRepositoryIndex=(function(){
     var url=new URL('diagrams.json',location.href).href;
     pending=(async function(){
       var response=await fetch(url,{cache:'no-cache'}),raw=null;
-      if(response.status!==404)raw=await readCanonLibraryJSON(response,'Repository catalog');
+      if(response.status!==404){
+        // Only a body shaped like a diagram library counts as a read; any
+        // other JSON (for example a placeholder) is "no library" and is not kept.
+        var body=await readCanonLibraryJSON(response,'Repository catalog');
+        if(body && [1,2,3].includes(body.version) && Array.isArray(body.diagrams))raw=body;
+      }
       return {status:response.status,redirected:!!response.redirected,raw:raw,url:url};
     })();
     pending.then(function(result){if(result.raw)cached=result;pending=null;},function(){pending=null;});

@@ -16,6 +16,7 @@
     "core/text-box.js",
     "core/details.js",
     "core/tab-views.js",
+    "core/document-links.js",
     "core/handoffs.js",
     "core/tour-model.js",
     "panels/media.js",

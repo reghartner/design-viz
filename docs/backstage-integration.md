@@ -285,3 +285,20 @@ and authorize each consumer's entire provider closure. Serve derived viewer valu
 but retain authored imports for Workbench. Freeze dependencies for each open session;
 never live-update an open consumer. No flattened files are published. See
 [integration details](../apps/backstage/README.md#central-canon-membership).
+
+## Portable destinations in 1.2.0
+
+The native viewer adds optional `NativeViewerOptions.siteBaseUrl`. Set it to the
+actual deployed viewer entry URL (for example
+`https://diagrams.example.com/team/workbench/flowspec.html`), or the directory
+URL only when that directory serves the viewer as its index. The company-wide
+`company.json` setting is `site.baseUrl`; preserve the deployment subpath.
+Flowview appends `?diagram=<existing-id>` and supported navigation fragments.
+
+Desktop Document settings saves a persistent Claude artifact share URL and its
+artifact ID in `page.documentLinks`. Reader Contents exposes configured links
+and copy actions in website, standalone, and native mounts. Imported topology
+snapshots retain inert source destinations, without provider source context.
+Continue supplying `resolveDiagramLink` for company routing and the existing
+pinned-revision `loadDetail` transport. Reference URLs are links only; this
+change does not add Claude embedding or fetch arbitrary reference URLs.

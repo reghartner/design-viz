@@ -257,6 +257,10 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .node-link-menu .nbacklabel{margin-top:5px;font-size:10px;}
 .node-link-menu .node-reference-link{padding:6px 8px;border-radius:6px;font:inherit;overflow-wrap:anywhere;}
 .node-link-close{position:absolute;right:5px;top:5px;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:22px;cursor:pointer;}
+.node-destination-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.node-destination-row .node-reference-link{flex:1;}
+.node-destination-row .node-reference-copy{padding:6px 8px;border-radius:6px;font:inherit;cursor:pointer;}
+.node-destination-row .copyfallback{max-width:100%;}
 .node-link-menu :focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .srcchip{font:600 10px 'IBM Plex Mono',monospace; text-decoration:none; padding:2px 8px; border-radius:999px;
   border:1px solid color-mix(in srgb, var(--acc) 45%, transparent); color:var(--acc); margin-left:10px; vertical-align:2px;}

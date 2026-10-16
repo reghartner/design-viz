@@ -16,7 +16,7 @@ function detailURL(value){
 function detailStepTarget(detail, stepper){
   var id = stepper && stepper.current().id;
   var mapped = id && detail.stepMap && Object.prototype.hasOwnProperty.call(detail.stepMap,id) ? detail.stepMap[id] : null;
-  return Object.assign({}, {path:detail.path,step:detail.step}, specObject(mapped) ? mapped : {});
+  return Object.assign({}, {view:detail.view,path:detail.path,step:detail.step}, specObject(mapped) ? mapped : {});
 }
 function validateDetails(page, errors, warnings){
   var records = sectionRecords(page), seen = Object.create(null);
@@ -33,7 +33,8 @@ function validateDetails(page, errors, warnings){
       if(!specObject(detail)){errors.push(where+': expected an object');return;}
       if(detail.mode != null && ['focus','expand','link'].indexOf(detail.mode)<0) errors.push(where+'.mode: expected focus or link');
       if(detail.mode==='expand')warnings.push(where+'.mode: inline expansion was removed; opens as a focused drilldown. Use focus for new diagrams.');
-      ['section','spec','revision','path','step'].forEach(function(k){if(detail[k]!=null && (typeof detail[k]!=='string' || !detail[k].trim()))errors.push(where+'.'+k+': expected a nonempty string');});
+      var links={};['siteBaseUrl','claudeUrl','claudeArtifactId'].forEach(function(key){if(detail[key]!=null)links[key]=detail[key];});validateDocumentLinks(links,null,where,errors);
+      ['section','spec','revision','view','path','step'].forEach(function(k){if(detail[k]!=null && (typeof detail[k]!=='string' || !detail[k].trim()))errors.push(where+'.'+k+': expected a nonempty string');});
       if(detail.url != null && !detailURL(detail.url))errors.push(where+'.url: expected an HTTP(S) URL without credentials');
       if(!detail.section && !detail.spec && !detail.url)errors.push(where+': choose a detail section, approved spec or URL');
       if((detail.spec || !detail.section) && detail.mode && detail.mode!=='link')errors.push(where+'.mode: external details use link');
@@ -54,7 +55,7 @@ function validateDetails(page, errors, warnings){
         else Object.keys(detail.stepMap).forEach(function(key){
           if(!(s.diagram.steps || []).some(function(st){return st.id===key;}))errors.push(where+'.stepMap.'+key+': unknown parent step ID');
           var mapped=detail.stepMap[key];
-          checkTarget(specObject(mapped)?Object.assign({path:detail.path,step:detail.step},mapped):mapped,where+'.stepMap.'+key);
+          checkTarget(specObject(mapped)?Object.assign({view:detail.view,path:detail.path,step:detail.step},mapped):mapped,where+'.stepMap.'+key);
         });
       }
       if(detail.ports!=null){

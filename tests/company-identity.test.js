@@ -220,3 +220,13 @@ test('the built workbench shows configured links, labels and brand; without conf
   fs.rmSync(path.join(checkout,'company/company.json'));
   assert.deepEqual(build(),plain);
 });
+
+test('site.baseUrl is configured once, validated and embedded in runtime and agent context',t=>{
+ const {loader,write}=scratchLoader(t);write('company.json',{version:1,site:{baseUrl:'https://internal.example/teams/diagrams/'}});
+ assert.equal(loader.companyConfig().site.baseUrl,'https://internal.example/teams/diagrams/');
+ assert.deepEqual(loader.companyAgentContext(),{site:{baseUrl:'https://internal.example/teams/diagrams/'}});
+ const B={};vm.runInNewContext(loader.readSource('core/document-links.js'),B);assert.equal(B.FLOWVIEW_SITE_BASE_URL,'https://internal.example/teams/diagrams/');
+ for(const baseUrl of ['//internal.example/','https://user:pw@internal.example/','https://internal.example/?x=1','https://internal.example/#','https://internal.example/\\evil',' https://internal.example/']){
+  write('company.json',{version:1,site:{baseUrl}});assert.throws(()=>loader.companyConfig(),/site.baseUrl/);
+ }
+});

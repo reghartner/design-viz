@@ -26,6 +26,12 @@ export interface DiagramHandoffReference {
   revision?: string;
   section?: string;
   url?: string;
+  view?: string;
+  path?: string;
+  step?: string;
+  siteBaseUrl?: string;
+  claudeUrl?: string;
+  claudeArtifactId?: string;
 }
 export interface NativeViewerTarget {
   section: string;
@@ -36,6 +42,8 @@ export interface NativeViewerTarget {
   step?: string;
 }
 export interface NativeViewerOptions {
+  /** Published website base, including deployment subpath. No query or fragment. */
+  siteBaseUrl?: string;
   /** Synchronous host routing only. Return an absolute, credential-free HTTP(S) URL.
    * Null, undefined, invalid URLs or thrown errors fall back to the authored URL.
    * Handoffs open as links and never use loadDetail or fetch a diagram. */

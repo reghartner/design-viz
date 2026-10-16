@@ -141,3 +141,28 @@ Replace its fictional destinations with real links before publishing. Test
 every endpoint, including in the intended embedded host, and confirm the
 destination explains the same accepted event or process boundary. Exported
 specs advertise `flow.handoff` for compatibility checks.
+
+## Persistent destinations and source diagrams
+
+Set the existing **Diagram ID** and paste the published **Claude artifact share
+URL** in desktop **Document settings**. Registered documents keep the ID from
+repository membership. Ordinary documents can save an ID without joining Canon.
+Set the internal site base once in `company/company.json` as
+`"site":{"baseUrl":"https://diagrams.example.com/team/flowspec.html"}`.
+
+A cross-document `handoff` or external `detail` can carry `spec`, `revision`,
+`section`, `view`, `path`, `step`, `siteBaseUrl`, `claudeUrl`, and
+`claudeArtifactId`, plus the existing fallback `url`. Known destinations travel
+with the reference. The published reader resolves catalog IDs to its local
+`?diagram=` route. Its detail loader validates the catalog revision and renders
+the target interactively with Back navigation; it never fetches a reference URL
+as a spec. Native Backstage retains its approved, pinned-revision loader.
+
+Reader **Contents** exposes available **Open on internal site** and **Open in
+Claude** links and copy buttons. Cross-document node links expose alternatives.
+Imported nodes expose **Open source diagram**, including nested providers.
+HTML snapshots retain these inert source references as `diagram.sourceDiagrams`
+while removing topology declarations, edit provenance and provider source context.
+Website links carry supported section/view/path/step fragments. Claude links use
+the actual published artifact URL unchanged; this does not enable live native
+Claude embedding. Missing destinations produce no placeholder links.

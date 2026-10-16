@@ -202,3 +202,14 @@ every upstream-owned file stays byte-identical. Copy that fixture as a starting
 point for a real overlay. `tests/company-identity.test.js` does the same for a
 `company.json` with a name, repository and brand, and
 `tests/backstage-pack.test.js` for package identity.
+
+### Internal diagram site
+
+Set `"site":{"baseUrl":"https://diagrams.example.com/team/flowspec.html"}`
+in `company/company.json` once. The base may include a deployment subpath; it
+must be an absolute HTTP(S) URL without credentials, query, or fragment.
+Use the actual viewer entry URL; use a directory URL only when its index serves
+the viewer. Flowview appends `?diagram=<existing-id>` and supported section/view/path/step
+fragments. Builds include this default in the shared runtime and agent context;
+Workbench HTML snapshots also save it in `page.documentLinks.siteBaseUrl`.
+Do not use a transient artifact sandbox URL as a persistent destination.

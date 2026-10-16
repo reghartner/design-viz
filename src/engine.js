@@ -251,18 +251,20 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
 
 /* Node references are authored evidence. Related step code is labeled as such,
    never presented as proof that an endpoint owns the referenced implementation. */
-function nodeReferenceLinks(diagram,id){
+function nodeReferenceLinks(diagram,id,options){
   if(typeof FlowCanon==='undefined')return [];
   var node=(diagram.nodes || {})[id];if(!node)return [];
   var out=[],seen=Object.create(null),binding=node.binding || {};
   function label(value,fallback){return typeof value==='string' && value ? value : fallback;}
-  function add(group,name,url){url=FlowCanon.http(url);if(!url || seen[url])return;seen[url]=true;out.push({group:group,label:name,url:url});}
+  function add(group,name,url,ariaLabel){url=FlowCanon.http(url);if(!url || seen[url])return;seen[url]=true;out.push(Object.assign({group:group,label:name,url:url},ariaLabel?{ariaLabel:ariaLabel}:{}));}
   function code(refs,group,suffix){
     (Array.isArray(refs)?refs:[]).forEach(function(ref){
       if(!ref || typeof ref!=='object' || Array.isArray(ref))return;
       add(group,'Code · '+label(ref.label,label(ref.id,'source'))+(suffix?' · '+suffix:''),FlowCanon.codeUrl(ref));
     });
   }
+  sourceDiagramReferences(diagram,id).forEach(function(ref){documentDestinations(ref,options && options.resolveDiagramLink).forEach(function(item){add('Source diagrams',ref.spec+' · '+(item.kind==='site'?'Internal site':item.kind==='claude'?'Claude':'Source'),item.url,'Open source diagram · '+ref.spec+' · '+item.label);});});
+  if(node.handoff || node.detail)documentDestinations(node.handoff || node.detail,options && options.resolveDiagramLink).forEach(function(item){add('Diagram destinations',item.label,item.url);});
   add('Node links','Source',node.link);
   add('Node links','Backstage · '+label(binding.label,label(binding.entityRef,id)),binding.catalogUrl);
   var api=binding.api || {};
@@ -281,7 +283,7 @@ function nodeReferenceLinks(diagram,id){
   });
   return out;
 }
-function wireNodeReferences(host,svg,diagram,prefix){
+function wireNodeReferences(host,svg,diagram,prefix,options){
   if(!svg || typeof svg.querySelectorAll!=='function')return null;
   var triggers=svg.querySelectorAll('.nrefs-trigger');if(!triggers.length)return null;
   var pop=document.createElement('div');pop.className='nbackpop node-link-menu';pop.id=prefix+'-node-links';
@@ -311,7 +313,7 @@ function wireNodeReferences(host,svg,diagram,prefix){
   function resize(){close(false);}
   function show(trigger,point){
     if(destroyed)return;
-    var id=trigger.getAttribute('data-dv-node-id'),node=(diagram.nodes || {})[id] || {},links=nodeReferenceLinks(diagram,id);
+    var id=trigger.getAttribute('data-dv-node-id'),node=(diagram.nodes || {})[id] || {},links=nodeReferenceLinks(diagram,id,options);
     if(!links.length)return;close(false);active=trigger;open=true;pop.replaceChildren();
     var title=document.createElement('strong');title.className='node-link-title';title.textContent=node.title || id;pop.appendChild(title);
     pop.setAttribute('aria-label','Links for '+(node.title || id));
@@ -319,7 +321,10 @@ function wireNodeReferences(host,svg,diagram,prefix){
     var group;
     links.forEach(function(item){
       if(group!==item.group){var heading=document.createElement('span');heading.className='nbacklabel';heading.textContent=item.group;pop.appendChild(heading);group=item.group;}
-      var a=document.createElement('a');a.className='nbacklink node-reference-link';a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.label+' ↗';pop.appendChild(a);
+      var destination=item.group==='Source diagrams' || item.group==='Diagram destinations',row=pop;
+      if(destination){row=document.createElement('div');row.className='node-destination-row';pop.appendChild(row);}
+      var a=document.createElement('a');a.className='nbacklink node-reference-link';a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.label+' ↗';if(item.ariaLabel)a.setAttribute('aria-label',item.ariaLabel+' ↗');row.appendChild(a);
+      if(destination){var copy=document.createElement('button');copy.type='button';copy.className='nbacklink node-reference-copy';copy.textContent='Copy';copy.setAttribute('aria-label','Copy '+(item.ariaLabel || item.label));row.appendChild(copy);bindCopyControl(window,copy,function(){return item.url;});}
     });
     trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
     var rect=trigger.getBoundingClientRect(),vw=window.innerWidth || document.documentElement.clientWidth,vh=window.innerHeight || document.documentElement.clientHeight;
@@ -943,7 +948,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
-    var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
+    var hasReferences=nodeReferenceLinks(d,id,options).length>0,referenceX=p.w-(hasNodeLink?38:15);
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
@@ -996,7 +1001,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     refreshLaneTitles(svg);
   }
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
-  el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
+  el._nodeLinks=wireNodeReferences(el,svg,d,prefix,options);
 
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
   /* every edge-bearing step owns one coin on its first delivered edge; steps
@@ -3016,6 +3021,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
 function renderPage(view, page, skin, backlinks, options){
   options=Object.assign({},options,{localHandoffTarget:function(value){return localHandoffTarget(page,value);}});
+  var hostResolver=options.resolveDiagramLink;
+  options.resolveDiagramLink=function(ref){
+    if(hostResolver)return hostResolver(ref);
+    if(ref.url && !ref.siteBaseUrl)return null;
+    return documentSiteURL(ref.siteBaseUrl || (page.documentLinks || {}).siteBaseUrl || options.siteBaseUrl || FLOWVIEW_SITE_BASE_URL,ref);
+  };
   skin = resolveSkin('', skin == null ? page.skin : skin);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
@@ -3060,7 +3071,7 @@ function renderPage(view, page, skin, backlinks, options){
   var pageBlocks = blocksOf(page);
   var records = sectionRecords(page);
   var deferredHides = [];
-  var ctl = {view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
+  var ctl = {page:page,documentDestinations:documentDestinations(documentReference(page),hostResolver,options.siteBaseUrl),view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
   ctl.destroy = function(){
     ctl.destroyed = true;

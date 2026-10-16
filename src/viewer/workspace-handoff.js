@@ -9,8 +9,10 @@ function readWorkspaceHandoff(hash){
     if(!data || data.version!==1 || typeof data.id!=='string' || !data.id || data.id.length>200 ||
       typeof data.revision!=='string' || !/^[a-f0-9]{64}$/.test(data.revision) ||
       ['view','edit','build'].indexOf(data.action)<0 ||
+      data.sourceRevision!=null && typeof data.sourceRevision!=='boolean' ||
       data.entity!=null && (typeof data.entity!=='string' || data.entity.length>300))throw new Error();
-    return {id:data.id,revision:data.revision,action:data.action,entity:data.entity || '',target:parseHash(hash)};
+    var result={id:data.id,revision:data.revision,action:data.action,entity:data.entity || '',target:parseHash(hash)};
+    if(data.sourceRevision)result.sourceRevision=true;return result;
   }catch(ex){return {error:'This Backstage link is invalid. Refresh diagrams in Backstage and open it again.'};}
 }
 // Content consistency, not authentication. The pure fallback keeps static HTTP

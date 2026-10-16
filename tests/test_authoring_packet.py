@@ -119,7 +119,8 @@ class AuthoringPacketTests(unittest.TestCase):
 
     def test_reference_discovery_route_stays_within_packet_growth_budget(self):
         # Baselines captured from exact origin/main before the guidance change.
-        budgets = {'new': 78_744 + 1_024, 'edit': 67_458 + 1_024}
+        # Portable document-link schema and its recipe pointer add at most 512 bytes.
+        budgets = {'new': 78_744 + 1_024 + 512, 'edit': 67_458 + 1_024 + 512}
         for mode, maximum in budgets.items():
             text, _ = packet.generate([], [], mode=mode)
             self.assertLessEqual(len(text.encode()), maximum)

@@ -310,9 +310,9 @@ for(const [width,height] of [[1280,800],[1440,900],[1920,1080]])for(const draft 
 // 1   | site/workbench/flowspec.html + site/examples/index.html     | #welcome-home #welcome-gallery visible; its href resolves to site/examples/index.html | no Welcome link, or one pointing elsewhere
 // 2   | same, real click on #welcome-new                            | #welcome-new-screen #welcome-new-gallery visible with the same resolved href | a link on only one surface
 // 3   | same, real click on #welcome-gallery                        | the opened tab has doctype html, characterSet UTF-8, .sub reads "N pages · every diagram", the Auralis card .t reads "Auralis Presence — mmWave …", no "â€"/"Â·" in its text | the generated page without doctype/charset (mojibake)
-// 4   | site/workbench/flowspec.html with no site/examples/          | the probe gets the server's real 404; then #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | a link shown whether or not the gallery is reachable
+// 4   | site/workbench/flowspec.html with no site/examples/          | exactly one HEAD probe gets the server's real 404; then #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | a link shown whether or not the gallery is reachable
 // 5   | row 4                                                      | the probe's 404 and its console line are the only audit entries (spliced explicitly) | a probe failure surfacing as a page error
-// 6   | /workbench.html (not a workbench/ folder, as in agent kits) | no request for any examples/index.html; both links hidden              | an unconditional probe adding network noise to hosts without the repo layout
+// 6   | /workbench.html (not a workbench/ folder, as in agent kits) | no request for any examples/index.html; #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | an unconditional probe adding network noise to hosts without the repo layout
 async function gallerySite(server,withGallery){
   const root=await mkdtemp(path.join(server.root,'gallery-site-')),workbench=path.join(root,'workbench');
   await mkdir(workbench);
@@ -350,9 +350,9 @@ test('the examples gallery is linked from Welcome and the template picker and re
 test('the examples gallery links stay hidden when the gallery is not served beside the workbench',async({page,server,audit})=>{
   const site=await gallerySite(server,false);
   try{
-    const probes=[];page.on('response',response=>{if(response.url()===site.gallery)probes.push(response.status());});
+    const probes=[];page.on('response',response=>{if(response.url()===site.gallery)probes.push(response.request().method()+' '+response.status());});
     await page.goto(site.url);
-    await expect.poll(()=>probes,'the workbench probes its sibling gallery once').toEqual([404]);
+    await expect.poll(()=>probes,'the workbench probes its sibling gallery once').toEqual(['HEAD 404']);
     await page.waitForLoadState('networkidle');
     await expect(home(page)).toBeVisible();await expect(page.locator('#welcome-library')).toBeVisible();
     await expect(home(page).locator('#welcome-gallery')).toBeHidden();
@@ -367,4 +367,8 @@ test('the examples gallery links stay hidden when the gallery is not served besi
   await page.waitForLoadState('networkidle');
   expect(requests).toEqual([]);
   await expect(home(page).locator('#welcome-gallery')).toBeHidden();
+  await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
+  await expect(page.locator('#welcome-templates .welcome-template-card').first()).toBeVisible();
+  await expect(screen(page,'new').locator('#welcome-new-gallery')).toBeHidden();
+  expect(requests).toEqual([]);
 });

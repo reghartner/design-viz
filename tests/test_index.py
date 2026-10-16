@@ -209,23 +209,47 @@ class IndexTest(unittest.TestCase):
 
     # #547 — the gallery must declare its encoding; served without a charset
     # header, "—" and "·" otherwise render as mojibake.
-    # row | fixture                  | assertion (scoped)                                   | rejects
-    # 1   | committed examples index | bytes start with b"<!doctype html>"                  | a page left in quirks mode
-    # 2   | committed examples index | <meta charset="utf-8"> sits inside the first 1024 bytes, before any non-ASCII byte | a missing charset, or one too late for the browser prescan
-    # 3   | committed examples index | bytes decode as UTF-8 and hold "—" and "·" themselves | locale-encoded output or entity-mangled text
-    def test_index_declares_doctype_and_utf8_before_content(self):
-        data = (EXAMPLES / "index.html").read_bytes()
-        self.assertTrue(data.startswith(b"<!doctype html>\n"), data[:80])
-        charset = data.find(b'<meta charset="utf-8">')
-        self.assertNotEqual(charset, -1, "index has no utf-8 charset meta")
-        self.assertLess(charset, 1024 - len(b'<meta charset="utf-8">'),
-                        "charset meta must fall inside the 1024-byte prescan")
+    # row | fixture                                   | assertion (scoped)                                   | rejects
+    # 1   | committed examples index                  | bytes start with b"<!doctype html>\n<meta charset=\"utf-8\">" | a page left in quirks mode or without a charset
+    # 2   | committed examples index                  | the charset meta ends inside the first 1024 bytes, before any non-ASCII byte | a charset too late for the browser prescan
+    # 3   | committed examples index                  | bytes decode as UTF-8 and hold "·" and "—" themselves | entity-mangled or re-encoded text
+    # 4   | fresh ASCII-only root, generator run under an ASCII locale (PYTHONUTF8=0, LC_ALL=C) | exit 0; index.html starts with the doctype + charset and holds "pages · every diagram" as UTF-8 | locale-dependent write_text() that crashes or writes non-UTF-8 bytes
+    def assert_utf8_index(self, data):
+        meta = b'<meta charset="utf-8">'
+        self.assertTrue(data.startswith(b"<!doctype html>\n" + meta + b"\n"), data[:80])
+        end = data.index(meta) + len(meta)
+        self.assertLessEqual(end, 1024, "charset meta must fall inside the 1024-byte prescan")
         first_non_ascii = next((i for i, b in enumerate(data) if b > 0x7F), len(data))
-        self.assertLess(charset, first_non_ascii,
-                        "charset meta must precede the first non-ASCII byte")
+        self.assertLessEqual(end, first_non_ascii,
+                             "charset meta must precede the first non-ASCII byte")
         text = data.decode("utf-8")
         self.assertRegex(text, r"\d+ pages · every diagram")
+        return text
+
+    def test_index_declares_doctype_and_utf8_before_content(self):
+        text = self.assert_utf8_index((EXAMPLES / "index.html").read_bytes())
         self.assertIn("Auralis Presence — mmWave", text)
+
+    def test_index_is_written_as_utf8_under_an_ascii_locale(self):
+        import os, tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            (root / "fam").mkdir()
+            (root / "fam" / "page.spec.json").write_text(json.dumps({"page": {
+                "blocks": [{"heading": "Flow", "diagram": {
+                    "nodes": {"service": {"title": "Service"}},
+                    "rows": [["service"]], "edges": []}}]}}))
+            (root / "manifest.json").write_text(json.dumps({"pages": [
+                {"file": "fam/page.html", "spec": "fam/page.spec.json",
+                 "title": "Page", "family": "fam", "description": "",
+                 "tags": [], "widgets": []}]}))
+            env = dict(os.environ, PYTHONUTF8="0", PYTHONCOERCECLOCALE="0",
+                       LC_ALL="C", LANG="C")
+            r = subprocess.run(["python3", str(ROOT / "tools" / "build_index.py"),
+                                "--root", str(root)],
+                               capture_output=True, text=True, env=env)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assert_utf8_index((root / "index.html").read_bytes())
 
     def test_crossref_derivation_is_exact_deduplicated_and_html_safe(self):
         import tempfile

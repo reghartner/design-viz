@@ -210,3 +210,55 @@ for(const width of [1440,1280])test(`the shipped Backstage example keeps labels 
   }
   expect(truncated,'fewer truncated titles than the 3 on the shipped Overview board').toBeLessThan(3);
 });
+
+/* #549 follow-up (Chuck): corner controls move to the card's left, above the icon,
+   so titles get the full width beside the icon column.
+   row | fixture | assertion (scoped) | rejects
+   10 short titles stay on one line | cumulus v2 "Command path" board at 1440: Nimbus API, Ops Console, Sentinel Auth (short float card), Edge Gateway, Ack Topic | that node's .t1 has no second tspan and shows exactly the authored title | ⋯/↗ still reserving the right edge, so "Nimbus API" wraps and "Sentinel Auth" is cut
+   11 controls left of the title | same nodes, each with a link and a references control | every .nlink/.nbackref circle rect is left of that node's .t1 rect | controls kept at the top-right over/beside the title
+   12 controls above the icon | same | every control rect's bottom ≤ that node's .icbg top, and no control intersects the .icbg or .t1 rect | controls overlapping the icon
+   13 title inside the card | same | .t1 rect inside that node's .card rect | a widened title running past the card
+   14 controls still work | Nimbus API | a real click on its ⋯ opens "Links for Nimbus API"; its ↗ keeps its href | a moved control that no longer receives clicks
+   15 board-wide bounds | whole board | rows 0-6 helper over every card | the move breaking any other card */
+test('cumulus Command path cards keep short titles on one line beside left-side controls at 1440px',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});
+  const raw=JSON.parse(await readFile(path.join(repo,'examples/cumulus/cumulus-page.spec.v2.json'),'utf8'));
+  const diagram=raw.page.blocks.flatMap(b=>b.tabs||[]).find(t=>t.label==='Command path').sections.find(s=>s.diagram&&s.diagram.nodes.nimbus).diagram;
+  const input=path.join(server.root,'cumulus-labels.json'),output=path.join(server.root,'cumulus-labels.html');
+  await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/cumulus-labels.html');await page.evaluate(()=>document.fonts.ready);
+  const board=page.locator('#docview .doc-sec:visible .boardcanvas>svg').filter({has:page.locator('[data-dv-node="nimbus"]')}).first();
+  await expect(board).toBeVisible();await board.scrollIntoViewIfNeeded();
+  const ids=['nimbus','console','sentinel','gateway','acktopic'];
+  for(const id of ids){
+    const node=board.locator(`[data-dv-node="${id}"]`);
+    await expect(node.locator(':scope>.nlink circle').first()).toBeAttached();
+    const geometry=await node.evaluate(el=>{
+      const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+      const t1=el.querySelector(':scope>.t1');
+      return {lines:t1.querySelectorAll('tspan').length,text:Array.from(t1.childNodes).filter(n=>n.nodeName!=='title').map(n=>n.textContent).join(''),
+        title:box(t1),card:box(el.querySelector(':scope>.card')),icon:box(el.querySelector(':scope>.icbg')),
+        controls:Array.from(el.querySelectorAll(':scope>.nlink circle,:scope>.nbackref circle'),box)};
+    });
+    const want=diagram.nodes[id].title,overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
+    expect.soft(geometry.lines,`${want} stays on one line`).toBeLessThanOrEqual(1);
+    expect.soft(geometry.text,`${want} shows in full`).toBe(want);
+    expect.soft(geometry.title.right,`${want} stays inside its card`).toBeLessThanOrEqual(geometry.card.right+1);
+    expect.soft(geometry.title.left,`${want} starts inside its card`).toBeGreaterThanOrEqual(geometry.card.left-1);
+    expect.soft(geometry.controls.length,`${want} has its link and references controls`).toBeGreaterThanOrEqual(2);
+    for(const [i,c] of geometry.controls.entries()){
+      expect.soft(c.right,`${want} control ${i} is left of the title`).toBeLessThanOrEqual(geometry.title.left+1);
+      expect.soft(c.bottom,`${want} control ${i} is above the icon`).toBeLessThanOrEqual(geometry.icon.top+1);
+      expect.soft(overlap(c,geometry.icon)||overlap(c,geometry.title),`${want} control ${i} clears icon and title`).toBe(false);
+    }
+  }
+  const nimbus=board.locator('[data-dv-node="nimbus"]');
+  await expect(nimbus.locator(':scope>a.nlink')).toHaveAttribute('href',diagram.nodes.nimbus.link);
+  await nimbus.locator(':scope>.nrefs-trigger').click();
+  await expect(page.getByRole('dialog',{name:'Links for Nimbus API',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  const report=await expectBoundedLabels(board,authoredOf(diagram));
+  await board.screenshot({path:info.outputPath('cumulus-command-path.png')});
+  expect.soft(report.failures,'every Command path card keeps labels bounded').toEqual([]);
+});

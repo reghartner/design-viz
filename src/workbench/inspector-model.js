@@ -130,7 +130,7 @@ var BUILDER_GUIDES = {
   document: {
     title:'Document settings',
     how:'These settings travel with Save and Export. Canvas appearance is a temporary preview.',
-    fields:[['title','page heading'],['skin','saved opening skin; omitted uses pastel'],['generatedFrom','source URL, description, version and date shown below the title'],['tour','advanced reader tour JSON; validated before committing']]
+    fields:[['title','page heading'],['description','optional one line (up to 200 characters) shown on library cards'],['tags','optional comma-separated lowercase tags shown as chips; both are matched by Search diagrams'],['skin','saved opening skin; omitted uses pastel'],['generatedFrom','source URL, description, version and date shown below the title'],['tour','advanced reader tour JSON; validated before committing']]
   },
   group: {
     title: 'Group — a containment boundary',

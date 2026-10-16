@@ -1968,6 +1968,14 @@ function documentForm(){
     rows.push(note('Use the existing diagram ID. This does not add the document to Canon. Paste the Claude artifact share URL once; the URL and artifact ID are saved with the document.'));
 
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
+    rows.push(frow('Description',textControl(val.description,function(v){return setting('description',v);},{placeholder:'One line shown on library cards'})));
+    var tagText=Array.isArray(val.tags)?val.tags.join(', '):val.tags;
+    rows.push(frow('Tags',textControl(tagText,function(v){
+      // Comma-separated in the form; stored as a lowercase list.
+      var tags=v==null?[]:v.split(',').map(function(tag){return tag.trim().toLowerCase();}).filter(Boolean);
+      return setting('tags',tags.length?tags:null);
+    },{placeholder:'payments, onboarding'})));
+    rows.push(note('Description and tags appear on published library cards and are matched by Search diagrams. Tags are comma-separated: lowercase letters, numbers and hyphens.'));
     var skin=selectControl(SELECTABLE_SKINS.concat(val.skin && SELECTABLE_SKINS.indexOf(val.skin)<0?[val.skin]:[]),val.skin || '',function(v){return setting('skin',v);},true);
     Array.from(skin.options).forEach(function(option){if(option.value)option.textContent=skinLabel(option.value);});
     skin.options[0].textContent='Default ('+DEFAULT_SKIN+')';skin.setAttribute('aria-label','Saved default skin');

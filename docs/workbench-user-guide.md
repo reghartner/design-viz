@@ -50,7 +50,8 @@ battery drain rates, and device-app report times whose "Updated … ago" text th
 cards compute (see [story time](step-time.md)).
 
 **Find your way** covers **Inspect → Document settings** for the saved title,
-skin and source line, the preview-only **Canvas appearance** controls, and
+description and tags (shown on published library cards and matched by
+**Search diagrams**), skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 

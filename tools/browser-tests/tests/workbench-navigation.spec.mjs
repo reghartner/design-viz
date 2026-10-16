@@ -67,6 +67,7 @@ test('editor shares the Contents, Views and Page shell without covering its auth
 /* #559 — Appearance menu and a direct Preview action (desktop editor only).
  row | fixture | assertion (scoped) | rejects
  1 Preview is one click | editor at 1440, no header menu open (asserted) | #open-page-preview is visible in .workbench-header, outside #workspace-appearance, its own visible text is exactly Preview and its accessible name Open page preview; one real click opens #page-preview | Preview still nested inside the skin menu (two clicks), or a direct button still labelled Open page preview
+ 1b Preview looks like its header neighbours | same | #open-page-preview computed font-family, font-size, font-weight, color, background-color and border widths equal those of .workspace-help>summary in the same header | Preview left in the small monospace bordered .bbtn style
  2 skin menu is clearly named | same | #workspace-appearance>summary text is exactly Appearance (not Preview) | menu left labelled Preview
  3 Appearance keeps every skin setting, no preview action | Appearance opened by a real click | inside #workspace-appearance-body: each of the seven #skinbtns buttons, #preview-skin-status, Use document default, Edit saved default…, Preview host select and Preview width spinbutton are visible; that body has 0 #open-page-preview and 0 buttons named Open page preview | duplicate Preview command left in the menu, or skin status/default/host controls dropped in the move
  4 one skin control in the editor | editor Contents sidebar visible (asserted) | #docview .explore-navigation .reader-contents contains 0 .reader-theme-footer/.reader-theme-menu | second bottom-left Theme picker left in the editor
@@ -80,7 +81,9 @@ test('Preview opens the page preview in one click and Appearance is the only edi
  const header=page.locator('.workbench-header'),appearance=page.locator('#workspace-appearance'),body=page.locator('#workspace-appearance-body'),preview=header.locator('#open-page-preview');
  expect(await appearance.evaluate(el=>el.open)).toBe(false);expect(await page.locator('#workspace-more').evaluate(el=>el.open)).toBe(true);
  await expect(appearance.locator(':scope>summary')).toHaveText('Appearance');
- await expect(preview).toBeVisible();await expect(preview).toHaveText('Preview');await expect(preview).toHaveAccessibleName('Open page preview');expect(await preview.evaluate(el=>!!el.closest('#workspace-appearance'))).toBe(false);
+ await expect(preview).toBeVisible();await expect(preview).toHaveText('Preview');await expect(preview).toHaveAccessibleName('Open page preview');
+ const look=el=>{const c=getComputedStyle(el);return {font:c.fontFamily,size:c.fontSize,weight:c.fontWeight,color:c.color,background:c.backgroundColor,border:[c.borderTopWidth,c.borderRightWidth,c.borderBottomWidth,c.borderLeftWidth].join(' ')};};
+ expect(await preview.evaluate(look)).toEqual(await header.locator('.workspace-help>summary').evaluate(look));expect(await preview.evaluate(el=>!!el.closest('#workspace-appearance'))).toBe(false);
  await expect(nav(page).locator('.reader-contents')).toBeVisible();await expect(nav(page).locator('.reader-contents .reader-theme-footer, .reader-contents .reader-theme-menu')).toHaveCount(0);
  await appearance.locator(':scope>summary').click();await expect(body).toBeVisible();
  for(const skin of ['aurora','pastel','blueprint','terminal','rose','lavender','lilac'])await expect(body.locator('#skinbtns #sk-'+skin)).toBeVisible();

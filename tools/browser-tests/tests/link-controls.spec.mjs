@@ -94,7 +94,7 @@ test('canon reader keeps one position-aware share action across tabs and diagram
  2 heading below bar 1280x800 | same at 1280x800 | same as row 1 | an offset tuned for one viewport only
  3 lands where a tab click lands | fresh load url, Deployment panel hidden + scrollY 0, real click through the reader Tab menu | hash-arrival section top equals click-arrival section top (±1px) | not scrolling at all, or a different offset than the click path
  4 tab click unchanged | same click | click section top = bar bottom + 12 and heading >= bar bottom | a fix that shifts tab clicks too
- 5 deep link still selects the tab | url#t=deployment | Deployment role=tab aria-selected=true, Deployment tabpanel visible, location.hash keeps t=deployment | a fix that rewrites or drops the fragment */
+ 5 deep link still selects the tab | url#t=deployment | Deployment role=tab aria-selected=true, Deployment tabpanel visible, the parsed location.hash t field equals deployment | a fix that rewrites or drops the fragment */
 for(const [width,height] of [[1440,900],[1280,800]])test(`#t= deep link lands the tab's first heading below the navigation bar like a tab click at ${width}x${height}`,async({page,server})=>{
  const output=path.join(server.root,'backstage-579.html');
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'docs/diagrams/backstage/backstage.spec.json'),path.join(repo,'template/flowview.html'),output]);
@@ -103,7 +103,7 @@ for(const [width,height] of [[1440,900],[1280,800]])test(`#t= deep link lands th
  await page.setViewportSize({width,height});
  await page.goto(url+'#t=deployment');await expect(nav).toBeVisible();await expect(tab).toHaveAttribute('aria-selected','true');
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
- const linked=await landing();expect(linked.panelHidden).toBe(false);expect(new URL(page.url()).hash).toContain('t=deployment');
+ const linked=await landing();expect(linked.panelHidden).toBe(false);expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('t')).toBe('deployment');
  expect(linked.barBottom).toBeGreaterThan(48);expect(linked.headingTop).toBeGreaterThanOrEqual(linked.barBottom);
  await page.goto('about:blank');await page.goto(url);await expect(nav).toBeVisible();
  const before=await landing();expect(before.panelHidden).toBe(true);expect(before.scrollY).toBe(0);

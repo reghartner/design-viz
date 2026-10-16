@@ -835,7 +835,7 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   /* Short (float) cards have no room for two title lines above a subtitle,
      and their single title line box needs the full card to clear it. */
   var twoLines = !(hasSub && Number(card.getAttribute('height')) < 54);
-  if (!twoLines){ titleY = 20; subY = 39; }
+  if (!twoLines){ titleY = 27; subY = 43; }
   var target = text;
   function fits(value, available){
     target.textContent = value;
@@ -1021,7 +1021,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var controlCount=(hasNodeLink?1:0)+(hasReferences?1:0)+(siblingPages.length?1:0),slot=0;
     /* Cards: an 18-wide hit area per control from the top edge down to the
        icon, which keeps one position on every card of a size. */
-    var iconY=small?12:14,hitH=iconY,controlY=n.handoff?14:hitH/2;
+    /* Short cards: 12-high control row, then the icon with equal room above
+       and below it (50 - 12 - 26 = 2 × 6). */
+    var iconY=small?18:14,hitH=small?12:14,controlY=n.handoff?14:hitH/2;
     function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
     var linkX=hasNodeLink?controlX(p.w-15):0;
     var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
@@ -1039,12 +1041,12 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          (nodeImage ?
            '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="' + imageY + '" width="38" height="' + (p.h-imageY-7) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
-           '<text class="t1" x="' + textX + '" y="' + (small?19:23) + '">' + esc(nodeTitle) + '</text>' +
-           '<text class="t2" x="' + textX + '" y="' + (small?34:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
+           '<text class="t1" x="' + textX + '" y="' + (small?25:23) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="' + textX + '" y="' + (small?41:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
            '<rect class="icbg" x="12" y="' + iconY + '" width="26" height="26" rx="8"/>' +
            '<use href="#i-' + icon + '" x="17" y="' + (iconY+5) + '" width="16" height="16"/>' +
-           '<text class="t1" x="' + textX + '" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
-           '<text class="t2" x="' + textX + '" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>')) +
+           '<text class="t1" x="' + textX + '" y="' + (small?28:25) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="' + textX + '" y="' + (small?43:41) + '">' + esc(n.sub || '') + '</text>')) +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            controlHit(linkX,9) +

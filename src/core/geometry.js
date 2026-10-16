@@ -2,7 +2,7 @@
    call-time dependency is clamp() from validator.js; no DOM initialization.
    Loaded once by the logical validator bundle before panel definitions. */
 
-var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
+var W = 1180, CARD_H = 54, FLOAT_H = 50, ROW_GAP = 140, STACK_GAP = 46;
 /* Reserve equal card gutters; a fixed right column left a node-sized blank
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;

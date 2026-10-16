@@ -67,3 +67,41 @@ test('advanced reader tour validates before committing and compatibility remains
   await expect.poll(async()=>JSON.parse(await source(page)).page.tour).toEqual(tour);expect(JSON.parse(await source(page)).page.flowview).toEqual(raw.page.flowview);await page.locator('#guide').screenshot({path:info.outputPath('document-advanced.png')});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await settings(page);await openInspectorGroup(page.locator('#guide .document-advanced'));await expect(field).toBeVisible();await field.fill('');await field.press('Tab');await expect.poll(async()=>JSON.parse(await source(page)).page.tour).toBeUndefined();
 });
+
+// #583 — Document settings edit description and tags; Save/Export and reopen keep them.
+// row | fixture | assertion (scoped) | rejects
+// 1 precondition | page without description/tags | Description and Tags fields empty; source has neither key | a fixture that already holds the values
+// 2 edit description | type into Description + Enter | source page.description equals the text; Undo restores the exact original source, Redo re-applies | a field that does not commit or bypasses Undo
+// 3 edit tags | "Checkout, payments-v2" into Tags | source page.tags equals ["checkout","payments-v2"] | storing one comma string or keeping uppercase
+// 4 invalid tags rejected | "two words, checkout" then "checkout, checkout" | #guide .ierr names the lowercase / duplicate rule and the source is unchanged | silently committing invalid tags
+// 5 invalid description rejected | 201 characters | #guide .ierr names the 200-character limit; source unchanged | committing an over-long description
+// 6 save/export | Save in Export | exported *.spec.json page.description and page.tags equal the edited values | export dropping them
+// 7 reopen | paste the exported spec into a fresh Workbench | Document settings Description and Tags fields show the saved values | a form that cannot display stored values
+// 8 clear | empty both fields in the reopened editor | source page has neither key | storing "" or [] placeholders
+test('#583 document settings edit description and tags; invalid values are rejected and saved values survive export and reopen',async({page,server})=>{
+  await useProjectDownloads({page});
+  const original=JSON.stringify({page:{title:'Checkout',blocks:[{heading:'Flow',diagram}]}},null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);await settings(page);
+  const field=label=>page.locator('#guide').getByLabel(label,{exact:true});
+  await expect(field('Description')).toHaveValue('');await expect(field('Tags')).toHaveValue('');
+  expect(Object.keys(JSON.parse(await source(page)).page)).toEqual(['title','blocks']);
+  await edit(page,'Description','Explains the checkout flow');
+  await expect.poll(async()=>JSON.parse(await source(page)).page.description).toBe('Explains the checkout flow');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+  await page.locator('#redo-builder').click();await expect.poll(async()=>JSON.parse(await source(page)).page.description).toBe('Explains the checkout flow');
+  await settings(page);await edit(page,'Tags','Checkout, payments-v2');
+  await expect.poll(async()=>JSON.parse(await source(page)).page.tags).toEqual(['checkout','payments-v2']);
+  const valid=await source(page);
+  await edit(page,'Tags','two words, checkout');await expect(page.locator('#guide .ierr')).toContainText('lowercase');expect(await source(page)).toBe(valid);
+  await edit(page,'Tags','checkout, checkout');await expect(page.locator('#guide .ierr')).toContainText('duplicate');expect(await source(page)).toBe(valid);
+  await edit(page,'Description','x'.repeat(201));await expect(page.locator('#guide .ierr')).toContainText('200 characters');expect(await source(page)).toBe(valid);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await download),saved=Object.entries(files).find(([name])=>name.endsWith('.spec.json'))[1];
+  const savedPage=JSON.parse(saved).page;expect(savedPage.description).toBe('Explains the checkout flow');expect(savedPage.tags).toEqual(['checkout','payments-v2']);
+  const reopened=await page.context().newPage();await reopened.goto(server.origin+'/workbench.html');await paste(reopened,saved);await prepareEditorSurface(reopened);await settings(reopened);
+  await expect(reopened.locator('#guide').getByLabel('Description',{exact:true})).toHaveValue('Explains the checkout flow');
+  await expect(reopened.locator('#guide').getByLabel('Tags',{exact:true})).toHaveValue('checkout, payments-v2');
+  await edit(reopened,'Tags','');await expect.poll(async()=>Object.hasOwn(JSON.parse(await source(reopened)).page,'tags')).toBe(false);
+  await settings(reopened);await edit(reopened,'Description','');await expect.poll(async()=>Object.hasOwn(JSON.parse(await source(reopened)).page,'description')).toBe(false);
+  await reopened.close();
+});

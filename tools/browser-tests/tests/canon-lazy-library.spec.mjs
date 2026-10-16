@@ -622,3 +622,40 @@ test('Browse diagrams filters published cards by title, ID, owner and service na
   await search.fill('');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story','Second story','Garage opener']);await expect(empty).toBeHidden();
   expect(requests).toEqual([]);
 });
+
+// #583 — published description and tags on library cards, matched by Search diagrams.
+// Fixture: First story has a description and two tags, Second story one tag and
+// no description; none of these words appears in a title, ID, owner or service.
+// row | fixture | assertion (scoped) | rejects
+// 1 precondition | empty query | both cards visible | a filter that starts narrowed
+// 2 description shown | First story card | its own .canon-library-description text equals the authored description | description missing or rendered on another card
+// 3 tag chips shown | each card | its own .canon-library-tag chip texts equal its authored tags, in order; Second story has no description element | chips missing, merged into one string, or leaking across cards
+// 4 search by description | "CHIME" typed into Search diagrams | exactly [First story] | search ignoring descriptions or case-sensitive matching
+// 5 search by tag | "billing" | exactly [Second story] | search ignoring tags
+// 6 no spec fetches | whole test | zero .spec.json requests | fetching specs to search or render cards
+async function describedFixture(server){
+  const fixture=await publish(server);
+  Object.assign(fixture.specs.first.page,{description:'Rings the hallway chime when a visitor arrives',tags:['hallway','alerts']});
+  Object.assign(fixture.specs.second.page,{tags:['billing']});
+  for(const id of ['first','second'])await writeFile(path.join(fixture.root,'diagrams',id,id+'.spec.json'),JSON.stringify(fixture.specs[id]));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  return fixture;
+}
+
+test('Browse diagrams cards show the published description and tag chips, and search matches both',async({page,server})=>{
+  const fixture=await describedFixture(server),requests=[];
+  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const cards=page.locator('#welcome-library-grid .canon-library-card');await expect(cards).toHaveCount(2);
+  expect(await visibleLibraryTitles(page)).toEqual(['First story','Second story']);
+  const card=title=>cards.filter({has:page.locator('strong',{hasText:new RegExp('^'+title+'$')})});
+  await expect(card('First story').locator('.canon-library-description')).toHaveText('Rings the hallway chime when a visitor arrives');
+  await expect(card('First story').locator('.canon-library-tag')).toHaveText(['hallway','alerts']);
+  await expect(card('Second story').locator('.canon-library-description')).toHaveCount(0);
+  await expect(card('Second story').locator('.canon-library-tag')).toHaveText(['billing']);
+  const search=page.getByRole('searchbox',{name:'Search diagrams'});
+  const query=async text=>{await search.fill('');await search.pressSequentially(text);};
+  await query('CHIME');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story']);
+  await query('billing');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Second story']);
+  expect(requests).toEqual([]);
+});

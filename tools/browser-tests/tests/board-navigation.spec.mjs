@@ -13,8 +13,8 @@ const width=board=>board.locator('.boardcanvas>svg').evaluate(el=>el.getBounding
 const scroll=board=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
 async function background(board){
   return board.evaluate(el=>{
-    const rect=el.getBoundingClientRect(),root=el.getRootNode(),legend=el.querySelector('.lg').getBoundingClientRect();
-    for(let y=Math.max(rect.top+20,legend.bottom+15);y<Math.min(innerHeight,rect.bottom)-20;y+=15)
+    const rect=el.getBoundingClientRect(),root=el.getRootNode(),legend=el.querySelector('.lg')?.getBoundingClientRect();
+    for(let y=Math.max(rect.top+20,legend?legend.bottom+15:0);y<Math.min(innerHeight,rect.bottom)-20;y+=15)
       for(let x=Math.max(0,rect.left)+25;x<Math.min(innerWidth,rect.right)-25;x+=15){
         const hit=root.elementFromPoint(x,y);
         if(hit?.closest('.boardcanvas') && !hit.closest('a,button,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return {x,y};
@@ -215,4 +215,76 @@ test('workbench Standard board routes vertical-dominant wheel at its boundary to
   const before=await workspaceY();expect(before).toBeGreaterThan(200);p=await background(board);await page.mouse.move(p.x,p.y);
   for(let i=0;i<6;i++)await page.mouse.wheel(4,-50);
   await expect.poll(workspaceY).toBeLessThan(before-200);expect(await workspaceY()).toBeGreaterThanOrEqual(before-300);
+});
+
+/* #550 viewer step keys outside Present. Contract matrix (standalone reader, one
+   stepped section "main" with Standard + Explore Views; scoped to #section-main
+   .stepline:not(.dv-caption-old) > b (the live caption, not the motion ghost), its .termbar[data-playback], the focused element, the board's scroll):
+   row | fixture | assertion (scoped) | rejects
+   R1 focused diagram ArrowRight | real click on board background, STEP 1/3, not presenting | board focused; STEP 2/3 | handler still gated on presenting()
+   R2 focused diagram ArrowLeft | after R1 | STEP 1/3 | Right-only wiring
+   R3 focused diagram Space plays | paused, autoplay off, motion allowed | data-playback=playing; keydown defaultPrevented (no page scroll) | Space left to scroll the page
+   R4 Space again pauses | after R3 | data-playback=paused, STEP unchanged | Space that only starts play
+   R5 text input in the section | denied clipboard makes the in-section "Copy this link manually" field | ArrowLeft/ArrowRight/Space reach the field un-prevented (native caret keys); field keeps focus; STEP and playback unchanged | text fields hijacked
+   R6 tab strip | "Views in selected Tab" Standard tab focused | ArrowRight focuses Explore tab; STEP unchanged | tabs hijacked
+   R7 zoomed Standard board | Zoom in, board focused | ArrowRight scrolls board right; STEP unchanged | pan keys hijacked on a pannable board
+   R8 Explore board | Explore View, zoomed, board keyboard-focused | ArrowRight scrolls board right; STEP unchanged | Explore arrow panning hijacked
+   R9 focus outside any diagram | PRESENT button focused, not presenting | ArrowRight: STEP unchanged, not defaultPrevented | page-wide hijack
+   R10 Present unchanged | PRESENT clicked, EXIT button (outside the section) focused | ArrowRight/ArrowLeft step, Space toggles play, Escape exits | Present path narrowed to focused diagrams */
+function stepKeysSpec(){
+  const layout=(id,name)=>({id,name,presentation:id,sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}});
+  return {page:{title:'Step keys',sections:[{id:'main',heading:'Main flow',diagram:{view:'step',autoplay:false,
+    nodes:{a:{title:'Source'},b:{title:'Relay'},c:{title:'Destination'}},rows:[['a','b','c']],
+    edges:[{from:'a',to:'b'},{from:'b',to:'c'}],
+    steps:[{id:'one',text:'One',edge:'a->b'},{id:'two',text:'Two',edge:'b->c'},{id:'three',text:'Three',edge:'a->b'}],
+    layouts:[layout('standard','Standard'),layout('explore','Explore')],defaultLayout:'standard'}}]}};
+}
+test('standalone focused diagram steps with arrows and Space outside Present without taking other keys',async({page,server})=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:900});
+  const input=path.join(server.root,'step-keys.json');await writeFile(input,JSON.stringify(stepKeysSpec()));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'step-keys.html')]);
+  await page.goto(server.origin+'/step-keys.html');
+  await page.evaluate(()=>{window.stepKeyLog=[];addEventListener('keydown',ev=>window.stepKeyLog.push(ev.key+':'+ev.defaultPrevented));});
+  const lastKey=()=>page.evaluate(()=>window.stepKeyLog.at(-1));
+  const section=page.locator('#section-main'),board=section.locator('.board'),step=section.locator('.stepline:not(.dv-caption-old) > b'),bar=section.locator('.termbar');
+  await expect(page.locator('body')).not.toHaveClass(/presenting/);
+  await expect(step).toHaveText('STEP 1/3');await expect(bar).toHaveAttribute('data-playback','paused');
+  // R1-R4: a focused diagram owns ArrowRight / ArrowLeft / Space.
+  const p=await background(board);await page.mouse.click(p.x,p.y);await expect(board).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect(step).toHaveText('STEP 2/3');
+  await page.keyboard.press('ArrowLeft');await expect(step).toHaveText('STEP 1/3');
+  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','playing');expect(await lastKey()).toBe(' :true');
+  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','paused');await expect(step).toHaveText('STEP 1/3');
+  // R5: a text field inside the section keeps its keys.
+  await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw Error('Denied');};document.execCommand=()=>false;});
+  await section.getByRole('button',{name:'Copy link to this diagram step',exact:true}).click();
+  const field=section.getByRole('textbox',{name:'Copy this link manually',exact:true});await expect(field).toBeFocused();
+  for(const key of ['ArrowLeft','ArrowRight','Space']){await page.keyboard.press(key);expect(await lastKey()).toBe((key==='Space'?' ':key)+':false');}
+  await expect(field).toBeFocused();await expect(step).toHaveText('STEP 1/3');await expect(bar).toHaveAttribute('data-playback','paused');
+  // R6: the Views tab strip keeps its roving arrows.
+  const strip=page.getByRole('tablist',{name:'Views in selected Tab'});
+  await strip.getByRole('tab',{name:'Standard',exact:true}).focus();await page.keyboard.press('ArrowRight');
+  await expect(strip.getByRole('tab',{name:'Explore',exact:true})).toBeFocused();await expect(step).toHaveText('STEP 1/3');
+  // R7: a zoomed Standard board keeps native arrow panning.
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
+  await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
+  await board.evaluate(el=>{el.scrollLeft=0;});const z=await background(board);await page.mouse.click(z.x,z.y);await expect(board).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect.poll(()=>board.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);await expect(step).toHaveText('STEP 1/3');
+  // R8: an Explore board keeps native arrow panning.
+  await strip.getByRole('tab',{name:'Explore',exact:true}).click();await expect(board).toHaveClass(/explore-board/);
+  await page.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
+  await page.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
+  await board.evaluate(el=>{el.scrollLeft=0;});await board.focus();await expect(board).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect.poll(()=>board.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);await expect(step).toHaveText('STEP 1/3');
+  await strip.getByRole('tab',{name:'Standard',exact:true}).click();
+  // R9: focus outside every diagram leaves the keys to the page.
+  const present=page.getByRole('button',{name:'Enter presenter mode (fullscreen)',exact:true});
+  await present.focus();await page.keyboard.press('ArrowRight');expect(await lastKey()).toBe('ArrowRight:false');await expect(step).toHaveText('STEP 1/3');
+  // R10: Present keeps stepping whatever is focused.
+  await present.click();await expect(page.locator('body')).toHaveClass(/presenting/);await expect(present).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect(step).toHaveText('STEP 2/3');
+  await page.keyboard.press('ArrowLeft');await expect(step).toHaveText('STEP 1/3');
+  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','playing');
+  await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','paused');
+  await page.keyboard.press('Escape');await expect(page.locator('body')).not.toHaveClass(/presenting/);
 });

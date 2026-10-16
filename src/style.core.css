@@ -3906,8 +3906,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .path-matrix .schip{scroll-margin-inline-start:calc(var(--path-matrix-label-width) + 12px);}
 .path-timeline .schip{scroll-margin-inline-start:calc(var(--path-label-visible-width) + 12px);}
 
-.handoff-back{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere;}
-@media print{.handoff-back{display:none !important;}}
+@media print{.handoff-breadcrumb,.handoff-back,.handoff-separator{display:none !important;}}
 
 /* Wire contract markers and shared-card preview. Top-layer popovers retain skin
    styles but are independent of Canvas transforms and scroll clipping. */

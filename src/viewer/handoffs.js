@@ -35,7 +35,13 @@ function wireLocalHandoffs(ctl, page){
     checkpoint=++nextCheckpoint;checkpoints.set(checkpoint,trail.slice());
     if(checkpoints.size>100)checkpoints.delete(checkpoints.keys().next().value);
   }
-  var back=document.createElement('button');back.type='button';back.className='mbtn handoff-back';
+  // The return action uses the drill-down breadcrumb pattern inside the visible
+  // card. Inside a detail it joins that detail's own breadcrumb trail.
+  var crumb=document.createElement('nav');crumb.className='detail-breadcrumb handoff-breadcrumb';crumb.setAttribute('aria-label','Diagram handoff');
+  var back=document.createElement('button');back.type='button';back.className='handoff-back';
+  var separator=document.createElement('span');separator.className='handoff-separator';separator.textContent='›';separator.setAttribute('aria-hidden','true');
+  var here=document.createElement('button');here.type='button';here.disabled=true;here.setAttribute('aria-current','page');
+  var base=null;
   function reader(rec){return rec.presentation && rec.presentation.snapshotReaderState?rec.presentation:rec.viewport;}
   function save(rec, trigger){
     var sp=rec.stepper,r=reader(rec),board=rec.sectionEl.querySelector('.board');
@@ -66,15 +72,25 @@ function wireLocalHandoffs(ctl, page){
     }
   }
   function paintBack(rec){
-    back.remove();
+    back.remove();separator.remove();crumb.remove();
     if(trail.length && rec){
       var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
-      back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
-      (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+      var label=trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference;
+      back.textContent=label;back.title='Back to '+label;back.setAttribute('aria-label','Back to '+label);
+      var drill=rec.sectionEl.querySelector('.detail-breadcrumb:not(.handoff-breadcrumb)');
+      if(drill){drill.prepend(separator);drill.prepend(back);}
+      else {
+        var heading=rec.sectionEl.querySelector('.sec-h');
+        here.textContent=heading && heading.textContent.trim() || rec.reference;
+        crumb.replaceChildren(back,separator,here);rec.sectionEl.prepend(crumb);
+      }
     }
-    // Destination selection can mount the shared navigation before this trail
-    // is painted. Move the newly created return action into that same bar.
-    ctl.view.dispatchEvent(new CustomEvent('navigation-actions-changed'));
+  }
+  // A drill-down opened or closed from the handoff destination keeps the
+  // return action in whichever card of that destination is visible.
+  function detailChanged(){
+    var drill=ctl.details && ctl.details.snapshot();
+    if(base && trail.length && (!drill || drill.section===base.reference))paintBack(ctl.details.activeSection() || base);
   }
   function activate(rec, saved){
     if(disposed)return;
@@ -98,7 +114,7 @@ function wireLocalHandoffs(ctl, page){
       ctl.view.dispatchEvent(new CustomEvent('local-handoff-navigation',{detail:{section:rec.number-1}}));
       if(saved)restore(saved);
       visible=ctl.details && ctl.details.activeSection() || rec;
-      paintBack(visible);
+      base=rec;paintBack(visible);
       remember();
     }finally{ctl.onChange=notify;}
     ctl.handoffHistoryPush=true;
@@ -127,15 +143,16 @@ function wireLocalHandoffs(ctl, page){
   }
   function goBack(){if(!disposed && trail.length){var saved=trail.pop();activate(saved.rec,saved);}}
   ctl.view.addEventListener('click',follow);ctl.view.addEventListener('keydown',follow);
+  ctl.view.addEventListener('detail-navigation',detailChanged);
   back.addEventListener('click',goBack);
   return {
     historyState:function(){return {owner:historyOwner,checkpoint:checkpoint};},
     restoreHistory:function(state,rec){
       if(state && state.owner===historyOwner && checkpoints.has(state.checkpoint)){checkpoint=state.checkpoint;trail=checkpoints.get(checkpoint).slice();}
       else {trail=[];remember();}
-      paintBack(ctl.details && ctl.details.activeSection() || rec);
+      base=rec || null;paintBack(ctl.details && ctl.details.activeSection() || rec);
     },
-    destroy:function(){disposed=true;trail=[];checkpoints.clear();back.remove();back.removeEventListener('click',goBack);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);}
+    destroy:function(){disposed=true;trail=[];checkpoints.clear();back.remove();separator.remove();crumb.remove();back.removeEventListener('click',goBack);ctl.view.removeEventListener('detail-navigation',detailChanged);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);}
   };
 }
 

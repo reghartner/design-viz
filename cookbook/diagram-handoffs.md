@@ -57,8 +57,10 @@ This complete example hands off from the Orders tab to the Delivery tab:
 
 Clicking **Continue →** switches to the destination section’s tab in the current
 viewer. It uses the existing diagram and retains that diagram’s current view,
-path and step. Playback pauses. **Back to …** returns to the source reading
-position; a reciprocal handoff node can lead back as well. Enter and Space
+path and step. Playback pauses. The destination card opens with a breadcrumb,
+the same return pattern as a drill-down: **← source** returns to the source
+reading position (inside a drill-down it leads that detail's breadcrumb). A
+reciprocal handoff node can lead back as well. Enter and Space
 activate the node. In the editor, the body selects the node and the arrow tip
 previews navigation. Standalone browser Back/Forward also follows handoffs.
 

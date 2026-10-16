@@ -63,3 +63,29 @@ function sectionRecords(page){
   });
   return out;
 }
+
+/* Optional discovery metadata shown on library cards and matched by search.
+   `at` prefixes each finding: the spec path in validation, the field label in
+   Document settings. */
+var DOCUMENT_DESCRIPTION_MAX = 200, DOCUMENT_TAGS_MAX = 12, DOCUMENT_TAG_MAX = 32;
+function validateDocumentDescription(value, at, errors){
+  if (value == null) return;
+  if (typeof value !== 'string') errors.push(at + ': expected one line of text');
+  else if (!value.trim()) errors.push(at + ': must not be empty — remove it instead');
+  else if (/[\r\n]/.test(value)) errors.push(at + ': must be one line (no line breaks)');
+  else if (value.length > DOCUMENT_DESCRIPTION_MAX) errors.push(at + ': must be ' + DOCUMENT_DESCRIPTION_MAX + ' characters or fewer (found ' + value.length + ')');
+}
+function validateDocumentTags(value, at, errors){
+  if (value == null) return;
+  if (!Array.isArray(value)){ errors.push(at + ': expected a list of tags such as ["payments", "onboarding"]'); return; }
+  if (value.length > DOCUMENT_TAGS_MAX){ errors.push(at + ': use at most ' + DOCUMENT_TAGS_MAX + ' tags (found ' + value.length + ')'); return; }
+  var seen = Object.create(null);
+  value.forEach(function(tag, i){
+    var path = at + '[' + i + ']';
+    if (typeof tag !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(tag))
+      errors.push(path + ': ' + JSON.stringify(tag) + ' — use a short lowercase tag: letters, numbers and single hyphens');
+    else if (tag.length > DOCUMENT_TAG_MAX) errors.push(path + ': "' + tag + '" — tags must be ' + DOCUMENT_TAG_MAX + ' characters or fewer');
+    else if (seen[tag]) errors.push(path + ': duplicate tag "' + tag + '"');
+    else seen[tag] = true;
+  });
+}

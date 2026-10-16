@@ -94,7 +94,9 @@ API, browser GitHub token or live Backstage connection. The read-only library,
 direct links, Back/Forward and explicit **Edit in Workbench** behavior are unchanged.
 
 `diagrams.json` is generated and gitignored, not another hand-maintained
-membership file. Its version 3 entries contain `id`, `title`, `canon` membership,
+membership file. Its version 3 entries contain `id`, `title`, the optional
+author-owned `description` and `tags` (copied from the spec's `page.description`
+and `page.tags` when present), `canon` membership,
 `counts` (resolved nodes, steps, panels), `services` (the distinct resolved node
 titles, used by **Search diagrams**), a relative authored `specUrl`, and a
 `revision` SHA256 of the membership-adjusted authored JSON. They contain no diagram
@@ -106,6 +108,8 @@ rows, steps, panels, or embedded specs. For example:
   "diagrams": [{
     "id": "doorbell",
     "title": "Doorbell delivery",
+    "description": "How a doorbell press reaches the homeowner's phone",
+    "tags": ["doorbell", "notifications"],
     "canon": {"version": 1, "id": "doorbell", "kind": "canonical", "owner": "group:default/home-team"},
     "counts": {"nodes": 12, "steps": 8, "panels": 3},
     "services": ["Doorbell", "Event gateway", "Clip store"],
@@ -116,8 +120,11 @@ rows, steps, panels, or embedded specs. For example:
 ```
 
 **Search diagrams** filters the cards as you type, case-insensitively, by title,
-ID, owner and `services`; it never fetches specs. Indexes without
-`services` still load and filter on the other fields.
+ID, description, tags, owner and `services`; it never fetches specs. Cards show the
+description under the title and each tag as a chip. Indexes without
+`services`, `description` or `tags` still load and filter on the other fields.
+Authors set description and tags in **Inspect → Document settings**; they live in
+the spec, not in `canon.json`, which still controls only membership, ID and owner.
 The browser loads the index for library cards, then fetches only the selected
 authored spec and its provider closure for reading or editing. It verifies source
 revisions and resolves [shared topology](shared-topology.md) in memory. Edit in

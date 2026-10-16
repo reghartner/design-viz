@@ -79,6 +79,7 @@ append them under "Company contract additions". See
 ```
 
 - `title` — page heading. Required in practice; short.
+- `description`/`tags` — optional library card line (≤200 chars) and lowercase tags.
 - `documentLinks` — `{id?, siteBaseUrl?, claudeUrl?, claudeArtifactId?}`. IDs must agree with `canon.id`; this adds no membership. See [persistent destinations](../cookbook/diagram-handoffs.md#persistent-destinations-and-source-diagrams) for validation and portable links.
 - `generatedFrom` — optional page provenance, shown as one quiet line directly
   under the title and included in print. It usually identifies a Confluence

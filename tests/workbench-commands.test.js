@@ -1011,6 +1011,38 @@ test('document settings preserve wrapped/bare blocks and sections and surroundin
   }
 });
 
+// #583 — Document settings commit description/tags through planDocumentSetting.
+// row | fixture | assertion (scoped) | rejects
+// 1 set both | wrapped and bare pages | page.description / page.tags equal the committed values; every other page member unchanged | a command that drops or rewrites neighbours
+// 2 clear | description/tags set, then null | the keys are removed | storing empty placeholders
+// 3 invalid rejected | multi-line / 201-char / non-string description; uppercase, spaced, duplicate, non-list tags | .error names Description/Tags and the rule; no text returned | committing invalid metadata
+test('#583 document description and tags commit valid values and reject invalid ones with field-named errors',()=>{
+  for(const wrapped of [true,false]){
+    const page={title:'Doc',skin:'aurora',blocks:[{heading:'Flow',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+    const raw=wrapped?{page}:page,text=JSON.stringify(raw,null,2),pageOf=value=>wrapped?value.page:value;
+    const described=B.planDocumentSetting(text,raw,'description','Explains the checkout flow');assert.ok(!described.error,described.error);
+    const next=JSON.parse(described.text);assert.strictEqual(pageOf(next).description,'Explains the checkout flow');
+    const tagged=B.planDocumentSetting(described.text,next,'tags',['checkout','payments-v2']);assert.ok(!tagged.error,tagged.error);
+    const both=pageOf(JSON.parse(tagged.text));assert.deepStrictEqual(both.tags,['checkout','payments-v2']);assert.strictEqual(both.description,'Explains the checkout flow');
+    assert.deepStrictEqual({...both,description:undefined,tags:undefined},{...page,description:undefined,tags:undefined});
+    const cleared=B.planDocumentSetting(tagged.text,JSON.parse(tagged.text),'tags',null),afterClear=JSON.parse(cleared.text);
+    const noDescription=pageOf(JSON.parse(B.planDocumentSetting(cleared.text,afterClear,'description',null).text));
+    assert.strictEqual(Object.hasOwn(noDescription,'tags'),false);assert.strictEqual(Object.hasOwn(noDescription,'description'),false);
+    for(const [key,value,pattern] of [
+      ['description','one\ntwo',/^Description: .*one line/],
+      ['description','x'.repeat(201),/^Description: .*200 characters/],
+      ['description',5,/^Description: .*text/],
+      ['tags',['Upper'],/^Tags\[0\]: .*lowercase/],
+      ['tags',['two words'],/^Tags\[0\]: .*lowercase/],
+      ['tags',['checkout','checkout'],/^Tags\[1\]: duplicate tag "checkout"/],
+      ['tags','checkout',/^Tags: .*list/],
+    ]){
+      const result=B.planDocumentSetting(text,raw,key,value);
+      assert.match(String(result.error),pattern,key+' '+JSON.stringify(value));assert.strictEqual(result.text,undefined);
+    }
+  }
+});
+
 test('document wrapper preserves bare diagram bytes and settings do not mutate bare diagrams implicitly',()=>{
   const text='{ "nodes": {"a": {"title":"A"}},\n  "rows": [["a"]] }',raw=JSON.parse(text);
   assert.ok(B.planDocumentSetting(text,raw,'title','Title').error);

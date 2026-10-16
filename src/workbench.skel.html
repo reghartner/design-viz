@@ -277,12 +277,12 @@
         <button class="bbtn" id="working-file-open">Open working file…</button>
         <button class="bbtn" id="working-folder-open">Choose working folder…</button>
         <button class="bbtn" id="working-file-retry" hidden>Retry file save</button>
-        <button class="bbtn" id="file-import">import Flowview / Mermaid&#8230;</button>
+        <button class="bbtn" id="file-import">import Flowview / Mermaid / draw.io&#8230;</button>
         <button class="bbtn" id="file-export" title="Save JSON, offline HTML, coverage ledger and README together">Export project</button>
         <button class="bbtn" id="confluence-export">Export for Confluence</button>
         <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
-        <input type="file" id="file-import-input" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,application/json,text/plain,text/markdown" hidden>
+        <input type="file" id="file-import-input" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,.drawio,.xml,application/json,application/xml,text/plain,text/markdown,text/xml" hidden>
         <div id="confluence-handoff" class="confluence-handoff" hidden>
           <label for="confluence-json">Confluence JSON</label>
           <textarea id="confluence-json" readonly spellcheck="false"></textarea>
@@ -384,7 +384,7 @@
       <button type="button" id="add-bullet" data-add-kind="bullet" data-add-prose><span class="diagram-add-symbol" aria-hidden="true">•</span><span><b>Bullet point</b><small>Start a list or add its next point</small></span></button>
       <button type="button" id="add-catalog" data-add-kind="catalog" aria-haspopup="dialog" aria-controls="catalog-picker"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
       <button type="button" id="add-topology" data-add-kind="topology" aria-haspopup="dialog" aria-controls="topology-picker"><span class="diagram-add-symbol" aria-hidden="true">◇</span><span><b>Referenced topology</b><small>Reuse a provider’s exported structure</small></span></button>
-      <button type="button" id="add-diagram-import" data-add-kind="diagram" aria-haspopup="dialog" aria-controls="diagram-import"><span class="diagram-add-symbol" aria-hidden="true">⊞</span><span><b>Add / Paste diagram</b><small>Merge a Flowview or Mermaid graph into this canvas</small></span></button>
+      <button type="button" id="add-diagram-import" data-add-kind="diagram" aria-haspopup="dialog" aria-controls="diagram-import"><span class="diagram-add-symbol" aria-hidden="true">⊞</span><span><b>Add / Paste diagram</b><small>Merge Flowview, Mermaid or draw.io into this canvas</small></span></button>
     </div>
     <div id="diagram-add-nodes" hidden>
       <button type="button" class="bbtn" id="diagram-add-back">← All additions</button>

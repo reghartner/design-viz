@@ -84,10 +84,11 @@ test('invalid, multiple, stale and internal drags never change the editor',async
   await preview.getByRole('button',{name:'Import'}).click();await expect(page.locator('.file-import-status:visible')).toContainText('document changed');
   await expect(page.locator('#src')).toHaveValue(replacement);
 
-  await page.evaluate(()=>{const native=FileReader.prototype.readAsText;window.__restoreImportReader=()=>{FileReader.prototype.readAsText=native;};FileReader.prototype.readAsText=function(file){setTimeout(()=>native.call(this,file),100);};});
+  await page.evaluate(()=>{const native=FileReader.prototype.readAsText;window.__restoreImportReader=()=>{FileReader.prototype.readAsText=native;};FileReader.prototype.readAsText=function(file){window.__releaseImportReader=()=>native.call(this,file);};});
   await page.locator('#file-import-input').setInputFiles({name:'slow.json',mimeType:'application/json',buffer:Buffer.from(story('Slow import'))});
   const typed=replacement+' ';
   await page.locator('#src').evaluate((source,text)=>{source.value=text;source.dispatchEvent(new Event('input',{bubbles:true}));},typed);
+  await page.evaluate(()=>window.__releaseImportReader());
   await expect(page.locator('.file-import-status:visible')).toContainText('changed while the file was loading');await expect(page.locator('#src')).toHaveValue(typed);
   await page.evaluate(()=>window.__restoreImportReader());
 });

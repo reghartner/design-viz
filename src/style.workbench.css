@@ -126,6 +126,8 @@ body.welcome-active{background:#f7f8fc;margin:0;}
 .welcome #welcome-json{min-height:280px;font:12px/1.8 'IBM Plex Mono',monospace;}
 .welcome-form-actions{display:flex;gap:10px;align-items:center;margin-top:22px;}
 .welcome-filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:29px;}
+.welcome-search{display:grid;gap:6px;max-width:420px;margin-top:24px;}.welcome-search label{font-size:12px;font-weight:650;color:var(--welcome-sub);}
+.welcome-search-empty{font-size:14px;color:var(--welcome-ink);}.welcome-template-card[hidden],.canon-library-card[hidden]{display:none;}
 .welcome-filters button{border:1px solid transparent;background:transparent;color:#6f7689;padding:7px 13px;border-radius:7px;font-size:12px;}
 .welcome-filters button:hover{background:#eeedf6;}
 .welcome-filters button[aria-pressed="true"]{background:#e9e6f5;color:#5e538f;border-color:#ded8ef;}

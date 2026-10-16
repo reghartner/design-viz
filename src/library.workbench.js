@@ -17,6 +17,15 @@ function canonLibrarySpecURL(value,base){
   if(url.origin!==new URL(base).origin || !/^https?:$/.test(url.protocol) || !/\.json$/i.test(url.pathname))throw new Error('Diagram spec URL must be a same-origin JSON file.');
   return url.href;
 }
+/* Library cards and templates filter on their labels plus node (service)
+   titles, lower-cased for case-insensitive substring matching. */
+function diagramSearchText(values,spec){
+  var names=[];
+  if(spec)FlowCanon.sections(spec).forEach(function(section){
+    Object.keys(section.diagram.nodes || {}).forEach(function(id){var node=section.diagram.nodes[id];if(node && typeof node.title==='string')names.push(node.title);});
+  });
+  return values.concat(names).filter(function(value){return typeof value==='string';}).join('\n').toLowerCase();
+}
 function parseCanonLibrary(raw){
   if(!raw || ![1,2,3].includes(raw.version) || !Array.isArray(raw.diagrams))throw new Error('Expected a version 1, 2 or 3 diagram library.');
   var ids=new Set();
@@ -32,7 +41,8 @@ function parseCanonLibrary(raw){
     canonLibrarySpecURL(entry.specUrl,'https://library.invalid/workbench/diagrams.json');
     if(!entry.counts || ['nodes','steps','panels'].some(function(key){return !Number.isSafeInteger(entry.counts[key]) || entry.counts[key]<0;}))throw new Error('Invalid diagram counts: '+entry.id);
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
-    return {id:entry.id,title:title,canon:entry.canon,counts:entry.counts,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
+    return {id:entry.id,title:title,canon:entry.canon,counts:entry.counts,services:services,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -185,6 +195,7 @@ function initWorkbenchLibrary(opts){
   var intro=document.getElementById('canon-reader-intro'),toolbar=intro.querySelector('.canon-reader-toolbar'),headerTitle=document.getElementById('workbench-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
+  var search=document.getElementById('welcome-library-search'),empty=document.getElementById('welcome-library-empty');
   var specRequests=new Map(),headerObserver=null;
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
@@ -292,16 +303,25 @@ function initWorkbenchLibrary(opts){
       var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=entry.canon.owner || entry.id;
       var action=document.createElement('span');action.className='canon-library-action';action.textContent='View diagram →';
       button.append(badge,name,detail,owner,action);
+      button.dataset.search=diagramSearchText([entry.title,entry.id,entry.canon.owner].concat(entry.services || []),entry.spec);
       button.addEventListener('click',function(event){
         if(published && (event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey))return;
         event.preventDefault();opts.open(entry.id,published);
       });grid.appendChild(button);
     });
+    filterCards();
   }
+  function filterCards(){
+    var query=search.value.trim(),needle=query.toLowerCase(),shown=0;
+    grid.querySelectorAll('.canon-library-card').forEach(function(card){card.hidden=!!needle && card.dataset.search.indexOf(needle)<0;if(!card.hidden)shown++;});
+    empty.hidden=!needle || !entries.length || shown>0;
+    empty.textContent=empty.hidden?'':'No diagrams match “'+query+'”. Try a title, owner or service name.';
+  }
+  search.addEventListener('input',filterCards);
   async function show(screen,id){
     stop();active=screen;var token=sequence;
     pending=null;specRequests.clear();
-    status.textContent='Loading diagrams…';retry.hidden=true;readerRetry.hidden=true;
+    status.textContent='Loading diagrams…';retry.hidden=true;empty.hidden=true;readerRetry.hidden=true;
     document.getElementById('canon-reader-origin').textContent='';
     error.hidden=true;error.textContent='';title.textContent='Loading diagram…';
     try{

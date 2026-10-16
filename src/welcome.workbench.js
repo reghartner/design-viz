@@ -380,11 +380,12 @@ function initWorkbenchWelcome(opts){
     button.appendChild(art);
     var copy = document.createElement('span'); copy.className = 'welcome-template-copy';
     function line(cls, value){ var span = document.createElement('span'); span.className = cls; span.textContent = value; copy.appendChild(span); return span; }
-    line('welcome-template-eyebrow', isBlank ? 'Start from scratch' : entry.tag || categories[entry.category] || 'Team template');
+    var eyebrow = line('welcome-template-eyebrow', isBlank ? 'Start from scratch' : entry.tag || categories[entry.category] || 'Team template');
     var title = line('welcome-template-title', entry.name); var arrow = document.createElement('span'); arrow.textContent = '↗'; arrow.setAttribute('aria-hidden','true'); title.appendChild(arrow);
     line('welcome-template-desc', entry.desc || 'An editable Flowview project.');
     line('welcome-template-meta', isBlank ? 'No sample nodes. All possibility.' : starterCountLine(entry.spec));
     button.appendChild(copy);
+    button.dataset.search = diagramSearchText([eyebrow.textContent, entry.name, entry.desc, categories[entry.category]].concat((entry.categories || []).map(function(key){ return categories[key]; })), isBlank ? null : entry.spec);
     button.addEventListener('click', function(){ openSpec(entry.spec, 'welcome-template-error'); });
     return button;
   }
@@ -394,7 +395,20 @@ function initWorkbenchWelcome(opts){
     shown.forEach(function(entry){ templateGrid.appendChild(card(entry, false)); });
     el('welcome-template-status').textContent = shown.length + ' editable examples · Every project can be changed in the workbench';
     el('welcome-template-filters').querySelectorAll('button').forEach(function(button){ button.setAttribute('aria-pressed', String(button.dataset.category === filter)); });
+    filterTemplates();
   }
+  /* The text filter narrows the category's built-ins, Blank and team templates alike. */
+  function filterTemplates(){
+    var query = el('welcome-template-search').value.trim(), needle = query.toLowerCase(), shown = 0, company = 0;
+    el('welcome-new-screen').querySelectorAll('.welcome-template-card').forEach(function(card){
+      card.hidden = !!needle && card.dataset.search.indexOf(needle) < 0;
+      if (!card.hidden){ shown++; if (card.parentElement.id === 'welcome-company-grid') company++; }
+    });
+    el('welcome-company-templates').hidden = !company;
+    var empty = el('welcome-template-empty'); empty.hidden = shown > 0;
+    empty.textContent = empty.hidden ? '' : 'No templates match “' + query + '”' + (filter === 'all' ? '' : ' in ' + categories[filter]) + '. Try a name, description, tag or service.';
+  }
+  el('welcome-template-search').addEventListener('input', filterTemplates);
   Object.keys(categories).forEach(function(key){
     var button = document.createElement('button'); button.type = 'button'; button.textContent = categories[key]; button.dataset.category = key;
     button.addEventListener('click', function(){ filter = key; renderTemplates(); }); el('welcome-template-filters').appendChild(button);
@@ -412,7 +426,7 @@ function initWorkbenchWelcome(opts){
       if (parsed.error) throw new Error(parsed.error);
       var company = el('welcome-company-grid');
       parsed.entries.forEach(function(entry){ company.appendChild(card(entry, false)); });
-      el('welcome-company-templates').hidden = !parsed.entries.length;
+      filterTemplates();
       if (parsed.skipped){ el('welcome-manifest-status').textContent = parsed.skipped + ' team template entries were skipped because their name or spec was missing.'; el('welcome-manifest-status').hidden = false; }
     }).catch(function(ex){
       el('welcome-manifest-status').textContent = 'Team templates unavailable. ' + ex.message + ' Built-in examples are ready to use.';

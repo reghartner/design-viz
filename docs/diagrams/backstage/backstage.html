@@ -7476,6 +7476,9 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 .node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
 .node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
 .node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
+/* Unreachable endpoints read as disabled whatever the step highlight. */
+.node-handoff .handoff-unavailable{cursor:not-allowed;}
+.node-handoff .handoff-unavailable .card{stroke-dasharray:4 3;fill-opacity:.6;}
 
 /* Authored step-circle colors intentionally override every skin, hover and path
    palette. Keep the current-step ring, keyboard focus and shared-step opacity. */
@@ -7577,7 +7580,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
  body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .t2{fill:var(--fl-muted);}
 }
 
-.handoff-destinations{position:fixed;z-index:10000;inset:auto 24px 24px auto;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
+.handoff-destinations{position:fixed;z-index:10000;left:24px;top:24px;box-sizing:border-box;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
 .handoff-destinations p{flex-basis:100%;margin:0 0 8px;font:14px/1.5 system-ui,sans-serif;}
 
 /* Section-local viewing chrome; floating defaults belong to each named view. */
@@ -13156,6 +13159,8 @@ function validate(page){
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
+  validateDocumentDescription(page.description,'page.description',errors);
+  validateDocumentTags(page.tags,'page.tags',errors);
   var blocks = blocksOf(page);
   if (!blocks.length){
     errors.push('page.blocks: required — provide at least one section or tabs block');
@@ -13578,6 +13583,32 @@ function sectionRecords(page){
     if(record.reference!==references[index])record.aliases=[references[index]];
   });
   return out;
+}
+
+/* Optional discovery metadata shown on library cards and matched by search.
+   `at` prefixes each finding: the spec path in validation, the field label in
+   Document settings. */
+var DOCUMENT_DESCRIPTION_MAX = 200, DOCUMENT_TAGS_MAX = 12, DOCUMENT_TAG_MAX = 32;
+function validateDocumentDescription(value, at, errors){
+  if (value == null) return;
+  if (typeof value !== 'string') errors.push(at + ': expected one line of text');
+  else if (!value.trim()) errors.push(at + ': must not be empty — remove it instead');
+  else if (/[\r\n]/.test(value)) errors.push(at + ': must be one line (no line breaks)');
+  else if (value.length > DOCUMENT_DESCRIPTION_MAX) errors.push(at + ': must be ' + DOCUMENT_DESCRIPTION_MAX + ' characters or fewer (found ' + value.length + ')');
+}
+function validateDocumentTags(value, at, errors){
+  if (value == null) return;
+  if (!Array.isArray(value)){ errors.push(at + ': expected a list of tags such as ["payments", "onboarding"]'); return; }
+  if (value.length > DOCUMENT_TAGS_MAX){ errors.push(at + ': use at most ' + DOCUMENT_TAGS_MAX + ' tags (found ' + value.length + ')'); return; }
+  var seen = Object.create(null);
+  value.forEach(function(tag, i){
+    var path = at + '[' + i + ']';
+    if (typeof tag !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(tag))
+      errors.push(path + ': ' + JSON.stringify(tag) + ' — use a short lowercase tag: letters, numbers and single hyphens');
+    else if (tag.length > DOCUMENT_TAG_MAX) errors.push(path + ': "' + tag + '" — tags must be ' + DOCUMENT_TAG_MAX + ' characters or fewer');
+    else if (seen[tag]) errors.push(path + ': duplicate tag "' + tag + '"');
+    else seen[tag] = true;
+  });
 }
 /* ---- src/core/contracts.js ---- */
 /* Contract block identities are shared by validation, rendering and authoring.
@@ -38973,7 +39004,7 @@ function handoffNodeContent(node, position, id, prefix, options){
   var interactive=action && (action.kind==='internal' || action.kind==='choose');
   var title=node.title || id, available=!!(href || destination || interactive);
   var hint=available?(action && action.kind==='choose'?'Choose destination for '+title:'Open '+title+' diagram'+(local?' in this spec':action && action.kind==='internal'?' in Backstage':' (new tab)')):local?'Diagram destination unavailable. Choose an existing diagram section.':'Diagram destination unavailable. Set a spec ID with known destinations or configure the host diagram resolver.';
-  var caption=available?(local?'CONTINUE →':action.kind==='choose'?'CHOOSE DESTINATION':action.kind==='internal'?'OPEN DIAGRAM →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
+  var caption=available?(local?'CONTINUE →':action.kind==='choose'?'OPEN DIAGRAM…':action.kind==='internal'?'OPEN DIAGRAM →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
   var max=Math.max(10,Math.floor((w-tip-22)/6.6));
   var chars=Array.from(title),shown=chars.length>max?chars.slice(0,max-1).join('')+'…':title;
   var outline='M10 0H'+(w-tip)+'L'+w+' '+(h/2)+'L'+(w-tip)+' '+h+'H10Q0 '+h+' 0 '+(h-10)+'V10Q0 0 10 0Z';
@@ -39127,16 +39158,34 @@ function wireExternalHandoffs(ctl,options){
   var disposed=false,pending=null,panel=null,trigger=null;
   function close(focus){
     if(pending)pending.abort();pending=null;
-    if(panel)panel.remove();panel=null;
+    if(panel){panel.remove();document.removeEventListener('scroll',place,true);window.removeEventListener('resize',place);}panel=null;
     if(focus && trigger && trigger.isConnected)trigger.focus();trigger=null;
   }
   function show(action,message){
     if(panel)panel.remove();
+    else {document.addEventListener('scroll',place,true);window.addEventListener('resize',place);}
     panel=document.createElement('div');panel.className='handoff-destinations';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Diagram destinations');panel.tabIndex=-1;
     var status=document.createElement('p');status.setAttribute('role','status');status.textContent=message;panel.appendChild(status);
     action.destinations.forEach(function(item){var link=document.createElement('a');link.className='mbtn';link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.label+' ↗';panel.appendChild(link);});
     var dismiss=document.createElement('button');dismiss.type='button';dismiss.className='mbtn';dismiss.textContent='Close';dismiss.addEventListener('click',function(){close(true);});panel.appendChild(dismiss);
-    ctl.view.appendChild(panel);panel.focus({preventScroll:true});
+    ctl.view.appendChild(panel);place();panel.focus({preventScroll:true});
+  }
+  // Beside the clicked node (below, else above, else alongside), kept inside its
+  // diagram. A transformed host ancestor can offset and scale fixed positioning,
+  // so measure the panel at 0,0, pin its CSS width, and convert screen offsets.
+  function place(){
+    if(!panel || !trigger || !trigger.isConnected)return;
+    panel.style.left='0px';panel.style.top='0px';panel.style.width='';
+    var origin=panel.getBoundingClientRect(),w=origin.width,h=origin.height;
+    var sx=panel.offsetWidth?w/panel.offsetWidth:1,sy=panel.offsetHeight?h/panel.offsetHeight:1;panel.style.width=panel.offsetWidth+'px';
+    var r=trigger.getBoundingClientRect(),area=(trigger.closest('.board') || ctl.view).getBoundingClientRect();
+    var left=Math.max(area.left,8),top=Math.max(area.top,8),right=Math.min(area.right,window.innerWidth-8),bottom=Math.min(area.bottom,window.innerHeight-8);
+    var gap=8,x=r.left+r.width/2-w/2,y=r.bottom+gap;
+    if(y+h>bottom){
+      if(r.top-gap-h>=top)y=r.top-gap-h;
+      else {y=r.top+r.height/2-h/2;x=r.right+gap+w<=right?r.right+gap:r.left-gap-w;}
+    }
+    panel.style.left=(Math.max(left,Math.min(right-w,x))-origin.left)/sx+'px';panel.style.top=(Math.max(top,Math.min(bottom-h,y))-origin.top)/sy+'px';
   }
   function follow(event){
     var target=event.target.closest && event.target.closest('[data-dv-external-handoff]');

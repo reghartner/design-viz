@@ -94,8 +94,8 @@ for(const skin of ['pastel','aurora'])test(`dense ${skin} lane titles stay bound
 
 /* #549 — node labels in standalone pages, every routing, every Tab.
    row | fixture | assertion (scoped) | rejects
-   1 truncated title: hover | long titles, default+lane routing | node's own <title> child == authored title | ellipsis with no tooltip; tooltip only on lane boards
-   2 truncated title: AT | same | that node's .t1 aria-label == authored title; shown text != title ⇒ ends in … | silent clipping; label lost to screen readers
+   1 truncated title: hover | long titles, default+lane routing | cut title ⇒ node's own <title> child == authored title (any <title> present must match) | ellipsis with no tooltip; tooltip only on lane boards
+   2 truncated title: AT | same | cut title ⇒ that node's .t1 aria-label == authored title and shown text ends in … | silent clipping; label lost to screen readers
    3 subtitle inside card | long subs, link + detail trigger, small float card | .t2 rect within its own .card rect | subtitle drawn past the card edge (Backstage "hosted by Flowview service")
    4 truncated subtitle exposed | same | .t2 aria-label and .t2>title == authored sub | subtitle cut without full text
    5 link icon clear of title | link/backref/drill controls on every card | each title line rect ∩ that node's control rects = ∅ | ↗ over the title; titles fitted while the Tab was hidden
@@ -114,10 +114,11 @@ async function expectBoundedLabels(board,authored){
       if(!cardEl||!t1)return;const card=cardEl.getBoundingClientRect();if(!card.width)return;
       const want=authored[id];if(!want){report.failures.push(id+': not authored');return;}
       const fail=msg=>report.failures.push(id+': '+msg);
-      const tip=node.querySelector(':scope>title');
-      if(!tip||tip.textContent!==want.title)fail('hover title is '+JSON.stringify(tip&&tip.textContent));
-      if(t1.getAttribute('aria-label')!==want.title)fail('t1 aria-label is '+JSON.stringify(t1.getAttribute('aria-label')));
-      const text=shown(t1);if(text!==want.title){if(!/…$/.test(text))fail('title cut without ellipsis: '+text);else report.truncatedTitles++;}
+      // Full text is required once the title is cut; when present it must never be stale.
+      const tip=node.querySelector(':scope>title'),label=t1.getAttribute('aria-label'),text=shown(t1),cut=text!==want.title;
+      if(cut||tip)if(!tip||tip.textContent!==want.title)fail('hover title is '+JSON.stringify(tip&&tip.textContent));
+      if(cut||label!==null)if(label!==want.title)fail('t1 aria-label is '+JSON.stringify(label));
+      if(cut){if(!/…$/.test(text))fail('title cut without ellipsis: '+text);else report.truncatedTitles++;}
       const controls=Array.from(node.querySelectorAll('.nlink circle,.nbackref circle,.detail-trigger rect'),el=>el.getBoundingClientRect());
       const sub=node.querySelector(':scope>.t2'),subBox=sub&&shown(sub)?sub.getBoundingClientRect():null;
       const lines=Array.from(t1.querySelectorAll('tspan'));if(lines.length>1)report.wrapped++;if(!lines.length)lines.push(t1);

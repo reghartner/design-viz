@@ -14,6 +14,7 @@ import html
 import json
 import os
 import pathlib
+import re
 import sys
 import subprocess
 import urllib.parse
@@ -81,17 +82,21 @@ def embedded_json(value) -> str:
     return json.dumps(value, ensure_ascii=True).replace('<', '\\u003c').replace('{{', '\\u007b\\u007b')
 
 
+def site_config_path(config=None) -> pathlib.Path:
+    return pathlib.Path(config).resolve() if config is not None else ROOT / 'workbench/site.json'
+
+
 def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
     """Read company-owned inputs without changing them. Paths belong to config."""
-    path = pathlib.Path(config).resolve() if config is not None else ROOT / 'workbench/site.json'
+    path = site_config_path(config)
     if no_config or (config is None and not path.exists()):
         return embedded_json({'spec': json.loads(read('starters/onboarding.json')),
                               'title': 'A visitor at the door', 'label': 'Fictional example',
                               'footer': 'One story. System flow, Home map, App screens, and Device app—moving together.'})
     try:
         data = json.loads(path.read_text())
-        if not isinstance(data, dict) or set(data) != {'version', 'landing'}:
-            raise ValueError('expected only version and landing fields')
+        if not isinstance(data, dict) or set(data) - {'examples'} != {'version', 'landing'}:
+            raise ValueError('expected only version, landing and optional examples fields')
         if type(data['version']) is not int or data['version'] != 1:
             raise ValueError('version must be 1')
         landing = data['landing']
@@ -118,6 +123,25 @@ def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
         return embedded_json({'spec': raw, 'title': landing.get('title', 'Company diagram'),
                               'label': landing.get('label', 'Company example'),
                               'footer': landing.get('footer', '')})
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Invalid site config {path}: {error}') from error
+
+
+def workbench_examples(config=None, *, no_config=False) -> str:
+    """Optional examples-gallery URL from site config, or null (no Welcome link)."""
+    path = site_config_path(config)
+    if no_config or (config is None and not path.exists()):
+        return 'null'
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict) or 'examples' not in data:
+            return 'null'
+        url = data['examples']
+        # Same-site only: a relative or root-relative path, never a scheme or another host.
+        if (not isinstance(url, str) or not url or any(c <= ' ' or c == '\x7f' for c in url)
+                or re.match(r'[A-Za-z][A-Za-z0-9+.-]*:', url) or url.startswith('//') or '\\' in url):
+            raise ValueError('examples must be a relative or same-site path to the examples gallery')
+        return embedded_json(url)
     except (OSError, ValueError) as error:
         raise SystemExit(f'Invalid site config {path}: {error}') from error
 
@@ -226,6 +250,7 @@ def main() -> int:
         parser.error('--config requires an HTML build')
     runtime = canon_runtime()
     landing = None if args.runtime_only else workbench_landing(args.config, no_config=args.no_config, runtime=runtime)
+    examples = None if args.runtime_only else workbench_examples(args.config, no_config=args.no_config)
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
@@ -253,6 +278,7 @@ def main() -> int:
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
             mapping['WORKBENCH_LANDING'] = landing
+            mapping['WORKBENCH_EXAMPLES'] = examples
             mapping['HUMAN_GUIDE'] = human_guide()
             mapping.update(company_markers())
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)

@@ -68,8 +68,6 @@ test('native reader shows configured destinations and supports copied links in i
 
 test('hosted ID handoffs and pinned detail loading use the published catalog and restore Back state',async({page,server},info)=>{
  const root=path.join(server.root,'linked-site'),workbench=path.join(root,'workbench');await mkdir(workbench,{recursive:true});await cp(path.join(server.root,'workbench.html'),path.join(workbench,'flowspec.html'));await cp(path.join(server.root,'catalog.json'),path.join(workbench,'catalog.json'));await cp(path.join(server.root,'starters.json'),path.join(workbench,'starters.json'));
- // A served workbench/ folder probes its sibling examples gallery (#547).
- await mkdir(path.join(root,'examples'),{recursive:true});await writeFile(path.join(root,'examples/index.html'),'<!doctype html><meta charset="utf-8"><title>Examples</title>');
  const target=spec();target.page.title='Provider detail';target.page.sections[0].diagram.nodes.a.title='Provider client';
  const parent=spec();parent.page.title='Parent story';const nodes=parent.page.sections[0].diagram.nodes;nodes.a.handoff={spec:'provider',section:'overview',step:'reply',claudeUrl:claude};nodes.b.detail={spec:'provider',section:'overview',mode:'link',step:'reply'};
  parent.page.documentLinks={siteBaseUrl:server.origin+'/linked-site/workbench/flowspec.html'};

@@ -24,10 +24,10 @@ from welcome, during editing, and in Focus workspace. The guide ships inside
 `workbench/flowspec.html`, including downloaded/offline copies and company nginx
 installations. No separate documentation service is required.
 
-When the workbench is served from a checkout (`…/workbench/flowspec.html` with the
-generated `examples/index.html` beside it), Welcome and **Start new project** also
-offer **Browse the examples gallery**, which opens the example page library in a new
-tab. Installs without the gallery, opened files and agent kits do not show it.
+When the build's site config names an examples gallery (`"examples"` in
+`workbench/site.json`; see [Put your own diagram on the homepage](homepage-example.md)),
+Welcome and **Start new project** also offer **Browse the examples gallery**, which
+opens it in a new tab. Builds without that setting do not show the link.
 
 During editing, **Help → Keyboard shortcuts** opens the compact key reference;
 press **?** outside a text field to open it directly. Canvas keys include

@@ -14,8 +14,6 @@ async function publish(server){
   const root=path.join(server.root,'company'),workbench=path.join(root,'workbench');
   await mkdir(workbench,{recursive:true});
   for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])await cp(path.join(server.root,from),path.join(workbench,to));
-  // A served workbench/ folder probes its sibling examples gallery (#547).
-  await mkdir(path.join(root,'examples'),{recursive:true});await writeFile(path.join(root,'examples/index.html'),'<!doctype html><meta charset="utf-8"><title>Examples</title>');
   const specs={};
   for(const id of ['first','second']){
     const spec=editorSpec();spec.page.title=id==='first'?'First story':'Second story';

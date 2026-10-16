@@ -38,6 +38,7 @@ html=build.fill(build.read('workbench.skel.html'),{
     'WORKBENCH_CANON':build.workbench_canon(),
     'WORKBENCH_ONBOARDING':json.dumps(json.loads(build.read('starters/onboarding.json'))).replace('<', '\\u003c'),
     'WORKBENCH_LANDING':build.workbench_landing(no_config=True),
+    'WORKBENCH_EXAMPLES':build.workbench_examples(no_config=True),
     'HUMAN_GUIDE':build.human_guide(),
     'FOLDER_AGENT_KIT':build.folder_agent_kit(root,build.canon_runtime()),
     # Repository links and labels; prepare.mjs disables company identity.

@@ -236,8 +236,10 @@ one Undo transaction. It does not merge stale proposals or open a review dialog.
 
 A brand-new or local draft uses the same picker. On a deployed site the picker
 pins this site's v3 index when it opens; there is no connect step. The pin is
-retained even if you close the picker without adding a reference. Only diagrams
-whose index entry names at least one export are offered. The Workbench gives the
+retained even if you close the picker without adding a reference. Diagrams whose
+index entry lists no topology export are not offered, nor is the document's own
+canon ID; an index published before export names existed still lists every
+diagram. The Workbench gives the
 draft a session-only consumer identity for resolution; browser recovery retains
 it, but it is never written into the document. A site without a published
 library (404, a version 1 or 2 index, or an offline `file://` editor) explains

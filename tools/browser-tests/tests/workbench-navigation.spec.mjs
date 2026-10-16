@@ -1,6 +1,10 @@
 import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,paste,closeTools,chapterOptions,chooseAddDestination,arrangeChapter} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
+import {writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
 function fixture(){
  const raw=editorSpec(),first=raw.page.blocks[0];raw.page.title='Sections and Views · Product journey';first.id='primary';first.text='The notes belong to this chapter.';
  const d=first.diagram;delete d.layouts[0].steps;d.layouts[0].presentation='explore';d.layouts[0].name='Engineering';
@@ -21,7 +25,6 @@ test('editor shares the Contents, Views and Page shell without covering its auth
  await expect(nav(page).getByRole('tab',{name:'Engineering',exact:true})).toHaveAttribute('aria-selected','true');
  await expect(page.locator('#workbench-editor-title')).toHaveText(fixture().page.title);await expect(page.locator('#workbench-editor-title')).toHaveAttribute('title',fixture().page.title);
  await expect(nav(page).locator('.embedcopy')).toHaveCount(1);
- await nav(page).locator('.reader-theme-menu>summary').click();await nav(page).getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(page.locator('#docview')).toHaveClass(/sk-lilac/);await expect(page.locator('#src')).toHaveValue(source);
  const contentsToggle=nav(page).locator('.reader-top>button');await contentsToggle.click();await expect(nav(page).locator('.reader-contents')).toBeHidden();
  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Edited Product journey');await title.press('Enter');
  await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await expect(page.locator('.workspace-rail')).toHaveCSS('left','12px');
@@ -59,6 +62,46 @@ test('editor shares the Contents, Views and Page shell without covering its auth
  const more=page.locator('#workspace-more>summary');await expect(more).toHaveAttribute('aria-label','More project actions');await more.focus();await page.keyboard.press('Enter');await expect(page.locator('#workspace-file')).toBeVisible();await expect(page.locator('#undo-builder')).toBeVisible();await expect(page.locator('#workspace-export-trigger')).toBeVisible();
  await page.locator('#workspace-export-trigger').click();await expect(page.locator('#file-save')).toBeVisible();await expect(page.locator('#workspace-more')).toHaveAttribute('open','');
  await expect(page.locator('#src')).toHaveValue(source);
+});
+
+/* #559 — Appearance menu and a direct Preview action (desktop editor only).
+ row | fixture | assertion (scoped) | rejects
+ 1 Preview is one click | editor at 1440, no header menu open (asserted) | #open-page-preview is visible in .workbench-header, outside #workspace-appearance, its own visible text is exactly Preview and its accessible name Open page preview; one real click opens #page-preview | Preview still nested inside the skin menu (two clicks), or a direct button still labelled Open page preview
+ 2 skin menu is clearly named | same | #workspace-appearance>summary text is exactly Appearance (not Preview) | menu left labelled Preview
+ 3 Appearance keeps every skin setting, no preview action | Appearance opened by a real click | inside #workspace-appearance-body: each of the seven #skinbtns buttons, #preview-skin-status, Use document default, Edit saved default…, Preview host select and Preview width spinbutton are visible; that body has 0 #open-page-preview and 0 buttons named Open page preview | duplicate Preview command left in the menu, or skin status/default/host controls dropped in the move
+ 4 one skin control in the editor | editor Contents sidebar visible (asserted) | #docview .explore-navigation .reader-contents contains 0 .reader-theme-footer/.reader-theme-menu | second bottom-left Theme picker left in the editor
+ 5 Appearance choice applies to the canvas only | Terminal not pressed and #docview not sk-terminal (asserted) | click #sk-terminal: its aria-pressed=true, #docview gets sk-terminal, #src unchanged | inert skin buttons, or skin written into the JSON
+ 6 readers keep their theme picker (#554 ruling) | page preview opened from row 1 | #page-preview-view .reader-contents .reader-theme-menu>summary is visible with data-current-skin=terminal; choosing Lavender there gives #page-preview-view sk-lavender | removing the picker from the shared viewer Contents, or rendering it unusable
+ 7 exported viewer keeps its theme picker (#554 ruling) | same fixture injected into template/flowview.html | #docview .reader-contents .reader-theme-menu>summary visible and choosing Rose there gives #docview sk-rose | removing the reader picker everywhere instead of only in the editor
+ 8 user guide updated | Help → User guide | inside #hg-workspace: a <b> reading exactly Appearance, the sentence naming Appearance as the editor's one skin control, the sentence saying Preview opens in one click; 0 <b> containing Open page preview | stale guide wording
+*/
+test('Preview opens the page preview in one click and Appearance is the only editor skin control',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});const source=await open(page,server);
+ const header=page.locator('.workbench-header'),appearance=page.locator('#workspace-appearance'),body=page.locator('#workspace-appearance-body'),preview=header.locator('#open-page-preview');
+ expect(await appearance.evaluate(el=>el.open)).toBe(false);expect(await page.locator('#workspace-more').evaluate(el=>el.open)).toBe(true);
+ await expect(appearance.locator(':scope>summary')).toHaveText('Appearance');
+ await expect(preview).toBeVisible();await expect(preview).toHaveText('Preview');await expect(preview).toHaveAccessibleName('Open page preview');expect(await preview.evaluate(el=>!!el.closest('#workspace-appearance'))).toBe(false);
+ await expect(nav(page).locator('.reader-contents')).toBeVisible();await expect(nav(page).locator('.reader-contents .reader-theme-footer, .reader-contents .reader-theme-menu')).toHaveCount(0);
+ await appearance.locator(':scope>summary').click();await expect(body).toBeVisible();
+ for(const skin of ['aurora','pastel','blueprint','terminal','rose','lavender','lilac'])await expect(body.locator('#skinbtns #sk-'+skin)).toBeVisible();
+ for(const control of [body.locator('#preview-skin-status'),body.getByRole('button',{name:'Use document default',exact:true}),body.getByRole('button',{name:'Edit saved default…',exact:true}),body.getByRole('combobox',{name:'Preview host',exact:true}),body.getByRole('spinbutton',{name:'Preview width in pixels',exact:true})])await expect(control).toBeVisible();
+ await expect(body.locator('#open-page-preview')).toHaveCount(0);await expect(body.getByRole('button',{name:'Open page preview'})).toHaveCount(0);
+ const terminal=body.locator('#sk-terminal');await expect(terminal).toHaveAttribute('aria-pressed','false');await expect(page.locator('#docview')).not.toHaveClass(/sk-terminal/);
+ await terminal.click();await expect(terminal).toHaveAttribute('aria-pressed','true');await expect(page.locator('#docview')).toHaveClass(/sk-terminal/);await expect(page.locator('#src')).toHaveValue(source);
+ await appearance.locator(':scope>summary').click();await expect(body).toBeHidden();
+ await expect(page.locator('#page-preview')).toBeHidden();await preview.click();await expect(page.locator('#page-preview')).toBeVisible();
+ const previewNav=page.locator('#page-preview-view .explore-navigation').first();if(!await previewNav.locator('.reader-contents').isVisible())await previewNav.locator('.reader-top>button').click();
+ const previewTheme=previewNav.locator('.reader-contents .reader-theme-menu>summary');await expect(previewTheme).toBeVisible();await expect(previewTheme).toHaveAttribute('data-current-skin','terminal');
+ await expect(page.locator('#page-preview-view')).not.toHaveClass(/sk-lavender/);await previewTheme.click();await previewNav.getByRole('menuitemradio',{name:'Lavender',exact:true}).click();await expect(page.locator('#page-preview-view')).toHaveClass(/sk-lavender/);
+
+ await page.locator('#close-page-preview').click();await expect(page.locator('#page-preview')).toBeHidden();
+ await page.locator('.workspace-help>summary').click();await page.locator('.workspace-help [data-open-human-guide]').click();
+ const guide=page.locator('#hg-workspace');await expect(guide.locator('b',{hasText:/^Appearance$/}).first()).toBeVisible();await expect(guide.locator('b',{hasText:'Open page preview'})).toHaveCount(0);
+ await expect(guide).toContainText("Appearance is the editor's one skin control");await expect(guide).toContainText('Preview opens the last usable document in one click');
+ await page.keyboard.press('Escape');
+ const input=path.join(server.root,'appearance-559.json'),output=path.join(server.root,'appearance-559.html');await writeFile(input,source);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ await page.goto(server.origin+'/appearance-559.html');const reader=page.locator('#docview .explore-navigation');if(!await reader.locator('.reader-contents').isVisible())await reader.locator('.reader-top>button').click();
+ const theme=reader.locator('.reader-contents .reader-theme-menu>summary');await expect(theme).toBeVisible();await expect(page.locator('#docview')).not.toHaveClass(/sk-rose/);await theme.click();await reader.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(page.locator('#docview')).toHaveClass(/sk-rose/);
 });
 
 test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{

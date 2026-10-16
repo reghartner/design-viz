@@ -458,8 +458,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     player.style.setProperty('--explore-rail-height',railHeight+'px');
     // Reserve a usable caption row even when the timeline needs scrolling.
     var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
-    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):tracks;
-    player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
+    // Grid transport shares the tracks row. Its wrapped status must fit even
+    // when a simple story has only one row of step circles. Compact layouts
+    // put transport in its own flex row and reserve that height above instead.
+    var rowMinimum=compact?34:Math.max(34,transportHeight);
+    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):Math.max(tracks,rowMinimum);
+    player.style.setProperty('--explore-tracks-height',Math.max(rowMinimum,Math.min(rowHeight,trackRoom))+'px');
     // Reader utilities reserve space for floating controls. Workbench toolbar
     // insets still apply only to automatic docks, not authored geometry.
     if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(automatic?insets.bottom:12)));

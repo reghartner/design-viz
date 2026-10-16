@@ -142,3 +142,18 @@ test('a Tab-owned Standard View does not expose Explore text settings from its a
  await page.locator('.sec-prose').click({position:{x:2,y:2}});await page.locator('#editor-tab-inspect').click();
  await expect(page.getByRole('textbox',{name:'Section notes text size',exact:true})).toHaveCount(0);
 });
+
+for(const placement of ['floating','canvas'])for(const scale of [1,1.75])for(const position of ['below','above'])test(`${placement} simple story at ${scale*100}% keeps wrapped transport clear of ${position} caption`,async({page,server},info)=>{
+ const raw=fixture(placement,scale),d=raw.page.sections[0].diagram;delete d.paths;d.steps=d.steps.slice(0,2);d.layouts[0].exploreLayout.steps={textPosition:position};
+ await page.setViewportSize({width:1280,height:1000});await open(page,server,raw);
+ for(const width of [1280,1440]){
+  await page.setViewportSize({width,height:1000});await checkControls(page);
+  const geometry=await player(page).evaluate(el=>{
+   const transport=el.querySelector('.step-transport'),caption=el.querySelector('.stepline:not(.dv-caption-old)'),status=el.querySelector('.playback-status'),chips=el.querySelector('.schips'),bar=el.querySelector('.termbar');
+   const c=caption.getBoundingClientRect(),s=status.getBoundingClientRect();
+   return {separate:s.bottom<=c.top+1 || c.bottom<=s.top+1,transportHeight:transport.offsetHeight,trackHeight:parseFloat(el.style.getPropertyValue('--explore-tracks-height')),chipsOverflow:chips.scrollHeight-chips.clientHeight,barOverflow:bar.scrollHeight-bar.clientHeight};
+  });
+  expect(geometry.separate).toBe(true);expect(geometry.trackHeight).toBeGreaterThanOrEqual(geometry.transportHeight);expect(geometry.chipsOverflow).toBeLessThanOrEqual(1);expect(geometry.barOverflow).toBeLessThanOrEqual(1);
+  await page.screenshot({path:info.outputPath(`${placement}-${scale}-${position}-${width}.png`)});
+ }
+});

@@ -1,4 +1,5 @@
 import {test,expect,chooseNavigation} from '../helpers/test.mjs';
+import {editorSpec} from '../fixtures/editor-spec.mjs';
 
 // One geometry: every ring rect must carry EXACTLY the attributes of a mask
 // hole rect (x, y, width, height, rx, ry) — hole and ring drawn from one
@@ -654,4 +655,83 @@ test('a malformed page.tour fails open: page renders, no stuck scrim',async({pag
   const chip=page.locator('.schip').first();
   await chip.click();
   await expect(chip).toHaveAttribute('aria-current','true');
+});
+
+// #562: "?" opens keyboard shortcuts on every reader surface; the tour has its own "Tour" control.
+// row | fixture | assertion (scoped) | rejects
+// 1 one "?" control | standalone viewer (#docview); canon reader (.workbench-header + #welcome-reader-screen), 1440x900 | visible buttons whose OWN trimmed text is exactly "?": count 1, accessible name "Keyboard shortcuts" | a "?" that replays the tour or opens the guide; two "?" buttons
+// 2 button opens shortcuts | same | real click: the dialog named in that button's aria-controls is open with accessible name "Keyboard shortcuts"; .dv-tour count 0; #human-guide (canon) closed | "?" still replays the tour / opens the guide
+// 3 key opens the SAME sheet | same, Esc first closes it (dialog closed = contrasting precondition) | real keyboard.press('?'): the single open dialog has the id from row 2's aria-controls; no tour, no guide | key unwired, or key opens a different sheet (e.g. the Workbench editing sheet)
+// 4 sheet lists the reader's real keys | same | ordered [dt, dd] pairs of that dialog's dl rows equal READER_KEYS (engine.js presenter/step keys, tab-bar keys, Esc) | the Workbench editing roster, an empty sheet, invented keys
+// 5 Esc closes, focus returns | same, opened by the button | dialog closed; the "?" button is focused | a sheet that traps the reader
+// 6 Tour is separately labelled | same | the tour replay control (.dv-tour-replay) inside the reader page actions: textContent exactly "Tour", accessible name contains "tour"; it is not the row-1 button | tour replay still "?"
+// 7 Tour still replays | same | real click on row 6's control shows .dv-tour-chooser | relabel drops the handler
+// 8 User guide labelled (canon) | canon reader | #canon-reader-guide textContent AND accessible name exactly "User guide"; real click opens #human-guide | guide entry still "?" or removed
+const READER_KEYS=[
+  ['?','Open this shortcut sheet'],
+  ['Esc','Close this sheet, an open menu or a popover'],
+  ['← / →','Previous or next step'],
+  ['Space','Play or pause the steps'],
+  ['1–9','Switch to that tab'],
+  ['Esc','Exit Present'],
+  ['← / →','Previous or next tab'],
+  ['Home / End','First or last tab'],
+];
+async function readerShortcutContract(page,chrome,extra={}){
+  const questions=chrome.locator('button:visible').filter({hasText:/^\s*\?\s*$/});
+  await expect(questions).toHaveCount(1);
+  const help=questions.first();
+  await expect(help).toHaveAccessibleName('Keyboard shortcuts');
+  const sheetId=await help.getAttribute('aria-controls');
+  expect(sheetId).toBeTruthy();
+  const sheet=page.locator('dialog#'+sheetId);
+  await expect(sheet).toHaveCount(1);await expect(sheet).not.toHaveAttribute('open','');
+  const quiet=async()=>{
+    await expect(page.locator('.dv-tour')).toHaveCount(0);
+    if(extra.guide)await expect(extra.guide).not.toHaveAttribute('open','');
+  };
+  await help.click();
+  await expect(sheet).toHaveAttribute('open','');await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveAccessibleName('Keyboard shortcuts');
+  await quiet();
+  const rows=await sheet.locator('dl').evaluateAll(lists=>lists.flatMap(list=>[...list.querySelectorAll(':scope > dt')].map(dt=>[dt.textContent.replace(/\s+/g,' ').trim(),dt.nextElementSibling.textContent.replace(/\s+/g,' ').trim()])));
+  expect(rows).toEqual(READER_KEYS);
+  await page.keyboard.press('Escape');
+  await expect(sheet).not.toHaveAttribute('open','');await expect(help).toBeFocused();
+  await help.blur();
+  await page.keyboard.press('?');
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await expect(page.locator('dialog[open]')).toHaveAttribute('id',sheetId);
+  await quiet();
+  await page.keyboard.press('Escape');await expect(sheet).not.toHaveAttribute('open','');
+  const tour=chrome.locator('.reader-page-actions .dv-tour-replay');
+  await expect(tour).toBeVisible();await expect(tour).toHaveText('Tour');
+  await expect(tour).toHaveAccessibleName(/tour/i);
+  expect(await tour.evaluate((el,id)=>el.getAttribute('aria-controls')!==id,sheetId)).toBe(true);
+  return {tour};
+}
+test('viewer: "?" button and key open the same reader shortcut sheet; Tour is its own control',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto(server.origin+'/standalone.html');
+  await expect(page.locator('.dv-tour')).toHaveCount(0);
+  const {tour}=await readerShortcutContract(page,page.locator('#docview'));
+  await tour.click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+});
+test('canon reader: one "?" opens the reader shortcut sheet; Tour and User guide are labelled',async({page,server})=>{
+  const spec=editorSpec();spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
+  await page.route('**/diagrams.json',route=>route.fulfill({json:{version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]}}));
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-library').click();await page.locator('.canon-library-card').first().click();
+  await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await expect(page.locator('.dv-tour')).toHaveCount(0);
+  const guide=page.locator('#human-guide'),editorSheet=page.locator('#keyboard-shortcuts');
+  const {tour}=await readerShortcutContract(page,page.locator('.workbench-header, #welcome-reader-screen'),{guide});
+  await expect(editorSheet).not.toHaveAttribute('open','');
+  const guideButton=page.locator('#canon-reader-guide');
+  await expect(guideButton).toBeVisible();await expect(guideButton).toHaveText('User guide');
+  await expect(guideButton).toHaveAccessibleName('User guide');
+  await guideButton.click();await expect(guide).toHaveAttribute('open','');
+  await page.locator('#human-guide-close').click();await expect(guide).not.toHaveAttribute('open','');
+  await tour.click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
 });

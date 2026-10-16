@@ -23,7 +23,7 @@ function createBuilderFileOpening(opts,current){
    preparation are staged; only the confirmation button owns publication. */
 function createStagedFileImport(opts){
   var document=opts.document,browser=opts.browser,surface=opts.surface,input=opts.input,trigger=opts.trigger;
-  var disposed=false,version=0,reader=null,depth=0,pending=null,returnFocus=null;
+  var disposed=false,version=0,reader=null,decoder=null,depth=0,pending=null,returnFocus=null;
   function element(tag,cls){var node=document.createElement(tag);node.className=cls;return node;}
   var overlay=element('div','file-drop-overlay');overlay.hidden=true;overlay.setAttribute('aria-hidden','true');overlay.textContent='Drop to preview import';
   var status=element('p','file-import-status');status.hidden=true;status.setAttribute('role','alert');
@@ -50,22 +50,25 @@ function createStagedFileImport(opts){
     var items=Array.from(dt.items || []);return !items.length || items.some(function(item){return item.kind==='file';});
   }
   function hideOverlay(){depth=0;overlay.hidden=true;}
-  function cancelRead(){version++;if(reader && reader.abort)reader.abort();reader=null;}
+  function cancelRead(){version++;if(reader && reader.abort)reader.abort();reader=null;if(decoder)decoder.abort();decoder=null;}
   function close(refocus){pending=null;if(dialog.open)dialog.close();if(refocus && returnFocus && returnFocus.isConnected)returnFocus.focus();returnFocus=null;}
-  function retire(reason){var had=!!reader || !!pending || dialog.open;cancelRead();hideOverlay();close(false);if(had && reason)message(reason);}
+  function retire(reason){var had=!!reader || !!decoder || !!pending || dialog.open;cancelRead();hideOverlay();close(false);if(had && reason)message(reason);}
   async function loaded(file,text,run,opening){
     if(!active() || run!==version)return;
     try{
       /* The opening owner validates after resolving any approved topology
          providers; pure callers retain io-model's direct validation default. */
-      var prepared=prepareFlowviewFileImport({name:file.name,size:file.size,type:file.type},String(text),function(){});
+      if(drawioImportRecognized(String(text)) || /\.(?:drawio|xml)$/i.test(file.name))decoder=new AbortController();
+      var prepared=await prepareFlowviewFileImportAsync({name:file.name,size:file.size,type:file.type},String(text),function(){},{signal:decoder && decoder.signal,isCurrent:function(){return active() && run===version && opening.current();}});
+      if(!active() || run!==version)return;
+      decoder=null;
       var context=await opening.stage(prepared.text);
       if(!active() || run!==version)return;
       if(context===false){message('Import cancelled because the document changed while the file was loading.');return;}
       pending={run:run,prepared:prepared,opening:opening,context:context};
       status.hidden=true;detail.textContent=prepared.name+' · '+prepared.type;summary.textContent=prepared.summary.text+(prepared.todos.length?'. '+prepared.todos.join(' '):'');
       returnFocus=document.activeElement;dialog.showModal();confirm.focus();
-    }catch(ex){if(active() && run===version)message('Could not import “'+file.name+'”. '+(ex.message || ex));}
+    }catch(ex){if(active() && run===version){decoder=null;message('Could not import “'+file.name+'”. '+(ex.message || ex));}}
   }
   function start(files){
     if(!active())return;
@@ -106,9 +109,13 @@ function createStagedFileImport(opts){
   listen(dialog,'cancel',function(ev){
     if(!pending)return;ev.preventDefault();version++;close(true);
   });
-  return {start:start,retire:retire,destroy:function(reason){
+  return {start:start,retire:retire,sourceChanged:function(){
+    /* A pending stream read cannot poll opening.current(); stop it immediately.
+       Already-staged previews retain their existing confirmation-time check. */
+    if(decoder)retire('Import cancelled because the document changed.');
+  },destroy:function(reason){
     if(disposed)return;
-    var had=!!reader || !!pending || dialog.open;
+    var had=!!reader || !!decoder || !!pending || dialog.open;
     retire();
     if(had && reason)durableMessage(reason);
     disposed=true;listeners.splice(0).forEach(function(remove){remove();});overlay.remove();status.remove();dialog.remove();
@@ -205,6 +212,7 @@ function createBuilderIO(opts){
       begin:opts.beginFileImport,message:inspectorMessage,durableStatus:document.getElementById('workbench-import-status'),confirmed:function(prepared){
         if(prepared.todos.length)importMessage('w',prepared.todos.length+' todo(s) added to the spec — enrich by hand');
       }});
+    listen(src,'input',function(){stagedImport.sourceChanged();});
   }
   var exportMenu=document.getElementById('workspace-export');
   var exportTrigger=document.getElementById('workspace-export-trigger');

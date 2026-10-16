@@ -90,6 +90,7 @@
     "workbench/brand.js",
     "workbench/inspector.js",
     "workbench/io-model.js",
+    "workbench/drawio-import.js",
     "workbench/svg-export.js",
     "workbench/io-browser.js",
     "workbench/io.js",

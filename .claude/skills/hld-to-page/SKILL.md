@@ -45,7 +45,7 @@ to explicit Views. See [arrangement limits](../../../docs/auto-arrange.md).
 
 ## Choose the starting point
 
-Mermaid browser import: [supported subset](../../../docs/workbench-user-guide.md).
+Browser imports: [supported formats](../../../docs/workbench-user-guide.md).
 
 After the packet, load a guide only for starting-material or handoff details:
 

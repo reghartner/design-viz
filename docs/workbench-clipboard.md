@@ -3,9 +3,10 @@
 ## Add a diagram to an existing canvas
 
 Choose **Add → Add / Paste diagram** (also available in Inspect), drop a
-Flowview `.json` or Mermaid `.mmd`, `.mermaid`, `.md`, or `.txt` file onto the
-active Diagram or Explore canvas, or paste an unambiguous Flowview document or
-Mermaid sequence or flowchart outside text fields. The preview names the destination,
+Flowview `.json`, Mermaid `.mmd`, `.mermaid`, `.md`, `.txt`, or draw.io
+`.drawio`/`.xml` file onto the active Diagram or Explore canvas, or paste an
+unambiguous Flowview document, Mermaid diagram or draw.io XML outside text fields.
+The preview names the destination,
 offers a source section chooser when the document contains multiple diagrams,
 and reports node, group, and connection counts before **Add diagram**.
 
@@ -21,6 +22,11 @@ Flowcharts retain directions, labels, groups, and all supported connections;
 shape/style conversion warnings appear before confirmation. The
 [Mermaid import subset](workbench-user-guide.md) documents supported syntax and
 parser limits. Imported flowcharts add no timeline events.
+draw.io pages may be compressed or plain XML. The source chooser selects one
+page to add; all retained labels, groups and directed connections are previewed
+with conversion warnings. Pending XML decoding disables Add and is cancelled
+when input or destination changes. Its aggregate decoding cap is 8 MiB; see
+the [user guide](workbench-user-guide.md) for the supported XML subset and limits.
 Conditional/loop blocks that omit connections, colliding Mermaid participant
 IDs, unresolved local references, shared topology, and local section/timeline
 dependencies are refused with an explanation before any edit. Export a resolved

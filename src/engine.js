@@ -574,7 +574,7 @@ function showCommunicationFailures(board,failures,animate){
 
 /* Board popovers own their listeners outside the board's DOM too. */
 function destroyBoardLinks(el){
-  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails'].forEach(function(key){
+  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails', '_frameWatch'].forEach(function(key){
     var controller = el[key];
     el[key] = null;
     if (controller) controller.destroy();
@@ -1199,15 +1199,14 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
      hid the board, is stale. Re-measure once fonts are ready and each time the
      board is shown again, so a later refresh (a Step/Ambient switch) cannot
      grow the viewBox and move the Explore drawing. */
-  if(svg.ownerDocument && svg.ownerDocument.fonts)svg.ownerDocument.fonts.ready.then(function(){if(svg.isConnected)refreshFrame();});
-  if(typeof ResizeObserver!=='undefined'){
-    var frameShown=false,frameObserver=new ResizeObserver(function(entries){
-      var rect=entries[entries.length-1].contentRect,shown=rect.width>0 && rect.height>0;
-      if(shown && !frameShown && svg.isConnected)refreshFrame();
-      frameShown=shown;
-    });
-    frameObserver.observe(svg);
-  }
+  var frameRetired=false,frameShown=false,frameObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(entries){
+    var rect=entries[entries.length-1].contentRect,shown=rect.width>0 && rect.height>0;
+    if(shown && !frameShown && !frameRetired)refreshFrame();
+    frameShown=shown;
+  }):null;
+  if(frameObserver)frameObserver.observe(svg);
+  if(svg.ownerDocument && svg.ownerDocument.fonts)svg.ownerDocument.fonts.ready.then(function(){if(!frameRetired && svg.isConnected)refreshFrame();});
+  el._frameWatch={destroy:function(){frameRetired=true;if(frameObserver)frameObserver.disconnect();}};
 
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));

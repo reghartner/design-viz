@@ -107,6 +107,42 @@ test('Preview opens the page preview in one click and Appearance is the only edi
  const theme=reader.locator('.reader-contents .reader-theme-menu>summary');await expect(theme).toBeVisible();await expect(page.locator('#docview')).not.toHaveClass(/sk-rose/);await theme.click();await reader.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(page.locator('#docview')).toHaveClass(/sk-rose/);
 });
 
+/* #560 — insert-target badge, save-status badge and Home tooltip (desktop editor only).
+ row | fixture | assertion (scoped) | rejects
+ 1 badge wording | editor at 1440; insert target starts on #section-primary (asserted) | #section-primary.dv-inserttarget has exactly one child .dv-inserttarget-tag whose own text is exactly Adding here; the section's ::before content is none/normal | old "insert target" corner text kept, or both labels shown
+ 2 badge tooltip is reachable | same | the tag is visible, its title names Add and says how to change the section; a real hover reaches it (document.elementFromPoint at the tag's centre is the tag) | tooltip on an element with pointer-events:none, or no title
+ 3 badge follows the target | Add → destination picker chooses section 2 (real select) | the tag moves to #section-secondary; #docview holds exactly one .dv-inserttarget-tag | stale or duplicated tags left behind
+ 4 save status is a status badge, not a button | same editor | #workspace-provenance keeps role=status, is not a button/link, has text Browser only, computed cursor is default, it has a non-transparent background and a pill radius (≥ half its height), and a status dot (::before content not none); its background, border radius and font family differ from both the File .bbtn and the Preview header button | plain text that reads as a header action, or styled as another button
+ 5 Home has a tooltip that is true | same editor | #workspace-home title names Home and says the draft stays available; a real click on Home shows the welcome screen with #welcome-resume visible, and clicking it returns to the editor with #src unchanged | no tooltip, or a tooltip promising a draft that Home loses
+ 6 user guide | Help → User guide | #hg-workspace has <b> Adding here and a <b> Browser only, and the sentences explaining the badge and that Home keeps the draft | stale guide
+*/
+test('#560 insert target says Adding here, save status is a badge and Home explains the kept draft',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});const source=await open(page,server);
+ const view=page.locator('#docview'),primary=view.locator('#section-primary'),secondary=view.locator('#section-secondary');
+ await expect(primary).toHaveClass(/\bdv-inserttarget\b/);await expect(secondary).not.toHaveClass(/\bdv-inserttarget\b/);
+ const tag=primary.locator(':scope>.dv-inserttarget-tag');await expect(tag).toHaveCount(1);await expect(tag).toBeVisible();await expect(tag).toHaveText('Adding here');
+ expect(await primary.evaluate(el=>getComputedStyle(el,'::before').content)).toMatch(/^(none|normal)$/);
+ await expect(tag).toHaveAttribute('title',/Add/);await expect(tag).toHaveAttribute('title',/another section/);
+ await tag.hover();expect(await tag.evaluate(el=>{const r=el.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===el;})).toBe(true);
+ await page.locator('#diagram-add').click();await page.locator('.diagram-add-destination-picker summary').click();await page.locator('#diagram-add-target').selectOption('1');await page.keyboard.press('Escape');
+ await expect(secondary).toHaveClass(/\bdv-inserttarget\b/);await expect(secondary.locator(':scope>.dv-inserttarget-tag')).toHaveText('Adding here');await expect(view.locator('.dv-inserttarget-tag')).toHaveCount(1);await expect(page.locator('#src')).toHaveValue(source);
+
+ const status=page.locator('.workbench-header #workspace-provenance');await expect(status).toBeVisible();await expect(status).toHaveText('Browser only');await expect(status).toHaveAttribute('role','status');
+ expect(await status.evaluate(el=>el.tagName)).toBe('SPAN');expect(await status.evaluate(el=>!!el.closest('button,a,summary'))).toBe(false);
+ const look=el=>{const c=getComputedStyle(el),b=getComputedStyle(el,'::before');return {cursor:c.cursor,background:c.backgroundColor,radius:parseFloat(c.borderTopLeftRadius),height:el.getBoundingClientRect().height,font:c.fontFamily,dot:b.content};};
+ const badge=await status.evaluate(look),file=await page.locator('#workspace-file').evaluate(look),previewButton=await page.locator('.workbench-header #open-page-preview').evaluate(look);
+ expect(badge.cursor).toBe('default');expect(badge.background).not.toBe('rgba(0, 0, 0, 0)');expect(badge.radius).toBeGreaterThanOrEqual(badge.height/2-0.5);expect(badge.dot).not.toMatch(/^(none|normal)$/);
+ for(const button of [file,previewButton]){expect(badge.background===button.background && badge.radius===button.radius && badge.font===button.font).toBe(false);expect(badge.radius).not.toBe(button.radius);}
+
+ const home=page.locator('.workbench-header #workspace-home');await expect(home).toBeVisible();await expect(home).toHaveAttribute('title',/Home/);await expect(home).toHaveAttribute('title',/draft stays/);
+ await home.hover();await home.click();await expect(page.locator('#workbench-welcome')).toBeVisible();const resume=page.locator('#welcome-resume');await expect(resume).toBeVisible();
+ await resume.click();await expect(page.locator('#workbench-welcome')).toBeHidden();await expect(page.locator('#src')).toHaveValue(source);
+
+ await page.locator('.workspace-help>summary').click();await page.locator('.workspace-help [data-open-human-guide]').click();
+ const guide=page.locator('#hg-workspace');await expect(guide.locator('b',{hasText:/^Adding here$/})).toHaveCount(1);await expect(guide.locator('b',{hasText:/^Browser only$/})).toHaveCount(1);
+ await expect(guide).toContainText('A dotted frame tagged Adding here marks the section that Add puts new items into');await expect(guide).toContainText('Home keeps your draft');
+});
+
 test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await open(page,server);const contents=nav(page),sections=id=>contents.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>contents.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
  await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','true');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','true');

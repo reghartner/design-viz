@@ -572,3 +572,50 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   await page.goBack();await reachableEdit(false);await edit.click();await prepareEditorSurface(page);
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
+
+// #545 — Browse diagrams text filter. Fixture: three published v3 diagrams with
+// distinct titles, owners and one service (node) name that no card displays.
+// row | fixture | assertion (scoped) | rejects
+// 1 precondition | 3 entries, empty query | all three #welcome-library-grid cards visible, #welcome-library-empty hidden | a filter that starts narrowed or shows the empty state up front
+// 2 Tab + focus | library screen after entry | Tab presses (no clicks) focus the "Search diagrams" searchbox; it matches :focus-visible with a ≥2px non-none outline | a mouse-only field, or one whose focus ring is suppressed
+// 3 title, case-insensitive | "GARAGE" | visible card titles exactly [Garage opener] | case-sensitive or title-blind matching
+// 4 owner | "payments" | exactly [Second story] | matching only titles
+// 5 service name | "ledger writer" (node title in first's spec, not on any card) | exactly [First story] with zero .spec.json requests | matching only visible card text, or fetching every spec to search
+// 6 no matches | "zzqx" | zero visible cards and #welcome-library-empty visible naming the query | a blank grid with no explanation
+// 7 clear | empty query | all three cards back, empty state hidden | a filter that cannot be undone
+async function searchFixture(server){
+  const fixture=await publish(server),root=fixture.root;
+  fixture.specs.first.page.blocks[0].diagram.nodes.b.title='Ledger Writer';
+  await writeFile(path.join(root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.specs.first));
+  const third=editorSpec();third.page.title='Garage opener';
+  delete third.page.canon;delete third.page.blocks[0].diagram.layouts;delete third.page.blocks[0].diagram.defaultLayout;
+  await mkdir(path.join(root,'diagrams/third'),{recursive:true});
+  await writeFile(path.join(root,'diagrams/third/third.spec.json'),JSON.stringify(third));await writeFile(path.join(root,'diagrams/third/third.html'),'<!doctype html>');
+  await writeFile(path.join(root,'canon.json'),JSON.stringify({version:1,diagrams:[
+    {folder:'diagrams/first',owner:'group:default/home'},{folder:'diagrams/second',owner:'group:default/payments'},{folder:'diagrams/third',owner:'group:default/home'}]}));
+  await publishLibrary({registryPath:path.join(root,'canon.json'),output:path.join(root,'workbench/diagrams.json')});
+  return fixture;
+}
+const visibleLibraryTitles=page=>page.locator('#welcome-library-grid .canon-library-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('strong').textContent));
+
+test('Browse diagrams filters published cards by title, owner and service name with an explicit no-matches state',async({page,server})=>{
+  const fixture=await searchFixture(server),requests=[];
+  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const empty=page.locator('#welcome-library-empty');
+  await expect(page.locator('#welcome-library-grid .canon-library-card')).toHaveCount(3);
+  expect(await visibleLibraryTitles(page)).toEqual(['First story','Second story','Garage opener']);await expect(empty).toBeHidden();
+  const search=page.getByRole('searchbox',{name:'Search diagrams'});
+  for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  const ring=await search.evaluate(input=>{const style=getComputedStyle(input);return {visible:input.matches(':focus-visible'),style:style.outlineStyle,width:parseFloat(style.outlineWidth)};});
+  expect(ring.visible).toBe(true);expect(ring.style).not.toBe('none');expect(ring.width).toBeGreaterThanOrEqual(2);
+  const query=async text=>{await search.fill('');await search.pressSequentially(text);};
+  await query('GARAGE');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Garage opener']);await expect(empty).toBeHidden();
+  await query('payments');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Second story']);
+  await query('ledger writer');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story']);
+  await query('zzqx');await expect.poll(()=>visibleLibraryTitles(page)).toEqual([]);
+  await expect(empty).toBeVisible();await expect(empty).toContainText('No diagrams match');await expect(empty).toContainText('zzqx');
+  await search.fill('');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story','Second story','Garage opener']);await expect(empty).toBeHidden();
+  expect(requests).toEqual([]);
+});

@@ -150,6 +150,47 @@ test('template navigation returns to the picker and Forward retains the same pro
   await page.locator('#welcome-resume').click();await expect(editor(page)).toBeVisible();await expect(src).toHaveValue(changed);
 });
 
+// #545 — Start new project text filter. Fixture: the 13 built-in templates + Blank,
+// plus one routed team template (starters.json) in the company grid.
+// row | fixture | assertion (scoped) | rejects
+// 1 precondition | empty query, All examples | 14 built-in cards + the team card visible, #welcome-template-empty hidden | a filter that starts narrowed
+// 2 Tab + focus | picker after entry | Tab presses (no clicks) focus the "Search templates" searchbox; :focus-visible with a ≥2px non-none outline | a mouse-only field or a suppressed focus ring
+// 3 name, case-insensitive | "PERSPECTIVES" | visible titles exactly [One story, two perspectives] | case-sensitive or name-blind matching
+// 4 description | "deadlines" (only in Retries & recovery's desc) | exactly [Retries & recovery] | name-only matching
+// 5 tag | "observed EXECUTION" (only in A trace, explained's tag) | exactly [A trace, explained] | ignoring the eyebrow tag
+// 6 service name | "traffic router" (a node title only in Rollout decisions' spec) | exactly [Rollout decisions] | matching only card text
+// 7 team templates | "payroll" | exactly [Payroll handoff] from #welcome-company-grid | filtering only the built-in grid
+// 8 composes with tabs | "traffic router" + Connected devices | zero cards and the empty state; All examples restores [Rollout decisions] | a query that overrides or resets the category
+// 9 no matches | "zzqx" | zero visible cards (Blank included) and #welcome-template-empty visible naming the query | a blank grid, or Blank kept as a false match
+// 10 clear | empty query | all 15 cards back, empty state hidden | a filter that cannot be undone
+const visibleTemplateTitles=page=>page.locator('#welcome-new-screen .welcome-template-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('.welcome-template-title').firstChild.textContent));
+test('Start new project filters built-in and team templates by name, description, tag and service name',async({page,server})=>{
+  await page.route('**/starters.json',route=>route.fulfill({json:[{name:'Payroll handoff',desc:'Pay runs between finance systems.',spec:{page:{title:'Payroll',sections:[{diagram:{nodes:{a:{title:'Ledger'}},rows:[['a']],edges:[]}}]}}}]}));
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
+  await expect(page.locator('#welcome-company-grid .welcome-template-card')).toHaveCount(1);
+  const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
+  expect(all).toHaveLength(15);expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));await expect(empty).toBeHidden();
+  const search=page.getByRole('searchbox',{name:'Search templates'});
+  for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  const ring=await search.evaluate(input=>{const style=getComputedStyle(input);return {visible:input.matches(':focus-visible'),style:style.outlineStyle,width:parseFloat(style.outlineWidth)};});
+  expect(ring.visible).toBe(true);expect(ring.style).not.toBe('none');expect(ring.width).toBeGreaterThanOrEqual(2);
+  const query=async text=>{await search.fill('');await search.pressSequentially(text);};
+  await query('PERSPECTIVES');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['One story, two perspectives']);await expect(empty).toBeHidden();
+  await query('deadlines');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Retries & recovery']);
+  await query('observed EXECUTION');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['A trace, explained']);
+  await query('traffic router');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Rollout decisions']);
+  await page.locator('#welcome-template-filters').getByRole('button',{name:'Connected devices'}).click();
+  await expect.poll(()=>visibleTemplateTitles(page)).toEqual([]);await expect(empty).toBeVisible();await expect(search).toHaveValue('traffic router');
+  await page.locator('#welcome-template-filters').getByRole('button',{name:'All examples'}).click();
+  await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Rollout decisions']);await expect(empty).toBeHidden();
+  await query('payroll');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Payroll handoff']);
+  await expect(page.locator('#welcome-company-grid .welcome-template-card').filter({visible:true})).toHaveCount(1);
+  await query('zzqx');await expect.poll(()=>visibleTemplateTitles(page)).toEqual([]);
+  await expect(empty).toBeVisible();await expect(empty).toContainText('No templates match');await expect(empty).toContainText('zzqx');
+  await search.fill('');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(all);await expect(empty).toBeHidden();
+});
+
 test('browser Back retires pending welcome and editor file reads',async({page,server})=>{
   await page.addInitScript(()=>{
     const Native=FileReader;

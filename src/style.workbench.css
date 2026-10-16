@@ -634,7 +634,7 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .extraction-actions .bbtn:disabled{opacity:.5;cursor:default;}
 /* the always-visible escape hatch from ADD TO STEP mode: a solid accent
    pill so the way out is never in doubt, in the app's own callout colour */
-.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font-weight:600; font-size:11px; line-height:normal; font-family:inherit;
+.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font-weight:700; font-size:11px; line-height:normal; font-family:inherit;
   padding:5px 12px; border-radius:7px; cursor:pointer; margin-left:auto;}
 .bexit:hover{box-shadow:0 0 0 3px var(--selglow);}
 .bexit:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}

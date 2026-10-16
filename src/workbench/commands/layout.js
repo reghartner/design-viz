@@ -37,14 +37,12 @@ function builderPlacementPlan(text,raw,path,before,after){
   return pairs.length?planSetFields(text,raw,path,pairs):{noop:true};
 }
 
-function planEdgeCurve(text,raw,sectionIdx,index,points,cubic){
-  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
-  if(!got.d.edges || !got.d.edges[index])return {error:'Connection not found.'};
+function planEdgeCurve(text,raw,sectionIdx,index,points,cubic,context,key){
   if(!(cubic && Array.isArray(points) && points.length?validCurveControls(points):validCurvePoints(points)))return {error:'Use up to 32 curve points with finite coordinates.'};
-  return planSetFields(text,raw,got.path.concat(['edges',index]),[
-    ['curvePoints',!cubic && points.length?JSON.stringify(points):null],
-    ['curveControls',cubic && points.length?JSON.stringify(points):null],['bend',null]
-  ]);
+  return planEdgeLayout(text,raw,sectionIdx,index,key,{
+    curvePoints:!cubic && points.length?points:null,
+    curveControls:cubic && points.length?points:null,bend:null
+  },context);
 }
 
 var BUILDER_EDGE_ROUTING_FIELDS=['fromPort','toPort','curvePoints','curveControls','bend','fromDx','fromDy','toDx','toDy'];

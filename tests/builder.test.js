@@ -412,6 +412,7 @@ function importHarness(ctl, boardSpec, extraGlobals, builderOptions){
       replaceChildren(...children){ this.children.forEach(child=>child.parentNode=null);this.children=[];this.append(...children); },
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
+      get isConnected(){ return !!doc.body && doc.body.contains(this); },
       get firstChild(){ return this.children[0] || null; },
       get options(){ return this.children; },
       removeChild(child){ child.remove(); child.parentNode = null; },
@@ -520,7 +521,7 @@ function importHarness(ctl, boardSpec, extraGlobals, builderOptions){
     clearTimeout(id){ 'use strict'; assert.equal(this,undefined); cancelled.push(id); },
     getComputedStyle(){ return {}; },
     localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
-  vm.runInNewContext(readSource('validator.js') + '\n' +
+  vm.runInNewContext(readSource('canon.js') + '\n' + readSource('validator.js') + '\n' +
     readSource('builder.workbench.js')+'\n'+readSource('steps.workbench.js'), sandbox);
   if(extraGlobals)Object.assign(sandbox,extraGlobals);
   let renders = 0;
@@ -1222,7 +1223,7 @@ test('actual row, group and edge-label drags each preserve form focus and publis
     const spec=nodePlacementFixture();
     spec.groups={pair:{title:'Pair'}}; spec.nodes.a.group='pair'; spec.nodes.b.group='pair';
     const h=importHarness(null,spec), before=' \n'+JSON.stringify(spec,null,2)+'\r\n';
-    h.elements.src.value=before;
+    h.elements.src.value=before; h.rerender();
     const focused=h.elements.guide.appendChild(h.element('input')); focused.focus();
     let target;
     if(kind==='row')target=h.svg.querySelector('g.dv-rowgrab[data-dv-row="0"]');
@@ -1236,7 +1237,7 @@ test('actual row, group and edge-label drags each preserve form focus and publis
     target.fire('mousedown',{button:0,clientX:120,clientY:120});
     h.move(kind==='label'?140:300,kind==='label'?150:450); h.release();
     const result=JSON.parse(h.elements.src.value);
-    if(kind==='label')assert.deepEqual([result.edges[0].labelDx,result.edges[0].labelDy],[20,30]);
+    if(kind==='label')assert.deepEqual([result.edges[0].labelDx,result.edges[0].labelDy],[20,30],h.elements.guide.children.map(el=>el.textContent).join(' '));
     else assert.deepEqual(result.rows,[['c','d'],['a','b']]);
     assert.equal(h.doc.activeElement,focused);
     assertOneBuilderUndo(h,before);

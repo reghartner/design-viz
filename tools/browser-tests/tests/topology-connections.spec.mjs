@@ -289,3 +289,101 @@ test('imported node drags retire when rendering, replacing provider context or d
   await hold();await page.evaluate(()=>__editorTest.builder.destroy());await page.mouse.up();
   await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
 });
+
+const codeRef=id=>({id,repository:'https://github.com/example/service',path:'src/'+id+'.js',revision:'a'.repeat(40),anchor:{start:'start',end:'end'}});
+const importedEdge=page=>page.locator('#docview path.edge[data-dv-edge="1"]');
+async function dragElement(page,locator,dx,dy,release=true){
+  const b=await locator.boundingBox();expect(b).not.toBeNull();
+  await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
+  await page.mouse.move(b.x+b.width/2+dx,b.y+b.height/2+dy,{steps:10});if(release)await page.mouse.up();
+}
+async function dragImportedCurve(page,release=true){
+  const p=await importedEdge(page).evaluate(el=>{const p=el.getPointAtLength(el.getTotalLength()*.3),m=el.getScreenCTM(),q=new DOMPoint(p.x,p.y).matrixTransform(m);return {x:q.x,y:q.y};});
+  await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x+15,p.y-65,{steps:10});if(release)await page.mouse.up();
+}
+const overlay=async page=>diagram(JSON.parse(await source(page))).topologyImports[0];
+
+test('imported node evidence appends locally, retains invalid draft, removes additions and survives save/reopen',async({page,server},info)=>{
+  const {provider}=await fixture(page,server,'file','ambient',provider=>{diagram(provider).nodes.api.codeRefs=[codeRef('inherited')];});
+  const providerBefore=JSON.stringify(provider);
+  await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();
+  const inherited=page.getByRole('textbox',{name:'Inherited code references (read only)',exact:true});
+  await expect(inherited).toHaveAttribute('readonly','');expect(JSON.parse(await inherited.inputValue())).toEqual([codeRef('inherited')]);
+  const refs=page.getByRole('textbox',{name:'Additional code references JSON',exact:true}),before=await source(page);
+  await refs.fill('[{"id":"bad"}]');await refs.press('Tab');
+  await expect(page.locator('#src')).toHaveValue(before);await expect(refs).toHaveValue('[{"id":"bad"}]');await expect(page.locator('#guide .ierr')).toContainText('repository');
+  await refs.fill(JSON.stringify([codeRef('local')]));await refs.press('Tab');
+  await expect.poll(async()=> (await overlay(page)).nodeCodeRefs?.api).toEqual([codeRef('local')]);
+  await roundtrip(page,before);
+  await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();
+  await expect(inherited).toHaveValue(JSON.stringify([codeRef('inherited')],null,2));
+  await page.screenshot({path:info.outputPath('imported-node-code-references.png')});
+  const added=await source(page);await refs.fill('[]');await refs.press('Tab');await expect.poll(async()=> (await overlay(page)).nodeCodeRefs).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(added);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const bytes=await projectSource(await download);
+  expect(diagram(JSON.parse(bytes)).topologyImports[0].nodeCodeRefs.api).toEqual([codeRef('local')]);expect(bytes).not.toContain('topologyProvenance');
+  await page.locator('#file-input').setInputFiles({name:'overlay.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});await expect(node(page,'shared::api')).toBeVisible();
+  await page.reload();await expect(page.locator('#src')).toHaveValue(bytes);await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();
+  expect(JSON.parse(await refs.inputValue())).toEqual([codeRef('local')]);expect(JSON.parse(await inherited.inputValue())).toEqual([codeRef('inherited')]);expect(JSON.stringify(provider)).toBe(providerBefore);
+});
+
+test('imported label, curve and attachment drags save overlays with exact history and provider reset',async({page,server},info)=>{
+  await fixture(page,server,'file','ambient',provider=>{diagram(provider).edges[0].labelDx=9;diagram(provider).edges[0].fromPort={side:'right',offset:.3};});
+  const initial=await source(page),providerRoute=await importedEdge(page).getAttribute('d');
+  await dragElement(page,page.locator('#docview text.lbl[data-dv-edge="1"]'),35,-25);
+  await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']?.labelDx).not.toBeUndefined();await roundtrip(page,initial);
+  let before=await source(page);await dragImportedCurve(page);await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']?.curvePoints?.length).toBe(1);await roundtrip(page,before);
+  await importedEdge(page).dispatchEvent('click');await expect(page.locator('[data-edge-port="fromPort"]')).toBeVisible();
+  before=await source(page);await dragElement(page,page.locator('[data-edge-port="fromPort"]'),-35,-35);
+  await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']?.fromPort).not.toBeUndefined();await roundtrip(page,before);
+  const authored=diagram(JSON.parse(await source(page)));expect(authored.edges).toEqual([{from:'local',to:'shared::api',label:'Request'}]);expect(Object.keys(authored.nodes)).toEqual(['local','other']);expect(authored.topologyProvenance).toBeUndefined();
+  await importedEdge(page).dispatchEvent('click');await page.locator('#editor-tab-inspect').click();await expect(page.getByRole('button',{name:'Reset imported connection layout',exact:true})).toBeVisible();
+  await page.screenshot({path:info.outputPath('imported-edge-layout-controls.png')});
+  const savedOverlay=await source(page),savedRoute=await importedEdge(page).getAttribute('d');
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const bytes=await projectSource(await download);
+  expect(diagram(JSON.parse(bytes))).toEqual(diagram(JSON.parse(savedOverlay)));await page.locator('#file-input').setInputFiles({name:'edge-layout.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
+  await page.reload();await expect(page.locator('#src')).toHaveValue(bytes);await expect(importedEdge(page)).toHaveAttribute('d',savedRoute);
+  await importedEdge(page).dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  before=await source(page);await page.getByRole('button',{name:'Reset imported connection layout',exact:true}).click();await expect.poll(async()=> (await overlay(page)).edgeOverrides).toBeUndefined();await expect(importedEdge(page)).toHaveAttribute('d',providerRoute);await roundtrip(page,before);
+  expect(diagram(JSON.parse(await source(page)))).toEqual(diagram(JSON.parse(initial)));
+});
+
+test('imported label, curve and attachment gestures cancel on Escape and source edits',async({page,server})=>{
+  await fixture(page,server);
+  for(const kind of ['label','curve','port']){
+    await closeTools(page);await importedEdge(page).dispatchEvent('click');const before=await source(page);
+    const begin=()=>kind==='label'?dragElement(page,page.locator('#docview text.lbl[data-dv-edge="1"]'),30,-30,false):kind==='curve'?dragImportedCurve(page,false):dragElement(page,page.locator('[data-edge-port="fromPort"]'),-35,-35,false);
+    await begin();await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('.dv-free-edge-preview')).toHaveCount(0);
+    await importedEdge(page).dispatchEvent('click');await begin();await page.locator('#src').evaluate(el=>{el.value+='\n';el.dispatchEvent(new Event('input',{bubbles:true}));});await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before+'\n');
+    await page.locator('#go').evaluate(el=>el.click());
+  }
+});
+
+
+test('imported edge gestures retire on render, provider replacement and project replacement',async({page,server})=>{
+  const {provider,consumer}=await fixture(page,server,'lifetime');const before=await source(page);
+  for(const kind of ['label','curve','port'])for(const change of ['render','provider']){
+    await closeTools(page);await importedEdge(page).dispatchEvent('click');
+    if(kind==='label')await dragElement(page,page.locator('#docview text.lbl[data-dv-edge="1"]'),30,-30,false);
+    else if(kind==='curve')await dragImportedCurve(page,false);
+    else await dragElement(page,page.locator('[data-edge-port="fromPort"]'),-35,-35,false);
+    if(change==='render')await page.evaluate(()=>document.querySelector('#go').click());
+    else{
+      diagram(provider).nodes.api.title+=' refreshed';
+      await page.evaluate(({text,context})=>__editorTest.builder.loadText(text,context),{text:before,context:{version:1,id:'consumer',specs:[provider,consumer]}});
+    }
+    await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('.dv-free-edge-preview')).toHaveCount(0);
+  }
+  await closeTools(page);await dragImportedCurve(page,false);
+  const replacement=JSON.stringify({nodes:{new:{title:'New project'}},rows:[['new']]});await page.evaluate(text=>__editorTest.builder.loadText(text),replacement);
+  await page.mouse.up();await expect(page.locator('#src')).toHaveValue(replacement);await expect(page.locator('.dv-free-edge-preview')).toHaveCount(0);
+});
+
+
+test('local connection curve reset still works beside imported topology',async({page,server})=>{
+  await fixture(page,server,'file','ambient',(_provider,consumer)=>{diagram(consumer).edges[0].curvePoints=[{t:.5,dx:30,dy:-40}];});
+  const before=await source(page);await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('button',{name:'Reset curve',exact:true}).click();
+  await expect.poll(async()=>diagram(JSON.parse(await source(page))).edges[0].curvePoints).toBeUndefined();await roundtrip(page,before);
+  expect((await overlay(page)).edgeOverrides).toBeUndefined();
+});

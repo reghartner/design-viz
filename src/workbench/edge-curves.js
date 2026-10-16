@@ -10,11 +10,14 @@ function createEdgeCurveEditor(opts){
     if(snapshot.error || !sec || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
     var section=Number(sec.getAttribute('data-dv-section')),index=Number(el.getAttribute('data-dv-edge'));
     var got=builderDiagram(snapshot.text,snapshot.raw,section);if(got.error)return null;
-    var edge=(got.d.edges || [])[index];if(!edge)return null;
     var resolved=snapshot.raw;
     try{if(opts.session.resolve)resolved=opts.session.resolve(resolved);}catch(ex){return null;}
     var preview=builderDiagram(snapshot.text,resolved,section);if(preview.error)return null;
-    return {snapshot:snapshot,section:section,index:index,edge:edge,L:layout(preview.d),svg:el.ownerSVGElement,el:el};
+    var edge=(preview.d.edges || [])[index];if(!edge)return null;
+    var topologyContext=opts.session.topologyContext?opts.session.topologyContext():null;
+    var target=builderEdgeLayoutTarget(snapshot.text,snapshot.raw,section,index,builderEdgeKey(edge),topologyContext);if(target.error)return null;
+    return {snapshot:snapshot,section:section,index:index,key:builderEdgeKey(edge),edge:edge,L:layout(preview.d),svg:el.ownerSVGElement,el:el,
+      topologyContext:topologyContext,contextKey:JSON.stringify(topologyContext)};
   }
   function element(tag,attrs){
     var el=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -34,13 +37,18 @@ function createEdgeCurveEditor(opts){
         'aria-label':hasEdgeCurve(c.edge)?'Curve point '+(i+1)+'. Arrow keys move; Delete removes.':'Drag to shape arrow. Arrow keys also move.'});
       var title=element('title',{});title.textContent='Drag to shape · Arrow keys move · Delete removes point';handle.appendChild(title);chrome.appendChild(handle);
     });
+    ['from','to'].forEach(function(end){
+      var p=c.el.getPointAtLength(end==='from'?0:c.el.getTotalLength());
+      chrome.appendChild(element('circle',{cx:p.x,cy:p.y,r:7/(scale || 1),'class':'dv-port-point',
+        'data-edge-port':end+'Port',tabindex:0,role:'button','aria-label':(end==='from'?'Exit':'Entry')+' attachment point. Drag to move.'}));
+    });
     c.svg.appendChild(chrome);
   }
   function pointer(c,ev){
     var matrix=c.svg.getScreenCTM();if(!matrix)return null;
     try{var p=c.svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(matrix.inverse());}catch(ex){return null;}
   }
-  function fresh(c){var now=opts.session.snapshot();return now.text===c.snapshot.text && now.project===c.snapshot.project;}
+  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && now.text===c.snapshot.text && now.project===c.snapshot.project && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)===c.contextKey;}
   function cancel(){
     if(!gesture)return;var g=gesture;gesture=null;
     if(g.ghost)g.ghost.remove();g.c.el.classList.remove('dv-free-edge-source');
@@ -50,7 +58,7 @@ function createEdgeCurveEditor(opts){
   function consumeClick(){suppress=true;life.delay(function(){suppress=false;},0);}
   function save(c,points,focus){
     if(!fresh(c)){opts.message('The source changed. Curve edit cancelled.');return;}
-    var plan=planEdgeCurve(c.snapshot.text,c.snapshot.raw,c.section,c.index,points,hasCubicCurve(c.edge));
+    var plan=planEdgeCurve(c.snapshot.text,c.snapshot.raw,c.section,c.index,points,hasCubicCurve(c.edge),c.topologyContext,c.key);
     if(plan.error){opts.message(plan.error);return;}
     opts.commit(plan,c.snapshot,c.section,c.index);
     if(focus!=null && chrome){
@@ -88,7 +96,7 @@ function createEdgeCurveEditor(opts){
   }
   life.listen(view,'pointerdown',function(ev){
     if(ev.button!==0 || ev.altKey || ev.shiftKey || ev.ctrlKey || ev.metaKey || opts.disabled())return;
-    var target=ev.target.closest && ev.target.closest('[data-curve-point],[data-curve-line],path.edge[data-dv-edge]');
+    var target=ev.target.closest && ev.target.closest('[data-edge-port],[data-curve-point],[data-curve-line],path.edge[data-dv-edge]');
     if(!target && ev.target.closest)target=nearbyEdge(ev);
     if(!target || target.closest('[data-dv-detail-preview]'))return;
     var handle=target.hasAttribute('data-curve-point')?Number(target.getAttribute('data-curve-point')):null;
@@ -98,10 +106,11 @@ function createEdgeCurveEditor(opts){
     if(selected!==el)opts.select(el,c.section,c.index);
     opts.pause();
     if(handle!=null && target.focus)target.focus({preventScroll:true});
-    var edit=handle!=null && handle>=0?{points:builderClone(edgeCurveData(c.edge)),index:handle}:insertAt(c,p);
+    var port=target.getAttribute('data-edge-port');
+    var edit=port?{points:[],index:0}:handle!=null && handle>=0?{points:builderClone(edgeCurveData(c.edge)),index:handle}:insertAt(c,p);
     if(edit.points.length>(hasCubicCurve(c.edge)?95:32)){opts.message('This arrow has reached its curve point limit. Move or remove an existing point.');return;}
-    gesture={c:c,points:edit.points,index:edit.index,start:p,x:ev.clientX,y:ev.clientY,moved:false,
-      pointerId:ev.pointerId,capture:handle!=null?target:c.svg};
+    gesture={c:c,port:port,patch:null,points:edit.points,index:edit.index,start:p,x:ev.clientX,y:ev.clientY,moved:false,
+      pointerId:ev.pointerId,capture:handle!=null || port?target:c.svg};
     // Existing handles remain mounted; a first selection uses the stable SVG.
     if(gesture.capture.setPointerCapture)gesture.capture.setPointerCapture(ev.pointerId);
   },true);
@@ -110,18 +119,26 @@ function createEdgeCurveEditor(opts){
     if(!fresh(g.c)){cancel();opts.message('The source changed. Curve edit cancelled.');return;}
     if(Math.hypot(ev.clientX-g.x,ev.clientY-g.y)>3)g.moved=true;
     if(!g.moved)return;var p=pointer(g.c,ev);if(!p)return;
-    moveEdgeCurvePoint(g.c.edge,g.points,g.index,edgeCurvePoint(g.c.edge,g.c.L,p,g.points[g.index].t));
-    if(!(hasCubicCurve(g.c.edge)?validCurveControls(g.points):validCurvePoints(g.points))){cancel();opts.message('Curve point is outside the supported canvas.');return;}
+    if(g.port){
+      var node=g.c.L.pos[g.c.edge[g.port==='fromPort'?'from':'to']],x=(p.x-node.cx)/(node.w/2),y=(p.y-node.cy)/(node.h/2);
+      var horizontal=Math.abs(x)>Math.abs(y),side=horizontal?(x<0?'left':'right'):(y<0?'top':'bottom');
+      g.patch={};g.patch[g.port]={side:side,offset:Math.max(0,Math.min(1,horizontal?(p.y-node.cy)/node.h+.5:(p.x-node.cx)/node.w+.5))};
+    }else moveEdgeCurvePoint(g.c.edge,g.points,g.index,edgeCurvePoint(g.c.edge,g.c.L,p,g.points[g.index].t));
+    if(!g.port && !(hasCubicCurve(g.c.edge)?validCurveControls(g.points):validCurvePoints(g.points))){cancel();opts.message('Curve point is outside the supported canvas.');return;}
     if(!g.ghost){g.ghost=g.c.el.cloneNode(false);g.ghost.removeAttribute('id');g.ghost.removeAttribute('data-dv-edge');
       g.ghost.setAttribute('class','edge dv-free-edge-preview');g.c.svg.appendChild(g.ghost);g.c.el.classList.add('dv-free-edge-source');}
     if(chrome)chrome.setAttribute('visibility','hidden');
-    var shaped=Object.assign({},g.c.edge);shaped[hasCubicCurve(shaped)?'curveControls':'curvePoints']=g.points;
+    var shaped=Object.assign({},g.c.edge,g.patch || {});if(!g.port)shaped[hasCubicCurve(shaped)?'curveControls':'curvePoints']=g.points;
     g.ghost.setAttribute('d',edgePath(shaped,g.c.L));
     ev.preventDefault();
   });
   life.listen(window,'pointerup',function(ev){
     var g=gesture;if(!g || ev.pointerId!==g.pointerId)return;cancel();consumeClick();
-    if(g.moved)save(g.c,g.points);
+    if(g.moved && g.port){
+      if(!fresh(g.c)){opts.message('The source changed. Attachment edit cancelled.');return;}
+      var plan=planEdgeLayout(g.c.snapshot.text,g.c.snapshot.raw,g.c.section,g.c.index,g.c.key,g.patch,g.c.topologyContext);
+      if(plan.error)opts.message(plan.error);else opts.commit(plan,g.c.snapshot,g.c.section,g.c.index);
+    }else if(g.moved)save(g.c,g.points);
   });
   life.listen(view,'click',function(ev){if(opts.disabled())return;if(suppress || ev.target.closest && ev.target.closest('.dv-curve-editor')){
     suppress=false;ev.preventDefault();ev.stopImmediatePropagation();

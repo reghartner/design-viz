@@ -317,7 +317,8 @@ exports and use the complete repository snapshot. Requested imported-node layout
 changes belong in the consumer import’s `nodePositions` (centers relative to its
 `position`, keyed by exported provider-relative ID, including nested IDs). Preserve
 node definitions, edges and groups in the provider. Removing `nodePositions`
-restores provider arrangement while preserving the import origin. See
+restores provider arrangement while preserving the import origin. Use `nodeCodeRefs` for local evidence and `edgeOverrides` for geometry. Null clears
+an inherited field; removing its override restores it. See
 [shared topology](../../../../docs/shared-topology.md) for validation and UI gestures.
 From the repository root,
 the documented Canon publisher validates the full registered provider/consumer

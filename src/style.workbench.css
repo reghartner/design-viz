@@ -690,6 +690,9 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .fctl{flex:1; min-width:0; background:var(--codebg); color:var(--codeink); border:1px solid var(--line);
   border-radius:6px; font:12px/1.4 'IBM Plex Mono',monospace; padding:4px 8px; box-sizing:border-box;}
 textarea.fctl{resize:vertical; min-height:44px;}
+.topology-code-refs{display:grid;gap:5px;margin-top:10px;}
+.topology-code-refs .flab{text-align:left;}
+.topology-code-refs textarea{width:100%;min-height:110px;}
 .fctl:focus-visible{outline:2px solid var(--accent); outline-offset:-1px;}
 .fnum{flex:0 1 90px;}
 /* typed setup-field editors: item rows, key/value maps, raw JSON fallback.
@@ -1117,8 +1120,8 @@ body.sk-aurora.sk-blueprint{
 .dv-free-edge-source{opacity:.18!important;}
 .dv-free-edge-preview{pointer-events:none;opacity:.8;}
 .dv-curve-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:grab;vector-effect:non-scaling-stroke;}
-.dv-curve-point{fill:var(--bg,#fff);stroke:var(--accent,#448aff);stroke-width:2;cursor:grab;pointer-events:all;vector-effect:non-scaling-stroke;}
-.dv-curve-point:focus{outline:none;stroke-width:4;}
+.dv-curve-point,.dv-port-point{fill:var(--bg,#fff);stroke:var(--accent,#448aff);stroke-width:2;cursor:grab;pointer-events:all;vector-effect:non-scaling-stroke;}
+.dv-curve-point:focus,.dv-port-point:focus{outline:none;stroke-width:4;}
 .node-text.dv-sel>.text-box-hit,.node-text:focus>.text-box-hit{stroke:var(--accent,#448aff);stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke;}
 .node-text:focus{outline:none;}
 .dv-text-editing>text{visibility:hidden;}

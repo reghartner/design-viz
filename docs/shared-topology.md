@@ -266,7 +266,7 @@ a source node (or choose **Connect from this node** in its Inspector), then clic
 the destination. The connection Inspector’s **from** and **to** lists include
 imported nodes; changing an endpoint also retargets the consumer’s story references
 in the same Undo action. Only the consumer connection is saved. Provider-owned
-connections remain read-only. Edit shared structure in the provider. Drag an
+connection semantics remain read-only; their layout can be customized locally. Edit shared structure in the provider. Drag an
 imported node to rearrange just that node; drag the reference’s **⋯** handle to
 move the whole block with its custom arrangement (a nested handle moves the
 containing direct reference). Click the handle for reference
@@ -286,6 +286,36 @@ identities use the full relative path (for example `inner::api`) on the direct
 consumer import. Coordinates and resulting absolute centers must be finite and
 between -100000 and 100000. Published resolved snapshots remain immutable;
 open the authored consumer with its provider context to arrange nodes.
+In the imported node Inspector, **Inherited code references (read only)** shows
+provider evidence. **Additional code references JSON** edits an array appended
+after those references for this flow. Remove entries or use `[]` to remove local
+additions. They are stored as `nodeCodeRefs: {"api": [codeReference, ...]}` on the
+consumer import. Both inherited and appended entries obey the existing code
+reference validation, including immutable revision SHAs and identity conflicts.
+
+Imported edge labels, curve points and endpoint attachment handles can be dragged
+on the desktop canvas. **Reset imported connection layout** restores the provider
+label and routing. These edits use `edgeOverrides`, keyed by provider-relative
+edge identity, for example `"edgeOverrides":{"api->store":{"labelDx":24}}`.
+Allowed fields are `labelDx`, `labelDy`, `curvePoints`, `curveControls`,
+`bend`, `fromPort` and `toPort`. Numeric offsets
+are finite and within ±100000; port offsets are between 0 and 1.
+Ports and curves use their normal validated shapes. A field set to `null`
+suppresses its inherited value (for example, a new through-point curve clears
+inherited cubic controls); an omitted field inherits the provider value. Removing
+the whole edge override restores all provider geometry. Semantic endpoints,
+label text, kind and other structure cannot be overridden.
+
+Both maps use full provider-relative paths for nested members on the direct
+import: `inner::api` or `inner::api->inner::store`. Keys must remain selected and
+exported, just like `nodePositions`; removed or deselected keys fail validation.
+On provider refresh, inherited references update before the retained additions;
+only explicitly overridden edge fields mask updated provider geometry. Frozen
+session recovery, saved JSON and reopening preserve authored overlays; resolved
+and offline views include the effective merged values. Materialized snapshots
+without authored imports remain read-only. Each edit or reset has one Undo/Redo;
+Escape, source changes and provider-context changes cancel held gestures.
+
 Workbench draws a light labeled boundary around each direct and nested referenced
 set; this editor-only cue is not persisted or shown on published pages. Selecting
 any imported node, connection, or group exposes **Remove referenced topology**.

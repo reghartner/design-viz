@@ -355,6 +355,40 @@ test('Skip returns focus to where the reader was',async({page,server})=>{
   await expect(page.locator('.dv-tour-replay')).toBeFocused();
 });
 
+// #563: one skip control, one label ("Skip tour"), chooser and steps alike.
+// row | fixture | assertion (scoped) | rejects
+// 1 chooser has one skip | standalone #tour=1, chooser shown | buttons inside .dv-tour whose name or text matches /skip/i: count 1, and it is .dv-tour-exit | chooser foot "Skip" beside the pill
+// 2 chooser label | same | that button's accessible name AND textContent are exactly "Skip tour" | "Skip tour ✕" text, "Skip the tour" aria-label, "Skip"
+// 3 step has one skip | after a persona choice, .dv-tour-ui visible | same /skip/i button count inside .dv-tour is 1, and it is .dv-tour-exit | step card "Skip tour" beside the pill
+// 4 step label | same | name AND textContent exactly "Skip tour" | the ✕ glyph or a different step-card wording
+// 5 same control, same style | chooser vs step | the skip control on both is the same node class with identical computed font/colour/background | a chooser-only restyle
+// 6 it still exits | step | real click on the control hides .dv-tour (visible before) | a relabel that drops the handler
+const skipControls=page=>page.locator('.dv-tour button').filter({visible:true,hasText:/skip/i})
+  .or(page.locator('.dv-tour').getByRole('button',{name:/skip/i}));
+const skipLook=loc=>loc.evaluate(e=>{const s=getComputedStyle(e);return [e.className,s.font,s.color,s.backgroundColor,s.borderTopStyle].join('|');});
+test('every skip control reads "Skip tour": one control on the chooser and on steps',async({page,server})=>{
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  const atChooser=skipControls(page);
+  await expect(atChooser).toHaveCount(1);
+  await expect(atChooser).toHaveClass(/\bdv-tour-exit\b/);
+  await expect(atChooser).toHaveAccessibleName('Skip tour');
+  await expect(atChooser).toHaveText('Skip tour');
+  const chooserLook=await skipLook(atChooser);
+  await page.locator('.dv-tour-choice').nth(1).click();
+  await expect(page.locator('.dv-tour-ui')).toBeVisible();
+  const atStep=skipControls(page);
+  await expect(atStep).toHaveCount(1);
+  await expect(atStep).toHaveClass(/\bdv-tour-exit\b/);
+  await expect(atStep).toHaveAccessibleName('Skip tour');
+  await expect(atStep).toHaveText('Skip tour');
+  expect(await skipLook(atStep)).toBe(chooserLook);
+  await expect(page.locator('.dv-tour')).toBeVisible();
+  await atStep.click();
+  await expect(page.locator('.dv-tour')).toBeHidden();
+});
+
 async function walkToDrill(page,server){
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/tour-drill.html#tour=1');

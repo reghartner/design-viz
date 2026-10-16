@@ -14,12 +14,24 @@ function createBuilderSession(options){
     if(!topologyContext){
       if(!nextContext || nextContext.ephemeral!==true)throw Error('The frozen Canon session changed. Reopen the picker.');
     }else{
-      if(!nextContext || nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
+      if(!nextContext || nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL)throw Error('The frozen Canon session changed. Reopen the picker.');
+      // A later index may replace the pinned catalog only while every frozen
+      // provider keeps its published revision (#592 refresh).
+      if(JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog) && !catalogCompatible(topologyContext,nextContext))throw Error('A provider frozen in this session was republished. Reopen the diagram to use the latest deployment.');
       topologyContext.specs.forEach(function(spec){
         var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
         if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
       });
     }
+  }
+  function catalogCompatible(current,next){
+    var before=current.catalog,after=next.catalog;
+    if(!before || !after || before.version!==3 || after.version!==3 || !Array.isArray(after.diagrams))return false;
+    var revisions=new Map(after.diagrams.map(function(entry){return [entry.id,entry.revision];}));
+    return current.specs.every(function(spec){
+      var entry=(before.diagrams || []).find(function(item){return item.id===spec.page.canon.id;});
+      return !entry || revisions.get(entry.id)===entry.revision;
+    });
   }
   function artifacts(){return Object.assign({},options.artifacts?options.artifacts():{},topologyContext?{topologyContext:topologyContext}:{});}
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;

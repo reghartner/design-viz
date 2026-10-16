@@ -1,5 +1,6 @@
-/* Dialog owns drafts only. Provider acquisition is explicit and revision locked;
-   the shared headless planner and builder session own the one source commit. */
+/* Dialog owns drafts only. Provider acquisition pins this site's index on open
+   and is revision locked; the shared headless planner and builder session own
+   the one source commit. */
 function initTopologyPicker(opts){
   var doc=opts.document,dialog=doc.getElementById('topology-picker');if(!dialog)return null;
   var life=createWorkbenchLifetime(),el=function(id){return doc.getElementById('topology-'+id);};
@@ -52,7 +53,7 @@ function initTopologyPicker(opts){
     options(exportChoice,Object.keys(record?record.diagram.topologyExports:{}).map(function(name){return {value:name,label:name};}));chooseExport();
   }
   async function chooseProvider(){
-    var token=++generation;loaded=null;plan=null;el('add').disabled=true;el('contents').hidden=true;el('owner').textContent='';
+    var token=++generation;loaded=null;plan=null;el('add').disabled=true;el('contents').hidden=true;el('owner').textContent='';el('refresh').hidden=true;
     options(section,[]);options(exportChoice,[]);
     if(!provider.value){message('No provider diagrams match.');return;}
     message('Loading approved provider and its dependencies…');
@@ -67,17 +68,36 @@ function initTopologyPicker(opts){
       el('owner').textContent=entry.id+' · '+(entry.canon.owner || 'Owner not supplied')+' · frozen revision '+entry.revision.slice(0,12);
       if(!records.length){message('This provider has no named topology exports. Its private structure cannot be imported.');return;}
       chooseSection();
-    }catch(ex){if(life.alive() && token===generation && dialog.open)message(ex.message);}
+    }catch(ex){if(life.alive() && token===generation && dialog.open){message(ex.message);if(ex.revisionMismatch && typeof opts.refresh==='function')el('refresh').hidden=false;}}
   }
   function browse(){
     var query=el('search').value.trim().toLowerCase(),old=provider.value;
-    options(provider,loader.entries.filter(function(entry){return entry.id!==(catalogContext && catalogContext.id) && [entry.title,entry.id,entry.canon.owner].join(' ').toLowerCase().includes(query);}).map(function(entry){return {value:entry.id,label:entry.title+' · '+entry.id};}));
+    var own=snapshot && snapshot.raw && snapshot.raw.page && snapshot.raw.page.canon && snapshot.raw.page.canon.id;
+    // Offer only providers: not this document, and not diagrams whose index
+    // entry says they export nothing (older indexes carry no export names).
+    options(provider,loader.entries.filter(function(entry){return entry.id!==(catalogContext && catalogContext.id) && entry.id!==own && (!entry.exports || entry.exports.length) && [entry.title,entry.id,entry.canon.owner].join(' ').toLowerCase().includes(query);}).map(function(entry){return {value:entry.id,label:entry.title+' · '+entry.id};}));
     if(Array.from(provider.options).some(function(option){return option.value===old;}))provider.value=old;
     chooseProvider();
   }
-  function close(focus){generation++;if(dialog.open)dialog.close();snapshot=null;loaded=null;plan=null;el('connect').disabled=false;if(focus!==false)doc.getElementById('diagram-add').focus({preventScroll:true});}
+  function close(focus){generation++;if(dialog.open)dialog.close();snapshot=null;loaded=null;plan=null;el('refresh').hidden=true;el('refresh').disabled=false;if(focus!==false)doc.getElementById('diagram-add').focus({preventScroll:true});}
+  function adopt(nextContext){
+    catalogContext=nextContext;loaderKey=JSON.stringify([snapshot.project,nextContext.catalogURL,nextContext.catalog]);
+    loader=createTopologyCatalogLoader(catalogContext);provider.disabled=false;el('refresh').hidden=true;browse();
+  }
+  /* A local draft pins this site's published library when the picker opens;
+     the session commits that context before any provider is listed. */
+  async function acquire(){
+    var token=++generation;message('Loading the published diagram library…');
+    try{
+      var nextContext=await opts.connect(snapshot.raw);
+      if(!life.alive() || token!==generation || !dialog.open)return;
+      if(!same()){invalid=true;refresh();return;}
+      if(opts.connected && !opts.connected(nextContext,snapshot)){invalid=true;refresh();return;}
+      adopt(nextContext);
+    }catch(ex){if(life.alive() && token===generation && dialog.open)message(ex.message);}
+  }
   function open(){
-    close(false);snapshot=opts.context();invalid=false;el('contents').hidden=true;el('add').disabled=true;el('connect').disabled=false;el('owner').textContent='';
+    close(false);snapshot=opts.context();invalid=false;el('contents').hidden=true;el('add').disabled=true;el('owner').textContent='';
     options(destination,(snapshot.sections || []).filter(function(item){var rec=specSectionPaths(snapshot.raw)[item.section];return !!specValueAt(snapshot.raw,rec.diagram);}).map(function(item){return {value:String(item.section),label:item.label};}));
     destination.value=String(snapshot.section);el('search').value='';options(provider,[]);options(section,[]);options(exportChoice,[]);
     if(opts.pause)opts.pause();dialog.showModal();el('search').focus();
@@ -86,33 +106,30 @@ function initTopologyPicker(opts){
       var key=snapshot.topologyContext?JSON.stringify([snapshot.project,snapshot.topologyContext.catalogURL,snapshot.topologyContext.catalog]):JSON.stringify([snapshot.project,'local-draft']);
       if(key!==loaderKey){loader=null;loaderKey=key;}
       catalogContext=snapshot.topologyContext || (loader?catalogContext:null);
-      el('connect').hidden=!!catalogContext;
-      el('search').disabled=!catalogContext;
+      // The search field stays enabled (and focused) while the library loads:
+      // disabling it would move focus outside the modal in Chromium, and
+      // Escape must stay owned by this dialog so closing the picker cannot
+      // also clear the Workbench's current selection.
       provider.disabled=!catalogContext;
       if(!catalogContext){
-        message('Referenced topology is unavailable for this local draft until you connect the repository catalog. Connect explicitly to pin the current approved provider revision for this editing session.');
-        // Disabling the initially focused search field moves focus outside the
-        // modal in Chromium. Keep Escape owned by this dialog so closing the
-        // picker cannot also clear the Workbench's current selection.
-        el('connect').focus({preventScroll:true});return;
+        if(typeof opts.connect!=='function')throw Error('Referenced topology is unavailable here.');
+        acquire();return;
       }
       if(!loader)loader=createTopologyCatalogLoader(catalogContext);
       browse();
     }catch(ex){message(ex.message);}
   }
-  life.listen(el('connect'),'click',async function(){
-    if(!snapshot || invalid || !same() || typeof opts.connect!=='function')return;
-    var token=++generation;el('connect').disabled=true;message('Connecting to the deployed repository catalog…');
+  life.listen(el('refresh'),'click',async function(){
+    if(!snapshot || invalid || !same() || !catalogContext || typeof opts.refresh!=='function')return;
+    var token=++generation;el('refresh').disabled=true;message('Reading the latest published library…');
     try{
-      var nextContext=await opts.connect(snapshot.raw);
+      var nextContext=await opts.refresh(catalogContext);
       if(!life.alive() || token!==generation || !dialog.open)return;
       if(!same()){invalid=true;refresh();return;}
       if(opts.connected && !opts.connected(nextContext,snapshot)){invalid=true;refresh();return;}
-      catalogContext=nextContext;
-      loaderKey=JSON.stringify([snapshot.project,nextContext.catalogURL,nextContext.catalog]);
-      loader=createTopologyCatalogLoader(catalogContext);el('connect').hidden=true;el('search').disabled=false;provider.disabled=false;el('search').focus();browse();
+      adopt(nextContext);
     }catch(ex){if(life.alive() && token===generation && dialog.open)message(ex.message);}
-    finally{if(life.alive() && token===generation && dialog.open)el('connect').disabled=false;}
+    finally{if(life.alive() && token===generation && dialog.open)el('refresh').disabled=false;}
   });
   life.listen(el('search'),'input',function(){if(loader)browse();});
   life.listen(provider,'change',chooseProvider);life.listen(section,'change',chooseSection);life.listen(exportChoice,'change',chooseExport);

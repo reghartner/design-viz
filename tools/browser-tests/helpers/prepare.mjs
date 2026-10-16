@@ -30,6 +30,8 @@ export default async function prepare(){
     for(const directory of [output,path.join(output,'lifetime')]){
       await cp(path.join(repo,'workbench/catalog.json'),path.join(directory,'catalog.json'));
       await writeFile(path.join(directory,'starters.json'),'[]');
+      // A deployed site always publishes an index (tools/build.py); the editor prefetches it.
+      await writeFile(path.join(directory,'diagrams.json'),'{"version":3,"diagrams":[]}');
     }
     const raw=JSON.parse(await readFile(path.join(repo,'examples/chime-radar/chime-radar.spec.json'),'utf8'));
     function pause(value){if(!value||typeof value!=='object')return;if(value.diagram)value.diagram.autoplay=false;Object.values(value).forEach(pause);}

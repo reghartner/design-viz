@@ -4,7 +4,10 @@ A provider owns reusable structure; each consumer owns its narrative. Imports
 are validated against the complete approved snapshot at build time, then resolved
 in memory when a reader or editor opens them. The fetched provider closure is
 frozen for that session: no polling, live refresh, or automatic reconciliation.
-Reloading/reopening can pick up a newly deployed revision.
+Reopening a diagram from the library pins the newly deployed revision; a plain
+reload resumes the draft with its frozen context. The picker's **Use the latest
+published library** adopts a later index only while every frozen provider keeps
+its revision.
 Black-box `handoff` and detail navigation remain separate contracts.
 
 In the provider's diagram, declare an export with explicit stable node IDs and
@@ -201,13 +204,17 @@ or invalid imports leave source and history unchanged.
 The dialog deliberately loads a chosen provider and its dependencies from the
 same v3 index/revision lock captured on Canon entry. It never reloads that index
 or refreshes existing providers. Browsing caches successful fetches for this
-session; successful insertion, opening a diagram file or agent folder, or an explicitly
-committed agent review extends persisted provider context. Undo
+session; successful insertion, opening a diagram file, pasting or typing a
+reference, opening an agent folder, or a committed agent review extends persisted
+provider context. Undo
 removes the import but retains the frozen cache for Redo. Recovery carries that
 context and catalog; JSON downloads contain authored references, while offline HTML
 exports contain a read-only page snapshot without provider context. Offline, legacy v1/v2 and backend
 sessions without a v3 authored-source catalog show an unavailable explanation,
-without guessing network paths. Reopen Canon to use a later deployment.
+without guessing network paths. When a chosen provider was republished after the
+session pinned the library, the picker offers **Use the latest published
+library**: it re-reads this site's index and adopts it only if every provider
+already frozen in the session keeps its revision; otherwise reopen the diagram.
 
 Agent and UI authoring use the same contract. The headless
 `planAddTopologyImport(text, raw, sectionIndex, reference, context)` in
@@ -227,17 +234,21 @@ The optional localhost helper uses the same pinned-provider preparation before
 its automatic acceptance, retaining its exact-current-revision requirement and
 one Undo transaction. It does not merge stale proposals or open a review dialog.
 
-A brand-new or local draft uses the same picker. Choose **Connect repository
-catalog** to explicitly pin the deployed v3 index, then browse approved providers
-normally. The connection is retained even if you close the picker without adding
-a reference, and a previously blocked agent proposal is checked again against it.
-The Workbench gives the draft a session-only consumer identity for
-resolution; browser recovery retains it, but it is never written into the
-document. Local provider files are deliberately unsupported.
+A brand-new or local draft uses the same picker. On a deployed site the picker
+pins this site's v3 index when it opens; there is no connect step. The pin is
+retained even if you close the picker without adding a reference. Only diagrams
+whose index entry names at least one export are offered. The Workbench gives the
+draft a session-only consumer identity for resolution; browser recovery retains
+it, but it is never written into the document. A site without a published
+library (404, a version 1 or 2 index, or an offline `file://` editor) explains
+that referenced topology is unavailable there; local exports still work. Local
+provider files are deliberately unsupported. Agent proposals that add a
+reference pin the same index during review, so an agent never receives an
+instruction that only a human at the UI could follow.
 
-Opening a local JSON file from Welcome or **File → open…**, or opening/resuming
-an agent diagram folder, also prepares its topology context,
-without requiring a Canon visit or a separate picker connection. It reuses an
+Opening or pasting a local JSON file from Welcome, **File → open…**, typing a
+reference into the JSON source, or opening/resuming an agent diagram folder, also
+prepares its topology context without requiring a Canon visit. It reuses an
 applicable frozen snapshot, including a complete backend snapshot without a
 catalog. If new providers need a catalog and none is pinned, it pins this site's
 approved v3 catalog while retaining all frozen provider bytes. Missing providers

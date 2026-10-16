@@ -218,8 +218,8 @@ test('Add to step gives imported nodes and edges the same emphasis as local memb
    C1 paste | Welcome paste of a consumer with topologyImports | editor renders notify::dispatch; source stays authored | "open this authored spec from Canon" refusal
    C2 JSON edit | blank draft, typed topologyImports in #src | board renders the imported node; source unchanged | the Topology editor error with no acquisition
    E1 redeploy | provider republished after pin | status names revision mismatch; #topology-refresh visible; after click providers load and insertion works | a dead end that only offers "reopen"
-   U1 no library | diagrams.json answers 404 | #topology-connect absent; status says no published diagram library and names no control; provider select disabled; no spec request | a Connect/Retry control or an instruction aimed at a human
-   U2 offline | workbench opened from file:// | status explains the offline editor has no published library; zero http(s) requests | guessing a network path offline */
+   U1 no library | diagrams.json answers 404 | #topology-connect absent; #topology-refresh hidden; status says no published diagram library and names no control; provider select disabled; no spec request | a Connect/Retry/refresh control or an instruction aimed at a human
+   U2 offline | workbench opened from file:// | #topology-connect absent; #topology-refresh hidden; status explains the offline editor has no published library; zero http(s) requests | guessing a network path offline */
 test('a brand-new local diagram on a deployed site browses providers automatically and persists only its reference',async({page,server})=>{
   const indexRequests=[];page.on('request',request=>{if(request.url().endsWith('/diagrams.json'))indexRequests.push(request.url());});
   await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
@@ -304,7 +304,7 @@ test('a workbench without a published diagram library explains that referenced t
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
   const before=await page.locator('#src').inputValue();await openTopology(page);
-  await expect(page.locator('#topology-connect')).toHaveCount(0);
+  await expect(page.locator('#topology-connect')).toHaveCount(0);await expect(page.locator('#topology-refresh')).toBeHidden();
   await expect(page.locator('#topology-status')).toContainText('no published diagram library');
   await expect(page.locator('#topology-status')).not.toContainText(/Connect|button/);
   await expect(page.locator('#topology-provider')).toBeDisabled();await expect(page.locator('#topology-add')).toBeDisabled();
@@ -315,7 +315,7 @@ test('an offline workbench opened from file:// explains that referenced topology
   const requests=[];page.on('request',request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
   await page.goto('file://'+server.root+'/workbench.html');await page.locator('#welcome-new').click();
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
-  await openTopology(page);await expect(page.locator('#topology-connect')).toHaveCount(0);
+  await openTopology(page);await expect(page.locator('#topology-connect')).toHaveCount(0);await expect(page.locator('#topology-refresh')).toBeHidden();
   await expect(page.locator('#topology-status')).toContainText('deployed');await expect(page.locator('#topology-status')).toContainText('no published diagram library');
   await expect(page.locator('#topology-provider')).toBeDisabled();await expect(page.locator('#topology-add')).toBeDisabled();
   await page.keyboard.press('Escape');expect(requests).toEqual([]);

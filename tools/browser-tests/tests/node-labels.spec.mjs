@@ -1,5 +1,8 @@
-import {test,expect} from '../helpers/test.mjs';
-import {readFile} from 'node:fs/promises';
+import {test,expect,chooseNavigation} from '../helpers/test.mjs';
+import {readFile,writeFile,copyFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
 
 const canon=JSON.parse(await readFile(new URL('../../../examples/canon/specs/doorbell.json',import.meta.url),'utf8'));
 async function openCanon(page,server,spec=canon){
@@ -87,4 +90,114 @@ for(const skin of ['pastel','aurora'])test(`dense ${skin} lane titles stay bound
     await expectContainedTitles(reader);
     await expectWordSeparator(reader);
   }
+});
+
+/* #549 — node labels in standalone pages, every routing, every Tab.
+   row | fixture | assertion (scoped) | rejects
+   1 truncated title: hover | long titles, default+lane routing | node's own <title> child == authored title | ellipsis with no tooltip; tooltip only on lane boards
+   2 truncated title: AT | same | that node's .t1 aria-label == authored title; shown text != title ⇒ ends in … | silent clipping; label lost to screen readers
+   3 subtitle inside card | long subs, link + detail trigger, small float card | .t2 rect within its own .card rect | subtitle drawn past the card edge (Backstage "hosted by Flowview service")
+   4 truncated subtitle exposed | same | .t2 aria-label and .t2>title == authored sub | subtitle cut without full text
+   5 link icon clear of title | link/backref/drill controls on every card | each title line rect ∩ that node's control rects = ∅ | ↗ over the title; titles fitted while the Tab was hidden
+   6 subtitle clear of controls | detail trigger on a subtitled card | .t2 rect ∩ detail/link rects = ∅ | subtitle under ⊞
+   7 hidden Tab | lane board in a second Tab, hidden at load | rows 1-6 after a real Tab click | measuring at display:none (zero widths)
+   8 fixture discriminates | per board | ≥1 wrapped title, ≥1 truncated title, ≥1 truncated subtitle | vacuous pass on short labels
+   9 Backstage example | committed docs/diagrams/backstage/backstage.html, every Tab | rows 1-6, truncated titles < 3 (3 on its Overview board today) | stale generated page; regressions in the shipped example */
+async function expectBoundedLabels(board,authored){
+  return board.locator('.node').evaluateAll((nodes,authored)=>{
+    const overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
+    const inside=(a,b)=>a.left>=b.left-1&&a.right<=b.right+1&&a.top>=b.top-1&&a.bottom<=b.bottom+1;
+    const shown=el=>Array.from(el.childNodes).filter(n=>n.nodeName!=='title').map(n=>n.textContent).join('');
+    const report={failures:[],wrapped:0,truncatedTitles:0,truncatedSubs:0};
+    nodes.forEach(node=>{
+      const cardEl=node.querySelector(':scope>.card'),t1=node.querySelector(':scope>.t1'),id=node.dataset.dvNode;
+      if(!cardEl||!t1)return;const card=cardEl.getBoundingClientRect();if(!card.width)return;
+      const want=authored[id];if(!want){report.failures.push(id+': not authored');return;}
+      const fail=msg=>report.failures.push(id+': '+msg);
+      const tip=node.querySelector(':scope>title');
+      if(!tip||tip.textContent!==want.title)fail('hover title is '+JSON.stringify(tip&&tip.textContent));
+      if(t1.getAttribute('aria-label')!==want.title)fail('t1 aria-label is '+JSON.stringify(t1.getAttribute('aria-label')));
+      const text=shown(t1);if(text!==want.title){if(!/…$/.test(text))fail('title cut without ellipsis: '+text);else report.truncatedTitles++;}
+      const controls=Array.from(node.querySelectorAll('.nlink circle,.nbackref circle,.detail-trigger rect'),el=>el.getBoundingClientRect());
+      const sub=node.querySelector(':scope>.t2'),subBox=sub&&shown(sub)?sub.getBoundingClientRect():null;
+      const lines=Array.from(t1.querySelectorAll('tspan'));if(lines.length>1)report.wrapped++;if(!lines.length)lines.push(t1);
+      lines.forEach(line=>{const box=line.getBoundingClientRect();
+        if(!inside(box,card))fail('title line outside card: '+line.textContent);
+        if(controls.some(c=>overlap(box,c)))fail('title line under a control: '+line.textContent);
+        if(subBox&&overlap(box,subBox))fail('title line over subtitle: '+line.textContent);});
+      if(subBox){
+        if(!inside(subBox,card))fail('subtitle outside card: '+shown(sub));
+        if(controls.some(c=>overlap(subBox,c)))fail('subtitle under a control: '+shown(sub));
+        if(shown(sub)!==want.sub){
+          report.truncatedSubs++;
+          if(!/…$/.test(shown(sub)))fail('subtitle cut without ellipsis: '+shown(sub));
+          if(sub.getAttribute('aria-label')!==want.sub)fail('t2 aria-label is '+JSON.stringify(sub.getAttribute('aria-label')));
+          const subTip=sub.querySelector(':scope>title');if(!subTip||subTip.textContent!==want.sub)fail('subtitle hover is '+JSON.stringify(subTip&&subTip.textContent));
+        }
+      }
+    });
+    return report;
+  },authored);
+}
+const authoredOf=diagram=>Object.fromEntries(Object.entries(diagram.nodes).map(([id,n])=>[id,{title:n.title||id,sub:n.sub||''}]));
+
+const overflowNodes={
+  a:{title:'Notification delivery coordinator service',sub:'hosted by Flowview service with retries',link:'https://example.test/a'},
+  b:{title:'GitHub Actions',sub:'source drift scanner',link:'https://example.test/b'},
+  c:{title:'Catalog adapter',sub:'server-side credentials and policy',link:'https://example.test/c'},
+  d:{title:'Recording service',sub:'immutable source comparison text'},
+  e:{title:'NotificationDeliveryCoordinatorWithAnExtremelyLongName',sub:'x'}};
+const freeDiagram={autoplay:false,nodes:{...overflowNodes,
+    c:{...overflowNodes.c,detail:{section:'child',mode:'focus'}},
+    f:{title:'Float observer with a long name',sub:'hosted by Flowview service',link:'https://example.test/f'}},
+  rows:[['a','b','c'],['d','e']],floats:[{id:'f',side:'below'}],
+  edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'a',to:'d'},{from:'d',to:'e'},{from:'e',to:'f'}]};
+const laneDiagram={autoplay:false,routing:'lanes',nodes:overflowNodes,rows:[['a','b','c','d','e']],
+  edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'d'},{from:'d',to:'e'}]};
+const overflowPage={page:{title:'Label overflow',blocks:[{tabs:[
+  {label:'Default',sections:[{id:'free',heading:'Default routing',diagram:freeDiagram},
+    {id:'child',heading:'Child',detailOnly:true,diagram:{nodes:{n:{title:'Worker'}},rows:[['n']]}}]},
+  {label:'Lanes',sections:[{id:'lanes',heading:'Lane routing',diagram:laneDiagram}]}]}]}};
+
+for(const width of [1440,1280])test(`standalone node labels stay inside cards and expose full text in every routing and Tab at ${width}px`,async({page,server},info)=>{
+  await page.setViewportSize({width,height:900});
+  const input=path.join(server.root,'label-overflow.json'),output=path.join(server.root,'label-overflow.html');
+  await writeFile(input,JSON.stringify(overflowPage));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/label-overflow.html');await page.evaluate(()=>document.fonts.ready);
+  const root=page.locator('#docview'),nav=root.locator('.explore-navigation').first();
+  const free=root.locator('#section-free .boardcanvas>svg'),lanes=root.locator('#section-lanes .boardcanvas>svg');
+  await expect(free).toBeVisible();await expect(lanes).toBeHidden();
+  await expect(free.locator('[data-dv-node="c"] .detail-trigger')).toBeVisible();
+  for(const [board,diagram,name] of [[free,freeDiagram,'free'],[lanes,laneDiagram,'lanes']]){
+    if(name==='lanes'){await chooseNavigation(nav,'Tab','Lanes');await expect(lanes).toBeVisible();}
+    await expect(board.locator('.node')).toHaveCount(Object.keys(diagram.nodes).length);
+    const report=await expectBoundedLabels(board,authoredOf(diagram));
+    await board.screenshot({path:info.outputPath(`overflow-${name}-${width}.png`)});
+    expect(report.failures,name+' labels fit their cards and expose full text').toEqual([]);
+    expect(report.wrapped,name+' fixture wraps a title').toBeGreaterThan(0);
+    expect(report.truncatedTitles,name+' fixture truncates a title').toBeGreaterThan(0);
+    expect(report.truncatedSubs,name+' fixture truncates a subtitle').toBeGreaterThan(0);
+  }
+});
+
+test('the shipped Backstage example keeps labels inside cards on every Tab',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});
+  const spec=JSON.parse(await readFile(path.join(repo,'docs/diagrams/backstage/backstage.spec.json'),'utf8'));
+  await copyFile(path.join(repo,'docs/diagrams/backstage/backstage.html'),path.join(server.root,'backstage-example.html'));
+  await page.goto(server.origin+'/backstage-example.html');await page.evaluate(()=>document.fonts.ready);
+  const root=page.locator('#docview'),nav=root.locator('.explore-navigation').first();
+  let truncated=0;
+  for(const [index,tab] of spec.page.blocks[0].tabs.entries()){
+    if(index)await chooseNavigation(nav,'Tab',tab.label);
+    for(const section of tab.sections.filter(s=>s.diagram)){
+      const board=root.locator('.doc-sec:visible .boardcanvas>svg').filter({has:page.locator(`[data-dv-node="${Object.keys(section.diagram.nodes)[0]}"]`)}).first();
+      await expect(board).toBeVisible();
+      const report=await expectBoundedLabels(board,authoredOf(section.diagram));
+      await board.screenshot({path:info.outputPath(`backstage-${index}.png`)});
+      expect(report.failures,tab.label+' labels fit their cards and expose full text').toEqual([]);
+      truncated+=report.truncatedTitles;
+    }
+  }
+  expect(truncated,'fewer truncated titles than the 3 on the shipped Overview board').toBeLessThan(3);
 });

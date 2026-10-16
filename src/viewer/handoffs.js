@@ -9,7 +9,7 @@ function handoffNodeContent(node, position, id, prefix, options){
   var interactive=action && (action.kind==='internal' || action.kind==='choose');
   var title=node.title || id, available=!!(href || destination || interactive);
   var hint=available?(action && action.kind==='choose'?'Choose destination for '+title:'Open '+title+' diagram'+(local?' in this spec':action && action.kind==='internal'?' in Backstage':' (new tab)')):local?'Diagram destination unavailable. Choose an existing diagram section.':'Diagram destination unavailable. Set a spec ID with known destinations or configure the host diagram resolver.';
-  var caption=available?(local?'CONTINUE →':action.kind==='choose'?'CHOOSE DESTINATION':action.kind==='internal'?'OPEN DIAGRAM →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
+  var caption=available?(local?'CONTINUE →':action.kind==='choose'?'OPEN DIAGRAM…':action.kind==='internal'?'OPEN DIAGRAM →':'OPEN DIAGRAM ↗'):'DESTINATION UNAVAILABLE';
   var max=Math.max(10,Math.floor((w-tip-22)/6.6));
   var chars=Array.from(title),shown=chars.length>max?chars.slice(0,max-1).join('')+'…':title;
   var outline='M10 0H'+(w-tip)+'L'+w+' '+(h/2)+'L'+(w-tip)+' '+h+'H10Q0 '+h+' 0 '+(h-10)+'V10Q0 0 10 0Z';
@@ -172,7 +172,23 @@ function wireExternalHandoffs(ctl,options){
     var status=document.createElement('p');status.setAttribute('role','status');status.textContent=message;panel.appendChild(status);
     action.destinations.forEach(function(item){var link=document.createElement('a');link.className='mbtn';link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.label+' ↗';panel.appendChild(link);});
     var dismiss=document.createElement('button');dismiss.type='button';dismiss.className='mbtn';dismiss.textContent='Close';dismiss.addEventListener('click',function(){close(true);});panel.appendChild(dismiss);
-    ctl.view.appendChild(panel);panel.focus({preventScroll:true});
+    ctl.view.appendChild(panel);place();panel.focus({preventScroll:true});
+  }
+  // Beside the clicked node (below, else above, else alongside), kept inside its
+  // diagram. A transformed host ancestor can offset fixed positioning, so measure
+  // the panel's origin and size at 0,0 and pin that width before moving it.
+  function place(){
+    if(!panel || !trigger || !trigger.isConnected)return;
+    panel.style.left='0px';panel.style.top='0px';panel.style.width='';
+    var origin=panel.getBoundingClientRect(),w=origin.width,h=origin.height;panel.style.width=w+'px';
+    var r=trigger.getBoundingClientRect(),area=(trigger.closest('.board') || ctl.view).getBoundingClientRect();
+    var left=Math.max(area.left,8),top=Math.max(area.top,8),right=Math.min(area.right,window.innerWidth-8),bottom=Math.min(area.bottom,window.innerHeight-8);
+    var gap=8,x=r.left+r.width/2-w/2,y=r.bottom+gap;
+    if(y+h>bottom){
+      if(r.top-gap-h>=top)y=r.top-gap-h;
+      else {y=r.top+r.height/2-h/2;x=r.right+gap+w<=right?r.right+gap:r.left-gap-w;}
+    }
+    panel.style.left=Math.max(left,Math.min(right-w,x))-origin.left+'px';panel.style.top=Math.max(top,Math.min(bottom-h,y))-origin.top+'px';
   }
   function follow(event){
     var target=event.target.closest && event.target.closest('[data-dv-external-handoff]');
@@ -191,5 +207,6 @@ function wireExternalHandoffs(ctl,options){
   }
   function escape(event){if(panel && event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true);}}
   ctl.view.addEventListener('click',follow);ctl.view.addEventListener('keydown',follow);ctl.view.addEventListener('keydown',escape);
-  return {destroy:function(){disposed=true;close(false);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);ctl.view.removeEventListener('keydown',escape);}};
+  document.addEventListener('scroll',place,true);window.addEventListener('resize',place);
+  return {destroy:function(){disposed=true;close(false);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);ctl.view.removeEventListener('keydown',escape);document.removeEventListener('scroll',place,true);window.removeEventListener('resize',place);}};
 }

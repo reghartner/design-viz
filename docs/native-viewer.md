@@ -160,7 +160,9 @@ integration supplies this callback and bounded retained-view history. It uses
 approved metadata plus the existing pinned `SpecLoader`, never `loadDetail` or a
 reference URL. See [Backstage wiring](../apps/backstage/README.md#diagram-handoffs-in-200).
 
-A missing current-host destination opens a chooser of saved alternatives. Reader
+A missing current-host destination is captioned **OPEN DIAGRAM…** and opens a
+chooser of saved alternatives beside the clicked node, inside its diagram. An
+endpoint with no destination is drawn dashed and announced as unavailable. Reader
 Contents links remain explicit. Unknown standalone pages offer known destinations
 for deliberate selection. External handoffs require `spec`; `handoff.url` is rejected.
 Standalone boot accepts `window.flowviewHandoffHost` set before boot. Otherwise,

@@ -3821,6 +3821,9 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
 .node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
 .node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
+/* Unreachable endpoints read as disabled whatever the step highlight. */
+.node-handoff .handoff-unavailable{cursor:not-allowed;}
+.node-handoff .handoff-unavailable .card{stroke-dasharray:4 3;fill-opacity:.6;}
 
 /* Authored step-circle colors intentionally override every skin, hover and path
    palette. Keep the current-step ring, keyboard focus and shared-step opacity. */
@@ -3922,5 +3925,5 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
  body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .t2{fill:var(--fl-muted);}
 }
 
-.handoff-destinations{position:fixed;z-index:10000;inset:auto 24px 24px auto;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
+.handoff-destinations{position:fixed;z-index:10000;left:24px;top:24px;box-sizing:border-box;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
 .handoff-destinations p{flex-basis:100%;margin:0 0 8px;font:14px/1.5 system-ui,sans-serif;}

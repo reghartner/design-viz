@@ -394,12 +394,13 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 // 3   | ?diagram=team.delivery_v2 (dots/underscore)          | #canon-reader-title "Team delivery v2"; Edit enabled; #welcome-link-error hidden                          | a stricter ID check that drops legal canon/document-link IDs
 // 4   | ?diagram=Ops.Delivery-2 (mixed case, hyphen)         | #canon-reader-title "Ops delivery 2"; Edit enabled; #welcome-link-error hidden                            | case-folding or lower-case-only checks
 // 4b  | ?diagram=2024.q3-review_1 (digit-leading)            | #canon-reader-title "Q3 review"; Edit enabled; #welcome-link-error hidden                                 | a letter-first shape check
+// 4d  | ?diagram=7 (one character, the shortest legal ID)    | #canon-reader-title "Seven"; Edit enabled; #welcome-link-error hidden                                    | a minimum-length check
 // 4c  | ?diagram=<200-character ID> (library maximum)        | #canon-reader-title "Longest ID"; Edit enabled; #welcome-link-error hidden                                | a length cap below the library's 200
 // 5   | ?diagram=team%2Edelivery%5Fv2 (percent-encoded)      | #canon-reader-title "Team delivery v2"                                                                    | matching the raw query bytes instead of the decoded value
 // 6   | ?layout=backstage&diagram=delivery#d=delivery&p=failed (other query + deep-link fragment) | #canon-reader-title "Reviewed delivery"; #welcome-link-error hidden                  | extra parameters or a fragment breaking the link
 // 7   | row 2, real click on #canon-reader-edit              | #workbench-workspace visible                                                                              | a reader with a dead Edit action
 // 8   | ?diagram=never-published                             | #welcome-home visible; #welcome-link-error visible and names “never-published”; #canon-reader-title hidden; body not .canon-reader-active; #workbench-workspace hidden; #welcome-{paste,new,agent,library,reader}-screen each hidden | the old reader error screen; an error that does not name the value; an editor opened
-// 9   | row 8, every Welcome home action (#welcome-agent, tour, #welcome-example-expand, #welcome-catalog, #welcome-paste, #welcome-open, #welcome-new, #welcome-library, #welcome-agent-prompt) | each is visible, enabled and the top element at its own centre (not covered by the message); real clicks on #welcome-paste, #welcome-new, #welcome-library, #welcome-agent-prompt each open their own screen | an error state that hides, disables or covers any Welcome action
+// 9   | row 8, every Welcome home action (#welcome-agent, tour, #welcome-example-expand, #welcome-catalog, #welcome-paste, #welcome-open, #welcome-new, #welcome-library, #welcome-agent-prompt) | each is visible, enabled and the top element at its own centre (not covered by the message); real clicks on each, from a fresh unknown-link landing, reach its own destination: paste/new/library/agent screens; #welcome-agent → #workbench-workspace; tour and #welcome-example-expand → dialog.workbench-tour-host open; #welcome-catalog → #catalog-picker open; #welcome-open (stubbed native picker returning the fixture file) → #src holds that file | an error state that hides, disables or covers any Welcome action
 // 10  | ?diagram=https://evil.example/x.spec.json            | as row 8, and #welcome-link-error text equals row 8's text with the value substituted                    | a separate refusal path that looks different from unknown
 // 11  | ?diagram=//evil.example/x.spec.json                  | as row 10                                                                                                 | protocol-relative addresses handled differently
 // 12  | ?diagram=diagrams/delivery/delivery.spec.json        | as row 10                                                                                                 | same-origin paths handled differently
@@ -413,20 +414,27 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 test('a ?diagram= link opens one published diagram read-only, and unknown values land on Welcome with a message naming them',async({page,server})=>{
   const data=library();
   const longId='L'+'o'.repeat(198)+'9';
-  for(const [id,title] of [['team.delivery_v2','Team delivery v2'],['Ops.Delivery-2','Ops delivery 2'],['2024.q3-review_1','Q3 review'],[longId,'Longest ID']]){
+  for(const [id,title] of [['team.delivery_v2','Team delivery v2'],['Ops.Delivery-2','Ops delivery 2'],['2024.q3-review_1','Q3 review'],['7','Seven'],[longId,'Longest ID']]){
     const entry=library().diagrams[0];entry.id=id;entry.title=title;entry.spec.page.title=title;entry.spec.page.canon.id=id;data.diagrams.push(entry);
   }
   await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   const foreign=[],specFetches=[];
   await page.route('**://evil.example/**',route=>{foreign.push(route.request().url());return route.fulfill({json:{}});});
   page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('delivery.spec.json'))specFetches.push(request.url());});
+  // Native file picker stand-in, as in working-file.spec.mjs: returns the fixture spec.
+  await page.addInitScript(({source})=>{
+    window.showOpenFilePicker=async()=>{
+      const root=await navigator.storage.getDirectory(),handle=await root.getFileHandle('linked.spec.json',{create:true});
+      const stream=await handle.createWritable();await stream.write(source);await stream.close();return [handle];
+    };
+  },{source});
   await page.setViewportSize({width:1440,height:900});
   const home=page.locator('#welcome-home'),linkError=page.locator('#welcome-link-error'),title=page.locator('#canon-reader-title');
   const edit=page.locator('#canon-reader-edit'),workspace=page.locator('#workbench-workspace');
   await page.goto(server.origin+'/workbench.html');
   await expect(home).toBeVisible();await expect(linkError).toBeHidden();await expect(title).toBeHidden();
   for(const [query,expected] of [['?diagram=delivery','Reviewed delivery'],['?diagram=team.delivery_v2','Team delivery v2'],['?diagram=Ops.Delivery-2','Ops delivery 2'],
-    ['?diagram=2024.q3-review_1','Q3 review'],['?diagram='+longId,'Longest ID'],['?diagram=team%2Edelivery%5Fv2','Team delivery v2'],['?layout=backstage&diagram=delivery#d=delivery&p=failed','Reviewed delivery']]){
+    ['?diagram=2024.q3-review_1','Q3 review'],['?diagram=7','Seven'],['?diagram='+longId,'Longest ID'],['?diagram=team%2Edelivery%5Fv2','Team delivery v2'],['?layout=backstage&diagram=delivery#d=delivery&p=failed','Reviewed delivery']]){
     await page.goto(server.origin+'/workbench.html'+query);
     await expect(title).toHaveText(expected);await expect(edit).toBeEnabled();await expect(edit).toHaveText('Edit in Workbench →');
     await expect(workspace).toBeHidden();await expect(linkError).toBeHidden();
@@ -446,9 +454,11 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
     const action=page.locator(selector);await expect(action).toBeVisible();await expect(action).toBeEnabled();
     expect(await action.evaluate(el=>{el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!top && el.contains(top);}),selector).toBe(true);
   }
-  for(const [action,target] of [['#welcome-paste','#welcome-paste-screen'],['#welcome-new','#welcome-new-screen'],['#welcome-library','#welcome-library-screen'],['#welcome-agent-prompt','#welcome-agent-screen']]){
+  for(const [action,target] of [['#welcome-paste','#welcome-paste-screen'],['#welcome-new','#welcome-new-screen'],['#welcome-library','#welcome-library-screen'],['#welcome-agent-prompt','#welcome-agent-screen'],
+    ['#welcome-agent','#workbench-workspace'],['#welcome-home [data-workbench-tour]','dialog.workbench-tour-host'],['#welcome-example-expand','dialog.workbench-tour-host'],['#welcome-catalog','#catalog-picker'],['#welcome-open','#workbench-workspace']]){
     if(action!=='#welcome-paste')await landsOnWelcome('never-published');
-    await page.locator(action).click();await expect(page.locator(target)).toBeVisible();await expect(home).toBeHidden();
+    await page.locator(action).click();await expect(page.locator(target),action).toBeVisible();
+    if(action==='#welcome-open')await expect(page.locator('#src')).toHaveValue(source);
   }
   for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json',''])
     expect(await landsOnWelcome(value)).toBe(unknown.replace('never-published',value));

@@ -56,11 +56,19 @@ async function setup(page){
   return {folder,requests,errors,writes,readGate:gate=>readGate=gate,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
     read:async name=>JSON.parse(await readFile(path.join(sessionFolder,name),'utf8')),
     run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
+    // The agent registers a request from its own conversation; begin waits for the editor.
+    begin:text=>new Promise((resolve,reject)=>{
+      const child=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'begin','--text',text],{cwd:folder,stdio:['ignore','pipe','pipe']});let out='',err='';
+      child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);child.on('close',code=>code===0?resolve(JSON.parse(out)):reject(Error(err || 'begin exited '+code)));
+    }),
     listen:async()=>{
       await expect(page.locator('#folder-agent-copy')).toBeEnabled();
       await expect.poll(()=>sessionFolder).toBeTruthy();
       await expect.poll(async()=>{try{return JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;}catch{return null;}}).toBeTruthy();
-      if(!listener || listener.exitCode!==null)listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});
+      // A renewed session retires the old watcher; start one for the current connection.
+      const connection=JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;
+      if(listener && listener.exitCode===null && listener.connection!==connection){listener.kill();await new Promise(resolve=>listener.once('close',resolve));}
+      if(!listener || listener.exitCode!==null){listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});listener.connection=connection;}
       await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
     },
     cleanup:async()=>{listener?.kill();if(listener && listener.exitCode===null)await new Promise(resolve=>listener.once('close',resolve));await rm(folder,{recursive:true,force:true});}};
@@ -90,10 +98,10 @@ async function expectWorkbenchCanvas(page){
   const metrics=await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0}));expect(metrics.top).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84+metrics.inset,y:metrics.top,width:viewport.width-96-metrics.inset,height:viewport.height-metrics.top-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
 }
-async function copyRequest(page,text){
-  await openAgent(page);
-  await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
-  await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
+async function askAgent(page,h,text){
+  const begun=await h.begin(text),request=await h.read('request.json');expect(request.id).toBe(begun.id);
+  await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
+  return request;
 }
 async function connectExternal(page){
   await openAgent(page);await page.locator('#folder-agent-open-setup').click();
@@ -307,7 +315,7 @@ for(const failure of ['catalog','missing provider','provider revision'])test('fo
 });
 async function finishCopiedRequest(page,h){
   const request=await h.read('request.json');h.run('reply','--request',request.id,'--text','Ready for the next request.');
-  await expect(page.locator('#folder-agent-cancel')).toBeHidden();
+  await expect(page.locator('#folder-agent-working')).toBeHidden();
 }
 async function chooseFolder(page){
   if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
@@ -380,12 +388,9 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(prompt).toContain('relative to your current working directory');
     expect(prompt).toContain(manifest.sessionId);expect(prompt).toContain(manifest.connectionId);
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
-    await expect(page.locator('#folder-agent-context')).toContainText('a');
     await closeGuide(page);await expect(page.locator('#folder-agent-send')).toBeDisabled();await h.listen();await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await publishedRequest(h,'Tell the customer story');expect(request.selection[0].id).toBe('a');
     expect(request.technicalLevel).toBe('story');
-    await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');
-    expect(await h.read('request.json')).toEqual(request); // This control configures the next request only.
     // Simulated agent asks a real protocol question; text must stay inert.
     await writeFile(path.join(h.session,'answer.txt'),'What should the customer learn? <img src=x onerror=alert(1)>');
     h.run('reply','--request',request.id,'--file','answer.txt');
@@ -394,7 +399,7 @@ test('editor conversation uses real local files and helper; changes render with 
     await closeGuide(page);await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(3);
     const next=await publishedRequest(h,'They can receive camera updates.'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
-    expect(next.technicalLevel).toBe('engineering');
+    expect(next.technicalLevel).toBe('story'); // Detail comes from the setup focus; there is no per-message control.
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
     await page.locator('#folder-agent-input').focus(); // Composer focus must allow diagram updates.
     await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
@@ -657,7 +662,7 @@ test('ordinary folder selection refuses an active owner, then reconnects saved s
     await closeGuide(page);await expect(page.locator('#folder-agent-messages')).toContainText('The saved folder conversation is ready to continue.');
     await expect(page.locator('#folder-agent-messages')).toContainText('Keep this pending request without replaying it');
     await expect(page.locator('#folder-agent-messages article').filter({hasText:'Keep this pending request without replaying it'})).toHaveCount(1);
-    await expect(page.locator('#folder-agent-cancel')).toBeHidden();expect((await h.read('request.json')).id).toBe(staleRequest.id);
+    await expect(page.locator('#folder-agent-working')).toBeHidden();expect((await h.read('request.json')).id).toBe(staleRequest.id);
     await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
     await page.locator('#editor-tab-agent').focus();await page.keyboard.press('Control+z');await expect(page.locator('#src')).toHaveValue(savedSource);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
@@ -759,7 +764,9 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
   const h=await setup(page);
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
+    // Beta keeps a composer draft; copy & paste has no composer.
+    await openAgent(page);await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
     await page.locator('#editor-tab-inspect').click();
     await expect(page.locator('#editor-agent')).toBeVisible();await expect(page.locator('#editor-inspect')).toBeVisible();
     const before=await page.locator('#src').inputValue(),win=page.locator('#workspace-window-agent'),grip=win.locator('.workspace-window-grip');
@@ -802,12 +809,11 @@ test('diagram itself fills the browser and pans and zooms without editing source
   }finally{await page.close();await h.cleanup();}
 });
 
-test('agent context hides until pairing and names the selection and freezes it beside the sent message',async({page})=>{
+test('Beta Send captures the selection and freezes it beside the sent message',async({page})=>{
   const h=await setup(page);
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('[data-dv-node="a"]').first().click();await page.locator('#editor-tab-agent').click();
-    await expect(page.locator('#folder-agent-context')).toBeHidden();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     await closeGuide(page);await h.listen();await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
@@ -817,7 +823,6 @@ test('agent context hides until pairing and names the selection and freezes it b
     h.run('progress','--request',request.id,'--text','Reading the selected doorbell.');
     await expect(page.locator('#editor-tab-agent')).toHaveAttribute('aria-label','Agent · Claude working');
     await page.locator('#editor-tab-agent').click();
-    await expect(page.locator('#folder-agent-context')).toContainText('Backend');
     await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
     expect((await h.read('request.json')).selection[0].label).toBe('Doorbell');
     expect(h.errors).toEqual([]);
@@ -883,10 +888,11 @@ test('full-document reviewed apply, exact receipt Undo and cancelled late propos
     await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
     h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Rename one service');
     await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
-    await page.locator('#folder-agent-review-accept').click();await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe('applied');
+    await page.locator('#agent-update-open').click();await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe('applied');
     await expect(page.locator('#src')).toHaveValue(/Delivery service/);h.run('reply','--request',request.id,'--text','Renamed the service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await page.getByRole('button',{name:'Undo change',exact:true}).click();await expect(page.locator('#src')).toHaveValue(original);
-    const cancelled=await send('This turn will be stopped'),state=await h.read('state.json');await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    const cancelled=await send('This turn will be stopped'),state=await h.read('state.json');await openAgent(page);await page.locator('#folder-agent-reestablish').click();
+    await expect(page.locator('#folder-agent-handoff')).toBeVisible();await h.listen();await expect(page.locator('#folder-agent-send')).toBeEnabled();
     const manifest=await h.read('session.json');await writeFile(path.join(h.session,'proposal.json'),JSON.stringify({...manifest,id:'late-cancelled',requestId:cancelled.id,baseRevision:state.revision,source:original.replace('Doorbell','Wrong old reply')}));
     await send('Keep this new turn separate');await expect(page.locator('#folder-agent-messages')).toContainText('Keep this new turn separate');await expect(page.locator('#src')).toHaveValue(original);
     // Switching projects must retire both pending work and old conversation receipts.
@@ -909,20 +915,18 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#folder-agent-copy').click();
     await expect(page.locator('#folder-agent-guide')).not.toBeVisible();await expect(page.locator('#editor-agent')).toBeVisible();
     await openAgent(page);await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
-    await expect(page.locator('#folder-agent-send')).toHaveText('Copy request');expect((await h.read('session.json')).workflow).toBe('external');
+    await expect(page.locator('#folder-agent-send')).toBeHidden();expect((await h.read('session.json')).workflow).toBe('external');
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);
-    await copyRequest(page,'Build the delivery story. Reference: docs/delivery.md');
-    const copied=await page.evaluate(()=>navigator.clipboard.readText()),request=await h.read('request.json');
-    expect(copied).toContain(request.id);expect(copied).toContain('docs/delivery.md');expect(request.delivery).toBe('clipboard');expect(request.replySurface).toBe('agent');
-    await page.locator('#folder-agent-send').click();expect((await h.read('request.json')).id).toBe(request.id);
+    const request=await askAgent(page,h,'Build the delivery story. Reference: docs/delivery.md');
+    expect(request.text).toContain('docs/delivery.md');expect(request.delivery).toBe('native');expect(request.replySurface).toBe('agent');
     const base=await h.read('state.json');await writeFile(path.join(h.session,'candidate.spec.json'),source);
     await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
     h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json','--summary','Delivery story');
     await expect(page.locator('#agent-update-open')).toBeVisible();await expect(page.locator('#src')).toHaveValue(base.source);
     await expect(page.locator('#folder-agent-stage')).toHaveText('Ready for your review');
-    await expect(page.locator('#folder-agent-review-accept')).toBeVisible();
+    await expect(page.locator('#folder-agent-review')).toBeVisible();
     await expect(page.locator('#folder-agent-messages')).toBeHidden();
-    expect(h.run('watch','--minutes','.002','--interval','.1')).toBe(''); // Even an optional watcher never dispatches a copied request.
+    expect(h.run('watch','--minutes','.002','--interval','.1')).toBe(''); // Even an optional watcher never dispatches a native request.
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Doorbell');
     await page.screenshot({path:info.outputPath('agent-full-preview.png')});
     await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-view')).toContainText('My story');await expect(page.locator('#agent-update-commit')).toBeDisabled();
@@ -965,7 +969,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     const original=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);
     await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await copyRequest(page,'Rename Backend to Delivery service.');
+    await connectExternal(page);await askAgent(page,h,'Rename Backend to Delivery service.');
     const request=await h.read('request.json'),state=await h.read('state.json');
     diagram.nodes.b.title='Delivery service';const proposed=JSON.stringify(raw,null,2);
     const ledger='# Coverage ledger\n\n'+('The service name changed; the story and paths are preserved.\n'.repeat(100));
@@ -1073,9 +1077,9 @@ test('copy and paste treats the folder as connected without Monitor and keeps co
     await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
     await expect(page.locator('#editor-tab-agent')).toHaveAttribute('aria-label','Agent · Shared folder ready');
     await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
-    const compact=await page.evaluate(()=>({header:document.querySelector('.folder-agent-header').getBoundingClientRect().bottom,composer:document.querySelector('.folder-agent-composer').getBoundingClientRect().top}));
-    expect(Math.abs(compact.composer-compact.header)).toBeLessThan(2);
-    await copyRequest(page,'Explain this selected flow in our agent conversation');const request=await h.read('request.json');
+    // Copy & paste has no composer: requests start in the agent's own conversation.
+    await expect(page.locator('.folder-agent-composer')).toBeHidden();
+    const request=await askAgent(page,h,'Explain this selected flow in our agent conversation');
     await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
     h.run('progress','--request',request.id,'--text','Only the native conversation needs this detailed progress.');
     await expect(page.locator('#folder-agent-activity')).toBeHidden();await expect(page.locator('#folder-agent-messages')).toBeHidden();
@@ -1090,9 +1094,8 @@ test('copy and paste treats the folder as connected without Monitor and keeps co
     h.run('reply','--request',request.id,'--text','This final answer belongs in the native conversation.');
     await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
     await expect(page.locator('#folder-agent-panel-status')).toHaveText('Request finished. Continue in your agent.');
-    await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await expect(page.locator('#folder-agent-send')).toBeHidden();
     await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain this selected flow in our agent conversation');
     // Folder I/O failures still surface, and recovering access restores readiness.
     h.readGate(async()=>{throw Error('Test folder temporarily unavailable');});
     await expect(page.locator('#folder-agent-stage')).toHaveText('Folder access needs attention');
@@ -1131,7 +1134,7 @@ test('an open review refreshes visibly and cannot accept the new version as the 
     await page.setViewportSize({width:1440,height:900});
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await copyRequest(page,'Rename Backend while preserving my other edits.');
+    await connectExternal(page);await askAgent(page,h,'Rename Backend while preserving my other edits.');
     const request=await h.read('request.json'),state=await h.read('state.json'),proposal=source.replace('"Backend"','"Delivery service"');
     await writeFile(path.join(h.session,'candidate.spec.json'),proposal);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nRenamed the delivery service and preserved the rest of the story.\n');
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the delivery service');
@@ -1150,7 +1153,7 @@ test('an open review refreshes visibly and cannot accept the new version as the 
   }finally{await page.close();await h.cleanup();}
 });
 
-test('Connected Agent reuses current node, step and panel selection and preserves one draft',async({page},info)=>{
+test('Connected Copy for agent reuses current node, step and panel selection',async({page},info)=>{
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
@@ -1158,43 +1161,30 @@ test('Connected Agent reuses current node, step and panel selection and preserve
     diagram.nodes.a.codeRefs=[{id:'capture',repository:'https://github.com/example/camera',path:'capture.js',revision:'a'.repeat(40),anchor:{start:'// capture:start',end:'// capture:end'}}];
     const input=JSON.stringify(spec,null,2);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await expect(page.locator('#agent-message-open')).toHaveCount(0);await expect(page.locator('#agent-message-dialog')).toHaveCount(0);
-    await page.locator('[data-dv-node="a"]').click();await openAgent(page);
-    await expect(page.locator('#folder-agent-input')).toBeHidden();
     await connectExternal(page);await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
-    await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
-    await page.locator('#folder-agent-input').fill('Explain the selected item. docs/design.md');
-    await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');
-    await copyRequest(page,'Explain the selected item. docs/design.md');
-    let copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('capture.js');expect(copied).toMatch(/"kind":\s*"node"/);expect(copied).not.toContain(input);expect(copied).not.toContain('"rows"');
     await page.locator('#workspace-window-agent .workspace-window-close').click();
-    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();
-    await page.locator('#workspace-window-steps .workspace-window-close').click();await openAgent(page);
-    await expect(page.locator('#folder-agent-context')).toContainText('step');
-    await finishCopiedRequest(page,h);
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');await copyRequest(page,'Explain the selected item. docs/design.md');
-    copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"kind":\s*"step"/);expect(copied).toMatch(/"steps",\s*1/);
-    await page.locator('#workspace-window-agent .workspace-window-close').click();
+    const quick=page.locator('#folder-agent-selection');
+    await page.locator('[data-dv-node="a"]').click();
     if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
-    await page.locator('#docview [data-dv-panel="0"] .ptitle').first().click();await openAgent(page);
-    await finishCopiedRequest(page,h);await expect(page.locator('#folder-agent-context')).toContainText('Home');await copyRequest(page,'Explain the selected item. docs/design.md');
+    await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
+    let copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('capture.js');expect(copied).toMatch(/"kind":\s*"node"/);expect(copied).not.toContain(input);expect(copied).not.toContain('"rows"');
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();
+    await page.locator('#workspace-window-steps .workspace-window-close').click();
+    await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
+    copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"kind":\s*"step"/);expect(copied).toMatch(/"steps",\s*1/);
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    await page.locator('#docview [data-dv-panel="0"] .ptitle').first().click();
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
     copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"kind":\s*"panel"/);expect(copied).toMatch(/"panels",\s*0/);
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);
     await page.screenshot({path:info.outputPath('unified-agent-copy.png')});
-
-    await page.setViewportSize({width:640,height:360});
-    for(const id of ['folder-agent-input','folder-agent-send']){
-      const control=page.locator('#'+id);await control.scrollIntoViewIfNeeded();
-      expect(await control.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' reachable at short height').toBe(true);
-    }
-    await page.screenshot({path:info.outputPath('unified-agent-short.png')});
-    await page.setViewportSize({width:430,height:920});expect(await page.locator('#editor-agent').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
     await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
 
-test('Copy for agent copies the canvas selection directly and preserves the draft and workflow',async({page},info)=>{
+test('Copy for agent copies the canvas selection directly and preserves the workflow',async({page},info)=>{
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
@@ -1210,17 +1200,13 @@ test('Copy for agent copies the canvas selection directly and preserves the draf
     await page.locator('#docview [data-dv-node="b"]').click({modifiers:['Shift']});
     await expect(quick).toHaveText('Copy for agent · 2 selected');await quick.focus();await page.keyboard.press('Enter');
     copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"nodes",\s*"a"/);expect(copied).toMatch(/"nodes",\s*"b"/);
-    await openAgent(page);await page.locator('#folder-agent-input').fill('Keep this unfinished request private.');
-    await page.locator('#workspace-window-agent .workspace-window-close').click();
     await quick.click();await expect(quick).toHaveText('Copied · 2 selected');
-    expect(await page.evaluate(()=>navigator.clipboard.readText())).not.toContain('Keep this unfinished request private.');
     await expect(page.locator('#editor-agent')).toBeHidden();
     await page.setViewportSize({width:640,height:360});await quick.scrollIntoViewIfNeeded();
     expect(await quick.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node;})).toBe(true);
     await page.screenshot({path:info.outputPath('copy-for-agent-selection.png')});
     await page.setViewportSize({width:1280,height:900});await openAgent(page);
-    await expect(page.locator('#folder-agent-send')).toHaveText('Copy request');
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this unfinished request private.');
+    await expect(page.locator('#folder-agent-send')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -1237,7 +1223,6 @@ test('Copy for agent opens manual copy only on denial and retires a late fallbac
     await expect(preview).toBeVisible();await expect(preview).toBeFocused();
     expect(await preview.inputValue()).toMatch(/"nodes",\s*"a"/);expect(await preview.inputValue()).not.toContain(source);
     expect(await preview.evaluate(node=>node.selectionEnd-node.selectionStart)).toBe((await preview.inputValue()).length);
-    await expect(page.locator('#folder-agent-input')).toHaveValue('');
     await page.locator('#folder-agent-copy-back').click();await page.locator('#workspace-window-agent .workspace-window-close').click();
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>new Promise((resolve,reject)=>{window.rejectSelectionCopy=reject;})}}));
     await page.locator('#folder-agent-selection').click();await expect.poll(()=>page.evaluate(()=>!!window.rejectSelectionCopy)).toBe(true);
@@ -1256,24 +1241,173 @@ test('Copy for agent keeps an existing shared-folder request intact',async({page
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await openAgent(page);await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-copy').click();
-    await copyRequest(page,'Keep this request active.');const request=await h.read('request.json'),manifest=await h.read('session.json');
+    const request=await askAgent(page,h,'Keep this request active.'),manifest=await h.read('session.json');
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').click();
     await page.locator('#folder-agent-selection').click();await expect(page.locator('#folder-agent-selection')).toHaveText('Copied · 1 selected');
     const copied=await page.evaluate(()=>navigator.clipboard.readText());
     expect(copied).toContain(manifest.connectionId);expect(copied).toContain('.flowview-agent/CONNECT.md');
     expect(copied).toContain('Selection context only');expect(copied).not.toContain(request.id);expect(copied).not.toContain('Keep this request active.');
     expect(await h.read('request.json')).toEqual(request);await expect(page.locator('#editor-agent')).toBeHidden();
-    await openAgent(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this request active.');
-    await expect(page.locator('#folder-agent-cancel')).toBeVisible();expect(h.errors).toEqual([]);
+    await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+/* #591 contract: the Agent window leaves requests and interrupts to the agent's own
+   conversation. Copy for agent, the update banner and a Re-establish session hand-off remain.
+   row | fixture | assertion (scoped) | rejects
+   1 removed controls, idle copy & paste | connected external folder | #folder-agent-review-accept/-cancel/-focus-summary/-detail-summary absent; #folder-agent-send and -input hidden; no Agent-window button named Copy request/Stop accepting/Preview Agent Updates | leaving any control in the window
+   2 no keyboard-reachable duplicate | Tab sweep from the Agent tab | no focus stop inside #workspace-window-agent named or id'd as a removed control | hiding visually but leaving it focusable
+   3 removed controls while a request is active | CLI begin request | rows 1-2 repeat with a pending request | showing Stop only while pending
+   4 removed duplicate preview with a proposal | helper propose | #folder-agent-review visible without a Preview Agent Updates button | keeping the card button
+   5 CLI begin is the request path | helper begin | request.json id matches begin output, delivery native, stage Request active | a request needing a workbench action
+   6 Copy for agent still copies context | node a selected, request active | #folder-agent-selection text Copied · 1 selected; clipboard has Selection context only and not the request id; request.json unchanged | Copy for agent starting or replacing a request
+   7 banner review → accept | proposal | #agent-update-open text Preview Agent Updates opens #agent-update-dialog; Accept writes result applied and #src changes | losing the only review entry
+   8 banner review → decline | second proposal | Discard writes result rejected and #src keeps the accepted text | decline unreachable
+   9 instructions | CONNECT.md on disk | no Copy request / stop accepting wording; begin for every new request; Copy for agent is not authorization; setup focus carries Technical level | stale instructions
+   10 setup focus choice kept | setup dialog | #folder-agent-setup-level visible and its choice reaches CONNECT.md | removing the kept select
+   11 stuck request | begin, agent silent | a second begin is refused while the first is active | vacuous renewal test
+   12 Re-establish reachable and labelled | Tab from the Agent tab | focus reaches the button named Re-establish session with a description of what it does; Enter activates it | mouse-only or unlabelled control
+   13 fresh ids | session.json before/after | sessionId and connectionId both differ | keeping the old session id
+   14 old request released | cancel.json, helper reply | cancel.json names the old request under the old ids; helper reply on it fails; working indicator hidden | leaving the turn pending
+   15 accepted pair unchanged | spec and ledger files | bytes equal before/after | rewriting the diagram on renewal
+   16 hand-off | #folder-agent-handoff-text, clipboard, CONNECT.md | contains folder, new session and connection ids and begin; not the old ids or request; clipboard equals it; CONNECT.md names the new ids | a hand-off the agent cannot act on
+   17 CLI continues | helper begin, propose after renewal | request carries the new ids; its proposal previews and applies | ids the helper rejects
+   18 Beta mode | embedded Send, Monitor watcher | no Stop accepting while pending; Re-establish releases it; renewed watcher and Send work with the new ids | Beta left without a release
+*/
+async function agentWindowStops(page,pattern){
+  // Real Tab presses from the Agent tab; records each focus stop inside the Agent window.
+  await page.locator('#editor-tab-agent').focus();const stops=[];
+  for(let i=0;i<80;i++){
+    await page.keyboard.press('Tab');
+    const stop=await page.evaluate(()=>{const node=document.activeElement;if(!node || !node.closest('#workspace-window-agent'))return null;return (node.id || '')+' '+(node.getAttribute('aria-label') || node.textContent || '').trim().slice(0,80);});
+    if(stop){stops.push(stop);if(pattern && pattern.test(stop))break;}
+  }
+  return stops;
+}
+const removedAgentControls=/Copy request|Stop accepting|Preview Agent Updates|Focus:|Detail:|folder-agent-(send|input|cancel|review-accept|focus-summary|detail-summary)\b/;
+async function expectAgentControlsRemoved(page){
+  for(const id of ['folder-agent-review-accept','folder-agent-cancel','folder-agent-focus-summary','folder-agent-detail-summary','folder-agent-detail-settings'])await expect(page.locator('#'+id),id).toHaveCount(0);
+  await openAgent(page);const agent=page.locator('#editor-agent');
+  await expect(agent.getByRole('button',{name:/Copy request|Stop accepting|Preview Agent Updates/})).toHaveCount(0);
+  await expect(page.locator('#folder-agent-send')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();
+  const stops=await agentWindowStops(page);expect(stops.length,'Agent window has keyboard stops').toBeGreaterThan(1);
+  for(const stop of stops)expect(stop,'keyboard-reachable Agent control').not.toMatch(removedAgentControls);
+}
+
+test('copy and paste Agent window drops Copy request, Stop, Focus/Detail and its duplicate preview; Copy for agent and the banner review remain',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await openAgent(page);await page.locator('#folder-agent-open-setup').click();
+    await expect(page.locator('#folder-agent-setup-level')).toBeVisible();await page.locator('#folder-agent-setup-level').selectOption('mixed');
+    await page.locator('#folder-agent-setup-mode-external').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    expect(connect).not.toMatch(/Copy request|stop accepting/i);expect(connect).toMatch(/For each new diagram request I make here, run python3 "[^"]+folder-agent\.py" begin --text/);
+    expect(connect).toContain('Copy for agent action copies selection context only, with no new request; do not treat it as authorization');expect(connect).toContain('Technical level: mixed.');
+    await closeGuide(page);await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    await expectAgentControlsRemoved(page);
+    const request=await askAgent(page,h,'Rename the backend to Delivery service.');expect(request.delivery).toBe('native');
+    await expectAgentControlsRemoved(page);
+    await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').click();
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    const quick=page.locator('#folder-agent-selection');await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
+    const copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('Selection context only');expect(copied).not.toContain(request.id);
+    expect(await h.read('request.json')).toEqual(request);
+    const proposal=source.replace('"Backend"','"Delivery service"');
+    await writeFile(path.join(h.session,request.candidate.spec),proposal);await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\nRenamed the service.\n');
+    h.run('propose','--request',request.id,'--revision',request.candidate.baseRevision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary','Rename the service');
+    await expect(page.locator('#agent-update-open')).toHaveText('Preview Agent Updates');
+    await openAgent(page);await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#folder-agent-review').getByRole('button')).toHaveCount(0);
+    await expectAgentControlsRemoved(page);
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-dialog')).toBeVisible();await expect(page.locator('#agent-update-view')).toContainText('Delivery service');
+    await page.locator('#agent-update-commit').click();
+    await expect.poll(async()=>{try{const result=await h.read('result.json');return result.requestId===request.id && result.status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(/Delivery service/);const accepted=await page.locator('#src').inputValue();
+    h.run('reply','--request',request.id,'--text','Renamed.');await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    const second=await askAgent(page,h,'Rename the doorbell.');
+    await writeFile(path.join(h.session,second.candidate.spec),accepted.replace('"Doorbell"','"Declined doorbell"'));await writeFile(path.join(h.session,second.candidate.ledger),'# Coverage ledger\n\nDeclined rename.\n');
+    h.run('propose','--request',second.id,'--revision',second.candidate.baseRevision,'--file',second.candidate.spec,'--ledger',second.candidate.ledger,'--summary','Rename the doorbell');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Declined doorbell');await page.locator('#agent-update-discard').click();
+    await expect.poll(async()=>{try{const result=await h.read('result.json');return result.requestId===second.id && result.status;}catch{return null;}}).toBe('rejected');
+    await expect(page.locator('#src')).toHaveValue(accepted);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('Re-establish session releases a stuck request and hands the agent fresh ids the helper accepts',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);
+    const old=await h.read('session.json'),files=old.artifacts;expect(files).toMatchObject({spec:expect.any(String),ledger:expect.any(String)});
+    const pair=async(mapping=files)=>({spec:await readFile(path.join(h.folder,mapping.spec),'utf8'),ledger:await readFile(path.join(h.folder,mapping.ledger),'utf8')});
+    const stuck=await askAgent(page,h,'This request will get stuck.');
+    await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/did not acknowledge/);
+    await expect(page.locator('#folder-agent-working')).toBeVisible();const before=await pair();
+    await openAgent(page);
+    const renew=page.locator('#editor-agent').getByRole('button',{name:'Re-establish session',exact:true});
+    await expect(renew).toBeVisible();await expect(renew).toHaveAccessibleDescription(/new session ID and releases any active request\. Your diagram and ledger stay unchanged\./);
+    const stops=await agentWindowStops(page,/^folder-agent-reestablish /);expect(stops.at(-1)).toMatch(/^folder-agent-reestablish Re-establish session$/);
+    await page.keyboard.press('Enter');
+    const handoff=page.getByRole('textbox',{name:'Hand-off for your agent',exact:true});await expect(handoff).toBeVisible();
+    const fresh=await h.read('session.json');
+    expect(fresh.sessionId).not.toBe(old.sessionId);expect(fresh.connectionId).not.toBe(old.connectionId);expect(fresh.artifacts).toEqual(files);
+    const text=await handoff.inputValue(),folderName=(await page.locator('#folder-agent-folder').textContent()).match(/^Diagram folder: (.+?) · /)[1];
+    for(const value of [JSON.stringify(folderName),JSON.stringify(fresh.sessionId),JSON.stringify(fresh.connectionId),'.flowview-agent/CONNECT.md','.flowview-agent/session.json'])expect(text).toContain(value);
+    // The hand-off's helper command, resolved against the folder, is what the agent runs next.
+    const helper=text.match(/python3 "<diagram folder>\/([^"]+)" begin --text/)[1];expect(path.join(h.folder,helper)).toBe(path.join(h.session,'folder-agent.py'));
+    for(const value of [old.sessionId,old.connectionId,stuck.id])expect(text).not.toContain(value);
+    expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(text);
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');expect(connect).toContain(fresh.sessionId);expect(connect).toContain(fresh.connectionId);
+    expect(await h.read('cancel.json')).toMatchObject({requestId:stuck.id,sessionId:old.sessionId,connectionId:old.connectionId});
+    expect(()=>h.run('reply','--request',stuck.id,'--text','Late reply')).toThrow();
+    await expect(page.locator('#folder-agent-working')).toBeHidden();await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    expect(await pair(fresh.artifacts)).toEqual(before);
+    const next=await askAgent(page,h,'Continue after re-establishing.');
+    expect(next).toMatchObject({sessionId:fresh.sessionId,connectionId:fresh.connectionId});expect(next.id).not.toBe(stuck.id);
+    await writeFile(path.join(h.session,next.candidate.spec),source.replace('"Backend"','"Renewed backend"'));await writeFile(path.join(h.session,next.candidate.ledger),'# Coverage ledger\n\nRenamed after renewal.\n');
+    h.run('propose','--request',next.id,'--revision',next.candidate.baseRevision,'--file',next.candidate.spec,'--ledger',next.candidate.ledger,'--summary','Rename after renewal');
+    await page.locator('#agent-update-open').click();await page.locator('#agent-update-commit').click();
+    await expect.poll(async()=>{try{const result=await h.read('result.json');return result.requestId===next.id && result.status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(/Renewed backend/);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('Beta conversation has no Stop accepting; Re-establish releases a pending turn for a renewed watcher',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await openAgent(page);await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await h.listen();
+    await page.locator('#folder-agent-input').fill('Explain the doorbell');await page.locator('#folder-agent-send').click();
+    const request=await publishedRequest(h,'Explain the doorbell'),old=await h.read('session.json');
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();await expect(page.locator('#folder-agent-working')).toBeVisible();
+    await expect(page.locator('#folder-agent-cancel')).toHaveCount(0);await expect(page.locator('#editor-agent').getByRole('button',{name:/Stop accepting/})).toHaveCount(0);
+    await page.locator('#editor-agent').getByRole('button',{name:'Re-establish session',exact:true}).click();
+    const handoff=page.getByRole('textbox',{name:'Hand-off for your agent',exact:true});await expect(handoff).toBeVisible();
+    const fresh=await h.read('session.json');expect(fresh.sessionId).not.toBe(old.sessionId);expect(fresh.connectionId).not.toBe(old.connectionId);
+    const text=await handoff.inputValue();for(const value of [fresh.sessionId,fresh.connectionId,'folder-agent.py" watch'])expect(text).toContain(value);expect(text).not.toContain(old.connectionId);
+    expect(await h.read('cancel.json')).toMatchObject({requestId:request.id,connectionId:old.connectionId});await expect(page.locator('#folder-agent-working')).toBeHidden();
+    await h.listen();await page.locator('#folder-agent-input').fill('Continue with the new session');await expect(page.locator('#folder-agent-send')).toBeEnabled();await page.locator('#folder-agent-send').click();
+    expect(await publishedRequest(h,'Continue with the new session')).toMatchObject({sessionId:fresh.sessionId,connectionId:fresh.connectionId});
+    expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
 
 test('clipboard failure offers manual copy and invalid source cannot create context',async({page},info)=>{
+  test.setTimeout(120000); // Ten desktop viewport cycles, each reopening the manual copy.
   const h=await setup(page);
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>Promise.reject(Error('denied'))}}));
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await page.locator('#folder-agent-input').fill('Review this.');await page.locator('#folder-agent-send').click();
+    await connectExternal(page);await askAgent(page,h,'Review this.');
+    await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').click();
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    await page.locator('#folder-agent-selection').click();
     await expect(page.locator('#folder-agent-panel-status')).toContainText('Ctrl+C');
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
@@ -1286,22 +1420,20 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
         const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1)};});
         expect(control,selector+' while Agent is active at '+width+'px').toMatchObject({inside:true,reachable:true});
       }
-      if(!await preview.isVisible())await page.locator('#folder-agent-send').click();
+      if(!await preview.isVisible()){await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#folder-agent-selection').click();}
       await expect(preview).toBeVisible();await preview.focus();
       await page.screenshot({path:info.outputPath('unified-agent-desktop-copy-fallback-'+width+'-'+cycle+'.png')});
       expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable on desktop').toBe(true);
       const windowRect=await page.locator('#workspace-window-agent').boundingBox();
       await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
-      await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
-      expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
-      for(const id of ['#folder-agent-input','#workspace-canvas-tools>summary'])expect(await page.locator(id).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' remains reachable alongside Copy request').toBe(true);
+      for(const id of ['#folder-agent-selection','#workspace-canvas-tools>summary'])expect(await page.locator(id).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' remains reachable after manual copy').toBe(true);
       expect(await page.locator('#workspace-window-agent').boundingBox()).toEqual(windowRect);
-      await page.screenshot({path:info.outputPath('unified-agent-desktop-return-draft-'+width+'-'+cycle+'.png')});
+      await page.screenshot({path:info.outputPath('unified-agent-desktop-after-copy-'+width+'-'+cycle+'.png')});
     }
     await page.setViewportSize({width:1280,height:900});
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{');
-    await page.locator('#workspace-window-json .workspace-window-close').click();await openAgent(page);
-    await expect(page.locator('#folder-agent-send')).toBeDisabled();
+    await page.locator('#workspace-window-json .workspace-window-close').click();
+    await expect(page.locator('#folder-agent-selection')).toBeDisabled();
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
@@ -1311,41 +1443,37 @@ test('a late denied copy cannot reveal an old project or steal focus after file 
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>new Promise((resolve,reject)=>{window.rejectCopy=reject;})}}));
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await page.locator('#folder-agent-input').fill('Old project draft');await page.locator('#folder-agent-send').click();
+    await connectExternal(page);await page.locator('#workspace-window-agent .workspace-window-close').click();
+    await page.locator('#docview [data-dv-node="a"]').click();await page.locator('#folder-agent-selection').click();
     await page.waitForFunction(()=>typeof window.rejectCopy==='function');
     const replacement=source.replace('Browser contract','Replacement project');
     await page.locator('#file-input').setInputFiles({name:'replacement.spec.json',mimeType:'application/json',buffer:Buffer.from(replacement)});
-    await expect(page.locator('#folder-agent-input')).toHaveValue('');
     await page.locator('#editor-tab-json').focus();await page.evaluate(()=>window.rejectCopy(Error('denied')));
     await expect(page.locator('#folder-agent-copy-preview')).toBeHidden();await expect(page.locator('#editor-tab-json')).toBeFocused();
     await expect(page.locator('#src')).toHaveValue(replacement);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
 
-test('connected Copy preserves a large message while registering a bounded native request',async({page})=>{
+test('native requests stay bounded while a large source registers from the agent conversation',async({page})=>{
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await page.locator('#welcome-agent').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-copy').click();
     await openAgent(page);
+    // A long message stays in the agent conversation; the helper refuses to register it.
     const long='Read this complete pasted context. '+('Reference detail. '.repeat(1400))+' END OF MESSAGE';
-    await copyRequest(page,long);
-    const request=await h.read('request.json'),copied=await page.evaluate(()=>navigator.clipboard.readText());
-    expect(request.text.length).toBeLessThanOrEqual(16000);expect(request.delivery).toBe('clipboard');
-    expect(copied).toContain(request.id);expect(copied).toContain(long);
-    await page.locator('#folder-agent-send').click();expect((await h.read('request.json')).id).toBe(request.id);
+    await expect(h.begin(long)).rejects.toThrow(/at most 16000 characters/);
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    const request=await askAgent(page,h,'Read the complete context pasted in our conversation.');
+    expect(request.text.length).toBeLessThanOrEqual(16000);expect(request.delivery).toBe('native');
     h.run('reply','--request',request.id,'--text','Ready for the next request.');
     await expect.poll(async()=> (await h.read('transcript.json')).messages.at(-1).role).toBe('assistant');
     const priorSource=await page.locator('#src').inputValue(),large=JSON.parse(priorSource);large.page.blocks[0].text='Complete evidence. '.repeat(1000)+'SOURCE END';const largeSource=JSON.stringify(large,null,2);
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill(largeSource);await page.locator('#go').click();
     await expect.poll(async()=>(await h.read('state.json')).source).toBe(largeSource);
-    await page.locator('#workspace-window-json .workspace-window-close').click();await copyRequest(page,'Review the full source.');
-    const largeRequest=await h.read('request.json'),fullCopy=await page.evaluate(()=>navigator.clipboard.readText());
-    expect(largeRequest.id).not.toBe(request.id);expect(largeRequest.text.length).toBeLessThanOrEqual(16000);
-    expect(fullCopy).toContain('Review the full source.');expect(fullCopy).toContain(largeRequest.id);
-    expect(fullCopy).not.toContain('SOURCE END');expect(fullCopy).not.toContain('Complete evidence.');
-    expect(fullCopy.length).toBeLessThan(3000);
+    await page.locator('#workspace-window-json .workspace-window-close').click();const largeRequest=await askAgent(page,h,'Review the full source.');
+    expect(largeRequest.id).not.toBe(request.id);expect(largeRequest.text).toBe('Review the full source.');
     expect((await h.read('state.json')).source).toBe(largeSource);
     // A valid published request's named pair is exactly its Workbench pair, read between matching states.
     const project=await h.read('project.json'),owner=await h.read('session.json'),stateBefore=await h.read('state.json');
@@ -1379,7 +1507,7 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     expect((await h.read('session.json')).artifacts).toMatchObject({spec:'payments.spec.json',ledger:'payments.ledger.md'});
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
     await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
-    await copyRequest(page,'Record the reviewed evidence in the ledger.');
+    await askAgent(page,h,'Record the reviewed evidence in the ledger.');
     const request=await h.read('request.json'),state=await h.read('state.json');
     await writeFile(path.join(h.session,'candidate.spec.json'),source);await writeFile(path.join(h.session,'candidate.ledger.md'),afterLedger);
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review evidence without changing the diagram');
@@ -1439,13 +1567,11 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
     await page.locator('#folder-agent-start-adopt').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
-    await copyRequest(page,'Rename the doorbell.');
+    await askAgent(page,h,'Rename the doorbell.');
     const request=await h.read('request.json'),state=await h.read('state.json'),candidate=request.candidate;
     expect(candidate).toEqual({spec:`candidate-${request.id}.spec.json`,ledger:`candidate-${request.id}.ledger.md`,baseRevision:state.revision});
     expect(request.revision).toBe(state.revision);
-    // Copy request delivers the seeded files with the short existing-edit guide.
-    const copied=await page.evaluate(()=>navigator.clipboard.readText());
-    expect(copied).toContain(request.id);expect(copied).toContain(JSON.stringify(candidate.spec));expect(copied).toContain(JSON.stringify(candidate.ledger));
+    // The registered request names the seeded files; CONNECT.md points to the short existing-edit guide.
     const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8'),guide='docs/folder-agent-existing-edit.md';
     expect(connect).toContain('/authoring/'+guide+' first');expect(connect).toContain('request.candidate names them');
     expect(connect).not.toMatch(/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
@@ -1463,7 +1589,7 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
     await expect(page.locator('#src')).toHaveValue(edited);
     await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(edited);
     await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
-    h.run('reply','--request',request.id,'--text','Renamed the doorbell.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    h.run('reply','--request',request.id,'--text','Renamed the doorbell.');await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(source);
     await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
@@ -1498,7 +1624,7 @@ for(const connectWhen of ['before submission','after blocked submission'])test('
       await expect(page.locator('#src')).toHaveValue(source);expect(hits[0]).toBe('browsed');
     }
     if(connectWhen==='before submission')await connect();
-    await copyRequest(page,'Import the submitted provider.');const request=await h.read('request.json'),candidate=request.candidate;
+    await askAgent(page,h,'Import the submitted provider.');const request=await h.read('request.json'),candidate=request.candidate;
     const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
     await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
     h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Import approved provider');
@@ -1691,7 +1817,7 @@ test('agent change navigation reaches other Views and paths and preserves stable
     raw.page.blocks.push(beta,hidden);raw.page.views=[{id:'overview',name:'Overview',presentation:'standard',sections:['alpha']},{id:'recovery',name:'Recovery',presentation:'explore',sections:[{section:'beta',layout:'explore'}]}];raw.page.defaultView='overview';
     const original=JSON.stringify(raw);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await copyRequest(page,'Review changes across the recovery story.');const request=await h.read('request.json'),state=await h.read('state.json');
+    await connectExternal(page);await askAgent(page,h,'Review changes across the recovery story.');const request=await h.read('request.json'),state=await h.read('state.json');
     raw.page.title='Updated browser contract';raw.page.views[1].name='Recovery review';beta.diagram.steps=[{...beta.diagram.steps[2],text:'Recovery failed after retry'},beta.diagram.steps[1],beta.diagram.steps[0]];
     beta.diagram.paths[1].label='Retry failure';delete beta.diagram.nodes.retired;beta.diagram.nodes.replacement={title:'Replacement worker'};beta.diagram.rows[1]=['replacement'];hidden.diagram.nodes.b.title='Unpublished backend';
     raw.page.blocks=[beta,alpha,hidden];const proposed=JSON.stringify(raw);
@@ -1738,7 +1864,7 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     const raw=JSON.parse(source),alpha=raw.page.blocks[0];alpha.id='alpha';
     const beta=structuredClone(alpha);beta.id='beta';beta.heading='Recovery';beta.diagram.layouts.push({...structuredClone(beta.diagram.layouts[0]),id:'explore',name:'Recovery canvas',presentation:'explore'});delete beta.diagram.layouts[1].steps;beta.diagram.defaultLayout='explore';raw.page.blocks.push(beta);
     const original=JSON.stringify(raw);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await connectExternal(page);await copyRequest(page,'Rename the recovery backend.');const request=await h.read('request.json'),state=await h.read('state.json');
+    await connectExternal(page);await askAgent(page,h,'Rename the recovery backend.');const request=await h.read('request.json'),state=await h.read('state.json');
     beta.diagram.nodes.b.title='Recovery backend';raw.page.blocks.reverse();const proposed=JSON.stringify(raw);
     await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed backend.\n');h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md');
     await page.locator('#agent-update-open').click();await page.locator('#agent-update-next').click();

@@ -359,13 +359,16 @@ function createFolderAgentClient(opts){
     publish({listening:listening,accessError:null});
   }
   return {
-    start:function(resume,choice){var started=epoch;return serial(async function(){
+    start:function(resume,choice,renewal){var started=epoch;return serial(async function(){
       if(disposed || started!==epoch)throw Error('Session was closed.');
       var opening=opts.snapshot();
       if(connected)throw Error('Disconnect before starting another session.');
       var existing=await files.read('session.json'),preview=null;
       if(resume && !existing)throw Error('Choose an existing Flowview session folder.');
       if(existing && !resume)throw Error('Choose a new session folder.');
+      // Renewal re-claims this editor's own folder with new ids; another owner aborts it.
+      if(renewal && (!existing || existing.sessionId!==renewal.expectedSessionId || existing.connectionId!==renewal.expectedConnectionId))
+        throw Error('The folder connection changed. Reopen the diagram folder to reconnect.');
       if(existing){
         preview=await inspectFolderAgentSession(files,opts.snapshot,now);
         if(existing.sessionId!==preview.identity.sessionId || existing.connectionId!==preview.identity.connectionId)
@@ -404,7 +407,7 @@ function createFolderAgentClient(opts){
             throw Error('The saved session changed while preserving its story. Review recovery again.');
         }
       }
-      manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
+      manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing && !renewal?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
       pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
@@ -461,6 +464,8 @@ function createFolderAgentClient(opts){
         if(typeof files.remove==='function'){
           try{await files.remove(recoveryState);}catch(ignored){} // Cleanup is optional; the canonical pair is committed.
         }
+        // Carry the workbench history over to the renewed session id.
+        if(renewal){await saveTranscript();await saveChanges();}
         if(!alive(token))throw Error('Session was closed.');
       }catch(ex){connected=false;epoch++;publish({listening:false});throw ex;}
       publish({status:'Paste the connection instructions into Claude.',listening:false});
@@ -517,15 +522,15 @@ function createFolderAgentClient(opts){
       publish({status:'Returning the proposed change…'});
       return serial(poll).then(function(){return !reviewCandidate;});
     },
-    cancel:function(){
+    cancel:function(reason){
       var requestId=pending,token=epoch;
       if(!connected || disposed || !requestId)return Promise.resolve(false);
       pending=null;turnEpoch++;clearReceipt();clearReview();activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
       transcript.forEach(function(item){if(item.requestId===requestId && item.role==='user')item.cancelled=true;});
-      publish({status:'Stopped accepting this turn. Claude may still be computing; interrupt it in its session if needed.',progress:''});
+      publish({status:'Released this turn. Claude may still be computing; interrupt it in its session if needed.',progress:''});
       return serial(async function(){
         if(!alive(token) || !belongs(await files.read('session.json')) || !alive(token))return false;
-        await files.write('cancel.json',envelope({id:uuid(),requestId:requestId,at:now(),reason:'Stopped accepting this turn in the editor.'}));
+        await files.write('cancel.json',envelope({id:uuid(),requestId:requestId,at:now(),reason:reason || 'Released in the editor.'}));
         if(!alive(token))return false;
         if(changesDirty){await saveChanges();if(!alive(token))return false;}
         await saveTranscript();return true;

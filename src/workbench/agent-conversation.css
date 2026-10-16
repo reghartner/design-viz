@@ -20,25 +20,13 @@
 #editor-agent .folder-agent-message{padding:12px 0;}
 .folder-agent-latest{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);white-space:nowrap;z-index:1;box-shadow:0 2px 10px #0002;}
 .folder-agent-composer{border-top:1px solid var(--line);padding:8px 12px;background:var(--card,var(--bg));min-width:0;}
-.folder-agent-compose-settings{max-height:140px;overflow:auto;overscroll-behavior:contain;}
-.folder-agent-composer .folder-agent-context-card{margin:0 0 5px;padding:0;border:0;font-size:12px;}
-.folder-agent-composer .folder-agent-context-card summary{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.folder-agent-composer .folder-agent-context-card>div{max-height:100px;overflow:auto;padding:6px 0;}
-.folder-agent-composer #folder-agent-context{white-space:pre-wrap;}
-.folder-agent-detail-settings{font-size:12px;margin-bottom:6px;}
-.folder-agent-detail-settings>summary{cursor:pointer;color:var(--sub);width:fit-content;}
-.folder-agent-detail-settings>div{max-height:105px;overflow:auto;padding-top:5px;}
-.folder-agent-detail-settings .folder-agent-hint{margin:2px 0 4px;font-size:11px;}
 .folder-agent-setup-detail{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);}
 .folder-agent-setup-detail label{display:block;font-weight:600;margin-bottom:6px;}
 .folder-agent-setup-detail select{width:100%;}
-.folder-agent-composer label[for="folder-agent-level"]{display:inline;font-size:11px;color:var(--sub);}
-.folder-agent-composer #folder-agent-level{width:100%;font-size:12px;min-height:27px;padding:3px 6px;margin:3px 0 5px;}
 .folder-agent-composer #folder-agent-form>label{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;}
 .folder-agent-composer #folder-agent-form textarea{height:3.3em;min-height:2.8em;max-height:7em;resize:vertical;margin:0 0 5px;padding:6px 8px;}
 .folder-agent-compose-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
 .folder-agent-compose-actions #folder-agent-send{margin:0;padding:6px 10px;font-size:12px;}
-.folder-agent-compose-actions #folder-agent-cancel{margin:0;padding:6px;font-size:11px;}
 .folder-agent-compose-actions .folder-agent-hint{margin-left:auto;font-size:10px;}
 #editor-agent .folder-agent-activity{padding:8px 10px;margin:8px 0;font-size:12px;}
 #editor-agent .folder-agent-activity>details>summary{cursor:pointer;}
@@ -52,9 +40,15 @@
 .folder-agent-prerequisites{border:1px solid var(--line);padding:10px;border-radius:8px;}
 .folder-agent-prerequisites ul{padding-left:20px;}
 #editor-agent [hidden]{display:none!important;}
-@media(max-height:600px){.folder-agent-composer{padding:6px 9px;}.folder-agent-header{padding:5px 9px;}.folder-agent-header-controls{max-height:44px;}.folder-agent-compose-settings{max-height:64px;}.folder-agent-composer #folder-agent-level{margin:1px 0 3px;}.folder-agent-composer #folder-agent-form textarea{height:2.8em;}.folder-agent-compose-actions .folder-agent-hint{display:none;}}
+@media(max-height:600px){.folder-agent-composer{padding:6px 9px;}.folder-agent-header{padding:5px 9px;}.folder-agent-header-controls{max-height:44px;}.folder-agent-composer #folder-agent-form textarea{height:2.8em;}.folder-agent-compose-actions .folder-agent-hint{display:none;}}
 .folder-agent-review-toggle{display:flex!important;align-items:flex-start;gap:5px;font-weight:400!important;margin-top:7px;}
 #folder-agent-review{margin:8px 0;border-color:var(--accent);}
+.folder-agent-renew{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.folder-agent-renew .bbtn{flex:none;margin:0;padding:4px 8px;font-size:12px;}
+.folder-agent-renew .folder-agent-hint{margin:0;font-size:11px;}
+.folder-agent-handoff{margin-top:8px;padding:9px;border:1px solid var(--accent);border-radius:7px;background:var(--card);font-size:12px;}
+.folder-agent-handoff textarea{display:block;box-sizing:border-box;width:100%;margin:6px 0;max-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:6px;font:11px/1.4 monospace;resize:vertical;}
+.folder-agent-handoff .bbtn{margin:0;padding:4px 8px;font-size:12px;}
 #folder-agent-review-source{font:11px/1.4 monospace;min-height:100px;resize:vertical;}
 /* Shared-folder workflows and the separate proposal viewer. */
 .agent-workflow-choices{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:32px 0;}
@@ -128,12 +122,11 @@
 .folder-agent-mode-description{margin:0;padding:10px 12px;font-size:12px;color:var(--sub);}
 .folder-agent-copy-fallback{font-size:12px;}
 .folder-agent-copy-fallback .bbtn{margin:4px 0;padding:3px 7px;font-size:11px;}
-.folder-agent-composer:has(.folder-agent-copy-fallback[open]:not([hidden]))>#folder-agent-form,
-.folder-agent-composer:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-compose-settings{display:none;}
+.folder-agent-composer:has(.folder-agent-copy-fallback[open]:not([hidden]))>#folder-agent-form{display:none;}
 .folder-agent-copy-fallback textarea{box-sizing:border-box;width:100%;max-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:8px;font:11px/1.4 monospace;resize:vertical;}
-#editor-agent[data-workflow="external"] .folder-agent-context-card{background:color-mix(in srgb,var(--accent) 8%,var(--card));border-radius:7px;padding:8px 10px;}
 #editor-agent[data-workflow="external"] .folder-agent-workflow-body{display:flex;flex-direction:column;overflow:auto;}
 #editor-agent[data-workflow="external"] .folder-agent-workflow-body>*{flex:none;}
+#editor-agent[data-workflow="external"] .folder-agent-composer:not(:has(>.folder-agent-copy-fallback:not([hidden]))){display:none;}
 #editor-agent[data-workflow="external"] .folder-agent-history{height:auto;max-height:200px;}
 .folder-agent-change-history{margin-top:8px;font-size:12px;}
 .folder-agent-change-history>summary{cursor:pointer;color:var(--sub);}
@@ -141,7 +134,6 @@
 @media(max-height:520px){
   .folder-agent-mode-description{display:none;}
   .folder-agent-workflow-body .folder-agent-header-controls{max-height:26px;}
-  #editor-agent[data-workflow="external"] .folder-agent-context-card{padding:3px 7px;}
   .folder-agent-workflow-body{grid-template-rows:auto minmax(32px,1fr) auto;}
   #editor-agent[data-workflow="external"] .folder-agent-workflow-body:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-header,
   #editor-agent[data-workflow="external"] .folder-agent-workflow-body:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-history-frame{display:none;}

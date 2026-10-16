@@ -62,6 +62,11 @@ shorter tour; the spec identifies active screens.
   `agent-review-ready-empty-diagram` show actual states of a local disk-backed
   empty-folder fixture. Copy request registers the request before Agent working
   appears; the ready state follows submission of a candidate spec and ledger.
+  These captures predate #591: the Agent window no longer has a request box,
+  Copy request, Focus/Detail disclosures or Stop accepting this turn. Requests
+  now start in the agent's own conversation (the folder helper's `begin`), and
+  Re-establish session releases a stuck turn. Re-capture the tour before
+  relying on its Agent-window screens or step text.
 - `reconnect-*` and `resume-folder.png` show a real saved-folder fixture.
   Focused captures omit one-time connection IDs. Adjacent YOU/CLAUDE dialogue
   is illustrative, not a captured transcript.

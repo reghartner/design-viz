@@ -1352,6 +1352,11 @@ function wireTour(ctl, view, win, config, options){
     replay.insertAdjacentElement('afterend',discovery);
   }
 
+  function onTourButton(ev){
+    if(ev.target.closest && ev.target.closest('.explore-tour-button')){disabled=false;guarded(start);}
+  }
+  if(options.tourButton){doc.body.classList.add('dv-tour-button');doc.addEventListener('click',onTourButton);}
+
   var previousStart=win.dvStartTour;
   var startPublic=function(){ if(destroyed)return false;disabled=false;guarded(start);return true; };
   win.dvStartTour=startPublic;
@@ -1365,6 +1370,7 @@ function wireTour(ctl, view, win, config, options){
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
     if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
+    if(options.tourButton){doc.body.classList.remove('dv-tour-button');doc.removeEventListener('click',onTourButton);}
     if(!pageActions.children.length){if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();pageActions.remove();}
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
@@ -1372,7 +1378,7 @@ function wireTour(ctl, view, win, config, options){
   }
 
   if (request === 'force') guarded(start);
-  else if (request !== 'suppress' && !options.deepLink){
+  else if (request !== 'suppress' && !options.deepLink && options.autostart !== false){
     if(!storageDone())guarded(start);
     else if(progress)guarded(offerDiscovery);
   }

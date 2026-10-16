@@ -190,6 +190,14 @@ function tourDoneFromCookie(cookieText){
 }
 
 /* #tour=1 forces the tour, #tour=0 suppresses it; parseHash ignores the key. */
+/* claude.ai artifacts each run on their own *.claudeusercontent.com origin,
+   a public suffix, so no storage or cookie can carry "tour done" from one
+   artifact to the next. Readers there skip the autostart and show a TOUR
+   button instead. */
+function tourArtifactHost(hostname){
+  return /(^|\.)claudeusercontent\.com$/i.test(String(hostname || ''));
+}
+
 function tourHashRequest(hash){
   var m = /(?:^#|[#&])tour=([01])(?:&|$)/.exec(String(hash || ''));
   return m ? (m[1] === '1' ? 'force' : 'suppress') : null;

@@ -121,3 +121,13 @@ test('completion cookie and #tour hash requests parse strictly',()=>{
   assert.equal(context.tourHashRequest('#contour=1'),null);
   assert.equal(context.tourHashRequest(''),null);
 });
+
+test('artifact host check matches only claude.ai artifact frames',()=>{
+  assert.equal(context.tourArtifactHost('0a1b2c.frame.claudeusercontent.com'),true);
+  assert.equal(context.tourArtifactHost('claudeusercontent.com'),true);
+  assert.equal(context.tourArtifactHost('claude.ai'),false);
+  assert.equal(context.tourArtifactHost('evilclaudeusercontent.com'),false);
+  assert.equal(context.tourArtifactHost('claudeusercontent.com.example.org'),false);
+  assert.equal(context.tourArtifactHost(''),false);
+  assert.equal(context.tourArtifactHost(undefined),false);
+});

@@ -152,8 +152,10 @@ function boot(raw){
   if (typeof wireTour === 'function' && !embedRequest){
     var tourConfig = tourUsableConfig(page.tour) ? page.tour :
       (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
+    var artifactHost = tourArtifactHost(window.location.hostname);
     wireTour(ctl, view, window, tourConfig,
-             {request: tourRequest, deepLink: tourDeferredByLink});
+             {request: tourRequest, deepLink: tourDeferredByLink,
+              autostart: !artifactHost, tourButton: artifactHost});
   }
 }
 

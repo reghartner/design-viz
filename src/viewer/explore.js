@@ -46,6 +46,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=true;
   var legendSummary=document.createElement('summary');legendSummary.textContent='Legend';legendMenu.appendChild(legendSummary);
   var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
+  // Shown only when the reader's tour opts in (body.dv-tour-button); the tour owns the click.
+  var tourButton=button('TOUR',function(){},actions,'mbtn explore-tour-button');tourButton.setAttribute('aria-label','Start the guided tour');
   var panelBody=document.createElement('div');panelBody.className='explore-panel-body';menu.appendChild(panelBody);panelBody.appendChild(choices);
   var placementLabel=document.createElement('label');placementLabel.className='explore-placement';placementLabel.textContent='Default placement';
   var placement=document.createElement('select');placement.setAttribute('aria-label','Default panel placement');

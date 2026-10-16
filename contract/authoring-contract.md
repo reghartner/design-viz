@@ -174,6 +174,18 @@ Relative and final absolute coordinates must be finite and within ±100000.
 Dragging an imported node saves its center and pins the import origin; dragging
 the reference’s ⋯ handle moves the entire block by changing only `position`.
 Reset node arrangement removes `nodePositions` and preserves `position`.
+Optional `nodeCodeRefs: {providerNodeId: [codeReference, ...]}` appends consumer
+references after inherited references; it never replaces inherited evidence.
+Optional `edgeOverrides: {"providerFrom->providerTo": geometry}` changes only
+`labelDx`, `labelDy`, `curvePoints`, `curveControls`, `bend`, `fromPort`,
+`toPort`. Null suppresses an inherited field;
+omission inherits it. Remove the edge override to restore provider geometry.
+Both maps require selected exported identities, including full nested paths.
+All effective code references and geometry are validated. Numeric geometry is
+finite within ±100000; port offsets are 0..1. Unknown fields and
+semantic edge edits are rejected. Provider refresh retains these consumer maps;
+removed identities require removing their saved entries. Saved source keeps only
+authored imports and overlays; resolved snapshots contain effective values.
 All layout data belongs to the consumer; provider structure stays read-only.
 Optional `nodes: [providerNodeId]` and `edges: ["from->to"]` on an import select
 within its named export; omission means the full corresponding array. Require

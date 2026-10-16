@@ -1449,7 +1449,7 @@ function createBuilderInteractions(opts){
       start = svgPointAt(svg, inv, ev.clientX, ev.clientY);
     } catch (ex){ return; } /* non-invertible CTM: no drag, plain click still works */
     if (!isFinite(start.x) || !isFinite(start.y)) return;
-    drag = {lbl: lbl, svg: svg, inv: inv, x0: start.x, y0: start.y, dx: 0, dy: 0, moved: false};
+    drag = {snapshot:parseEditor(),context:session.topologyContext(),contextKey:JSON.stringify(session.topologyContext()),lbl: lbl, svg: svg, inv: inv, x0: start.x, y0: start.y, dx: 0, dy: 0, moved: false};
     ev.preventDefault(); /* no text selection while dragging */
   });
   life.listen(window,'mousemove', function(ev){
@@ -1604,16 +1604,12 @@ function createBuilderInteractions(opts){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error); return; }
     var target = {section: gi, kind: 'edge', index: idx};
-    var path = builderTargetPath(parsed.raw, target);
-    var e = path ? specValueAt(parsed.raw, path) : null;
-    if (!e){ inspectorMessage('edge not found in the editor text — the render and the editor may be out of sync'); return; }
-    var newDx = Math.round((typeof e.labelDx === 'number' ? e.labelDx : 0) + d.dx);
-    var newDy = Math.round((typeof e.labelDy === 'number' ? e.labelDy : 0) + d.dy);
-    if (!isFinite(newDx) || !isFinite(newDy)) return; /* never write NaN into the spec */
-    var plan = planSetFields(session.text(), parsed.raw, path, [
-      ['labelDx', newDx === 0 ? null : String(newDx)],
-      ['labelDy', newDy === 0 ? null : String(newDy)]
-    ]);
+    if(parsed.text!==d.snapshot.text || parsed.project!==d.snapshot.project || !d.lbl.isConnected || parsed.renderedText!=null && parsed.renderedText!==parsed.text || JSON.stringify(session.topologyContext())!==d.contextKey){inspectorMessage('The source changed. Label move cancelled.');return;}
+    var edgeTarget=builderEdgeLayoutTarget(parsed.text,parsed.raw,gi,idx,null,d.context);
+    if(edgeTarget.error){inspectorMessage(edgeTarget.error);return;}
+    var e=edgeTarget.edge;
+    var newDx=Math.round((typeof e.labelDx==='number'?e.labelDx:0)+d.dx),newDy=Math.round((typeof e.labelDy==='number'?e.labelDy:0)+d.dy);
+    var plan=planEdgeLayout(parsed.text,parsed.raw,gi,idx,edgeTarget.key,{labelDx:newDx===0 && !edgeTarget.owner?null:newDx,labelDy:newDy===0 && !edgeTarget.owner?null:newDy},d.context);
     if (plan.error){ inspectorMessage(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     session.target = target;
@@ -1655,6 +1651,7 @@ function createBuilderInteractions(opts){
     if(document.querySelector('#object-clipboard[open], #panel-picker[open], #diagram-add-menu[open]'))return;
     if (ev.key === 'Escape'){
       if(ev.defaultPrevented)return; /* an owned importer consumed Escape */
+      if (drag){drag.lbl.removeAttribute('transform');drag=null;ev.preventDefault();return;}
       if (rowDrag){ cancelRowDrag(); return; }
       if (nodeDrag){ cancelNodeDrag(); return; }
       if (groupDrag){ cancelGroupDrag(); return; }
@@ -1701,9 +1698,10 @@ function createBuilderInteractions(opts){
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
+  life.listen(window,'keydown',function(ev){if(ev.key==='Escape' && drag){drag.lbl.removeAttribute('transform');drag=null;ev.preventDefault();ev.stopImmediatePropagation();}},true);
   life.listen(window,'blur',cancelGestures);
   life.listen(window,'pointercancel',cancelGestures);
-  life.listen(src,'input',function(){if(connect)cancelConnect('Connection cancelled — the source changed.');});
+  life.listen(src,'input',function(){if(drag){drag.lbl.removeAttribute('transform');drag=null;}if(connect)cancelConnect('Connection cancelled — the source changed.');});
   life.listen(window,'blur',function(){if(connect)cancelConnect('Connection cancelled');});
   function beforeReplace(request){
     textEditor.clear();

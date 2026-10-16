@@ -785,7 +785,7 @@ function edgeForm(val, ctx){
     curveControls.appendChild(curveHint);
     if(hasEdgeCurve(val) || val.bend!=null){
       curveControls.appendChild(actionButton('Reset curve',function(){
-        return commitCascade(function(raw){return planEdgeCurve(session.text(),raw,t.section,t.index,[]);});
+        return commitCascade(function(raw){return planEdgeCurve(session.text(),raw,t.section,t.index,[],false,session.topologyContext());});
       }));
     }
     return [
@@ -2563,7 +2563,7 @@ function renderInspector(){
       var authoredRecord=specSectionPaths(parsed.raw)[t.section],authoredDiagram=authoredRecord && specValueAt(parsed.raw,authoredRecord.diagram);
       var hasAuthoredImport=(authoredDiagram && authoredDiagram.topologyImports || []).some(function(imp){return imp.as===imported.as;});
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s arrangement is saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s arrangement, additional code references, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
       documentDestinations(imported.destination || {spec:imported.spec},null,(normalize(parsed.raw).documentLinks || {}).siteBaseUrl).forEach(function(item){var link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open source diagram · '+item.label;guide.appendChild(link);});
       if(t.kind==='node'){
@@ -2576,6 +2576,32 @@ function renderInspector(){
       if(t.kind==='node' || t.kind==='edge'){
         var importedActions=actionGroup('Imported topology actions','inspector-actions');
         importedActions.appendChild(clearCustomEdgesAction({targets:[t]},renderInspector));guide.appendChild(importedActions);
+      }
+      if(hasAuthoredImport && t.kind==='node'){
+        var localImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeNode=t.id.slice(imported.as.length+2);
+        var additions=(localImport.nodeCodeRefs || {})[relativeNode] || [],inherited=(resolvedValue.codeRefs || []).slice(0,(resolvedValue.codeRefs || []).length-additions.length);
+        var inheritedControl=document.createElement('textarea');inheritedControl.readOnly=true;inheritedControl.className='fctl';inheritedControl.value=JSON.stringify(inherited,null,2);
+        var inheritedRow=frow('Inherited code references (read only)',inheritedControl);inheritedRow.classList.add('topology-code-refs');guide.appendChild(inheritedRow);
+        var refsContext=session.topologyContext(),refsContextKey=JSON.stringify(refsContext);
+        var additionalRow=frow('Additional code references JSON',textControl(JSON.stringify(additions,null,2),function(value){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==refsContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var refs;try{refs=value==null?[]:JSON.parse(value);}catch(ex){formError('Additional code references must be valid JSON.');return false;}
+          var ok=applyPlan(planTopologyNodeCodeRefs(parsed.text,parsed.raw,t.section,t.id,refs,refsContext),null,parsed);
+          if(ok)refreshFormSoon();return ok;
+        },{textarea:true}));additionalRow.classList.add('topology-code-refs');guide.appendChild(additionalRow);
+        var refsNote=document.createElement('p');refsNote.className='fnote';refsNote.textContent='These references are appended after inherited references for this flow only. Remove an entry here to remove a local addition; inherited references stay in the provider.';guide.appendChild(refsNote);
+      }
+      if(hasAuthoredImport && t.kind==='edge'){
+        var edgeContext=session.topologyContext(),edgeContextKey=JSON.stringify(edgeContext),edgeKey=builderEdgeKey(resolvedValue);
+        var edgeNote=document.createElement('p');edgeNote.className='fnote';edgeNote.textContent='Drag the label, arrow curve, or endpoint handles to customize this flow. Reset restores all provider label and routing geometry.';guide.appendChild(edgeNote);
+        var resetConnection=actionButton('Reset imported connection layout',function(){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==edgeContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var ok=applyPlan(planResetTopologyEdgeLayout(parsed.text,parsed.raw,t.section,t.index,edgeKey,edgeContext),null,parsed);
+          if(ok)refreshFormSoon();return ok;
+        });
+        var edgeImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeEdge=edgeKey.split('->').map(function(id){return id.slice(imported.as.length+2);}).join('->');
+        resetConnection.disabled=!Object.prototype.hasOwnProperty.call(edgeImport.edgeOverrides || {},relativeEdge);
+        guide.appendChild(resetConnection);
       }
       var arrangementContextKey=JSON.stringify(session.topologyContext());
       var resetArrangement=actionButton('Reset node arrangement',function(){

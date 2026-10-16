@@ -148,3 +148,57 @@ function planTopologyExport(text,raw,targets,options,context){
   try{FlowTopology.resolveSource(JSON.parse(plan.text),context);}catch(ex){return {error:ex.message};}
   return plan;
 }
+
+/* Local overlays address resolved identities, never rendered array offsets in
+   authored JSON. Validate both the existing frozen view and the full candidate. */
+function topologyLocalTarget(text,raw,section,kind,id,context){
+  var parsed;try{parsed=JSON.parse(text);}catch(ex){return {error:'The source is not valid JSON.'};}
+  if(JSON.stringify(parsed)!==JSON.stringify(raw))return {error:'The source changed. Render and reselect.'};
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var resolved;try{resolved=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}
+  var rec=specSectionPaths(resolved)[section],d=rec && specValueAt(resolved,rec.diagram);
+  if(!d)return {error:'Diagram not found.'};
+  var owner=FlowTopology.origin(d,kind,id),imports=got.d.topologyImports || [];
+  var index=owner?imports.findIndex(function(imp){return imp.as===owner.as;}):-1;
+  if(owner && index<0)return {error:'Open the authored consumer with its providers to edit imported layout.'};
+  return {got:got,diagram:d,owner:owner,index:index,relative:owner?id.split('->').map(function(part){return part.slice(owner.as.length+2);}).join('->'):id};
+}
+function topologyLocalPlan(text,raw,target,field,id,value,context){
+  var imp=target.got.d.topologyImports[target.index],map=builderClone(imp[field] || {});
+  if(value===null)delete map[id];else Object.defineProperty(map,id,{value:value,enumerable:true,writable:true,configurable:true});
+  var plan=planSetField(text,raw,target.got.path.concat(['topologyImports',target.index]),field,Object.keys(map).length?JSON.stringify(map):null);
+  if(plan.error)return plan;
+  try{FlowTopology.resolveSource(JSON.parse(plan.text),context);}catch(ex){return {error:ex.message};}
+  return plan;
+}
+function planTopologyNodeCodeRefs(text,raw,section,id,refs,context){
+  var t=topologyLocalTarget(text,raw,section,'nodes',id,context);if(t.error)return t;
+  if(!t.owner)return {error:'Choose a node in an authored topology import.'};
+  if(!Array.isArray(refs))return {error:'Additional code references must be a JSON array.'};
+  return topologyLocalPlan(text,raw,t,'nodeCodeRefs',t.relative,refs.length?refs:null,context);
+}
+function builderEdgeLayoutTarget(text,raw,section,index,key,context){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var resolved;try{resolved=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}
+  var rec=specSectionPaths(resolved)[section],d=rec && specValueAt(resolved,rec.diagram),edge=d && (d.edges || [])[index];
+  if(!edge || key && builderEdgeKey(edge)!==key)return {error:'The connection changed. Render and select it again.'};
+  key=builderEdgeKey(edge);
+  if(FlowTopology.origin(d,'edges',key) && d.edges.filter(function(e){return builderEdgeKey(e)===key;}).length!==1)return {error:'Connection identity is ambiguous.'};
+  var t=topologyLocalTarget(text,raw,section,'edges',key,context);if(t.error)return t;
+  t.edge=edge;t.key=key;t.localIndex=(got.d.edges || [])[index] && builderEdgeKey(got.d.edges[index])===key?index:(got.d.edges || []).findIndex(function(e){return builderEdgeKey(e)===key;});return t;
+}
+function planEdgeLayout(text,raw,section,index,key,patch,context){
+  var t=builderEdgeLayoutTarget(text,raw,section,index,key,context);if(t.error)return t;
+  try{FlowTopology.validateEdgeOverride(patch,'edge layout');}catch(ex){return {error:ex.message};}
+  if(t.owner){
+    var previous=(t.got.d.topologyImports[t.index].edgeOverrides || {})[t.relative] || {};
+    return topologyLocalPlan(text,raw,t,'edgeOverrides',t.relative,Object.assign({},previous,patch),context);
+  }
+  if(t.localIndex<0)return {error:'Authored connection not found.'};
+  return planSetFields(text,raw,t.got.path.concat(['edges',t.localIndex]),Object.keys(patch).map(function(field){return [field,patch[field]===null?null:JSON.stringify(patch[field])];}));
+}
+function planResetTopologyEdgeLayout(text,raw,section,index,key,context){
+  var t=builderEdgeLayoutTarget(text,raw,section,index,key,context);if(t.error)return t;
+  if(!t.owner)return {error:'Choose an imported connection.'};
+  return topologyLocalPlan(text,raw,t,'edgeOverrides',t.relative,null,context);
+}

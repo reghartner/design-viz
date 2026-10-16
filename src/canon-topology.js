@@ -48,6 +48,21 @@ var FlowTopology = (function(){
     return id;
   }
 
+  var edgeLayoutFields=['labelDx','labelDy','fromPort','toPort','curvePoints','curveControls','bend'];
+  function validateEdgeOverride(value,at){
+    shape(value,edgeLayoutFields,at);
+    Object.keys(value).forEach(function(key){
+      var v=value[key];if(v===null)return;
+      if(key==='fromPort' || key==='toPort'){
+        shape(v,['side','offset'],at+' '+key);if(!validEdgePort(v))fail(at,'invalid '+key);
+      }else if(key==='curvePoints' || key==='curveControls'){
+        if(!(key==='curvePoints'?validCurvePoints(v):validCurveControls(v)))fail(at,'invalid '+key);
+        v.forEach(function(p){shape(p,['t','dx','dy'],at+' '+key);});
+      }else if(!Number.isFinite(v) || Math.abs(v)>100000)fail(at,'invalid '+key);
+    });
+    if(value.curvePoints!=null && value.curveControls!=null)fail(at,'use either curvePoints or curveControls');
+  }
+
   function materialize(specs){
     if(!Array.isArray(specs))fail('snapshot','expected an array of specs');
     var copies=specs.map(clone),byId=new Map(),states=new Map(),exportsById=new Map();
@@ -85,7 +100,7 @@ var FlowTopology = (function(){
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','edgeOverrides'],where);
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.export) || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           ['nodes','edges'].forEach(function(key){if(own(imp,key))list(imp[key],where+' '+key);});
           if(own(imp,'nodePositions')){
@@ -94,6 +109,17 @@ var FlowTopology = (function(){
               shape(imp.nodePositions[key],['x','y'],where+' nodePositions '+key);
               if(!positionedFloat(imp.nodePositions[key]))fail(where,'nodePositions '+key+' requires finite x/y coordinates between -100000 and 100000');
             });
+          }
+          if(own(imp,'nodeCodeRefs')){
+            if(!object(imp.nodeCodeRefs))fail(where,'nodeCodeRefs must be an object keyed by exported node identity');
+            Object.keys(imp.nodeCodeRefs).forEach(function(key){
+              if(!Array.isArray(imp.nodeCodeRefs[key]))fail(where,'nodeCodeRefs '+key+' must be an array');
+              imp.nodeCodeRefs[key].forEach(function(ref){var errors=FlowCanon.referenceErrors(ref);if(errors.length)fail(where,'nodeCodeRefs '+key+': '+errors.join('; '));});
+            });
+          }
+          if(own(imp,'edgeOverrides')){
+            if(!object(imp.edgeOverrides))fail(where,'edgeOverrides must be an object keyed by exported edge identity');
+            Object.keys(imp.edgeOverrides).forEach(function(key){validateEdgeOverride(imp.edgeOverrides[key],where+' edgeOverrides '+key);});
           }
           if(own(imp,'position')){
             shape(imp.position,['x','y'],where+' position');
@@ -129,6 +155,8 @@ var FlowTopology = (function(){
           Object.keys(imp.nodePositions || {}).forEach(function(key){
             if(!selected.has(key))fail(where,'nodePositions identity is not selected/exported: '+key);
           });
+          Object.keys(imp.nodeCodeRefs || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeCodeRefs identity is not selected/exported: '+key);});
+          Object.keys(imp.edgeOverrides || {}).forEach(function(key){if(!exp.edges.includes(key))fail(where,'edgeOverrides identity is not selected/exported: '+key);});
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
           if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];
@@ -153,6 +181,7 @@ var FlowTopology = (function(){
           exp.nodes.forEach(function(key){
             if(!own(nodes,key) || !object(nodes[key]))fail(where,'missing exported node '+key);
             var value=clone(nodes[key]);if(value.group){group(value.group,new Set());value.group=prefix+value.group;}
+            if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
             // Reveal indices belong to the provider's story, not the consumer.
             delete value.revealAt;delete value.hideAt;
             Object.defineProperty(d.nodes,prefix+key,{value:value,enumerable:true,writable:true,configurable:true});nodeIds.push(prefix+key);
@@ -180,6 +209,7 @@ var FlowTopology = (function(){
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
             var edge=clone(matches[0]);
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
+            Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
             if(d.edges.some(function(e){return e && edgeKey(e)===edgeKey(edge);}))fail(where,'edge collision '+edgeKey(edge));
             d.edges.push(edge);edgeIds.push(edgeKey(edge));
@@ -319,7 +349,7 @@ var FlowTopology = (function(){
     if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
-  return {materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+  return {validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

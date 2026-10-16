@@ -18,20 +18,20 @@ async function openRaw(page,server,raw,name='contents'){
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
 test('Contents preserves Standard stacks, ordered Explore members and state through theme changes',async({page,server})=>{
-  const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 3');
+  const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');
   await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');
-  await root.getByRole('button',{name:'Previous Page',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
-  await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');
+  await root.getByRole('button',{name:'Previous section',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();const zoom=await root.locator('.reader-zoom-menu>summary').innerText();
   const board=await root.locator('#section-review .board').elementHandle();
   await root.locator('.reader-theme-menu>summary').click();await expect(root.getByRole('menuitemradio')).toHaveText(['Aurora','Pastel','Blueprint','Terminal','Rose','Lavender','Opus Lilac']);
-  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
+  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
   await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();
   await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
-  await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-page-label')).toHaveText('Page 3 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
 });
 
 test('Standard Contents exposes ordered section headlines and routes mouse and keyboard without collapsing the stack',async({page,server})=>{
@@ -41,11 +41,11 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
   await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
-  await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
-  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
-  await root.locator('.reader-tree-tab').getByText('Reference',{exact:true}).click();const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');
+  await root.locator('.reader-tree-tab').getByText('Reference',{exact:true}).click();const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 1');
 });
 
 test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
@@ -57,7 +57,7 @@ test('desktop Contents expands every View by default and preserves independent d
   await disclosure('full').focus();await page.keyboard.press('Enter');await expect(disclosure('full')).toBeFocused();await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('full')).toHaveAccessibleName('Expand Full story');await expect(sections('full')).toHaveCount(0);await expect(sections('explore')).toHaveCount(3);
   await disclosure('explore').click();await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');await expect(sections('explore')).toHaveCount(0);
   await choose(root,'explore');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
-  await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
+  await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
   await disclosure('full').click();await disclosure('explore').click();await expect(sections('full')).toHaveCount(3);await expect(sections('explore')).toHaveCount(3);
 });
 
@@ -90,7 +90,7 @@ test('native Contents themes and destruction are isolated between sibling hosts'
   await choose(one,'explore');await one.locator('.reader-theme-menu>summary').click();await one.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(one.locator('.docview')).toHaveClass(/sk-rose/);await expect(two.locator('.docview')).not.toHaveClass(/sk-rose/);
   const canvas=await one.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.x+canvas.width).toBeLessThanOrEqual(900);
   const nativeRoot=await one.locator('flowview-root').boundingBox(),sidebar=await one.locator('.reader-contents').boundingBox();expect(sidebar.y+sidebar.height).toBe(nativeRoot.y+nativeRoot.height);
-  await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next Page',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(one.locator('.reader-navigation')).toHaveCount(0);
+  await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next section',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(one.locator('.reader-navigation')).toHaveCount(0);
 });
 
 
@@ -99,7 +99,7 @@ test('desktop Contents closes on transition to phone and releases its focus trap
   await expect(root.locator('.reader-contents')).toBeVisible();await root.locator('.reader-tree-view[aria-current="page"]').focus();
   await page.setViewportSize({width:390,height:844});
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(toggle).toBeFocused();await expect(root.locator('.reader-scrim')).toBeHidden();
-  await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');
   await toggle.click();await expect(root.locator('.reader-contents')).toBeVisible();
   // A height-only resize must preserve a deliberately opened phone overlay.
   await page.setViewportSize({width:390,height:700});await expect(toggle).toHaveAttribute('aria-expanded','true');
@@ -112,12 +112,12 @@ for(const width of [1440,390])test('top Views route with Contents closed and ret
   await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story','Review + Backstage']);
   const full=strip.getByRole('tab',{name:'Full story',exact:true}),subset=strip.getByRole('tab',{name:'Review + Backstage',exact:true});
   await full.focus();await page.keyboard.press('ArrowRight');const explore=strip.getByRole('tab',{name:'Explore story',exact:true});await expect(explore).toBeFocused();
-  await page.evaluate(()=>location.hash='d=review&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(explore).toBeFocused();await expect(explore).toHaveAttribute('tabindex','0');await expect(full).toHaveAttribute('tabindex','-1');await expect(full).toHaveAttribute('aria-selected','true');await expect(strip.locator('[tabindex="0"]')).toHaveCount(1);
-  await page.evaluate(()=>location.hash='d=build&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 3');
+  await page.evaluate(()=>location.hash='d=review&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(explore).toBeFocused();await expect(explore).toHaveAttribute('tabindex','0');await expect(full).toHaveAttribute('tabindex','-1');await expect(full).toHaveAttribute('aria-selected','true');await expect(strip.locator('[tabindex="0"]')).toHaveCount(1);
+  await page.evaluate(()=>location.hash='d=build&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');
   await full.focus();await page.keyboard.press('End');await expect(subset).toBeFocused();await expect(full).toHaveAttribute('aria-selected','true');await page.keyboard.press('Enter');
   await expect(subset).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(root.locator('.reader-contents')).toBeHidden();
-  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');expect(new URL(page.url()).hash).toContain('v=subset');
-  await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
+  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');expect(new URL(page.url()).hash).toContain('v=subset');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   const step=root.locator('#section-review .stepid'),before=await step.innerText();await page.evaluate(()=>document.body.classList.add('presenting'));
   await subset.focus();await page.keyboard.press('ArrowLeft');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);
   await page.keyboard.press('Space');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);await expect(root.locator('#section-review .termbar')).toContainText('Paused');await page.evaluate(()=>document.body.classList.remove('presenting'));
@@ -208,7 +208,7 @@ test('embedded top Views only offer memberships containing the embedded Section'
   const root=await open(page,server);await page.goto(server.origin+'/contents.html#embed=build&v=explore');
   const strip=root.getByRole('tablist',{name:'Views in selected Tab'});await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story']);
   await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section')).toHaveText(['Turn a doorbell story into a reviewable draft']);
-  for(const name of ['Full story','Explore story']){await strip.getByRole('tab',{name,exact:true}).click();await expect(root.locator('.doc-sec .board:visible')).toHaveCount(1);await expect(root.locator('#section-build .board')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');}
+  for(const name of ['Full story','Explore story']){await strip.getByRole('tab',{name,exact:true}).click();await expect(root.locator('.doc-sec .board:visible')).toHaveCount(1);await expect(root.locator('#section-build .board')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 1');}
 });
 
 test('native top Views retain focus and align wrapped headers with their bounded canvas',async({page,server})=>{

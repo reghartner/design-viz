@@ -34,9 +34,10 @@ press **?** outside a text field to open it directly. Canvas keys include
 **⌘/Ctrl A** for every visible node in the active section (including referenced
 read-only nodes), **F** for Fit diagram, **Shift F** for Fit selection, and
 **F2** to open Inspect and focus the selected object’s first editable field.
-Existing copy, paste, duplicate, delete, nudge, object-menu, pan, and quick-connect
-keys are listed there too. These navigation and selection actions do not edit the
-JSON or add Undo history.
+**⌘/Ctrl K** opens Find objects, and **⌘/Ctrl Shift Z** or **⌘/Ctrl Y** redoes
+an undone action. Existing copy, paste, duplicate, delete, nudge, object-menu,
+pan, and quick-connect keys are listed there too. These navigation and selection
+actions do not edit the JSON or add Undo history.
 
 Start with **Your first diagram** for a complete walkthrough. The chapter list
 then covers the workspace, rows and free placement, quick connections, step

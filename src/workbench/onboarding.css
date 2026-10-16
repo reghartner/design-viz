@@ -49,3 +49,4 @@
 #folder-agent-setup-mode-embedded:not([aria-pressed="true"]){background:transparent}
 [data-open-human-guide]+.welcome-text-button{margin-left:14px}
 @media(max-width:800px){.welcome-hero{grid-template-columns:1fr}.workbench-tour-header>b{width:100%}}
+@media(min-width:1101px){.welcome{padding-top:26px}.welcome-hero{min-height:0;gap:44px}.welcome-intro .welcome-kicker{margin-bottom:12px}.welcome-intro h1{font-size:clamp(38px,3.4vw,50px);margin-bottom:14px}#welcome-example-view{max-height:max(240px,calc(100vh - 490px));margin:0 auto}.welcome-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:22px}.welcome-action{padding:15px 14px;gap:12px}.welcome-resume{margin-top:12px;padding:10px 18px}.welcome-library-entry{margin-top:12px;padding:13px 25px}}

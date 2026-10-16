@@ -91,8 +91,12 @@ function initWorkbenchOnboarding(opts){
   doc.getElementById('welcome-example-footer').hidden=!WORKBENCH_LANDING.footer;
   var stage=doc.createElement('div');stage.id='welcome-example-stage';
   function sizeExample(){
-    if(!ctl || home.hidden || welcomeRoot.hidden || !example.clientWidth)return;
-    var scale=example.clientWidth/stage.offsetWidth;
+    var room=example.parentNode.clientWidth;
+    if(!ctl || home.hidden || welcomeRoot.hidden || !room)return;
+    // A desktop max-height narrows the preview so the Welcome actions stay above the fold.
+    var scale=room/stage.offsetWidth,limit=parseFloat(getComputedStyle(example).maxHeight);
+    if(limit>0 && stage.offsetHeight*scale>limit)scale=limit/stage.offsetHeight;
+    example.style.width=scale<room/stage.offsetWidth?(stage.offsetWidth*scale)+'px':'';
     stage.style.transform='scale('+scale+')';
     example.style.height=(stage.offsetHeight*scale)+'px';
   }
@@ -112,6 +116,10 @@ function initWorkbenchOnboarding(opts){
     sizeFrame=requestAnimationFrame(function(){sizeFrame=null;sizeExample();});
   });
   exampleSize.observe(example);exampleSize.observe(stage);
+  window.addEventListener('resize',function(){
+    if(sizeFrame!==null)return;
+    sizeFrame=requestAnimationFrame(function(){sizeFrame=null;sizeExample();});
+  });
   var welcomeVisibility=new MutationObserver(paintExample);
   welcomeVisibility.observe(home,{attributes:true,attributeFilter:['hidden']});
   welcomeVisibility.observe(welcomeRoot,{attributes:true,attributeFilter:['hidden']});paintExample();

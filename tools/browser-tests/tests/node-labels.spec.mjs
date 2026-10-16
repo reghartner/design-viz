@@ -316,3 +316,57 @@ test('card icons keep their size and share a row height with or without controls
   await sizes(cumulus,'cumulus');
   await cumulus.screenshot({path:info.outputPath('cumulus-icons.png')});
 });
+
+/* #549 follow-up (Chuck): short (float) cards grow so the full-size icon has equal room above and below.
+   row | fixture | assertion (scoped) | rejects
+   19 short card taller | cumulus Sentinel Auth (Command path) and Frozen (OTA rollout) floats | that card's .card height is 50 (was 44) | keeping 44 and squeezing the icon against the bottom edge
+   20 regular cards unchanged | every non-float card on both boards | .card height stays 54 | growing every card
+   21 equal icon gaps | Sentinel Auth and Frozen | icon top − control-row bottom equals card bottom − icon bottom (±1), both ≥ 2 | icon touching the control row or the card edge
+   22 icon full size | same | .icbg 26×26 | shrinking the icon instead
+   23 edges meet the real edge | every edge touching Sentinel Auth / Frozen | the path end at that card lies within 0.5 units of the card's top or bottom edge (ends sit exactly on the edge; a 44-high port would be 3 off) and inside its x span | ports still computed for the 44-high card
+   24 no overlap | every card pair on both boards | card rects (board units) do not intersect | a taller float colliding with a row card */
+test('short float cards grow so the full-size icon has equal space above and below at 1440px',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});
+  const raw=JSON.parse(await readFile(path.join(repo,'examples/cumulus/cumulus-page.spec.v2.json'),'utf8'));
+  const tabs=raw.page.blocks.flatMap(b=>b.tabs||[]);
+  const input=path.join(server.root,'short-cards.json'),output=path.join(server.root,'short-cards.html');
+  await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/short-cards.html');await page.evaluate(()=>document.fonts.ready);
+  const nav=page.locator('#docview .explore-navigation').first();
+  for(const [label,floatId] of [['Command path','sentinel'],['OTA rollout','frozen']]){
+    if(label!=='Command path')await chooseNavigation(nav,'Tab',label);
+    const diagram=tabs.find(t=>t.label===label).sections.find(s=>s.diagram&&s.diagram.nodes[floatId]).diagram;
+    const floats=new Set((diagram.floats||[]).map(f=>f.id));
+    const board=page.locator('#docview .doc-sec:visible .boardcanvas>svg').filter({has:page.locator(`[data-dv-node="${floatId}"]`)}).first();
+    await expect(board).toBeVisible();await board.scrollIntoViewIfNeeded();
+    const edgeIds=diagram.edges.map((e,i)=>e.from===floatId||e.to===floatId?i:-1).filter(i=>i>=0);
+    const g=await board.evaluate((svg,{floatId,edgeIds})=>{
+      const inv=svg.getScreenCTM().inverse(),pt=(x,y)=>new DOMPoint(x,y).matrixTransform(inv);
+      const rect=el=>{const r=el.getBoundingClientRect(),a=pt(r.left,r.top),b=pt(r.right,r.bottom);return {left:a.x,top:a.y,right:b.x,bottom:b.y};};
+      const cards=Array.from(svg.children).filter(n=>n.matches('.node')&&n.querySelector(':scope>.card')).map(n=>{const c=n.querySelector(':scope>.card');return {id:n.dataset.dvNode,h:Number(c.getAttribute('height')),box:rect(c)};});
+      const node=svg.querySelector(`:scope>[data-dv-node="${floatId}"]`),bg=node.querySelector(':scope>.icbg');
+      const hits=Array.from(node.querySelectorAll(':scope>.nlink :is(circle,.nhit),:scope>.nbackref :is(circle,.nhit)'),h=>{const b=h.getBBox();return b.y+b.height;});
+      const ends=edgeIds.map(i=>{const p=svg.querySelector(`path.edge[data-dv-edge="${i}"]`),m=p.getScreenCTM(),len=p.getTotalLength();
+        return [p.getPointAtLength(0),p.getPointAtLength(len)].map(q=>{const s=new DOMPoint(q.x,q.y).matrixTransform(m);return pt(s.x,s.y);}).map(q=>({x:q.x,y:q.y}));});
+      return {cards,hitBottom:Math.max(...hits),iconY:Number(bg.getAttribute('y')),iconW:bg.getBBox().width,iconH:bg.getBBox().height,ends};
+    },{floatId,edgeIds});
+    const short=g.cards.find(c=>c.id===floatId);
+    expect.soft(short.h,`${label}: ${floatId} card is 50 high`).toBe(50);
+    for(const c of g.cards.filter(c=>!floats.has(c.id)))expect.soft(c.h,`${label}: ${c.id} keeps 54`).toBe(54);
+    expect(g.hitBottom,`${label}: ${floatId} has its controls`).toBeGreaterThan(0);
+    const top=g.iconY-g.hitBottom,bottom=short.h-(g.iconY+g.iconH);
+    expect.soft(Math.abs(top-bottom),`${label}: ${floatId} icon gaps ${top} above / ${bottom} below are equal`).toBeLessThanOrEqual(1);
+    expect.soft(Math.min(top,bottom),`${label}: ${floatId} icon clears row and edge`).toBeGreaterThanOrEqual(2);
+    expect.soft([g.iconW,g.iconH],`${label}: ${floatId} icon stays 26×26`).toEqual([26,26]);
+    expect(g.ends.length,`${label}: ${floatId} has edges`).toBeGreaterThan(0);
+    for(const end of g.ends){
+      const at=end.map(p=>({p,d:Math.min(Math.abs(p.y-short.box.top),Math.abs(p.y-short.box.bottom))})).sort((a,b)=>a.d-b.d)[0];
+      expect.soft(at.d,`${label}: edge meets ${floatId}'s top or bottom edge`).toBeLessThanOrEqual(0.5);
+      expect.soft(at.p.x>=short.box.left-1&&at.p.x<=short.box.right+1,`${label}: edge end inside ${floatId}'s x span`).toBe(true);
+    }
+    const hit=(a,b)=>a.left<b.right-0.5&&a.right>b.left+0.5&&a.top<b.bottom-0.5&&a.bottom>b.top+0.5;
+    g.cards.forEach((a,i)=>g.cards.slice(i+1).forEach(b=>expect.soft(hit(a.box,b.box),`${label}: ${a.id} and ${b.id} do not overlap`).toBe(false)));
+    await board.screenshot({path:info.outputPath(`short-${floatId}.png`)});
+  }
+});

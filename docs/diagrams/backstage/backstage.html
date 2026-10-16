@@ -810,7 +810,7 @@ body.sk-daylight{background:#F4F2EC;}
 .doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:26px; color:var(--dink); margin:0;min-width:0;}
 .doc-company-brand{margin-left:auto;min-width:0;max-width:45%;color:var(--dink);font:650 13px/1.3 'IBM Plex Sans',sans-serif;}
 .doc-company-brand .fv-brand-mark{width:28px;height:28px;}
-.doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
+.doc-company-brand .fv-brand-name{color:var(--dink);}
 .errbox{font:500 12px/1.6 'IBM Plex Mono',monospace; color:#FF8B7A; background:#1A0F12;
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 .tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
@@ -925,6 +925,8 @@ html.dv-commenting .docview>:not(.explore-navigation),html.dv-commenting .docvie
 
 /* style.core.css — shared doc/board/widget styles for both built pages. */
 :root{--delta:#2FBF71;}
+/* Buttons take their context's UI font, never the browser's Arial default; class rules still win. */
+:where(button,input[type=button],input[type=submit],input[type=reset]){font-family:inherit;}
 .tabbar{display:flex; gap:6px; flex-wrap:wrap; margin-top:24px;}
 .tabunit{display:inline-flex; align-items:stretch; gap:3px;}
 .tabbtn{font:600 12px 'IBM Plex Mono',monospace; padding:7px 14px; border-radius:8px; cursor:pointer;}
@@ -2500,13 +2502,13 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-daylight .generated-from a:hover{color:#2A33A0;}
 /* presenter mode (C1) */
 .presentbtn{float:right; margin-top:4px;}
-.presenting .presentbtn{position:fixed; top:10px; right:12px; z-index:9; float:none;}
+/* below the reader navigation (its bottom is published on .docview), or the Legend takes Exit's clicks */
+.presenting .presentbtn{position:fixed; top:var(--flowview-navigation-bottom,10px); right:12px; z-index:9; float:none;}
 .presenting .docview{max-width:1400px;}
 .presenting .stepline{font-size:16px;}
 .presenting .stepline b{font-size:16px;}
 .presenting .tbtn:not(.presentbtn){font-size:14px; padding:7px 14px;}
 .presenting .schip{width:30px; height:30px; font-size:12px;}
-.presenting .doc-sub{display:none;}
 /* print-only step caption list (C4) */
 .printsteps{display:none;}
 /* ---------- step mode: dim everything but the lit step; protocol colors stay ---------- */
@@ -2910,20 +2912,6 @@ body.sk-editorial .doc-title{
   font:600 clamp(38px,5vw,62px)/.98 'Newsreader', Georgia, serif;
   letter-spacing:-.035em;
   text-wrap:balance;
-}
-body.sk-editorial .doc-sub{
-  margin:18px 0 0;
-  color:var(--ed-muted);
-  font:600 10px/1.4 'IBM Plex Mono', monospace;
-  letter-spacing:.13em;
-  text-transform:uppercase;
-}
-body.sk-editorial .doc-sub::after{
-  content:"";
-  display:block;
-  width:72px;
-  margin-top:22px;
-  border-bottom:2px solid var(--ed-accent);
 }
 body.sk-editorial .generated-from{color:var(--ed-muted);}
 body.sk-editorial .generated-from a{color:var(--ed-accent);}
@@ -3671,14 +3659,6 @@ body.sk-editorial .errbox{
     font-size:24px;
     font-weight:700;
     letter-spacing:-.035em;
-  }
-}
-@media screen {
-  body.sk-terminal .doc-sub{
-    color:var(--tm-muted);
-    font-size:10px;
-    letter-spacing:.12em;
-    text-transform:uppercase;
   }
 }
 @media screen {
@@ -4641,19 +4621,6 @@ body.sk-editorial .errbox{
     font-weight:800;
     line-height:1.2;
     margin-bottom:9px;
-  }
-}
-@media screen {
-  body.sk-pastel .doc-sub {
-    display:inline-flex;
-    align-items:center;
-    width:max-content;
-    color:#748197;
-    background:rgba(255,255,255,.76);
-    border:1px solid #E1E7F0;
-    border-radius:999px;
-    padding:4px 10px;
-    box-shadow:0 3px 12px rgba(65,78,112,.05);
   }
 }
 @media screen {
@@ -5925,13 +5892,6 @@ body.sk-editorial .errbox{
   }
 }
 @media screen {
-  body.sk-blueprint .doc-sub{
-    color:#9AC7DF;
-    font-size:10px;
-    letter-spacing:.08em;
-  }
-}
-@media screen {
   body.sk-blueprint .generated-from{color:#9AC7DF;}
 }
 @media screen {
@@ -7111,7 +7071,7 @@ button.tr-op{cursor:pointer;}
    every skin's section-box treatment. */
 body.dv-embed{margin:0 !important;}
 body.dv-embed header, body.dv-embed footer,
-body.dv-embed .doc-heading, body.dv-embed .doc-sub,
+body.dv-embed .doc-heading,
 body.dv-embed .generated-from, body.dv-embed .presentbtn,
 body.dv-embed .tabbar,
 body.dv-embed .doc-sec:not(.dv-embed-target),
@@ -7991,12 +7951,15 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  body .docview.has-reader-contents{padding-left:calc(var(--reader-inset,0px) + 24px)!important;}
  /* Skin metadata badges use max-content width; include their padding in the
     reader's available content width, including beneath the fixed Explore canvas. */
- .has-reader-contents>.doc-sub{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
  body .docview.has-reader-contents>.reader-navigation{display:block;padding:0;gap:0;font:13px/1.45 'IBM Plex Sans',sans-serif;color:var(--dtext);}
  .reader-navigation>.explore-navigation-group{display:none!important;}
- .reader-top{min-height:56px;display:grid;grid-template-columns:34px minmax(60px,120px) minmax(0,1fr) minmax(316px,max-content);align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
- .reader-breadcrumb{min-width:0;}
- .reader-tab-label{display:block;color:var(--dfaint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ .reader-top{min-height:56px;display:grid;grid-template-columns:34px fit-content(320px) minmax(0,1fr) minmax(316px,max-content);align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
+ .reader-breadcrumb{min-width:0;display:flex;align-items:baseline;gap:6px;}
+ .reader-tab-label{display:block;min-width:0;color:var(--dfaint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ .reader-top.reader-detail-open{grid-template-columns:34px minmax(120px,320px) minmax(0,1fr) minmax(316px,max-content);}
+ .reader-wrapped .reader-top.reader-detail-open{grid-template-columns:34px minmax(0,1fr) auto;}
+ .reader-detail-separator{flex:none;color:var(--dfaint);}
+ .reader-detail-label{flex:0 0 auto;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
  .reader-view-strip{display:flex;flex-wrap:wrap;gap:4px;min-width:0;align-items:center;}
  body .reader-navigation .reader-view-strip .reader-top-view{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-color:var(--explore-border);font-size:12px;font-weight:500;padding:5px 9px;}
  body .reader-navigation .reader-view-strip .reader-top-view[aria-selected=true]{color:var(--navigation-accent);background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));border-color:var(--navigation-accent);}
@@ -8029,6 +7992,10 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  .reader-tree-sections{margin:4px 0 12px 14px;padding:0 0 0 8px;border-left:1px solid var(--explore-border);list-style:none;}
  body .reader-navigation .reader-tree-section{display:flex;gap:12px;width:100%;padding:10px 8px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
  .reader-tree-section:before{content:attr(data-page-number);min-width:12px;font-variant-numeric:tabular-nums;}
+ .reader-tree-details{margin:2px 0 4px 32px;padding:0;list-style:none;font-size:12px;line-height:1.5;}
+ .reader-tree-detail{padding:4px 8px;color:var(--dfaint);overflow-wrap:anywhere;}
+ .reader-tree-detail:before{content:'↳ ';}
+ .reader-tree-detail[aria-current=location]{color:var(--navigation-accent);font-weight:500;}
  body .reader-navigation .reader-tree-section[aria-current=page]{background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);font-weight:500;box-shadow:-2px 0 var(--navigation-accent);}
  .reader-theme-footer{display:flex;align-items:center;gap:12px;flex:none;padding:13px 14px;border-top:1px solid var(--explore-border);background:var(--reader-footer,var(--explore-bg));}
  .reader-theme-label{font-size:12px;color:var(--dfaint);}.reader-theme-menu{position:relative;flex:1;min-width:0;}
@@ -34094,7 +34061,19 @@ function initViewerExploreCanvas(ctl,view,opts){
       var anchor=container===document.body && view.querySelector('.dv-hash-target');
       if(anchor!==document.activeElement)anchor=null;
       var top=anchor && anchor.getBoundingClientRect().top;
+      // A #t= link scrolled to the in-page tab bar before this first mount
+      // collapsed it; land on the tab's section the way a tab click does,
+      // after boot has added the reader page actions above it. Web fonts can
+      // still reflow the page; re-land once unless the reader has moved.
+      var tabArrival=!anchor && rec && container===document.body && !contained && !navigation.current() && ctl.activeTarget && ctl.activeTarget.kind==='tab';
       navigation.mount(rec);
+      if(tabArrival){
+        var moved=false,inputs=['wheel','keydown','pointerdown','touchstart'];
+        var stop=function(){moved=true;inputs.forEach(function(type){window.removeEventListener(type,stop,true);});};
+        var land=function(){if(moved || navigation.current()!==rec || !ctl.activeTarget || ctl.activeTarget.kind!=='tab')return;rec.sectionEl.scrollIntoView({block:'start'});};
+        inputs.forEach(function(type){window.addEventListener(type,stop,true);});
+        requestAnimationFrame(function(){land();(document.fonts && document.fonts.ready || Promise.resolve()).then(function(){requestAnimationFrame(function(){land();stop();});});});
+      }
       if(contained && previous && standardScroll){container.scrollLeft=standardScroll.x;container.scrollTop=standardScroll.y;standardScroll=null;}
       if(anchor && anchor.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
       return;
@@ -34188,6 +34167,7 @@ function createReaderContents(ctl,nav,actions,options){
   nav.classList.add('reader-navigation');view.classList.add('has-reader-contents');
   var top=element('div','reader-top',null,nav),toggle=button('Open Contents','☰',top,function(){setOpen(!opened,true,true);});
   var breadcrumb=element('div','reader-breadcrumb',null,top),tabLabel=element('span','reader-tab-label',null,breadcrumb);
+  var detailSeparator=element('span','reader-detail-separator','/'),detailLabel=element('span','reader-detail-label');detailSeparator.setAttribute('aria-hidden','true');
   var viewStrip=element('div','reader-view-strip',null,top);viewStrip.setAttribute('role','tablist');viewStrip.setAttribute('aria-label','Views in selected Tab');top.appendChild(actions);
   var utilities=element('details','reader-utilities',null,actions),utilitySummary=element('summary','reader-button','⋯',utilities);utilitySummary.setAttribute('aria-label','More actions');
   var utilityBody=element('div','reader-utility-options',null,utilities);
@@ -34198,8 +34178,8 @@ function createReaderContents(ctl,nav,actions,options){
   var zoomOptions=element('div','reader-zoom-options',null,zoomMenu);
   [50,75,100,125,150,200].forEach(function(percent){button('Zoom '+percent+'%',percent+'%',zoomOptions,function(){setZoom(percent/100);zoomMenu.open=false;zoomSummary.focus();});});
   var plus=button('Zoom in','+',zoomGroup,function(){zoomBy(1.25);});
-  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');pager.setAttribute('aria-label','Pages in selected View');
-  var previous=button('Previous Page','‹',pager,function(){pageBy(-1);}),pageLabel=element('span','reader-page-label',null,pager),next=button('Next Page','›',pager,function(){pageBy(1);});pageLabel.setAttribute('aria-live','polite');
+  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');pager.setAttribute('aria-label','Sections in selected View');
+  var previous=button('Previous section','‹',pager,function(){pageBy(-1);}),pageLabel=element('span','reader-page-label',null,pager),next=button('Next section','›',pager,function(){pageBy(1);});pageLabel.setAttribute('aria-live','polite');
   var fit=button('Fit','Fit',toolbar,function(){var handled=options.fit && options.fit(current,viewportRecord,owner)!==false;if(!handled && viewportRecord && viewportRecord.viewport && viewportRecord.viewport.isExplore())viewportRecord.viewport.fitCanvas();else if(!handled)setZoom(1);updateZoom();});
   var scrim=button('Close Contents','',nav,function(){setOpen(false,true,true);});scrim.classList.add('reader-scrim');scrim.tabIndex=-1;
   var sidebar=element('aside','reader-contents',null,nav);sidebar.setAttribute('aria-label','Contents');
@@ -34215,6 +34195,8 @@ function createReaderContents(ctl,nav,actions,options){
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
   SELECTABLE_SKINS.forEach(function(skin){var choice=button(skinLabel(skin),skinLabel(skin),themeOptions,function(){if(typeof window.dvSetSkin==='function')window.dvSetSkin(skin);applySkinClasses(document.body,view,skin);themeMenu.open=false;themeSummary.focus();});choice.setAttribute('role','menuitemradio');choice.setAttribute('data-reader-skin',skin);});
+  // The editor has one skin control (header Appearance); only readers get this picker.
+  if(options.themePicker===false)footer.remove();
   function updateTheme(ev){
     var skin=ev && ev.detail && ev.detail.skin || SKIN_NAMES.slice().reverse().find(function(name){return view.classList.contains('sk-'+name);}) || DEFAULT_SKIN;
     themeSummary.textContent=skinLabel(skin)+'　⌃';themeSummary.setAttribute('data-current-skin',skin);
@@ -34248,6 +34230,8 @@ function createReaderContents(ctl,nav,actions,options){
     themeOptions.style.maxHeight=Math.max(70,bottom-rect.bottom-110)+'px';
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
+  // An open drill-down stays inside its root section; name each open level.
+  function detailTrail(){var open=ctl.details && ctl.details.activeSections();return open && open[0]===current?ctl.details.activeTrail():[];}
   function ownerLabel(item){return item.source.label || item.source.title || 'Document';}
   function embedded(){return ctl.sections.find(function(section){return section.sectionEl.classList.contains('dv-embed-target');});}
   function choose(item,definition,rec,fromTop){
@@ -34291,7 +34275,8 @@ function createReaderContents(ctl,nav,actions,options){
         var expanded=!collapsedViews.has(key),disclosure=button((expanded?'Collapse ':'Expand ')+definition.name,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});disclosure.classList.add('reader-view-disclosure');disclosure.setAttribute('aria-expanded',String(expanded));disclosure.setAttribute('data-reader-key',key+':disclosure');
         if(expanded){
           var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);
-          definition.members.filter(function(member){return !embed || member.record.runtime===embed;}).forEach(function(member,index){var rec=member.record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-reader-key',key+':'+rec.number);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));});
+          definition.members.filter(function(member){return !embed || member.record.runtime===embed;}).forEach(function(member,index){var rec=member.record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-reader-key',key+':'+rec.number);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));
+            if(selected && current===rec){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,li);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}});
         }
       });
     });
@@ -34313,8 +34298,12 @@ function createReaderContents(ctl,nav,actions,options){
     if(owner && owner.current.presentation==='standard' && !(options.isCanvas && options.isCanvas()))members.forEach(function(section){section.sectionEl.style.zoom=standardZoom.get(owner.current) || 1;});
     nav.setAttribute('data-reader-multiple-views',String(!!(owner && owner.views.length>1)));
     tabLabel.textContent=owner?ownerLabel(owner):'Document';tabLabel.title=tabLabel.textContent;
+    var trail=detailTrail(),deepest=trail[trail.length-1];
+    if(deepest){detailLabel.textContent=deepest.label;detailLabel.title=trail.map(function(level){return level.title;}).join(' › ');breadcrumb.append(detailSeparator,detailLabel);}
+    else{detailSeparator.remove();detailLabel.remove();}
+    top.classList.toggle('reader-detail-open',!!deepest);
     if(owner)expandedTabs.add(owner.path);
-    var index=members.indexOf(current);pageLabel.textContent='Page '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
+    var index=members.indexOf(current);pageLabel.textContent='Section '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
     // Shared utility controls remain live. Ordinary readers surface the hidden
     // Tab bar's real copy control; a host-owned share action consolidates it.
     release();
@@ -34704,8 +34693,6 @@ function applySkinClasses(body, view, name){
     skinClasses(name).forEach(function(cls){ el.classList.add(cls); });
   });
   if (view && view.querySelector){
-    var label = view.querySelector('[data-dv-skin-label]');
-    if (label) label.textContent = 'generated from spec · skin: ' + name;
     view.dispatchEvent(new CustomEvent('reader-skin-change',{detail:{skin:name}}));
   }
   var scope = body && body.querySelectorAll ? body : view;
@@ -35229,7 +35216,7 @@ function showCommunicationFailures(board,failures,animate){
 
 /* Board popovers own their listeners outside the board's DOM too. */
 function destroyBoardLinks(el){
-  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails'].forEach(function(key){
+  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails', '_frameWatch'].forEach(function(key){
     var controller = el[key];
     el[key] = null;
     if (controller) controller.destroy();
@@ -35949,6 +35936,19 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     }
   }
   refreshFrame();
+  /* Ink measured before webfonts settle, or skipped while an inactive tab
+     hid the board, is stale. Re-measure once fonts are ready and each time the
+     board is shown again, so a later refresh (a Step/Ambient switch) cannot
+     grow the viewBox and move the Explore drawing. */
+  var frameRetired=false,frameShown=false,frameObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(entries){
+    var rect=entries[entries.length-1].contentRect,shown=rect.width>0 && rect.height>0;
+    if(shown && !frameShown && !frameRetired)refreshFrame();
+    frameShown=shown;
+  }):null;
+  if(frameObserver)frameObserver.observe(svg);
+  var frameFonts=svg.ownerDocument && svg.ownerDocument.fonts;
+  if(frameFonts && frameFonts.ready && typeof frameFonts.ready.then==='function')frameFonts.ready.then(function(){if(!frameRetired && svg.isConnected)refreshFrame();});
+  el._frameWatch={destroy:function(){frameRetired=true;if(frameObserver)frameObserver.disconnect();}};
 
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
@@ -37655,7 +37655,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   }
   if (hasDelta){
     btnDelta = document.createElement('button');
-    btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ ONLY';
+    btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ only';
     btnDelta.setAttribute('aria-pressed', 'false');
     btnDelta.addEventListener('click', function(){
       var on = btnDelta.getAttribute('aria-pressed') !== 'true';
@@ -37675,8 +37675,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   /* mode toggle in the legend bar */
   var tog = document.createElement('span'); tog.className = 'mtoggle';
-  var btnAmb = document.createElement('button'); btnAmb.className = 'mbtn'; btnAmb.textContent = 'AMBIENT';
-  var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'STEP';
+  var btnAmb = document.createElement('button'); btnAmb.className = 'mbtn'; btnAmb.textContent = 'Ambient';
+  var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'Step';
   btnAmb.setAttribute('aria-pressed', 'true'); btnStep.setAttribute('aria-pressed', 'false');
   tog.appendChild(btnAmb); tog.appendChild(btnStep); (boardLayout.modesHost || lg).appendChild(tog);
   if (btnDelta) tog.appendChild(btnDelta);
@@ -37812,12 +37812,6 @@ function renderPage(view, page, skin, backlinks, options){
   }
   var provenance = generatedFromHTML(page.generatedFrom);
   if (provenance) view.insertAdjacentHTML('beforeend', provenance);
-  if (page.title){
-    var su = document.createElement('p');
-    su.className = 'doc-sub'; su.setAttribute('data-dv-skin-label', '');
-    su.textContent = 'generated from spec · skin: ' + skin;
-    view.appendChild(su);
-  }
   var gi = 0;
   var pageBlocks = blocksOf(page);
   var records = sectionRecords(page);
@@ -38581,26 +38575,30 @@ function wirePresenter(ctl, view, win){
   var doc = win.document;
   var btn = doc.createElement('button');
   btn.className = 'tbtn presentbtn';
-  btn.textContent = 'PRESENT';
-  btn.setAttribute('aria-label', 'Enter presenter mode (fullscreen)');
   readerPageActions(view,ctl).appendChild(btn);
+  function label(on){
+    btn.textContent = on ? 'Exit' : 'Present';
+    btn.title = on ? 'Exit full screen' : 'Present full screen';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  label(false);
   function presenting(){ return doc.body.classList.contains('presenting'); }
   function enter(){
     doc.body.classList.add('presenting');
-    btn.textContent = 'EXIT';
+    label(true);
     var root = doc.documentElement;
     if (root.requestFullscreen) root.requestFullscreen().catch(function(){});
   }
   function exit(){
     doc.body.classList.remove('presenting');
-    btn.textContent = 'PRESENT';
+    label(false);
     if (doc.fullscreenElement && doc.exitFullscreen) doc.exitFullscreen().catch(function(){});
   }
   btn.addEventListener('click', function(){ presenting() ? exit() : enter(); });
   doc.addEventListener('fullscreenchange', function(){
     if (!doc.fullscreenElement && presenting()){
       doc.body.classList.remove('presenting');
-      btn.textContent = 'PRESENT';
+      label(false);
     }
   });
   function stepKey(sp, ev){
@@ -38778,11 +38776,12 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
       if(button)button.focus();
     }
   }
+  function label(frame){return (frame.section.heading || frame.section.id || 'Detail').split(' · ')[0];}
   function breadcrumb(frame){
     var nav=document.createElement('nav');nav.className='detail-breadcrumb';nav.setAttribute('aria-label','Diagram drill-down');
     session.stack.forEach(function(item,i){
       if(i){var arrow=document.createElement('span');arrow.textContent='›';arrow.setAttribute('aria-hidden','true');nav.appendChild(arrow);}
-      var button=document.createElement('button');button.type='button';button.textContent=i===0?'Overview':(item.section.heading || item.section.id || 'Detail').split(' · ')[0];button.title=item.section.heading || item.section.id || 'Overview';
+      var button=document.createElement('button');button.type='button';button.textContent=i===0?'Overview':label(item);button.title=item.section.heading || item.section.id || 'Overview';
       if(item===frame){button.setAttribute('aria-current','page');button.disabled=true;}
       else button.addEventListener('click',function(){back(i);});
       nav.appendChild(button);
@@ -38954,6 +38953,8 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   return {snapshot:snapshot,restore:restore,close:close,
     showSection:function(reference){var frame=liveRoots.get(reference);if(!frame || ctl.views && !ctl.views.ensure(frame.rec,undefined,true))return false;close(true);liveRoots.forEach(function(f){restoreOriginal(f);});if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
+    // Reader chrome (header, Contents) names each open level below the root.
+    activeTrail:function(){return session?session.stack.slice(1).map(function(frame){return {label:label(frame),title:frame.section.heading || frame.section.id || 'Detail'};}):[];},
     activeSections:function(){return session?session.stack.map(function(frame){return frame.rec;}):[];},
     activeStepper:function(){return current() && current().rec.stepper;},
     pause:function(){if(session)session.stack.forEach(pause);},
@@ -39454,8 +39455,8 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The big picture',
-        body: 'AMBIENT shows the calls together, with activity looping across the diagram.',
-        reducedMotionBody: 'AMBIENT shows the calls together. Animation stays off with reduced motion.'
+        body: 'Ambient shows the calls together, with activity looping across the diagram.',
+        reducedMotionBody: 'Ambient shows the calls together. Animation stays off with reduced motion.'
       }
     },
     {
@@ -39467,13 +39468,13 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'One call at a time',
-        body: 'STEP follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
-        reducedMotionBody: 'STEP follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
+        body: 'Step follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
+        reducedMotionBody: 'Step follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
       },
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'PRESENT gives a room the full-page presentation.'
+          note: 'Present goes full screen for a room.'
         }
       ]
     },
@@ -39490,7 +39491,7 @@ var TOUR_DEFAULT_CONFIG = {
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'PRESENT gives a room the full-page presentation.'
+          note: 'Present goes full screen for a room.'
         }
       ]
     },
@@ -39631,7 +39632,7 @@ var TOUR_DEFAULT_CONFIG = {
 
    Design (approved "presenter cinema" mockups): dark scrim with a bright
    ring-lit hole over the real control, subtitle narration in a corner card,
-   a segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
+   a segment timeline top-center, Back/Next, one fixed "Skip tour", keyboard hints. The hole is
    deliberately click-through — the copy invites trying the spotlit control —
    so the dialog is non-modal (role=dialog without aria-modal).
 
@@ -39978,10 +39979,10 @@ function wireTour(ctl, view, win, config, options){
     var scrim = el('div', 'dv-tour-scrim');
     overlay.appendChild(scrim);
     var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
-    /* a mouse way out that never waits for the card: fixed top-right from
-       the first frame, above the click blockers, never moved */
-    var exit = button('dv-tour-exit', 'Skip tour \u2715', function(){ finish(); });
-    exit.setAttribute('aria-label', 'Skip the tour');
+    /* the tour's only skip control, chooser and steps alike: a mouse way
+       out that never waits for the card, fixed top-left from the first
+       frame, above the click blockers, never moved */
+    var exit = button('dv-tour-exit', 'Skip tour', function(){ finish(); });
     overlay.appendChild(exit);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
     var ui = el('div', 'dv-tour-ui');
@@ -39996,8 +39997,7 @@ function wireTour(ctl, view, win, config, options){
     var controls = el('div', 'dv-tour-controls');
     var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
     var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
-    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
-    controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
+    controls.appendChild(back); controls.appendChild(next);
     var practice=el('div','dv-tour-practice');
     var replayExample=button('dv-tour-skip dv-tour-replay-example','Replay example',function(){go(at);});
     var tryControls=button('dv-tour-skip dv-tour-try','Try the controls',function(){
@@ -40014,7 +40014,7 @@ function wireTour(ctl, view, win, config, options){
     parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
              rings: rings, glowId: glowId, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
-             back: back, next: next, skip: skip, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
+             back: back, next: next, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
   }
   /* One geometry, one render path. Every highlight is a single shape
      object {x, y, width, height, rx}; that object writes the mask hole AND
@@ -40478,10 +40478,11 @@ function wireTour(ctl, view, win, config, options){
       row.appendChild(b);
     });
     parts.chooser.appendChild(row);
-    var foot = el('div', 'dv-tour-choice-foot');
-    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
-    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(); }));
-    parts.chooser.appendChild(foot);
+    if (copy.note) {
+      var foot = el('div', 'dv-tour-choice-foot');
+      foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
+      parts.chooser.appendChild(foot);
+    }
     var first = row.querySelector('button');
     if (first) first.focus();
   }

@@ -222,7 +222,9 @@ working on the canvas or panel handles. Text fields keep their native text undo.
 **Dock** in each tool's title bar reserves canvas space on the right. One tool
 can be docked at a time; docking another restores the previous tool to floating.
 **Float** restores its floating size and position. Closing or hiding docked tools
-returns their space to the canvas. Docking and floating keep the selected object
+returns their space to the canvas. **Focus diagram** also releases a dock when
+it hides that tool; **Return to page** restores the dock and its reserved space.
+Docking and floating keep the selected object
 in the usable canvas, preserving its screen position where it fits. They never
 automatically fit the diagram; use **Fit diagram** when you want to reframe it.
 

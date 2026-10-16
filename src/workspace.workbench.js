@@ -141,7 +141,7 @@ function initWorkbenchWorkspace(){
     return {left:left,top:top,bottom:controls?innerHeight-controls.top+12:12};
   }
   function defaults(name){var b=bounds();return {x:name==='agent'?b.left:innerWidth-392,y:b.top,w:name==='json'?500:380,h:Math.min(700,innerHeight-b.top-b.bottom),open:false};}
-  function docked(){return names.find(function(name){return prefs.windows[name] && prefs.windows[name].docked && prefs.windows[name].open && !hidden;});}
+  function docked(){return names.find(function(name){return prefs.windows[name] && prefs.windows[name].docked && prefs.windows[name].open && !hidden && !(windows[name] && windows[name].classList.contains('workspace-focus-tucked'));});}
   function dockWidth(){var b=bounds(),name=docked();return name?Math.min(Math.max(300,prefs.windows[name].w),Math.max(300,(innerWidth-b.left)*.45)):0;}
   function boundRect(value,name){
     var b=bounds(),reserve=docked() && docked()!==name?dockWidth()+12:0;
@@ -319,6 +319,7 @@ function initWorkbenchWorkspace(){
   // A deferred viewport adjustment belongs only to the Dock/Float gesture that
   // requested it. Selection, navigation, project replacement and newer canvas
   // gestures retire it before any old anchor can move the new camera.
+  document.getElementById('workspace-focus-diagram').addEventListener('click',retireDock);
   var view=document.getElementById('docview');
   ['diagram-view-change','diagram-tab-change','tab-view-change','detail-navigation','workbench-view-section','pointerdown','wheel','keydown'].forEach(function(type){view.addEventListener(type,retireDock,true);});
   // A fresh editor has no selection, so keep the authored controls and panels

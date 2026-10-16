@@ -1662,3 +1662,6 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .workspace-window[data-docked="true"] .workspace-window-grip::before{content:'▥';}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{right:calc(12px + var(--workspace-dock-width,0px));}
 .workspace-canvas:not(.workspace-diagram) #workspace-canvas{right:var(--workspace-dock-width,0px);}
+
+/* Let the document title yield before desktop project actions overflow. */
+@media(min-width:1181px){.workspace-canvas .workspace-tools{min-width:max-content;}}

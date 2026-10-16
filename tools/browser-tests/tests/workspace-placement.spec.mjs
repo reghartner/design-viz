@@ -26,7 +26,7 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080]])test(`desktop pa
   await agent.locator('.workspace-window-close').click();
   const node=page.locator('#docview [data-dv-node="c"]').first();const beforeCamera=await camera(page);
   await node.click();await page.locator('#editor-tab-inspect').click();await expect(inspect).toBeVisible();await clearSelectionOverlap(page);expect(await camera(page)).toEqual(beforeCamera);
-  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Storage');
+  await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Storage');
   await capture(page,testInfo,`inspect-${width}`);
   // Selection changes while Inspect is open must recheck its placement.
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
@@ -49,7 +49,7 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080]])test(`desktop pa
   expect((await page.locator('.workbench-diagram-canvas').boundingBox()).width).toBe(canvas.width);
   await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
   // An authored change remains the next Undo after chrome moves and docking.
-  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Front door');await title.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Front door');await title.press('Enter');
   await inspect.locator('.workspace-window-grip').focus();await page.keyboard.press('ArrowDown');
   await inspect.locator('.workspace-window-resize').focus();await page.keyboard.press('ArrowLeft');
   await inspect.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
@@ -108,4 +108,29 @@ test('a newer selection retires pending dock camera preservation',async({page,se
   // old left-node anchor; the selected node must finish in the usable viewport.
   await expect.poll(()=>page.locator('#docview .dv-sel').evaluate(el=>{const r=el.getBoundingClientRect(),b=el.closest('.explore-board').getBoundingClientRect();return r.left>=b.left && r.right<=b.right;})).toBe(true);
   await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+
+for(const presentation of ['standard','explore'])test(presentation+' diagram Focus releases a tucked dock and restores its cameras on Return',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation=presentation);
+  const source=JSON.stringify(raw);await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  const agent=page.locator('#workspace-window-agent'),inspect=page.locator('#workspace-window-inspect');
+  const reservation=()=>page.locator('body').evaluate(el=>el.style.getPropertyValue('--workspace-dock-width'));
+  const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+  const cameras=()=>page.locator('#docview .board').first().evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,graph:el.querySelector('.boardcanvas>svg').getBoundingClientRect().width,canvas:el.closest('.doc-sec').style.zoom}));
+  await page.locator('#editor-tab-agent').click();await agent.getByRole('button',{name:'Dock Agent panel',exact:true}).click();
+  const saved=await reservation();expect(parseFloat(saved)).toBeGreaterThan(300);await settle();const agentCameras=await cameras();
+  await page.getByRole('button',{name:'Focus diagram',exact:true}).click();
+  await expect(agent).toBeHidden();await expect.poll(reservation).toBe('0px');
+  await page.getByRole('button',{name:'Return to page',exact:true}).click();
+  await expect(agent).toBeVisible();await expect(agent).toHaveAttribute('data-docked','true');await expect.poll(reservation).toBe(saved);await settle();expect(await cameras()).toEqual(agentCameras);
+  await agent.locator('.workspace-window-close').click();
+  await page.locator('#docview [data-dv-node="a"]').first().click();await page.locator('#editor-tab-inspect').click();
+  await inspect.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
+  const inspectReserve=await reservation();await settle();const inspectCameras=await cameras();
+  await page.getByRole('button',{name:'Focus diagram',exact:true}).click();
+  await expect(inspect).toBeVisible();await expect.poll(reservation).toBe(inspectReserve);
+  await page.getByRole('button',{name:'Return to page',exact:true}).click();
+  await expect(inspect).toHaveAttribute('data-docked','true');await expect.poll(reservation).toBe(inspectReserve);await settle();expect(await cameras()).toEqual(inspectCameras);
+  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

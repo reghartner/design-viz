@@ -57,7 +57,7 @@ test('fresh desktop entry leaves Standard and Explore controls clear until selec
   for(const width of [1280,1440,1920]){
     await fresh(width);
     const story=page.locator('.section-layout-grid').filter({visible:true});
-    const ambient=story.getByRole('button',{name:'AMBIENT',exact:true}),step=story.getByRole('button',{name:'STEP',exact:true});
+    const ambient=story.getByRole('button',{name:/^ambient$/i}),step=story.getByRole('button',{name:/^step$/i});
     await expectCenterHit(ambient,'Standard AMBIENT at '+width);await ambient.click();await expect(ambient).toHaveAttribute('aria-pressed','true');
     await expectCenterHit(step,'Standard STEP at '+width);await step.click();await expect(step).toHaveAttribute('aria-pressed','true');
     await expectCenterHit(story.locator('.ptitle').filter({hasText:'Resident app'}),'Standard Resident app at '+width);
@@ -138,6 +138,45 @@ test('Steps opens on rows and preserves the list while filtering, inspecting and
   await expect(list.locator('.story-step')).toHaveCount(5);expect((await win.boundingBox()).height).toBeGreaterThan(600);
   await testInfo.attach('steps-alternate-1440x900',{body:await win.screenshot(),contentType:'image/png'});
   await expect(pane).toBeVisible();
+});
+
+/* #565 the steps panel has one name, and the editor's mode toggle uses sentence case.
+   Contract matrix (desktop 1440x900 workbench, editorSpec as authored (stepped, no delta); scoped to
+   #editor-tab-steps, #workspace-window-steps and its own controls, and the visible
+   .section-layout-grid's .mtoggle; text read as rendered innerText):
+   row | fixture | assertion (scoped) | rejects
+   S1 rail tool | fresh editor, Steps window closed | the .workspace-rail button named exactly "Steps" is #editor-tab-steps | a rail label other than "Steps"
+   S2 window title | real click on the rail tab | #workspace-window-steps visible; its grip's innerText is exactly "Steps" | "Story steps" window title
+   S3 window landmark | same | the window's aria-label is "Steps" | "Story steps" landmark
+   S4 window controls | same | Move / Close / Resize / Dock buttons are named "<verb> Steps panel" | controls naming a different panel
+   S5 list and filter | same | #steps-list aria-label "Steps"; #steps-search aria-label "Filter steps" | "Story steps" / "Filter story steps"
+   S6 no other name | same | no element inside the window carries "story steps" (any case) in its rendered text or aria-label | a leftover second name anywhere in the panel
+   M1 mode toggle | visible section grid | its .mtoggle buttons render exactly "Ambient" and "Step" | "AMBIENT" / "STEP" */
+test('Steps panel has one name and the editor mode toggle uses sentence case',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});await open(page,server,JSON.stringify(editorSpec(),null,2));
+  const rendered=locator=>locator.evaluate(el=>el.innerText.trim());
+  const win=page.locator('#workspace-window-steps');
+  // S1
+  await expect(win).toBeHidden();
+  expect(await page.locator('.workspace-rail').getByRole('button',{name:'Steps',exact:true}).evaluate(el=>el.id)).toBe('editor-tab-steps');
+  // S2-S5
+  await page.locator('#editor-tab-steps').click();await expect(win).toBeVisible();
+  expect(await rendered(win.locator('.workspace-window-grip'))).toBe('Steps');
+  await expect(win).toHaveAttribute('aria-label','Steps');
+  await expect(win.locator('.workspace-window-grip')).toHaveAttribute('aria-label','Move Steps panel');
+  await expect(win.locator('.workspace-window-close')).toHaveAttribute('aria-label','Close Steps panel');
+  await expect(win.locator('.workspace-window-resize')).toHaveAttribute('aria-label','Resize Steps panel');
+  await expect(win.locator('.workspace-window-dock')).toHaveAttribute('aria-label',/^(?:Dock|Float) Steps panel$/);
+  await expect(win.locator('#steps-list')).toHaveAttribute('aria-label','Steps');
+  await expect(win.locator('#steps-search')).toHaveAttribute('aria-label','Filter steps');
+  // S6
+  const other=await win.evaluate(root=>[root,...root.querySelectorAll('*')].flatMap(el=>[el.getAttribute('aria-label') || '',el.matches('summary,.workspace-window-grip') ? el.textContent : ''])
+    .filter(text=>/story steps/i.test(text)));
+  expect(other).toEqual([]);
+  // M1
+  const modes=page.locator('.section-layout-grid').filter({visible:true}).first().locator('.mtoggle button');
+  await expect(modes).toHaveCount(2);
+  expect([await rendered(modes.nth(0)),await rendered(modes.nth(1))]).toEqual(['Ambient','Step']);
 });
 
 test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{

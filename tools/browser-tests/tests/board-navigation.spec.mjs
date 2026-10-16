@@ -286,7 +286,7 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   await board.focus();await pans();
   await strip.getByRole('tab',{name:'Standard',exact:true}).click();
   // R9: focus outside every diagram leaves the keys to the page.
-  const present=page.getByRole('button',{name:'Enter presenter mode (fullscreen)',exact:true});
+  const present=page.locator('.reader-page-actions .presentbtn');
   await page.evaluate(()=>scrollTo(0,0));await page.getByRole('heading',{name:'Step keys',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>document.activeElement===document.body)).toBe(true);
   await page.keyboard.press('Space');expect(await lastKey()).toBe(' :false');await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(0);
@@ -301,4 +301,51 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','playing');
   await page.keyboard.press('Space');await expect(bar).toHaveAttribute('data-playback','paused');
   await page.keyboard.press('Escape');await expect(page.locator('body')).not.toHaveClass(/presenting/);
+});
+
+/* #565 viewer control labels share sentence case and Present says it goes full screen.
+   Contract matrix (standalone reader, one section "main" opening in ambient with steps and a
+   delta step; scoped to #section-main .mtoggle buttons and .reader-page-actions .presentbtn;
+   text is read as rendered innerText so a CSS uppercase transform also fails):
+   row | fixture | assertion (scoped) | rejects
+   M0 roster | ambient view, steps + delta | #section-main .mtoggle holds exactly 3 buttons | an extra or missing mode control escaping the rows below
+   M1 Ambient | initial ambient mode | that button's innerText is exactly "Ambient", aria-pressed=true | "AMBIENT" (text or CSS uppercase)
+   M2 Step | real click on the Step button | innerText exactly "Step", aria-pressed flips false->true | "STEP"
+   M3 Delta filter | delta:true step | innerText exactly "Δ only" | "Δ ONLY"
+   P1 Present idle | not presenting | innerText exactly "Present"; title "Present full screen"; the role=button named "Present full screen" is this element | "PRESENT"; a tooltip or name that never mentions full screen
+   P2 presenting | real click on Present | body.presenting; same element innerText "Exit", title and accessible name "Exit full screen" | "EXIT"; a stale "Present"/"Enter presenter mode" name while presenting
+   P3 click Exit | real click again | body not presenting; innerText "Present", title "Present full screen" | one-way relabel
+   P4 Escape exit | Present clicked, then keyboard Escape | not presenting; innerText "Present", title "Present full screen" | Escape path leaving the Exit label behind */
+test('viewer mode toggle and Present use sentence case and Present says it goes full screen',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const raw={page:{title:'Control labels',sections:[{id:'main',heading:'Main flow',diagram:{view:'ambient',autoplay:false,
+    nodes:{a:{title:'Source'},b:{title:'Destination'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
+    steps:[{id:'one',text:'One',edge:'a->b'},{id:'two',text:'Two',edge:'a->b',delta:true}]}}]}};
+  const input=path.join(server.root,'control-labels.json');await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'control-labels.html')]);
+  await page.goto(server.origin+'/control-labels.html');
+  const rendered=locator=>locator.evaluate(el=>el.innerText.trim());
+  const modes=page.locator('#section-main .mtoggle button');
+  // M0-M3
+  await expect(modes).toHaveCount(3);
+  const ambient=modes.nth(0),step=modes.nth(1),delta=modes.nth(2);
+  expect(await rendered(ambient)).toBe('Ambient');await expect(ambient).toHaveAttribute('aria-pressed','true');
+  expect(await rendered(step)).toBe('Step');await expect(step).toHaveAttribute('aria-pressed','false');
+  await step.click();await expect(step).toHaveAttribute('aria-pressed','true');expect(await rendered(step)).toBe('Step');
+  expect(await rendered(delta)).toBe('Δ only');
+  // P1-P4
+  const body=page.locator('body'),present=page.locator('.reader-page-actions .presentbtn');
+  await expect(present).toHaveCount(1);
+  const idle=async()=>{
+    await expect(body).not.toHaveClass(/presenting/);
+    expect(await rendered(present)).toBe('Present');await expect(present).toHaveAttribute('title','Present full screen');
+    expect(await page.getByRole('button',{name:'Present full screen',exact:true}).evaluate(el=>el.matches('.reader-page-actions .presentbtn'))).toBe(true);
+  };
+  await idle();
+  await present.click();await expect(body).toHaveClass(/presenting/);
+  expect(await rendered(present)).toBe('Exit');await expect(present).toHaveAttribute('title','Exit full screen');
+  expect(await page.getByRole('button',{name:'Exit full screen',exact:true}).evaluate(el=>el.matches('.reader-page-actions .presentbtn'))).toBe(true);
+  await present.click();await idle();
+  await present.click();await expect(body).toHaveClass(/presenting/);
+  await page.keyboard.press('Escape');await idle();
 });

@@ -30,7 +30,7 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080]])test(`desktop pa
   await capture(page,testInfo,`inspect-${width}`);
   // Selection changes while Inspect is open must recheck its placement.
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
-  await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   await clearSelectionOverlap(page);await page.locator('#workspace-window-outline .workspace-window-close').click();
   await page.locator('#editor-tab-agent').click();
   for(const win of [agent,inspect])for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(win.locator(control));

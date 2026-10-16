@@ -876,8 +876,10 @@ function fitLaneNodeTitle(node, title, width, subtitle){
     target = text;
   }
   if (fits(title, firstRight - x)) return true;
-  /* A cut title shows its full text on hover; lane and image cards render one. */
-  if (!Array.prototype.some.call(node.children, function(child){ return child.tagName.toLowerCase() === 'title'; })){
+  /* A title cut with … shows its full text on hover; lane and image cards
+     already render one. */
+  function exposeTitle(){
+    if (Array.prototype.some.call(node.children, function(child){ return child.tagName.toLowerCase() === 'title'; })) return;
     var full = document.createElementNS(SVGNS,'title');
     full.setAttribute('data-dv-fit-title','');
     full.textContent = title;
@@ -885,6 +887,7 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   }
   if (!twoLines){
     text.textContent = take(title, firstRight - x, true).trimEnd() + '…';
+    exposeTitle();
     return true;
   }
   var first = take(title, firstRight - x, false), split = first.lastIndexOf(' ');
@@ -893,7 +896,10 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   /* Keep the separator in textContent, but on the second line: a trailing
      SVG space expands the first tspan's bounds without painting a glyph. */
   var second = (title.charAt(first.length) === ' ' ? ' ' : '') + rest;
-  if (!fits(second, secondRight - x)) second = take(second, secondRight - x, true).trimEnd() + '…';
+  if (!fits(second, secondRight - x)){
+    second = take(second, secondRight - x, true).trimEnd() + '…';
+    exposeTitle();
+  }
   var y = hasSub ? titleY - 8 : titleY;
   text.textContent = '';
   [first, second].forEach(function(line, index){
@@ -1053,12 +1059,18 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
     }
   });
+  /* Fit this board's own cards: another board may reuse the same prefix. */
+  var fitEls = {};
+  Array.prototype.forEach.call(svg.children || [], function(child){
+    var id = child.getAttribute && child.getAttribute('data-dv-node');
+    if (id != null && Object.prototype.hasOwnProperty.call(nodeEls, id)) fitEls[id] = child;
+  });
   svg._fitLaneTitles = function(){
     svg._titlesPending = false;
-    Object.keys(nodeEls).forEach(function(id){
+    Object.keys(fitEls).forEach(function(id){
       var n = d.nodes[id];
       if (n.handoff || isTextBoxNode(n)) return;
-      if (!fitLaneNodeTitle(nodeEls[id], n.title || id, L.pos[id].w, n.sub || (embeddedImageKind(n.image) ? 'Embedded image' : ''))) svg._titlesPending = true;
+      if (!fitLaneNodeTitle(fitEls[id], n.title || id, L.pos[id].w, n.sub || (embeddedImageKind(n.image) ? 'Embedded image' : ''))) svg._titlesPending = true;
     });
   };
   refreshLaneTitles(svg);

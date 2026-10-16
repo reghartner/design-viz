@@ -145,44 +145,60 @@ test('#560 insert target says Adding here, save status is a badge and Home expla
 
 /* #564 — one UI font for buttons; no Arial fallback; monospace kept for code and deliberate skins (desktop only).
  row | fixture | assertion (scoped) | rejects
- 1 welcome buttons never fall back to Arial | run last: welcome screen at 1440 (asserted visible; reached by a real Home click if the kept draft reopens the editor), then a real click on Build with my agent | #folder-agent-connect and every visible .welcome-text-button: own computed first font family is not Arial and equals its parent element's first family (the panel's UI font); every button/input[type=button|submit|reset] in the document (visible or hidden): own computed first family is not Arial | welcome-button/text-button left on the UA Arial default outside .welcome
- 2 header toolbar and mode buttons share one family | editor at 1440 in the fixture's own skin (Pastel), no menu open except More (asserted) | each of Home, Add, File, Undo, Redo, Appearance summary, Preview, Help summary, Export, every editor rail tab (#editor-tab-*), Focus diagram and Fit selection is visible and its own computed first family is one value, equal to body's first family and not monospace | Home/File/Undo/Redo left in IBM Plex Mono, Add left in Sora, or rail tabs on a different family
- 3 editor canvas buttons never fall back to Arial | same editor; #docview holds ≥1 .prosetoggle/.copychip (asserted) | every button/input button in the document: own computed first family is not Arial | prose toggles and copy chips left on the UA default
+ 1 header toolbar and mode buttons share one family | editor at 1440 in the fixture's own skin (Pastel), no menu open except More (asserted) | named roster Home, Add, File, Undo, Redo, Appearance summary, Preview, Help summary, Export, every rail tab #editor-tab-*, Focus diagram, Fit selection is visible; that roster plus EVERY visible .workbench-header button/summary and EVERY visible .bbtn/.skbtn/.rbtn/.bexit/rail tab outside the #docview canvas: each element's own computed first family is one value, equal to body's first family and not monospace | Home/File/Undo/Redo left in IBM Plex Mono, Add left in Sora, rail tabs or any other .bbtn on a different family
+ 2 menu buttons share it too | same editor; Appearance, Help and Export each opened by a real click (closed before, asserted) | every visible button inside that menu body (skin buttons, Use document default, Keyboard shortcuts, User guide, Export project, SVG actions): own first family equals body's | .skbtn or menu .bbtn left in monospace
+ 3 editor buttons never fall back to Arial | same editor; #docview holds ≥1 .prosetoggle/.copychip (asserted) | every button/input[type=button|submit|reset] in the document (visible or hidden): own computed first family is not Arial | prose toggles, copy chips, window close/resize buttons left on the UA default
  4 code/JSON stays monospace | same editor | #src computed first family is IBM Plex Mono | a blanket rule that turns code fields sans
- 5 a skin chosen in Appearance keeps the header in one family | Appearance → Aurora by real click (aria-pressed flips false→true) | the row 2 roster again shares exactly one first family, equal to body's (which differs from row 2's) | skin font applied to some header buttons but not others
- 6 exported viewer buttons never fall back to Arial | the fixture injected into template/flowview.html | every button/input button in the document: own computed first family is not Arial, with ≥1 .prosetoggle/.copychip present (asserted) | viewer-only buttons left on the UA default
- 7 terminal skin keeps its deliberate monospace | that viewer, reader theme menu → Terminal by real click (#docview not sk-terminal before, sk-terminal after) | a .prosetoggle's computed first family is IBM Plex Mono | a fix that overrides the terminal skin's monospace UI
+ 5 every skin keeps the header in one family | Appearance → each of Aurora, Blueprint, Terminal, Rose, Lavender, Lilac, Pastel by real click (aria-pressed false before, true after) | per skin: the row 1 element set shares exactly one first family equal to body's; it is IBM Plex Mono for Terminal (the skin's deliberate monospace UI) and not monospace for every other skin; no button in the document computes to Arial | a skin font reaching some header buttons but not others, a fix that overrides Terminal's monospace, or Arial resurfacing under a skin
+ 6 exported viewer buttons never fall back to Arial | the fixture injected into template/flowview.html, ≥1 .prosetoggle/.copychip present (asserted) | every button/input button in the document: own computed first family is not Arial | viewer-only buttons left on the UA default
+ 7 terminal skin keeps its deliberate monospace in the viewer | that viewer, reader theme menu → Terminal by real click (#docview not sk-terminal before, sk-terminal after) | EVERY visible button in #docview (≥5 asserted) computes IBM Plex Mono as its first family | a fix that overrides the terminal skin's monospace on some viewer buttons
+ 8 welcome buttons never fall back to Arial | run last: welcome screen at 1440 (asserted visible; reached by a real Home click if the kept draft reopens the editor), then a real click on Build with my agent | #folder-agent-connect and every visible .welcome-text-button: own first family is not Arial and equals its parent element's first family (the panel's UI font); every button/input button in the document: not Arial | welcome-button/text-button left on the UA Arial default outside .welcome
 */
 test('#564 buttons share one UI font, never fall back to Arial, and keep monospace for code and the terminal skin',async({page,server})=>{
+ test.setTimeout(90_000);
  await page.setViewportSize({width:1440,height:900});
  const first=f=>f.split(',')[0].trim().replace(/^["']|["']$/g,'');
  const family=loc=>loc.evaluate(el=>getComputedStyle(el).fontFamily).then(first);
  const bodyFamily=()=>page.evaluate(()=>getComputedStyle(document.body).fontFamily).then(first);
  const arial=()=>page.evaluate(()=>[...document.querySelectorAll('button,input[type=button],input[type=submit],input[type=reset]')].map(el=>({el:(el.id?'#'+el.id:el.tagName.toLowerCase()+'.'+String(el.className).trim().split(/\s+/).join('.')),f:getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'')})).filter(r=>/^arial$/i.test(r.f)).map(r=>r.el));
+ const visibleFamilies=(scope,selector)=>scope.evaluate((root,selector)=>{const out={};for(const el of root.querySelectorAll(selector)){if(!el.getClientRects().length||getComputedStyle(el).visibility==='hidden'||el.closest('#docview'))continue;const f=getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'');(out[f]??=[]).push(el.id?'#'+el.id:el.tagName.toLowerCase()+'.'+String(el.className).trim().split(/\s+/).join('.')+'|'+el.textContent.trim().slice(0,20));}return out;},selector);
  const source=await open(page,server);
  expect(await page.locator('#workspace-appearance').evaluate(el=>el.open)).toBe(false);expect(await page.locator('#workspace-more').evaluate(el=>el.open)).toBe(true);
  const header=page.locator('.workbench-header');
- const roster=()=>[header.locator('#workspace-home'),header.locator('#diagram-add'),header.locator('#workspace-file'),header.locator('#undo-builder'),header.locator('#redo-builder'),header.locator('#workspace-appearance>summary'),header.locator('#open-page-preview'),header.locator('.workspace-help>summary'),header.locator('#workspace-export-trigger'),
+ const roster=[header.locator('#workspace-home'),header.locator('#diagram-add'),header.locator('#workspace-file'),header.locator('#undo-builder'),header.locator('#redo-builder'),header.locator('#workspace-appearance>summary'),header.locator('#open-page-preview'),header.locator('.workspace-help>summary'),header.locator('#workspace-export-trigger'),
   ...['agent','brief','inspect','layers','steps','outline','json','file'].map(name=>page.locator('#editor-tab-'+name)),page.locator('#workspace-focus-diagram'),page.locator('#workspace-fit-selection')];
- const families=async()=>{const out=[];for(const control of roster()){await expect(control).toBeVisible();out.push(await family(control));}return out;};
- const editorBody=await bodyFamily(),headerFamilies=await families();
- expect([...new Set(headerFamilies)]).toEqual([editorBody]);expect(editorBody).not.toMatch(/mono/i);
+ const controls='.workbench-header :is(button,summary), .bbtn, .skbtn, .rbtn, .bexit, .workspace-rail [role="tab"]';
+ const families=async()=>{const named=[];for(const control of roster){await expect(control).toBeVisible();named.push(await family(control));}const all=await visibleFamilies(page.locator('body'),controls);for(const f of named)(all[f]??=[]);return Object.keys(all).length===1?Object.keys(all):all;};
+ const editorBody=await bodyFamily();expect(editorBody).not.toMatch(/mono/i);
+ expect(await families()).toEqual([editorBody]);
+ for(const [menu,body] of [['#workspace-appearance','#workspace-appearance-body'],['.workspace-help','.workspace-help-body'],['#workspace-export','.workspace-export-body']]){
+  const details=header.locator(menu).first();expect(await details.evaluate(el=>el.open)).toBe(false);await details.locator(':scope>summary').click();expect(await details.evaluate(el=>el.open)).toBe(true);
+  const inside=await visibleFamilies(details.locator(body).first(),'button');expect(Object.values(inside).flat().length).toBeGreaterThan(1);expect(Object.keys(inside)).toEqual([editorBody]);
+  await details.locator(':scope>summary').click();expect(await details.evaluate(el=>el.open)).toBe(false);
+ }
  expect(await page.locator('#docview').locator('.prosetoggle, .copychip').count()).toBeGreaterThan(0);
  expect(await arial()).toEqual([]);
  expect(await family(page.locator('#src'))).toBe('IBM Plex Mono');
 
- await page.locator('#workspace-appearance>summary').click();const aurora=page.locator('#workspace-appearance-body #sk-aurora');
- await expect(aurora).toHaveAttribute('aria-pressed','false');await aurora.click();await expect(aurora).toHaveAttribute('aria-pressed','true');
- await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#workspace-appearance-body')).toBeHidden();
- const auroraBody=await bodyFamily();expect(auroraBody).not.toBe(editorBody);expect([...new Set(await families())]).toEqual([auroraBody]);await expect(page.locator('#src')).toHaveValue(source);
+ const appearance=page.locator('#workspace-appearance>summary');
+ for(const skin of ['aurora','blueprint','terminal','rose','lavender','lilac','pastel']){
+  await appearance.click();const button=page.locator('#workspace-appearance-body #sk-'+skin);
+  await expect(button).toHaveAttribute('aria-pressed','false');await button.click();await expect(button).toHaveAttribute('aria-pressed','true');
+  await appearance.click();await expect(page.locator('#workspace-appearance-body')).toBeHidden();
+  const body=await bodyFamily();if(skin==='terminal')expect(body).toBe('IBM Plex Mono');else expect(body,skin).not.toMatch(/mono/i);
+  expect(await families(),skin).toEqual([body]);expect(await arial(),skin).toEqual([]);
+ }
+ await expect(page.locator('#src')).toHaveValue(source);
 
  const input=path.join(server.root,'fonts-564.json'),output=path.join(server.root,'fonts-564.html');await writeFile(input,source);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
- await page.goto(server.origin+'/fonts-564.html');const toggle=page.locator('#docview .prosetoggle').first();await expect(toggle).toBeVisible();
+ await page.goto(server.origin+'/fonts-564.html');await expect(page.locator('#docview .prosetoggle').first()).toBeVisible();
  expect(await page.locator('#docview').locator('.prosetoggle, .copychip').count()).toBeGreaterThan(0);
  expect(await arial()).toEqual([]);
  const reader=page.locator('#docview .explore-navigation');if(!await reader.locator('.reader-contents').isVisible())await reader.locator('.reader-top>button').click();
  await expect(page.locator('#docview')).not.toHaveClass(/sk-terminal/);await reader.locator('.reader-contents .reader-theme-menu>summary').click();await reader.getByRole('menuitemradio',{name:'Terminal',exact:true}).click();
- await expect(page.locator('#docview')).toHaveClass(/sk-terminal/);expect(await family(toggle)).toBe('IBM Plex Mono');
+ await expect(page.locator('#docview')).toHaveClass(/sk-terminal/);
+ const viewerButtons=await page.locator('#docview').evaluate(root=>{const out={};for(const el of root.querySelectorAll('button')){if(!el.getClientRects().length)continue;const f=getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'');(out[f]??=[]).push(String(el.className));}return out;});
+ expect(Object.values(viewerButtons).flat().length).toBeGreaterThanOrEqual(5);expect(Object.keys(viewerButtons)).toEqual(['IBM Plex Mono']);
 
  await page.goto(server.origin+'/workbench.html');const welcome=page.locator('#workbench-welcome');if(!await welcome.isVisible())await page.locator('#workspace-home').click();await expect(welcome).toBeVisible();
  await page.locator('#welcome-agent').click();const connect=page.locator('#folder-agent-connect');await expect(connect).toBeVisible();

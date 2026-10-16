@@ -159,13 +159,13 @@ test('template navigation returns to the picker and Forward retains the same pro
 // 4 description | "deadlines" (only in Retries & recovery's desc) | exactly [Retries & recovery] | name-only matching
 // 5 tag | "observed EXECUTION" (only in A trace, explained's tag) | exactly [A trace, explained] | ignoring the eyebrow tag
 // 6 service name | "traffic router" (a node title only in Rollout decisions' spec) | exactly [Rollout decisions] | matching only card text
-// 7 team templates | "payroll" | exactly [Payroll handoff] from #welcome-company-grid | filtering only the built-in grid
+// 7 team templates | "payroll" (name), "FINANCE" (desc), "tax ledger" (node title) | each exactly [Payroll handoff] from #welcome-company-grid | filtering only the built-in grid, or team templates by name only
 // 8 composes with tabs | "traffic router" + Connected devices | zero cards and the empty state; All examples restores [Rollout decisions] | a query that overrides or resets the category
 // 9 no matches | "zzqx" | zero visible cards (Blank included) and #welcome-template-empty visible naming the query | a blank grid, or Blank kept as a false match
 // 10 clear | empty query | all 15 cards back, empty state hidden | a filter that cannot be undone
 const visibleTemplateTitles=page=>page.locator('#welcome-new-screen .welcome-template-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('.welcome-template-title').firstChild.textContent));
 test('Start new project filters built-in and team templates by name, description, tag and service name',async({page,server})=>{
-  await page.route('**/starters.json',route=>route.fulfill({json:[{name:'Payroll handoff',desc:'Pay runs between finance systems.',spec:{page:{title:'Payroll',sections:[{diagram:{nodes:{a:{title:'Ledger'}},rows:[['a']],edges:[]}}]}}}]}));
+  await page.route('**/starters.json',route=>route.fulfill({json:[{name:'Payroll handoff',desc:'Pay runs between finance systems.',spec:{page:{title:'Payroll',sections:[{diagram:{nodes:{a:{title:'Tax Ledger'}},rows:[['a']],edges:[]}}]}}}]}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
   await expect(page.locator('#welcome-company-grid .welcome-template-card')).toHaveCount(1);
   const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
@@ -186,6 +186,8 @@ test('Start new project filters built-in and team templates by name, description
   await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Rollout decisions']);await expect(empty).toBeHidden();
   await query('payroll');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Payroll handoff']);
   await expect(page.locator('#welcome-company-grid .welcome-template-card').filter({visible:true})).toHaveCount(1);
+  await query('FINANCE');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Payroll handoff']);
+  await query('tax ledger');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Payroll handoff']);
   await query('zzqx');await expect.poll(()=>visibleTemplateTitles(page)).toEqual([]);
   await expect(empty).toBeVisible();await expect(empty).toContainText('No templates match');await expect(empty).toContainText('zzqx');
   await search.fill('');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(all);await expect(empty).toBeHidden();

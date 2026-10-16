@@ -581,6 +581,8 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
 // 3 title, case-insensitive | "GARAGE" | visible card titles exactly [Garage opener] | case-sensitive or title-blind matching
 // 4 owner | "payments" | exactly [Second story] | matching only titles
 // 5 service name | "ledger writer" (node title in first's spec, not on any card) | exactly [First story] with zero .spec.json requests | matching only visible card text, or fetching every spec to search
+// 5b diagram ID | "THIRD" (third's ID; its title, owner and services do not contain it) | exactly [Garage opener] | matching only displayed fields
+// (no kind row: every registry-published entry is kind "canonical", so the badge cannot discriminate and is not matched)
 // 6 no matches | "zzqx" | zero visible cards and #welcome-library-empty visible naming the query | a blank grid with no explanation
 // 7 clear | empty query | all three cards back, empty state hidden | a filter that cannot be undone
 async function searchFixture(server){
@@ -598,7 +600,7 @@ async function searchFixture(server){
 }
 const visibleLibraryTitles=page=>page.locator('#welcome-library-grid .canon-library-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('strong').textContent));
 
-test('Browse diagrams filters published cards by title, owner and service name with an explicit no-matches state',async({page,server})=>{
+test('Browse diagrams filters published cards by title, ID, owner and service name with an explicit no-matches state',async({page,server})=>{
   const fixture=await searchFixture(server),requests=[];
   page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
   await page.goto(fixture.url);await page.locator('#welcome-library').click();
@@ -614,6 +616,7 @@ test('Browse diagrams filters published cards by title, owner and service name w
   await query('GARAGE');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Garage opener']);await expect(empty).toBeHidden();
   await query('payments');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Second story']);
   await query('ledger writer');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story']);
+  await query('THIRD');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Garage opener']);
   await query('zzqx');await expect.poll(()=>visibleLibraryTitles(page)).toEqual([]);
   await expect(empty).toBeVisible();await expect(empty).toContainText('No diagrams match');await expect(empty).toContainText('zzqx');
   await search.fill('');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story','Second story','Garage opener']);await expect(empty).toBeHidden();

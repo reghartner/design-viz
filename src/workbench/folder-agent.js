@@ -37,7 +37,9 @@ function createFolderAgentFiles(directory){
         if(ex.name!=='NotFoundError')throw ex;
         handle=await directory.getFileHandle(name,{create:true});created=true;
       }
-      var stream=await handle.createWritable();
+      // Keep competing browser streams out through close where supported. The
+      // guards still detect outside changes; this does not lock OS editors.
+      var stream=await handle.createWritable({mode:'exclusive'});
       try{
         if(guard)await guard({name:name,created:created,phase:'before-write'});
         await stream.write(text);
@@ -109,7 +111,7 @@ function folderAgentPilotHealth(value,identity,now){
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
-  var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
+  var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   function publish(state){
@@ -174,12 +176,12 @@ function createFolderAgentClient(opts){
       await files.write('state.json',envelope(sent.snapshot));if(!alive(token))return null;
       if(files.flushArtifacts){
         var invalid=sent.snapshot.parseError;try{if(!invalid && opts.validate)invalid=opts.validate(sent.snapshot.source);}catch(ex){invalid=ex.message;}
-        if(invalid)publish({status:'Your JSON needs repair. The last valid spec and ledger remain in the diagram folder; your unfinished draft stays in the workbench.'});
-        else await files.flushArtifacts(sent.snapshot.source,sent.snapshot.ledger,async function(){if(!alive(token) || !belongs(await files.read('session.json')) || !alive(token))throw Error('Connection changed.');});
+        if(invalid){lastArtifactState='paused';if(opts.artifactStatus)opts.artifactStatus('paused','Repair the JSON. The last valid spec and ledger are unchanged.');publish({status:'Your JSON needs repair. The last valid spec and ledger remain in the diagram folder; your unfinished draft stays in the workbench.'});}
+        else {if(opts.artifactStatus)opts.artifactStatus('saving');await files.flushArtifacts(sent.snapshot.source,sent.snapshot.ledger,async function(){var latest=opts.snapshot();if(!alive(token) || !latest.open || latest.project!==project || !belongs(await files.read('session.json')) || !alive(token))throw Error('Connection changed.');});lastArtifactState='saved';if(opts.artifactStatus){var latest=opts.snapshot();opts.artifactStatus(latest.source===sent.snapshot.source && latest.ledger===sent.snapshot.ledger?'saved':'pending');}}
       }
       else await files.write('story.spec.json',sent.snapshot.source);if(!alive(token))return null;
       lastState=serialized;
-    }
+    }else if(files.flushArtifacts && opts.artifactStatus)opts.artifactStatus(lastArtifactState,lastArtifactState==='paused'?'Repair the JSON. The last valid spec and ledger are unchanged.':'');
     if(now()-lastHeartbeat>=1000){
       await files.write('editor.json',envelope({connected:true,at:now()}));lastHeartbeat=now();
     }
@@ -539,7 +541,9 @@ function createFolderAgentClient(opts){
       return {text:text,filename:files.artifacts?files.artifacts.ledger:'story.ledger.md',sessionId:manifest.sessionId,connectionId:manifest.connectionId,
         sourceRevision:null,sharedRevision:sent.snapshot.revision,sourceMatches:null,verified:false,at:now(),readAt:now()};
     });},
-    poll:function(){return serial(poll).catch(function(ex){pilotStatus=null;publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},
+    // Standalone folder autosave renews ownership without processing agent input.
+    flush:function(){var token=epoch;return serial(function(){if(!alive(token))throw Error('The folder is disconnected. Reopen it to resume file saving.');return snapshot(token);}).catch(function(ex){if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);throw ex;});},
+    poll:function(){return serial(poll).catch(function(ex){pilotStatus=null;if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},
     disconnect:function(){
       connected=false;pending=null;epoch++;clearReview();publish({status:'Disconnected. Files and conversation remain in your folder.',listening:false});
       return serial(async function(){if(manifest && belongs(await files.read('session.json')))await files.write('editor.json',envelope({connected:false,at:now()}));});

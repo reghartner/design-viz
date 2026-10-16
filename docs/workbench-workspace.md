@@ -314,6 +314,10 @@ Commit JSON, HTML and ledger together; README is a fourth support file. Reopen
 via **Agent → Select Diagram Folder** to discover the matching pair and recreate
 connection metadata as needed. Export excludes `.flowview-agent` and all session,
 request, transcript, lease and recovery files, preserving live working metadata.
-File reports whether browser recovery was saved. Export requires valid JSON and
+The desktop header shows the working filename and file save state. File reports
+browser recovery independently and offers Open working file, Choose working folder
+and Retry file save. Valid edits autosave; unfinished JSON remains in recovery
+until repaired. See the [saving guide](workbench-user-guide.md) for permissions,
+external changes, paired ledgers and reload behavior. Export requires valid JSON and
 the viewer template. For unfinished JSON, copy the JSON workspace text to a
 repair file; retry a failed complete export once its reported error is resolved.

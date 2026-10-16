@@ -35,7 +35,7 @@ function createBuilderSession(options){
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
   }
-  function save(){if(disposed)return;projectOpen=true;if(options.artifacts || topologyContext)persistence.save(text(),baselineText,artifacts());else persistence.save(text(),baselineText);}
+  function save(){if(disposed)return;projectOpen=true;if(options.artifacts || topologyContext)persistence.save(text(),baselineText,artifacts());else persistence.save(text(),baselineText);if(options.saveWorking)options.saveWorking();}
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
@@ -161,7 +161,7 @@ function createBuilderSession(options){
     noteInput:function(){
       if(disposed)return;
       historyVersion++;
-      projectOpen=true;importedText=null;persistence.schedule(save);
+      projectOpen=true;importedText=null;if(options.pendingWorking)options.pendingWorking();persistence.schedule(save);
     },
     save:save,markSaved:function(){if(!disposed)baselineText=text();},baseline:function(){return baselineText;},
     saveInitial:function(){if(!options.deferInitialSave && (!initialDraft || initialDraft.text===text()))save();},

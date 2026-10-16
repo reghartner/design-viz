@@ -6,21 +6,22 @@ points lead to the same editor:
 - **Paste JSON** accepts a Flowview page spec or a bare diagram. Paste JSON
   without Markdown fences. Invalid JSON or a spec validation error stays on the
   welcome screen so you can correct it; the current project remains available.
-- **Open file** reads a local `.json` file in the browser and validates it before
-  opening the editor. Imports are not uploaded.
+- **Open file** validates a local `.json` file, then keeps it as the working file.
+  With writable access, ordinary edits autosave to that actual file and browser
+  recovery together. Files are not uploaded.
 - **Start new project** offers a curated set of editable examples and a **Blank
   diagram**. The blank has one diagram section with no nodes, edges, or steps.
   Use **Add to diagram** to add the first elements.
 
-**Open file**, including **File → open…** inside the editor, loads shared topology
+**Open file**, including **File → Open working file…** inside the editor, loads shared topology
 references from the workbench site's approved authored-source catalog. No Canon
 visit is required. Already loaded provider revisions stay frozen; missing
 providers and their dependencies are checked against the pinned catalog before
 replacing your draft. The JSON keeps its authored imports, with provider copies
 stored separately in browser recovery. Import-free files make no provider requests.
 Unavailable catalogs or invalid providers leave your current project and Undo
-history intact. The editor's **File → open…** still accepts unfinished JSON and
-invalid diagrams without imports for repair; Welcome requires a valid diagram.
+history intact. Working-file opens require a valid diagram. Import/paste and browser recovery
+remain separate from working-file association.
 
 **User guide** opens the bundled human walkthrough, including alternates and
 shared-step editing. **Canon diagrams** opens the [published library](workbench-canon-library.md)
@@ -56,7 +57,9 @@ Back can leave the workbench normally.
 
 Reloading the same tab restores its screen. An editor reload recovers the saved
 local draft when available, or returns safely to welcome; Undo/Redo history and
-unfinished welcome forms are not persisted across reloads. Leaving the editor
+unfinished welcome forms are not persisted across reloads. Reload returns to
+browser-only editing; explicitly reopen the working file or folder to review its
+current disk contents and restore writable access. Leaving the editor
 flushes its current draft before the normal autosave delay. Navigating away also
 retires pending file reads and provider loading, so a late import cannot reopen
 the editor. Selecting another file or changing the draft also retires the earlier

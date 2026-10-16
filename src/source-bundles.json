@@ -62,6 +62,7 @@
     "workbench/commands/layout.js",
     "workbench/commands/topology.js",
     "workbench/persistence.js",
+    "workbench/working-file.js",
     "workbench/session.js",
     "workbench/field-values.js",
     "workbench/panel-collections.js",

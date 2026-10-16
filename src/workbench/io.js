@@ -121,8 +121,8 @@ var builderDirectoryExportQueues=new WeakMap();
 function createBuilderIO(opts){
   var document=opts.document,src=opts.sourceElement,session=opts.session,browser=opts.browser;
   var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null,svgCopyRun=0;
-  var stagedImport=null,exportQueue=builderDirectoryExportQueues.get(document);
-  if(!exportQueue){exportQueue={pending:Promise.resolve()};builderDirectoryExportQueues.set(document,exportQueue);}
+  var stagedImport=null,exportQueue=typeof builderWorkingFileQueues!=='undefined'?builderWorkingFileQueues.get(document):builderDirectoryExportQueues.get(document);
+  if(!exportQueue){exportQueue={pending:Promise.resolve()};builderDirectoryExportQueues.set(document,exportQueue);if(typeof builderWorkingFileQueues!=='undefined')builderWorkingFileQueues.set(document,exportQueue);}
   var retireTraceUI=function(){};
   var traceFileVersion=0,traceReader=null,traceReading=false;
   function parseEditor(){return session.snapshot();}
@@ -265,8 +265,9 @@ function createBuilderIO(opts){
     if(urls.has(url))urls.set(url,browser.schedule(function(){releaseUrl(url);},1000));
     return function(){releaseUrl(url);};
   }
-  async function writeIntoDirectory(dir,name,contents,run){
+  async function writeIntoDirectory(dir,name,contents,run,guard){
     if(!exportCurrent(run))return false;
+    if(guard)await guard();
     var handle=await dir.getFileHandle(name,{create:true});
     if(!exportCurrent(run))return false;
     var writer=await handle.createWritable();
@@ -274,7 +275,7 @@ function createBuilderIO(opts){
       if(!exportCurrent(run)){await writer.abort();return false;}
       // Once write begins, finish that authorized snapshot and close its stream.
       // Retirement prevents follow-on files and stale UI, never rolls files back.
-      await writer.write(contents);await writer.close();return true;
+      await writer.write(contents);if(guard)await guard();await writer.close();return true;
     }catch(ex){
       try{await writer.abort();}catch(cleanupError){/* retain the original write failure */}
       throw ex;
@@ -358,17 +359,21 @@ function createBuilderIO(opts){
         try{
           var files=prepare(tplText);
           if(dir){
+            var coordinated=opts.prepareDirectoryExport?await opts.prepareDirectoryExport(dir,files,parsed.text,ledger,function(){return exportCurrent(run);}):null;
             // A superseding export waits for any already-started write to close.
             // Otherwise an old JSON close could overwrite the newer bundle.
             var writing=exportQueue.pending.then(async function(){
               for(var file of files){
-                if(!await writeIntoDirectory(dir,file.name,file.text,run))return;
+                if(!exportCurrent(run))return;
+                if(coordinated)await coordinated.guard();
+                if(coordinated && coordinated.skip(file.name)){completed++;continue;}
+                if(!await writeIntoDirectory(dir,file.name,file.text,run,coordinated && coordinated.guard))return;
                 completed++;
               }
             });
             exportQueue.pending=writing.catch(function(){});
             await writing;
-            if(exportCurrent(run) && completed===files.length)inspectorMessage('Exported project: '+files.map(function(file){return file.name;}).join(', ')+' (overwritten in place).');
+            if(exportCurrent(run) && completed===files.length)inspectorMessage('Exported project: '+files.map(function(file){return file.name;}).join(', ')+(coordinated?' (working artifacts verified; HTML and README exported).':' (overwritten in place).'));
           }else{
             // One archive avoids browser multiple-download permission loss.
             var zip=browser.zipFiles(files);

@@ -8,6 +8,7 @@ function createBuilderBrowserIO(document,window){
     objectUrl:function(text,mime){return URL.createObjectURL(new Blob([text],{type:mime}));},
     revokeUrl:function(url){URL.revokeObjectURL(url);},
     schedule:function(fn,ms){return setTimeout(fn,ms);},cancel:function(timer){clearTimeout(timer);},
+    pickFile:typeof window.showOpenFilePicker==='function'?function(options){return window.showOpenFilePicker(options);}:null,
     pickDirectory:typeof window.showDirectoryPicker==='function'?function(options){return window.showDirectoryPicker(options);}:null,
     copyText:function(text){
       return typeof navigator!=='undefined' && navigator.clipboard && navigator.clipboard.writeText?

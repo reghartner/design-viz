@@ -470,6 +470,7 @@ function initWorkbenchBuilder(opts){
   function retireInspector(){inspector.retire();}
   var interactions=null;
 
+  var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
   var session=createBuilderSession({
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
     persistence:createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
@@ -481,6 +482,7 @@ function initWorkbenchBuilder(opts){
         status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Use Export → Export project to keep your changes. For unfinished JSON, copy the text from the JSON workspace to a repair file.'}[state];
         status.dataset.state=state;
       }}),
+    saveWorking:function(){if(workingFile)workingFile.save();},pendingWorking:function(){if(workingFile)workingFile.pending();},
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
     editError:function(message){inspectorMessage(message);},
     historyChanged:function(undo,redo){
@@ -498,8 +500,117 @@ function initWorkbenchBuilder(opts){
     },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
-    invalidateProject:function(policy){retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
+    invalidateProject:function(policy){workingOperation++;if(workingFile && (!policy || !policy.preserveHistory || workingFile.attached() && workingFile.attached().external))workingFile.clear();retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
   });
+  /* File choices authorize a working destination; import/paste remain copies. */
+  function refreshWorkingHeader(){
+    var el=document.getElementById('workspace-provenance');if(!el || !workingView)return;
+    var value=workingView,label={browser:'Browser only',pending:'File pending',saving:'Saving file',saved:'File saved',paused:'File save paused',failed:'File save failed'}[value.state];
+    el.textContent=label+(value.name?' · '+value.name:'');el.dataset.state=value.state;
+    var status=document.getElementById('workbench-working-status');if(status)el.title=status.textContent+' Browser recovery is reported separately in File.';
+  }
+  function workingStatus(value){
+    workingView=value;
+    var el=document.getElementById('workbench-working-status'),retry=document.getElementById('working-file-retry');
+    if(!el)return;
+    var label=value.name || '',suffix=value.paired?' + coverage ledger':'';
+    el.textContent={browser:'Browser-only editing. '+(value.detail || (workingBrowser.pickFile?'Choose a working file or folder to save changes on your computer.':'Writable file access is unavailable here. Use desktop Chrome or Edge over HTTPS, or Export project to download a copy.')),
+      pending:'Changes waiting to save to '+label+suffix+'.',saving:'Saving '+label+suffix+'…',
+      saved:'Saved to '+label+suffix+'.'+(value.detail?' '+value.detail:''),
+      paused:'File save paused: '+label+'. '+value.detail+' Unfinished text stays in browser recovery.',
+      failed:'File save failed: '+label+'. '+value.detail+' Disk is not up to date. Retry or reopen the destination.'}[value.state];
+    el.dataset.state=value.state;refreshWorkingHeader();
+    if(retry)retry.hidden=value.state!=='failed';
+  }
+  workingFile=createBuilderWorkingFile({owner:document,snapshot:function(){return Object.assign(session.snapshot(),{ledger:agentLedger});},
+    validate:function(text){return session.validate(JSON.parse(text)).errors.join('\n');},changed:workingStatus});
+  workingStatus({state:'browser',detail:workingBrowser.pickFile?'':'Writable file access is unavailable here. Use desktop Chrome or Edge over HTTPS, or Export project to download a copy.'});
+  life.own(function(){workingOperation++;workingFile.destroy();});
+  async function releaseWorking(){
+    var drained=workingFile.clear();
+    if(agentChat && agentChat.releaseWorking)await agentChat.releaseWorking();
+    await drained;
+  }
+  async function chooseWorkingFile(current,onError){
+    if(!workingBrowser.pickFile)return false;
+    var token=++workingOperation;
+    function active(){return life.alive() && token===workingOperation && (!current || current());}
+    var opening=beginFileOpen(active,false);
+    try{
+      var handles=await workingBrowser.pickFile({multiple:false,types:[{description:'Flowview JSON',accept:{'application/json':['.json']}}]});
+      if(!opening.current() || !handles.length)return false;
+      var handle=handles[0],denied=null;
+      try{if(handle.requestPermission && await handle.requestPermission({mode:'readwrite'})!=='granted')denied='Write permission was not granted.';}
+      catch(ex){denied=ex.message;}
+      if(!opening.current())return false;
+      var text=await(await handle.getFile()).text(),context=await opening.stage(text);
+      if(context===false)return false;
+      await releaseWorking();if(!opening.current())return false;
+      if(await(await handle.getFile()).text()!==text)throw Error('The selected file changed while opening. Choose it again to review those changes.');
+      if(!opening.current())return false;
+      if(!opening.publish(text,context))return false;
+      var association={name:handle.name,handle:handle,expected:text};workingFile.attach(association);
+      if(denied){association.failed=denied;workingFile.report(association,'failed',denied);}
+      return true;
+    }catch(ex){if(active() && ex.name!=='AbortError')(onError || inspectorMessage)('Could not open the working file. '+ex.message);return false;}
+  }
+  function chooseWorkingName(names){
+    return new Promise(function(resolve){
+      var dialog=document.createElement('dialog'),label=document.createElement('label'),select=document.createElement('select');
+      label.textContent='Choose the working diagram ';label.appendChild(select);dialog.appendChild(label);
+      names.forEach(function(name){var option=document.createElement('option');option.value=option.textContent=name;select.appendChild(option);});
+      var open=document.createElement('button'),cancel=document.createElement('button');open.textContent='Open';cancel.textContent='Cancel';dialog.append(open,cancel);document.body.appendChild(dialog);
+      var done=false;function finish(value){if(done)return;done=true;dialog.remove();resolve(value);}
+      open.addEventListener('click',function(){finish(select.value);});cancel.addEventListener('click',function(){finish(null);});dialog.addEventListener('cancel',function(){finish(null);});
+      life.own(function(){finish(null);});dialog.showModal();select.focus();
+    });
+  }
+  async function chooseWorkingFolder(){
+    if(!workingBrowser.pickDirectory){inspectorMessage('Writable folder access requires desktop Chrome or Edge over HTTPS. Browser recovery remains available.');return;}
+    var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,unlock=null;
+    function check(){var now=session.snapshot();if(!life.alive() || token!==workingOperation || now.project!==expected.project || now.text!==expected.text)throw Error('The document changed while choosing its folder. Choose it again.');}
+    try{
+      var directory=await workingBrowser.pickDirectory({mode:'readwrite',id:'flowview-working'});check();
+      await releaseWorking();check();
+      if(navigator.locks)unlock=await new Promise(function(resolve,reject){navigator.locks.request('flowview-diagram-folder-setup',function(){return new Promise(function(release){resolve(release);});}).catch(reject);});
+      check();
+      var found=await openFolderAgentProject(directory);check();
+      if(found.selectionRequired){var name=await chooseWorkingName(found.specs);check();if(!name)return;found=await openFolderAgentProject(directory,name);check();}
+      var previousLedger=agentLedger,source=found.source===null?expected.text:found.source,context=await prepareAuthoredTopology(JSON.parse(source),session.topologyContext());check();
+      var findings=session.validate(JSON.parse(source),context);if(findings.errors.length)throw Error(findings.errors.join('\n'));
+      var project=await found.initialize(check);check();
+      if((project.source===null?expected.text:project.source)!==source)throw Error('The saved source changed. Choose the folder again.');
+      if(!replaceProject(source,undefined,context))return;
+      agentOptions.setLedger(project.hasLedger?project.ledger:found.source===null?previousLedger || '':'',true);
+      var documentId=session.snapshot().project;
+      binding={name:directory.name+'/'+found.spec,paired:true,handle:directory,artifacts:project.files.artifacts,
+        flush:function(){return client.flush();},close:function(){var closing=client.disconnect();client.destroy();return closing;}};
+      // Home retires UI operations but keeps this same document association.
+      // Replacement synchronously clears it before another source is published.
+      client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',
+        snapshot:function(){var snap=agentOptions.snapshot();return Object.assign({},snap,{project:documentId,open:workingFile.attached()===binding,source:session.text()});},
+        busy:function(){return true;},apply:function(){return {ok:false,error:'Connect an agent to review proposals.'};},validate:agentOptions.validate,
+        artifactStatus:function(state,detail){workingFile.report(binding,state,detail);},
+        changed:function(update){if(update.connected===false){binding.reconnectOnly=true;workingFile.report(binding,'failed',update.status || 'The folder is disconnected. Reopen it to resume file saving.');}}});
+      workingFile.attach(binding);workingFile.report(binding,'saving');
+      try{await client.start(found.hasSession);}catch(ex){binding.reconnectOnly=true;throw ex;}
+      if(workingFile.attached()!==binding)return;
+      workingFile.report(binding,'saved');
+      if(workingHeartbeat===null)workingHeartbeat=life.delay(renewWorkingFolder,1000);
+    }catch(ex){if(binding && workingFile.attached()===binding)workingFile.report(binding,'failed',ex.message);
+      else if(life.alive() && ex.name!=='AbortError')inspectorMessage('Could not open the working folder. '+ex.message);
+    }finally{if(unlock)unlock();}
+  }
+  var workingOpen=document.getElementById('working-file-open'),workingFolder=document.getElementById('working-folder-open'),workingRetry=document.getElementById('working-file-retry');
+  if(workingOpen)life.listen(workingOpen,'click',function(){if(workingBrowser.pickFile)chooseWorkingFile();else document.getElementById('file-input').click();});
+  if(workingFolder)life.listen(workingFolder,'click',chooseWorkingFolder);
+  if(workingRetry)life.listen(workingRetry,'click',function(){workingFile.retry();});
+  function renewWorkingFolder(){
+    workingHeartbeat=null;if(!life.alive())return;
+    var binding=workingFile.attached();if(!binding || !binding.flush)return;
+    if(!binding.failed)workingFile.save();
+    workingHeartbeat=life.delay(renewWorkingFolder,1000);
+  }
   if(opts.workspace && opts.workspace.setHistory){
     opts.workspace.setHistory(life.guard(session.rememberView));
     life.own(function(){opts.workspace.setHistory(null);});
@@ -685,6 +796,7 @@ function initWorkbenchBuilder(opts){
 
   function closeInsertMenu(){if(addMenu)addMenu.close(false);}
   function beforeImported(kind){
+    workingOperation++;workingFile.clear();if(agentChat && agentChat.releaseWorking)agentChat.releaseWorking();
     setSelected(null);session.target=null;session.insertSection=0;
     if(interactions.connecting())cancelConnect(null);
     if(kind==='mermaid')closeInsertMenu();else clearMultiSelect();
@@ -695,6 +807,12 @@ function initWorkbenchBuilder(opts){
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
     exportLedger:function(project){return agentLedgerProject===project?agentLedger:null;},
+    prepareDirectoryExport:function(directory,files,source,ledger,active){
+      var binding=workingFile.attached();
+      return prepareBuilderWorkingExport({binding:binding,directory:directory,files:files,source:source,ledger:ledger,
+        current:function(){return active() && life.alive() && workingFile.attached()===binding && session.text()===source && (agentLedgerProject===session.snapshot().project?agentLedger:null)===ledger;},
+        flush:function(){return binding.external?binding.flush():workingFile.save();},readText:createFolderAgentFiles(directory).readText});
+    },
     replaceProject:replaceProject,beginFileOpen:beginFileOpen,beginFileImport:beginFileImport,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
     svgExport:function(){
       var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
@@ -1347,6 +1465,7 @@ function initWorkbenchBuilder(opts){
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
     if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Export → Export project saves JSON, HTML, ledger and README; Brief can download a review package. Neither publishes to your company.';}
+    refreshWorkingHeader();
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
@@ -1354,6 +1473,9 @@ function initWorkbenchBuilder(opts){
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,
+    releaseWorking:function(){return workingFile.clear();},
+    workingDestination:function(binding){workingFile.attach(binding);},
+    workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},
     setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
@@ -1505,6 +1627,7 @@ function initWorkbenchBuilder(opts){
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),
+    supportsWorkingFile:function(){return !!workingBrowser.pickFile;},chooseWorkingFile:chooseWorkingFile,
     loadText:loadText,beginFileOpen:beginFileOpen, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
     isProjectOpen:session.isProjectOpen,

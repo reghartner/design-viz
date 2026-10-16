@@ -48,6 +48,46 @@ skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 
+**Open file** and **File → Open working file…** make the selected file your
+working document. Valid ordinary edits and Undo/Redo autosave to that actual file;
+browser recovery also keeps the exact source, including unfinished JSON. The
+header identifies the filename and file save state. **File** reports browser
+recovery separately, so successful browser recovery never means a disk save succeeded.
+
+**File → Choose working folder…** opens the matching spec and coverage ledger,
+or creates a pair from the current draft in an empty folder. It requires no agent
+connection or setup instructions. Existing ledger bytes are preserved. The folder
+uses the same editor lease, paired write journal and conflict checks as an agent
+connection. Agent acceptance, Undo and Redo save the reviewed spec/ledger pair;
+pending or declined proposals leave the accepted files unchanged. Selecting only
+a file cannot grant access to its sibling ledger: choose the folder to save both.
+
+Invalid or incomplete JSON pauses disk writes and preserves the last valid file.
+Browser recovery still saves the unfinished text. Repairing the source resumes
+file saves. Permission/write failures show **File save failed**; **Retry file save**
+requests access again. External file changes detected before a write commits stop
+saving; reopen the destination to review its current contents.
+New, imported and pasted documents start browser-only. Home/Continue retains a
+standalone working association; an agent connection that disconnects must be
+reopened. Reload recovers the browser draft without claiming a writable file;
+reopen the file/folder explicitly. Reopening loads disk contents and preserves the
+outgoing browser draft in Earlier drafts.
+
+Writable access requires a supporting desktop browser and secure context. Other
+browsers explicitly show **Browser only**; Export project still downloads a copy.
+Exporting into the active working folder verifies and preserves the exact working
+JSON/ledger bytes, then updates HTML and README. HTML is a snapshot updated only
+by Export. If the working draft changes during export, retry the complete export.
+File writes already inside the browser's final close cannot be recalled. Subsequent
+writes wait for those operations, and project changes retire queued/staged writes.
+There is no guaranteed file flush on tab close; wait for **File saved** before leaving.
+Flowview requests an exclusive browser writer, blocking competing browser writes
+where supported. Older browsers may ignore that option; byte comparisons still
+run before writing and immediately before close. These checks cannot prevent an
+operating-system editor from changing the file between the last check and commit:
+the file API has no atomic compare-and-swap, and that race can overwrite an outside
+edit. Avoid editing the same file simultaneously in another application.
+
 The toolbar **Export** menu offers **Export project**, **Download SVG**, and
 **Copy SVG**. **Export project** saves matching `.spec.json`, `.html` and
 `.ledger.md` files plus `README.md` to a chosen folder, or downloads one ZIP with
@@ -56,7 +96,7 @@ is the same action. Keep JSON and Markdown ledger together for future editing;
 commit JSON, HTML and ledger together. README is a fourth support file. A missing
 ledger is exported as an explicitly unverified placeholder, never invented evidence.
 
-Select the exported diagram folder from the Agent workspace to reopen its JSON
+Select the exported diagram folder from File or the Agent workspace to reopen its JSON
 and ledger together. Matching filenames allow discovery without connection
 metadata. Flowview recreates that metadata when needed; `.flowview-agent`,
 sessions, requests, transcripts, leases and recovery journals are excluded from

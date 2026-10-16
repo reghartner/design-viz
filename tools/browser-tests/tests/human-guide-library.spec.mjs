@@ -420,7 +420,8 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
   }
   await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   const foreign=[],specFetches=[];
-  await page.route('**://evil.example/**',route=>{foreign.push(route.request().url());return route.fulfill({json:{}});});
+  // Match by host: a glob would also match the Workbench URL whose query holds the address.
+  await page.route(url=>url.hostname==='evil.example',route=>{foreign.push(route.request().url());return route.fulfill({json:{}});});
   page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('delivery.spec.json'))specFetches.push(request.url());});
   // Native file picker stand-in, as in working-file.spec.mjs: returns the fixture spec.
   await page.addInitScript(({source})=>{

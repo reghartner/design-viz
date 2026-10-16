@@ -89,14 +89,11 @@ the file API has no atomic compare-and-swap, and that race can overwrite an outs
 edit. Avoid editing the same file simultaneously in another application.
 
 The toolbar **Export** menu is the one complete list of exports: **Export
-project**, **Download SVG**, **Copy SVG**, **Export for Confluence**, and **Copy
-JSON for Confluence**. The File workspace has no separate export buttons; its
+project**, **Download SVG**, and **Copy SVG**. The File workspace has no separate export buttons; its
 **All exports in the Export menu** button opens that menu. **Export project** saves
 matching `.spec.json`, `.html` and `.ledger.md` files plus `README.md` to a chosen
 folder, or downloads one ZIP with the same four files when no folder picker is
-available. **Export for Confluence** downloads `<title>.confluence.json`; **Copy
-JSON for Confluence** copies the same payload and shows it selected in a dialog
-when automatic copy is unavailable (see [Confluence](confluence.md)). Keep JSON and Markdown ledger together for future editing;
+available. Keep JSON and Markdown ledger together for future editing;
 commit JSON, HTML and ledger together. README is a fourth support file. A missing
 ledger is exported as an explicitly unverified placeholder, never invented evidence.
 

@@ -587,7 +587,8 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .generated-from a:hover{color:#2A33A0;}
 /* presenter mode (C1) */
 .presentbtn{float:right; margin-top:4px;}
-.presenting .presentbtn{position:fixed; top:10px; right:12px; z-index:9; float:none;}
+/* below the reader navigation (its bottom is published on .docview), or the Legend takes Exit's clicks */
+.presenting .presentbtn{position:fixed; top:var(--flowview-navigation-bottom,10px); right:12px; z-index:9; float:none;}
 .presenting .docview{max-width:1400px;}
 .presenting .stepline{font-size:16px;}
 .presenting .stepline b{font-size:16px;}

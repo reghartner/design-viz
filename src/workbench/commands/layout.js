@@ -672,6 +672,18 @@ function planSectionPathLabelWidth(text,raw,section,layoutId,value){
   });
   if(!plan.error)plan.layoutId=selected;return plan;
 }
+function planSectionExploreTextScale(text,raw,section,layoutId,surface,value,allowPresentationOverride){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(['prose','controls'].indexOf(surface)<0)return {error:'Choose Section notes or step controls.'};
+  var view=Array.isArray(got.d.layouts)?got.d.layouts.find(function(v){return v && v.id===layoutId;}):allowPresentationOverride?{}:null;
+  if(!view || view.presentation!=='explore' && !allowPresentationOverride)return {error:'Select an Explore view before changing text size.'};
+  var warnings=[];if(value!==null)sectionExploreTextScale(value,warnings);
+  if(warnings.length)return {error:warnings.join('\n')};
+  var next=builderClone(view.exploreLayout || {}),scales=next.textScale && typeof next.textScale==='object' && !Array.isArray(next.textScale)?next.textScale:{};
+  if(value===null || value===1)delete scales[surface];else scales[surface]=value;
+  if(Object.keys(scales).length)next.textScale=scales;else delete next.textScale;
+  return planSectionExploreLayout(text,raw,section,layoutId,Object.keys(next).length?next:null,allowPresentationOverride);
+}
 function planSectionExploreLayout(text,raw,section,layoutId,value,allowPresentationOverride){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var warnings=[];

@@ -2064,10 +2064,10 @@ function sectionProseActions(val,target){
     });
     return actions.children.length?[frowBlock('Section prose',actions)]:[];
   }
-function sectionNotesForm(val){
+function sectionNotesForm(val,ctx){
     var help=document.createElement('p');help.className='fnote';
     help.textContent='Select a paragraph or bullet to edit it. Delete Section notes removes only the text and bullets; the section, diagram and layouts stay in place. Use × on the notes window to hide it temporarily.';
-    return [help].concat(sectionProseActions(val,session.target));
+    return exploreTextSizeRows('prose',ctx.diagram).concat([help],sectionProseActions(val,session.target));
   }
 function proseControl(value,commit,options){
     options=options || {};
@@ -2493,7 +2493,23 @@ function renderMultiInspector(multiSel){
     finishForm(previous);
   }
 
-  function stepControlsForm(val){
+  function exploreTextSizeRows(surface,diagram){
+    var target=Object.assign({},session.target),el=findTargetEl(target),section=el && el.closest('.doc-sec');
+    var activeExplore=section && section.querySelector('.section-viewport.explore-text-sizing');
+    var id=section && section.getAttribute('data-view-id') || target.layoutId;
+    var view=sectionLayoutDefinition(diagram || {},id) || (activeExplore?{id:id}:null);
+    if(!view || (section?!activeExplore:view.presentation!=='explore'))return [];
+    var current=sectionExploreTextScale(view.exploreLayout && view.exploreLayout.textScale && view.exploreLayout.textScale[surface]);
+    function edit(value){return commitCascade(function(raw){
+      return planSectionExploreTextScale(session.text(),raw,target.section,view.id,surface,value,!!activeExplore);
+    },{after:refreshFormSoon});}
+    var input=numberControl(Math.round(current*10000)/100,function(value){return edit(value===null?null:value/100);});
+    input.setAttribute('aria-label',surface==='prose'?'Section notes text size':'Step controls text size');input.setAttribute('inputmode','numeric');
+    var reset=actionButton('Reset text size',function(){return edit(null);});reset.disabled=current===1;
+    var note=document.createElement('p');note.className='fnote';note.textContent='75–175%, independent of the frame. Empty restores 100%. On-canvas text follows diagram zoom.';
+    return [frow('Text size (%)',input),reset,note];
+  }
+  function stepControlsForm(val,ctx){
     var target=Object.assign({},session.target),layout=val.exploreLayout && typeof val.exploreLayout==='object' && !Array.isArray(val.exploreLayout)?val.exploreLayout:{};
     var width=numberControl(sectionPathLabelWidth(val.pathLabelWidth),function(value){
       return commitCascade(function(raw){return planSectionPathLabelWidth(session.text(),raw,target.section,target.layoutId,value);},{after:refreshFormSoon});
@@ -2501,7 +2517,7 @@ function renderMultiInspector(multiSel){
     width.setAttribute('aria-label','Path label width');width.setAttribute('inputmode','numeric');
     var widthRow=frow('Path label width (px)',width);
     var widthNote=document.createElement('p');widthNote.className='fnote';widthNote.textContent='160–360 px for this section arrangement. Empty restores 230 px. Labels wrap to two lines; hover for the full name.';
-    if(val.presentation!=='explore')return [widthRow,widthNote];
+    if(val.presentation!=='explore')return exploreTextSizeRows('controls',ctx.diagram).concat([widthRow,widthNote]);
     var placement=selectControl(['floating','canvas'],layout.controlsPlacement || 'floating',function(value){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
@@ -2527,7 +2543,7 @@ function renderMultiInspector(multiSel){
     position.setAttribute('aria-label','Caption position');
     Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
     var note=document.createElement('p');note.className='fnote';note.textContent='Resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
-    return [widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note];
+    return exploreTextSizeRows('controls',ctx.diagram).concat([widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note]);
   }
 
 function renderInspector(){
@@ -2685,7 +2701,7 @@ function renderInspector(){
         t.kind === 'panel' ? panelForm(val, ctx) :
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
-        t.kind === 'prose' ? sectionNotesForm(val) :
+        t.kind === 'prose' ? sectionNotesForm(val,ctx) :
         t.kind === 'crow' ? crowForm(val, ctx) :
         t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);

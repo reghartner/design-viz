@@ -3,7 +3,7 @@
    No runtime state is combined here and no document listeners are retained. */
 function createPathTimeline(host, source, paths, shownPaths, graph, pick, labelWidth){
   var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
-  var rowGap=32, top=22, columnWidth=44;
+  var rowGap=32, top=22, columnWidth=44,stopSize=28;
   labelWidth=sectionPathLabelWidth(labelWidth);
   var rows=pathTimelineRows(paths,graph);
   var lanePositions=new Map(Array.from(rows.lanes,function(pair){return [pair[0],top+pair[1]*rowGap];}));
@@ -56,41 +56,45 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick, labelW
   paths.forEach(function(path){
     var first=graph.nodes.find(function(node){return node.occurrences.some(function(o){return o.pathId===path.id && o.visibleIndex===0;});});
     if(!first)return;
-    var point=nodes.get(first.id),x=labelWidth-10,middle=(x+point.x)/2;
-    var line=stroke(function(){var y=lanePositions.get(path.id);return 'M '+x+' '+y+' C '+middle+' '+y+' '+middle+' '+point.y+' '+point.x+' '+point.y;},[path.id]);
+    var point=nodes.get(first.id),x=labelWidth-10;
+    var line=stroke(function(){var y=lanePositions.get(path.id),middle=(x+point.x)/2;return 'M '+x+' '+y+' C '+middle+' '+y+' '+middle+' '+point.y+' '+point.x+' '+point.y;},[path.id]);
     line.setAttribute('data-path-entry',path.id);
   });
   graph.edges.forEach(function(edge){
-    var a=nodes.get(edge.from),b=nodes.get(edge.to),middle=(a.x+b.x)/2;
-    stroke(function(){return 'M '+a.x+' '+a.y+' C '+middle+' '+a.y+' '+middle+' '+b.y+' '+b.x+' '+b.y;},edge.pathIds);
+    var a=nodes.get(edge.from),b=nodes.get(edge.to);
+    stroke(function(){var middle=(a.x+b.x)/2;return 'M '+a.x+' '+a.y+' C '+middle+' '+a.y+' '+middle+' '+b.y+' '+b.x+' '+b.y;},edge.pathIds);
   });
   // A cap belongs to an authored ending, never to the last stop of a filtered view.
   graph.nodes.forEach(function(node){
     var ending=node.occurrences.filter(function(o){return o.index===pathById.get(o.pathId).indices.length-1;}).map(function(o){return o.pathId;});
     if(!ending.length)return;
-    var point=nodes.get(node.id),capX=point.x+22;
-    stroke(function(){return 'M '+point.x+' '+point.y+' H '+capX+' M '+capX+' '+(point.y-5)+' V '+(point.y+5);},ending);
+    var point=nodes.get(node.id);
+    stroke(function(){var capX=point.x+stopSize/2+8;return 'M '+point.x+' '+point.y+' H '+capX+' M '+capX+' '+(point.y-5)+' V '+(point.y+5);},ending);
   });
   /* Observe actual chip sizes: font loading, narrow containers, themes and
      chapter width changes can all change wrapping. Use unscaled layout sizes
      so Explore zoom does not distort the logical connector geometry. */
   function layout(){
     if(retired)return;
-    var extras=choices.map(function(choice){return Math.max(0,(choice.button.offsetHeight || 28)-28);});
+    stopSize=buttons.reduce(function(size,entry){return Math.max(size,entry.button.offsetWidth || 28);},28);
+    rowGap=stopSize+4;top=stopSize/2+8;columnWidth=stopSize+16;
+    var extras=choices.map(function(choice){return Math.max(0,(choice.button.offsetHeight || 28)-stopSize);});
     function rowY(row){return top+row*rowGap+extras.reduce(function(sum,extra,i){return sum+extra*(row>i?1:row===i?.5:0);},0);}
     rows.lanes.forEach(function(row,id){lanePositions.set(id,rowY(row));});
     rows.shared.forEach(function(row,id){sharedPositions.set(id,rowY(row));});
     choices.forEach(function(choice){position(choice.button,0,lanePositions.get(choice.path.id)-(choice.button.offsetHeight || 28)/2);});
-    nodes.forEach(function(point){var node=point.node;point.y=node.blockId?sharedPositions.get(node.blockId):lanePositions.get(node.pathIds[0]);});
-    buttons.forEach(function(entry){var point=nodes.get(entry.node.id);position(entry.wrap,point.x-14,point.y-14);});
-    height=Math.max.apply(null,Array.from(lanePositions.values()).concat(Array.from(sharedPositions.values())))+22+(extras[extras.length-1] || 0)/2;
-    var changed=root.style.height!==height+'px';
+    nodes.forEach(function(point){var node=point.node;point.x=labelWidth+node.column*columnWidth+columnWidth/2;point.y=node.blockId?sharedPositions.get(node.blockId):lanePositions.get(node.pathIds[0]);});
+    buttons.forEach(function(entry){var point=nodes.get(entry.node.id);position(entry.wrap,point.x-stopSize/2,point.y-stopSize/2);});
+    height=Math.max.apply(null,Array.from(lanePositions.values()).concat(Array.from(sharedPositions.values())))+top+(extras[extras.length-1] || 0)/2;
+    width=labelWidth+Math.max(1,graph.columns)*columnWidth+stopSize;
+    var changed=root.style.height!==height+'px' || root.style.width!==width+'px';
+    root.style.width=width+'px';canvas.setAttribute('width',width);
     root.style.height=height+'px';canvas.setAttribute('height',height);canvas.setAttribute('viewBox','0 0 '+width+' '+height);
     tracks.forEach(function(track){track.element.setAttribute('d',track.geometry());});
     if(changed)root.dispatchEvent(new CustomEvent('dv:pathlayout',{bubbles:true}));
   }
   var observer=typeof ResizeObserver==='function'?new ResizeObserver(layout):null;
-  if(observer)choices.forEach(function(choice){observer.observe(choice.button);});
+  if(observer)choices.concat(buttons).forEach(function(choice){observer.observe(choice.button);});
   layout();
   function sync(selectedId,index){
     if(retired)return;

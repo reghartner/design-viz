@@ -16,7 +16,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
   if(value.canvasPanels)saved.canvasPanels=JSON.parse(JSON.stringify(value.canvasPanels));else delete saved.canvasPanels;
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
   if(value.layout){
-    ['panels','prose','controls','overlayScale','prosePlacement','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
+    ['panels','prose','controls','textScale','overlayScale','prosePlacement','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
       if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
     });
   }
@@ -107,7 +107,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,prosePlacement:value.layout.prosePlacement,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
+    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{textScale:value.layout.textScale?copy(value.layout.textScale):undefined,panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,prosePlacement:value.layout.prosePlacement,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
@@ -156,6 +156,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   // Notes retain readable text and independent geometry when panels are scaled.
   // Dormant canvas controls sizing must never resize floating panel content.
+  function controlsContentScale(){return (definition && definition.presentation==='explore' || canvasWindow(playerWindow))?1:overlayScale();}
   function windowScale(w){return w.prose?1:w===playerWindow?overlayScale():floatingOverlayScale();}
   function zoomFloor(){
     if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
@@ -363,7 +364,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function sizingScale(){return hasFloatingPanels()?floatingOverlayScale():overlayScale();}
   function latchOverlayScale(){if(memory.layout.overlayScale===undefined && !savedOverlayGeometry(memory.layout))memory.layout.overlayScale=floatingOverlayScale();}
   // Panel dimensions and control height describe the size at 100%. Controls
-  // retain their chosen horizontal span so smaller text exposes more steps.
+  // retain their chosen horizontal span; Explore type has its own scale.
   // Positions stay in viewport coordinates; the diagram camera is independent.
   function scaledRect(w,r,inverse){
     if(canvasWindow(w))return graphRect(r);
@@ -429,7 +430,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     apply(w,constrain(w,scaledRect(w,w.state)));
     var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
-    // Pristine notes keep fitting fluid type through viewport changes.
+    // Pristine notes keep fitting text through viewport and text-size changes.
     // Gestures and authored rectangles leave automatic sizing explicitly.
   }
   function fittedControlsRect(r,insets,automatic){
@@ -452,15 +453,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var compact=style.display==='flex',beside=!compact && /^(left|right)$/.test(player.getAttribute('data-step-text-position'));
     var gap=parseFloat(style.rowGap)||0,padding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
     var rail=player.querySelector('.playback-mode-rail'),railHeight=rail?rail.offsetHeight:0;
-    var scale=canvasWindow(playerWindow)?1:overlayScale();
+    var scale=controlsContentScale();
     var contentHeight=compact?transportHeight+tracks+captionHeight+gap*2:beside?Math.max(transportHeight,tracks,captionHeight):Math.max(transportHeight,tracks)+captionHeight+gap;
     var room=Math.max(104,bounds().h-insets.top-insets.bottom);
     r.h=Math.min(Math.max(r.h,railHeight+(contentHeight+padding)*scale+2),room);
     player.style.setProperty('--explore-rail-height',railHeight+'px');
     // Reserve a usable caption row even when the timeline needs scrolling.
     var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
-    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):tracks;
-    player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
+    // Grid transport shares the tracks row. Its wrapped status must fit even
+    // when a simple story has only one row of step circles. Compact layouts
+    // put transport in its own flex row and reserve that height above instead.
+    var rowMinimum=compact?34:Math.max(34,transportHeight);
+    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):Math.max(tracks,rowMinimum);
+    player.style.setProperty('--explore-tracks-height',Math.max(rowMinimum,Math.min(rowHeight,trackRoom))+'px');
     // Reader utilities reserve space for floating controls. Workbench toolbar
     // insets still apply only to automatic docks, not authored geometry.
     if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(automatic?insets.bottom:12)));
@@ -470,7 +475,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
     if(selectedCanvasWindow && (!canvasWindow(selectedCanvasWindow) || !visible(selectedCanvasWindow)))selectCanvasWindow(null);
-    var contentScale=overlayScale();player.style.setProperty('--explore-overlay-scale',String(canvasWindow(playerWindow)?1:contentScale));stage.style.setProperty('--explore-overlay-scale',String(contentScale));
+    var contentScale=overlayScale();player.style.setProperty('--explore-overlay-scale',String(controlsContentScale()));
+    player.style.setProperty('--explore-text-scale',String(sectionExploreTextScale(memory.layout.textScale && memory.layout.textScale.controls)));stage.style.setProperty('--explore-overlay-scale',String(contentScale));
     var textPosition=memory.layout.steps && memory.layout.steps.textPosition || 'below';
     player.setAttribute('data-step-text-position',textPosition);
     player.setAttribute('data-explore-layout',definition.id);
@@ -486,7 +492,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // State changes can replace panel content without changing the viewport.
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
-    windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
+    windows.forEach(function(w){if(w.prose)w.el.style.setProperty('--explore-text-scale',String(sectionExploreTextScale(memory.layout.textScale && memory.layout.textScale.prose)));w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom,stageRect=stage.getBoundingClientRect();
     var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),readerTools=readerCanvas && shell.closest('.docview') && shell.closest('.docview').querySelector(':scope > .reader-page-actions');
@@ -497,19 +503,47 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var obstacleRects=obstacleNodes.filter(function(node){return node.getClientRects().length;}).map(function(node){return node.getBoundingClientRect();});
     var toolRect=obstacleRects.length && obstacleRects.reduce(function(union,r){return {left:Math.min(union.left,r.left),right:Math.max(union.right,r.right),top:Math.min(union.top,r.top),bottom:Math.max(union.bottom,r.bottom)};});
     function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-12);}
-    var columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
-    var stackRects=new Map();
-    stacked.forEach(function(w){
-      var r=constrain(w,scaledRect(w,w.state));
-      // Never compress a panel to fit the lane. An oversized panel owns a
-      // top-aligned column (and may overflow below); the next panel wraps left.
-      // Clear the entire toolbar, which can be wider than a single panel.
-      var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
-      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight=Math.min(columnRight,toolRect.left-stageRect.left-gap);width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
-      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
-      r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
-      y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
-    });
+    var stackLeft,stackRects;
+    function packStack(maxAutomaticHeight){
+      var columnRight=b.w-12,columnWidth=0,y=insetTop,columns=[];
+      stackLeft=b.w;stackRects=new Map();
+      stacked.forEach(function(w,index){
+        var r=constrain(w,scaledRect(w,w.state));
+        if(w.state.automatic)r.h=Math.min(r.h,maxAutomaticHeight);
+        // Reuse an earlier column's remaining space before opening another.
+        // Readable notes can be taller than other cards; leaving their lower
+        // space unused can consume the playback lane on desktop. Only reuse a
+        // column that already has enough width, preserving its neighbors.
+        var priorColumn=columns.find(function(column){return r.w<=column.width && column.y+r.h<=columnBottom(column.right-column.width,column.right);});
+        if(priorColumn){r.x=Math.max(12,priorColumn.right-r.w);r.y=priorColumn.y;stackRects.set(w,r);priorColumn.y+=r.h+gap;stackLeft=Math.min(stackLeft,r.x);return;}
+        // Authored panels retain their full size. An oversized panel owns a
+        // top-aligned column (and may overflow below); the next panel wraps left.
+        // Clear the entire toolbar, which can be wider than a single panel.
+        var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
+        if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight=Math.min(columnRight,toolRect.left-stageRect.left-gap);width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+        // If only the bottom toolbar prevents a fit, move this column just
+        // left of it before spending another whole column on the final small card.
+        if(columns.length && index===stacked.length-1 && y>insetTop && y+r.h>stackBottom && y+r.h<=b.h-12 && toolRect && stackBottom<b.h-12 && toolRect.left-stageRect.left-gap-width>=12){
+          var shiftedRight=Math.min(columnRight,toolRect.left-stageRect.left-gap),shift=shiftedRight-columnRight;
+          stackRects.forEach(function(placed){if(Math.abs(placed.x+placed.w-columnRight)<1){placed.x+=shift;stackLeft=Math.min(stackLeft,placed.x);}});
+          columnRight=shiftedRight;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);
+        }
+        if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columns.push({right:columnRight,width:columnWidth,y:y});columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
+        r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
+        y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
+      });
+    }
+    packStack(Infinity);
+    var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
+    // Enlarged automatic content can exhaust the desktop columns and push the
+    // dock over panels. Keep widths and type, but let automatic bodies scroll
+    // before spending the playback lane. Authored/free rectangles are untouched.
+    if(workbenchCanvas && b.w>=800 && !controls && stacked.some(function(w){return w.state.automatic;})){
+      var maxAutomaticHeight=Math.max.apply(null,stacked.map(function(w){return stackRects.get(w).h;}));
+      for(var pass=0;pass<16 && maxAutomaticHeight>72 && stackLeft-(stackLeft<420?12:84)-gap<minimum(playerWindow);pass++){
+        maxAutomaticHeight=Math.max(72,maxAutomaticHeight*.8);packStack(maxAutomaticHeight);
+      }
+    }
     var maxWidth=stacked.length?b.w-stackLeft:0;
     windows.forEach(function(w){
       var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
@@ -522,11 +556,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     });
     player.hidden=workbenchFocus || !bar && !player.querySelector('.playback-mode-rail');
     player.classList.toggle('player-ambient',!!bar && bar.hidden);
-    var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
     var automaticControls=!controls;
     if(!controls){
       var controlLeft=workbenchCanvas?84:12,right=12,minControls=minimum(playerWindow);
-      if(maxWidth){var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,besideWidth=b.w-(maxWidth+28)-besideLeft;if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+28;}}
+      if(maxWidth){
+        var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,dockGap=28,besideWidth=b.w-(maxWidth+dockGap)-besideLeft;
+        // Prefer the usual breathing room, but use the panel stack's gap
+        // before falling back to a dock that spans beneath the panels.
+        if(besideWidth<minControls){dockGap=gap;besideWidth=b.w-(maxWidth+dockGap)-besideLeft;}
+        if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+dockGap;}
+      }
       var controlWidth=workbenchCanvas?Math.max(minControls,b.w-right-controlLeft):b.w-right-controlLeft;
       controls={x:controlLeft,y:12,w:controlWidth,h:146};
     }
@@ -717,7 +756,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     active=true;choices.replaceChildren();memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     fitFloor=memory.fitFloor!==undefined?memory.fitFloor:memory.layout.camera?memory.layout.camera.zoom:null;
-    stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
+    stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');shell.classList.toggle('explore-text-sizing',definition.presentation==='explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     var modeRail=box.querySelector('.playback-mode-rail');if(modeRail)move(modeRail,player);
     if(bar)move(bar,player);move(board,canvas);board.querySelector('.boardcanvas').appendChild(objectLayer);if(legend)move(legend,tools);overlayZoom.hidden=false;syncTools();
@@ -752,7 +791,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(prose)prose.setFloating(false);
     stage.appendChild(player);controlsPlacementLabel.hidden=true;objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=!legendItems.childElementCount;
     stage.hidden=true;grid.hidden=false;board.hidden=canvasBoardHidden;board.classList.remove('explore-board','authored-diagram-hidden');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
-    shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
+    shell.classList.remove('viewport-explore','explore-text-sizing');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
   function fullscreenHost(){return shell.closest('.has-document-navigation') || shell;}
@@ -926,7 +965,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     reset:function(){
       if(!active)return;var token=beginEdit(true);if(token===false)return;
-      var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};leave();delete memories[id];
+      var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};if(memory.layout.textScale)defaults.textScale=copy(memory.layout.textScale);leave();delete memories[id];
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
     },
     scrollTarget:function(){return active?stage:grid;},

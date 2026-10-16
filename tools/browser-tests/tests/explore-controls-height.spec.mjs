@@ -94,18 +94,21 @@ for(const position of ['below','above','left','right'])test('step text changes r
  await page.screenshot({path:info.outputPath('caption-'+position+'-with-contents.png')});
 });
 
-test('authored floating controls grow without moving when content fits near the stage bottom',async({page,server})=>{
+test('authored floating controls keep their origin when content fits and clamp only when needed',async({page,server},info)=>{
  const raw=fixture('floating'),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
  layout.controls={x:.08,y:.6,w:.6,h:.1};
  await page.setViewportSize({width:1280,height:1100});await open(page,server,raw,'workbench');
  const source=page.locator('#src'),original=await source.inputValue();
- for(const height of [1100,1400,1100]){
+ for(const height of [1100,1400,1000,1100]){
   await page.setViewportSize({width:1280,height});
   await expect.poll(()=>player(page).evaluate((el,saved)=>{
    const r=el.getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect();
-   return Math.max(Math.abs(r.x-stage.x-saved.x*stage.width),Math.abs(r.y-stage.y-saved.y*stage.height),Math.abs(r.width-saved.w*stage.width));
+   return Math.max(Math.abs(r.x-stage.x-saved.x*stage.width),Math.abs(r.y-stage.y-Math.min(saved.y*stage.height,stage.height-r.height-12)),Math.abs(r.width-saved.w*stage.width));
   },layout.controls)).toBeLessThan(1);
-  const geometry=await player(page).evaluate(el=>{const r=el.getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect();return {height:r.height/stage.height,bottom:r.bottom-stage.bottom};});
+  const geometry=await player(page).evaluate(el=>{const r=el.getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect();return {height:r.height/stage.height,bottom:r.bottom-stage.bottom,y:r.y-stage.y,stageHeight:stage.height,pixelHeight:r.height};});
+  if(height===1400)expect(geometry.y).toBeCloseTo(layout.controls.y*geometry.stageHeight,0);
+  if(height===1000)expect(geometry.y).toBeLessThan(layout.controls.y*geometry.stageHeight-10);
+  await info.attach('authored-'+height,{body:JSON.stringify(geometry),contentType:'application/json'});
   expect(geometry.height).toBeGreaterThan(layout.controls.h);expect(geometry.bottom).toBeLessThanOrEqual(-12);
   const m=await metrics(page);expect(m.overflow).toBeLessThanOrEqual(1);expect(m.captionVisible).toBe(true);
   await expect(source).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();

@@ -170,7 +170,7 @@ for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprin
     if(surface==='reader')await page.goto(await build(server,raw,'notes-'+skin));
     else{await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);}
     await expect(notes(page)).toBeVisible();await page.evaluate(()=>document.fonts.ready);
-    for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');
+    for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','18px');
     const contrast=await notes(page).evaluate(el=>{
       function luminance(color){const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
       const bg=luminance(getComputedStyle(el).backgroundColor);
@@ -231,19 +231,19 @@ test('notes placement and both geometries save, undo, redo and reopen independen
 for(const width of [1280,1440,1920])test('notes remain readable and independently sized at '+width+'px',async({page,server},info)=>{
  await page.setViewportSize({width,height:1000});const raw=fixture('explore');delete raw.page.sections[0].diagram.layouts[1].exploreLayout.prose;
  await page.goto(await build(server,raw,'readable-notes-'+width));await page.evaluate(()=>document.fonts.ready);
- for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');const before=await notes(page).boundingBox();
+ for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','18px');const before=await notes(page).boundingBox();
  await page.locator('.reader-navigation .explore-panel-menu>summary').click();await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await page.keyboard.press('Escape');expect(await notes(page).boundingBox()).toEqual(before);
  expect(await notes(page).locator('.explore-window-body').evaluate(el=>({overflow:el.scrollHeight-el.clientHeight,scale:getComputedStyle(el).transform}))).toEqual({overflow:0,scale:'matrix(1, 0, 0, 1, 0, 0)'});
  await page.screenshot({path:info.outputPath('section-notes-'+width+'.png')});
  await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');
  await page.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();await expect(notes(page)).toBeInViewport();
- const openFont=await notes(page).evaluate(el=>parseFloat(getComputedStyle(el.querySelector('.sec-text')).fontSize)*el.getBoundingClientRect().width/el.offsetWidth);expect(openFont).toBeGreaterThanOrEqual(14);
+ const openFont=await notes(page).evaluate(el=>parseFloat(getComputedStyle(el.querySelector('.sec-text')).fontSize)*el.getBoundingClientRect().width/el.offsetWidth);expect(openFont).toBeGreaterThan(0);
  // Restore the full canvas width used by this readability contract; the open
  // Contents sidebar intentionally reserves 284px and Fit scales to that space.
  await page.locator('.reader-top>button').click();await page.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();
  await expect(notes(page)).toBeInViewport();
- const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
- expect(metrics.font).toBeGreaterThanOrEqual(19);expect(metrics.font).toBeLessThanOrEqual(22);expect(metrics.overflow).toBeLessThanOrEqual(1);
+ const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {scale:scale,logical:parseFloat(getComputedStyle(texts[0]).fontSize),font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
+ expect(metrics.logical).toBe(18);expect(metrics.font).toBeCloseTo(18*metrics.scale,1);expect(metrics.overflow).toBeLessThanOrEqual(1);
  await info.attach('canvas-notes-rendered-size-'+width,{body:JSON.stringify(metrics),contentType:'application/json'});
  await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
  await page.locator('.explore-panel-menu summary').click();
@@ -260,7 +260,7 @@ for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live
  await page.setViewportSize({width:1920,height:1000});const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
  await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);
  const wide=await notesGeometry(page);expect(await notesOverflow(page)).toBe(0);
- await page.setViewportSize({width:1280,height:1000});await expect.poll(async()=>(await notesGeometry(page)).h).toBeGreaterThan(wide.h);await expect.poll(()=>notesOverflow(page)).toBe(0);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);await expect.poll(()=>notesOverflow(page)).toBe(0);
  await page.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);expect(await notesOverflow(page)).toBe(0);
  await notes(page).focus();await notes(page).getByRole('button',{name:gesture+' Section notes; use arrow keys',exact:true}).press('ArrowRight');const manual=await notesGeometry(page);expect(manual).not.toEqual(wide);

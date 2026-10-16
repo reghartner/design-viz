@@ -4,9 +4,9 @@ import path from 'node:path';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
-async function build(server,{unstacked=false,oversized=false}={}){
+async function build(server,{unstacked=false,oversized=false,textScale=1}={}){
  const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;sec.id='doorbell';d.autoplay=false;
- delete d.layouts[1].exploreLayout;d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
+ delete d.layouts[1].exploreLayout;if(textScale!==1)d.layouts[1].exploreLayout={textScale:{prose:textScale,controls:textScale}};d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.panels.push({id:'queue',type:'queue',title:'Upload queue',initial:{depth:3}});
  if(unstacked)d.layouts[1].exploreLayout={
   panels:d.panels.map((panel,index)=>({panel:panel.id,x:.02+index*.2,y:.12,w:.18,h:oversized && panel.id==='outcome' ? 1 : .22,stacked:false})),
@@ -88,37 +88,70 @@ test('right and top-right remain free placement; Stack at edge preserves size an
   column.rects.forEach((r,index)=>{expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);if(index)expect(r.y-column.rects[index-1].y-column.rects[index-1].height).toBeCloseTo(8,0);});
  }
 });
-test('automatic Explore panels open at readable content size across desktop viewports and Workbench',async({page,server},info)=>{
- const url=await build(server);
- for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1440,900]]){
+for(const textScale of [1,1.75])test(`automatic Explore panels open at readable content size at ${textScale*100}% across desktop viewports and Workbench`,async({page,server},info)=>{
+ const url=await build(server,{textScale});
+ const viewports=textScale===1?[['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1280,800,360],['workbench',1440,900]]:[['workbench',1280,800],['workbench',1440,900],['reader',1920,1400],['workbench',1280,1400],['workbench',1440,1400],['workbench',1920,1200]];
+ for(const [surface,width,height,toolbarWidth=0] of viewports){
   await page.setViewportSize({width,height});
   if(surface==='reader'){await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');await page.locator('.reader-top>button').click();}
   else{await page.goto(url);await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
   await page.evaluate(()=>document.fonts.ready);
+  if(toolbarWidth){
+   // Desktop font metrics can make the toolbar wider on Linux. Keep that
+   // packing pressure deterministic on every browser-test host.
+   await page.locator('.workspace-canvas-controls').evaluate((el,width)=>{el.style.width=width+'px';window.dispatchEvent(new Event('resize'));},toolbarWidth);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  }
+  const original=surface==='workbench'?await page.locator('#src').inputValue():null;
   const stage=await rect(page.locator('.explore-stage')),scale=responsiveScale(stage.width);
   await expect(page.locator('.explore-overlay-value')).toHaveText(Math.round(scale*100)+'%');
   const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
   expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
+  const constrainedNotes=surface==='workbench' && width===1280 && height===800;
+  if(toolbarWidth){const notes=windows.find(win=>win.id==='prose');expect(notes.scrollHeight-notes.clientHeight).toBeGreaterThan(2);}
   for(const win of windows){
    const preferred={clip:340,home:340,outcome:300,prose:320,queue:300}[win.id];expect(win.width,win.id).toBeCloseTo(preferred*(win.id==='prose'?1:scale),0);
-   expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
+   if((textScale>1 || constrainedNotes) && win.id==='prose' && win.scrollHeight-win.clientHeight>2){
+    // Automatic notes may scroll under desktop packing pressure at any
+    // text size. Roomier 100% cases below still require full content fit.
+    expect(win.height).toBeGreaterThanOrEqual(72);expect(win.height).toBeLessThanOrEqual(stage.height-24);
+    const body=page.locator('.explore-prose-window .explore-window-body');
+    expect(await body.evaluate(el=>{el.scrollTop=el.scrollHeight;return Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop);})).toBeLessThanOrEqual(1);
+   }else expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
    expect(win.x,win.id+' left bound').toBeGreaterThanOrEqual(stage.x+10);expect(win.y,win.id+' top bound').toBeGreaterThanOrEqual(stage.y+10);
    expect(win.x+win.width,win.id+' right bound').toBeLessThanOrEqual(stage.x+stage.width-10);expect(win.y+win.height,win.id+' bottom bound').toBeLessThanOrEqual(stage.y+stage.height-10);
   }
-  // Notes remain 320px at 100%; allow two columns with an 8px gap.
+  // Notes remain 320px wide; allow two columns plus the measured horizontal
+  // shift required to clear a bottom toolbar that crosses the second column.
   const footprint=stage.x+stage.width-12-Math.min(...windows.map(win=>win.x));
-  expect(footprint,surface+' panel footprint').toBeLessThanOrEqual(Math.ceil(Math.max(320,340*scale)+340*scale+8));
+  const toolbar=surface==='workbench'?await rect(page.locator('.workspace-canvas-controls')):null;
+  const toolbarClearance=toolbar?(windows.some(win=>win.height>toolbar.y-stage.y-24)?stage.x+stage.width-12-toolbar.x+8:Math.max(0,stage.x+stage.width-12-Math.max(320,340*scale)-toolbar.x)):0;
+  expect(footprint,surface+' panel footprint').toBeLessThanOrEqual(Math.ceil(Math.max(320,340*scale)+340*scale+8+toolbarClearance));
   for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
   const controls=await rect(page.locator('.explore-player'));
   for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
   if(surface==='workbench'){
    const canvasControls=await rect(page.locator('.workspace-canvas-controls'));
    for(const win of windows)expect(overlaps(win,canvasControls),win.id+' overlaps canvas controls').toBe(false);
+   await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   }
-  await info.attach(surface+'-'+width+'x'+height+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
-  await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
+  await info.attach(surface+'-'+width+'x'+height+(toolbarWidth?'-toolbar-'+toolbarWidth:'')+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
+  await info.attach(surface+'-'+width+'x'+height+(toolbarWidth?'-toolbar-'+toolbarWidth:''),{body:await page.screenshot(),contentType:'image/png'});
   if(width===1280)await page.screenshot({path:'/tmp/explore-'+surface+'-1280x800-responsive.png'});
  }
+});
+test('enlarged automatic notes regain height after desktop resize without authoring geometry',async({page,server})=>{
+ await build(server,{textScale:1.75});await page.setViewportSize({width:1280,height:800});
+ await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
+ const source=page.locator('#src'),original=await source.inputValue(),notes=page.locator('.explore-prose-window'),short=await rect(notes);
+ await page.setViewportSize({width:1280,height:1400});await expect.poll(async()=>(await rect(notes)).height).toBeGreaterThan(short.height+100);
+ await page.setViewportSize({width:1280,height:800});await expect.poll(async()=>(await rect(notes)).height).toBeCloseTo(short.height,0);
+ const panels=await Promise.all((await floats(page).all()).map(rect)),controls=await rect(page.locator('.explore-player'));
+ for(let a=0;a<panels.length;a++){expect(overlaps(panels[a],controls)).toBe(false);for(let b=a+1;b<panels.length;b++)expect(overlaps(panels[a],panels[b])).toBe(false);}
+ for(const scrollable of [notes.locator('.explore-window-body'),page.locator('.explore-player .stepline:not(.dv-caption-old)')]){
+  expect(await scrollable.evaluate(el=>{el.scrollTop=el.scrollHeight;return Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop);})).toBeLessThanOrEqual(1);
+ }
+ await expect(source).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 test('automatic panels remeasure when a late font changes rendered content metrics',async({page,server})=>{
  const fontName='explore-late-font.woff2';

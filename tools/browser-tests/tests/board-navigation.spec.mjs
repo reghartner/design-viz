@@ -226,9 +226,9 @@ test('workbench Standard board routes vertical-dominant wheel at its boundary to
    R3 focused diagram Space plays | paused, autoplay off, motion allowed | data-playback=playing; keydown defaultPrevented (no page scroll) | Space left to scroll the page
    R4 Space again pauses | after R3 | data-playback=paused, STEP unchanged; keydown defaultPrevented | Space that only starts play, or scrolls the page when pausing
    R5 text input in the section | denied clipboard makes the in-section "Copy this link manually" field | ArrowLeft/ArrowRight/Space reach the field un-prevented (native caret keys); field keeps focus; STEP and playback unchanged | text fields hijacked
-   R6 tab strip | "Views in selected Tab" Standard tab focused | ArrowRight focuses Explore tab; STEP unchanged | tabs hijacked
-   R7 zoomed Standard board | Zoom in, board focused | ArrowRight scrolls board right; STEP unchanged | pan keys hijacked on a pannable board
-   R8 Explore board | Explore View, zoomed, board keyboard-focused | ArrowRight scrolls board right; STEP unchanged | Explore arrow panning hijacked
+   R6 tab strip | "Views in selected Tab" Standard tab focused | ArrowRight focuses Explore tab, ArrowLeft focuses Standard again; STEP unchanged | tabs hijacked (either direction)
+   R7 zoomed Standard board | Zoom in, board focused | from scrollLeft 100, ArrowRight scrolls right and ArrowLeft scrolls left; STEP unchanged | pan keys hijacked on a pannable board (either direction)
+   R8 Explore board | Explore View, zoomed, board keyboard-focused | from scrollLeft 100, ArrowRight scrolls right and ArrowLeft scrolls left; STEP unchanged | Explore arrow panning hijacked (either direction)
    R9 focus outside any diagram | real click on the page title (body focused), then PRESENT button focused; not presenting | Space and ArrowRight/ArrowLeft not defaultPrevented, the page scrolls down on Space, STEP and playback unchanged | page-wide Space/arrow hijack
    R10 Present unchanged | PRESENT clicked, EXIT button (outside the section) focused | ArrowRight/ArrowLeft step, Space toggles play, Escape exits | Present path narrowed to focused diagrams */
 function stepKeysSpec(){
@@ -265,17 +265,25 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   const strip=page.getByRole('tablist',{name:'Views in selected Tab'});
   await strip.getByRole('tab',{name:'Standard',exact:true}).focus();await page.keyboard.press('ArrowRight');
   await expect(strip.getByRole('tab',{name:'Explore',exact:true})).toBeFocused();await expect(step).toHaveText('STEP 1/3');
+  await page.keyboard.press('ArrowLeft');await expect(strip.getByRole('tab',{name:'Standard',exact:true})).toBeFocused();await expect(step).toHaveText('STEP 1/3');
   // R7: a zoomed Standard board keeps native arrow panning.
   await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   await board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
-  await board.evaluate(el=>{el.scrollLeft=0;});const z=await background(board);await page.mouse.click(z.x,z.y);await expect(board).toBeFocused();
-  await page.keyboard.press('ArrowRight');await expect.poll(()=>board.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);await expect(step).toHaveText('STEP 1/3');
+  const left=()=>board.evaluate(el=>el.scrollLeft);
+  async function pans(){
+    for(const [key,direction] of [['ArrowRight',1],['ArrowLeft',-1]]){
+      await board.evaluate(el=>{el.scrollLeft=100;});await expect(board).toBeFocused();
+      await page.keyboard.press(key);await expect.poll(async()=>Math.sign(await left()-100)).toBe(direction);
+      await expect.poll(async()=>{const a=await left();await page.waitForTimeout(150);return await left()-a;}).toBe(0);
+      await expect(step).toHaveText('STEP 1/3');
+    }
+  }
+  const z=await background(board);await page.mouse.click(z.x,z.y);await expect(board).toBeFocused();await pans();
   // R8: an Explore board keeps native arrow panning.
   await strip.getByRole('tab',{name:'Explore',exact:true}).click();await expect(board).toHaveClass(/explore-board/);
   await page.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   await page.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
-  await board.evaluate(el=>{el.scrollLeft=0;});await board.focus();await expect(board).toBeFocused();
-  await page.keyboard.press('ArrowRight');await expect.poll(()=>board.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);await expect(step).toHaveText('STEP 1/3');
+  await board.focus();await pans();
   await strip.getByRole('tab',{name:'Standard',exact:true}).click();
   // R9: focus outside every diagram leaves the keys to the page.
   const present=page.getByRole('button',{name:'Enter presenter mode (fullscreen)',exact:true});

@@ -264,6 +264,35 @@ test('Canon edit and browser Back preserve Ambient mode while stale modes use th
   await expect(editor.locator('.termbar')).toBeVisible();
 });
 
+// #546 — the published-library entry uses plain wording ("Browse diagrams"), not the internal term "Canon diagrams".
+// row | fixture                                   | assertion (scoped)                                                                 | rejects
+// 1   | 1440×900 home, library served             | precondition: #welcome-home visible, #welcome-library-screen hidden                | a vacuous pass that starts on the library screen
+// 2   | home                                      | #welcome-library's own <b> label has exact text "Browse diagrams"                   | label left as "Canon diagrams" / renamed to some other wording
+// 3   | home                                      | getByRole('button',{name:/^Browse diagrams/}) resolves to #welcome-library and a real click on it opens #welcome-library-screen | label changed only in a hidden node while the accessible name still says Canon; id renamed
+// 4   | library screen                            | #welcome-library-screen h1 has exact text "Browse diagrams."                        | card renamed but the screen heading still says "Canon diagrams."
+// 5   | in-app user guide, §09 (#hg-evidence)     | its first <b> is exactly "Browse diagrams" and the section text has no "Canon diagrams" | guide still telling users to choose "Canon diagrams"
+// 6   | library load fails (version 99 snapshot)  | #welcome-library-status says "Could not load" and contains no "canon" (any case)     | failure status still naming the internal term
+// 7   | ?diagram=missing direct reader            | #canon-reader-error names "Browse diagrams" and not "Canon diagrams"                 | stale-diagram recovery still pointing at the old label
+test('the published-library entry, its screen, the user guide and its recovery text use the plain "Browse diagrams" label',async({page,server})=>{
+  let data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
+  await expect(page.locator('#welcome-home')).toBeVisible();await expect(screen(page,'library')).toBeHidden();
+  const entry=page.locator('#welcome-library');
+  await expect(entry.locator('b')).toHaveText('Browse diagrams');
+  const named=page.getByRole('button',{name:/^Browse diagrams/});
+  await expect(named).toHaveCount(1);expect(await named.evaluate(el=>el.id)).toBe('welcome-library');
+  await openGuide(page);const evidence=guide(page).locator('#hg-evidence');
+  await expect(evidence.locator('b').first()).toHaveText('Browse diagrams');await expect(evidence).not.toContainText('Canon diagrams');
+  await page.locator('#human-guide-close').click();await expect(guide(page)).not.toBeVisible();
+  await named.click();await expect(screen(page,'library')).toBeVisible();
+  await expect(screen(page,'library').locator('h1')).toHaveText('Browse diagrams.');
+  data={version:99,diagrams:[]};await page.reload();await expect(screen(page,'library')).toBeVisible();
+  const status=page.locator('#welcome-library-status');await expect(status).toContainText('Could not load');await expect(status).not.toContainText(/canon/i);
+  data=library();await page.goto(server.origin+'/workbench.html?diagram=missing');
+  const error=page.locator('#canon-reader-error');await expect(error).toContainText('no longer in the published library');
+  await expect(error).toContainText('Browse diagrams');await expect(error).not.toContainText('Canon diagrams');
+});
+
 test('empty or invalid company libraries do not masquerade as demos and late loads do not navigate',async({page,server})=>{
   let data={version:1,diagrams:[]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();

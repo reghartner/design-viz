@@ -201,3 +201,41 @@ test('native top Views retain focus and align wrapped headers with their bounded
   }
   await page.evaluate(()=>viewer.destroy());await expect(nav).toHaveCount(0);
 });
+
+/* #552 — Contents "you are here" on scroll; header title room at 1440.
+   row | fixture | assertion (scoped) | rejects
+   S1 precondition | Full story stack, 1440x900, top of page | Full story Contents rows aria-current = [page,false,false] | a test that starts already on the target row
+   S2 scroll marks entry | real mouse.wheel down to Review | Full story rows = [false,page,false] (only the Review row) | highlight stuck on the last clicked/loaded row
+   S3 scroll to end | real mouse.wheel to page end | rows = [false,false,page] | tracking only the first transition / never reaching the last section
+   S4 scroll back | real mouse.wheel up to top | rows = [page,false,false] | one-way tracking
+   S5 click still works | real click on the Review row | that row aria-current=page, #section-review top within 24px under the header (its scroll-margin) | scroll tracking that swallows or overrides Contents clicks
+   S6 click does not pin | real mouse.wheel up after the click | rows = [page,false,false] | a click that freezes the highlight ("keeps whatever was last clicked")
+   S7 deep link kept | location.hash before/after each scroll | hash unchanged by scrolling; click still rewrites it to d=review | scroll tracking that rewrites #d=/#t= deep links
+   T1 title fits | 31-char Tab label, 1440x900 | .reader-tab-label text = full label and its scrollWidth <= clientWidth | a 120px header column that ellipsizes "Chime Doorbell — …"
+   T2 hover tooltip | same | .reader-tab-label title = full label | a clipped label without a full-title tooltip
+   T3 long title bounded | 90-char Tab label, 1440x900 | title = full label; label right edge <= Views strip left; no page-wide horizontal overflow | an unbounded label pushing the Views strip off the header */
+function labelled(label){const raw=story();raw.page.sections[0].tabs[0].label=label;return raw;}
+test('scrolling marks the visible section in Contents without pinning clicks or rewriting the deep link',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await openRaw(page,server,labelled('Chime Doorbell — motion to clip'),'contents-scroll');
+  const rows=root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section'),current=()=>rows.evaluateAll(els=>els.map(el=>el.getAttribute('aria-current')));
+  const wheel=async dy=>{await page.mouse.move(720,600);await page.mouse.wheel(0,dy);};
+  await expect(rows).toHaveText(['Turn a doorbell story into a reviewable draft','Decide what becomes the accepted diagram','Find the right workspace in Backstage']);
+  await expect.poll(current).toEqual(['page','false','false']);const hash=await page.evaluate(()=>location.hash);
+  const reviewTop=await root.locator('#section-review').evaluate(el=>el.getBoundingClientRect().top),navBottom=await root.locator('.reader-navigation').evaluate(el=>el.getBoundingClientRect().bottom);
+  await wheel(Math.round(reviewTop-navBottom-8));await expect.poll(current).toEqual(['false','page','false']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+  await wheel(4000);await expect.poll(current).toEqual(['false','false','page']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+  await wheel(-4000);await expect.poll(current).toEqual(['page','false','false']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+  await rows.nth(1).click();await expect.poll(current).toEqual(['false','page','false']);await expect.poll(()=>page.evaluate(()=>location.hash)).toContain('d=review');
+  const target=await root.locator('#section-review').boundingBox(),header=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(header.y+header.height);expect(target.y).toBeLessThanOrEqual(header.y+header.height+24);
+  const clicked=await page.evaluate(()=>location.hash);await wheel(-4000);await expect.poll(current).toEqual(['page','false','false']);expect(await page.evaluate(()=>location.hash)).toBe(clicked);
+});
+test('header Tab title keeps about 30 characters unclipped at 1440 and names the full title on hover',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  for(const label of ['Chime Doorbell — motion to clip','Chime Doorbell — motion to clip, thermal throttle, shutdown and recovery for the resident']){
+    const root=await openRaw(page,server,labelled(label),'contents-title-'+label.length),title=root.locator('.reader-top .reader-tab-label');
+    await expect(title).toHaveText(label);await title.hover();await expect(title).toHaveAttribute('title',label);
+    const box=await title.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,right:el.getBoundingClientRect().right,strip:el.closest('.reader-top').querySelector('.reader-view-strip').getBoundingClientRect().left}));
+    if(label.length<=31)expect(box.scroll).toBeLessThanOrEqual(box.client);
+    expect(box.right).toBeLessThanOrEqual(box.strip);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(1440);
+  }
+});

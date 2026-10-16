@@ -419,10 +419,11 @@ is restored when the tour finishes or is skipped.
   controls remain reachable when a section enters browser fullscreen.
 - Any internal error tears the overlay down, restores state, logs
   `flowspec: tour error` — fail-open, always.
-- A small **Skip tour ✕** control sits fixed at the top LEFT for the
-  whole tour (clear of PRESENT, which lives top right) — a mouse way out
-  even while a click step holds its card. On narrow screens the step
-  counter row is hidden (the card's eyebrow already carries the count); at
+- A small **Skip tour** control sits fixed at the top LEFT for the
+  whole tour (clear of Present, which lives top right) — a mouse way out
+  even while a click step holds its card. It is the tour's only skip
+  control: the chooser and the step card carry no skip button of their
+  own. On narrow screens the step counter row is hidden (the card's eyebrow already carries the count); at
   any width, on a step where the counter would sit on a ring, it steps
   aside for that step.
 - Keyboard: ← → navigate lessons while focus is on the tour's controls;

@@ -90,21 +90,30 @@ test('right and top-right remain free placement; Stack at edge preserves size an
 });
 for(const textScale of [1,1.75])test(`automatic Explore panels open at readable content size at ${textScale*100}% across desktop viewports and Workbench`,async({page,server},info)=>{
  const url=await build(server,{textScale});
- const viewports=textScale===1?[['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1440,900]]:[['workbench',1280,800],['workbench',1440,900],['reader',1920,1400],['workbench',1280,1400],['workbench',1440,1400],['workbench',1920,1200]];
- for(const [surface,width,height] of viewports){
+ const viewports=textScale===1?[['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1280,800,360],['workbench',1440,900]]:[['workbench',1280,800],['workbench',1440,900],['reader',1920,1400],['workbench',1280,1400],['workbench',1440,1400],['workbench',1920,1200]];
+ for(const [surface,width,height,toolbarWidth=0] of viewports){
   await page.setViewportSize({width,height});
   if(surface==='reader'){await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');await page.locator('.reader-top>button').click();}
   else{await page.goto(url);await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
   await page.evaluate(()=>document.fonts.ready);
+  if(toolbarWidth){
+   // Desktop font metrics can make the toolbar wider on Linux. Keep that
+   // packing pressure deterministic on every browser-test host.
+   await page.locator('.workspace-canvas-controls').evaluate((el,width)=>{el.style.width=width+'px';window.dispatchEvent(new Event('resize'));},toolbarWidth);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  }
   const original=surface==='workbench'?await page.locator('#src').inputValue():null;
   const stage=await rect(page.locator('.explore-stage')),scale=responsiveScale(stage.width);
   await expect(page.locator('.explore-overlay-value')).toHaveText(Math.round(scale*100)+'%');
   const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
   expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
+  const constrainedNotes=surface==='workbench' && width===1280 && height===800;
+  if(toolbarWidth){const notes=windows.find(win=>win.id==='prose');expect(notes.scrollHeight-notes.clientHeight).toBeGreaterThan(2);}
   for(const win of windows){
    const preferred={clip:340,home:340,outcome:300,prose:320,queue:300}[win.id];expect(win.width,win.id).toBeCloseTo(preferred*(win.id==='prose'?1:scale),0);
-   if(textScale>1 && win.id==='prose' && win.scrollHeight-win.clientHeight>2){
-    // Long enlarged notes may fill their bounded viewport and scroll.
+   if((textScale>1 || constrainedNotes) && win.id==='prose' && win.scrollHeight-win.clientHeight>2){
+    // Automatic notes may scroll under desktop packing pressure at any
+    // text size. Roomier 100% cases below still require full content fit.
     expect(win.height).toBeGreaterThanOrEqual(72);expect(win.height).toBeLessThanOrEqual(stage.height-24);
     const body=page.locator('.explore-prose-window .explore-window-body');
     expect(await body.evaluate(el=>{el.scrollTop=el.scrollHeight;return Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop);})).toBeLessThanOrEqual(1);
@@ -126,8 +135,8 @@ for(const textScale of [1,1.75])test(`automatic Explore panels open at readable 
    for(const win of windows)expect(overlaps(win,canvasControls),win.id+' overlaps canvas controls').toBe(false);
    await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   }
-  await info.attach(surface+'-'+width+'x'+height+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
-  await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
+  await info.attach(surface+'-'+width+'x'+height+(toolbarWidth?'-toolbar-'+toolbarWidth:'')+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
+  await info.attach(surface+'-'+width+'x'+height+(toolbarWidth?'-toolbar-'+toolbarWidth:''),{body:await page.screenshot(),contentType:'image/png'});
   if(width===1280)await page.screenshot({path:'/tmp/explore-'+surface+'-1280x800-responsive.png'});
  }
 });

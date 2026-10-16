@@ -49,10 +49,10 @@ test('standalone details support native Back/Forward and shareable reloadable de
    H1 header names the open detail | click Connectivity | .reader-top .reader-breadcrumb .reader-detail-label text "Connectivity"; .reader-tab-label still the document label ("Parent / Detail") | header untouched; detail replacing the parent label
    H2 header follows depth | Enter on Cloud handoff | .reader-detail-label text "Cloud handoff" | header stuck on the first detail
    C1 Contents marks the parent with the open detail | depth 1 | root row [data-reader-section=doorbell-domains] aria-current=page AND its own <li> holds .reader-tree-detail ["Connectivity"]; no other row holds one | no indicator; indicator under the wrong row or tree-wide
-   C2 Contents shows the full open trail | depth 2 | root row <li> .reader-tree-detail = ["Connectivity","Cloud handoff"], last carries aria-current=location | only the first level; current level unmarked
-   R1 in-card breadcrumb partial Back | click "Connectivity" crumb at depth 2 | header "Connectivity"; tree trail ["Connectivity"] | stale depth-2 labels after Back
+   C2 Contents shows the full open trail | depth 2 | root row still aria-current=page; its <li> .reader-tree-detail = ["Connectivity","Cloud handoff"], last carries aria-current=location | only the first level; current level unmarked; parent row losing its current mark
+   R1 in-card breadcrumb partial Back | click "Connectivity" crumb at depth 2 | header "Connectivity"; root row aria-current=page; tree trail ["Connectivity"] | stale depth-2 labels after Back
    R2 in-card breadcrumb Back to Overview | click "Overview" crumb | header label count 0; tree detail count 0 | labels left behind after closing
-   R3 browser Back | page.goBack() from depth 2, then again | depth 1 header/tree, then both cleared | history restore that skips the reader refresh */
+   R3 browser Back | page.goBack() from depth 2, then again | depth 1 header/tree (root row aria-current=page), then both cleared with root row still current | history restore that skips the reader refresh */
 test('an open drilldown is named in the reader header and marked under its parent in Contents, and both restore on Back',async({page,server})=>{
  await page.setViewportSize({width:1440,height:900});
  const input=path.join(server.root,'detail-reader-spec.json'),output=path.join(server.root,'detail-reader.html');await writeFile(input,source);
@@ -73,13 +73,13 @@ test('an open drilldown is named in the reader header and marked under its paren
  // H2 + C2
  const cloud=active(page).locator('[data-dv-detail="handoff"]');await cloud.focus();await cloud.press('Enter');
  await expect(active(page).locator('.detail-breadcrumb')).toContainText('Cloud handoff');
- await expect(detailLabel).toHaveText('Cloud handoff');
+ await expect(detailLabel).toHaveText('Cloud handoff');await expect(parentRow).toHaveAttribute('aria-current','page');
  await expect(trail).toHaveText(['Connectivity','Cloud handoff']);await expect(allTrail).toHaveCount(2);
  await expect(trail.last()).toHaveAttribute('aria-current','location');await expect(trail.first()).not.toHaveAttribute('aria-current','location');
  // R1
  await active(page).locator('.detail-breadcrumb').getByRole('button',{name:'Connectivity',exact:true}).click();
  await expect(active(page).locator('[data-dv-detail="handoff"]')).toBeVisible();
- await expect(detailLabel).toHaveText('Connectivity');await expect(trail).toHaveText(['Connectivity']);
+ await expect(detailLabel).toHaveText('Connectivity');await expect(parentRow).toHaveAttribute('aria-current','page');await expect(trail).toHaveText(['Connectivity']);
  // R2
  await active(page).locator('.detail-breadcrumb').getByRole('button',{name:'Overview',exact:true}).click();await expect(root(page)).toBeVisible();
  await expect(detailLabel).toHaveCount(0);await expect(allTrail).toHaveCount(0);await expect(parentRow).toHaveAttribute('aria-current','page');
@@ -87,9 +87,10 @@ test('an open drilldown is named in the reader header and marked under its paren
  await root(page).locator('[data-dv-detail="connectivity"]').click();await expect(detailLabel).toHaveText('Connectivity');
  const deeper=active(page).locator('[data-dv-detail="handoff"]');await deeper.focus();await deeper.press('Enter');await expect(detailLabel).toHaveText('Cloud handoff');
  await page.goBack();await expect(active(page).locator('.detail-breadcrumb [aria-current="page"]')).toHaveText('Connectivity');
- await expect(detailLabel).toHaveText('Connectivity');await expect(trail).toHaveText(['Connectivity']);
+ await expect(detailLabel).toHaveText('Connectivity');await expect(parentRow).toHaveAttribute('aria-current','page');await expect(trail).toHaveText(['Connectivity']);
  await page.goBack();await expect(root(page)).toBeVisible();await expect(active(page)).toHaveCount(0);
  await expect(detailLabel).toHaveCount(0);await expect(allTrail).toHaveCount(0);await expect(header.locator('.reader-tab-label')).toHaveText(docLabel);
+ await expect(parentRow).toHaveAttribute('aria-current','page');
 });
 test('Forge single-section macro keeps the detail definitions available without showing them as extra sections',async({page,server})=>{
  await page.addInitScript(specJson=>{window.__bridge={callBridge:async method=>{if(method==='getContext')return {extension:{config:{specJson,section:'1',focus:'spec',skin:'spec'},macro:{isConfiguring:false}}};if(['navigate','close'].includes(method))return true;throw Error(method);}};},source);

@@ -401,6 +401,9 @@ function initWorkbenchLibrary(opts){
       }
       if(opts.shareable() && !published)throw new Error('No published diagram library is available at this address. Publish the site’s diagrams.json and retry.');
       var selected=entries.find(function(entry){return entry.id===id;});
+      // A direct link to anything that is not a published ID returns to
+      // Welcome, naming the value; nothing is fetched or opened for it.
+      if(!selected && !opts.handoff && opts.unknown){stop();opts.unknown(typeof id==='string'?id:'');return;}
       if(!selected)throw new Error('This diagram is no longer in the published library. Return to Browse diagrams to choose another.');
       var loaded=await loadSpec(selected);if(token!==sequence)return;
       current=Object.assign({},selected,loaded);

@@ -224,7 +224,7 @@ function initWorkbenchWelcome(opts){
     if(welcomeImport)welcomeImport.retire();
     screen = name;
     Object.keys(screens).forEach(function(key){ el(screens[key]).hidden = key !== name; });
-    error('welcome-file-error', '');
+    error('welcome-file-error', '');error('welcome-link-error', '');
     recovery.hidden=true;
     updateResume();
     if (name === 'new') loadManifest();
@@ -481,7 +481,8 @@ function initWorkbenchWelcome(opts){
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
   library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,
     position:navigation.readerTarget,savePosition:navigation.readerTarget,
-    open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct,topologyContext,target){
+    open:function(id,published){navigation.go('reader',id,published);},
+    unknown:function(value){navigation.replace('home',true);error('welcome-link-error','No published diagram matches “'+value+'”. Choose one from Browse diagrams.');},edit:function(spec,request,direct,topologyContext,target){
     if(direct)builder.preserveDraft();
     if(!builder.loadSpec(spec,request?{title:(spec.page || spec).title || request.id,id:request.id,entity:request.entity || null,digest:request.revision || null,origin:'Backstage'}:null,topologyContext))throw new Error('Could not open the authored source. Your draft has not changed.');
     if(request){var url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('fv');url.hash=hash.toString();history.replaceState(history.state,'',url.pathname+url.search+url.hash);}

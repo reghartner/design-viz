@@ -1026,7 +1026,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var backlinkX=siblingPages.length?controlX(p.w-15-(hasNodeLink?23:0)-(hasReferences?23:0)):0;
     var textX=Math.max(nodeImage?52:46,controlCount?18+18*(controlCount-1)+controlR+1:0);
     var iconY=controlCount?(small?18:20):(small?9:14),iconSize=controlCount && small?22:26,glyph=iconSize-10;
-    var imageY=controlCount?(small?17:19):7;
+    var imageY=controlCount?(small?18:20):7;
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +

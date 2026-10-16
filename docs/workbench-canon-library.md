@@ -95,7 +95,8 @@ direct links, Back/Forward and explicit **Edit in Workbench** behavior are uncha
 
 `diagrams.json` is generated and gitignored, not another hand-maintained
 membership file. Its version 3 entries contain `id`, `title`, `canon` membership,
-`counts` (resolved nodes, steps, panels), a relative authored `specUrl`, and a
+`counts` (resolved nodes, steps, panels), `services` (the distinct resolved node
+titles, used by **Search diagrams**), a relative authored `specUrl`, and a
 `revision` SHA256 of the membership-adjusted authored JSON. They contain no diagram
 rows, steps, panels, or embedded specs. For example:
 
@@ -107,12 +108,16 @@ rows, steps, panels, or embedded specs. For example:
     "title": "Doorbell delivery",
     "canon": {"version": 1, "id": "doorbell", "kind": "canonical", "owner": "group:default/home-team"},
     "counts": {"nodes": 12, "steps": 8, "panels": 3},
+    "services": ["Doorbell", "Event gateway", "Clip store"],
     "specUrl": "../diagrams/home/doorbell/doorbell.spec.json",
     "revision": "<64-character-source-sha256>"
   }]
 }
 ```
 
+**Search diagrams** filters the cards as you type, case-insensitively, by title,
+ID, owner and `services`; it never fetches specs. Indexes without
+`services` still load and filter on the other fields.
 The browser loads the index for library cards, then fetches only the selected
 authored spec and its provider closure for reading or editing. It verifies source
 revisions and resolves [shared topology](shared-topology.md) in memory. Edit in

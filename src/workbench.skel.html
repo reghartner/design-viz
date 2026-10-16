@@ -76,7 +76,9 @@
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
       <p class="welcome-kicker">THE SHARED PICTURE</p><h1 tabindex="-1">Browse diagrams.</h1>
       <p class="welcome-description">Explore the published stories, follow the steps, and see how things connect. Editing starts only when you choose it.</p>
+      <div class="welcome-search"><label for="welcome-library-search">Search diagrams</label><input id="welcome-library-search" type="search" placeholder="Title, owner or service" autocomplete="off" spellcheck="false" aria-controls="welcome-library-grid"></div>
       <p id="welcome-library-status" class="welcome-note" role="status"></p><button id="welcome-library-retry" type="button" class="welcome-button" hidden>Retry loading library</button>
+      <p id="welcome-library-empty" class="welcome-note welcome-search-empty" role="status" hidden></p>
       <div id="welcome-library-grid" class="canon-library-grid"></div>
     </div>
     <div id="welcome-reader-screen" class="welcome-screen canon-reader-screen" hidden>
@@ -105,10 +107,12 @@
     <div id="welcome-new-screen" class="welcome-screen" hidden>
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
       <div class="welcome-screen-heading"><div><p class="welcome-kicker">Make it your own</p><h1 tabindex="-1">Every story starts somewhere.</h1><p class="welcome-description">Start simple, explore a complete example, or make space for something new.</p></div><button type="button" id="welcome-new-agent" class="welcome-button">Build with my agent <span aria-hidden="true">↗</span></button></div>
+      <div class="welcome-search"><label for="welcome-template-search">Search templates</label><input id="welcome-template-search" type="search" placeholder="Name, description, tag or service" autocomplete="off" spellcheck="false"></div>
       <div id="welcome-template-filters" class="welcome-filters" role="group" aria-label="Filter templates"></div>
       <button type="button" id="welcome-new-catalog" class="welcome-button">Start from your service catalog →</button>
       <button type="button" id="welcome-new-prompt" class="welcome-text-button">Create a standalone brief →</button>
       <p class="welcome-note" id="welcome-template-status" role="status"></p>
+      <p class="welcome-note welcome-search-empty" id="welcome-template-empty" role="status" hidden></p>
       <div class="welcome-template-grid" id="welcome-templates"></div>
       <div id="welcome-company-templates" hidden><div class="welcome-company-heading"><h2>From your team</h2><p class="welcome-note">Templates provided with this workbench.</p></div><div class="welcome-template-grid" id="welcome-company-grid"></div></div>
       <p class="welcome-note" id="welcome-manifest-status" role="status" hidden></p>

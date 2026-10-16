@@ -1343,7 +1343,7 @@ test('Re-establish session releases a stuck request and hands the agent fresh id
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await connectExternal(page);
     const old=await h.read('session.json'),files=old.artifacts;expect(files).toMatchObject({spec:expect.any(String),ledger:expect.any(String)});
-    const pair=async()=>({spec:await readFile(path.join(h.folder,files.spec),'utf8'),ledger:await readFile(path.join(h.folder,files.ledger),'utf8')});
+    const pair=async(mapping=files)=>({spec:await readFile(path.join(h.folder,mapping.spec),'utf8'),ledger:await readFile(path.join(h.folder,mapping.ledger),'utf8')});
     const stuck=await askAgent(page,h,'This request will get stuck.');
     await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/did not acknowledge/);
     await expect(page.locator('#folder-agent-working')).toBeVisible();const before=await pair();
@@ -1354,16 +1354,18 @@ test('Re-establish session releases a stuck request and hands the agent fresh id
     await page.keyboard.press('Enter');
     const handoff=page.getByRole('textbox',{name:'Hand-off for your agent',exact:true});await expect(handoff).toBeVisible();
     const fresh=await h.read('session.json');
-    expect(fresh.sessionId).not.toBe(old.sessionId);expect(fresh.connectionId).not.toBe(old.connectionId);
-    const text=await handoff.inputValue();
-    for(const value of ['"Test folder"',JSON.stringify(fresh.sessionId),JSON.stringify(fresh.connectionId),'folder-agent.py" begin --text'])expect(text).toContain(value);
+    expect(fresh.sessionId).not.toBe(old.sessionId);expect(fresh.connectionId).not.toBe(old.connectionId);expect(fresh.artifacts).toEqual(files);
+    const text=await handoff.inputValue(),folderName=(await page.locator('#folder-agent-folder').textContent()).match(/^Diagram folder: (.+?) · /)[1];
+    for(const value of [JSON.stringify(folderName),JSON.stringify(fresh.sessionId),JSON.stringify(fresh.connectionId),'.flowview-agent/CONNECT.md','.flowview-agent/session.json'])expect(text).toContain(value);
+    // The hand-off's helper command, resolved against the folder, is what the agent runs next.
+    const helper=text.match(/python3 "<diagram folder>\/([^"]+)" begin --text/)[1];expect(path.join(h.folder,helper)).toBe(path.join(h.session,'folder-agent.py'));
     for(const value of [old.sessionId,old.connectionId,stuck.id])expect(text).not.toContain(value);
     expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(text);
     const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');expect(connect).toContain(fresh.sessionId);expect(connect).toContain(fresh.connectionId);
     expect(await h.read('cancel.json')).toMatchObject({requestId:stuck.id,sessionId:old.sessionId,connectionId:old.connectionId});
     expect(()=>h.run('reply','--request',stuck.id,'--text','Late reply')).toThrow();
     await expect(page.locator('#folder-agent-working')).toBeHidden();await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
-    expect(await pair()).toEqual(before);
+    expect(await pair(fresh.artifacts)).toEqual(before);
     const next=await askAgent(page,h,'Continue after re-establishing.');
     expect(next).toMatchObject({sessionId:fresh.sessionId,connectionId:fresh.connectionId});expect(next.id).not.toBe(stuck.id);
     await writeFile(path.join(h.session,next.candidate.spec),source.replace('"Backend"','"Renewed backend"'));await writeFile(path.join(h.session,next.candidate.ledger),'# Coverage ledger\n\nRenamed after renewal.\n');

@@ -85,7 +85,7 @@ test('twenty exchanges keep composer reachable and do not force an older-message
   await page.evaluate(()=>{document.getElementById('folder-agent-history').scrollTop=0;publish({transcript:[...turns,{role:'assistant',requestId:'last',text:'Latest question?'}]});});
   await expect(page.locator('#folder-agent-latest')).toBeVisible();expect(await page.locator('#folder-agent-history').evaluate(n=>n.scrollTop)).toBeLessThan(60);
   await page.locator('#folder-agent-latest').click();await expect(page.locator('#folder-agent-latest')).toBeHidden();
-  await page.setViewportSize({width:640,height:360});await composerVisible(page);
+  await page.setViewportSize({width:1280,height:360});await composerVisible(page);
   await page.locator('#folder-agent-input').focus();await page.keyboard.press('Control+Enter');await expect.poll(()=>page.evaluate(()=>lastSent)).toBe('My next question');
   // Re-establish replaces Stop accepting: it releases the turn and offers a hand-off.
   await page.setViewportSize({width:1280,height:720});
@@ -290,7 +290,8 @@ test('setup detail and the live selection reach the sent request without Focus o
   await composerVisible(page);
 });
 
-for(const viewport of [{width:1280,height:720},{width:390,height:844},{width:640,height:360}])test(`streamed output follows until the reader scrolls up at ${viewport.width}×${viewport.height}`,async({page},info)=>{
+// Authoring is desktop-only: cover standard and short desktop windows.
+for(const viewport of [{width:1280,height:720},{width:1440,height:900},{width:1280,height:360}])test(`streamed output follows until the reader scrolls up at ${viewport.width}×${viewport.height}`,async({page},info)=>{
   await page.setViewportSize(viewport);await mount(page);await connect(page);
   await stageVisible(page);
   await page.evaluate(()=>publish({listening:true,pending:'live',activityPhase:'waiting'}));

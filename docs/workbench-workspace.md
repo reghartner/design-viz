@@ -182,11 +182,18 @@ cancel without changing the spec. Render handwritten JSON edits before starting.
 Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
 Finish **ADD TO STEP** before using the quick connection shortcut.
 
-The left rail opens independent **Agent**, **Inspect**, **Layers**, **Steps**, **Outline**,
+The left rail opens independent **Agent**, **Inspect**, **Layers**, **Steps**, **Find objects**,
 **JSON**, and **File** windows. Multiple windows can stay open. Drag a header to
 move it, drag its corner to resize, or use arrow keys on those handles (Shift
 moves farther). Close a window with × and reopen it from the rail. Existing
 forms, drafts, selection and disclosure state remain intact.
+
+**Contents** navigates tabs, sections, and saved Views. **Find objects** (⌘/Ctrl K)
+searches object names, IDs, and source paths across every tab and section, including
+hidden content. Results group their section context once, with names above type
+and ID details. Duplicate section headings retain their section numbers; hover a
+result for its exact source path. Selecting a result keeps the list open;
+**Inspect selection** opens its properties.
 
 **Layers** is a searchable active-section list of ordinary graph nodes in their
 authored placement order. Selecting a layer selects the rendered node without
@@ -277,7 +284,7 @@ sent context and live output, with its waiting/working indicator on the Agent ra
 The bottom-left **Copy for agent** button copies selected references directly.
 The full spec and ledger remain available through the shared folder.
 
-**⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
+**⌘/Ctrl K** opens Find objects and focuses search. Explicit inspection opens Inspect;
 Home, File, Export, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
 story and panel fields side by side; narrower windows stack them.
 

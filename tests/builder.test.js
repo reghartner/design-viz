@@ -1529,3 +1529,29 @@ test('Outline finds nested prose by content and retains full source addresses',(
  assert.deepStrictEqual(entries[0].target,{kind:'bullet',section:0,index:0,bulletPath:[0,1,0]});
  assert.deepStrictEqual(entries[0].path,['sections',0,'bullets',0,'sub',1,'sub',0]);
 });
+
+test('object search keeps names first and duplicate identities distinct with searchable technical detail',()=>{
+  const diagram={nodes:{'first.node':{title:'Shared name'},second:{title:'Shared name'}},groups:{g:{title:'Shared name'}},
+    edges:[{from:'first.node',to:'second',label:'Shared name'},{from:'first.node',to:'second',label:'Shared name'}],
+    panels:[{id:'budget-id',type:'budget',title:'Shared name'}],steps:[{id:'hidden-step',text:'Shared name'},{id:'next',text:'Shared name'}]};
+  const raw={page:{blocks:[{tabs:[{label:'First tab',sections:[{heading:'Repeated heading',diagram}]},
+    {label:'Second tab',sections:[{heading:'Repeated heading',diagram}]}]}]}};
+  const entries=plain(B.builderOutline(raw,'shared name'));
+  assert.equal(entries.length,16);
+  assert.ok(entries.every(entry=>entry.label==='Shared name'));
+  assert.equal(new Set(entries.map(entry=>JSON.stringify(entry.path))).size,16);
+  assert.equal(new Set(entries.map(entry=>entry.context+' '+entry.detail)).size,16);
+  assert.match(entries[0].context,/First tab.*Repeated heading.*Section 1/);
+  assert.match(entries[8].context,/Second tab.*Repeated heading.*Section 2/);
+  assert.equal(B.builderOutline(raw,'tabs[1] repeated heading nodes').length,2);
+  const result=plain(B.builderOutline(raw,'hidden-step second tab'));
+  assert.deepEqual(result[0].target,{section:1,kind:'step',index:0});
+  assert.equal(result[0].label,'Shared name');assert.equal(result[0].detail,'step · 1 · hidden-step');
+  assert.deepEqual(plain(B.builderOutline(raw,'page.blocks[0].tabs[1].sections[0].diagram.nodes.second'))[0].target,{section:1,kind:'node',id:'second'});
+  assert.equal(B.builderOutline(raw,'budget-id budget second tab')[0].target.index,0);
+  assert.ok(B.builderOutline(raw,'node shared name first.node second tab').some(entry=>entry.target.section===1 && entry.target.kind==='node' && entry.target.id==='first.node'));
+  raw.page.blocks[0].tabs.forEach(tab=>tab.label='Same tab name');
+  assert.equal(new Set(B.builderOutline(raw,'shared name').map(entry=>entry.context+' '+entry.detail)).size,16);
+  const contracts=plain(B.builderOutline({sections:[{contract:{title:'Payload'},contracts:[{id:'payload',title:'Payload'}]}]},'Payload'));
+  assert.deepEqual(contracts.map(entry=>entry.detail),['contract · legacy card','contract · card 1 · payload']);
+});

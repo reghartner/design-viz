@@ -882,11 +882,11 @@ path.edge.dv-instep{stroke-width:3.4;}
 /* the section that inserts land in: a quiet dotted frame set well OUTSIDE
    the selection ring (offset 8px, muted colour, no animation) so "where a
    + node / + section goes" is visible without competing with the accent
-   selection highlight. A corner tag names it. */
+   selection highlight. A corner tag names it; hover explains it. */
 section.doc-sec.dv-inserttarget{outline:2px dotted var(--sub); outline-offset:8px; border-radius:6px; position:relative;}
-section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolute; top:-9px; left:10px;
-  font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
+section.doc-sec>.dv-inserttarget-tag{position:absolute; top:-10px; left:10px;
+  font:600 11px 'IBM Plex Sans',sans-serif; line-height:1.3;
+  color:var(--card); background:var(--sub); padding:1px 7px; border-radius:4px; z-index:2; cursor:help;}
 .docview .stepline{cursor:pointer;}
 /* click selects the current step */
 /* @panel-style-order:573 */
@@ -1417,7 +1417,10 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-width:700px){.workspace-canvas:has(.extraction-preview) .workspace-history,.workspace-canvas:has(.extraction-preview) .workspace-selection,.workspace-canvas:has(.extraction-preview) .workspace-canvas-controls{visibility:hidden;}}
 
 /* Workspace intent and local provenance remain separate from authored views. */
-.workspace-provenance{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px 'IBM Plex Sans',sans-serif;color:var(--sub);}
+.workspace-provenance{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px 'IBM Plex Sans',sans-serif;color:var(--sub);
+  box-sizing:border-box;padding:3px 10px 3px 8px;border-radius:999px;background:color-mix(in srgb,var(--sub) 12%,transparent);cursor:default;user-select:none;}
+/* a status dot marks it as a read-only save status, not a header action */
+.workspace-provenance::before{content:"";display:inline-block;width:6px;height:6px;margin-right:6px;border-radius:50%;background:currentColor;vertical-align:1px;}
 .workspace-preset{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 8px;font:12px 'IBM Plex Sans',sans-serif;}
 .workspace-preset select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;max-width:100%;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{z-index:135;}
@@ -1660,7 +1663,7 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-add-menu>strong{display:block;padding:6px 12px;font-size:12px;opacity:.7;}
 
 /* Keep the working destination visible in the desktop project toolbar. */
-@media(min-width:900px){.workspace-canvas .workspace-tools>.workspace-more{flex-shrink:0;min-width:max-content;}.workspace-canvas .workspace-tools>.workspace-provenance{display:block;max-width:220px;flex:0 1 220px;min-width:100px;}}
+@media(min-width:900px){.workspace-canvas .workspace-tools>.workspace-more{flex-shrink:0;min-width:max-content;}.workspace-canvas .workspace-tools>.workspace-provenance{display:block;max-width:220px;flex:0 1 auto;min-width:100px;}}
 .workspace-provenance[data-state="failed"],.workspace-provenance[data-state="paused"]{color:var(--danger,#a13b32);}
 /* Editor docking reserves the rendered viewport; floating preferences stay intact. */
 .workspace-window-dock{flex:none;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--card);color:var(--ink);font:12px 'IBM Plex Sans',sans-serif;cursor:pointer;}

@@ -342,7 +342,7 @@ activity state without another button in the header.
 
 **Brief → Download review package** downloads a ZIP containing the current JSON,
 viewer HTML, story notes, and evidence references. It does not publish or submit
-anything. **Export → Export project** (also in **File**) saves matching
+anything. **Export → Export project** saves matching
 `.spec.json`, `.html` and `.ledger.md` artifacts plus a static `README.md` in a
 chosen folder. Without a folder picker, one ZIP delivers those same four files.
 The current accepted ledger is preserved exactly; a document without one gets

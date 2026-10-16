@@ -353,10 +353,6 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .specbox>.editor-add-status{margin:8px;}
 .specbox>.msgs{flex:none;max-height:100px;overflow:auto;margin:0;padding:8px 14px;}
 .specbox>.msgs:empty{display:none;}
-.confluence-handoff{flex-basis:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;}
-.confluence-handoff label{font-size:12px;font-weight:600;}
-.confluence-handoff textarea{box-sizing:border-box;width:100%;height:110px;margin-top:6px;resize:vertical;font:11px monospace;}
-.confluence-handoff p{font-size:12px;margin:8px 0;}
 body.workspace-focus{margin:0;}
 body.workspace-focus #workbench-workspace>.wrap,body.workspace-focus>footer{display:none;}
 body.workspace-focus .workspace-tools{margin-top:0;}

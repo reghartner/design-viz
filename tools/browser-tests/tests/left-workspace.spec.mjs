@@ -165,13 +165,13 @@ test('object search shortcut and selection stay in Find objects; explicit inspec
   await page.locator('#redo-builder').click();expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.a.title).toBe('Front camera');
 });
 
-test('File hosts company catalog, imports and exports; complete project export works from JSON',async({page,server})=>{
+test('File hosts company catalog and imports, links to every export; complete project export works from JSON',async({page,server})=>{
   await open(page,server);await page.locator('#editor-tab-file').click();
   await page.locator('#editor-company summary').click();await expect(page.getByRole('textbox',{name:'Catalog JSON',exact:true})).toBeVisible();
   await page.locator('#sec-insert > summary').click();await page.locator('#import-mermaid').click();await expect(page.locator('#importbox')).toBeVisible();
   await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-file').click();await expect(page.locator('#importbox')).toBeVisible();
   await page.locator('#import-mermaid-cancel').click();
-  const exportedPromise=page.waitForEvent('download');await page.locator('#confluence-export').click();const exported=await exportedPromise;
+  const exportedPromise=page.waitForEvent('download');await page.locator('#file-show-exports').click();await page.locator('#confluence-export').click();const exported=await exportedPromise;
   expect(exported.suggestedFilename()).toContain('confluence');expect(JSON.parse(await readFile(await exported.path(),'utf8'))).toBeTruthy();
   await page.locator('#editor-tab-json').click();const savePromise=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await savePromise;
   expect(JSON.parse(await projectSource(saved)).page.title).toBe(editorSpec().page.title);
@@ -181,9 +181,9 @@ test('top Home and File keep project navigation and exports reachable at desktop
   await page.setViewportSize({width:1280,height:800});await open(page,server);const original=await page.locator('#src').inputValue();
   const home=page.locator('#workspace-home'),file=page.locator('#workspace-file');
   await expect(home).toHaveText('Home');await expectCenterHit(home,'top Home');await expectCenterHit(file,'top File');
-  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#editor-tab-file')).toBeFocused();
+  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-show-exports')).toBeVisible();await expect(page.locator('#editor-tab-file')).toBeFocused();
   await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-preset').selectOption('present');await expect(page.locator('.workspace-window:visible')).toHaveCount(0);
-  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
+  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-show-exports')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
   const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await download;
   expect(JSON.parse(await projectSource(saved)).page.title).toBe(editorSpec().page.title);await expect(page.locator('#src')).toHaveValue(original);
   await home.click();await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#workbench-workspace')).toBeHidden();

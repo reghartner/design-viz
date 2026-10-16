@@ -100,7 +100,8 @@ In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. 
 use it to frame the selected nodes and on-canvas panels
 inside the free viewport around Inspect, floating panels, and navigation controls.
 It preserves selection and source. The same action is in Inspect and the object menu.
-Tab to a node or canvas panel, then Enter to select it or Shift+Enter to add/remove
+Click a node or canvas panel to select it and keep keyboard focus on the canvas.
+You can also Tab to an object, then use Enter to select it or Shift+Enter to add/remove
 it. Arrow keys nudge the selection by 10 graph units; Shift+Arrow uses 50, independent
 of zoom. Repeated arrows are one Undo action when all held arrows are released;
 Escape cancels the held movement. Row nodes explain that Free placement is required.

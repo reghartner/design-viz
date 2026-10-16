@@ -1637,11 +1637,19 @@ function createBuilderInteractions(opts){
     }
     if (ev.shiftKey || ev.metaKey || ev.ctrlKey){
       toggleMultiSelect(target);
+      focusPointerSelection(ev,target);
       return;
     }
     if (multiSel.length) clearMultiSelect(); /* a plain click is single-select again */
     selectTarget(target, false, true);
+    focusPointerSelection(ev,target);
   });
+
+  function focusPointerSelection(ev,target){
+    if(!spatial || ev.detail===0 || ['node','panel'].indexOf(target.kind)<0)return;
+    if(ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable],.dv-text-editor,.explore-window-grip,.explore-window-resize'))return;
+    spatial.focusSelection(target);
+  }
 
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */

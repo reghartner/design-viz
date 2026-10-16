@@ -8,6 +8,7 @@ const navigation=page=>page.locator('#docview>.explore-navigation');
 async function fit(page){await navigation(page).getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();}
 async function openRaw(page,server,raw,width=1280){await page.setViewportSize({width,height:width===1280?800:900});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await fit(page);await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
 async function open(page,server,row=false,skin='pastel',customEdge=false){const raw=fixture(row);raw.page.skin=skin;if(customEdge)Object.assign(raw.page.sections[0].diagram.edges[0],{fromPort:{side:'right',offset:.25},curvePoints:[{t:.5,dx:20,dy:-40}],label:'kept',labelDx:9});await openRaw(page,server,raw);}
+async function openStandard(page,server){const raw=fixture(),d=raw.page.sections[0].diagram;d.layouts[0].presentation='standard';delete d.layouts[0].exploreLayout;d.panels=[];d.layouts[0].sectionLayout.default=[{x:0,y:0,w:12,h:12}];await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await expect(page.locator('[data-dv-node=a]')).toBeVisible();}
 const node=page=>page.locator('[data-dv-node=a]');
 const panel=page=>page.locator('[data-explore-panel=p]');
 const menu=page=>page.getByRole('menu',{name:'Object actions'});
@@ -18,6 +19,28 @@ async function marquee(page,hold=false){
  const bounds=await page.locator('.explore-board').evaluate(el=>{const r=el.getBoundingClientRect();const boxes=Array.from(el.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel]')).map(e=>e.getBoundingClientRect());let x=Math.max(r.left+5,Math.min(...boxes.map(b=>b.left))-16),y=Math.max(r.top+5,Math.min(...boxes.map(b=>b.top))-16);return {x,y,right:Math.min(r.right-5,Math.max(...boxes.map(b=>b.right))+16),bottom:Math.min(r.bottom-5,Math.max(...boxes.map(b=>b.bottom))+16)};});
  await page.keyboard.down('Alt');await page.mouse.move(bounds.x,bounds.y);await page.mouse.down();await page.mouse.move(bounds.right,bounds.bottom,{steps:8});if(!hold){await page.mouse.up();await page.keyboard.up('Alt');}
 }
+test('pointer-selected Standard free node receives canvas focus and nudges with Undo and Redo',async({page,server},info)=>{
+ await openStandard(page,server);const anchor=node(page),before=await source(page),x=JSON.parse(before).page.sections[0].diagram.floats.find(item=>item.id==='a').x;
+ await page.locator('#workspace-home').focus();await anchor.click();await expect(anchor).toBeFocused();await page.keyboard.press('ArrowRight');
+ const after=await source(page),moved=JSON.parse(after).page.sections[0].diagram.floats.find(item=>item.id==='a');expect(moved.x).toBeCloseTo(x+10,1);await page.screenshot({path:'/tmp/flowview-nudge-standard-fixed.png'});await info.attach('Standard click then nudge',{body:await page.screenshot(),contentType:'image/png'});await history(page,before,after);
+});
+test('pointer-selected Explore node and canvas panel receive focus after Inspector editing and nudge',async({page,server},info)=>{
+ await open(page,server);await node(page).click();await page.locator('#editor-tab-inspect').click();const field=page.locator('#guide input').first();await field.focus();
+ const before=await source(page),nodeX=JSON.parse(before).page.sections[0].diagram.floats.find(item=>item.id==='a').x;await node(page).click();await expect(node(page)).toBeFocused();await page.keyboard.press('ArrowRight');
+ const nodeMoved=await source(page);expect(JSON.parse(nodeMoved).page.sections[0].diagram.floats.find(item=>item.id==='a').x).toBeCloseTo(nodeX+10,1);await history(page,before,nodeMoved);
+ await panel(page).click({position:{x:4,y:4}});await expect(panel(page)).toBeFocused();const panelBefore=await source(page),panelY=JSON.parse(panelBefore).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].y;await page.keyboard.press('ArrowDown');
+ const panelMoved=await source(page);expect(JSON.parse(panelMoved).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].y).toBeCloseTo(panelY+10,1);await page.screenshot({path:'/tmp/flowview-nudge-explore-fixed.png'});await info.attach('Explore click then nudge',{body:await page.screenshot(),contentType:'image/png'});await history(page,panelBefore,panelMoved);
+});
+test('modifier pointer selection focuses its clicked node and leaves locked members fixed while nudging',async({page,server})=>{
+ const raw=fixture();raw.page.sections[0].diagram.nodes.b.locked=true;await openRaw(page,server,raw);const before=await source(page),positions=Object.fromEntries(JSON.parse(before).page.sections[0].diagram.floats.map(item=>[item.id,item.x]));
+ await node(page).click();const second=page.locator('[data-dv-node=b]');await second.click({modifiers:['Shift']});await expect(second).toBeFocused();await expect(page.locator('.dv-sel[data-dv-node]')).toHaveCount(2);await page.keyboard.press('ArrowRight');
+ const after=await source(page),moved=Object.fromEntries(JSON.parse(after).page.sections[0].diagram.floats.map(item=>[item.id,item.x]));expect(moved.a).toBeCloseTo(positions.a+10,1);expect(moved.b).toBeCloseTo(positions.b,1);await history(page,before,after);
+});
+test('Alt marquee leaves a selected canvas object focused for immediate mixed-object nudging',async({page,server})=>{
+ await open(page,server);const before=await source(page),diagram=JSON.parse(before).page.sections[0].diagram,positions=Object.fromEntries(diagram.floats.map(item=>[item.id,item.y])),panelY=diagram.layouts[0].exploreLayout.canvas.panels[0].y;await marquee(page);
+ await expect(page.locator('.dv-sel')).toHaveCount(3);expect(await page.evaluate(()=>document.activeElement?.matches('[data-dv-object-menu].dv-sel'))).toBe(true);await page.keyboard.press('ArrowDown');
+ const after=await source(page),moved=JSON.parse(after).page.sections[0].diagram;for(const item of moved.floats)expect(item.y).toBeCloseTo(positions[item.id]+10,1);expect(moved.layouts[0].exploreLayout.canvas.panels[0].y).toBeCloseTo(panelY+10,1);await history(page,before,after);
+});
 test('marquee selects intersecting nodes and canvas panels without source or pan; menu edits mixed objects atomically',async({page,server},info)=>{
  await open(page,server);const original=await source(page),scroll=await page.locator('.explore-board').evaluate(el=>[el.scrollLeft,el.scrollTop]);
  await marquee(page,true);await expect(page.locator('.dv-selection-marquee')).toBeVisible();await page.screenshot({path:'/tmp/explore-marquee-1280.png'});await info.attach('marquee',{body:await page.screenshot(),contentType:'image/png'});await page.mouse.up();await page.keyboard.up('Alt');

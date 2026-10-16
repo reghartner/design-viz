@@ -207,6 +207,26 @@ class IndexTest(unittest.TestCase):
                          "committed crossref drifts from the manifest/specs — "
                          "rerun tools/build_index.py and commit")
 
+    # #547 — the gallery must declare its encoding; served without a charset
+    # header, "—" and "·" otherwise render as mojibake.
+    # row | fixture                  | assertion (scoped)                                   | rejects
+    # 1   | committed examples index | bytes start with b"<!doctype html>"                  | a page left in quirks mode
+    # 2   | committed examples index | <meta charset="utf-8"> sits inside the first 1024 bytes, before any non-ASCII byte | a missing charset, or one too late for the browser prescan
+    # 3   | committed examples index | bytes decode as UTF-8 and hold "—" and "·" themselves | locale-encoded output or entity-mangled text
+    def test_index_declares_doctype_and_utf8_before_content(self):
+        data = (EXAMPLES / "index.html").read_bytes()
+        self.assertTrue(data.startswith(b"<!doctype html>\n"), data[:80])
+        charset = data.find(b'<meta charset="utf-8">')
+        self.assertNotEqual(charset, -1, "index has no utf-8 charset meta")
+        self.assertLess(charset, 1024 - len(b'<meta charset="utf-8">'),
+                        "charset meta must fall inside the 1024-byte prescan")
+        first_non_ascii = next((i for i, b in enumerate(data) if b > 0x7F), len(data))
+        self.assertLess(charset, first_non_ascii,
+                        "charset meta must precede the first non-ASCII byte")
+        text = data.decode("utf-8")
+        self.assertRegex(text, r"\d+ pages · every diagram")
+        self.assertIn("Auralis Presence — mmWave", text)
+
     def test_crossref_derivation_is_exact_deduplicated_and_html_safe(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:

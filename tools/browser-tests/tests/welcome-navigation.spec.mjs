@@ -1,7 +1,9 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdtemp,mkdir,cp,rm} from 'node:fs/promises';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
 
 const home=page=>page.locator('#welcome-home');
 const editor=page=>page.locator('#workbench-workspace');
@@ -300,3 +302,69 @@ for(const [width,height] of [[1280,800],[1440,900],[1920,1080]])for(const draft 
     }
   });
 }
+
+// #547 — Welcome and the template picker link the examples gallery only when a
+// served workbench (…/workbench/flowspec.html) has ../examples/index.html beside
+// it, and the gallery itself renders its UTF-8 text.
+// row | fixture                                                   | assertion (scoped)                                                         | rejects
+// 1   | site/workbench/flowspec.html + site/examples/index.html     | #welcome-home #welcome-gallery visible; its href resolves to site/examples/index.html | no Welcome link, or one pointing elsewhere
+// 2   | same, real click on #welcome-new                            | #welcome-new-screen #welcome-new-gallery visible with the same resolved href | a link on only one surface
+// 3   | same, real click on #welcome-gallery                        | the opened tab has doctype html, characterSet UTF-8, .sub reads "N pages · every diagram", the Auralis card .t reads "Auralis Presence — mmWave …", no "â€"/"Â·" in its text | the generated page without doctype/charset (mojibake)
+// 4   | site/workbench/flowspec.html with no site/examples/          | the probe gets the server's real 404; then #welcome-gallery hidden and, after a real click on #welcome-new, #welcome-new-gallery hidden | a link shown whether or not the gallery is reachable
+// 5   | row 4                                                      | the probe's 404 and its console line are the only audit entries (spliced explicitly) | a probe failure surfacing as a page error
+// 6   | /workbench.html (not a workbench/ folder, as in agent kits) | no request for any examples/index.html; both links hidden              | an unconditional probe adding network noise to hosts without the repo layout
+async function gallerySite(server,withGallery){
+  const root=await mkdtemp(path.join(server.root,'gallery-site-')),workbench=path.join(root,'workbench');
+  await mkdir(workbench);
+  for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])
+    await cp(path.join(server.root,from),path.join(workbench,to));
+  if(withGallery){await mkdir(path.join(root,'examples'));await cp(path.join(repo,'examples/index.html'),path.join(root,'examples/index.html'));}
+  const base=server.origin+'/'+path.basename(root);
+  return {url:base+'/workbench/flowspec.html',gallery:base+'/examples/index.html',cleanup:()=>rm(root,{recursive:true,force:true})};
+}
+
+test('the examples gallery is linked from Welcome and the template picker and renders UTF-8 text',async({page,server})=>{
+  const site=await gallerySite(server,true);
+  try{
+    await page.goto(site.url);await expect(home(page)).toBeVisible();
+    const homeLink=home(page).locator('#welcome-gallery');
+    await expect(homeLink).toBeVisible();
+    expect(await homeLink.evaluate(link=>link.href)).toBe(site.gallery);
+    await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
+    const pickerLink=screen(page,'new').locator('#welcome-new-gallery');
+    await expect(pickerLink).toBeVisible();
+    expect(await pickerLink.evaluate(link=>link.href)).toBe(site.gallery);
+    await page.locator('#welcome-new-screen [data-welcome-back]').click();await expect(homeLink).toBeVisible();
+    const opened=page.waitForEvent('popup');await homeLink.click();
+    const tab=await opened;await tab.waitForLoadState();
+    expect(tab.url()).toBe(site.gallery);
+    expect(await tab.evaluate(()=>({doctype:document.doctype&&document.doctype.name,charset:document.characterSet}))).toEqual({doctype:'html',charset:'UTF-8'});
+    await expect(tab.locator('.sub')).toHaveText(/^\d+ pages · every diagram /);
+    await expect(tab.locator('a.card .t').filter({hasText:'Auralis Presence'})).toHaveText('Auralis Presence — mmWave room sensing, fall safety, offline autonomy');
+    const text=await tab.locator('body').innerText();
+    expect(text).not.toContain('â€');expect(text).not.toContain('Â·');
+    await tab.close();
+  }finally{await site.cleanup();}
+});
+
+test('the examples gallery links stay hidden when the gallery is not served beside the workbench',async({page,server,audit})=>{
+  const site=await gallerySite(server,false);
+  try{
+    const probes=[];page.on('response',response=>{if(response.url()===site.gallery)probes.push(response.status());});
+    await page.goto(site.url);
+    await expect.poll(()=>probes,'the workbench probes its sibling gallery once').toEqual([404]);
+    await page.waitForLoadState('networkidle');
+    await expect(home(page)).toBeVisible();await expect(page.locator('#welcome-library')).toBeVisible();
+    await expect(home(page).locator('#welcome-gallery')).toBeHidden();
+    await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
+    await expect(page.locator('#welcome-templates .welcome-template-card').first()).toBeVisible();
+    await expect(screen(page,'new').locator('#welcome-new-gallery')).toBeHidden();
+    const expected=['HTTP 404: '+site.gallery,'console: Failed to load resource: the server responded with a status of 404 (Not Found)'];
+    for(const message of expected){expect(audit).toContain(message);audit.splice(audit.indexOf(message),1);}
+  }finally{await site.cleanup();}
+  const requests=[];page.on('request',request=>{if(request.url().includes('examples/index.html'))requests.push(request.url());});
+  await page.goto(server.origin+'/workbench.html');await expect(home(page)).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(requests).toEqual([]);
+  await expect(home(page).locator('#welcome-gallery')).toBeHidden();
+});

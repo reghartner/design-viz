@@ -143,6 +143,54 @@ test('#560 insert target says Adding here, save status is a badge and Home expla
  await expect(guide).toContainText('A dotted frame tagged Adding here marks the section that Add puts new items into');await expect(guide).toContainText('Home keeps your draft');
 });
 
+/* #564 — one UI font for buttons; no Arial fallback; monospace kept for code and deliberate skins (desktop only).
+ row | fixture | assertion (scoped) | rejects
+ 1 welcome buttons never fall back to Arial | run last: welcome screen at 1440 (asserted visible; reached by a real Home click if the kept draft reopens the editor), then a real click on Build with my agent | #folder-agent-connect and every visible .welcome-text-button: own computed first font family is not Arial and equals its parent element's first family (the panel's UI font); every button/input[type=button|submit|reset] in the document (visible or hidden): own computed first family is not Arial | welcome-button/text-button left on the UA Arial default outside .welcome
+ 2 header toolbar and mode buttons share one family | editor at 1440 in the fixture's own skin (Pastel), no menu open except More (asserted) | each of Home, Add, File, Undo, Redo, Appearance summary, Preview, Help summary, Export, every editor rail tab (#editor-tab-*), Focus diagram and Fit selection is visible and its own computed first family is one value, equal to body's first family and not monospace | Home/File/Undo/Redo left in IBM Plex Mono, Add left in Sora, or rail tabs on a different family
+ 3 editor canvas buttons never fall back to Arial | same editor; #docview holds ≥1 .prosetoggle/.copychip (asserted) | every button/input button in the document: own computed first family is not Arial | prose toggles and copy chips left on the UA default
+ 4 code/JSON stays monospace | same editor | #src computed first family is IBM Plex Mono | a blanket rule that turns code fields sans
+ 5 a skin chosen in Appearance keeps the header in one family | Appearance → Aurora by real click (aria-pressed flips false→true) | the row 2 roster again shares exactly one first family, equal to body's (which differs from row 2's) | skin font applied to some header buttons but not others
+ 6 exported viewer buttons never fall back to Arial | the fixture injected into template/flowview.html | every button/input button in the document: own computed first family is not Arial, with ≥1 .prosetoggle/.copychip present (asserted) | viewer-only buttons left on the UA default
+ 7 terminal skin keeps its deliberate monospace | that viewer, reader theme menu → Terminal by real click (#docview not sk-terminal before, sk-terminal after) | a .prosetoggle's computed first family is IBM Plex Mono | a fix that overrides the terminal skin's monospace UI
+*/
+test('#564 buttons share one UI font, never fall back to Arial, and keep monospace for code and the terminal skin',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});
+ const first=f=>f.split(',')[0].trim().replace(/^["']|["']$/g,'');
+ const family=loc=>loc.evaluate(el=>getComputedStyle(el).fontFamily).then(first);
+ const bodyFamily=()=>page.evaluate(()=>getComputedStyle(document.body).fontFamily).then(first);
+ const arial=()=>page.evaluate(()=>[...document.querySelectorAll('button,input[type=button],input[type=submit],input[type=reset]')].map(el=>({el:(el.id?'#'+el.id:el.tagName.toLowerCase()+'.'+String(el.className).trim().split(/\s+/).join('.')),f:getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'')})).filter(r=>/^arial$/i.test(r.f)).map(r=>r.el));
+ const source=await open(page,server);
+ expect(await page.locator('#workspace-appearance').evaluate(el=>el.open)).toBe(false);expect(await page.locator('#workspace-more').evaluate(el=>el.open)).toBe(true);
+ const header=page.locator('.workbench-header');
+ const roster=()=>[header.locator('#workspace-home'),header.locator('#diagram-add'),header.locator('#workspace-file'),header.locator('#undo-builder'),header.locator('#redo-builder'),header.locator('#workspace-appearance>summary'),header.locator('#open-page-preview'),header.locator('.workspace-help>summary'),header.locator('#workspace-export-trigger'),
+  ...['agent','brief','inspect','layers','steps','outline','json','file'].map(name=>page.locator('#editor-tab-'+name)),page.locator('#workspace-focus-diagram'),page.locator('#workspace-fit-selection')];
+ const families=async()=>{const out=[];for(const control of roster()){await expect(control).toBeVisible();out.push(await family(control));}return out;};
+ const editorBody=await bodyFamily(),headerFamilies=await families();
+ expect([...new Set(headerFamilies)]).toEqual([editorBody]);expect(editorBody).not.toMatch(/mono/i);
+ expect(await page.locator('#docview').locator('.prosetoggle, .copychip').count()).toBeGreaterThan(0);
+ expect(await arial()).toEqual([]);
+ expect(await family(page.locator('#src'))).toBe('IBM Plex Mono');
+
+ await page.locator('#workspace-appearance>summary').click();const aurora=page.locator('#workspace-appearance-body #sk-aurora');
+ await expect(aurora).toHaveAttribute('aria-pressed','false');await aurora.click();await expect(aurora).toHaveAttribute('aria-pressed','true');
+ await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#workspace-appearance-body')).toBeHidden();
+ const auroraBody=await bodyFamily();expect(auroraBody).not.toBe(editorBody);expect([...new Set(await families())]).toEqual([auroraBody]);await expect(page.locator('#src')).toHaveValue(source);
+
+ const input=path.join(server.root,'fonts-564.json'),output=path.join(server.root,'fonts-564.html');await writeFile(input,source);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ await page.goto(server.origin+'/fonts-564.html');const toggle=page.locator('#docview .prosetoggle').first();await expect(toggle).toBeVisible();
+ expect(await page.locator('#docview').locator('.prosetoggle, .copychip').count()).toBeGreaterThan(0);
+ expect(await arial()).toEqual([]);
+ const reader=page.locator('#docview .explore-navigation');if(!await reader.locator('.reader-contents').isVisible())await reader.locator('.reader-top>button').click();
+ await expect(page.locator('#docview')).not.toHaveClass(/sk-terminal/);await reader.locator('.reader-contents .reader-theme-menu>summary').click();await reader.getByRole('menuitemradio',{name:'Terminal',exact:true}).click();
+ await expect(page.locator('#docview')).toHaveClass(/sk-terminal/);expect(await family(toggle)).toBe('IBM Plex Mono');
+
+ await page.goto(server.origin+'/workbench.html');const welcome=page.locator('#workbench-welcome');if(!await welcome.isVisible())await page.locator('#workspace-home').click();await expect(welcome).toBeVisible();
+ await page.locator('#welcome-agent').click();const connect=page.locator('#folder-agent-connect');await expect(connect).toBeVisible();
+ const textButtons=page.locator('.welcome-text-button:visible');expect(await textButtons.count()).toBeGreaterThan(0);
+ for(const button of [connect,...await textButtons.all()]){const own=await family(button);expect(own).not.toMatch(/^arial$/i);expect(own).toBe(await family(button.locator('xpath=..')));}
+ expect(await arial()).toEqual([]);
+});
+
 test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await open(page,server);const contents=nav(page),sections=id=>contents.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>contents.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
  await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','true');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','true');

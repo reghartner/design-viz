@@ -86,10 +86,11 @@ After the packet, load a guide only for starting-material or handoff details:
   imported-node rearrangement, use consumer import `nodePositions`; preserve
   provider structure. See [shared topology](../../../docs/shared-topology.md).
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
-  preserves detailed phases. [Recipe routing](references/recipe-routing.md) and
+  preserves phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
+- [Diagram links](../../../cookbook/diagram-handoffs.md).
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

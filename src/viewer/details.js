@@ -178,8 +178,8 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
           if(!section || !section.section.diagram)throw new Error('The detail section is unavailable in this revision.');
           notice(frame,'');openLocal(frame,id,detail,child,section.section,target);
         }).catch(function(error){if(!disposed && !signal.aborted && request===generation)notice(frame,error.message || 'Unable to load detail diagram.');});
-      }else if(detailURL(detail.url)){
-        var a=document.createElement('a');a.href=detailURL(detail.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open detail diagram ↗';
+      }else if(diagramHandoffURL(detail,options.resolveDiagramLink)){
+        var a=document.createElement('a');a.href=diagramHandoffURL(detail,options.resolveDiagramLink);a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open detail diagram ↗';
         frame.rec.sectionEl.appendChild(a);a.click();a.remove();
       }else notice(frame,'This detail requires an approved-spec loader from the host. Add a fallback URL to open it separately.');
     }catch(error){notice(frame,error.message);}

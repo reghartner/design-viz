@@ -15,12 +15,13 @@ function planWrapDocument(text,raw){
 function planDocumentSetting(text,raw,key,value){
   var doc=builderDocumentPage(raw);
   if(!doc)return {error:'Add document settings to this bare diagram first.'};
-  if(['title','skin','generatedFrom','tour'].indexOf(key)<0)return {error:'Unknown document setting.'};
+  if(['title','skin','generatedFrom','tour','documentLinks'].indexOf(key)<0)return {error:'Unknown document setting.'};
   if(key==='skin' && value!=null && SKIN_NAMES.indexOf(value)<0)return {error:'Choose a supported default skin.'};
   if(key==='tour' && value!=null){
     var warnings=tourLintConfig(value);if(warnings.length)return {error:warnings.join(' ')};
   }
-  if(key!=='generatedFrom' && key!=='tour' && value!=null && typeof value!=='string')return {error:'Enter text for this setting.'};
+  if(key==='documentLinks'){var errors=[];validateDocumentLinks(value,doc.page.canon && doc.page.canon.id,'Document links',errors);if(errors.length)return {error:errors.join(' ')};}
+  if(key!=='documentLinks' && key!=='generatedFrom' && key!=='tour' && value!=null && typeof value!=='string')return {error:'Enter text for this setting.'};
   return planSetField(text,raw,doc.path,key,value==null?null:JSON.stringify(value));
 }
 function planDocumentSource(text,raw,key,value){

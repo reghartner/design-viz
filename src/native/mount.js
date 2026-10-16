@@ -1,12 +1,12 @@
 /* This function is compiled in the renderer's instance scope. No URL boot,
-   address-bar synchronization, storage, clipboard or request transport runs. */
+   address-bar synchronization, storage or request transport runs. Clipboard writes require an explicit copy action. */
 function mountNativeSpec(environment, spec, options){
   var page=normalize(spec), findings=validate(page);
   if(findings.errors.length)throw new Error(findings.errors.join('\n'));
   var skin=resolveSkin('',options.skin || page.skin), view=document.createElement('div');
   environment.body.appendChild(view);applySkinClasses(environment.body,view,skin);
   var records=sectionRecords(page), controller=renderPage(view,page,skin,options.backlinks || {},
-    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink});
+    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink,siteBaseUrl:options.siteBaseUrl});
   function protectLinks(){
     view.querySelectorAll('a[href]').forEach(function(link){
       var url=FlowCanon.http(link.getAttribute('href'));

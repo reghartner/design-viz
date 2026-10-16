@@ -543,3 +543,14 @@ new specs can be read from GitHub independently.
 
 References: [entity-content extensions](https://backstage.io/docs/frontend-system/building-plugins/#plugin-specific-extensions),
 [authenticated proxy configuration](https://backstage.io/docs/plugins/proxying/).
+
+### Portable document destinations (1.2.0)
+
+`mountNativeViewer` accepts optional `siteBaseUrl`, an absolute HTTP(S) website
+base including its deployment subpath (no query, fragment or credentials).
+`page.documentLinks` can also supply `id`, `siteBaseUrl`, `claudeUrl`, and
+`claudeArtifactId`. Repository members retain `page.canon.id`. Reader Contents
+shows configured website and Claude links with explicit copy controls. Handoffs
+and imported source links reuse `resolveDiagramLink` and portable destinations;
+external details retain the host's approved pinned-revision `loadDetail` contract.
+The renderer never loads a reference URL as a spec or embeds native Claude.

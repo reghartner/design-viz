@@ -355,7 +355,11 @@ function prepareExportSnapshot(specText, resolve){
     var snapshot=JSON.parse(JSON.stringify(resolved)), changed=JSON.stringify(snapshot)!==JSON.stringify(source);
     var diagrams=FlowCanon.sections(snapshot).map(function(section){return section.diagram;});
     if(snapshot && snapshot.nodes && snapshot.rows && !snapshot.page && !snapshot.blocks && !snapshot.sections)diagrams.push(snapshot);
+    var page=normalize(snapshot);
+    if(snapshot && snapshot.nodes && snapshot.rows && FLOWVIEW_SITE_BASE_URL){snapshot={page:page};changed=true;}
+    if(page && FLOWVIEW_SITE_BASE_URL && !(page.documentLinks || {}).siteBaseUrl){page.documentLinks=Object.assign({},page.documentLinks,{siteBaseUrl:FLOWVIEW_SITE_BASE_URL});changed=true;}
     diagrams.forEach(function(diagram){
+      if(diagram.topologyProvenance){diagram.sourceDiagrams=((diagram.sourceDiagrams || []).concat(diagram.topologyProvenance.imports.map(function(item){return Object.assign(diagramLinkReference(item.destination || {spec:item.spec}),{nodes:item.nodes});})));changed=true;}
       ['topologyImports','topologyExports','topologyProvenance'].forEach(function(key){
         if(Object.prototype.hasOwnProperty.call(diagram,key)){delete diagram[key];changed=true;}
       });

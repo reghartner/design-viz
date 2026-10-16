@@ -1955,6 +1955,17 @@ function documentForm(){
     function setting(key,value){return commitCascade(function(raw){return planDocumentSetting(session.text(),raw,key,value);},{after:refreshFormSoon});}
     function source(key,value){return commitCascade(function(raw){return planDocumentSource(session.text(),raw,key,value);},{after:refreshFormSoon});}
     var val=doc.page;
+    var links=val.documentLinks || {};
+    function linkSetting(key,value){
+      var next=Object.assign({},links);if(value==null)delete next[key];else next[key]=value;
+      if(key==='claudeUrl'){var artifact=claudeArtifact(value);if(artifact)next.claudeArtifactId=artifact.id;else delete next.claudeArtifactId;}
+      return setting('documentLinks',Object.keys(next).length?next:null);
+    }
+    var identity=textControl(val.canon && val.canon.id || links.id,function(v){return linkSetting('id',v);},{placeholder:'existing_diagram_id'});
+    identity.disabled=!!(val.canon && val.canon.id);rows.push(frow('Diagram ID',identity));
+    rows.push(frow('Claude artifact share URL',textControl(links.claudeUrl,function(v){return linkSetting('claudeUrl',v);},{placeholder:'https://claude.ai/public/artifacts/…'})));
+    rows.push(note('Use the existing diagram ID. This does not add the document to Canon. Paste the Claude artifact share URL once; the URL and artifact ID are saved with the document.'));
+
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
     var skin=selectControl(SELECTABLE_SKINS.concat(val.skin && SELECTABLE_SKINS.indexOf(val.skin)<0?[val.skin]:[]),val.skin || '',function(v){return setting('skin',v);},true);
     Array.from(skin.options).forEach(function(option){if(option.value)option.textContent=skinLabel(option.value);});
@@ -2554,6 +2565,7 @@ function renderInspector(){
       var note=document.createElement('p');note.className='fnote';
       note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s arrangement is saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
+      documentDestinations(imported.destination || {spec:imported.spec},null,(normalize(parsed.raw).documentLinks || {}).siteBaseUrl).forEach(function(item){var link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open source diagram · '+item.label;guide.appendChild(link);});
       if(t.kind==='node'){
         var connectImported=actionButton('Connect from this node',function(){modes.connectFrom(t);});
         connectImported.className+=' node-connect-button';

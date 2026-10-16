@@ -29,6 +29,12 @@ function createReaderContents(ctl,nav,actions,options){
   var sidebar=element('aside','reader-contents',null,nav);sidebar.setAttribute('aria-label','Contents');
   var heading=element('div','reader-contents-heading',null,sidebar);element('strong','','Contents',heading);button('Close Contents','«',heading,function(){setOpen(false,true,true);});
   var tree=element('div','reader-contents-tree',null,sidebar);
+  var destinations=element('div','reader-document-links',null,sidebar);
+  (ctl.documentDestinations || []).forEach(function(item){
+    var row=element('div','reader-document-link',null,destinations),link=element('a','reader-button',item.label,row);link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+    var copy=button('Copy '+(item.kind==='claude'?'Claude link':'internal site link'),'Copy',row,function(){});bindCopyControl(window,copy,function(){return item.url;});
+  });
+  destinations.hidden=!destinations.children.length;
   var footer=element('div','reader-theme-footer',null,sidebar);element('span','reader-theme-label','Theme',footer);
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
@@ -38,7 +44,7 @@ function createReaderContents(ctl,nav,actions,options){
     themeSummary.textContent=skinLabel(skin)+'　⌃';themeSummary.setAttribute('data-current-skin',skin);
     themeOptions.querySelectorAll('[data-reader-skin]').forEach(function(choice){choice.setAttribute('aria-checked',String(choice.getAttribute('data-reader-skin')===skin));});
   }
-  function focusable(){return Array.from(sidebar.querySelectorAll('button,summary')).filter(function(el){return el.getClientRects().length && !el.disabled;});}
+  function focusable(){return Array.from(sidebar.querySelectorAll('button,summary,a[href],input')).filter(function(el){return el.getClientRects().length && !el.disabled;});}
   function setOpen(value,focus,remember){
     opened=value;sidebar.hidden=!value;scrim.hidden=!value || !narrow;view.classList.toggle('reader-contents-open',value);toggle.setAttribute('aria-expanded',String(value));toggle.setAttribute('aria-label',value?'Close Contents':'Open Contents');toggle.title=value?'Close Contents':'Open Contents';
     if(remember && options.onOpenChange)options.onOpenChange(value);

@@ -540,6 +540,7 @@ function validate(page){
   if (errors.length) return {errors:errors, warnings:warnings};
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
+  validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
   var blocks = blocksOf(page);
   if (!blocks.length){
     errors.push('page.blocks: required — provide at least one section or tabs block');

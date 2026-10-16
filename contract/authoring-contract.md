@@ -79,6 +79,7 @@ append them under "Company contract additions". See
 ```
 
 - `title` — page heading. Required in practice; short.
+- `documentLinks` — `{id?, siteBaseUrl?, claudeUrl?, claudeArtifactId?}`. IDs must agree with `canon.id`; this adds no membership. See [persistent destinations](../cookbook/diagram-handoffs.md#persistent-destinations-and-source-diagrams) for validation and portable links.
 - `generatedFrom` — optional page provenance, shown as one quiet line directly
   under the title and included in print. It usually identifies a Confluence
   page and its version. `url` is required for the line to render; `http`/`https`
@@ -550,7 +551,7 @@ with no `title` shows its id:
   A local target must differ from its source section and cannot be `detailOnly`;
   a local detail may target its ordinary overview. Do not mix `localSection` with external
   fields. Section rename/delete edits maintain local references.
-  For another document, use `{url:"https://…", spec?:"external-spec-id", revision?, section?}` or
+  For another document, use `{url:"https://…", spec?:"external-spec-id", revision?, section?, view?, path?, step?, siteBaseUrl?, claudeUrl?, claudeArtifactId?}` or
   a spec-only reference resolved by the host. Requires `url` or `spec`;
   `revision`/`section` require `spec`. URLs are absolute HTTP(S), without
   credentials, and include the complete route/hash. The native host may supply

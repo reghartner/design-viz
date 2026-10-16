@@ -102,7 +102,7 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
@@ -120,6 +120,11 @@ function companyConfig(root = sourceRoot) {
     const extra = Object.keys(raw.backstage).filter(key => key !== 'baseUrl');
     if (extra.length) throw companyError(file, 'unknown backstage field ' + extra.join(', ') + '; allowed: baseUrl');
     config.backstage = {baseUrl: backstageBaseUrl(raw.backstage.baseUrl, file)};
+  }
+  if (Object.hasOwn(raw, 'site')) {
+    if (!raw.site || typeof raw.site !== 'object' || Array.isArray(raw.site) || Object.keys(raw.site).some(key => key !== 'baseUrl')) throw companyError(file, 'site must be an object with baseUrl');
+    try { backstageBaseUrl(raw.site.baseUrl, file); config.site = {baseUrl: new URL(raw.site.baseUrl).href}; }
+    catch { throw companyError(file, 'site.baseUrl must be an absolute http(s) URL without credentials, query, fragment, whitespace or control characters'); }
   }
   if (raw.brand != null) {
     if (typeof raw.brand !== 'string' || !raw.brand.trim()) throw companyError(file, 'brand must be a path relative to company.json');
@@ -144,7 +149,7 @@ function companyConfig(root = sourceRoot) {
 }
 // Only public authoring context travels into prompts and the offline kit.
 function companyAgentContext(config = companyConfig()) {
-  return config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {};
+  return Object.assign({}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,
@@ -210,6 +215,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (substitute) source = companyText(source, file, company);
     if (file === 'workbench/agent-chat.js' && substitute)
       source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
+    if (file === 'core/document-links.js' && substitute) source = source.replace('/* @company-site-base */ null', () => JSON.stringify(company && company.site ? company.site.baseUrl : null).replace(/</g, '\\u003c'));
     if (file === 'company-brand.config.js' && company && company.brand) source = companyBrandSource(company.brand);
     if (file === 'compatibility.js' && substitute) {
       const marker = '/* @panel-features */ {}';

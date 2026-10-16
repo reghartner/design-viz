@@ -267,6 +267,20 @@ function initWorkbenchLibrary(opts){
     var context={version:1,id:entry.id,specs:Array.from(sources.values()),catalog:{version:3,diagrams:snapshotEntries},catalogURL:new URL('diagrams.json',location.href).href};
     return {source:source,spec:FlowTopology.resolveSource(source,context),topologyContext:context};
   }
+  function readerOptions(){
+    var frozen=entries.slice(),site=new URL(location.href);site.search='';site.hash='';
+    return {autoplay:false,resolveDiagramLink:function(reference){
+      var entry=frozen.find(function(item){return item.id===reference.spec;});
+      if(!entry || reference.revision && reference.revision!==entry.revision)return null;
+      return documentSiteURL(site.href,reference);
+    },loadDetail:async function(reference,signal){
+      var entry=frozen.find(function(item){return item.id===reference.spec;});
+      if(!entry)throw new Error('The detail diagram is not in this published library.');
+      if(reference.revision && reference.revision!==entry.revision)throw new Error('The detail revision is no longer in this published library. Reload after deployment.');
+      if(signal.aborted)throw new Error('Detail request cancelled.');
+      var loaded=await loadSpec(entry);if(signal.aborted)throw new Error('Detail request cancelled.');return loaded.spec;
+    }};
+  }
   function cards(){
     grid.replaceChildren();
     entries.forEach(function(entry){
@@ -301,12 +315,12 @@ function initWorkbenchLibrary(opts){
       var loaded=await loadSpec(selected);if(token!==sequence)return;
       current=Object.assign({},selected,loaded);
       var handoff=opts.handoff && (opts.handoff.error || opts.handoff.id===id)?opts.handoff:null;
-      await verifyWorkspaceHandoff(current.spec,handoff,window.crypto);if(token!==sequence)return;
+      await verifyWorkspaceHandoff(handoff && handoff.sourceRevision?current.source:current.spec,handoff,window.crypto);if(token!==sequence)return;
       if(handoff && handoff.action==='build' && !openedBuild){
         // Validate the exact target against the actual renderer before saving
         // or switching projects. A bad fragment leaves the existing draft intact.
         var checked=normalize(JSON.parse(JSON.stringify(current.spec)));
-        ctl=renderPage(reader,checked,current.spec.page.skin,null,{autoplay:false});
+        ctl=renderPage(reader,checked,current.spec.page.skin,null,readerOptions());
         applyWorkspaceTarget(ctl,checked,handoff.target);retireViewer();
         opts.edit(JSON.parse(JSON.stringify(current.source)),handoff,true,current.topologyContext);openedBuild=true;return;
       }
@@ -314,7 +328,7 @@ function initWorkbenchLibrary(opts){
       document.getElementById('canon-reader-origin').textContent=origin+(handoff?' · Opened from '+(handoff.entity || 'Backstage'):'')+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
-      ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});
+      ctl=renderPage(reader,page,spec.page.skin,null,readerOptions());
       var remembered=opts.position && opts.position();
       if(remembered){
         try{applyWorkspaceTarget(ctl,page,remembered);}
@@ -322,7 +336,7 @@ function initWorkbenchLibrary(opts){
           // The published story may have changed while this history entry was
           // away. Rebuild once so a partially applied stale view/path cannot
           // replace the authored opening state.
-          ctl.destroy();reader.replaceChildren();ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});
+          ctl.destroy();reader.replaceChildren();ctl=renderPage(reader,page,spec.page.skin,null,readerOptions());
           if(opts.savePosition)opts.savePosition(null);
         }
       }

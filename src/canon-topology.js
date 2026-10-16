@@ -66,7 +66,7 @@ var FlowTopology = (function(){
           if(d.topologyProvenance){
             if(!object(d.topologyProvenance) || d.topologyProvenance.version!==1 || !Array.isArray(d.topologyProvenance.imports))fail(at,'invalid generated topologyProvenance');
             d.topologyProvenance.imports.forEach(function(imp){
-              shape(imp,['spec','export','as','nodes','edges','groups','position'],at+' provenance');
+              shape(imp,['spec','export','as','nodes','edges','groups','position','destination'],at+' provenance');
               if(typeof imp.spec!=='string' || !token(imp.export) || !namespacePath(imp.as))fail(at,'invalid generated import provenance');
               ['nodes','edges','groups'].forEach(function(key){list(imp[key],at+' provenance '+key);});
             });
@@ -202,7 +202,9 @@ var FlowTopology = (function(){
             if(custom)defaultPlacements[key]={id:key,side:'below',x:position.x+p.cx-minX,y:position.y+p.cy-minY};
             d.floats.push(f);
           });
-          provenance.push({spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
+          var providerPage=byId.get(imp.spec).page,sourceSection=typeof sectionRecords==='function'?sectionRecords(providerPage).find(function(record){return record.section.diagram===provider;}):null;
+          var destination=typeof documentReference==='function'?documentReference(providerPage):{spec:imp.spec};if(sourceSection)destination.section=sourceSection.reference;
+          provenance.push({destination:destination,spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
           // Retain nested provenance as derived editor metadata so the
           // Workbench can frame both the outer reference and its inner source
           // blocks. The direct import stays first and remains the authored
@@ -211,7 +213,7 @@ var FlowTopology = (function(){
             var nestedNodes=(nested.nodes || []).map(function(key){return prefix+key;}).filter(function(key){return nodeIds.includes(key);});
             var nestedEdges=(nested.edges || []).map(function(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}).filter(function(key){return edgeIds.includes(key);});
             var nestedGroups=(nested.groups || []).map(function(key){return prefix+key;}).filter(function(key){return own(d.groups || {},key);});
-            if(nestedNodes.length)provenance.push({spec:nested.spec,export:nested.export,as:imp.as+'::'+nested.as,position:position,nodes:nestedNodes,edges:nestedEdges,groups:nestedGroups});
+            if(nestedNodes.length)provenance.push({destination:clone(nested.destination || {spec:nested.spec}),spec:nested.spec,export:nested.export,as:imp.as+'::'+nested.as,position:position,nodes:nestedNodes,edges:nestedEdges,groups:nestedGroups});
           });
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
@@ -298,7 +300,7 @@ var FlowTopology = (function(){
       // temporary identity metadata that is never published into authored JSON.
       var local=clone(raw),wrapped=!!local.page,page=wrapped?local.page:local;
       var canon=page.canon;
-      if(!canon)page.canon={version:1,id:'local-export',kind:'design',owner:'group:default/local'};
+      if(!canon)page.canon={version:1,id:page.documentLinks && page.documentLinks.id || 'local-export',kind:'design',owner:'group:default/local'};
       var result=materialize([wrapped?local:{page:local}])[0];
       if(!canon)delete result.page.canon;
       return wrapped?result:result.page;
@@ -309,9 +311,12 @@ var FlowTopology = (function(){
     var input=mode==='wrapped'?candidate:mode==='diagram'?{page:{sections:[{diagram:candidate}]}}:{page:candidate};
     var original=context.specs.find(function(spec){return spec.page && spec.page.canon && spec.page.canon.id===context.id;});
     if(!original)fail('editor','consumer is missing from the authored snapshot');
+    var authoredCanon=input.page.canon,authoredIdentity=input.page.documentLinks && input.page.documentLinks.id;
+    if(context.ephemeral && input.page.documentLinks)delete input.page.documentLinks.id;
     input.page.canon=clone(original.page.canon);
     var inputs=context.specs.map(function(spec){return spec.page.canon.id===context.id?input:spec;});
     var result=materialize(inputs).find(function(spec){return spec.page.canon.id===context.id;});
+    if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
   return {materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};

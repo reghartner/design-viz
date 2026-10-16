@@ -107,6 +107,8 @@ function createNativeEnvironment(host, assets){
   };
   const windowListeners = [];
   const boundWindow = {
+    document:boundDocument,
+    navigator:{get clipboard(){return win.navigator.clipboard;}},
     matchMedia:win.matchMedia.bind(win), get innerWidth(){return win.innerWidth;}, get innerHeight(){return win.innerHeight;},
     setTimeout:later, clearTimeout:clearLater, setInterval:repeat, clearInterval:clearRepeat,
     addEventListener(type,fn,options){

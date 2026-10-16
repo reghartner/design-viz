@@ -529,8 +529,11 @@ Map of node id → card. Ids are short lowercase tokens (letters/digits), used i
 with no `title` shows its id:
 
 - `title` — display name, ~16 characters max (the card is fixed-width).
+  Longer titles wrap to a second line, then end in `…`; hovering the card
+  shows the full title.
 - `sub` — one-line detail under the title (a role, a topic, a port). Monospace;
-  ~20 characters max.
+  ~20 characters max. A longer one ends in `…` inside the card and shows in
+  full on hover.
 - Node `image` — optional embedded PNG, JPEG or WebP data URL, at most 512 KiB
   decoded. Remote URLs, SVG, GIF and mislabeled binary data are rejected.
   In Workbench, drop or paste one local image on the active Standard or Explore

@@ -1505,7 +1505,9 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view [data-dv-node="shared::api"]')).toBeVisible();
     await expect(page.locator('#agent-update-issues')).toBeHidden();await expect(page.locator('#src')).toHaveValue(source);
     await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
+    // The feedback text is what an agent would read: it must never carry the old UI instruction.
     await expect(page.locator('#agent-update-feedback')).toBeHidden();
+    expect(await page.locator('#agent-update-feedback').inputValue()).not.toMatch(/Connect repository catalog|Referenced topology/);
     expect(hits).toEqual(['submitted']);
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect(staged.topologyContext.specs.map(spec=>spec.page.canon.id)).not.toContain('submitted');

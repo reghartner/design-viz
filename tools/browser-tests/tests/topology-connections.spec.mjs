@@ -225,7 +225,8 @@ for(const view of ['ambient','explore'])test('imported node arrangement survives
   await page.locator('#file-input').setInputFiles({name:'arranged.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
   await page.reload();await expect(node(page,'shared::store')).toBeVisible();await closeTools(page);
   expect(await Promise.all(ids.map(center))).toEqual(movedPositions);await painted(page);
-  await info.attach('custom-import-arrangement',{body:await page.locator('#docview').screenshot(),contentType:'image/png'});
+  // Explore's #docview holds only fixed-position children, so capture the viewport.
+  await info.attach('custom-import-arrangement',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 for(const [view,selection] of [['ambient','Shift'],['explore','Alt marquee']])test(view+' imported groups drag together after '+selection+' selection from imported and local initiators',async({page,server})=>{

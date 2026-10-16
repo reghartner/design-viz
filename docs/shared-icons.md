@@ -82,6 +82,9 @@ Set **Company / app name** and choose **Library icon**, **Monogram**, or
 Monograms contain 1–4 characters. Uploads accept PNG, JPEG or WebP up to 512 KiB
 and 4096 × 4096 pixels; the image is embedded in the saved spec. **Accent color**,
 **Monogram background**, and **Text color** accept `#RGB` or `#RRGGBB`.
+Text color styles the monogram and panel brand text. The document-header
+company name always uses the document's own text color, so it stays legible
+in whichever theme a reader picks.
 
 Precedence is global → `page.brand` for the document-header lockup, and global
 → `diagram.brand` → `panel.brand` for supported panels. `page.brand:false`

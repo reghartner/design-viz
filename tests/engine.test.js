@@ -711,7 +711,7 @@ test('resolveSkin ignores invalid cookie tokens, then uses a valid spec default 
   assert.strictEqual(C.resolveSkin('', undefined), 'pastel');
 });
 
-test('applySkinClasses layers overlays on Aurora and rejects unknown tokens without a change', () => {
+test('applySkinClasses layers overlays on Aurora, writes no build/skin label and rejects unknown tokens without a change', () => {
   const classList = (...initial) => {
     const values = new Set(initial);
     return {values, add: value => values.add(value), remove: value => values.delete(value)};
@@ -722,7 +722,7 @@ test('applySkinClasses layers overlays on Aurora and rejects unknown tokens with
   assert.strictEqual(C.applySkinClasses(body, view, 'editorial'), true);
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), ['host-shell', 'sk-aurora', 'sk-editorial']);
   assert.deepStrictEqual(Array.from(view.classList.values).sort(), ['docview', 'sk-aurora', 'sk-editorial']);
-  assert.strictEqual(label.textContent, 'generated from spec · skin: editorial');
+  assert.strictEqual(label.textContent, '');
   const before = Array.from(body.classList.values).sort();
   assert.strictEqual(C.applySkinClasses(body, view, 'sepia'), false);
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), before);

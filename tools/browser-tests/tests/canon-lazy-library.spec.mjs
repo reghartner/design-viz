@@ -217,7 +217,9 @@ test('Add to step gives imported nodes and edges the same emphasis as local memb
    S2 settlement | held response resolves / rejects | resolve: providers listed without a new request; reject: next open requests again and lists providers | caching a failed index
    C1 paste | Welcome paste of a consumer with topologyImports | editor renders notify::dispatch; source stays authored | "open this authored spec from Canon" refusal
    C2 JSON edit | blank draft, typed topologyImports in #src | board renders the imported node; source unchanged | the Topology editor error with no acquisition
-   E1 redeploy | provider republished after pin | status names revision mismatch; #topology-refresh visible; after click providers load and insertion works | a dead end that only offers "reopen" */
+   E1 redeploy | provider republished after pin | status names revision mismatch; #topology-refresh visible; after click providers load and insertion works | a dead end that only offers "reopen"
+   U1 no library | diagrams.json answers 404 | #topology-connect absent; status says no published diagram library and names no control; provider select disabled; no spec request | a Connect/Retry control or an instruction aimed at a human
+   U2 offline | workbench opened from file:// | status explains the offline editor has no published library; zero http(s) requests | guessing a network path offline */
 test('a brand-new local diagram on a deployed site browses providers automatically and persists only its reference',async({page,server})=>{
   const indexRequests=[];page.on('request',request=>{if(request.url().endsWith('/diagrams.json'))indexRequests.push(request.url());});
   await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
@@ -227,6 +229,8 @@ test('a brand-new local diagram on a deployed site browses providers automatical
   await openTopology(page);await expect(page.locator('#topology-connect')).toHaveCount(0);
   await expect(page.locator('#topology-search')).toBeEnabled();await expect(page.locator('#topology-add')).toBeEnabled();
   await expect(page.locator('#topology-provider')).toHaveValue('first');
+  // Only diagrams with named exports are offered: 'second' has none and is not a provider.
+  await expect(page.locator('#topology-provider option')).toHaveText(['Notification platform · first']);
   expect(indexRequests.length).toBe(requestsBefore);
   await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const authored=JSON.parse(await page.locator('#src').inputValue()),d=authored.page.blocks[0].diagram;
@@ -291,6 +295,30 @@ test('typing a topology reference into the JSON source of a local draft loads th
   await expect(page.locator('#src')).toHaveValue(typed);
   const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
   expect(recovered.topologyContext.ephemeral).toBe(true);expect(recovered.topologyContext.specs.map(spec=>spec.page.canon.id)).toContain('first');
+});
+
+test('a workbench without a published diagram library explains that referenced topology is unavailable',async({page,server,audit})=>{
+  const indexURL=server.origin+'/diagrams.json';audit.allowStatus(404,url=>url===indexURL);
+  await page.route(indexURL,route=>route.fulfill({status:404,contentType:'text/plain',body:''}));
+  const specRequests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))specRequests.push(request.url());});
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
+  const before=await page.locator('#src').inputValue();await openTopology(page);
+  await expect(page.locator('#topology-connect')).toHaveCount(0);
+  await expect(page.locator('#topology-status')).toContainText('no published diagram library');
+  await expect(page.locator('#topology-status')).not.toContainText(/Connect|button/);
+  await expect(page.locator('#topology-provider')).toBeDisabled();await expect(page.locator('#topology-add')).toBeDisabled();
+  await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(before);expect(specRequests).toEqual([]);
+});
+
+test('an offline workbench opened from file:// explains that referenced topology needs a deployed site and makes no request',async({page,server})=>{
+  const requests=[];page.on('request',request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
+  await page.goto('file://'+server.root+'/workbench.html');await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
+  await openTopology(page);await expect(page.locator('#topology-connect')).toHaveCount(0);
+  await expect(page.locator('#topology-status')).toContainText('deployed');await expect(page.locator('#topology-status')).toContainText('no published diagram library');
+  await expect(page.locator('#topology-provider')).toBeDisabled();await expect(page.locator('#topology-add')).toBeDisabled();
+  await page.keyboard.press('Escape');expect(requests).toEqual([]);
 });
 
 test('a later deployment of a provider can be adopted from the picker when frozen providers are unchanged',async({page,server})=>{

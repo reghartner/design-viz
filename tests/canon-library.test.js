@@ -153,7 +153,7 @@ test('output aliases cannot overwrite discovered specs or an explicit registry s
 });
 
 
-test('version 2 and 3 indexes validate metadata and URLs without embedding or mutating source content',async()=>{
+test('version 2 and 3 indexes validate metadata and URLs without embedding or mutating source content',async t=>{
   const {buildLibrary}=await import('../tools/canon/library.mjs');
   const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
   const entries=context.parseCanonLibrary(raw),entry=entries[0];
@@ -168,6 +168,11 @@ test('version 2 and 3 indexes validate metadata and URLs without embedding or mu
   const published=(await buildLibraryFromDirectory(topology)).diagrams;
   assert.deepEqual(published.find(item=>item.id==='platform').exports,['core']);
   assert.deepEqual(published.find(item=>item.id==='checkout').exports,[]);
+  // Several exports are published sorted by name, not in authoring order.
+  const f=discoveryFixture(t),provider=namedSpec('provider'),nodes=Object.keys(provider.page.sections[0].diagram.nodes);
+  provider.page.sections[0].diagram.topologyExports={zeta:{nodes:[nodes[0]],edges:[]},alpha:{nodes:[nodes[1]],edges:[]}};
+  f.write('provider.json',provider);
+  assert.deepEqual((await buildLibraryFromDirectory(f.directory)).diagrams[0].exports,['alpha','zeta']);
   const original=structuredClone(spec);original.page.canon={id:'old',kind:'design'};
   const before=JSON.stringify(original),resolved=context.canonLibrarySpec(original,entry);
   assert.equal(resolved.page.canon.id,'doorbell');assert.equal(JSON.stringify(original),before);

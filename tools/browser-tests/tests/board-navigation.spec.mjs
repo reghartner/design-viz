@@ -347,3 +347,53 @@ test('viewer mode toggle and Present use sentence case and Present says it goes 
   expect(await page.getByRole('button',{name:'Exit full screen',exact:true}).evaluate(el=>el.matches('.reader-page-actions .presentbtn'))).toBe(true);
   await page.keyboard.press('Escape');await idle();
 });
+
+/* #551 Present EXIT under the reader navigation. Contract matrix (standalone reader
+   from examples/cumulus/cumulus-page.spec.v2.json at 1440x900; scoped to the one
+   .reader-page-actions .presentbtn, the "Document navigation" <nav> rect and its Legend
+   <summary>). Names/text are matched by verb, not exact copy. #565 (PR #589) already
+   names the button "Present full screen" / "Exit full screen", so R2 and R6 guard that;
+   R3-R5 are the #551 defect. Rows are soft so a RED run reports every row:
+   row | fixture | assertion (scoped) | rejects
+   R1 before | page loaded, not presenting | the button's accessible name starts Enter/Present, text Present | precondition only
+   R2 label while presenting | real click on the button | body.presenting; same element's text and accessible name both start with Exit | aria-label left saying "Enter presenter mode (fullscreen)"
+   R3 EXIT not covered | presenting | elementFromPoint at the EXIT centre is inside the button; button rect top >= nav rect bottom | nav (Legend) stacked over EXIT
+   R4 Legend not covered | presenting | elementFromPoint at the Legend summary centre is inside that summary | EXIT lifted over the nav, hiding Legend instead
+   R5 mouse exit | real page.mouse.click at the EXIT centre | body not presenting; text and name start with Present/Enter again | click swallowed / label not restored on exit
+   R6 Escape exit | button clicked again, then Escape | not presenting; name starts with Present/Enter again | label restored only on the click path */
+test('standalone reader Present EXIT stays clickable below the navigation and names its action',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/cumulus/cumulus-page.spec.v2.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'present-exit.html')]);
+  await page.goto(server.origin+'/present-exit.html');
+  const body=page.locator('body'),button=page.locator('.reader-page-actions .presentbtn');
+  const idleName=/^(enter|present)\b/i,exitName=/^exit\b/i;
+  const named=name=>page.getByRole('button',{name}).and(button);
+  const nav=page.getByRole('navigation',{name:'Document navigation',exact:true}),legend=nav.locator('summary',{hasText:/^Legend$/});
+  // R1
+  await expect(body).not.toHaveClass(/presenting/);await expect(button).toHaveCount(1);
+  await expect(button).toHaveText(/^present$/i);await expect(named(idleName)).toHaveCount(1);
+  await expect(nav).toBeVisible();await expect(legend).toBeVisible();
+  // R2
+  await button.click();
+  await expect(body).toHaveClass(/presenting/);await expect(button).toHaveText(/^exit$/i);
+  await expect.soft(named(exitName)).toHaveCount(1);
+  // R3
+  const exitBox=await button.boundingBox(),navBox=await nav.boundingBox();
+  expect.soft(exitBox.y).toBeGreaterThanOrEqual(navBox.y+navBox.height);
+  const centre={x:exitBox.x+exitBox.width/2,y:exitBox.y+exitBox.height/2};
+  expect.soft(await button.evaluate((el,p)=>{const hit=document.elementFromPoint(p.x,p.y);return !!hit&&el.contains(hit);},centre)).toBe(true);
+  // R4
+  expect.soft(await legend.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!hit&&el.contains(hit);})).toBe(true);
+  // R5
+  await page.mouse.click(centre.x,centre.y);
+  await expect.soft(body).not.toHaveClass(/presenting/);
+  // RED-only recovery: a swallowed click may have opened Legend, whose Escape comes first.
+  for(let i=0;i<3&&await body.evaluate(el=>el.classList.contains('presenting'));i++)await page.keyboard.press('Escape');
+  await expect(body).not.toHaveClass(/presenting/);
+  await expect(button).toHaveText(/^present$/i);await expect.soft(named(idleName)).toHaveCount(1);
+  // R6
+  await button.click();await expect(body).toHaveClass(/presenting/);
+  await expect.soft(named(exitName)).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(body).not.toHaveClass(/presenting/);await expect(named(idleName)).toHaveCount(1);
+});

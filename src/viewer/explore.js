@@ -502,15 +502,28 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var toolRect=obstacleRects.length && obstacleRects.reduce(function(union,r){return {left:Math.min(union.left,r.left),right:Math.max(union.right,r.right),top:Math.min(union.top,r.top),bottom:Math.max(union.bottom,r.bottom)};});
     function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-12);}
     var columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
-    var stackRects=new Map();
-    stacked.forEach(function(w){
+    var stackRects=new Map(),columns=[];
+    stacked.forEach(function(w,index){
       var r=constrain(w,scaledRect(w,w.state));
+      // Reuse an earlier column's remaining space before opening another.
+      // Readable notes can be taller than other cards; leaving their lower
+      // space unused can consume the playback lane on desktop. Only reuse a
+      // column that already has enough width, preserving its neighbors.
+      var priorColumn=columns.find(function(column){return r.w<=column.width && column.y+r.h<=columnBottom(column.right-column.width,column.right);});
+      if(priorColumn){r.x=Math.max(12,priorColumn.right-r.w);r.y=priorColumn.y;stackRects.set(w,r);priorColumn.y+=r.h+gap;stackLeft=Math.min(stackLeft,r.x);return;}
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
       // Clear the entire toolbar, which can be wider than a single panel.
       var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
       if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight=Math.min(columnRight,toolRect.left-stageRect.left-gap);width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
-      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
+      // If only the bottom toolbar prevents a fit, move this column just
+      // left of it before spending another whole column on the final small card.
+      if(columns.length && index===stacked.length-1 && y>insetTop && y+r.h>stackBottom && y+r.h<=b.h-12 && toolRect && stackBottom<b.h-12 && toolRect.left-stageRect.left-gap-width>=12){
+        var shiftedRight=Math.min(columnRight,toolRect.left-stageRect.left-gap),shift=shiftedRight-columnRight;
+        stackRects.forEach(function(placed){if(Math.abs(placed.x+placed.w-columnRight)<1){placed.x+=shift;stackLeft=Math.min(stackLeft,placed.x);}});
+        columnRight=shiftedRight;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);
+      }
+      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columns.push({right:columnRight,width:columnWidth,y:y});columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
       r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
     });
@@ -530,7 +543,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var automaticControls=!controls;
     if(!controls){
       var controlLeft=workbenchCanvas?84:12,right=12,minControls=minimum(playerWindow);
-      if(maxWidth){var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,besideWidth=b.w-(maxWidth+28)-besideLeft;if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+28;}}
+      if(maxWidth){
+        var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,dockGap=28,besideWidth=b.w-(maxWidth+dockGap)-besideLeft;
+        // Prefer the usual breathing room, but use the panel stack's gap
+        // before falling back to a dock that spans beneath the panels.
+        if(besideWidth<minControls){dockGap=gap;besideWidth=b.w-(maxWidth+dockGap)-besideLeft;}
+        if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+dockGap;}
+      }
       var controlWidth=workbenchCanvas?Math.max(minControls,b.w-right-controlLeft):b.w-right-controlLeft;
       controls={x:controlLeft,y:12,w:controlWidth,h:146};
     }

@@ -404,6 +404,7 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
 // 10  | ?diagram=https://evil.example/x.spec.json            | as row 8, and #welcome-link-error text equals row 8's text with the value substituted                    | a separate refusal path that looks different from unknown
 // 11  | ?diagram=//evil.example/x.spec.json                  | as row 10                                                                                                 | protocol-relative addresses handled differently
 // 12  | ?diagram=diagrams/delivery/delivery.spec.json        | as row 10                                                                                                 | same-origin paths handled differently
+// 12c | ?diagram=DELIVERY (wrong case of published "delivery") | as row 10                                                                                               | case-folded matching instead of the exact match main uses
 // 12b | ?diagram= (empty value)                              | as row 10 (message names “”)                                                                              | an empty value silently treated as a plain Welcome visit
 // 13  | rows 10–12                                           | 0 requests to evil.example; 0 requests whose path ends in delivery.spec.json                              | values used as a spec transport
 // 14  | in-app user guide §09 (#hg-evidence)                 | exactly one <code> in #hg-evidence contains "?diagram="                                                    | the parameter left undocumented in the guide
@@ -460,7 +461,7 @@ test('a ?diagram= link opens one published diagram read-only, and unknown values
     await page.locator(action).click();await expect(page.locator(target),action).toBeVisible();
     if(action==='#welcome-open')await expect(page.locator('#src')).toHaveValue(source);
   }
-  for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json',''])
+  for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json','','DELIVERY'])
     expect(await landsOnWelcome(value)).toBe(unknown.replace('never-published',value));
   expect(foreign).toEqual([]);expect(specFetches).toEqual([]);
   await openGuide(page);

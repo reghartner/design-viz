@@ -60,8 +60,17 @@ function createBuilderInteractions(opts){
     /* frame the section inserts land in, on the board */
     var prev = view.querySelectorAll('.doc-sec.dv-inserttarget');
     for (var i = 0; i < prev.length; i++) prev[i].classList.remove('dv-inserttarget');
+    var tags = view.querySelectorAll('.dv-inserttarget-tag');
+    for (var j = 0; j < tags.length; j++) tags[j].remove();
     var el = view.querySelector('.doc-sec[data-dv-section="' + session.insertSection + '"]');
-    if (el) el.classList.add('dv-inserttarget');
+    if (!el) return;
+    el.classList.add('dv-inserttarget');
+    /* a real element, so its tooltip can be hovered */
+    var tag = document.createElement('span');
+    tag.className = 'dv-inserttarget-tag';
+    tag.textContent = 'Adding here';
+    tag.title = 'New items from Add go into this section. Click another section to add there instead.';
+    el.appendChild(tag);
   }
 
 
@@ -1763,7 +1772,7 @@ function createBuilderInteractions(opts){
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();
-      Array.prototype.forEach.call(view.querySelectorAll('.dv-rowgrab,.dv-topology-boundary,.home-layout-button'),function(el){el.remove();});
+      Array.prototype.forEach.call(view.querySelectorAll('.dv-rowgrab,.dv-topology-boundary,.home-layout-button,.dv-inserttarget-tag'),function(el){el.remove();});
       Array.prototype.forEach.call(view.querySelectorAll('.dv-inserttarget'),function(el){el.classList.remove('dv-inserttarget');});
     }
   };

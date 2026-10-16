@@ -75,6 +75,9 @@ outgoing browser draft in Earlier drafts.
 
 Writable access requires a supporting desktop browser and secure context. Other
 browsers explicitly show **Browser only**; Export project still downloads a copy.
+The save status is a read-only badge beside **Add**, not a button; hover it for
+how to choose a working file. **Home** keeps the draft (its tooltip says so).
+The dotted frame tagged **Adding here** marks the section that **Add** fills.
 Exporting into the active working folder verifies and preserves the exact working
 JSON/ledger bytes, then updates HTML and README. HTML is a snapshot updated only
 by Export. If the working draft changes during export, retry the complete export.

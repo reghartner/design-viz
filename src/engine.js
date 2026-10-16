@@ -51,8 +51,6 @@ function applySkinClasses(body, view, name){
     skinClasses(name).forEach(function(cls){ el.classList.add(cls); });
   });
   if (view && view.querySelector){
-    var label = view.querySelector('[data-dv-skin-label]');
-    if (label) label.textContent = 'generated from spec · skin: ' + name;
     view.dispatchEvent(new CustomEvent('reader-skin-change',{detail:{skin:name}}));
   }
   var scope = body && body.querySelectorAll ? body : view;
@@ -3060,12 +3058,6 @@ function renderPage(view, page, skin, backlinks, options){
   }
   var provenance = generatedFromHTML(page.generatedFrom);
   if (provenance) view.insertAdjacentHTML('beforeend', provenance);
-  if (page.title){
-    var su = document.createElement('p');
-    su.className = 'doc-sub'; su.setAttribute('data-dv-skin-label', '');
-    su.textContent = 'generated from spec · skin: ' + skin;
-    view.appendChild(su);
-  }
   var gi = 0;
   var pageBlocks = blocksOf(page);
   var records = sectionRecords(page);

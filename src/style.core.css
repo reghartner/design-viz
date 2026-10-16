@@ -591,7 +591,6 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .presenting .stepline b{font-size:16px;}
 .presenting .tbtn:not(.presentbtn){font-size:14px; padding:7px 14px;}
 .presenting .schip{width:30px; height:30px; font-size:12px;}
-.presenting .doc-sub{display:none;}
 /* print-only step caption list (C4) */
 .printsteps{display:none;}
 /* ---------- step mode: dim everything but the lit step; protocol colors stay ---------- */
@@ -901,20 +900,6 @@ body.sk-editorial .doc-title{
   font:600 clamp(38px,5vw,62px)/.98 'Newsreader', Georgia, serif;
   letter-spacing:-.035em;
   text-wrap:balance;
-}
-body.sk-editorial .doc-sub{
-  margin:18px 0 0;
-  color:var(--ed-muted);
-  font:600 10px/1.4 'IBM Plex Mono', monospace;
-  letter-spacing:.13em;
-  text-transform:uppercase;
-}
-body.sk-editorial .doc-sub::after{
-  content:"";
-  display:block;
-  width:72px;
-  margin-top:22px;
-  border-bottom:2px solid var(--ed-accent);
 }
 body.sk-editorial .generated-from{color:var(--ed-muted);}
 body.sk-editorial .generated-from a{color:var(--ed-accent);}
@@ -1467,14 +1452,6 @@ body.sk-editorial .errbox{
     font-size:24px;
     font-weight:700;
     letter-spacing:-.035em;
-  }
-}
-@media screen {
-  body.sk-terminal .doc-sub{
-    color:var(--tm-muted);
-    font-size:10px;
-    letter-spacing:.12em;
-    text-transform:uppercase;
   }
 }
 @media screen {
@@ -2037,19 +2014,6 @@ body.sk-editorial .errbox{
     font-weight:800;
     line-height:1.2;
     margin-bottom:9px;
-  }
-}
-@media screen {
-  body.sk-pastel .doc-sub {
-    display:inline-flex;
-    align-items:center;
-    width:max-content;
-    color:#748197;
-    background:rgba(255,255,255,.76);
-    border:1px solid #E1E7F0;
-    border-radius:999px;
-    padding:4px 10px;
-    box-shadow:0 3px 12px rgba(65,78,112,.05);
   }
 }
 @media screen {
@@ -2829,13 +2793,6 @@ body.sk-editorial .errbox{
   }
 }
 @media screen {
-  body.sk-blueprint .doc-sub{
-    color:#9AC7DF;
-    font-size:10px;
-    letter-spacing:.08em;
-  }
-}
-@media screen {
   body.sk-blueprint .generated-from{color:#9AC7DF;}
 }
 @media screen {
@@ -3578,7 +3535,7 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
    every skin's section-box treatment. */
 body.dv-embed{margin:0 !important;}
 body.dv-embed header, body.dv-embed footer,
-body.dv-embed .doc-heading, body.dv-embed .doc-sub,
+body.dv-embed .doc-heading,
 body.dv-embed .generated-from, body.dv-embed .presentbtn,
 body.dv-embed .tabbar,
 body.dv-embed .doc-sec:not(.dv-embed-target),

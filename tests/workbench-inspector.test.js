@@ -794,3 +794,32 @@ test('bulk node editing offers the Node style control and icon color beside the 
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.style),['amber','amber',undefined]);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
 });
+
+test('step forms expose Declaration overrides under Advanced with Inherit and This step only; starting state forms do not',()=>{
+  const e=environment();
+  const spec={nodes:{a:{title:'A'}},rows:[['a']],panels:[{id:'g',type:'gauge',title:'Draw',unit:'mA',max:400,initial:{value:12}}],
+    steps:[{id:'one',text:'One',nodes:['a'],panels:{g:{value:20}}},{id:'two',text:'Two',nodes:['a'],panels:{g:{value:30}}}]};
+  const h=e.mount(spec);
+  h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'declare'),null,'the starting state never overrides its own declaration');
+  h.session.target={kind:'step',section:0,index:1};h.inspector.render();
+  const field=aria(h.guide,'declare');assert.ok(field,'step form has the declare control');
+  assert.equal(aria(h.guide,'Declaration overrides assignment').value,'omit');
+  const duration=aria(h.guide,'declare duration');assert.equal(duration.value,'inherit');assert.equal(duration.disabled,true);
+  const heading=h.guide.querySelectorAll('.panel-state-group').find(el=>el.textContent==='Advanced');assert.ok(heading,'grouped under Advanced');
+  const before=h.text;
+  field.value='{"max":200,"unit":"W"}';field.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.g,{value:30,declare:{max:200,unit:'W'}});
+  h.inspector.render();
+  aria(h.guide,'declare duration').value='once';aria(h.guide,'declare duration').fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.g,{value:30,enterOnce:{declare:{max:200,unit:'W'}}});
+  h.inspector.render();
+  assert.equal(aria(h.guide,'declare').value,'{"max":200,"unit":"W"}','the one-step value is edited in place');
+  aria(h.guide,'Declaration overrides assignment').value='omit';aria(h.guide,'Declaration overrides assignment').fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.g,{value:30});
+  h.session.undo();h.session.undo();h.session.undo();assert.equal(h.text,before);
+  h.session.redo();assert.deepEqual(JSON.parse(h.text).steps[1].panels.g,{value:30,declare:{max:200,unit:'W'}});
+  h.inspector.render();
+  aria(h.guide,'declare').value='[1,2]';aria(h.guide,'declare').fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.g,{value:30,declare:{max:200,unit:'W'}},'an invalid value is refused');
+});

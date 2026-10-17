@@ -1157,7 +1157,7 @@ function panelPatchControl(pid, patch, decl, target, options){
           current=got.st.panels[pid];
         }
         if(!whole){
-          if(!initial && (panelAuthoring(decl.type).transientFields || []).indexOf(key)>=0){
+          if(!initial && panelFieldSupportsOnce(decl.type,key)){
             var currentOnce=panelObject(current) && panelObject(current.enterOnce) && Object.prototype.hasOwnProperty.call(current.enterOnce,key);
             if(!panelObject(current) || (storage==='once')!==!!currentOnce)
               return {error:'This field’s duration changed in JSON. Click Render, then select the step again.'};
@@ -1236,6 +1236,9 @@ function panelPatchControl(pid, patch, decl, target, options){
       }, {textarea: true});
     }
     var fields = panelPatchFields(decl);
+    /* Declaration overrides are a step concept; the starting state is always
+       authored against the panel's own declaration. */
+    if(initial && fields)fields=fields.filter(function(f){return f[0]!=='declare';});
     if(initial){
       var note=document.createElement('p');note.className='home-note';
       note.textContent='These values start every path. Step changes stay separate; unset fields use the panel defaults.';body.appendChild(note);
@@ -1260,7 +1263,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         var groupHeading=document.createElement('h4');groupHeading.className='panel-state-group';groupHeading.textContent=groupName;body.appendChild(groupHeading);
       }
       lastGroup=groupName || lastGroup;
-      var temporary=!initial && (panelAuthoring(decl.type).transientFields || []).indexOf(key)>=0;
+      var temporary=!initial && panelFieldSupportsOnce(decl.type,key);
       var once=temporary && patch && panelObject(patch.enterOnce)?patch.enterOnce:null;
       var hasOnce=once && Object.prototype.hasOwnProperty.call(once,key),hasCarry=patch && Object.prototype.hasOwnProperty.call(patch,key);
       var storage=hasOnce?'once':'carry';if(hasOnce){cur=once[key];has=true;}

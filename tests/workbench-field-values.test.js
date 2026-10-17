@@ -58,7 +58,8 @@ test('panelPatchFields uses declaration vocabularies only when nonempty and fall
     for (const states of [[], undefined, 'invalid'])
       assert.deepStrictEqual(plain(B.panelPatchFields({type, states})[0]), ['state', 'text']);
   }
-  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'gauge'})), [['value', 'num']]);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'gauge'})), [['value', 'num'], plain(B.PANEL_DECLARE_FIELD)]);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'gauge'}).at(-1)).slice(0, 2), ['declare', 'json'], 'every typed step form ends with the declaration override');
   for (const decl of [null, {}, {type: 'future-widget'}, {type: 'toString'}])
     assert.strictEqual(B.panelPatchFields(decl), null);
   assert.strictEqual(B.PANEL_PATCH_FIELDS.state[0][1], 'text', 'table stays unchanged');
@@ -66,16 +67,16 @@ test('panelPatchFields uses declaration vocabularies only when nonempty and fall
 
 test('panelPatchFields expands declared led tile and signal ids with the correct nested fields', () => {
   assert.deepStrictEqual(plain(B.panelPatchFields({type: 'leds', leds: [{id: 'power'}, null, {}, {id: ''}]})),
-    [['power', 'enum', ['on', 'off', 'tx', 'rx'], {label: 'power', group: 'Indicators'}]]);
+    [['power', 'enum', ['on', 'off', 'tx', 'rx'], {label: 'power', group: 'Indicators'}], plain(B.PANEL_DECLARE_FIELD)]);
   const tile = {type: 'tiles', tiles: [{id: 'front'}], states: ['ready']};
   assert.deepStrictEqual(plain(B.panelPatchFields(tile)),
-    [['front', 'objf', [['state', 'enum', ['ready']], ['sub', 'text']], {label: 'front', group: 'Devices'}]]);
+    [['front', 'objf', [['state', 'enum', ['ready']], ['sub', 'text']], {label: 'front', group: 'Devices'}], plain(B.PANEL_DECLARE_FIELD)]);
   tile.states = [];
   assert.deepStrictEqual(plain(B.panelPatchFields(tile)[0][2][0]), ['state', 'text']);
   assert.deepStrictEqual(plain(B.panelPatchFields({type: 'signal', links: [{id: 'uplink'}]})),
     [['uplink', 'objf', [['state', 'enum', ['ok', 'weak', 'retrying', 'lost', 'jammed']],
-      ['bars', 'num', {min: 0, max: 4}], ['note', 'text']], {label: 'uplink', group: 'Links'}]]);
-  for (const type of ['leds', 'tiles', 'signal']) assert.deepStrictEqual(plain(B.panelPatchFields({type})), []);
+      ['bars', 'num', {min: 0, max: 4}], ['note', 'text']], {label: 'uplink', group: 'Links'}], plain(B.PANEL_DECLARE_FIELD)]);
+  for (const type of ['leds', 'tiles', 'signal']) assert.deepStrictEqual(plain(B.panelPatchFields({type})), [plain(B.PANEL_DECLARE_FIELD)]);
 });
 
 test('simple and dynamic panels expose typed starting-state controls with authored labels', () => {
@@ -85,8 +86,8 @@ test('simple and dynamic panels expose typed starting-state controls with author
   assert.equal(B.PanelRegistry.get('inflight').authoring.initialFields,undefined);
   assert.ok(!B.PANEL_SETUP_FIELDS.inflight.some(field=>field[0]==='initial'));
   assert.equal(B.panelFieldPresentation({type:'leds'},B.panelPatchFields({type:'leds',leds:[{id:'power',label:'Power'}]})[0],'initial').label,'Power');
-  assert.equal(B.panelFieldPresentation({type:'dispatch'},B.panelPatchFields({type:'dispatch',responders:[{id:'patrol',label:'Patrol unit'}]}).at(-1),'step').group,'Responders');
-  assert.equal(B.panelFieldPresentation({type:'security'},B.panelPatchFields({type:'security',sensors:[{id:'frontDoor',label:'Front door'}]}).at(-1),'initial').label,'Front door');
+  assert.equal(B.panelFieldPresentation({type:'dispatch'},B.panelPatchFields({type:'dispatch',responders:[{id:'patrol',label:'Patrol unit'}]}).at(-2),'step').group,'Responders');
+  assert.equal(B.panelFieldPresentation({type:'security'},B.panelPatchFields({type:'security',sensors:[{id:'frontDoor',label:'Front door'}]}).at(-2),'initial').label,'Front door');
   assert.equal(B.panelFieldPresentation({type:'battery'},['drain','num'],'initial').hidden,true);
   assert.equal(B.panelFieldPresentation({type:'battery'},['drain','num'],'step').hidden,false);
 });
@@ -261,7 +262,7 @@ test('homemap subject patch fields accept positions and explicit null', () => {
   const decl = {type: 'homemap', devices: [{id: 'cam', kind: 'camera', x: 1, y: 2}], subjects};
   const fields = B.panelPatchFields(decl);
   assert.deepStrictEqual(plain(fields.slice(1)), [
-    ['walker', 'json', {nullable: true}], ['__proto__', 'json', {nullable: true}], ['signals', 'jsonArr']
+    ['walker', 'json', {nullable: true}], ['__proto__', 'json', {nullable: true}], ['signals', 'jsonArr'], plain(B.PANEL_DECLARE_FIELD)
   ]);
   for (const raw of ['{"x":120,"y":60}', 'null'])
     assert.deepStrictEqual(plain(B.patchFieldsCollect(fields, {walker: raw}).item), {walker: JSON.parse(raw)});

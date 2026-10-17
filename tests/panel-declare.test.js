@@ -389,3 +389,43 @@ test('every registered panel type renders every step of both paths under a decla
   }
 });
 
+/* ---- workbench: step form field, duration and effective-state view ---- */
+test('declare is an Advanced JSON step field for every typed form, never a starting-state field, with a one-step duration', () => {
+  for (const type of Array.from(C.PanelRegistry.types())){
+    const sample = C.panelPickerExample(type, {referenceImage: PNG});
+    const fields = C.panelPatchFields(sample.panel);
+    if (fields === null) continue;
+    const last = plain(fields.at(-1));
+    assert.deepEqual(last.slice(0, 2), ['declare', 'json'], type);
+    const meta = C.panelFieldPresentation(sample.panel, fields.at(-1), 'step');
+    assert.equal(meta.label, 'Declaration overrides'); assert.equal(meta.advanced, true); assert.match(meta.help, /null restores/);
+    assert.equal(C.panelFieldSupportsOnce(type, 'declare'), true);
+  }
+  assert.deepEqual(plain(C.patchFieldsCollect(C.panelPatchFields({type:'gauge'}), {value:'5', declare:'{"max":200}'})), {item:{value:5, declare:{max:200}}});
+  assert.match(C.patchFieldsCollect(C.panelPatchFields({type:'gauge'}), {declare:'[1]'}).error, /JSON object/);
+  assert.match(C.patchFieldsCollect(C.panelPatchFields({type:'gauge'}), {declare:'null'}).error, /JSON object/);
+  const raw = page(fixture()), text = JSON.stringify(raw);
+  const once = C.planPanelFieldDuration(text, raw, {kind:'step', section:0, index:1}, 'g', 'declare', 'once', JSON.stringify(raw.page.sections[0].diagram.steps[1].panels.g));
+  assert.equal(once.error, undefined, once.error);
+  const moved = JSON.parse(once.text).page.sections[0].diagram.steps[1].panels.g;
+  assert.deepEqual(moved, {value:40, enterOnce:{declare:{max:200, unit:'W', title:'Draw (watts)'}}});
+  const back = C.planPanelFieldDuration(once.text, JSON.parse(once.text), {kind:'step', section:0, index:1}, 'g', 'declare', 'carry', JSON.stringify(moved));
+  assert.deepEqual(JSON.parse(back.text).page.sections[0].diagram.steps[1].panels.g, {value:40, declare:{max:200, unit:'W', title:'Draw (watts)'}});
+  assert.match(C.planPanelFieldDuration(text, raw, {kind:'step', section:0, index:1}, 'g', 'value', 'once').error || '', /does not support temporary/);
+});
+
+test('the effective-state inspector lists the overridden declaration keys with their authoring steps and never throws', () => {
+  const d = fixture();
+  const model = C.builderEffectivePanelStates(d, 2, 'happy');
+  assert.equal(model.error, undefined, model.error);
+  const gauge = model.panels.find(p => p.id === 'g'), table = model.panels.find(p => p.id === 't'), log = model.panels.find(p => p.id === 'l');
+  assert.deepEqual(plain(gauge.fields.map(f => f.key)), ['log','value','declare']);
+  const declare = gauge.fields.find(f => f.key === 'declare');
+  assert.deepEqual(plain(declare.value), {title:'Draw (watts)', unit:'W', max:50});
+  assert.deepEqual(plain(declare.origin.inputs.map(i => [i.step, i.path.join('.')])), [[1,'steps.1.panels.g.declare'],[2,'steps.2.panels.g.enterOnce.declare']]);
+  assert.deepEqual(plain(table.fields.find(f => f.key === 'declare').value), {columns:[{id:'k',label:'Key'},{id:'z',label:'Zed'}]});
+  assert.equal(log.fields.some(f => f.key === 'declare'), false, 'panels without overrides are unchanged');
+  assert.equal(C.builderEffectivePanelStates(d, 3, 'happy').panels.find(p => p.id === 'g').fields.find(f => f.key === 'declare').value.max, undefined, 'null restored max');
+  assert.equal(C.builderEffectivePanelStates(d, 4, 'alt').panels.find(p => p.id === 'g').fields.some(f => f.key === 'declare'), false, 'the alternate path never saw it');
+  assert.equal(C.builderEffectivePanelStates(d, 0, 'happy').panels.find(p => p.id === 'g').fields.some(f => f.key === 'declare'), false);
+});

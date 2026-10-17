@@ -7,6 +7,12 @@ function panelAuthoring(type){
   var definition = PanelRegistry.get(type);
   return definition && definition.authoring || {};
 }
+/* `declare` is the reserved per-step declaration override every panel type
+   accepts; like a declared transient field it has a one-step form under
+   enterOnce. */
+function panelFieldSupportsOnce(type,key){
+  return key==='declare' || (panelAuthoring(type).transientFields || []).indexOf(key)>=0;
+}
 function panelAuthoringMap(key){
   return new Proxy(Object.create(null), {
     get:function(_,type){return panelAuthoring(type)[key];},

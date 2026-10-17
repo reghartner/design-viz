@@ -2,7 +2,7 @@
 function planPanelFieldDuration(text,raw,target,pid,key,duration,expected){
   var got=builderStepAt(raw,target.section,target.index),rec=specSectionPaths(raw)[target.section];
   var d=rec && specValueAt(raw,rec.diagram),panel=d && (d.panels || []).find(function(p){return p.id===pid;});
-  if(target.kind!=='step' || !panel || (panelAuthoring(panel.type).transientFields || []).indexOf(key)<0)
+  if(target.kind!=='step' || !panel || !panelFieldSupportsOnce(panel.type,key))
     return {error:'This panel field does not support temporary changes.'};
   if(['carry','once','inherit'].indexOf(duration)<0)return {error:'Choose a supported duration.'};
   var patch=got && got.st.panels && got.st.panels[pid];

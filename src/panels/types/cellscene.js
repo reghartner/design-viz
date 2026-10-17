@@ -412,8 +412,20 @@ function cellsceneStateWarnings(state, path, context, warnings) {
     } else cellsceneWarn(warnings, at, 'unknown field — ignored');
   });
 }
+/* The fold applies a step's own events first and its enterOnce events on top
+   of the result, so enterOnce is validated against the state after the step's
+   own events, under exactly the fold's rules (cellsceneApply). */
 function cellscenePatchWarnings(state, path, context, warnings) {
-  softwarePanelPatchWarnings(state, path, context, warnings, cellsceneStateWarnings);
+  if (!panelObject(state) || !panelObject(state.enterOnce)) {
+    softwarePanelPatchWarnings(state, path, context, warnings, cellsceneStateWarnings);
+    return;
+  }
+  var main = Object.assign({}, state), once = Object.assign({}, state.enterOnce);
+  delete main.enterOnce; delete once.enterOnce;
+  cellsceneStateWarnings(main, path, context, warnings);
+  var carried = Object.assign({ items: {}, vesicles: {}, divided: false, daughters: {}, events: [] }, context.before);
+  var after = cellsceneApply(carried, main, context.decl);
+  cellsceneStateWarnings(once, path + '.enterOnce', { decl: context.decl, before: after }, warnings);
 }
 function cellsceneDeclarationWarnings(panel, path, warnings, errors, diagram) {
   var decl = cellsceneDecl(panel, path, warnings);

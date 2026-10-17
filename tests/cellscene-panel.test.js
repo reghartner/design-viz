@@ -335,3 +335,18 @@ test('validation and fold agree when a skipped fuse precedes a valid fuse of the
   same(states[1].events.map(e => e.kind), ['fuse']);
   assert.equal(states[1].items.c.in, 'out');
 });
+
+test('enterOnce events are validated against the state after the step\'s own events, as the fold applies them', () => {
+  const steps = [
+    {id:'both', panels:{cell:{events:[{kind:'bud',vesicle:'v1',from:'cyt',items:['c']},{kind:'divide'}],
+      enterOnce:{events:[{kind:'fuse',vesicle:'v1',with:'cell',to:'out'},{kind:'divide'}]}}}},
+    {id:'next', panels:{cell:{caption:'After.'}}},
+  ];
+  const d = diagram(steps), states = folded(d);
+  const w = validate(d).warnings.join('\n');
+  assert.doesNotMatch(w, /enterOnce\.events\[0\]/, 'the fuse of a vesicle budded earlier in the same step is valid');
+  assert.match(w, /steps\[0\]\.panels\.cell\.enterOnce\.events\[1\]: the cell has already divided on this path — event skipped/);
+  same(states[0].events.map(e => e.kind), ['bud','divide','fuse'], 'the fold applied the one-step fuse and skipped the second divide');
+  same(Object.keys(states[0].vesicles), [], 'the one-step fuse removed the vesicle at that step');
+  same(Object.keys(states[1].vesicles), ['v1'], 'the one-step fuse is not carried');
+});

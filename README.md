@@ -337,6 +337,8 @@ python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json \
 Committed pages under `examples/` and `docs/diagrams/` embed a copy of the engine, so
 they go stale when `src/` changes. To refresh one, rebuild it from the spec beside it:
 `python3 tools/inject.py <dir>/<name>.spec.json template/flowview.html <dir>/<name>.html`.
+A page whose folder has its own `build.py` (such as `examples/flowview-product-tour/`)
+is rebuilt with that script instead, because it adds more than the spec.
 `examples/index.html` comes from `python3 tools/build_index.py` and has no engine.
 
 ## Using this repo as a tool from another project

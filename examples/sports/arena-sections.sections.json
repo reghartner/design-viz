@@ -1,0 +1,501 @@
+{
+  "geometry": "bowl",
+  "bowl": "rink",
+  "rings": [
+    {
+      "id": "100-level",
+      "label": "100 level"
+    },
+    {
+      "id": "200-level",
+      "label": "200 level"
+    },
+    {
+      "id": "300-level",
+      "label": "300 level"
+    }
+  ],
+  "sections": [
+    {
+      "id": "101",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "102",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "103",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "104",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "105",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "106",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "107",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "108",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "109",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "110",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "111",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "112",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "113",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "114",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "115",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "116",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "117",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "118",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "119",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "120",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "121",
+      "ring": "100-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "201A",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "201B",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "202",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "203",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "204",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "205",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "206",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "207",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "208",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "209",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "210",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "211",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "212",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "213",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "214",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "215",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "216",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "217",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "218",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "219",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "220",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "221",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "222",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "223",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "224",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "225",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "226A",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "226B",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "227",
+      "ring": "200-level",
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "228",
+      "ring": "200-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "229",
+      "ring": "200-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "230",
+      "ring": "200-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "231",
+      "ring": "200-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "301",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "302",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "303",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "304",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "305",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "306",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "307",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "308",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "309",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "310",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "311",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "312",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "313",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "314",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "315",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "316",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "317",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "318",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "319",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "320",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "321",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "322",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "323",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "324",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "325",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "326",
+      "ring": "300-level",
+      "capacity": 215,
+      "zone": "corner"
+    }
+  ],
+  "capacityNote": "illustrative even split"
+}

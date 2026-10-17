@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Hand-written fixture for tools/seatmap-import.mjs: a transformed group,
+     a polygon, a rect, a circle, a hostile script, a style block, decorative
+     shapes without section ids and one element under an unsupported skewX. -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 400 260" width="400" height="260">
+  <style>.sec{fill:#ccc} #101{fill:url(javascript:alert(1))}</style>
+  <script type="text/javascript">document.body.innerHTML = '<img src=x onerror=alert(1)>';</script>
+  <defs>
+    <path id="105" d="M0 0 L10 0 L10 10 Z"/>
+  </defs>
+  <rect id="ice" x="150" y="100" width="100" height="60" fill="#dff"/>
+  <path id="stage-outline" d="M0 0 H400 V260 H0 Z" fill="none"/>
+  <g id="1" transform="translate(20, 30) scale(2)">
+    <style>#101 { fill: red }</style>
+    <path id="101" class="sec" d="m0 0 l40 0 l0 20 l-40 0 z" data-capacity="480" data-zone="end"/>
+    <polygon id="102" points="50,0 90,0 90,20 50,20" data-capacity="450"/>
+    <rect data-section="103" x="100" y="0" width="40" height="20" data-capacity="400" data-zone="corner"/>
+  </g>
+  <g id="2" transform="matrix(1 0 0 1 20 120)">
+    <script>/* nested: must not pop the group */ var x = '</g>';</script>
+    <circle id="201A" cx="30" cy="30" r="25"/>
+    <rect id="202" x="80" y="10" width="60" height="40" data-capacity="900"/>
+    <g transform="skewX(20)">
+      <path id="203" d="M160 10 L220 10 L220 50 L160 50 Z" data-capacity="700"/>
+    </g>
+    <path id="204" d="M240 10 C260 0 280 0 300 10 L300 50 L240 50 Z"/>
+    <path id="205" d="M320 10 L360 10 L360 50 L320 50 Z" onclick="alert(1)" data-capacity="12abc"/>
+    <path id="206" d="M10 80 L50 80 L50 100 L10 100 Z" transform="rotate(10)"/>
+    <path id="207" d="M60 80 L100 80 Q120 90 100 100 L60 100 Z" transform="matrix(0.9 0.1 0 1 0 0)"/>
+  </g>
+  <path id="208" d="M1 1 L2 2 L3 3 Z" transform="translate(bad)"/>
+  <path id="bad-path" d="M10 10 L20 20 onclick"/>
+  <path id="209" d="M10 10 L20 20 onclick"/>
+</svg>

@@ -1,7 +1,8 @@
 /* Build-only renderer capture. No browser code or dependency ships to nginx. */
 import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
-import {readFile,realpath,stat,lstat,mkdir,mkdtemp,writeFile,rename,rm} from 'node:fs/promises';
+import {readFile,realpath,stat,lstat,mkdir,mkdtemp,writeFile,rename,rm,open} from 'node:fs/promises';
+import {constants} from 'node:fs';
 import path from 'node:path';
 const require=createRequire(import.meta.url);
 const {entrypoint,entrypointAssets,fontCss}=require('../source-loader.cjs');
@@ -9,6 +10,17 @@ const WIDTH=960,HEIGHT=600,MAX_BYTES=750*1024;
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const inside=(file,root)=>file.startsWith(root+path.sep);
 const types={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml'};
+
+async function staticPermissions(file,{directory=false,name}={}){
+  // Use the checked handle for chmod; never follow a final-component symlink.
+  const handle=await open(file,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK|(directory?constants.O_DIRECTORY:0));
+  try{
+    const info=await handle.stat();
+    if(directory?!info.isDirectory():!info.isFile())throw Error('Thumbnail output must be a regular '+(directory?'directory':'file'));
+    if(name && hash(await handle.readFile())+'.png'!==name)throw Error('Existing thumbnail batch differs');
+    await handle.chmod(directory?0o755:0o644);
+  }finally{await handle.close();}
+}
 
 export async function thumbnailAsset(url,resourceType,assetRoot){
   assetRoot=await realpath(assetRoot);url=new URL(url);
@@ -108,10 +120,16 @@ export async function captureLibraryThumbnails({entries,library,output,assetRoot
     capture=await createThumbnailCapture(assetRoot);const images=[];
     for(const entry of entries){const result=await capture.capture(entry),name=hash(result.png)+'.png';await writeFile(path.join(stage,name),result.png,{flag:'wx'}).catch(error=>{if(error.code!=='EEXIST')throw error;});images.push({name});}
     const batch=hash(JSON.stringify(images.map((image,i)=>[library.diagrams[i].revision,image.name]))),target=path.join(directory,batch);
+    // mkdtemp deliberately starts private (0700). Publish readable files and
+    // traversable directories regardless of the build process's umask.
+    for(const image of images)await staticPermissions(path.join(stage,image.name),{name:image.name});
+    await staticPermissions(stage,{directory:true});
+    await staticPermissions(directory,{directory:true});
     try{await rename(stage,target);}catch(error){
       if(!['EEXIST','ENOTEMPTY'].includes(error.code))throw error;
-      if((await lstat(target)).isSymbolicLink())throw Error('Thumbnail batch must not be a symlink');
-      for(const image of images){const file=path.join(target,image.name);if((await lstat(file)).isSymbolicLink() || hash(await readFile(file))+'.png'!==image.name)throw Error('Existing thumbnail batch differs');}
+      const info=await lstat(target);if(info.isSymbolicLink() || !info.isDirectory())throw Error('Thumbnail batch must be a real directory');
+      for(const image of images)await staticPermissions(path.join(target,image.name),{name:image.name});
+      await staticPermissions(target,{directory:true});
     }
     images.forEach((image,i)=>{library.diagrams[i].preview={version:1,url:'library-thumbnails/'+batch+'/'+image.name,revision:library.diagrams[i].revision,width:WIDTH,height:HEIGHT};});
   }finally{if(capture)await capture.close();await rm(stage,{recursive:true,force:true});}

@@ -1,7 +1,7 @@
 import {test,expect} from '../helpers/test.mjs';
 import {createThumbnailCapture,thumbnailAsset} from '../../canon/thumbnails.mjs';
 import {publishLibrary} from '../../canon/library.mjs';
-import {mkdir,readFile,writeFile,rm,symlink,readdir} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,rm,symlink,readdir,stat,chmod} from 'node:fs/promises';
 import path from 'node:path';
 
 const graph=title=>({nodes:{a:{title},b:{title:'Worker'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]});
@@ -37,9 +37,19 @@ test('real opening-view captures preserve panel-only content, hidden graph, firs
 test('publication commits image batches before the index, preserves sources, and fails atomically on unreadable images',async({server},info)=>{
   const f=await setup(server),raw={page:{title:'Home',canon:{version:1,id:'home',kind:'canonical',owner:'group:default/home'},sections:[{heading:'Home',diagram:{nodes:{},rows:[[]],edges:[],panels:[home()],primaryPanel:'home'}}]}};
   await writeFile(f.file,JSON.stringify(raw));const before=await readFile(f.file),options={diagramsDir:path.dirname(f.file),output:f.output,thumbnails:true};
-  const library=await publishLibrary(options),index=await readFile(f.output),preview=library.diagrams[0].preview,image=await readFile(path.join(path.dirname(f.output),preview.url));
+  let library;const previousMask=process.umask(0o077);
+  try{library=await publishLibrary(options);}finally{process.umask(previousMask);}
+  const index=await readFile(f.output),preview=library.diagrams[0].preview,image=await readFile(path.join(path.dirname(f.output),preview.url));
   expect(preview.revision).toBe(library.diagrams[0].revision);expect(await readFile(f.file)).toEqual(before);expect(image.readUInt32BE(16)).toBe(960);await info.attach('published-home',{body:image,contentType:'image/png'});
+  const imageFile=path.join(path.dirname(f.output),preview.url),batchDir=path.dirname(imageFile),imageDir=path.dirname(batchDir);
+  for(const directory of [imageDir,batchDir])expect((await stat(directory)).mode&0o777).toBe(0o755);
+  expect((await stat(imageFile)).mode&0o777).toBe(0o644);
+  // Matching batches from an earlier private publication must become readable too.
+  for(const directory of [imageDir,batchDir])await chmod(directory,0o700);
+  await chmod(imageFile,0o600);
   const again=await publishLibrary(options);expect(again).toEqual(library);
+  for(const directory of [imageDir,batchDir])expect((await stat(directory)).mode&0o777).toBe(0o755);
+  expect((await stat(imageFile)).mode&0o777).toBe(0o644);
   // Passes structural validation but cannot decode as a real image.
   raw.page.sections[0].diagram.panels.push({id:'broken',type:'image',title:'Broken',src:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB',alt:'Broken test'});
   await writeFile(f.file,JSON.stringify(raw));await expect(publishLibrary(options)).rejects.toThrow(/Thumbnail capture failed/);
@@ -50,7 +60,12 @@ test('publication commits image batches before the index, preserves sources, and
   await expect.poll(async()=>(await readdir(path.join(path.dirname(f.output),'library-thumbnails'))).some(n=>n.startsWith('.stage-'))).toBe(true);
   const edited=JSON.parse(before);edited.page.title='Changed during capture';await writeFile(f.file,JSON.stringify(edited));
   expect((await pending).message).toContain('Source changed during thumbnail publication');expect(await readFile(f.output)).toEqual(index);
-
+  // Reusing a batch must not chmod an image symlink's destination.
+  await writeFile(f.file,before);
+  const outside=path.join(f.root,'outside.png');await writeFile(outside,image,{mode:0o600});
+  await rm(imageFile);await symlink(outside,imageFile);
+  await expect(publishLibrary(options)).rejects.toThrow();
+  expect((await stat(outside)).mode&0o777).toBe(0o600);expect(await readFile(f.output)).toEqual(index);
 });
 
 test('capture asset guard refuses outbound, code, traversal and symlink escapes',async({server})=>{

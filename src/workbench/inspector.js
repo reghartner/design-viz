@@ -279,10 +279,15 @@ function nodeColorControl(value,commit,emptyLabel){
     select.setAttribute('aria-label','Icon color');show(current || 'cmd');
     wrap.appendChild(swatch);wrap.appendChild(select);return wrap;
   }
-/* The Icon row holds the icon picker and, beside it, the icon's color (#610). */
-function iconRowControl(iconPicker,colorControl){
+/* The Icon row holds the icon picker and, beside it, the icon's color (#610).
+   Two controls cannot share one <label>, so this row is a group: the caption
+   names the group and each control carries its own accessible name. */
+function iconRow(iconPicker,colorControl){
+    var row=document.createElement('div');row.className='frow';row.setAttribute('role','group');row.setAttribute('aria-label','Icon');
+    var lab=document.createElement('span');lab.className='flab';lab.textContent='Icon';lab.setAttribute('aria-hidden','true');
     var wrap=document.createElement('div');wrap.className='icon-row-controls';
-    wrap.appendChild(iconPicker);wrap.appendChild(colorControl);return wrap;
+    wrap.appendChild(iconPicker);wrap.appendChild(colorControl);
+    row.appendChild(lab);row.appendChild(wrap);return row;
   }
 /* Node style: a hidden select carries the token and the commit; the visible
    button opens a modal of rendered samples (#610). */
@@ -550,8 +555,8 @@ function nodeForm(val, ctx){
     return [
       frow('Name', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
       frow('Subtitle', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
-      frow('Icon', iconRowControl(iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
-        nodeColorControl(val.tint,function(v){return commitSimple('tint',v==null?null:JSON.stringify(v));}))),
+      iconRow(iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
+        nodeColorControl(val.tint,function(v){return commitSimple('tint',v==null?null:JSON.stringify(v));})),
       frow('Node style', nodeStyleControl(val.style,function(v){return commitSimple('style',v==null?null:JSON.stringify(v));})),
       frow('Placement', floatControl),
       frow('Group', groupControl(val.group, function(v){
@@ -2469,9 +2474,9 @@ function renderMultiInspector(multiSel){
       }, true,true);
       bulkIcon.setAttribute('data-icon-default-label','Use default icons');
       if(mixedIcons)bulkIcon.setAttribute('data-icon-current-label','Mixed icons');
-      form.appendChild(frow('Icon',iconRowControl(iconPickerControl(bulkIcon),nodeColorControl(null,function(v){
+      form.appendChild(iconRow(iconPickerControl(bulkIcon),nodeColorControl(null,function(v){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
-      },'Choose a color'))));
+      },'Choose a color')));
       form.appendChild(frow('Node style', nodeStyleControl(null,function(v){
         return applyBulkField('style', v == null ? null : JSON.stringify(v));
       },'Choose a style')));

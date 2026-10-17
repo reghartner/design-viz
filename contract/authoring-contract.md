@@ -543,16 +543,11 @@ with no `title` shows its id:
   shield = auth, server = backend service, terminal = console/UI).
 - `tint` — icon-chip color role, one of: `cmd auth data mqtt dev`. Default
   `cmd`. Convention: `cmd` = main-path services, `auth` = auth/signing,
-  `data` = stores, `mqtt` = brokers, `dev` = end devices. Workbench edits it
-  as **Icon color**, beside the icon picker.
+  `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `style` — optional preset node style, one of: `slate rose ember amber moss
-  teal sky indigo violet magenta sand ink`. One token sets the card's border,
-  background, title and subtitle colors together; every preset is readable
-  (WCAG AA) in every skin, with a pale variant on light skins and a deep
-  variant on Aurora, Terminal and Blueprint. Omit it for the skin's default
-  card. The icon keeps its own `tint`. Workbench edits it as **Node style**
-  (a modal of rendered samples). Unknown tokens warn and render unstyled.
-  See [node styles](../docs/node-styles.md).
+  teal sky indigo violet magenta sand ink`. One token colors the card's
+  border, background and text, readable in every skin; omit it for the skin
+  card. Unknown tokens warn. See [node styles](../docs/node-styles.md).
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
 - `locked` — optional boolean. `true` pins this ordinary graph node's center at

@@ -3319,6 +3319,13 @@ body.sk-editorial .errbox{
    Narrative state is a class on the node group; authored specs never supply
    these colors. Tone owns the card/title hue; step focus composes a stronger
    tone-colored outline and halo without replacing that hue. */
+/* Node style presets (#610): title and subtitle colors. Placed before the step
+   tone rules so a tone's title color (same specificity, later) wins; the
+   skins' own text rules are earlier or less specific, so the preset wins
+   over them. The card paint and the preset values live at the end of this
+   sheet. */
+.docview .node.node-styled .t1{fill:var(--ns-ink);}
+.docview .node.node-styled .t2{fill:var(--ns-sub);}
 .node.tone-pulse .card{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out;}
 @keyframes dvnodepulse{
   0%{transform:scale(1);}
@@ -3982,8 +3989,8 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-sand{--ns-bg:#3B2A18;--ns-line:#BF966A;--ns-ink:#F7F1EA;--ns-sub:#D3C1AE;}
 .sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-ink{--ns-bg:#F2F4F8;--ns-line:#9AA5B8;--ns-ink:#161B26;--ns-sub:#3E4756;}
 .docview .node.node-styled .card{fill:var(--ns-bg);stroke:var(--ns-line);}
-.docview .node.node-styled .t1{fill:var(--ns-ink);}
-.docview .node.node-styled .t2{fill:var(--ns-sub);}
+/* The title and subtitle paint sits earlier in this sheet, before the step tone
+   rules, so a tone's title color still wins on a styled card. */
 /* A lit step must read on every preset even when the skin's lit stroke color
    sits close to the preset's own border (Pastel's blue on Indigo): styled
    cards thicken the lit stroke as well. The attribute raises specificity above
@@ -3991,5 +3998,6 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .docview .stepmode .node.node-styled.lit[data-dv-style] .card{stroke-width:2.6;}
 /* Ink inverts to a light card on dark skins, where the skins' pale lit strokes
    (white on Blueprint, bright green on Terminal) would vanish; a dark lit stroke
-   keeps the step highlight visible on that one card. */
-.sk-aurora:not(.sk-editorial):not(.sk-pastel) .docview .stepmode .node.ns-ink.lit .card{stroke:#1F2430;}
+   keeps the step highlight visible on that one card. A step tone still replaces
+   it, like every other preset color. */
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .docview .stepmode .node.ns-ink.lit:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .card{stroke:#1F2430;}

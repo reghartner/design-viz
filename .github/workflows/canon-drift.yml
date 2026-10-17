@@ -24,11 +24,11 @@ jobs:
     timeout-minutes: 15
     steps:
       # Never check out a PR head. Source repositories are read as text by API.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Generate the static backend before importing Canon tools
@@ -68,7 +68,7 @@ jobs:
         run: node tools/canon/github.mjs "$FLOWVIEW_COMMAND"
       - name: Save scan evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flowview-drift-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

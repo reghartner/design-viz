@@ -22,8 +22,8 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -38,7 +38,7 @@ jobs:
         run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
       - name: Required browser contracts (serialized shard, no retries or missing-browser skips)
         run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs --shard=${{ matrix.shard }}/12
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser-contract-results-${{ matrix.shard }}-of-12
@@ -54,15 +54,15 @@ jobs:
     if: always()
     needs: browser-contract-shards
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: tools/browser-tests/package-lock.json
       - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
       - name: Download every shard report and diagnostic
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: browser-contract-results-*-of-12
           path: tools/browser-tests/shard-results
@@ -79,7 +79,7 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_FILE: merged-report.json
         run: npx playwright merge-reports --reporter=html,json ./all-blob-reports
       - name: Upload merged report and all shard diagnostics
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser-contract-results
@@ -98,8 +98,8 @@ jobs:
   backstage-rehearsal:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: python3 tools/build.py --runtime-only
@@ -108,8 +108,8 @@ jobs:
   catalog-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -124,8 +124,8 @@ jobs:
       run:
         working-directory: apps/backstage
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -142,7 +142,7 @@ jobs:
           # Same as npm pack here unless company/company.json or the
           # FLOWVIEW_PACKAGE_* variables set a fork's package identity.
           node ../../tools/backstage-pack.mjs pack --ignore-scripts --pack-destination release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: backstage-plugin-package
           path: apps/backstage/release/*.tgz
@@ -154,15 +154,15 @@ jobs:
       run:
         working-directory: apps/confluence
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/confluence/package-lock.json
       - run: npm ci --no-fund --no-audit
       - run: npm run verify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: confluence-viewer-assets
           path: apps/confluence/static/viewer/
@@ -170,8 +170,8 @@ jobs:
   python-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Rebuild HTML before tests
@@ -179,7 +179,7 @@ jobs:
       - name: Run Python tests with structured diagnostics
         run: python3 tools/run_python_tests.py --report "${{ runner.temp }}/python-test-results.json"
       - name: Upload Python test report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: python-test-results
@@ -190,10 +190,10 @@ jobs:
   node-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
       - name: Rebuild HTML before tests
         run: python3 tools/build.py
       # *.test.js glob keeps local (any node >=20) and CI invocations identical;
@@ -205,7 +205,7 @@ jobs:
           --test-reporter=junit --test-reporter-destination="${{ runner.temp }}/node-test-results.xml"
           tests/*.test.js
       - name: Upload Node test report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: node-test-results
@@ -216,8 +216,8 @@ jobs:
   examples-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Generate HTML and backend runtime from source
@@ -253,7 +253,7 @@ jobs:
           curl -fsS http://localhost:8080/workbench/catalog.json -o /tmp/catalog.json
           cmp /tmp/catalog.json workbench/catalog.json
       - name: Upload portable viewer and workbench
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flowview-html
           path: |

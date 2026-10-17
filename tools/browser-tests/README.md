@@ -25,7 +25,7 @@ Playwright's test-level sharding to keep large spec files from becoming
 indivisible long poles, while every shard retains one worker because its
 checkout's generated fixtures share fixed paths. Each job uses Ubuntu 24.04,
 explicitly selects Node 24, and installs the Chromium build pinned by Playwright
-1.63.0's lockfile.
+1.64.1's lockfile.
 `fail-fast` is disabled so failures do not discard other shards' diagnostics.
 The stable `browser-contracts` job merges their blob reports, uploads the merged
 HTML/JSON plus each shard's traces and screenshots, and fails unless every shard

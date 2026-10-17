@@ -54,10 +54,10 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
   if(!entries.length)return null;
   var pop=document.createElement('div');pop.className='nbackpop wire-contract-preview';pop.id=prefix+'-wire-contract';
   pop.setAttribute('popover','manual');pop.setAttribute('role','dialog');pop.hidden=true;host.appendChild(pop);
-  var markers=[],active=null,pinned=false,closeTimer=null,retired=false,suppressFocus=false;
+  var markers=[],active=null,pinned=false,closeTimer=null,retired=false,suppressFocus=false,generation=0,visibilityObserver=null;
   function cancelClose(){if(closeTimer!=null)clearTimeout(closeTimer);closeTimer=null;}
   function close(focus){
-    cancelClose();var previous=active;active=null;pinned=false;
+    cancelClose();generation++;if(visibilityObserver){visibilityObserver.disconnect();visibilityObserver=null;}var previous=active;active=null;pinned=false;
     if(previous){previous.setAttribute('aria-expanded','false');previous.setAttribute('aria-pressed','false');}
     document.removeEventListener('keydown',escape,true);document.removeEventListener('pointerdown',outsideSection,true);document.removeEventListener('focusin',outsideSection,true);document.removeEventListener('scroll',position,true);window.removeEventListener('resize',position);
     if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;
@@ -100,12 +100,37 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
     cancelClose();
     if(active!==marker){
       close(false);active=marker;
-      pop.innerHTML='<div class="wire-contract-heading"><span>On this wire</span><button type="button" aria-label="Close wire contract">×</button></div>'+contractCardHTML(entry.record.value,null,entry.record);
+      var payload=entry.jsonContract?JSON.stringify(entry.jsonContract.json,null,2):null;
+      pop.innerHTML='<div class="wire-contract-heading"><div class="wire-contract-caption"><span>'+esc(entry.jsonContract && entry.jsonContract.title || 'On this wire')+'</span>'+
+        (entry.jsonContract?'<small>'+esc(entry.edge)+'</small>':'')+'</div>'+
+        (entry.jsonContract?'<button type="button" class="wire-contract-copy">Copy JSON</button>':'')+
+        '<button type="button" class="wire-contract-close" aria-label="Close wire contract">×</button></div>'+
+        (entry.jsonContract?'<pre class="wire-contract-json" tabindex="0" aria-label="Contract JSON">'+esc(payload)+'</pre><div class="wire-contract-context">'+(entry.overridden?'Step override':'Connection default')+'</div><div role="status" aria-live="polite"></div>':contractCardHTML(entry.record.value,null,entry.record));
+      if(entry.jsonContract){
+        var copy=pop.querySelector('.wire-contract-copy'),status=pop.querySelector('[role="status"]'),version=generation,copying=false;
+        copy.addEventListener('click',function(){
+          if(copying)return;
+          copying=true;copy.setAttribute('aria-disabled','true');status.textContent='Copying…';
+          function finish(ok){
+            if(retired || generation!==version || active!==marker)return;
+            copying=false;copy.setAttribute('aria-disabled','false');status.textContent=ok?'JSON copied.':'Copy unavailable. Select the JSON below and copy it manually.';
+            position();
+          }
+          try{
+            if(!navigator.clipboard || !navigator.clipboard.writeText){finish(false);return;}
+            Promise.resolve(navigator.clipboard.writeText(payload)).then(function(){finish(true);},function(){finish(false);});
+          }catch(error){finish(false);}
+        });
+      }
       pop.setAttribute('aria-label',entry.record.value.title || 'Wire contract');
-      pop.querySelector('button').addEventListener('click',function(){close(true);});
+      pop.querySelector('.wire-contract-close').addEventListener('click',function(){close(true);});
       setFragmentStep(pop,stepIndex,true);
       pop.hidden=false;if(pop.showPopover)pop.showPopover();
       active.setAttribute('aria-expanded','true');
+      // Static diagrams have no stepper onHide hook. Retire their top-layer
+      // preview as soon as navigation hides any containing section/tab.
+      visibilityObserver=new MutationObserver(function(){if(active && !active.getClientRects().length)close(false);});
+      for(var ancestor=host;ancestor;ancestor=ancestor.parentElement)visibilityObserver.observe(ancestor,{attributes:true,attributeFilter:['hidden','style','class']});
       document.addEventListener('keydown',escape,true);document.addEventListener('pointerdown',outsideSection,true);document.addEventListener('focusin',outsideSection,true);document.addEventListener('scroll',position,true);window.addEventListener('resize',position);
     }
     if(pin){pinned=true;active.setAttribute('aria-pressed','true');if(onPin)onPin();}
@@ -130,8 +155,8 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
     marker.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
     marker.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);});
     marker.addEventListener('keydown',function(ev){
-      if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);pop.querySelector('button').focus({preventScroll:true});}
-      else if(ev.key==='Tab' && !ev.shiftKey && active===marker){ev.preventDefault();pop.querySelector('button').focus({preventScroll:true});}
+      if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);pop.querySelector('.wire-contract-copy,.wire-contract-close').focus({preventScroll:true});}
+      else if(ev.key==='Tab' && !ev.shiftKey && active===marker){ev.preventDefault();pop.querySelector('.wire-contract-copy,.wire-contract-close').focus({preventScroll:true});}
     });
     board.svg.appendChild(marker);markers.push(marker);
   });

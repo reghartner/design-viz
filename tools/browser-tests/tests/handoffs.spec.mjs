@@ -56,6 +56,49 @@ test('native site handoffs route through the host and offer rejected targets as 
  await page.evaluate(()=>viewer.destroy());await expect(host).toBeEmpty();
 });
 
+/* #557 reader handoff states and destination chooser placement.
+   row | fixture | assertion (scoped) | rejects
+   1 choose caption | lake: claudeUrl only, host 'site' | lake .handoff-caption text is exactly 'OPEN DIAGRAM…' | 'CHOOSE DESTINATION' authoring-style label
+   2 sibling captions | push: resolved site link; action: no destination | push caption 'OPEN DIAGRAM ↗', action caption 'DESTINATION UNAVAILABLE' | a caption change that also rewrites link/unavailable labels
+   3 unavailable look | action vs push + lake | action .card computed stroke-dasharray != none and its group cursor 'not-allowed'; push and lake cards 'none' with cursor 'pointer' | unavailable card styled exactly like a reachable one
+   4 unavailable announced | action | action group is role=img named '… Diagram destination unavailable …', exposes no link/button | an unavailable endpoint announced as an action
+   5 chooser closed before | lake | no 'Diagram destinations' dialog before the click | a chooser opened by mounting
+   6 chooser adjacent | lake (rightmost column) | dialog rect does not overlap the lake card and its edge gap to the card is <= 16px | the fixed bottom-right corner panel
+   7 chooser in bounds | lake's .board | dialog rect lies inside the board rect that contains lake | a panel placed right of the node, overflowing the diagram */
+test('handoff captions name the reader action, unavailable endpoints look disabled and the chooser opens beside its node',async({page,server})=>{
+ await writeFile(path.join(server.root,'handoff-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'handoff-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./handoff-native.js";window.mountHandoffs=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/handoff-native.html');await page.waitForFunction(()=>!!window.mountHandoffs);
+ await page.evaluate(({raw,origin})=>{
+  delete raw.page.sections[0].diagram.nodes.action.handoff.siteBaseUrl;
+  raw.page.sections[0].diagram.nodes.lake.handoff.claudeUrl='https://claude.ai/artifact/lake';
+  mountHandoffs(document.querySelector('#host'),raw,{handoffHost:'site',resolveDiagramLink(ref){
+   if(ref.spec==='doorbell-push')return origin+'/push.html';
+   throw Error('Unknown destination');
+  }});
+ },{raw:localSpec(server.origin),origin:server.origin});
+ const host=page.locator('#host'),node=key=>host.locator('[data-dv-node="'+key+'"]');
+ await expect.soft(node('lake').locator('.handoff-caption')).toHaveText('OPEN DIAGRAM…');
+ await expect.soft(node('push').locator('.handoff-caption')).toHaveText('OPEN DIAGRAM ↗');
+ await expect.soft(node('action').locator('.handoff-caption')).toHaveText('DESTINATION UNAVAILABLE');
+ const look=key=>node(key).locator('.card').evaluate(card=>({dash:getComputedStyle(card).strokeDasharray,cursor:getComputedStyle(card.closest('.handoff-link,.handoff-unavailable')).cursor}));
+ const unavailable=await look('action');
+ expect.soft(unavailable.dash).not.toBe('none');expect.soft(unavailable.cursor).toBe('not-allowed');
+ for(const key of ['push','lake'])expect.soft(await look(key),key).toEqual({dash:'none',cursor:'pointer'});
+ await expect.soft(node('action').getByRole('img',{name:/Diagram destination unavailable/})).toHaveCount(1);
+ await expect.soft(node('action').locator('a,[role="button"]')).toHaveCount(0);
+ const chooser=host.getByRole('dialog',{name:'Diagram destinations'});
+ await expect(chooser).toHaveCount(0);
+ await node('lake').locator('.handoff-link').click();
+ await expect(chooser).toBeVisible();
+ const card=await node('lake').locator('.card').boundingBox(),panel=await chooser.boundingBox();
+ const board=await host.locator('.board:has([data-dv-node="lake"])').boundingBox();
+ const gapX=Math.max(0,panel.x-(card.x+card.width),card.x-(panel.x+panel.width)),gapY=Math.max(0,panel.y-(card.y+card.height),card.y-(panel.y+panel.height));
+ expect.soft(gapX>0 || gapY>0,'chooser does not cover the clicked node').toBe(true);
+ expect.soft(Math.hypot(gapX,gapY),'chooser edge gap to the clicked node').toBeLessThanOrEqual(16);
+ expect.soft({left:panel.x>=board.x-.5,top:panel.y>=board.y-.5,right:panel.x+panel.width<=board.x+board.width+.5,bottom:panel.y+panel.height<=board.y+board.height+.5},'chooser inside the diagram').toEqual({left:true,top:true,right:true,bottom:true});
+});
+
 test('workbench handoff body selects for editing, fields apply atomically and Undo restores source',async({page,server})=>{
  const source=JSON.stringify(localSpec(server.origin),null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);

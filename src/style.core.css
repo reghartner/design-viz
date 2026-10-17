@@ -587,7 +587,8 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .generated-from a:hover{color:#2A33A0;}
 /* presenter mode (C1) */
 .presentbtn{float:right; margin-top:4px;}
-.presenting .presentbtn{position:fixed; top:10px; right:12px; z-index:9; float:none;}
+/* below the reader navigation (its bottom is published on .docview), or the Legend takes Exit's clicks */
+.presenting .presentbtn{position:fixed; top:var(--flowview-navigation-bottom,10px); right:12px; z-index:9; float:none;}
 .presenting .docview{max-width:1400px;}
 .presenting .stepline{font-size:16px;}
 .presenting .stepline b{font-size:16px;}
@@ -3820,6 +3821,9 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
 .node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
 .node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
+/* Unreachable endpoints read as disabled whatever the step highlight. */
+.node-handoff .handoff-unavailable{cursor:not-allowed;}
+.node-handoff .handoff-unavailable .card{stroke-dasharray:4 3;fill-opacity:.6;}
 
 /* Authored step-circle colors intentionally override every skin, hover and path
    palette. Keep the current-step ring, keyboard focus and shared-step opacity. */
@@ -3880,7 +3884,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .wire-contract-preview{display:block;font:400 12px/1.5 'IBM Plex Sans',sans-serif;position:fixed;inset:auto;margin:0;z-index:10000;box-sizing:border-box;width:440px;max-width:calc(100vw - 16px);max-height:min(460px,calc(100vh - 16px));overflow:auto;padding:10px;border:1px solid var(--muted,#68788f);border-radius:12px;box-shadow:0 12px 40px #0003;}
 .wire-contract-preview[hidden]{display:none;}
 .wire-contract-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;}
-.wire-contract-heading button{cursor:pointer;border:0;border-radius:5px;background:transparent;color:inherit;font-size:22px;width:30px;height:30px;}
+.wire-contract-heading .wire-contract-close{cursor:pointer;border:0;border-radius:5px;background:transparent;color:inherit;font-size:22px;width:30px;height:30px;}
 .wire-contract-heading button:focus-visible{outline:2px solid var(--acc,#38bdf8);}
 .wire-contract-preview .ctcard{margin:4px 0 0;overflow-wrap:anywhere;}
 .wire-contract-preview .cttable{table-layout:fixed;}
@@ -3921,5 +3925,12 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
  body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .t2{fill:var(--fl-muted);}
 }
 
-.handoff-destinations{position:fixed;z-index:10000;inset:auto 24px 24px auto;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
+.handoff-destinations{position:fixed;z-index:10000;left:24px;top:24px;box-sizing:border-box;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
 .handoff-destinations p{flex-basis:100%;margin:0 0 8px;font:14px/1.5 system-ui,sans-serif;}
+
+.wire-contract-caption{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere;}
+.wire-contract-caption small{display:block;font-weight:400;color:var(--dfaint,#68788f);}
+.wire-contract-context{color:var(--dfaint,#68788f);font-size:11px;}
+.wire-contract-preview [role=status]:not(:empty){margin-top:8px;}
+.wire-contract-copy{flex:none;cursor:pointer;padding:5px 10px;border:1px solid currentColor;border-radius:6px;color:inherit;background:transparent;font:inherit;}
+.wire-contract-json{font:12px/1.6 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;margin:8px 0;padding:10px;background:#80808012;border-radius:6px;}

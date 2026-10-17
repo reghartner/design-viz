@@ -4,7 +4,7 @@
 
    Design (approved "presenter cinema" mockups): dark scrim with a bright
    ring-lit hole over the real control, subtitle narration in a corner card,
-   a segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
+   a segment timeline top-center, Back/Next, one fixed "Skip tour", keyboard hints. The hole is
    deliberately click-through — the copy invites trying the spotlit control —
    so the dialog is non-modal (role=dialog without aria-modal).
 
@@ -351,10 +351,10 @@ function wireTour(ctl, view, win, config, options){
     var scrim = el('div', 'dv-tour-scrim');
     overlay.appendChild(scrim);
     var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
-    /* a mouse way out that never waits for the card: fixed top-right from
-       the first frame, above the click blockers, never moved */
-    var exit = button('dv-tour-exit', 'Skip tour \u2715', function(){ finish(); });
-    exit.setAttribute('aria-label', 'Skip the tour');
+    /* the tour's only skip control, chooser and steps alike: a mouse way
+       out that never waits for the card, fixed top-left from the first
+       frame, above the click blockers, never moved */
+    var exit = button('dv-tour-exit', 'Skip tour', function(){ finish(); });
     overlay.appendChild(exit);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
     var ui = el('div', 'dv-tour-ui');
@@ -369,8 +369,7 @@ function wireTour(ctl, view, win, config, options){
     var controls = el('div', 'dv-tour-controls');
     var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
     var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
-    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
-    controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
+    controls.appendChild(back); controls.appendChild(next);
     var practice=el('div','dv-tour-practice');
     var replayExample=button('dv-tour-skip dv-tour-replay-example','Replay example',function(){go(at);});
     var tryControls=button('dv-tour-skip dv-tour-try','Try the controls',function(){
@@ -387,7 +386,7 @@ function wireTour(ctl, view, win, config, options){
     parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
              rings: rings, glowId: glowId, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
-             back: back, next: next, skip: skip, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
+             back: back, next: next, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
   }
   /* One geometry, one render path. Every highlight is a single shape
      object {x, y, width, height, rx}; that object writes the mask hole AND
@@ -851,10 +850,11 @@ function wireTour(ctl, view, win, config, options){
       row.appendChild(b);
     });
     parts.chooser.appendChild(row);
-    var foot = el('div', 'dv-tour-choice-foot');
-    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
-    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(); }));
-    parts.chooser.appendChild(foot);
+    if (copy.note) {
+      var foot = el('div', 'dv-tour-choice-foot');
+      foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
+      parts.chooser.appendChild(foot);
+    }
     var first = row.querySelector('button');
     if (first) first.focus();
   }

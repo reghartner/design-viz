@@ -355,6 +355,62 @@ test('Skip returns focus to where the reader was',async({page,server})=>{
   await expect(page.locator('.dv-tour-replay')).toBeFocused();
 });
 
+// #563: one skip control, one label ("Skip tour"), chooser and steps alike.
+// row | fixture | assertion (scoped) | rejects
+// 1 chooser has one skip | standalone #tour=1, chooser shown | buttons inside .dv-tour whose name or text matches /skip/i: count 1, and it is .dv-tour-exit | chooser foot "Skip" beside the pill
+// 2 chooser label | same | that button's accessible name AND textContent are exactly "Skip tour" | "Skip tour ✕" text, "Skip the tour" aria-label, "Skip"
+// 3 every step has one skip | "Show me both" (the full walkthrough), walked with real Next clicks through EVERY step to the Done step | on each step the /skip/i button count inside .dv-tour is 1, and it is .dv-tour-exit | step card "Skip tour" beside the pill, on any step
+// 4 step label | same, every step | name AND textContent exactly "Skip tour" | the ✕ glyph or a different step-card wording
+// 5 same control, same style | chooser vs every step | the skip control is the same node class with identical computed font/colour/background | a chooser-only or step-only restyle
+// 6 it still exits | the final (Done) step | real click on the control hides .dv-tour (visible before) | a relabel that drops the handler
+// 7 no other exit, whatever its label | chooser, every step | the EXACT ordered inventory (class|text) of visible buttons inside .dv-tour: chooser = the exit plus the three persona choices; each step = the exit, optional Replay example, optional Try the controls (each at most once), then exactly Back and Next/Done | a retained chooser/card exit under any label or class on any step, e.g. "Dismiss", "End tour", a second "Back" or "Done"
+const skipControls=page=>page.locator('.dv-tour button').filter({visible:true,hasText:/skip/i})
+  .or(page.locator('.dv-tour').getByRole('button',{name:/skip/i}));
+// label-independent inventory: every visible overlay button, class|text, in DOM order
+const visibleButtons=page=>page.locator('.dv-tour button').evaluateAll(els=>els
+  .filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden')
+  .map(e=>e.className+'|'+e.textContent.trim()));
+const skipLook=loc=>loc.evaluate(e=>{const s=getComputedStyle(e);return [e.className,s.font,s.color,s.backgroundColor,s.borderTopStyle].join('|');});
+test('every skip control reads "Skip tour": one control on the chooser and on steps',async({page,server})=>{
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  const atChooser=skipControls(page);
+  await expect(atChooser).toHaveCount(1);
+  await expect(atChooser).toHaveClass(/\bdv-tour-exit\b/);
+  await expect(atChooser).toHaveAccessibleName('Skip tour');
+  await expect(atChooser).toHaveText('Skip tour');
+  const chooserLook=await skipLook(atChooser);
+  await expect.poll(()=>visibleButtons(page)).toEqual(['dv-tour-exit|Skip tour',
+    'dv-tour-choice|The user experienceReading views, story steps, and live panels.',
+    'dv-tour-choice|The engineeringCalls, branching paths, source links, and room to explore.',
+    'dv-tour-choice|Show me bothThe full walkthrough, at your pace.']);
+  await page.locator('.dv-tour-choice').nth(2).click(); // Show me both: every step
+  await expect(page.locator('.dv-tour-ui')).toBeVisible();
+  const stepInventory=/^dv-tour-exit\|Skip tour(,dv-tour-skip dv-tour-replay-example\|Replay example)?(,dv-tour-skip dv-tour-try\|Try the controls)?,dv-tour-btn dv-tour-back\|Back,dv-tour-btn dv-tour-next\|(Next|Done)$/;
+  const narration=page.locator('.dv-tour-ui .dv-tour-narration');
+  const atStep=skipControls(page);
+  let steps=0;
+  for(;steps<40;steps++){
+    await expect(narration).not.toHaveText('');
+    await expect(atStep).toHaveCount(1);
+    await expect(atStep).toHaveClass(/\bdv-tour-exit\b/);
+    await expect(atStep).toHaveAccessibleName('Skip tour');
+    await expect(atStep).toHaveText('Skip tour');
+    expect(await skipLook(atStep)).toBe(chooserLook);
+    await expect.poll(async()=>(await visibleButtons(page)).join(',')).toMatch(stepInventory);
+    if(await page.locator('.dv-tour-next').textContent()==='Done')break;
+    const was=await narration.textContent();
+    await page.locator('.dv-tour-next').click();
+    await expect(narration).not.toHaveText(was);
+  }
+  expect(steps).toBeGreaterThan(3);
+  await expect(page.locator('.dv-tour-next')).toHaveText('Done');
+  await expect(page.locator('.dv-tour')).toBeVisible();
+  await atStep.click();
+  await expect(page.locator('.dv-tour')).toBeHidden();
+});
+
 async function walkToDrill(page,server){
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/tour-drill.html#tour=1');

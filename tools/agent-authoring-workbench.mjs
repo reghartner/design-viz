@@ -294,10 +294,9 @@ export async function createSession(page, outDir, options = {}) {
     }, 'listener readiness and previous reply', 15000);
     const previous = await readJson(path.join(sessionPath, 'request.json'));
     const level = page.locator('#folder-agent-level');
-    // The editor keeps next-message settings collapsed between sends. Use the
-    // same visible disclosure as a person before interacting with its select.
-    if (!await level.isVisible()) await page.locator('#folder-agent-detail-summary').click();
-    await level.selectOption(control.technicalLevel);
+    // The Agent window has no per-message detail control; the setup focus fills this
+    // hidden select. The broker sets it directly to vary detail between turns.
+    await level.selectOption(control.technicalLevel, {force: true});
     await page.locator('#folder-agent-input').fill(control.text);
     await page.locator('#folder-agent-send').click();
     const request = await waitFor(async () => {

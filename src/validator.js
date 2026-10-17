@@ -406,6 +406,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
       errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
@@ -458,6 +459,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
     var failures = stepFailures(st);
+    if(st && st.contracts!=null){
+      var CP=DP+'.steps['+ti+'].contracts';
+      if(!specObject(st.contracts))warnings.push(CP+': expected an object mapping edge keys to JSON contracts — ignored');
+      else Object.keys(st.contracts).forEach(function(key){
+        if(!Object.prototype.hasOwnProperty.call(edgeKeys,key) || keys.indexOf(key)<0)warnings.push(CP+'.'+key+': edge must be declared and used by this step — skipped');
+        if(st.contracts[key]!==null && !validJsonContract(st.contracts[key]))warnings.push(CP+'.'+key+': expected {json: JSON value, title?: string} or null — skipped');
+      });
+    }
     if (st && st.failures != null){
       var FP = DP + '.steps[' + ti + '].failures';
       if (typeof st.failures !== 'object' || Array.isArray(st.failures)) errors.push(FP + ': expected an object mapping edge keys to dropped or blocked');
@@ -541,6 +550,8 @@ function validate(page){
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
+  validateDocumentDescription(page.description,'page.description',errors);
+  validateDocumentTags(page.tags,'page.tags',errors);
   var blocks = blocksOf(page);
   if (!blocks.length){
     errors.push('page.blocks: required — provide at least one section or tabs block');

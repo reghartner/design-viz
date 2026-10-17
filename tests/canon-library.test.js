@@ -199,3 +199,100 @@ test('published URLs address authored sources with encoded filenames',async t=>{
   assert.equal(published,file);assert.deepEqual(JSON.parse(fs.readFileSync(published)),JSON.parse(fs.readFileSync(file)));
   assert.ok(!JSON.stringify(library).includes('rows'));assert.ok(!JSON.stringify(library).includes('codeRefs'));
 });
+
+// #583 — optional diagram description and tags (spec page level), validated,
+// published to the v3 index and read back by the library.
+// row | fixture | assertion (scoped) | rejects
+// 1 valid accepted | doorbell spec + page.description + page.tags | validator findings and tools/validate.js output name no page.description/page.tags error | a validator that rejects the new optional fields
+// 1b limits accepted | 200-char description; 12 tags incl. a 32-char tag and an inner-hyphen tag | no page.description/page.tags finding | off-by-one limits
+// 2 invalid rejected, clear message | non-string, blank, multi-line, 201-char description; non-array, 13 tags, uppercase, spaced, 33-char, non-string, leading/trailing/double hyphen, duplicate tag | one finding per case, prefixed by its own path (page.description / page.tags / page.tags[i]) and naming the rule | silent acceptance, a generic message, or the wrong field blamed
+// 3 CLI | spec file with a duplicate tag | tools/validate.js exits 1 and prints the page.tags[1] duplicate finding | a check only the browser runs
+// 4 publish carries them | canon.json with one described+tagged and one plain diagram | described entry has exactly the authored description/tags; plain entry has neither key | publish dropping them, or writing empty placeholders
+// 5 publish rejects invalid | described spec edited to an uppercase tag | publishLibrary rejects naming the file and page.tags[0]; the prior index bytes survive | publishing invalid metadata
+// 6 older index loads | v3 index whose entries lack the keys | parseCanonLibrary yields description '' and tags [] without throwing | requiring the new keys
+// 7 index read back | published v3 index; v1 manifest embedding a spec | parseCanonLibrary surfaces the authored description and tags | a reader that drops them
+// 8 canon.json + Backstage unaffected | same canon.json through publish and loadCanonDiagrams (the Backstage snapshot adapter) | published canon equals canon.json membership (ID, owner); the snapshot loads both specs, keeps the authored description/tags in the served spec, and lists the described diagram under exactly the same Backstage entities as the identical plain one | metadata leaking into membership, or a Backstage path that rejects/strips the new fields
+test('#583 diagram description and tags validate, publish to the index and load from older indexes',async t=>{
+  const {publishLibrary}=await import('../tools/canon/library.mjs'),{spawnSync}=require('node:child_process');
+  const findings=raw=>plain(context.validate(context.normalize(raw)).errors);
+  const described=structuredClone(spec);described.page.description='Rings the hallway chime when a visitor arrives';described.page.tags=['hallway','alerts-v2'];
+  assert.deepEqual(findings(described).filter(e=>/^page\.(description|tags)/.test(e)),[]);
+  const withPage=patch=>{const raw=structuredClone(spec);Object.assign(raw.page,patch);return raw;};
+  const limits=withPage({description:'d'.repeat(200),tags:['a'.repeat(32),'a-b-c',...Array.from({length:10},(_,i)=>'t'+i)]});
+  assert.deepEqual(findings(limits).filter(e=>/^page\.(description|tags)/.test(e)),[]);
+  for(const [patch,pattern] of [
+    [{description:7},/^page\.description: .*text/],
+    [{description:'   '},/^page\.description: .*empty/],
+    [{description:'one\ntwo'},/^page\.description: .*one line/],
+    [{description:'x'.repeat(201)},/^page\.description: .*200 characters.*201/],
+    [{tags:'hallway'},/^page\.tags: .*list/],
+    [{tags:Array.from({length:13},(_,i)=>'t'+i)},/^page\.tags: .*12 tags.*13/],
+    [{tags:['ok','Upper']},/^page\.tags\[1\]: .*lowercase/],
+    [{tags:['two words']},/^page\.tags\[0\]: .*lowercase/],
+    [{tags:['a'.repeat(33)]},/^page\.tags\[0\]: .*32 characters/],
+    [{tags:[5]},/^page\.tags\[0\]: .*lowercase/],
+    [{tags:['-tag']},/^page\.tags\[0\]: .*hyphens/],
+    [{tags:['tag-']},/^page\.tags\[0\]: .*hyphens/],
+    [{tags:['a--b']},/^page\.tags\[0\]: .*hyphens/],
+    [{tags:['alerts','hallway','alerts']},/^page\.tags\[2\]: duplicate tag "alerts"/],
+  ]){
+    const errors=findings(withPage(patch)).filter(e=>/^page\.(description|tags)/.test(e));
+    assert.equal(errors.length,1,JSON.stringify(patch)+' → '+JSON.stringify(errors));assert.match(errors[0],pattern);
+  }
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-describe-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const cliFile=path.join(root,'duplicate.spec.json');fs.writeFileSync(cliFile,JSON.stringify(withPage({tags:['alerts','alerts']})));
+  const cli=spawnSync(process.execPath,[path.join(__dirname,'../tools/validate.js'),'--quiet',cliFile],{encoding:'utf8'});
+  assert.equal(cli.status,1);assert.match(cli.stdout,/page\.tags\[1\]: duplicate tag "alerts"/);
+  const okFile=path.join(root,'ok.spec.json');fs.writeFileSync(okFile,JSON.stringify(described));
+  const ok=spawnSync(process.execPath,[path.join(__dirname,'../tools/validate.js'),'--quiet',okFile],{encoding:'utf8'});
+  assert.equal(ok.status,0,ok.stdout);assert.doesNotMatch(ok.stdout,/page\.(description|tags)/);
+  const write=(id,raw)=>{const folder=path.join(root,'diagrams',id);fs.mkdirSync(folder,{recursive:true});const file=path.join(folder,id+'.spec.json');const copy=structuredClone(raw);delete copy.page.canon;fs.writeFileSync(file,JSON.stringify(copy));return file;};
+  const describedFile=write('described',described);write('plain',spec);
+  fs.writeFileSync(path.join(root,'canon.json'),JSON.stringify({version:1,diagrams:['described','plain'].map(id=>({folder:'diagrams/'+id,owner:'group:default/home-team'}))}));
+  const output=path.join(root,'workbench/diagrams.json'),options={registryPath:path.join(root,'canon.json'),output};
+  const library=await publishLibrary(options),byId=Object.fromEntries(library.diagrams.map(d=>[d.id,d]));
+  assert.equal(byId.described.description,'Rings the hallway chime when a visitor arrives');assert.deepEqual(byId.described.tags,['hallway','alerts-v2']);
+  assert.equal(Object.hasOwn(byId.plain,'description'),false);assert.equal(Object.hasOwn(byId.plain,'tags'),false);
+  const parsed=Object.fromEntries(context.parseCanonLibrary(JSON.parse(fs.readFileSync(output,'utf8'))).map(e=>[e.id,e]));
+  assert.equal(parsed.described.description,'Rings the hallway chime when a visitor arrives');assert.deepEqual(plain(parsed.described.tags),['hallway','alerts-v2']);
+  assert.equal(parsed.plain.description,'');assert.deepEqual(plain(parsed.plain.tags),[]);
+  const before=fs.readFileSync(output,'utf8'),bad=JSON.parse(fs.readFileSync(describedFile,'utf8'));bad.page.tags=['Hallway'];fs.writeFileSync(describedFile,JSON.stringify(bad));
+  await assert.rejects(publishLibrary(options),/described\.spec\.json.*page\.tags\[0\]/);assert.equal(fs.readFileSync(output,'utf8'),before);
+  const legacy=JSON.parse(before);delete legacy.diagrams[0].description;delete legacy.diagrams[0].tags;
+  for(const entry of context.parseCanonLibrary(legacy)){assert.equal(entry.description,'');assert.deepEqual(plain(entry.tags),[]);}
+  for(const entry of library.diagrams)assert.deepEqual(entry.canon,{version:1,id:entry.id,kind:'canonical',owner:'group:default/home-team'});
+  const good=JSON.parse(fs.readFileSync(describedFile,'utf8'));good.page.tags=['hallway','alerts-v2'];fs.writeFileSync(describedFile,JSON.stringify(good));
+  const {loadCanonDiagrams}=await import('../tools/canon/library.mjs'),snapshot=await loadCanonDiagrams(path.join(root,'canon.json'),{publicBaseUrl:'https://flows.test'});
+  assert.deepEqual(snapshot.specs.map(s=>s.page.canon.id).sort(),['described','plain']);
+  const served=snapshot.loadSpec('described');assert.equal(served.page.description,'Rings the hallway chime when a visitor arrives');assert.deepEqual(served.page.tags,['hallway','alerts-v2']);
+  const listed=id=>Object.keys(snapshot.index.entities).filter(ref=>snapshot.index.entities[ref].some(d=>d.id===id)).sort();
+  assert.ok(listed('plain').length>0);assert.deepEqual(listed('described'),listed('plain'));
+  const embedded=manifest();embedded.diagrams[0].spec=described;
+  const v1=context.parseCanonLibrary(embedded)[0];assert.equal(v1.description,'Rings the hallway chime when a visitor arrives');assert.deepEqual(plain(v1.tags),['hallway','alerts-v2']);
+});
+function plain(value){return JSON.parse(JSON.stringify(value));}
+
+// #583 row 9 — cross-document linking is unaffected by the metadata.
+// row | fixture | assertion (scoped) | rejects
+// 9a topology import | described+tagged provider exporting nodes/edges, described+tagged consumer importing it, both in canon.json | publish succeeds and indexes both with their own description/tags; the consumer's resolved diagram (C.materializeTopology) deep-equals resolution of the same specs without metadata | metadata breaking provider resolution or leaking into the consumer graph
+// 9b document links | the consumer page with documentLinks.siteBaseUrl | documentReference and documentSiteURL equal those of the metadata-free page | metadata altering link identity or URLs
+test('#583 description and tags leave shared topology imports and document links unchanged',async t=>{
+  const {publishLibrary}=await import('../tools/canon/library.mjs');
+  const make=meta=>{
+    const spec=(id,d,extra)=>({page:{title:id,...(meta?{description:'About '+id,tags:[id,'shared']}:{}),...extra,sections:[{id:'delivery',diagram:d}]}});
+    return [spec('provider',{nodes:{a:{title:'Dispatcher'},b:{title:'Push'}},rows:[['a','b']],edges:[{from:'a',to:'b',kind:'https'}],topologyExports:{channels:{nodes:['a','b'],edges:['a->b']}}}),
+      spec('consumer',{topologyImports:[{spec:'provider',export:'channels',as:'notify'}],steps:[{id:'send',edge:'notify::a->notify::b'}]},{documentLinks:{siteBaseUrl:'https://flows.test/site/'}})];
+  };
+  const withCanon=specs=>specs.map(s=>{const c=structuredClone(s);c.page.canon={version:1,id:s.page.title,kind:'canonical',owner:'group:default/home-team'};return c;});
+  const resolved=specs=>plain(C.materializeTopology(withCanon(specs))[1].page.sections[0].diagram);
+  assert.deepEqual(resolved(make(true)),resolved(make(false)));
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-describe-links-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  for(const s of make(true)){const folder=path.join(root,'diagrams',s.page.title);fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,s.page.title+'.spec.json'),JSON.stringify(s));}
+  fs.writeFileSync(path.join(root,'canon.json'),JSON.stringify({version:1,diagrams:['provider','consumer'].map(id=>({folder:'diagrams/'+id,owner:'group:default/home-team'}))}));
+  const library=await publishLibrary({registryPath:path.join(root,'canon.json'),output:path.join(root,'workbench/diagrams.json')});
+  for(const id of ['provider','consumer']){const entry=library.diagrams.find(d=>d.id===id);assert.equal(entry.description,'About '+id);assert.deepEqual(entry.tags,[id,'shared']);}
+  const [withMeta,without]=[make(true),make(false)].map(specs=>withCanon(specs)[1].page);
+  assert.deepEqual(plain(context.documentReference(withMeta)),plain(context.documentReference(without)));
+  const ref=plain(context.documentReference(withMeta));assert.equal(ref.spec,'consumer');
+  assert.equal(context.documentSiteURL(withMeta.documentLinks.siteBaseUrl,{...ref,step:'send'}),context.documentSiteURL(without.documentLinks.siteBaseUrl,{...plain(context.documentReference(without)),step:'send'}));
+});

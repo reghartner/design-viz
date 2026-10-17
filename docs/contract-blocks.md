@@ -60,3 +60,41 @@ Bindings never use step positions. Invalid or stale references warn and show no
 marker; update bindings if you change step, node, or path IDs in JSON. Existing
 section cards and diagrams without bindings retain their presentation. The
 capability is `content.wire-contracts`; regenerate exports to add this behavior.
+
+## JSON directly on a connection
+
+No section block is needed. In the desktop Workbench, select a connection and
+enter its payload in **Contract JSON**. Select a step to replace the payload
+independently for each hop. **Inherit connection contract** removes that override;
+**Hide contract on this step** suppresses it. Blank JSON removes the local value.
+Invalid JSON stays in the editor with an error; valid edits support Undo/Redo.
+
+```json
+{
+  "edges": [{"from":"device","to":"cloud","contract":{"title":"Request","json":{"event":"press"}}}],
+  "steps": [
+    {"id":"send","edge":"device->cloud"},
+    {"id":"retry","edge":"device->cloud","contracts":{"device->cloud":{"json":{"event":"press","retry":true}}}},
+    {"id":"silent","edge":"device->cloud","contracts":{"device->cloud":null}}
+  ]
+}
+```
+
+The wrapper distinguishes suppression (`null`) from a null payload (`{json:null}`).
+Overrides replace the entire wrapper, never merge fields or accumulate across
+steps. Keys inside `json` are literal data. Ambient shows defaults; Step mode shows
+resolved payloads only for delivered, visible edges. Duplicate endpoint pairs are
+ambiguous and get no JSON marker. Section-card bindings remain independent.
+
+Hover/focus the notepad to read formatted JSON; click/Enter/Space pins it and pauses
+playback. Move into the preview to use **Copy JSON**, which copies only the payload
+with two-space indentation. Clipboard failure is reported visibly; select the
+JSON and copy manually when browser permissions prevent copying. Close/Escape or
+step/path/mode/section changes retire the preview and pending feedback.
+
+Endpoint changes, node renames, edge deletion and hop removal update or remove
+step override keys. Hand-edited stale keys warn and do not produce a preview. Extraction remaps
+boundary overrides; internal step overrides must be moved or removed first,
+because the extracted diagram starts without steps.
+The capability is `content.edge-json-contracts`, schema major 1. Regenerate old
+exports and upgrade packaged viewers. See the [small example](../examples/edge-json-contracts/edge-json-contracts.spec.json).

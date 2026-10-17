@@ -142,7 +142,7 @@ def infer(raw):
                              ('groups', 'groups'), ('topology', 'topology')]:
             if d.get(key): features.add(feature)
         if any(view.get('presentation') == 'explore' for view in d.get('layouts', []) if isinstance(view, dict)): features.add('explore')
-        if sec.get('contract') or sec.get('contracts'): features.add('contracts')
+        if sec.get('contract') or sec.get('contracts') or any('contract' in e for e in d.get('edges', []) if isinstance(e, dict)) or any('contracts' in step for step in d.get('steps', []) if isinstance(step, dict)): features.add('contracts')
         def visit(value):
             if isinstance(value, dict):
                 for key, item in value.items():

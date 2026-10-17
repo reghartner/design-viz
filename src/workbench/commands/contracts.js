@@ -53,3 +53,16 @@ function planContractWire(text,raw,target,wire,removeIndex){
   }
   return planSetField(text,raw,path,'wires',wires.length?JSON.stringify(wires,null,2):null);
 }
+
+function planEdgeJsonContract(text,raw,target,key,value){
+  var got=builderDiagram(text,raw,target.section);if(got.error)return got;
+  if(value!==undefined && value!==null && !validJsonContract(value))return {error:'Use a JSON contract envelope with a json payload.'};
+  var path=builderTargetPath(raw,target),owner=path && specValueAt(raw,path);
+  if(!owner)return {error:'Contract owner not found. Reselect it.'};
+  if(target.kind==='edge')return planSetField(text,raw,path,'contract',value===undefined?null:JSON.stringify(value,null,2));
+  if(target.kind!=='step' || stepKeys(owner).indexOf(key)<0)return {error:'Choose an edge used by this step.'};
+  if(owner.contracts!=null && (typeof owner.contracts!=='object' || Array.isArray(owner.contracts)))return {error:'Fix step contracts to be an object before editing.'};
+  var map=Object.assign(Object.create(null),owner.contracts || {});
+  if(value===undefined)delete map[key];else map[key]=value;
+  return planSetField(text,raw,path,'contracts',Object.keys(map).length?JSON.stringify(map,null,2):null);
+}

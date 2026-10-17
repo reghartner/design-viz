@@ -234,8 +234,7 @@ Preserve the existing spec and ledger, and read the parts a change depends on
 before making it. A ledger is required for every proposed change, including a
 ledger-only update.
 
-Before publishing a registered request (Copy request, Beta Send, or native
-`begin`), Flowview copies the request's exact spec and ledger into complete
+Before publishing a registered request (native `begin` or Beta Send), Flowview copies the request's exact spec and ledger into complete
 candidate files in the support folder. `request.json` names them:
 
 ```json
@@ -320,7 +319,8 @@ at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
 both artifacts. Oversized handwritten artifacts are refused before replacing
 the last saved pair.
 
-**Preview Agent Updates** opens a full-window proposed rendering, with **Current**
+**Preview Agent Updates** in the update banner at the top of the workbench opens a
+full-window proposed rendering (the Agent window only notes that an update waits), with **Current**
 and **Proposed** controls in the pinned decision bar. Change highlights start
 on: Proposed marks added content in green and modified content in amber;
 Current marks removed counterparts in red and modified counterparts in amber.
@@ -387,24 +387,16 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 After connecting a folder, select items and click **Copy for agent · N selected** at
 the bottom left. It copies selection identifiers, references and view context
 without opening Agent or requiring a message. **Copied** confirms success.
-This action leaves your message draft and any active request alone; it creates
-no request, seeds no candidates and sends nothing to Monitor. With no selection it is disabled.
+This action leaves any active request alone; it creates no request, seeds no
+candidates, sends nothing to Monitor and is not authorization to start a turn. With no selection it is disabled.
 If clipboard access is denied, Agent opens with the selected text for manual copy.
 
-In **Agent → Copy & paste**, write the request in the shared message box;
-include additional URLs or file paths there if useful. **Copy request** includes
-your message, selected item identifiers and JSON paths, their evidence references,
-view/path/step context and detail level. It does not include the complete source,
-panel payloads or the contents of selected sections/documents. The agent edits
-the request's seeded candidate copies in the shared folder after inspecting the
-regions the change depends on. A connected folder is required to copy a request.
-
-With a connected folder, Copy registers a request, seeds its candidate files and
-copies its ID and candidate filenames with the message and context. Long clipboard messages use a bounded registration
-placeholder while preserving the complete message on the clipboard. Clipboard
-requests are not dispatched by Monitor. Recopy of the same pending request reuses
-its ID. If clipboard permission is denied, the prepared request is shown for
-manual selection and copying. Invalid JSON must be repaired before copying.
+In **Agent → Copy & paste**, there is no message box: ask your agent for the change
+in its own conversation, with any URLs, file paths or copied selection context.
+The agent registers each request with `begin` (below); the workbench seeds its
+candidate files and the agent edits those copies after inspecting the regions the
+change depends on. Native requests are not dispatched by Monitor. Invalid JSON
+must be repaired before a request is accepted.
 
 **Agent → In workbench — Beta → Send to Claude** requires both a connection and
 a live listener. Direct Send is limited to 16,000 characters. Merely opening this
@@ -419,8 +411,19 @@ python3 /path/to/diagram/.flowview-agent/folder-agent.py begin --text "The reque
 Wait for browser acknowledgement before working. `begin` waits for both the request
 file and its accepted transcript entry; it withdraws after eight seconds without
 acknowledgement. Keep the workbench visible, or retry after returning to it. One
-request is active at a time. **Stop accepting this turn** cancels acceptance of
-its proposals/replies; interrupt computation in the agent app itself.
+request is active at a time; the agent finishes it with its proposal result and
+completion `reply`.
+
+**Re-establish session** in the Agent window recovers a stuck or lost turn in either
+mode. It writes `cancel.json` for any active request under the old identity,
+disconnects, and reclaims the same folder with a new `sessionId` and
+`connectionId` (rewriting `session.json`, `editor.json`, `state.json`,
+`CONNECT.md` and the workbench history under the new identity). The accepted
+spec and ledger bytes are unchanged. The panel shows and copies a hand-off naming
+the folder and the new IDs; pasting it tells the agent to reread `CONNECT.md`,
+verify `session.json`, and continue with `begin` (copy & paste) or a renewed
+Monitor `watch` (Beta). Helper commands for the released request fail because its
+identity no longer matches. Interrupt computation in the agent app itself.
 
 In the Beta conversation, use `progress --request ID --text TEXT` to report meaningful work phases, errors,
 and observable activity during longer work (roughly every 20 seconds at tool

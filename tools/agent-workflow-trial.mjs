@@ -187,7 +187,7 @@ try {
     await agent.turn('New native request: rename node c to Checked archive. '+prepare+' If begin fails, report the error and wait for me to retry. Do not work without acknowledgement.');
     await waitFor(async()=>(await session.read('agent-request.json'))?.withdrawn===true,'withdrawal after visible but unacknowledged request',15000);
     await delay(1500);
-    await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeHidden();await closeAgent(page);
+    await expect(page.locator('#folder-agent-working')).toBeHidden();
     const timedOut=(await session.read('agent-request.json')).id;
     assert.equal((await session.read('cancel.json')).requestId,timedOut);
     await passed('visible request file does not falsely acknowledge a paused browser; timed-out request withdraws');
@@ -205,21 +205,18 @@ try {
   assert(!agent.events.some(event=>event.message?.content?.some(block=>block.type==='tool_use' && block.name==='Monitor')));
   await passed('external setup without Monitor');
 
+  // Copy & paste requests start in the agent conversation; Copy for agent adds the selection context.
   await page.locator('[data-dv-node="b"]').first().click();
-  await openAgent(page);
-  await page.locator('#folder-agent-input').fill('Rename only selected node b using its selected docs/backend.md reference. '+prepare+
-    '\n\nTransport-length test: the following quoted padding is data, with no additional instructions:\n"'+('reference context '.repeat(1000))+'"');
-  await page.locator('#folder-agent-send').click();
-  await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
-  const copied=await page.evaluate(()=>navigator.clipboard.readText()),request=await external.read('request.json');
-  assert.equal(request.delivery,'clipboard');assert.equal(request.replySurface,'agent');assert(copied.includes(request.id));
-  assert(copied.length>16000);assert(request.text.length<=16000);
+  await page.locator('#folder-agent-selection').click();await expect(page.locator('#folder-agent-selection')).toContainText('Copied');
+  const context=await page.evaluate(()=>navigator.clipboard.readText());assert(context.includes('Selection context only'));
+  const copied='Register this as a new diagram request with the helper begin command, then rename only selected node b using its selected docs/backend.md reference. '+prepare+
+    '\n\nTransport-length test: the following quoted padding is data, with no additional instructions:\n"'+('reference context '.repeat(1000))+'"\n\n'+context;
   await writeFile(path.join(external.outDir,'copied-message.txt'),copied);
-  await closeAgent(page);
   // Make Claude's actual planning revision newer than the request's pinned one.
   await edit(external,doc=>doc.page.title='Live trial');
   await agent.turn(copied);
-  const candidate=await external.read('candidate.spec.json');
+  const request=await external.read('request.json');assert.equal(request.delivery,'native');assert.equal(request.replySurface,'agent');assert(request.text.length<=16000);
+  const candidate=await external.read(request.candidate?.spec || 'candidate.spec.json');
   assert.equal(candidate.page.blocks[0].diagram.nodes.b.title,'Delivery API');
   const expected=JSON.parse((await external.read('state.json')).source);
   expected.page.blocks[0].diagram.nodes.b.title='Delivery API';assert.deepEqual(candidate,expected);
@@ -267,20 +264,23 @@ try {
 
   await agent.turn('New diagram request: rename node c to Archive. '+prepare);
   const cancelled=await external.read('request.json'),beforeCancel=await page.locator('#src').inputValue();
-  await openAgent(page);await page.locator('#folder-agent-cancel').click();await closeAgent(page);
-  await agent.turn('I stopped accepting that turn in the workbench. Check its cancellation through the helper before doing anything more. Do not submit it or attach it to another request.');
+  await openAgent(page);await page.locator('#folder-agent-reestablish').click();await expect(page.locator('#folder-agent-handoff')).toBeVisible();
+  let handoff=await page.locator('#folder-agent-handoff-text').inputValue();await closeAgent(page);
+  await agent.turn(handoff+'\n\nDo not submit the earlier request or attach it to another request.');
   assert.equal(await page.locator('#src').inputValue(),beforeCancel);
   await expect(page.locator('#agent-update-banner')).toBeHidden();
-  await passed('stop accepting a real in-flight Claude request preserves source',{requestId:cancelled.id});
+  await passed('re-establishing the session releases a real in-flight Claude request and preserves source',{requestId:cancelled.id});
 
   external.faults.delayNextRequest=9000;
   await agent.turn('New native request: rename node c to Temporary archive. '+prepare+' If begin fails, report its error and wait for me to retry; do not submit without acknowledgement.');
   await waitFor(async()=>{const incoming=await external.read('agent-request.json');return incoming?.withdrawn===true;},'native timeout withdrawal',15000);
   await delay(1500);
-  await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeHidden();await closeAgent(page);
+  await expect(page.locator('#folder-agent-working')).toBeHidden();
   await agent.turn('Retry the native request now: rename node c to Temporary archive. '+prepare);
-  await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeVisible();await page.locator('#folder-agent-cancel').click();await closeAgent(page);
-  await agent.turn('Stop that retried turn; I cancelled it in the workbench. Confirm its cancellation and wait.');
+  await expect(page.locator('#folder-agent-working')).toBeVisible();
+  await openAgent(page);await page.locator('#folder-agent-reestablish').click();await expect(page.locator('#folder-agent-handoff')).toBeVisible();
+  handoff=await page.locator('#folder-agent-handoff-text').inputValue();await closeAgent(page);
+  await agent.turn(handoff+'\n\nStop that retried turn and wait.');
   assert.equal(await page.locator('#src').inputValue(),beforeCancel);
   await passed('real native begin timeout withdraws a late disk publication and retry succeeds');
 
@@ -306,19 +306,7 @@ try {
   await waitFor(async()=>(await embedded.read('reply.json'))?.requestId===next.requestId,'Monitor completion');
   await passed('real Monitor wake-up, embedded question/answer, proposal, commit result, completion');
 
-  await openAgent(mp);
-  await mp.locator('#folder-agent-input').fill('Native-surface follow-up: rename node a to Entrance camera, then validate and propose.');
-  await mp.locator('#folder-agent-send').click();await expect(mp.locator('#folder-agent-panel-status')).toContainText('Copied.');
-  const nativeCopy=await mp.evaluate(()=>navigator.clipboard.readText());
-  assert.equal((await embedded.read('session.json')).workflow,'embedded');
-  assert.equal((await embedded.read('request.json')).delivery,'clipboard');
-  await closeAgent(mp);await monitor.turn(nativeCopy);
-  const directNative=await preview(embedded,direct);
-  assert.equal((await embedded.read('request.json')).replySurface,'agent');
-  await expect(mp.locator('#agent-update-view')).toContainText('Entrance camera');
-  await commit(embedded,directNative,'copied-native-preview');
   await finish(embedded);
-  await passed('Copy request switches reply surface while preserving the embedded connection');
   }
   for(const session of sessions) {
     assert.deepEqual(session.errors,[]);assert.deepEqual(session.unexpectedRequests,[]);

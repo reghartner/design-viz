@@ -99,3 +99,44 @@ test('wire binding authoring preserves raw wrappers, unrelated source and refuse
  const removed=C.planContractWire(added.text,next,target,null,0);assert.equal(section(JSON.parse(removed.text)).contract.wires,undefined);
  assert.ok(C.planContractWire(text,raw,target,null,9).error);
 });
+
+test('edge JSON defaults, independent step replacement, suppression and malformed/ambiguous ownership fail closed',()=>{
+ const d={edges:[{from:'a',to:'b',contract:{json:{request:'default'}}},{from:'b',to:'c',contract:{json:null}}]};
+ assert.deepEqual(plain(C.edgeJsonContracts(d).map(e=>e.jsonContract.json)),[{request:'default'},null]);
+ const step={edges:['a->b','b->c'],contracts:{'a->b':{json:[false,0,'</pre><script>oops()</script>']}}};
+ assert.deepEqual(plain(C.edgeJsonContracts(d,step).map(e=>e.jsonContract.json)),[[false,0,'</pre><script>oops()</script>'],null]);
+ assert.equal(C.edgeJsonContracts(d,{...step,failures:{'a->b':'blocked'}}).length,1);
+ assert.equal(C.edgeJsonContracts(d,{...step,contracts:{'a->b':null}}).length,1);
+ assert.equal(C.edgeJsonContracts(d,{edge:'a->b',contracts:{'a->b':{title:'Missing payload'}}}).length,0);
+ assert.equal(C.edgeJsonContracts({...d,edges:[...d.edges,d.edges[0]]},{edge:'a->b'}).length,0);
+ assert.equal(C.edgeJsonContracts(d,{edge:'absent->edge'}).length,0);
+ const raw=doc({diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],...d,steps:[step]}});
+ assert.ok(C.FlowviewCompatibility.detect(raw).includes('content.edge-json-contracts'));
+ assert.equal(C.validate(C.normalize(raw)).warnings.length,0);
+ step.contracts['a->b']={oops:true};step.contracts['a->c']={json:5};
+ assert.equal(C.validate(C.normalize(raw)).warnings.filter(w=>w.includes('.contracts.')).length,2);
+});
+
+test('JSON contract authoring preserves wrappers, resets one override, and follows graph identities',()=>{
+ let raw=doc({diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{id:'send',edges:['a->b','b->c']}]}}),text=JSON.stringify(raw,null,2);
+ function apply(p){assert.ok(!p.error,p.error);text=p.text;raw=JSON.parse(text);return section(raw).diagram;}
+ let d=apply(C.planEdgeJsonContract(text,raw,{section:1,kind:'edge',index:0},null,{json:null}));assert.equal(d.edges[0].contract.json,null);
+ d=apply(C.planEdgeJsonContract(text,raw,{section:1,kind:'step',index:0},'a->b',{json:{n:1}}));
+ d=apply(C.planEdgeJsonContract(text,raw,{section:1,kind:'step',index:0},'b->c',{json:{n:2}}));
+ d=apply(C.planEdgeJsonContract(text,raw,{section:1,kind:'step',index:0},'a->b',undefined));assert.deepEqual(d.steps[0].contracts,{'b->c':{json:{n:2}}});
+ d=apply(C.planRenameNode(text,raw,1,'c','renamed'));assert.deepEqual(d.steps[0].contracts,{'b->renamed':{json:{n:2}}});
+ d=apply(C.planSetEdgeEndpoint(text,raw,1,1,'from','a'));assert.deepEqual(d.steps[0].contracts,{'a->renamed':{json:{n:2}}});
+ d=apply(C.planStepToggleHop(text,raw,1,0,'a->renamed'));assert.equal(d.steps[0].contracts,undefined);
+ assert.ok(C.planSetEdgeEndpoint(text,raw,1,1,'to','b').error);
+ assert.ok(C.planEdgeJsonContract(text,raw,{section:1,kind:'step',index:0},'a->renamed',{json:true}).error);
+ assert.deepEqual(raw.page.blocks[0],{heading:'Other'});
+});
+
+
+test('edge deletion removes only its replacement and renames refuse stale override collisions',()=>{
+ const raw=doc({diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{edges:['a->b','b->c'],contracts:{'a->b':{json:1},'b->c':{json:2}}}]}});
+ const text=JSON.stringify(raw),deleted=C.planDeleteEdge(text,raw,1,0);
+ assert.deepEqual(section(JSON.parse(deleted.text)).diagram.steps[0].contracts,{'b->c':{json:2}});
+ section(raw).diagram.steps[0].contracts['renamed->b']={json:3};
+ assert.match(C.planRenameNode(JSON.stringify(raw),raw,1,'a','renamed').error,/contract already references/);
+});

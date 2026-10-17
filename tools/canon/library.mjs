@@ -39,7 +39,10 @@ async function libraryFromEntries(entries,output){
     }
     const specUrl=path.relative(path.dirname(path.resolve(output)),await realpath(entry.filename)).split(path.sep).map(encodeURIComponent).join('/');
     if(Buffer.byteLength(JSON.stringify(rendered))>30*1024*1024)throw new Error(label+': resolved diagram exceeds 30 MB.');
+    // Optional author-owned discovery metadata; validated above with the spec.
+    const {description,tags}=entry.spec.page;
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
+      ...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
       canon:entry.spec.page.canon,counts,services,exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
   }))};
 }

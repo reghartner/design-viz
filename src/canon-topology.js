@@ -279,7 +279,7 @@ var FlowTopology = (function(){
     (d.edges || []).forEach(function(e){node(e.from,'edge '+edgeKey(e));node(e.to,'edge '+edgeKey(e));});
     (d.steps || []).forEach(function(s,i){
       var where='step '+(s.id || i);
-      stepKeys(s).forEach(function(id){edge(id,where);});Object.keys(stepFailures(s)).forEach(function(id){edge(id,where+' failures');});
+      stepKeys(s).forEach(function(id){edge(id,where);});Object.keys(s.contracts || {}).forEach(function(id){edge(id,where+' contracts');});Object.keys(stepFailures(s)).forEach(function(id){edge(id,where+' failures');});
       stepNodes(s).concat(Object.keys(stepTonePatch(s) || {})).forEach(function(id){node(id,where);});
       Object.keys(stepPanelPatch(s) || {}).concat(Object.keys(s.panelVisibility || {})).forEach(function(id){
         if(!(d.panels || []).some(function(p){return p && p.id===id;}))fail(at,where+' references missing panel '+id);

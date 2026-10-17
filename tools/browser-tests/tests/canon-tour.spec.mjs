@@ -29,7 +29,7 @@ test('launch-page Canon visit offers the tour once, replays, and leaves the draf
   await info.attach('canon-first-visit-tour',{body:await page.screenshot(),contentType:'image/png'});
   await page.locator('.dv-tour-choice').nth(2).click();
   await expect(page.locator('.dv-tour-ui')).toBeVisible();
-  await page.getByRole('button',{name:'Skip the tour',exact:true}).click();
+  await page.getByRole('button',{name:'Skip tour',exact:true}).click();
   await expect(page.locator('.dv-tour')).toBeHidden();
   await expect(page.locator('#src')).toHaveValue(source);
   expect(await page.evaluate(()=>localStorage.getItem('dv_tour_v1'))).toBe('done');

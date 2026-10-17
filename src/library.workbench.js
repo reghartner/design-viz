@@ -26,6 +26,10 @@ function diagramSearchText(values,spec){
   });
   return values.concat(names).filter(function(value){return typeof value==='string';}).join('\n').toLowerCase();
 }
+/* Description and tags are optional; indexes published before them, or with
+   malformed values, still load as if the metadata were absent. */
+function libraryDescription(value){return typeof value==='string'?value:'';}
+function libraryTags(value){return Array.isArray(value)?value.filter(function(tag){return typeof tag==='string' && tag;}):[];}
 function parseCanonLibrary(raw){
   if(!raw || ![1,2,3].includes(raw.version) || !Array.isArray(raw.diagrams))throw new Error('Expected a version 1, 2 or 3 diagram library.');
   var ids=new Set();
@@ -35,7 +39,7 @@ function parseCanonLibrary(raw){
     var title=typeof entry.title==='string' && entry.title.trim()?entry.title:entry.id;
     if(raw.version===1){
       var spec=canonLibrarySpec(entry.spec,{id:entry.id});
-      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
+      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
     }
     if(!entry.canon || entry.canon.id!==entry.id || FlowCanon.validate({page:{canon:entry.canon}}).length)throw new Error('Invalid diagram membership: '+entry.id);
     canonLibrarySpecURL(entry.specUrl,'https://library.invalid/workbench/diagrams.json');
@@ -43,7 +47,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,title:title,description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -360,8 +364,16 @@ function initWorkbenchLibrary(opts){
       var detail=document.createElement('span');detail.textContent=entry.spec?starterCountLine(entry.spec):['nodes','steps','panels'].map(function(key){return entry.counts[key]+' '+(entry.counts[key]===1?key.slice(0,-1):key);}).join(' · ');
       var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=entry.canon.owner || entry.id;
       var action=document.createElement('span');action.className='canon-library-action';action.textContent='View diagram →';
-      button.append(badge,name,detail,owner,action);
-      button.dataset.search=diagramSearchText([entry.title,entry.id,entry.canon.owner].concat(entry.services || []),entry.spec);
+      button.append(badge,name);
+      if(entry.description){var description=document.createElement('span');description.className='canon-library-description';description.textContent=entry.description;button.append(description);}
+      button.append(detail,owner);
+      if(entry.tags && entry.tags.length){
+        var tags=document.createElement('span');tags.className='canon-library-tags';
+        entry.tags.forEach(function(tag){var chip=document.createElement('span');chip.className='canon-library-tag';chip.textContent=tag;tags.appendChild(chip);});
+        button.append(tags);
+      }
+      button.append(action);
+      button.dataset.search=diagramSearchText([entry.title,entry.id,entry.canon.owner,entry.description].concat(entry.tags || [],entry.services || []),entry.spec);
       button.addEventListener('click',function(event){
         if(published && (event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey))return;
         event.preventDefault();opts.open(entry.id,published);
@@ -373,7 +385,7 @@ function initWorkbenchLibrary(opts){
     var query=search.value.trim(),needle=query.toLowerCase(),shown=0;
     grid.querySelectorAll('.canon-library-card').forEach(function(card){card.hidden=!!needle && card.dataset.search.indexOf(needle)<0;if(!card.hidden)shown++;});
     empty.hidden=!needle || !entries.length || shown>0;
-    empty.textContent=empty.hidden?'':'No diagrams match “'+query+'”. Try a title, owner or service name.';
+    empty.textContent=empty.hidden?'':'No diagrams match “'+query+'”. Try a title, description, tag, owner or service name.';
   }
   search.addEventListener('input',filterCards);
   async function show(screen,id){

@@ -142,6 +142,30 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
  await player.getByRole('button',{name:'Step',exact:true}).click();await readable();
 });
 
+/* #577 contract: Step <-> Ambient must not move the Explore camera.
+   row | fixture | assertion (scoped) | rejects
+   1 viewBox | product-tour Backstage Explore, desktop, both skins | this board's own svg viewBox attribute equal in Step, Ambient, Step | a frame re-measured on the mode switch (late font/label ink) that grows 1-3 units
+   2 camera | same | this board's scrollLeft/scrollTop equal in all three states | a camera re-fit or scroll jump on the switch
+   3 on-screen graph | same | the first node's own client rect equal in all three states | a viewBox/fitted-size change that shifts the drawing under an unchanged scroll
+   4 fitted size | same | this board's svg client width/height equal in all three states | a board resized by playback-only label state
+   5 modes really switch | same | Step/Ambient aria-pressed and the termbar hidden only in Ambient | a test that never leaves Step */
+for(const skin of ['pastel','aurora'])test(`desktop Explore camera and viewBox stay fixed across Step, Ambient and Step (${skin})`,async({page,server})=>{
+ await page.setViewportSize({width:1280,height:900});await page.emulateMedia({reducedMotion:'reduce'});
+ const raw=JSON.parse(await readFile(path.join(repo,'examples/flowview-product-tour/flowview-product-tour.spec.json'),'utf8'));
+ raw.page.skin=skin;const tab=raw.page.blocks[0].tabs[3],section=tab.sections[0];
+ tab.views=[{id:'standard',name:'Backstage story',presentation:'standard',sections:[section.id]},{id:'explore',name:'Explore Backstage',presentation:'explore',sections:[section.id]}];tab.defaultView='explore';
+ section.diagram.autoplay=false;
+ const input=path.join(server.root,'stable-camera-'+skin+'.json'),output=path.join(server.root,'stable-camera-'+skin+'.html');
+ await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ await page.goto(server.origin+'/stable-camera-'+skin+'.html');await chooseTab(page.locator('#docview'),'04 · Backstage');await page.evaluate(()=>document.fonts.ready);
+ const root=page.locator('#section-backstage'),player=root.locator('.explore-player'),bar=player.locator('.termbar'),board=root.locator('.explore-board'),step=player.getByRole('button',{name:'Step',exact:true}),ambient=player.getByRole('button',{name:'Ambient',exact:true});
+ await expect(board).toBeVisible();await expect(step).toHaveAttribute('aria-pressed','true');await expect(bar).toBeVisible();
+ const state=()=>board.evaluate(el=>{const svg=el.querySelector('.boardcanvas>svg'),box=svg.getBoundingClientRect(),node=svg.querySelector('[data-dv-node]').getBoundingClientRect();return {viewBox:svg.getAttribute('viewBox'),x:el.scrollLeft,y:el.scrollTop,width:box.width,height:box.height,node:{x:node.x,y:node.y,width:node.width,height:node.height}};});
+ const initial=await state();
+ await ambient.click();await expect(ambient).toHaveAttribute('aria-pressed','true');await expect(bar).toBeHidden();expect(await state()).toEqual(initial);
+ await step.click();await expect(step).toHaveAttribute('aria-pressed','true');await expect(bar).toBeVisible();expect(await state()).toEqual(initial);
+});
+
 for(const width of [870,1280])for(const authored of [false,true])test(`reader View reordering preserves the ${authored?'authored':'default'} camera before Fit at ${width}px`,async({page,server},info)=>{
  await page.setViewportSize({width,height:742});const raw=await fixture(),tab=raw.page.blocks[0].tabs[0];
  tab.views=[

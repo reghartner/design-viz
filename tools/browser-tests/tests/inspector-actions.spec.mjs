@@ -200,7 +200,7 @@ test('Home selection and new rows reveal the intended editor while normal select
 /* #610 contract matrix (Node style picker modal, real input)
    row | fixture | assertion (scoped) | rejects
    P1 open | click button.node-style-browse in the Node style row | dialog.node-style-picker is visible; its .node-style-grid tile ids equal ['', ...NODE_STYLE_SET] in order; each preset tile shows a sample `svg .node.ns-<id> .card`; the current preset's tile is aria-pressed=true | a plain list, a missing preset, an invented tile
-   P2 keyboard | ArrowRight from the first tile, Enter | focus moves to the next tile; Enter applies that tile: nodes.a.style equals its data-style-id, the dialog closes, focus returns to the browse button | arrows that scroll instead of moving, Enter that does nothing
+   P2 keyboard | from the first tile: ArrowRight, ArrowDown, ArrowUp, ArrowLeft, End, Home, then ArrowRight + Enter | each key moves focus to the expected tile (down/up by one grid row); Enter applies the focused tile: nodes.a.style equals its data-style-id, the dialog closes, focus returns to the browse button | a missing arrow direction, arrows that scroll, Enter that does nothing
    P3 render | after apply | #section-overview [data-dv-node="a"] has class ns-<id> and data-dv-style; its .card computed fill differs from node b's .card fill; title .t1 fill differs from b's | a stored field that does not paint
    P4 selected | the styled node is still selected | its .card stroke is the dashed selection ring: stroke-dasharray set, stroke-width >= 2, stroke-opacity >= .9, and the stroke color contrasts with the card fill at >= 1.5:1 | a preset whose border hides or matches the selection ring
    P5 escape | reopen, press Escape | the dialog is gone, the source is unchanged, focus is back on the browse button | a modal that swallows Escape
@@ -226,9 +226,17 @@ test('node style picker applies presets from a modal of rendered samples with mo
   expect(styleSet.length).toBeGreaterThan(8);expect(tokens).toEqual(['',...styleSet]);
   for(const token of tokens.slice(1))await expect(dialog.locator('.node-style-tile[data-style-id="'+token+'"] svg .node.ns-'+token+' .card')).toHaveCount(1);
   await expect(dialog.locator('.node-style-tile[aria-pressed="true"]')).toHaveAttribute('data-style-id','rose');
-  // P2: ArrowRight from the first tile, Enter applies the second tile.
-  await tiles.first().focus();await page.keyboard.press('ArrowRight');
-  await expect(tiles.nth(1)).toBeFocused();const chosen=tokens[1];
+  // P2: every arrow direction moves focus by the grid; Enter applies the focused tile.
+  const columns=await dialog.locator('.node-style-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(/\s+/).filter(Boolean).length);
+  expect(columns).toBeGreaterThanOrEqual(2);expect(tokens.length).toBeGreaterThan(columns+1);
+  await tiles.first().focus();await expect(tiles.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect(tiles.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowDown');await expect(tiles.nth(1+columns)).toBeFocused();
+  await page.keyboard.press('ArrowUp');await expect(tiles.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowLeft');await expect(tiles.nth(0)).toBeFocused();
+  await page.keyboard.press('End');await expect(tiles.nth(tokens.length-1)).toBeFocused();
+  await page.keyboard.press('Home');await expect(tiles.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect(tiles.nth(1)).toBeFocused();const chosen=tokens[1];
   await page.keyboard.press('Enter');await expect(dialog).toHaveCount(0);await expect(browse).toBeFocused();
   await expect.poll(async()=>(await spec()).nodes.a.style).toBe(chosen);
   // P3 + P4
@@ -290,15 +298,37 @@ const LEGACY_CARD={
    K2 border | same | computed .card stroke differs from its fill, stroke-width >= 1, stroke-opacity 1, and contrasts with the fill at >= 1.3:1 | a border that vanishes into the card
    K3 distinct | same | every pair of presets differs by an OKLab distance >= 0.05 on the border OR >= 0.05 on the background; every preset differs from the default card on fill or stroke | two presets that look alike, or a preset equal to the skin card
    K4 legacy | the node without style, every skin | computed fill, stroke, .t1 and .t2 equal the LEGACY_CARD table captured before #610 | a change to older documents
-   K5 lit | standalone viewer page (inject.py), step mode lighting the styled node | the lit card's stroke differs from the same card's stroke out of step mode; the class ns-<token> and data-dv-style are present in the reader | a preset that hides the lit-step highlight, or a reader that drops the field */
+   K5 lit | every preset, every skin (editor canvas and the Daylight/Editorial reader pages): a step that lights every node | each styled card's lit stroke differs from its resting stroke by an OKLab distance >= 0.05 or grows by >= 1px, and contrasts with its fill at >= 1.5:1; leaving step mode restores the resting fill and text (editor) and the resting stroke (reader; the editor keeps its dashed step-membership stroke on member cards) | an imperceptible or missing lit highlight on any preset
+   K6 selected | every preset, every editor skin: all nodes selected with Enter / Shift+Enter | each styled card's stroke is the dashed ring (stroke-dasharray set, width >= 2, opacity >= .9) and contrasts with the card fill at >= 1.5:1; Escape clears it | a preset whose border hides the selection ring
+   K7 export | Download SVG of the styled section (editor, current skin) | the file contains g.node.ns-<token> for every token; reopened, each styled card's computed fill and stroke equal the live card's; the default card keeps the skin card colors | an export that loses or flattens the preset paint
+   H1 Confluence | the Forge viewer page with a pasted styled spec (skin aurora) | rows K1–K4 hold on #docview | a host whose stylesheet lacks the presets
+   H2 Backstage | the native host fixture (its camera node carries style rose, skin pastel) | the card has class ns-rose; its fill and title differ from the sibling default card; title contrast >= 4.5:1; the sibling keeps the pastel legacy colors | a scoped host stylesheet that drops or mangles the preset rules */
 const STYLE_TOKENS=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
 function styledDiagram(){
   const diagram={autoplay:false,nodes:{plain:{title:'Default card',sub:'no style'}},rows:[],edges:[],steps:[]};
   STYLE_TOKENS.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
   const ids=Object.keys(diagram.nodes);for(let i=0;i<ids.length;i+=4)diagram.rows.push(ids.slice(i,i+4));
   diagram.edges=[{from:'plain',to:'rose'},{from:'rose',to:'teal'}];
-  diagram.steps=[{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}];
+  diagram.steps=[{id:'all',text:'every card lit',nodes:ids},{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}];
   return diagram;
+}
+/* Rows K5/K6: compares the lit (or selected) stroke of every styled card with its resting stroke. */
+async function auditState(page,scope,skin,resting,label){
+  const seen=await page.evaluate(scope=>{
+    const out={};for(const g of document.querySelectorAll(scope+' [data-dv-node]')){
+      const card=getComputedStyle(g.querySelector('.card'));
+      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,width:parseFloat(card.strokeWidth),opacity:parseFloat(card.strokeOpacity),dash:card.strokeDasharray,classes:g.getAttribute('class')};
+    }return out;},scope);
+  for(const token of STYLE_TOKENS){
+    const now=seen[token],was=resting[token];
+    expect(now.classes,skin+' '+token+' '+label).toMatch(label==='lit'?/\blit\b/:/\bdv-sel\b/);
+    if(label==='lit')expect(labDistance(now.stroke,was.stroke)>=.05 || now.width>=was.width+1,skin+' '+token+' lit stroke change (color '+labDistance(now.stroke,was.stroke).toFixed(3)+', width '+was.width+'→'+now.width+')').toBe(true);
+    else expect(labDistance(now.stroke,was.stroke),skin+' '+token+' '+label+' stroke change').toBeGreaterThanOrEqual(.05);
+    expect(contrastRatio(now.stroke,now.fill),skin+' '+token+' '+label+' stroke contrast').toBeGreaterThanOrEqual(1.5);
+    expect(now.opacity,skin+' '+token+' '+label+' opacity').toBeGreaterThanOrEqual(.9);
+    if(label==='selected'){expect(now.dash,skin+' '+token+' selection dashes').not.toBe('none');expect(now.width).toBeGreaterThanOrEqual(2);}
+  }
+  return seen;
 }
 /* Reads every card in `scope` and checks rows K1–K4 for one skin. */
 async function auditCards(page,scope,skin){
@@ -339,10 +369,41 @@ test('every node style preset stays readable, bordered and distinct in the edito
   await page.locator('#workspace-appearance>summary').click();
   const editorSkins=await page.locator('#workspace-appearance-body button[id^="sk-"]').evaluateAll(buttons=>buttons.map(b=>b.id.slice(3)));
   expect(editorSkins.sort()).toEqual(['aurora','blueprint','lavender','lilac','pastel','rose','terminal']);
+  const section=page.locator('#section-overview'),ids=Object.keys(styledDiagram().nodes);let lastResting=null;
   for(const skin of editorSkins){
     await page.locator('#sk-'+skin).click();await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
-    await auditCards(page,'#section-overview',skin);
+    const resting=await auditCards(page,'#section-overview',skin);lastResting=resting;
+    // K5: Step mode, then the first step lights every card.
+    await section.getByRole('button',{name:'Step',exact:true}).click();await section.locator('button.schip').first().click();
+    await expect(section.locator('[data-dv-node="rose"]')).toHaveClass(/\blit\b/);
+    await auditState(page,'#section-overview',skin,resting,'lit');
+    await section.getByRole('button',{name:'Ambient',exact:true}).click();await expect(section.locator('[data-dv-node="rose"]')).not.toHaveClass(/\blit\b/);
+    // Choosing a step chip also selects that step in the editor, whose member cards keep the editor's dashed
+    // membership stroke; the fill and text return to rest here, and the reader page below checks the stroke.
+    await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
+    const afterStep=await page.evaluate(()=>{const g=document.querySelector('#section-overview [data-dv-node="rose"]');return {fill:getComputedStyle(g.querySelector('.card')).fill,t1:getComputedStyle(g.querySelector('.t1')).fill};});
+    expect(afterStep).toEqual({fill:resting.rose.fill,t1:resting.rose.t1});
+    // K6: select every node, then clear.
+    await section.locator('[data-dv-node="'+ids[0]+'"]').focus();await page.keyboard.press('Enter');
+    for(const id of ids.slice(1)){await section.locator('[data-dv-node="'+id+'"]').focus();await page.keyboard.press('Shift+Enter');}
+    await expect(page.locator('.dv-sel[data-dv-node]')).toHaveCount(ids.length);
+    await auditState(page,'#section-overview',skin,resting,'selected');
+    await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
   }
+  // K7: the SVG export of this section keeps the resting preset paint of the current skin (the export
+  // strips editor state such as focus and selection, so it is compared with the resting audit).
+  const liveCards=lastResting;
+  await section.locator('[data-dv-node="plain"] .t1').click();await closeTools(page);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
+  const svg=await (await import('node:fs/promises')).readFile(await (await download).path(),'utf8');
+  for(const token of STYLE_TOKENS)expect(svg,token+' class survives export').toMatch(new RegExp('class="node[^"]*\\bns-'+token+'\\b'));
+  const reader=await page.context().newPage();await reader.goto('data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64'));
+  const exported=await reader.evaluate(tokens=>{
+    const read=g=>{const card=getComputedStyle(g.querySelector('.card'));return {fill:card.fill,stroke:card.stroke};};
+    const out={plain:read(document.querySelector('g.node:not(.node-styled)'))};
+    for(const token of tokens)out[token]=read(document.querySelector('g.node.ns-'+token));return out;},STYLE_TOKENS);
+  await reader.close();
+  for(const id of ['plain',...STYLE_TOKENS])expect(exported[id],id+' exported paint').toEqual({fill:liveCards[id].fill,stroke:liveCards[id].stroke});
 });
 
 test('the standalone reader paints presets in Daylight and Editorial and keeps the lit-step highlight on a styled card (K1–K5)',async({page,server})=>{
@@ -352,18 +413,40 @@ test('the standalone reader paints presets in Daylight and Editorial and keeps t
     const spec=path.join(server.root,'node-styles-'+skin+'.json');await writeFile(spec,JSON.stringify(raw));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),spec,path.join(repo,'template/flowview.html'),path.join(server.root,'node-styles-'+skin+'.html')]);
     await page.goto(server.origin+'/node-styles-'+skin+'.html');await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
-    await auditCards(page,'#section-flow',skin);
+    const resting=await auditCards(page,'#section-flow',skin);
+    // K5 in the reader: Step mode, first step lights every card.
+    await page.getByRole('button',{name:'Step',exact:true}).first().click();await page.locator('button.schip').first().click();
+    await expect(page.locator('[data-dv-node="rose"]').first()).toHaveClass(/\blit\b/);
+    await auditState(page,'#section-flow',skin,resting,'lit');
+    await page.getByRole('button',{name:'Ambient',exact:true}).first().click();
+    await expect(page.locator('[data-dv-node="rose"]').first()).not.toHaveClass(/\blit\b/);
   }
   const node=id=>page.locator('[data-dv-node="'+id+'"]').first();
   await expect(node('rose')).toHaveClass(/\bns-rose\b/);await expect(node('rose')).toHaveAttribute('data-dv-style','rose');
   await expect(node('plain')).not.toHaveAttribute('data-dv-style');
-  const card=async id=>node(id).locator('.card').evaluate(el=>({fill:getComputedStyle(el).fill,stroke:getComputedStyle(el).stroke}));
-  expect((await card('rose')).fill).not.toBe((await card('plain')).fill);
-  await page.getByRole('button',{name:'Step',exact:true}).first().click();await page.locator('button.schip').first().click();
-  await expect(node('rose')).toHaveClass(/\blit\b/);
-  const lit=await card('rose');
-  await page.getByRole('button',{name:'Ambient',exact:true}).first().click();
-  await expect(node('rose')).not.toHaveClass(/\blit\b/);
-  const unlit=await card('rose');
-  expect(lit.stroke).not.toBe(unlit.stroke);expect(unlit.fill).toBe(lit.fill);
+});
+
+test('the Confluence and Backstage hosts paint presets through their own stylesheets (H1, H2)',async({page,server})=>{
+  // H1: Forge viewer with a pasted styled spec in a dark skin.
+  await page.addInitScript(()=>{window.__bridge={callBridge:async(method)=>{
+    if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config:{},macro:{isConfiguring:true}}};
+    if(['submit','close','navigate'].includes(method))return true;throw Error('Unexpected bridge call: '+method);}};});
+  await page.goto(server.origin+'/forge/index.html');await expect(page.locator('#app-status')).toBeHidden();
+  const raw={page:{title:'Styled host',skin:'aurora',sections:[{id:'flow',heading:'Flow',diagram:{view:'ambient',...styledDiagram()}}]}};
+  await page.locator('#spec-input').fill(JSON.stringify(raw,null,2));await page.locator('#validate').click();
+  await expect(page.locator('#docview [data-dv-node="rose"]')).toHaveClass(/\bns-rose\b/);
+  await auditCards(page,'#docview','aurora');
+  // H2: the packaged Backstage components, scoped styles and all.
+  await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
+  await page.evaluate(()=>{__host.left(true);});
+  const alpha=page.locator('#alpha');await expect(alpha.locator('[data-dv-node="camera"]').first()).toHaveClass(/\bns-rose\b/);
+  // The packaged components render inside a shadow root; locators pierce it, so read each card through one.
+  const read=id=>alpha.locator('[data-dv-node="'+id+'"]').first().evaluate(g=>{const card=getComputedStyle(g.querySelector('.card'));return {fill:card.fill,stroke:card.stroke,t1:getComputedStyle(g.querySelector('.t1')).fill,t2:getComputedStyle(g.querySelector('.t2')).fill};});
+  const cards={camera:await read('camera'),service:await read('service')};
+  // The fixture opens in Step mode, so the sibling's stroke may be the lit ring; its fill and text stay the pastel legacy colors.
+  expect({fill:cards.service.fill,t1:cards.service.t1,t2:cards.service.t2}).toEqual({fill:LEGACY_CARD.pastel.fill,t1:LEGACY_CARD.pastel.t1,t2:LEGACY_CARD.pastel.t2});
+  expect(cards.camera.fill).not.toBe(cards.service.fill);expect(cards.camera.t1).not.toBe(cards.service.t1);
+  expect(contrastRatio(cards.camera.t1,cards.camera.fill)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(cards.camera.t2,cards.camera.fill)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(cards.camera.stroke,cards.camera.fill)).toBeGreaterThanOrEqual(1.3);
 });

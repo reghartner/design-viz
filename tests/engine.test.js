@@ -4999,7 +4999,10 @@ test('node style presets: the reader hosts and the documentation carry the featu
     assert.ok(/\bstyle\b/.test(text), file + ' names the style field');
     for (const token of C.NODE_STYLE_SET) assert.ok(new RegExp('\\b' + token + '\\b').test(text), file + ' lists ' + token);
   }
-  assert.ok(/`style`/.test(docs['contract/authoring-contract.md']), 'the field reference documents `style`');
+  const bullet = /- `style` — optional preset node style, one of: `([a-z ]+)`/.exec(docs['contract/authoring-contract.md'].replace(/\n\s+/g, ' '));
+  assert.ok(bullet, 'the field reference has a `style` bullet naming it optional with the token list');
+  assert.deepStrictEqual(bullet[1].split(' '), [...C.NODE_STYLE_SET]);
+  assert.match(docs['src/boot.workbench.js'], /node styles[^\n]*omit for the skin default/, 'the agent prompt says the field is optional');
 });
 
 test('node style presets: exports declare media.node-styles only when a node carries a style (N8)', () => {

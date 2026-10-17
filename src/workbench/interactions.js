@@ -574,7 +574,7 @@ function createBuilderInteractions(opts){
                      id: target.id, index: target.index, card:target.card, bulletPath:target.bulletPath,
                      block: target.block, tab: target.tab, layoutId:target.layoutId};
     /* setSelected paints first; publish the stable authored identity after it
-       is assigned so selection mirrors (Layers, clipboard context) see it. */
+       is assigned so selection mirrors (clipboard context) see it. */
     selectionChanged();
     if (target.kind !== 'tab' && target.kind !== 'document') session.insertSection = target.section;
     var parsed = parseEditor();

@@ -713,13 +713,11 @@ to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to
 release the pin, or **in rows** to return the node to the grid. Row nodes retain
 their row insertion/swap gestures. See `docs/free-node-placement.md`.
 
-The **Layers** rail lists the active section's ordinary graph nodes in authored
-placement order (rows and stacks, then floats, then unplaced definitions), with
-search, selection sync, per-node position locks, and a one-edit **Lock row** action
-that pins the row's member nodes through those same node locks. Unlocking keeps
-the explicit pinned position. The same lock is available in **Inspect → position
-lock**. Layers works in Standard and Explore; imported
-topology members, groups, panels, visibility, and z-order are not layers.
+A graph node's position lock is set from **Inspect → Keep position fixed** or the
+node's right-click **Lock position**; a multi-node selection offers **Lock selected
+positions**. Each writes `locked: true` and pins the node as explicit free placement
+in one edit. Unlocking keeps the explicit pinned position. Locks work in Standard
+and Explore.
 
 Optional `dx` / `dy` (numbers, px) manually nudge a float from its computed
 spot — a below float pinned under a tall last row can be raised into the

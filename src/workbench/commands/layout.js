@@ -7,7 +7,7 @@ function builderLockedNodeIds(d,ids){
 }
 function builderNodePositionLocked(d,id){return !!(d && d.nodes && d.nodes[id] && d.nodes[id].locked===true);}
 /* A pin is an absolute float. Lifting raw-authored locked row nodes here makes
-   old/manual JSON obey the same invariant as the Layers and Inspect controls. */
+   old/manual JSON obey the same invariant as the Inspect and object-menu controls. */
 function builderFreezeLockedPositions(d,positions,onlyIds){
   var locked=builderLockedNodeIds(d,onlyIds),wanted=new Set(locked);if(!locked.length)return false;
   var before=JSON.stringify([d.rows,d.floats]);

@@ -60,8 +60,8 @@ Field references: `python3 tools/widget_doc.py sequence frames reads locus funne
    in frame 1, then the same grid.
 
 Author your own story by replacing the sequences, reads and counts. Each panel
-handles out-of-span coordinates in its own way (some warn and drop, some clip,
-`reads` lists a read that lies outside the reference without cells); the
-contract bullet printed by `python3 tools/widget_doc.py <type>` states the rule
-for that panel. Run `node tools/validate.js <spec>` after editing: every
+has its own rule for coordinates outside its declared span (for example,
+`reads` lists a read that lies outside the reference as a row without cells);
+the contract bullet printed by `python3 tools/widget_doc.py <type>` states the
+rule for that panel. Run `node tools/validate.js <spec>` after editing: every
 boundary decision that the validator makes is reported with its source path.

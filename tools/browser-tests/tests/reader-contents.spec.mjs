@@ -353,7 +353,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    H3 hover-intent overlay | real hover on marker 2 | .reader-contents visible with .reader-contents-overlay, opened 150–700ms after the rail's pointerenter; its left edge = rail right; #section-overview box unchanged; toggle still aria-expanded=false | a 0ms open; the pinned push sidebar; an overlay that moves the page
    H4 numbered entries match | overlay open | each .reader-tree-tab .reader-part-number = the rail marker text in order and its name = the marker's name | unnumbered Contents; numbers that drift from the rail
    H5 only current part expanded | overlay open on part 2 | .reader-tree-tab aria-expanded = [false,true,false×4] | the pinned all-expanded tree in the overlay
-   H6 mouse leave closes | real mouse move to the page centre | overlay hidden, toggle aria-expanded=false | an overlay that stays until clicked
+   H6 mouse leave closes after a delay | real mouse move from the marker into the overlay, then to the page centre | crossing into the overlay keeps it open 600ms later; leaving it hides it 150–1000ms after the pointerleave; toggle aria-expanded=false | an overlay that stays until clicked; one that closes the instant the pointer leaves the rail
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
    K1 click pins | real click on marker 4 while the overlay is open | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; tab label "Smart motion"; pager "Section 4 of 6"; every Contents Tab aria-expanded=true (#607) | a click that only navigates; a pinned panel that keeps the overlay tree
    K2 keyboard | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=true, pager "Section 5 of 6", focus on the current Contents row inside "Day-one setup" | mouse-only markers; a marker that pins without navigating
@@ -366,7 +366,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    B1 Backstage native | atlas() through nativeViewer.js in a 1200x800 shadow host | rail visible inside the host with the six named markers; hover opens the overlay beside the rail without moving the page; Escape closes; the overlay's "Pin Contents open" pins (toggle expanded, rail hidden); Next → "Section 3 of 6" | fixing only the standalone viewer
    W1 Workbench reader | atlas() pasted into workbench.html | after closing Contents: rail with six named markers left of the Workbench tool rail; hover opens the overlay; pager "Section 1 of 6", Next → "Section 2 of 6" with marker 2 current | fixing only the viewer bundle
    N1 phone hides the rail | atlas() at 390x844 (read-only mobile) | .reader-rail hidden; #section-overview left < 44; Next → "Section 3 of 6"; widening to 1440 shows the rail with its single current marker = the pager's part | a rail covering phone content
-   M1 many parts scroll | 30 one-section prose Tabs at 1440x900, Tab link #t=part-28, Contents closed | rail bottom = 900; .reader-rail-list scrollHeight > clientHeight; marker 28 is current and its box lies inside the list's box; .reader-rail-count "28/30" inside the rail | a rail that overflows the window or hides the current marker off-list
+   M1 many parts scroll | 30 one-section prose Tabs at 1440x900, Tab link #t=part-28, Contents closed | rail bottom = 900; .reader-rail-list scrollHeight > clientHeight; marker 28 is current and its box lies inside the list's box; the rail's own .reader-rail-count reads "28/30" and its box lies inside the rail's box | a rail that overflows the window or hides the current marker off-list
    C1 current marker contrast | every theme in the picker at 1440, Contents closed | current marker text vs its own filled background >= 4.5:1 | accent-on-accent or dark-on-dark text in the dark skins */
 function atlas(skin='pastel'){
   const base=story(skin).page.sections[0].tabs[0].sections[0],section=(id,heading)=>({...structuredClone(base),id,heading});
@@ -381,14 +381,14 @@ const railOf=root=>root.locator('.reader-rail'),marksOf=root=>railOf(root).getBy
 async function closeContents(root){const toggle=root.locator('.reader-top>button');await expect(toggle).toHaveAttribute('aria-expanded','true');await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();}
 async function expectCurrentPart(root,index){
   const marks=marksOf(root);await expect(marks.nth(index)).toHaveAttribute('aria-current','page');await expect(railOf(root).locator('[aria-current="page"]')).toHaveCount(1);
-  await expect(root.locator('.reader-rail-count')).toHaveText((index+1)+'/'+atlasParts.length);
+  await expect(railOf(root).locator('.reader-rail-count')).toHaveText((index+1)+'/'+atlasParts.length);
 }
 async function expectRailMarkers(root){
   const marks=marksOf(root);await expect(marks).toHaveText(atlasParts.map((_,i)=>String(i+1)));
   for(let i=0;i<atlasParts.length;i++)await expect(marks.nth(i)).toHaveAccessibleName(atlasParts[i]);
 }
 // Observe (never drive) the panel: log the rail's pointerenter and every show/hide of .reader-contents.
-async function watchOverlay(nav){await nav.evaluate(el=>{const side=el.querySelector('.reader-contents'),rail=el.querySelector('.reader-rail'),log=el.__overlayLog=[];rail.addEventListener('pointerenter',()=>log.push({type:'enter',t:performance.now()}));new MutationObserver(()=>log.push({type:side.hidden?'hidden':'shown',t:performance.now()})).observe(side,{attributes:true,attributeFilter:['hidden']});});}
+async function watchOverlay(nav){await nav.evaluate(el=>{const side=el.querySelector('.reader-contents'),rail=el.querySelector('.reader-rail'),log=el.__overlayLog=[];rail.addEventListener('pointerenter',()=>log.push({type:'enter',t:performance.now()}));[rail,side].forEach(target=>target.addEventListener('pointerleave',()=>log.push({type:'leave',t:performance.now()})));new MutationObserver(()=>log.push({type:side.hidden?'hidden':'shown',t:performance.now()})).observe(side,{attributes:true,attributeFilter:['hidden']});});}
 const takeLog=nav=>nav.evaluate(el=>el.__overlayLog.splice(0));
 async function expectNeverShown(page,nav,ms=600){await page.waitForTimeout(ms);expect((await takeLog(nav)).filter(entry=>entry.type==='shown')).toEqual([]);await expect(nav.locator('.reader-contents')).toBeHidden();}
 async function expectHoverOverlay(page,root,index){
@@ -419,7 +419,10 @@ test('#622 closed Contents shows a numbered rail, a hover overlay that pins on c
   const tabs=root.locator('.reader-tree-tab');await expect(tabs).toHaveCount(6);
   for(let i=0;i<6;i++){await expect(tabs.nth(i).locator('.reader-part-number')).toHaveText(String(i+1));await expect(tabs.nth(i)).toHaveAccessibleName(atlasParts[i]);}
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(['false','true','false','false','false','false']);
-  await page.mouse.move(900,500);await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  const overlay=await side.boundingBox();await page.mouse.move(overlay.x+overlay.width/2,overlay.y+overlay.height/2);await page.waitForTimeout(600);await expect(side).toBeVisible();
+  await takeLog(nav);await page.mouse.move(900,500);await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  const closing=await takeLog(nav),left=closing.find(entry=>entry.type==='leave'),hidden=closing.find(entry=>entry.type==='hidden');
+  expect(left && hidden,'pointerleave then hide').toBeTruthy();expect(hidden.t-left.t).toBeGreaterThanOrEqual(150);expect(hidden.t-left.t).toBeLessThanOrEqual(1000);
   await marksOf(root).nth(1).hover();await expect(side).toBeVisible();await page.keyboard.press('Escape');await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
   await page.mouse.move(900,500);await expectHoverOverlay(page,root,3);await marksOf(root).nth(3).click();
   await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).toBeVisible();await expect(side).not.toHaveClass(/reader-contents-overlay/);expect((await side.boundingBox()).x).toBe(navBox.x);await expect(railOf(root)).toBeHidden();
@@ -459,9 +462,10 @@ test('#622 a long document scrolls its rail and keeps the current marker in view
   await expect(root.locator('.reader-page-label')).toHaveText('Section 28 of 30');await closeContents(root);
   const rail=await railOf(root).boundingBox();expect(rail.y+rail.height).toBe(900);await expect(marksOf(root)).toHaveCount(30);
   const list=root.locator('.reader-rail-list');expect(await list.evaluate(el=>el.scrollHeight>el.clientHeight)).toBe(true);
-  await expect(marksOf(root).nth(27)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-rail-count')).toHaveText('28/30');
-  const box=await list.boundingBox(),mark=await marksOf(root).nth(27).boundingBox(),count=await root.locator('.reader-rail-count').boundingBox();
-  expect(mark.y).toBeGreaterThanOrEqual(box.y);expect(mark.y+mark.height).toBeLessThanOrEqual(box.y+box.height);expect(count.y+count.height).toBeLessThanOrEqual(rail.y+rail.height);
+  const counter=railOf(root).locator('.reader-rail-count');await expect(marksOf(root).nth(27)).toHaveAttribute('aria-current','page');await expect(counter).toHaveText('28/30');await expect(counter).toBeVisible();
+  const box=await list.boundingBox(),mark=await marksOf(root).nth(27).boundingBox(),count=await counter.boundingBox();
+  expect(mark.y).toBeGreaterThanOrEqual(box.y);expect(mark.y+mark.height).toBeLessThanOrEqual(box.y+box.height);
+  expect(count.x).toBeGreaterThanOrEqual(rail.x);expect(count.x+count.width).toBeLessThanOrEqual(rail.x+rail.width);expect(count.y).toBeGreaterThanOrEqual(box.y+box.height);expect(count.y+count.height).toBeLessThanOrEqual(rail.y+rail.height);
 });
 
 test('#622 Backstage native reader shows the rail, hover overlay, pin and part pager',async({page,server})=>{

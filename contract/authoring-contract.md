@@ -1021,6 +1021,43 @@ perspectives" of one timeline). Types:
 - `leds` — indicator dots: `{"id":"leds","type":"leds","leds":[{"id":"radio",
   "label":"RADIO"}],"initial":{"radio":"on"}}`. Patch values per led id:
   `on` `off` `tx` `rx` (tx/rx pulse).
+- `frames` — reading frames: a 3–120-letter nucleotide sequence with its three
+  forward frames translated to one-letter amino acids under it, for teaching
+  frames, frameshifts, where a stop appears and a chosen protein motif:
+  `{"id":"orf","type":"frames","label":"ORF candidate","alphabet":"dna",
+  "sequence":"ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG","start":1,
+  "initial":{"frame":"all","showStops":true}}`. Declare `sequence` (string;
+  whitespace is removed, letters upper-cased; fewer than 3 letters warns and
+  translates nothing, more than 120 warns and renders the first 120; letters
+  outside the alphabet warn, render as unknown and translate to `X`),
+  `alphabet` (`dna` ACGTN default or `rna` ACGUN; anything else warns and uses
+  dna), `start` (1-based coordinate of the first letter, safe integer ≥ 1,
+  default 1), optional `label` text and `initial`. Translation uses the
+  standard genetic code; a trailing partial codon is omitted; codons containing
+  N or an unknown letter translate to `X`. State fields (sparse, carried, `null`
+  clears): `frame` — `1`, `2`, `3` (numbers or numeric strings) or `"all"`
+  (default): the emphasised frame; the other two dim. `marks` — full snapshot
+  of up to 24 nucleotide ranges `{id,from,to,tone?,label?}` exactly as in
+  `sequence` (1-based inclusive coordinates respecting `start`, clipped to the
+  span; a range entirely outside it, a `from` > `to`, a missing id or an
+  unknown tone warns by exact path; later marks draw on top; labelled marks
+  list in the legend). `motif` — a protein pattern of 1–12 one-letter amino
+  acids where `X` matches any residue except a stop and `*` matches a stop
+  (e.g. `RXXR`, case-insensitive); every match in every frame, overlaps
+  included, highlights its codons with tone `motif`; invalid characters or
+  lengths warn and the motif is ignored. `showStops` — boolean, default true:
+  stop codons show `*` on a `bad` cell; false shows a quiet dot. `note`.
+  Unknown state fields warn and are ignored; an invalid step value is ignored
+  and the carried value stays. `enterOnce` follows normal panel state. The
+  display is a scrolling monospace grid: a ruler numbered every ten
+  coordinates, the nucleotides coloured per letter, a mark band when marks
+  exist, then rows F1–F3 whose amino-acid cells span three columns at their
+  frame offset, plus a legend/key naming marks, the motif match count and the
+  stop colour. `framesModel(panel,state)` returns `letters[{ch,coord}]`,
+  `frames[{index,codons[{at,coord,codon,aa,stop,motif}],active}]` (`at` is the
+  zero-based index of the codon's first letter) and
+  `motifMatches[{frame,at,length}]` (`at` of the first matched codon; `length`
+  in codons). Picker category Science & sequencing. Desktop-only editing.
 - `gauge` — numeric bar: `{"id":"pw","type":"gauge","unit":"mA","max":400,
   "initial":{"value":2}}`. Patched via `{"value": <number>}`.
 - `replicas` — aligned positions for replicas, event consumers or device/cloud
@@ -1161,6 +1198,98 @@ perspectives" of one timeline). Types:
   Linked engineering node counts deduplicate node ids per route. Node removal
   removes the reference, retaining the cost line. No tiering, currency conversion
   or engineering labor is inferred. See [messaging costs](../cookbook/messaging-cost.md).
+- `funnel` — stage counts for any filtering pipeline: horizontal bars, one per
+  stage, with the authored number of items that remain, the share retained
+  relative to the first known count, and the drop between consecutive known
+  stages ("−12,340 (−4.1%)"). Declare 2–12 `stages:[{id,label?,tone?}]` in
+  pipeline order; ids are unique, start with a letter or digit and use only
+  letters, digits, `-` or `_` (they key the `counts` object). `label` defaults
+  to the id; `tone` is one of the shared sequence-teaching tones (`neutral
+  accent insert mismatch motif primer cut feature good bad`) and colours that
+  bar. Optional `unit` is the item noun shown in the footer and accessible text
+  (default `items`). Starting and step state accept `counts`, `active` and
+  `note`. `counts` is an object keyed by stage id whose values are non-negative
+  safe integers or `null` (not yet known). Patches merge sparsely into the
+  carried counts: an omitted stage keeps its earlier count, a stage set to
+  `null` is forgotten, and `counts: null` forgets every stage. Unknown stage ids
+  and invalid values warn and are ignored without touching the other keys.
+  `active` is the stage id being computed (animated stripe and a "computing"
+  tag); `null` clears it. `enterOnce` may carry any of these fields for one step
+  only. Malformed or missing stages, duplicate ids, bad tones, unknown fields,
+  bad units and non-object patches warn with the exact path and never throw.
+  Unknown counts render an empty track with "—" and are skipped when measuring
+  drops, so a drop is always measured against the previous *known* stage. A
+  count larger than the previous known count is never a negative drop: the row
+  is flagged `grew` and shows a "+n (+p%) grew" badge. Bars share one scale (the
+  largest known count) and grow in with the shared bar-entrance motion when a
+  stage first becomes known; reduced-motion disables stripes and transitions.
+  `funnelModel(panel, state)` returns rows `{id,label,tone,count,known,pct,
+  dropped,droppedPct,gained,gainedPct,grew,barPct,active}` plus `total` (first
+  known count), `remaining` (last known), `retainedPct` and `unit`. Numbers are
+  authored teaching values, never computed from data files.
+- `grid` — a small value matrix (heatmap): a real `<table>` with row and column
+  headers whose cells are coloured by value, with optional significance marks
+  and row/column/cell emphasis. Declare 1–12 `rows:[{id,label?}]` and 1–12
+  `cols:[{id,label?}]`; ids are unique, dot-free, start with a letter or digit
+  and use only letters, digits, `-` or `_`, because cells are keyed
+  `"<rowId>.<colId>"`. Optional `scale:{min?,max?,mid?,kind?}`: `kind` is
+  `sequential` (default, low → high) or `diverging` (low → mid → high); `min`
+  and `max` are finite numbers with `min < max`, and either or both may be
+  omitted to use the current step's values (no numbers at all falls back to
+  0–1 without a warning); `mid` must lie strictly between `min` and `max` and
+  defaults to `(min+max)/2`. `decimals` is 0–4 (default 2); `unit` is optional
+  suffix text for tooltips and the colour key. Starting and step state accept
+  `cells`, `marks`, `highlight` and `note`. `cells` maps cell keys to finite
+  numbers or `null`; `marks` maps cell keys to `"*"`, `"**"`, `"***"`, `"ns"` or
+  `""`. Both merge sparsely into the carried objects: an omitted key keeps its
+  value, a key set to `null` is forgotten, and `cells: null` / `marks: null`
+  forget everything. Unknown keys and invalid values warn and are ignored
+  without touching other keys. `highlight` is `{row?,col?,cell?}` (declared ids
+  / a cell key, each nullable) or `null`; it outlines the matching headers and
+  cells. `enterOnce` may carry any of these fields for one step only. Malformed
+  axes, duplicate or unsafe ids, bad scales, decimals, units, unknown fields and
+  non-object patches warn with the exact path and never throw. Values outside
+  authored bounds clamp; identical values sit mid-scale; nothing renders as
+  NaN. Cell text is `toLocaleString` with the declared decimals; unknown cells
+  show "—" with an empty outline; marks render as a superscript; cells beyond
+  half intensity switch to light text. The key under the table shows the scale
+  bounds and "auto" when they came from the data. `gridModel(panel, state)`
+  returns `rows[{id,label,highlight,cells[{key,row,col,value,known,text,mark,
+  intensity (0–1, never NaN),side,depth,highlight,rowHighlight,colHighlight}]}]`,
+  `cols`, `scale {kind,min,max,mid,auto}`, `decimals`, `unit` and `count`.
+  Every number is authored; nothing is computed from data files.
+- `locus` — a linear genome map: a horizontal bar with features on up to four
+  stacked rows, point markers above it, arcs that connect two positions, and a
+  ruler with nice ticks. Every position is a 1-based base typed in the spec;
+  nothing is computed from data files. Declare `length` (required safe integer
+  1–10,000,000,000; an invalid length warns and renders an empty card),
+  optional `unit` `"bp"` (default) | `"kb"` | `"Mb"` for ruler and distance
+  labels (positions are still authored in bp), optional `label`, and up to 48
+  `features:[{id,label?,from,to,tone?,strand?,row?}]` with unique string ids
+  and `from ≤ to`. A range entirely outside the length warns and is skipped; a
+  range past the end warns and clips. `tone` is a shared bio tone (default
+  `feature`), `strand` `"+"`/`"-"` adds a chevron, `row` is 0–3. Explicit rows
+  are placed first; the rest take the first row with no overlap in authored
+  order, and when all four rows overlap the feature shares the last row and
+  is flagged crowded in its tooltip. Starting and step state accept `markers`
+  (full snapshot ≤ 24 `{id,at,label?,tone?}` pins above the bar, default tone
+  `accent`), `arcs` (≤ 12 `{id,from,to,label?,tone?}` connectors above the bar;
+  `from > to` draws a dashed arc; the apex label is `label` or the distance
+  `|to − from|` in the declared unit; `from === to` warns and is skipped),
+  `window` (`{from,to}` zoom: only that span renders, the ruler re-labels and
+  features or arcs crossing an edge clip; `null` shows the whole length; a
+  window outside the length warns and is ignored, one past the end clips),
+  `highlight` (feature id emphasised while the rest dim; unknown ids warn) and
+  `note`. Positions beyond the length warn and are skipped; markers and arcs
+  outside the window are hidden. Unknown state fields warn. A patch field with
+  the wrong shape is ignored and the carried value stays. Sparse patches and
+  `enterOnce` follow normal panel state. The ruler picks 5–10 ticks at 1, 2,
+  2.5 or 5 × 10ⁿ (fewer for very short windows). `locusModel(panel, state)`
+  exposes the pure geometry (percent positions, rows, arcs, ticks). Rendering
+  is a stretched inline SVG (`viewBox 0 0 1000 H`, `preserveAspectRatio="none"`,
+  non-scaling strokes) under HTML overlays for blocks and labels so text keeps
+  its size, plus a legend of the visible features; the map has `role="img"`
+  with a summary `aria-label`. Editing is desktop-only.
 - `log` — appending monospace event lines: `{"id":"log","type":"log",
   "tags":{"NET":"#38E1FF"}}`. Patched via
   `{"log":[{"tag":"NET","text":"line"}]}` — log patches APPEND. Log panels
@@ -1189,6 +1318,39 @@ perspectives" of one timeline). Types:
   `reason` is ignored (both with validator warnings). Under reduced motion
   the message and its context labels render statically; in print the held
   state shows the label and the reason line.
+- `reads` — a read alignment: a short authored reference with sequencing reads
+  stacked under it, aligned by coordinate, with mismatches, deletion gaps,
+  insertions and soft clips visible and a coverage depth bar above the
+  reference. A teaching display: nothing is computed from data files. Declare
+  `reference` (1–240 letters; whitespace is removed; invalid letters warn and
+  render as unknown; longer text truncates with a warning), `alphabet` `"dna"`
+  (default) | `"rna"`, `start` (1-based coordinate of the first reference
+  letter, default 1), optional `label`, `maxReads` 1–24 (default 12) and
+  `showMatches` (default false: matching letters render as `.`). Starting and
+  step state accept `reads` (full snapshot of at most `maxReads`
+  `{id,at,seq,label?,strand?,tone?}`; `at` is the reference coordinate of the
+  first aligned letter; `seq` uses alphabet letters and `-` for a deletion gap;
+  letters beyond the reference render dimmed as soft clips, at most 12 per
+  side with further letters counted as "… n"; a read entirely outside the
+  reference warns and is listed without cells; extra reads warn and are
+  ignored), `inserts` (≤ 24 `{read,after,seq}` with 1–24 inserted letters that
+  sit between reference coordinate `after` and `after+1` in that read, drawn as
+  a `▲` wedge on the read cell with the letters in its tooltip and the legend;
+  the reference never shifts; an insertion naming a missing read or a
+  coordinate the read does not cover stays in the legend as unplaced), `focus`
+  (read id to emphasise while the rest dim; `null` none), `showDepth` (default
+  true), `marks` (≤ 24 `{id,from,to,tone?,label?}` reference ranges drawn as a
+  band under the reference and listed in the legend; ranges partly outside
+  clip, ranges entirely outside warn and are skipped) and `note`. A mismatch is
+  a read letter that differs from the reference letter case-insensitively; `N`
+  on either side matches. Depth counts aligned letters (match or mismatch) per
+  reference position, never gaps or clips. Unknown state fields warn; a patch
+  field with the wrong shape is ignored and the carried value stays. Sparse
+  patches and `enterOnce` follow normal panel state. `readsModel(panel, state)`
+  exposes rows with per-cell `match|mismatch|gap|clip`, insertions, depth and
+  the grid. The grid scrolls horizontally when wider than the card; residue
+  colours and tones reuse the sequence panel's shared classes. Editing is
+  desktop-only.
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
   `{"mode":"off|boot|active|live|rec|save|playing|unavailable", "banner":"<save-banner text>"}`.
@@ -1688,6 +1850,47 @@ perspectives" of one timeline). Types:
   the placement map updates its declaration coordinates across all steps/paths,
   without changing any step patch or room occupants. Moves stay in the frame
   and commit as one undo action; Escape cancels. See [the editing guide](../docs/homemap-workbench.md).
+- `sequence` — sequence track: one short nucleotide or protein sequence as a
+  row of monospace letters with a coordinate ruler, highlighted ranges, an
+  optional cursor, a zoom window and a reveal boundary, for teaching "where is
+  this feature, on which strand, at what coordinate":
+  `{"id":"ref","type":"sequence","label":"Reference","alphabet":"dna",
+  "sequence":"ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG","start":1,"strand":"+",
+  "wrap":60,"initial":{"marks":[{"id":"start","from":1,"to":3,"tone":"good",
+  "label":"Start codon"}]}}`. Declare `sequence` (string, 1–240 letters after
+  whitespace removal, upper-cased; empty or non-string warns and the panel
+  renders empty; more than 240 warns and renders the first 240; letters
+  outside the alphabet warn and render as unknown), `alphabet` (`dna` ACGTN
+  default, `rna` ACGUN or `protein` one-letter amino acids plus `X` and `*`;
+  anything else warns and uses dna), `start` (1-based coordinate of the first
+  letter, safe integer ≥ 1, default 1; marks, cursor and window use these
+  coordinates), `strand` (`"+"` default or `"-"`, a label only — nothing is
+  recomputed), optional `label` text, `wrap` (letters per row, 20–120, default
+  60) and `initial`. State fields (sparse, carried, `null` clears): `marks` —
+  full snapshot array of up to 24 `{id,from,to,tone?,label?}` with 1-based
+  inclusive coordinates; ranges are clipped to the declared span; a range
+  entirely outside it, a `from` > `to`, a non-position `from`/`to`, a missing
+  or duplicate id, an unknown tone (`neutral accent insert mismatch motif
+  primer cut feature good bad`, default neutral) or a non-text label warns by
+  exact path (`….marks[2].from`); overlapping marks are allowed and later marks
+  draw on top; labelled marks list in a legend under the letters. `cursor` —
+  one coordinate within the span, drawn as a bracket under that letter with
+  its number; it glides between letters of the same row (no motion under
+  reduced motion); `null` hides it. `window` — `{from,to}` zoom: only those
+  coordinates render, with a "… n more" cue at each end; `null` shows all.
+  `reveal` — integer 0–length: letters beyond it render dimmed ("the
+  sequencer has read this far"); omit or `null` reveals all. `note`. Unknown
+  state fields warn and are ignored; an invalid step value is ignored and the
+  carried value stays. `enterOnce` follows normal panel state. Letters are
+  coloured per residue (A green, C blue, G amber, T/U red, N grey; protein
+  letters by chemistry group), the ruler is numbered every ten coordinates,
+  and marks draw as a coloured band under the letters. The group carries an
+  `aria-label` summarising the visible span, marks, cursor and reveal.
+  `sequenceModel(panel,state)` returns the clean span, window, cursor, marks,
+  legend and `rows[{from,to,letters[{ch,coord,cls,tone,revealed,cursor}]}]`.
+  This panel also owns the shared `.bio-b-*` letter and `.bio-tone-*` colour
+  classes reused by the other Science & sequencing panels. Desktop-only
+  editing.
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",
   "transport":"wifi"},{"id":"cell","label":"Cellular","transport":

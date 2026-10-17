@@ -11,6 +11,7 @@ topology, notification or outcome without evidence.
 | Shared icons, per-step card icons, company branding | `docs/shared-icons.md`, `examples/shared-icons/shared-icons.spec.json` |
 | Battery drain, low battery, charging | `cookbook/battery-level.md`, `python3 tools/widget_doc.py battery` |
 | Operation cost breakdowns, messaging costs, visual cost differences, compact cost charts | `cookbook/messaging-cost.md`, `python3 tools/widget_doc.py cost`; start from `src/starters/operation-cost.json` for one operation or `src/starters/messaging-cost.json` for two routes |
+| Sequences, aligned reads, insertions or variants, genome or plasmid maps, pipeline stage counts, reading frames, small heatmaps (teaching pages) | `cookbook/sequence-panels.md`, `python3 tools/widget_doc.py sequence frames reads locus funnel grid`; start from `src/starters/sequencing-walkthrough.json`; all letters and counts are authored and labelled illustrative |
 | Hot/cold devices, protective shutdown, temperature recovery | `cookbook/thermal-protection.md`, `cookbook/temperature.md`; `homemap`, `thermo`, `screen`, `battery` widget docs |
 | Physical home, outside grounds, doors | `cookbook/home-story.md`, `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera state versus scene event | `cookbook/camera-events.md`, `python3 tools/widget_doc.py screen` |

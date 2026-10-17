@@ -38,6 +38,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | two-way conversation, operator talk-down, device sounds, chimes, sirens, sound detection or audio failures | [audio-storytelling.md](audio-storytelling.md) — shared endpoint audio and the complete Sound at the door seed |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
+| a sequence, aligned reads, an insertion or variant, a genome or plasmid map, pipeline stage counts, reading frames, or a small heatmap for a teaching page | [sequence-panels.md](sequence-panels.md) — six sequence-teaching panels and the sequencing walkthrough starter |
 | messaging bus alternatives, cost per million messages, engineering components or break-even volume | [messaging-cost.md](messaging-cost.md) — two routes and explicit pricing assumptions |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |
 | replica positions, read-your-writes tokens, lag, or device/cloud versions | `replica-positions.md` |

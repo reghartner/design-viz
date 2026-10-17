@@ -1,5 +1,18 @@
 # Changelog
 
+## Sequence-teaching panels (2026-10-17)
+
+- Six generic science panels for step-driven teaching pages: `sequence`,
+  `frames`, `reads`, `locus`, `funnel` and `grid`. Every value is authored in
+  the spec; nothing is computed from data files. Shared pure helpers
+  (alphabets, 1-based ranges, emphasis tones, the standard genetic code) live
+  in `src/panels/bio.js`; the `sequence` module owns the shared residue and
+  tone colours. Picker category **Science & sequencing**.
+- New workbench template **Sequencing walkthrough**
+  (`src/starters/sequencing-walkthrough.json`): a fictional plasmid, aligned
+  reads, one insertion, its origin on the map, a quality filter, and an
+  in-frame versus frameshift ending. Recipe: `cookbook/sequence-panels.md`.
+
 ## Company identity from configuration (2026-10-13)
 
 - `company/company.json` sets a fork's `companyName`, `repository`,

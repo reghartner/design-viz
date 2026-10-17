@@ -499,8 +499,8 @@ available through Resume and Undo. Once open, tweak the live preview or use the
 JSON pane and Render button, then save the result back to your `.spec.json`. Clicking
 a rendered node, edge, edge label, step coin, panel widget, or section box
 opens an **inspector form** for it, with a link to select its exact JSON:
-every common field is an editable control (selects for icon, tint,
-kind, edge endpoints, step edge and lane; text fields elsewhere) that writes
+every common field is an editable control (pickers for icon and node style,
+selects for icon color, kind, edge endpoints, step edge and lane; text fields elsewhere) that writes
 straight through to the JSON and re-renders on commit. Clearing an optional
 field removes it from the spec. Renaming a node or panel **id** rewrites
 every reference — rows, floats, edge endpoints, step `from->to` keys, step

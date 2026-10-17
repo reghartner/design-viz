@@ -1,0 +1,44 @@
+/* Node style control and its modal of rendered samples (#610). */
+.icon-row-controls{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
+.icon-row-controls>.flow-icon-control{flex:1 1 55%;min-width:0;}
+.icon-row-controls>.node-color-control{flex:1 1 45%;min-width:0;}
+.node-style-control{display:flex;align-items:center;flex:1;min-width:0;}
+.node-style-control>select[hidden]{display:none!important;}
+.node-style-control>.node-style-browse{display:flex;align-items:center;gap:8px;flex:1;min-width:0;width:100%;border:1px solid var(--line);border-radius:8px;padding:5px 8px;min-height:39px;max-width:100%;background:var(--card);color:var(--ink);font:inherit;text-align:left;cursor:pointer;}
+.node-style-control>.node-style-browse:hover{border-color:var(--accent);background:var(--bg);}
+.node-style-control>.node-style-browse:disabled{opacity:.5;cursor:not-allowed;}
+.node-style-control>.node-style-browse:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.node-style-preview{display:grid;place-items:center;flex:none;width:29px;height:29px;padding:0;}
+/* Samples carry the page's skin classes; the core preset rules need a .docview ancestor, so the same paint is repeated for the sample wrapper. */
+.node-style-sample .node.node-styled .card{fill:var(--ns-bg);stroke:var(--ns-line);}
+.node-style-sample .node.node-styled .t1{fill:var(--ns-ink);}
+.node-style-sample .node.node-styled .t2{fill:var(--ns-sub);}
+.node-style-preview svg{display:block;width:28px;height:28px;overflow:visible;}
+.node-style-preview .card{stroke-width:2;filter:none;}
+.node-style-value{flex:1;min-width:0;overflow-wrap:anywhere;}
+.node-style-action{flex:none;color:var(--sub);font-size:10px;}
+.node-style-picker{box-sizing:border-box;width:min(760px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 40px);padding:0;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);box-shadow:0 28px 110px #0b142a40;}
+.node-style-picker[open]{display:flex;flex-direction:column;}
+.node-style-picker::backdrop{background:#111b336f;backdrop-filter:blur(5px);}
+.node-style-picker *,.node-style-picker *::before,.node-style-picker *::after{box-sizing:border-box;}
+.node-style-picker :is(button):focus-visible{outline:3px solid var(--accent);outline-offset:3px;}
+.node-style-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:26px 28px 19px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 8%,var(--card)),var(--card) 65%);}
+.node-style-kicker{display:block;font:500 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:1.7px;text-transform:uppercase;color:var(--sub);margin-bottom:7px;}
+.node-style-picker .node-style-title{font:600 26px/1.3 'Sora',sans-serif;letter-spacing:-.9px;margin:0;color:var(--ink);}
+.node-style-intro{margin:8px 0 0;color:var(--sub);font-size:13px;}
+.node-style-picker .node-style-close{display:grid;place-items:center;flex:none;width:33px;height:33px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--sub);font:24px/1 sans-serif;cursor:pointer;}
+.node-style-picker .node-style-close:hover{background:var(--bg);color:var(--ink);}
+.node-style-results{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:20px 28px 24px;scrollbar-gutter:stable;}
+.node-style-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-content:start;}
+.node-style-picker .node-style-tile{display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;min-width:0;margin:0;padding:12px 8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:600 11px/1.3 'IBM Plex Sans',sans-serif;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}
+.node-style-picker .node-style-tile:hover{background:var(--bg);border-color:color-mix(in srgb,var(--accent) 65%,var(--line));box-shadow:0 4px 12px #13213b10;transform:translateY(-2px);}
+.node-style-picker .node-style-tile[aria-pressed='true']{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--card));box-shadow:inset 0 0 0 1px var(--accent);}
+.node-style-tile-art{display:block;width:100%;max-width:176px;}
+.node-style-tile-art svg{display:block;width:100%;height:auto;overflow:visible;}
+.node-style-tile-label{max-width:100%;overflow-wrap:anywhere;}
+.node-style-tile-check{display:none;position:absolute;right:6px;top:5px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:600 11px/16px 'IBM Plex Sans',sans-serif;}
+.node-style-tile[aria-pressed='true'] .node-style-tile-check{display:block;}
+.node-style-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;min-height:55px;padding:12px 28px;border-top:1px solid var(--line);background:var(--bg);color:var(--sub);font-size:11px;}
+.node-style-current{color:var(--ink);}
+.node-style-key-hint{text-align:right;font-size:10px;}
+@media(prefers-reduced-motion:reduce){.node-style-picker .node-style-tile{transition:none;}.node-style-picker .node-style-tile:hover{transform:none;}}

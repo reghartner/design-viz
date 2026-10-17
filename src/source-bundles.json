@@ -277,6 +277,7 @@
       ],
       "workbench": [
         "workbench/icon-picker.css",
+        "workbench/node-style-picker.css",
         "workbench/brand.css",
         "workbench/agent-conversation.css",
         "workbench/story-brief.css",

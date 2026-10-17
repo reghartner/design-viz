@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
+    'media.node-styles':['Preset node styles','0.2.0'],
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
     'document.tab-views':['Tab-owned Views and section membership','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
@@ -136,6 +137,7 @@ var FlowviewCompatibility = (function(){
         if((Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (object(s.panels)?s.panels:s.patch);return object(patches) && object(patches[p.id]) && Object.prototype.hasOwnProperty.call(patches[p.id],'drain');}))used['flow.story-time']=true;
       });
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
+      if(object(d.nodes) && Object.keys(d.nodes).some(function(id){return object(d.nodes[id]) && d.nodes[id].style!=null;}))used['media.node-styles']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;

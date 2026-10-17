@@ -544,6 +544,10 @@ with no `title` shows its id:
 - `tint` — icon-chip color role, one of: `cmd auth data mqtt dev`. Default
   `cmd`. Convention: `cmd` = main-path services, `auth` = auth/signing,
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
+- `style` — optional preset node style, one of: `slate rose ember amber moss
+  teal sky indigo violet magenta sand ink`. One token colors the card's
+  border, background and text, readable in every skin; omit it for the skin
+  card. Unknown tokens warn. See [node styles](../docs/node-styles.md).
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
 - `locked` — optional boolean. `true` pins this ordinary graph node's center at
@@ -2096,8 +2100,8 @@ Errors (block rendering — never emit these):
 Errors also include: a `panels` entry without an `id`; two panels sharing an
 `id`.
 
-Warnings (rendered anyway, logged): unknown `icon`, `tint`, `kind`, `accent`,
-`view`, `skin`, panel `type`, or `scene` (each falls back to its default); a
+Warnings (rendered anyway, logged): unknown `icon`, `tint`, node `style`, `kind`,
+`accent`, `view`, `skin`, panel `type`, or `scene` (each falls back to its default); a
 node defined but never placed; a step referencing a non-existent edge
 (skipped); a step with no edges, nodes, or panel patches; a step patching an
 undeclared panel id (ignored); an undeclared `lane`; a node `group` not in

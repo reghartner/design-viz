@@ -799,6 +799,18 @@ textarea.fctl{resize:vertical; min-height:44px;}
 @keyframes dvselants{to{stroke-dashoffset:-24;}}
 .grp.dv-sel .grpbox, g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
   animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+/* Preset node styles (#610) paint the card stroke with the same specificity as
+   skin rules; the selection ring must still win on a styled card. Ink inverts to
+   a light card on dark skins, where the bright accent ring would barely show
+   (about 1.4:1), so that one card takes a dark ring instead. */
+g.node.node-styled.dv-sel .card{stroke:var(--accent);}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) g.node.ns-ink.dv-sel:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .card{stroke:#1F2430;}
+/* The same holds for the thinner dashed stroke that marks the members of the
+   selected step (g.node.dv-instep .card below). Both overrides stay below the
+   step tone rules' specificity, so a tone still colors the stroke while the
+   dashes keep marking the state, as on unstyled cards. */
+g.node.node-styled.dv-instep .card{stroke:var(--accent);}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) g.node.ns-ink.dv-instep:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .card{stroke:#1F2430;}
 path.edge.dv-sel{stroke-width:4; filter:drop-shadow(0 0 4px var(--accent));}
 text.lbl.dv-sel{fill:var(--accent); paint-order:stroke; stroke:var(--selglow); stroke-width:3px;}
 g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;

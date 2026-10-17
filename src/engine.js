@@ -1000,6 +1000,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var small = p.h === FLOAT_H;
     var icon = ICON_SET.indexOf(n.icon) >= 0 ? n.icon : 'gear';
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
+    var nodeStyle = NODE_STYLE_SET.indexOf(n.style) >= 0 ? n.style : null;
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
     if(isTextBoxNode(n)){
@@ -1034,7 +1035,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
         '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
     }
-    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
+    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
+         (nodeStyle ? ' data-dv-style="' + nodeStyle + '"' : '') +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :

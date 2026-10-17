@@ -3319,6 +3319,16 @@ body.sk-editorial .errbox{
    Narrative state is a class on the node group; authored specs never supply
    these colors. Tone owns the card/title hue; step focus composes a stronger
    tone-colored outline and halo without replacing that hue. */
+/* Node style presets (#610): title and subtitle colors. Placed before the step
+   tone rules so a tone's title color (same specificity, later) wins; the
+   skins' own text rules are earlier or less specific, so the preset wins
+   over them. The card paint and the preset values live at the end of this
+   sheet. */
+.docview .node.node-styled .t1{fill:var(--ns-ink);}
+/* Tones repaint the card and the title but leave the subtitle to the skin;
+   a toned styled card therefore drops its preset subtitle color and reads
+   like a plain card (Ink's subtitle would otherwise sit on the tone fill). */
+.docview .node.node-styled:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .t2{fill:var(--ns-sub);}
 .node.tone-pulse .card{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out;}
 @keyframes dvnodepulse{
   0%{transform:scale(1);}
@@ -3951,3 +3961,46 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
 .reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
 @media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}
+
+/* ---------- node style presets (#610) ----------
+   One authored choice sets border, background and text together. Light
+   values are the default; pure Aurora, Terminal and Blueprint take the dark
+   values. Step tones, lit steps and the editor selection ring keep their
+   higher-specificity rules, so state stays visible on every preset. */
+.node.ns-slate{--ns-bg:#E9F1F9;--ns-line:#6E89A5;--ns-ink:#1F2F41;--ns-sub:#465464;}
+.node.ns-rose{--ns-bg:#FFEBEA;--ns-line:#D15A63;--ns-ink:#580918;--ns-sub:#7D3C3F;}
+.node.ns-ember{--ns-bg:#FEECE2;--ns-line:#CB6620;--ns-ink:#4C1F00;--ns-sub:#794220;}
+.node.ns-amber{--ns-bg:#FEEED3;--ns-line:#AC7D00;--ns-ink:#3D2A00;--ns-sub:#6B4D01;}
+.node.ns-moss{--ns-bg:#E3F7DF;--ns-line:#539A43;--ns-ink:#0A3900;--ns-sub:#375E2F;}
+.node.ns-teal{--ns-bg:#D4F9F6;--ns-line:#049A94;--ns-ink:#003634;--ns-sub:#02605C;}
+.node.ns-sky{--ns-bg:#E0F4FF;--ns-line:#0392C4;--ns-ink:#003347;--ns-sub:#005A7B;}
+.node.ns-indigo{--ns-bg:#EBF0FE;--ns-line:#687DE0;--ns-ink:#1C2564;--ns-sub:#414E84;}
+.node.ns-violet{--ns-bg:#F4ECFF;--ns-line:#9B6BCE;--ns-ink:#3B1959;--ns-sub:#5E457A;}
+.node.ns-magenta{--ns-bg:#FFE9F4;--ns-line:#C35C9B;--ns-ink:#510D3A;--ns-sub:#753C5E;}
+.node.ns-sand{--ns-bg:#FAEEE1;--ns-line:#A77D4E;--ns-ink:#412705;--ns-sub:#654D34;}
+.node.ns-ink{--ns-bg:#1F2430;--ns-line:#5B6678;--ns-ink:#FFFFFF;--ns-sub:#C9D1E0;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-slate{--ns-bg:#252F3A;--ns-line:#88A1BC;--ns-ink:#EEF2F6;--ns-sub:#BAC5D2;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-rose{--ns-bg:#4B1D20;--ns-line:#E8777D;--ns-ink:#FEEDED;--ns-sub:#E9B5B5;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-ember{--ns-bg:#492107;--ns-line:#E28247;--ns-ink:#FEEEE6;--ns-sub:#E5BAA2;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-amber{--ns-bg:#3D2A00;--ns-line:#C99414;--ns-ink:#F9F1E3;--ns-sub:#D8C198;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-moss{--ns-bg:#1A3614;--ns-line:#6FB261;--ns-ink:#EBF5E9;--ns-sub:#B1CEAB;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-teal{--ns-bg:#003634;--ns-line:#00B6AF;--ns-ink:#E4F6F4;--ns-sub:#9AD1CC;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-sky{--ns-bg:#003347;--ns-line:#12ACE6;--ns-ink:#E5F5FD;--ns-sub:#9DCCE5;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-indigo{--ns-bg:#222A51;--ns-line:#8097F5;--ns-ink:#EDF1FE;--ns-sub:#B6C3EC;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-violet{--ns-bg:#36244A;--ns-line:#B386E4;--ns-ink:#F5EFFD;--ns-sub:#CDBBE4;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-magenta{--ns-bg:#461E36;--ns-line:#DB78B2;--ns-ink:#FCEDF5;--ns-sub:#E2B5CD;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-sand{--ns-bg:#3B2A18;--ns-line:#BF966A;--ns-ink:#F7F1EA;--ns-sub:#D3C1AE;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.ns-ink{--ns-bg:#F2F4F8;--ns-line:#9AA5B8;--ns-ink:#161B26;--ns-sub:#3E4756;}
+.docview .node.node-styled .card{fill:var(--ns-bg);stroke:var(--ns-line);}
+/* The title and subtitle paint sits earlier in this sheet, before the step tone
+   rules, so a tone's title color still wins on a styled card. */
+/* A lit step must read on every preset even when the skin's lit stroke color
+   sits close to the preset's own border (Pastel's blue on Indigo): styled
+   cards thicken the lit stroke as well. The attribute raises specificity above
+   the skins' own lit rules. */
+.docview .stepmode .node.node-styled.lit[data-dv-style] .card{stroke-width:2.6;}
+/* Ink inverts to a light card on dark skins, where the skins' pale lit strokes
+   (white on Blueprint, bright green on Terminal) would vanish; a dark lit stroke
+   keeps the step highlight visible on that one card. A step tone still replaces
+   it, like every other preset color. */
+.sk-aurora:not(.sk-editorial):not(.sk-pastel) .docview .stepmode .node.ns-ink.lit:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .card{stroke:#1F2430;}

@@ -123,12 +123,20 @@ test('#617 '+(lanes?'lanes':'standard')+' '+label+': lock and unlock move no nod
  assert.equal(state.session.redo(),true);assert.equal(state.text,unlocked);
 });
 
+/* Accepted edits pass the session lock guard, as every Workbench plan does. */
+function textSession(text){
+ const state={text};
+ const persistence=C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}});
+ state.session=C.createBuilderSession({source:{read:()=>state.text,write:value=>state.text=value},render(){},persistence});
+ return state;
+}
 test('#617 a locked row node stays pinned when a row neighbour is deleted',()=>{
  for(const lanes of [false,true]){
   const raw=reflowFixture(lanes),text=JSON.stringify(raw,null,2),before=allCenters(text);
   const lock=C.planSetNodeLocked(text,raw,0,'b',true);assert.equal(lock.error,undefined);
-  const del=C.planDeleteNode(lock.text,JSON.parse(lock.text),0,'a');assert.equal(del.error,undefined);
-  assert.deepEqual(allCenters(del.text).b,before.b);
+  const state=textSession(lock.text);
+  assert.equal(state.session.accept(C.planDeleteNode(state.text,JSON.parse(state.text),0,'a')),true);
+  assert.deepEqual(allCenters(state.text).b,before.b);
  }
 });
 
@@ -164,25 +172,71 @@ const pinCases=[
  ['lanes: add edge',{lanes:true},(t,r)=>C.planAddEdge(t,r,0)],
  ['lanes: add edge between',{lanes:true},(t,r)=>C.planAddEdgeBetween(t,r,0,'a','c')],
  ['lanes: delete edge',{lanes:true,sameRowEdge:true},(t,r)=>C.planDeleteEdge(t,r,0,5)],
- ['lanes: change edge endpoint',{lanes:true},(t,r)=>C.planSetEdgeEndpoint(t,r,0,3,'to','h')]
+ ['lanes: change edge endpoint',{lanes:true},(t,r)=>C.planSetEdgeEndpoint(t,r,0,3,'to','h')],
+ ['clear group (band disappears)',{groupA:true},(t,r)=>C.planSetNodeGroup(t,r,0,'a',null)],
+ ['add an "above" float',{},(t,r)=>C.planSetNodeFloat(t,r,0,'i','above')],
+ ['remove the row above',{lock:'e'},(t)=>C.planBulkDelete(t,['a','b','c','h'].map(id=>({kind:'node',section:0,id})))],
+ ['switch routing to lanes (Inspector / Advanced JSON field)',{},(t,r)=>C.planSetField(t,r,['page','sections',0,'diagram'],'routing','"lanes"')]
 ];
 /* Everything except b's own lock flag and placement entry: the locked edit
  must make the same content AND placement change for every other node as the
  unlocked one, so a plan that refuses, drops or misplaces the edit near a
  lock cannot pass. b leaves its slot the way a pin lift does (a one-node
  stack collapses, an emptied row stays). */
-function contentOnly(text){
- const raw=JSON.parse(text),d=diagram(raw);delete d.nodes.b.locked;
- d.rows=(d.rows||[]).map(row=>row.flatMap(slot=>{if(!Array.isArray(slot))return slot==='b'?[]:[slot];const kept=slot.filter(id=>id!=='b');return kept.length===1?[kept[0]]:kept.length?[kept]:[];}));
- d.floats=(d.floats||[]).filter(f=>f.id!=='b');return raw;
+function contentOnly(text,pin='b'){
+ const raw=JSON.parse(text),d=diagram(raw);if(d.nodes[pin])delete d.nodes[pin].locked;
+ d.rows=(d.rows||[]).map(row=>row.flatMap(slot=>{if(!Array.isArray(slot))return slot===pin?[]:[slot];const kept=slot.filter(id=>id!==pin);return kept.length===1?[kept[0]]:kept.length?[kept]:[];}));
+ d.floats=(d.floats||[]).filter(f=>f.id!==pin);return raw;
 }
-for(const [label,options,edit] of pinCases)test('#617 lock pins b through: '+label,()=>{
- const raw=pinFixture(options),text=JSON.stringify(raw,null,2),before=allCenters(text).b;
- const unlocked=edit(text,JSON.parse(text));assert.equal(unlocked.error,undefined);assert.notDeepEqual(allCenters(unlocked.text).b,before,'precondition: the edit re-spaces b when unlocked');
- const lock=C.planSetNodeLocked(text,JSON.parse(text),0,'b',true);assert.equal(lock.error,undefined);assert.deepEqual(allCenters(lock.text).b,before);
- const locked=edit(lock.text,JSON.parse(lock.text));assert.equal(locked.error,undefined);
- const after=JSON.parse(locked.text);assert.equal(diagram(after).nodes.b.locked,true);assert.deepEqual(allCenters(locked.text).b,before);
- assert.notDeepEqual(contentOnly(unlocked.text),contentOnly(text),'the edit changes content');assert.deepEqual(contentOnly(locked.text),contentOnly(unlocked.text),'the locked edit still happens');
+for(const [label,options,edit] of pinCases)test('#617 lock pins '+(options.lock||'b')+' through: '+label,()=>{
+ const pin=options.lock||'b',raw=pinFixture(options),text=JSON.stringify(raw,null,2),before=allCenters(text)[pin];
+ const unlocked=edit(text,JSON.parse(text));assert.equal(unlocked.error,undefined);assert.notDeepEqual(allCenters(unlocked.text)[pin],before,'precondition: the edit re-spaces the node when unlocked');
+ const lock=C.planSetNodeLocked(text,JSON.parse(text),0,pin,true);assert.equal(lock.error,undefined);assert.deepEqual(allCenters(lock.text)[pin],before);
+ const state=textSession(lock.text);assert.equal(state.session.accept(edit(state.text,JSON.parse(state.text))),true);
+ const locked=state.text,after=JSON.parse(locked);assert.equal(diagram(after).nodes[pin].locked,true);assert.deepEqual(allCenters(locked)[pin],before);
+ assert.notDeepEqual(contentOnly(unlocked.text,pin),contentOnly(text,pin),'the edit changes content');assert.deepEqual(contentOnly(locked,pin),contentOnly(unlocked.text,pin),'the locked edit still happens; no other placement changes');
+ assert.equal(state.session.undo(),true);assert.equal(state.text,lock.text,'edit and re-pin are one undo step');
+ assert.equal(state.session.redo(),true);assert.equal(state.text,locked);
+});
+
+/* #617 session guard rows. exactSource: file import and accepted Agent
+ proposals publish the reviewed text byte-for-byte (typing in the JSON tab
+ never reaches session.accept). Rejects a guard that rewrites reviewed text,
+ runs layout on lock-free documents, acts across sections, or loops. */
+test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
+ const raw=pinFixture(),text=JSON.stringify(raw,null,2),lock=C.planSetNodeLocked(text,raw,0,'b',true).text;
+ const moved=C.planDeleteNode(lock,JSON.parse(lock),0,'a').text,before=allCenters(lock).b;
+ assert.notDeepEqual(allCenters(moved).b,before,'precondition: the reviewed text moves b');
+ for(const label of ['file import','Agent proposal']){
+  const state=textSession(lock);assert.equal(state.session.accept({text:moved},{exactSource:true}),true,label);assert.equal(state.text,moved,label);
+ }
+ const guarded=textSession(lock);assert.equal(guarded.session.accept({text:moved}),true);assert.deepEqual(allCenters(guarded.text).b,before);
+});
+test('#617 guard: no layout runs for a document without locks',()=>{
+ const raw=pinFixture(),text=JSON.stringify(raw,null,2),state=textSession(text),real=C.layout;let calls=0;
+ const plan=C.planDeleteNode(text,raw,0,'a');C.layout=d=>{calls++;return real(d);};
+ try{assert.equal(state.session.accept(plan),true);}finally{C.layout=real;}
+ assert.equal(calls,0);assert.equal(state.text,plan.text);
+});
+test('#617 guard: re-pins two locked nodes in one row, leaves other sections and unlocked placement alone',()=>{
+ const raw=pinFixture(),two=JSON.parse(JSON.stringify(raw));two.page.sections.push(JSON.parse(JSON.stringify(raw.page.sections[0])));two.page.sections[1].heading='Second';
+ two.page.sections.forEach(section=>{section.diagram.nodes.b.locked=true;section.diagram.nodes.c.locked=true;});
+ const text=JSON.stringify(two,null,2),centersAt=(t,i)=>Object.fromEntries(Object.entries(plain(C.layout(JSON.parse(t).page.sections[i].diagram).pos)).map(([id,p])=>[id,xy(p)]));
+ const before1=centersAt(text,1),state=textSession(text),plan=C.planDeleteNode(text,two,1,'a');
+ assert.notDeepEqual(centersAt(plan.text,1).b,before1.b,'precondition');
+ assert.equal(state.session.accept(plan),true);
+ const after=JSON.parse(state.text);assert.deepEqual(after.page.sections[0],two.page.sections[0],'the untouched section is byte-identical in value');
+ assert.deepEqual(centersAt(state.text,1).b,before1.b);assert.deepEqual(centersAt(state.text,1).c,before1.c);
+ const d=after.page.sections[1].diagram;assert.deepEqual(d.rows,[['h'],['d','e','f','i']]);assert.deepEqual(d.floats.map(f=>[f.id,f.x,f.y,f.noSpread]),[['b',before1.b.cx,before1.b.cy,true],['c',before1.c.cx,before1.c.cy,true]]);
+ assert.equal(state.session.undo(),true);assert.equal(state.text,text);
+});
+test('#617 guard: a plan that unlocks or locks a node is not re-pinned',()=>{
+ const raw=pinFixture(),text=JSON.stringify(raw,null,2),lock=C.planSetNodeLocked(text,raw,0,'b',true).text;
+ /* One edit that unlocks b AND re-spaces its row, and one that locks b AND re-spaces it. */
+ const unlockAndMove=C.planDeleteNode(text,raw,0,'a').text,lockAndMove=C.planDeleteNode(lock,JSON.parse(lock),0,'a').text;
+ assert.notDeepEqual(allCenters(unlockAndMove).b,allCenters(text).b,'precondition');
+ const state=textSession(lock);assert.equal(state.session.accept({text:unlockAndMove}),true);assert.equal(state.text,unlockAndMove);
+ const fresh=textSession(text);assert.equal(fresh.session.accept({text:lockAndMove}),true);assert.equal(fresh.text,lockAndMove);
 });
 
 /* #617 guard: row slots are spaced by slot count and fixed card height, never

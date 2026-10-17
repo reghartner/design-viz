@@ -62,7 +62,7 @@ test('node object menus toggle single and selected position locks with one Undo'
  await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Lock position',exact:true}).click();
  const singleLocked=await source(page);expect(JSON.parse(singleLocked).page.sections[0].diagram.nodes.a.locked).toBe(true);await history(page,original,singleLocked);
  await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Unlock position',exact:true}).click();
- const singleUnlocked=await source(page),singleDiagram=JSON.parse(singleUnlocked).page.sections[0].diagram;expect(singleDiagram.nodes.a.locked).toBeUndefined();expect(singleDiagram.floats.find(f=>f.id==='a').noSpread).toBe(true);await history(page,singleLocked,singleUnlocked);
+ const singleUnlocked=await source(page),singleDiagram=JSON.parse(singleUnlocked).page.sections[0].diagram;expect(singleDiagram.nodes.a.locked).toBeUndefined();const at=f=>({x:f.x,y:f.y});expect(at(singleDiagram.floats.find(f=>f.id==='a'))).toEqual(at(JSON.parse(original).page.sections[0].diagram.floats.find(f=>f.id==='a')));await history(page,singleLocked,singleUnlocked);
  await node(page).click();await page.locator('[data-dv-node=b]').click({modifiers:['Shift']});await node(page).click({button:'right'});
  await expect(menu(page).getByRole('menuitem',{name:'Lock selected positions',exact:true})).toBeEnabled();await expect(menu(page).getByRole('menuitem',{name:/^Unlock selected positions/})).toHaveAttribute('aria-disabled','true');
  await menu(page).getByRole('menuitem',{name:'Lock selected positions',exact:true}).click();const selectedLocked=await source(page);expect(['a','b'].map(id=>JSON.parse(selectedLocked).page.sections[0].diagram.nodes[id].locked)).toEqual([true,true]);await history(page,singleUnlocked,selectedLocked);
@@ -76,7 +76,8 @@ test('node object menus toggle single and selected position locks with one Undo'
  3 Undo/Redo | each edit | #src equals the exact prior/next text; centers unchanged after Redo | multi-step or lossy history
  4 Inspector Keep position fixed | Inspect b, check then uncheck | b.locked toggles; every rendered center unchanged both times | Inspector path still reflowing
  5 row lock | Shift-select a,b,c,h, Lock selected positions | all four locked; every center unchanged (row d,e,f,i included) | the row vanishing so the row below moves up
- 6 multi-select lock (#520) | Shift-select b,e, Lock then Unlock selected positions | both toggled; every center unchanged | either row re-spacing */
+ 6 multi-select lock (#520) | Shift-select b,e, Lock then Unlock selected positions | both toggled; every center unchanged | either row re-spacing
+ 7 JSON tab exclusion | lock b, then type source without a into the JSON tab and Render | #src keeps the typed text exactly; b re-spaces as typed | a lock guard that silently rewrites hand-typed source */
 function rowFixture(){return {page:{title:'Lock reflow',skin:'pastel',sections:[{heading:'Rows',diagram:{autoplay:false,nodes:{a:{title:'Alpha'},b:{title:'Beta',group:'g'},c:{title:'Gamma'},h:{title:'Hotel'},d:{title:'Delta'},e:{title:'Echo'},f:{title:'Fox'},i:{title:'India'}},groups:{g:{title:'Beta group'}},rows:[['a','b','c','h'],['d','e',['f','i']]],edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'h'},{from:'b',to:'e'},{from:'d',to:'f'}]}}]}};}
 const rowIds=['a','b','c','h','d','e','f','i'];
 async function renderedCenters(page){return page.evaluate(ids=>Object.fromEntries(ids.map(id=>{const el=document.querySelector('[data-dv-node="'+id+'"]'),card=el.querySelector('.card'),inverse=el.ownerSVGElement.getScreenCTM().inverse(),r=card.getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return [id,{x:(a.x+b.x)/2,y:(a.y+b.y)/2}];})),rowIds);}
@@ -107,6 +108,10 @@ test('locking a row node from the menu, Inspector or a selection moves no other 
  const pairLocked=await source(page);expect(lockedIds(pairLocked)).toEqual(['b','e']);await expectUnmoved(page,before);await history(page,original,pairLocked);
  await shiftSelect(page,['b','e']);await b.click({button:'right'});await menu(page).getByRole('menuitem',{name:'Unlock selected positions',exact:true}).click();
  const pairUnlocked=await source(page);expect(lockedIds(pairUnlocked)).toEqual([]);await expectUnmoved(page,before);await history(page,pairLocked,pairUnlocked);await expectUnmoved(page,before);
+ await b.click({button:'right'});await menu(page).getByRole('menuitem',{name:'Lock position',exact:true}).click();expect(lockedIds(await source(page))).toEqual(['b']);
+ const typedRaw=JSON.parse(await source(page)),typedDiagram=typedRaw.page.sections[0].diagram;typedDiagram.rows[0]=['b','c','h'];delete typedDiagram.nodes.a;typedDiagram.edges=typedDiagram.edges.filter(e=>e.from!=='a'&&e.to!=='a');const typed=JSON.stringify(typedRaw,null,2);
+ await page.locator('#editor-tab-json').click();await page.locator('#src').fill(typed);await page.locator('#go').click();await closeTools(page);
+ await expect(page.locator('#src')).toHaveValue(typed);await expect(page.locator('[data-dv-node=a]')).toHaveCount(0);const typedCenters=await page.evaluate(()=>{const el=document.querySelector('[data-dv-node="b"]'),r=el.querySelector('.card').getBoundingClientRect(),inv=el.ownerSVGElement.getScreenCTM().inverse(),a=new DOMPoint(r.left,r.top).matrixTransform(inv),z=new DOMPoint(r.right,r.bottom).matrixTransform(inv);return {x:(a.x+z.x)/2};});expect(Math.abs(typedCenters.x-before.b.x)).toBeGreaterThan(20);
 });
 for(const width of [1280,1440])test('locked drag feedback and mixed selection filtering at '+width,async({page,server},info)=>{
  const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.nodes.a.locked=true;await openRaw(page,server,raw,width);

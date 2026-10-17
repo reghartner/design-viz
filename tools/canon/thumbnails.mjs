@@ -33,6 +33,12 @@ export async function thumbnailAsset(url,resourceType,assetRoot){
   return {body:await readFile(file),contentType:type};
 }
 
+// Forks whose build image cannot use Playwright's downloaded browser (Alpine,
+// corporate base images) name a system Chromium; containers run it as root.
+export function chromiumLaunchOptions(env=process.env){
+  return env.FLOWVIEW_CHROMIUM_PATH?{headless:true,executablePath:env.FLOWVIEW_CHROMIUM_PATH,args:['--no-sandbox']}:{headless:true};
+}
+
 export async function createThumbnailCapture(assetRoot){
   const {chromium}=require('../browser-tests/node_modules/@playwright/test');
   assetRoot=await realpath(assetRoot);
@@ -44,7 +50,7 @@ html,body{margin:0;background:#fff}#view{width:1200px;max-width:none;margin:0;pa
 .thumbnail-ready[data-thumbnail-visual]>.sec-heading-row,.thumbnail-ready[data-thumbnail-visual]>.sec-prose,.thumbnail-ready[data-thumbnail-visual]>.sec-teaser{display:none!important}
 .thumbnail-ready .sec-heading-row{margin-top:0}.thumbnail-ready .sec-h{font-size:18px}.thumbnail-ready .sec-h a,.thumbnail-ready .sec-h button{display:none!important}
 </style>${assets.icons}<div id="view"></div><script>${native.body.replace(/<\/script/gi,'<\\/script')}</script>`;
-  const browser=await chromium.launch({headless:true});
+  const browser=await chromium.launch(chromiumLaunchOptions());
   return {async close(){await browser.close();},async capture(entry){
     const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:1,reducedMotion:'reduce',locale:'en-US',timezoneId:'UTC',serviceWorkers:'block'});
     const page=await context.newPage(),errors=[];page.setDefaultTimeout(20000);

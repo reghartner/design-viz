@@ -163,7 +163,8 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  const exploreTab=page.getByRole('tab',{name:'Explore story',exact:true,includeHidden:true});
  await expect(standardTab).not.toHaveAttribute('data-explore-view','true');await expect(exploreTab).toHaveAttribute('data-explore-view','true');
  await readerTab(page,'Explore story');const navigation=page.locator('.reader-navigation');
- await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Standard story','Explore story']);
+ // #622 numbers each top-level Contents entry to match the section rail.
+ await expect(navigation.locator('.reader-tree-tab')).toHaveText(['1Standard story','2Explore story']);
  await expect(page.locator('#section-explore .diagram-view-choice [data-view-layout]')).toHaveCount(3);
  for(const name of ['Explore','Fresh view','Authored']){const button=navigation.getByRole('button',{name,exact:true});await expect(button).toHaveAttribute('data-explore-view','true');await expect(button).toHaveAttribute('aria-description',/pan.*zoom/);}
  await info.attach('explore-navigation-desktop',{body:await page.screenshot(),contentType:'image/png'});
@@ -185,7 +186,7 @@ test('Explore top bar keeps every tab block reachable and restricts section navi
  await standalone(page,server,navigationFixture());
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
  await expect(navigation.locator('.tabbar[role=tablist]')).toHaveCount(2);
- await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Navigation hierarchy','First','Second','Third','Fourth']);
+ await expect(navigation.locator('.reader-tree-tab')).toHaveText(['1Navigation hierarchy','2First','3Second','4Third','5Fourth']);
  await chooseNavigation(navigation,'Tab','Fourth');
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();
  await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveAttribute('aria-current','false');

@@ -5,7 +5,7 @@ function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[];
   // Closed Contents leaves a numbered rail; hovering it floats the panel over the page.
-  var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44;
+  var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
     var paths={'☰':'M4 6h16M4 12h16M4 18h16','‹':'m14 6-6 6 6 6','›':'m9 6 6 6-6 6','«':'M9 4H4v16h16V4h-5M14 8l-4 4 4 4','⋯':'M5 12h.01M12 12h.01M19 12h.01'};
@@ -86,6 +86,15 @@ function createReaderContents(ctl,nav,actions,options){
     view.style.setProperty('--reader-left',rect.left+'px');view.style.setProperty('--reader-width',rect.width+'px');
     var inset=opened && !narrow?width+'px':railShown?RAIL_WIDTH+'px':'0px';view.style.setProperty('--reader-inset',inset);if(options.insetTarget)options.insetTarget.style.setProperty('--reader-host-inset',inset);
     themeOptions.style.maxHeight=Math.max(70,bottom-rect.bottom-110)+'px';
+    fitToggle(rect.width);
+  }
+  // A crowded header keeps its row height: the toggle drops its label before
+  // the View strip would wrap. Measured only when the width or labels change.
+  function fitToggle(width){
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
+    top.classList.remove('reader-toggle-compact');if(narrow)return;
+    var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
+    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
   // An open drill-down stays inside its root section; name each open level.

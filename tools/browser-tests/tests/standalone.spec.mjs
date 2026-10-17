@@ -10,7 +10,8 @@ function scrollPosition(row){
     aligned:Math.abs(scrollY-wantedScroll)<=1,fonts:document.fonts.status};
 }
 test('standalone exports fill wide and narrow responsive viewports',async({page,server})=>{
-  for(const [viewport,paddingLeft] of [[{width:1800,height:1000},'24px'],[{width:640,height:900},'24px']]){
+  // #622: with Contents closed on desktop the 44px section rail stays; phones have none.
+  for(const [viewport,paddingLeft] of [[{width:1800,height:1000},'68px'],[{width:640,height:900},'24px']]){
     await page.setViewportSize(viewport);
     await page.goto(pathToFileURL(path.join(server.root,'standalone.html')).href);
     if(await page.locator('.reader-top>button').getAttribute('aria-expanded')==='true')await page.locator('.reader-top>button').click();

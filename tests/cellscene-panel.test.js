@@ -320,3 +320,18 @@ test('a declaration change between renders rebuilds the scene; an overlay-only s
   assert.equal(host.writes, first + 2, 'an added item rebuilt the scene');
   assert.match(host.html, /data-id="w"/);
 });
+
+test('validation and fold agree when a skipped fuse precedes a valid fuse of the same vesicle', () => {
+  const steps = [
+    {id:'bud', panels:{cell:{events:[{kind:'bud',vesicle:'v1',from:'cyt',items:['c']}]}}},
+    {id:'fuse', panels:{cell:{events:[{kind:'fuse',vesicle:'v1',with:'nowhere',to:'out'},{kind:'fuse',vesicle:'v1',with:'cell',to:'out'}]}}},
+  ];
+  const d = diagram(steps), states = folded(d);
+  const w = validate(d).warnings.join('\n');
+  assert.match(w, /steps\[1\]\.panels\.cell\.events\[0\]\.with: unknown compartment — event skipped/);
+  assert.doesNotMatch(w, /steps\[1\]\.panels\.cell\.events\[1\]/, 'the second, valid fuse is not reported as skipped');
+  same(Object.keys(states[0].vesicles), ['v1']);
+  same(Object.keys(states[1].vesicles), [], 'the fold applied the second fuse');
+  same(states[1].events.map(e => e.kind), ['fuse']);
+  assert.equal(states[1].items.c.in, 'out');
+});

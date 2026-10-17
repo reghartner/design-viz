@@ -376,7 +376,10 @@ function cellsceneStateWarnings(state, path, context, warnings) {
           else if (vesicles.indexOf(raw.vesicle) < 0) cellsceneWarn(warnings, atE + '.vesicle', 'no vesicle "' + raw.vesicle + '" has budded on this path — event skipped');
           if (!comp(raw.with)) cellsceneWarn(warnings, atE + '.with', 'unknown compartment — event skipped');
           if (raw.to !== undefined && !comp(raw.to)) cellsceneWarn(warnings, atE + '.to', 'unknown compartment — contents stay with the fused compartment');
-          vesicles = vesicles.filter(function (v) { return v !== raw.vesicle; });
+          /* Mirror the fold: only a fuse it applies (known vesicle that has
+             budded on this path, known compartment) removes the vesicle. */
+          if (mechId(raw.vesicle) && vesicles.indexOf(raw.vesicle) >= 0 && comp(raw.with))
+            vesicles = vesicles.filter(function (v) { return v !== raw.vesicle; });
         } else if (raw.kind === 'divide') {
           if (divided) cellsceneWarn(warnings, atE, 'the cell has already divided on this path — event skipped');
           if (raw.daughters !== undefined && (!Array.isArray(raw.daughters) || raw.daughters.length > 2))

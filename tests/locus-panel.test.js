@@ -121,7 +121,9 @@ test('arcs swap reversed ends, label the distance in the declared unit, rise wit
   near(zoom.arcs[0].x1, 0); near(zoom.arcs[1].x2, 100); near(zoom.arcs[2].x1, 0); near(zoom.arcs[2].x2, 100);
   assert.ok(zoom.arcs.every(a => a.x1 >= 0 && a.x2 <= 100 && a.x1 <= a.x2));
   const html = C.locusHTML({...panel(), unit:'kb'}, state);
-  assert.match(html, /class="locus-arc locus-arc-reversed"/);
+  assert.match(html, /class="locus-arc locus-arc-reversed bio-tone-motif"/);
+  assert.match(html, /class="locus-arc bio-tone-accent"/);
+  assert.match(C.locusHTML(panel(), {markers:[{id:'m', at:10, tone:'cut'}]}), /class="locus-pin bio-tone-cut"/);
   assert.match(html, /locus-arclabel bio-tone-motif[^>]*>loop</);
   assert.match(html, /locus-arclabel bio-tone-accent[^>]*>3 kb</);
   const w = validate({nodes:{n:{}}, rows:[['n']], panels:[{...panel(), initial:state}]}).warnings.join('\n');

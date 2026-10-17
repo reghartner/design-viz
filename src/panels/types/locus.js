@@ -12,7 +12,9 @@ var LOCUS_ROWS = 4;
 var LOCUS_UNITS = { bp: 1, kb: 1000, Mb: 1000000 };
 var LOCUS_UNIT_DECIMALS = { bp: 0, kb: 2, Mb: 3 };
 var LOCUS_STATE_KEYS = ['markers', 'arcs', 'window', 'highlight'];
-/* Vertical geometry in CSS pixels; the SVG is 1000 units wide and stretched
+/* Tone colours come from the sequence panel's `.bio-tone-*` classes, which set
+   `--bio-tone`; SVG strokes read that variable with the neutral ink as fallback.
+   Vertical geometry in CSS pixels; the SVG is 1000 units wide and stretched
    horizontally, so x coordinates are percentages × 10 and y is in pixels. */
 var LOCUS_WIDTH = 1000;
 var LOCUS_ARC_H = 56;
@@ -294,11 +296,11 @@ function locusHTML(panel, state) {
   model.markers.forEach(function (marker) {
     if (!marker.visible) return;
     var x = (marker.x * 10).toFixed(2);
-    h += '<line class="locus-pin" x1="' + x + '" y1="' + (g.markerTop + 12) + '" x2="' + x + '" y2="' + g.barTop + '" vector-effect="non-scaling-stroke"/>';
+    h += '<line class="locus-pin bio-tone-' + marker.tone + '" x1="' + x + '" y1="' + (g.markerTop + 12) + '" x2="' + x + '" y2="' + g.barTop + '" vector-effect="non-scaling-stroke"/>';
   });
   model.arcs.forEach(function (arc) {
     if (!arc.visible) return;
-    h += '<path class="locus-arc' + (arc.reversed ? ' locus-arc-reversed' : '') + '" d="' + arc.path + '" vector-effect="non-scaling-stroke"/>';
+    h += '<path class="locus-arc' + (arc.reversed ? ' locus-arc-reversed' : '') + ' bio-tone-' + arc.tone + '" d="' + arc.path + '" vector-effect="non-scaling-stroke"/>';
   });
   h += '</svg><div class="locus-layer">';
   model.features.forEach(function (feature) {
@@ -359,8 +361,8 @@ PanelRegistry.define('locus', {
 .locus-track{fill:color-mix(in srgb,var(--dtext) 7%,transparent)}
 .locus-base{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
 .locus-tickline{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
-.locus-pin{stroke:color-mix(in srgb,var(--dink) 70%,transparent);stroke-width:1.5}
-.locus-arc{fill:none;stroke:color-mix(in srgb,var(--dink) 75%,transparent);stroke-width:1.5}
+.locus-pin{stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 70%,transparent));stroke-width:1.5}
+.locus-arc{fill:none;stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 75%,transparent));stroke-width:1.5}
 .locus-arc-reversed{stroke-dasharray:4 3}
 .locus-layer{position:absolute;inset:0;pointer-events:none}
 .locus-layer>*{pointer-events:auto}

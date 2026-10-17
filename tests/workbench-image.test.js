@@ -58,13 +58,23 @@ function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
   return {source,spec,manifest};
 }
 
+function dockerCopyInputs(source){
+  if(!/[?*[]/.test(source))return [source];
+  // Current Docker COPY patterns use only basename stars. Fail explicitly if
+  // a future Dockerfile needs broader matching; keep this guard on Node 20.
+  const directory=path.posix.dirname(source),basename=path.posix.basename(source);
+  assert.ok(!/[?*[]/.test(directory) && /^[\w.*-]+$/.test(basename),`Unsupported Docker COPY pattern: ${source}`);
+  const pattern=new RegExp('^'+basename.split('*').map(part=>part.replace(/\./g,'\\.')).join('.*')+'$');
+  return fs.readdirSync(path.join(ROOT,directory)).filter(name=>pattern.test(name)).map(name=>path.posix.join(directory,name));
+}
+
 function assertImageCopyInputs(directory){
   const dockerfile=fs.readFileSync(path.join(ROOT,'deploy/workbench/Dockerfile'),'utf8');
   for(const line of dockerfile.split('\n').filter(line=>/^COPY\s/.test(line)&&!line.includes('--from='))){
     for(const source of line.trim().split(/\s+/).slice(1,-1)){
       // Expand against the real checkout so a partly populated fixture cannot
       // hide a missing wildcard member (especially package-lock.json).
-      const inputs=/[?*[]/.test(source)?fs.globSync(source,{cwd:ROOT}):[source];
+      const inputs=dockerCopyInputs(source);
       assert.ok(inputs.length,`Docker COPY source matches no inputs: ${source}`);
       for(const input of inputs)assert.ok(fs.existsSync(path.join(directory,input)),`Missing image fixture input: ${input}`);
     }
@@ -76,6 +86,7 @@ test('image fixture contains every literal and wildcard Docker COPY source witho
   t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
   prepareImageContext(directory);
   assertImageCopyInputs(directory);
+  assert.throws(()=>dockerCopyInputs('tools/**/package.json'),/Unsupported Docker COPY pattern/);
   const browserInputs=path.join(directory,'tools/browser-tests');
   assert.deepEqual(fs.readdirSync(browserInputs).sort(),['package-lock.json','package.json']);
   for(const file of fs.readdirSync(browserInputs))

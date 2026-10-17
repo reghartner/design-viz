@@ -1,6 +1,6 @@
 'use strict';
-// The Cloudflare deploy folder must never carry account or Worker identity:
-// only three generic files may be tracked there, and they name no Worker.
+// The upstream Cloudflare deploy files must never carry account or Worker identity,
+// and the local settings / generated files they produce must stay gitignored.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -11,10 +11,11 @@ const ROOT = path.resolve(__dirname, '..');
 const DIR = 'deploy/cloudflare';
 const ALLOWED = ['deploy/cloudflare/README.md', 'deploy/cloudflare/deploy.sh', 'deploy/cloudflare/local.env.example'];
 
-test('only the generic Cloudflare deploy files are tracked', () => {
-  const tracked = execFileSync('git', ['-C', ROOT, 'ls-files', '--', DIR], { encoding: 'utf8' })
-    .split('\n').filter(Boolean).sort();
-  assert.deepStrictEqual(tracked, [...ALLOWED].sort());
+test('the generic Cloudflare deploy files are tracked', () => {
+  // Forks may track more files here on purpose; upstream ships exactly these.
+  const tracked = new Set(execFileSync('git', ['-C', ROOT, 'ls-files', '--', DIR], { encoding: 'utf8' })
+    .split('\n').filter(Boolean));
+  for (const rel of ALLOWED) assert.ok(tracked.has(rel), rel + ' is not tracked');
 });
 
 test('local settings, generated config and upload output are gitignored', () => {

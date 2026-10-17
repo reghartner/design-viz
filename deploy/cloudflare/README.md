@@ -34,10 +34,13 @@ projects are embedded in `flowspec.html`, so `src/starters/` is not uploaded. Th
 
 ## Nothing account-specific is committed
 
-Only `README.md`, `deploy.sh` and `local.env.example` in this folder are tracked;
-`.gitignore` excludes everything else here, and `tests/cloudflare-deploy.test.js`
-fails if another file in this folder is tracked or if a Worker name or
-`workers.dev` address appears in them. The Worker name lives in the gitignored
+Upstream tracks only `README.md`, `deploy.sh` and `local.env.example` in this
+folder; `.gitignore` excludes everything else here, so an ordinary `git add`
+cannot pick up local settings or generated files. `tests/cloudflare-deploy.test.js`
+fails if those ignore rules stop applying or if a Worker name, `workers.dev`
+address, Access team address or 32-hex identifier appears in the three tracked
+files. A private company fork may still choose to force-add its own `local.env`;
+the test does not reject that. The Worker name lives in the gitignored
 `local.env` (or the `FLOWVIEW_CF_WORKER` environment variable). Wrangler keeps
 its login token in your user profile, outside the repository. Do not paste the
 deployed address, account ID or Access team name into commits, PRs or docs.
@@ -54,9 +57,12 @@ deployed address, account ID or Access team name into commits, PRs or docs.
    **Protect this Worker behind Access** → choose **Cloudflare account** (not
    **Email domain**, which admits every address at that domain). Zero Trust
    onboarding runs first if the account has none; pick the Free plan.
-5. Add people: Zero Trust → Access → Applications → the Worker's application →
-   Policies → Include → **Emails** → list addresses. They sign in with a
-   one-time PIN sent to that email.
+5. Let people without a Cloudflare login in: new Zero Trust organizations sign
+   in only through the Cloudflare identity provider, so first add email PINs at
+   Zero Trust → Integrations → Identity providers → **Add new identity
+   provider** → **One-time PIN**. Then Zero Trust → Access → Applications → the
+   Worker's application → Policies → Include → **Emails** → list addresses.
+   Each person signs in with a one-time PIN sent to that address.
 
 Verify from outside: `curl -sI https://<worker>.workers.dev/workbench/flowspec.html`
 must answer `302` to a `cloudflareaccess.com` URL.

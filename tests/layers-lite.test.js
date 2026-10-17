@@ -8,20 +8,20 @@ const diagram=raw=>raw.page.sections[0].diagram;
 const centers=d=>plain(C.layout(d).pos);
 const xy=p=>({cx:p.cx,cy:p.cy});
 
-test('locking one node or a row is one edit; undo restores membership and unlock retains its pin',()=>{
+test('locking one node or a row is one edit; undo restores membership and unlock retains its position',()=>{
  let text=JSON.stringify(fixture(),null,2),original=text;
  const persistence=C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}});
  const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},persistence});
  const before=centers(diagram(JSON.parse(text))).a;
  assert.equal(session.accept(C.planSetNodeLocked(text,JSON.parse(text),0,'a',true)),true);
- let d=diagram(JSON.parse(text));assert.equal(d.nodes.a.locked,true);assert.ok(d.floats.some(f=>f.id==='a'&&f.noSpread===true));
+ let d=diagram(JSON.parse(text));assert.equal(d.nodes.a.locked,true);
  assert.deepEqual(xy(centers(d).a),xy(before));assert.equal(session.undo(),true);assert.equal(text,original);assert.equal(session.canUndo(),false);
  assert.equal(session.accept(C.planSetNodesLocked(text,JSON.parse(text),0,['a','b','c'],true)),true);
  d=diagram(JSON.parse(text));assert.ok(['a','b','c'].every(id=>d.nodes[id].locked===true));
  assert.equal(session.undo(),true);assert.equal(text,original);
  assert.equal(session.accept(C.planSetNodeLocked(text,JSON.parse(text),0,'a',true)),true);
  assert.equal(session.accept(C.planSetNodeLocked(text,JSON.parse(text),0,'a',false)),true);
- d=diagram(JSON.parse(text));assert.equal(d.nodes.a.locked,undefined);assert.ok(d.floats.some(f=>f.id==='a'));
+ d=diagram(JSON.parse(text));assert.equal(d.nodes.a.locked,undefined);assert.deepEqual(xy(centers(d).a),xy(before));
 });
 
 test('mixed placement operations retain locked selection but move only unlocked nodes',()=>{
@@ -80,4 +80,59 @@ test('locked validates as boolean and lock affordance is Workbench/export scoped
  const findings=C.validate(C.normalize(raw));assert.ok(findings.warnings.some(w=>w.includes('.nodes.a.locked: must be true or false')));
  const repo=path.join(__dirname,'..'),engine=fs.readFileSync(path.join(repo,'src/engine.js'),'utf8'),interactions=fs.readFileSync(path.join(repo,'src/workbench/interactions.js'),'utf8'),exporter=fs.readFileSync(path.join(repo,'src/workbench/svg-export.js'),'utf8');
  assert.doesNotMatch(engine,/dv-position-lock/);assert.match(interactions,/dv-position-lock-badge/);assert.match(interactions,/setAttribute\('aria-label','Position locked'\)/);assert.match(interactions,/dv-position-lock-feedback/);assert.match(exporter,/dv-position-lock-badge/);assert.match(exporter,/lock-feedback/);
+});
+
+/* #617 lock leaves every other node in place. Contract matrix:
+ row | fixture | assertion (scoped) | rejects
+ 1 single lock | reflowFixture standard + lanes, lock 'b' inside the 4-node row a,b,c,h | layout(d).pos cx/cy of EVERY node equal before/after | lift-to-float that lets 'c' slide left into the gap (4 slots to 3)
+ 2 row lock | same, lock all of row 0 (a,b,c,h) | every node's cx/cy unchanged | row vanishing so rows below slide up
+ 3 multi-select lock (#520) | same, lock ['b','e'] (each inside its row) across two rows | every node's cx/cy unchanged | per-row reflow of either row
+ 4 group band | standard variant: only 'b' is grouped | every node's cy unchanged after locking 'b' | top band shrinking when the only grouped node leaves rows
+ 5 unlock | each locked state above, then unlock the same ids | every node's cx/cy unchanged, locked flags removed | unlock re-inserting into rows or clearing the pin
+ 6 undo/redo | each lock and unlock | undo restores exact prior text; redo restores exact locked text and positions | multi-edit locks or lossy undo
+ 7 pin holds | lock 'b', then delete row neighbour 'a' | 'b' keeps its cx/cy | a flag-only lock that leaves 'b' re-spacing with its row
+ 8 old documents | legacyLockFixture: old-style locked noSpread float + raw locked row node | layout positions equal recorded numbers | changing how stored locks render */
+function reflowFixture(lanes){
+ const d={nodes:{a:{title:'Alpha'},b:{title:'Beta'},c:{title:'Gamma'},h:{title:'Hotel'},d:{title:'Delta'},e:{title:'Echo'},f:{title:'Fox'},i:{title:'India'}},rows:[['a','b','c','h'],['d','e','f','i']],edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'h'},{from:'b',to:'e'},{from:'d',to:'f'}]};
+ if(lanes)d.routing='lanes';
+ else{d.rows=[['a','b','c','h'],['d','e',['f','i']]];d.nodes.b.group='g';d.groups={g:{title:'Only Beta'}};d.nodes.x={title:'Spread float'};d.floats=[{id:'x',side:'below'}];d.edges.push({from:'x',to:'c'});}
+ return {page:{sections:[{heading:'Rows',diagram:d}]}};
+}
+function lockSession(raw){
+ const state={text:JSON.stringify(raw,null,2)};
+ const persistence=C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}});
+ state.session=C.createBuilderSession({source:{read:()=>state.text,write:value=>state.text=value},render(){},persistence});
+ return state;
+}
+const allCenters=text=>Object.fromEntries(Object.entries(centers(diagram(JSON.parse(text)))).map(([id,p])=>[id,xy(p)]));
+
+for(const lanes of [false,true])for(const [label,ids] of [['single middle node',['b']],['row lock',['a','b','c','h']],['multi-select across rows',['b','e']]])
+test('#617 '+(lanes?'lanes':'standard')+' '+label+': lock and unlock move no node; undo/redo exact',()=>{
+ const state=lockSession(reflowFixture(lanes)),original=state.text,before=allCenters(original);
+ assert.equal(Object.keys(before).length,lanes?8:9);
+ assert.equal(state.session.accept(C.planSetNodesLocked(state.text,JSON.parse(state.text),0,ids,true)),true);
+ const locked=state.text;assert.notEqual(locked,original);
+ assert.ok(ids.every(id=>diagram(JSON.parse(locked)).nodes[id].locked===true));
+ assert.deepEqual(allCenters(locked),before);
+ assert.equal(state.session.undo(),true);assert.equal(state.text,original);
+ assert.equal(state.session.redo(),true);assert.equal(state.text,locked);assert.deepEqual(allCenters(state.text),before);
+ assert.equal(state.session.accept(C.planSetNodesLocked(state.text,JSON.parse(state.text),0,ids,false)),true);
+ const unlocked=state.text;assert.ok(ids.every(id=>diagram(JSON.parse(unlocked)).nodes[id].locked===undefined));
+ assert.deepEqual(allCenters(unlocked),before);
+ assert.equal(state.session.undo(),true);assert.equal(state.text,locked);
+ assert.equal(state.session.redo(),true);assert.equal(state.text,unlocked);
+});
+
+test('#617 a locked row node stays pinned when a row neighbour is deleted',()=>{
+ for(const lanes of [false,true]){
+  const raw=reflowFixture(lanes),text=JSON.stringify(raw,null,2),before=allCenters(text);
+  const lock=C.planSetNodeLocked(text,raw,0,'b',true);assert.equal(lock.error,undefined);
+  const del=C.planDeleteNode(lock.text,JSON.parse(lock.text),0,'a');assert.equal(del.error,undefined);
+  assert.deepEqual(allCenters(del.text).b,before.b);
+ }
+});
+
+test('#617 documents saved with older locks render unchanged',()=>{
+ const d={nodes:{a:{title:'Alpha'},b:{title:'Beta',locked:true},c:{title:'Gamma'},p:{title:'Pinned',locked:true}},rows:[['a','b','c']],floats:[{id:'p',side:'below',x:410,y:260,noSpread:true}],edges:[{from:'a',to:'p'}]};
+ assert.deepEqual(Object.fromEntries(Object.entries(centers(d)).map(([id,p])=>[id,xy(p)])),{a:{cx:110,cy:69},b:{cx:590,cy:69},c:{cx:1070,cy:69},p:{cx:410,cy:260}});
 });

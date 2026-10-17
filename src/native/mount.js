@@ -41,6 +41,8 @@ function mountNativeSpec(environment, spec, options){
   function changed(){if(environment.disposed || navigating)return;canvasSync();protectLinks();if(options.onChange)options.onChange(snapshot());}
   controller.onChange=changed;
   var reader=initViewerExploreCanvas(controller,view,{container:environment.body,contained:true});
+  /* "?" opens the reader shortcut sheet; no presenter runs in a host page. */
+  var shortcuts=typeof wireReaderShortcuts==='function' ? wireReaderShortcuts(controller,view,window,{presenter:false}) : null;
   environment.listen(view,'click',linkClick,true);environment.listen(view,'auxclick',linkClick,true);
   var size=new ResizeObserver(function(){if(options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));});size.observe(view);
   environment.fontsReady.then(function(){if(!environment.disposed && options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));},function(){
@@ -92,6 +94,6 @@ function mountNativeSpec(environment, spec, options){
       return deactivation;
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
-    destroy:function(){if(environment.disposed)return;reader.destroy();try{controller.destroy();}finally{environment.destroy();}}
+    destroy:function(){if(environment.disposed)return;reader.destroy();if(shortcuts)shortcuts.destroy();try{controller.destroy();}finally{environment.destroy();}}
   };
 }

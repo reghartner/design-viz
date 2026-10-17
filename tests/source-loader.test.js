@@ -47,7 +47,7 @@ test('actual entrypoints have unique ordered declarations and deliberate exports
     assert.equal(Object.keys(entry.exports).includes('wireBuilderCommit'),false);
   }
   assert.equal(loader.entrypoint('backend').records.some(record=>record.file==='engine.js'),false);
-  assert.deepEqual(Object.keys(loader.entrypoint('forge').exports),['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage','confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','SELECTABLE_SKINS','skinLabel','DEFAULT_SKIN','renderPage','applySkinClasses']);
+  assert.deepEqual(Object.keys(loader.entrypoint('forge').exports),['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage','confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','SELECTABLE_SKINS','skinLabel','DEFAULT_SKIN','renderPage','applySkinClasses','wireReaderShortcuts']);
 });
 test('static backend module uses only pure sources and retains the packaged facade and semantic diagnostics',()=>{
   const context={module:{exports:{}}};

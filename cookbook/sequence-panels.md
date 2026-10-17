@@ -29,10 +29,11 @@ Field references: `python3 tools/widget_doc.py sequence frames reads locus funne
 - **Tones** name the meaning of an emphasis, not a colour: `insert`,
   `mismatch`, `motif`, `primer`, `cut`, `feature`, `good`, `bad`, `accent`,
   `neutral`. The same tone looks the same in every panel and every skin.
-- **Sparse state.** `marks`, `reads`, `markers` and `arcs` are full snapshots
-  (an array replaces the previous one; `[]` clears). `counts`, `cells` and
-  `marks` on `funnel`/`grid` merge key by key; a `null` value clears one key.
-  Alternate paths fold independently.
+- **Sparse state.** `marks`, `reads`, `inserts`, `markers` and `arcs` are full
+  snapshots (an array replaces the previous one; `[]` clears). `counts` on
+  `funnel`, and `cells` and `marks` on `grid`, merge key by key; a `null`
+  value clears one key and a `null` field clears the whole map. Alternate
+  paths fold independently.
 - **Frames show what is declared.** `frames` translates its own `sequence`.
   To compare an in-frame and a shifted product, declare two `frames` panels
   with the two sequences, start them hidden (`"visible": false`) and show the
@@ -58,5 +59,8 @@ Field references: `python3 tools/widget_doc.py sequence frames reads locus funne
    **Frameshift insert** shows the thirteen-letter product with no stop left
    in frame 1, then the same grid.
 
-Author your own story by replacing the sequences, reads and counts; the panel
-contracts warn on any position outside the declared sequence or genome.
+Author your own story by replacing the sequences, reads and counts. A range,
+marker or read that lies entirely outside the declared sequence or genome
+warns and is left out; a range or read that only partly overlaps is clipped to
+the declared span without a warning, so check coordinates against `start` and
+`length` when a mark seems short.

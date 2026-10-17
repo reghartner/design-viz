@@ -227,6 +227,7 @@ function readsModel(panel, state) {
   var inserts = [];
   (Array.isArray(state.inserts) ? state.inserts : []).slice(0, READS_MAX_INSERTS).forEach(function (insert) {
     if (!panelObject(insert) || typeof insert.read !== 'string' || !insert.read || !bioPosition(insert.after)) return;
+    if (bioNormalizeSequence(insert.seq, alphabet).text.length > READS_MAX_INSERT) return;
     var seq = readsSequence(insert.seq, alphabet, READS_MAX_INSERT);
     if (!seq.text.length || seq.text.indexOf('-') >= 0) return;
     var row = null;

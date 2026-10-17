@@ -200,3 +200,21 @@ test('state folds independently across alternate paths with enterOnce and never 
   assert.equal(collected.error, undefined);
   assert.deepEqual(plain(collected.item), {focus:'r2', showDepth:false, reads:[{id:'q', at:101, seq:'AC'}]});
 });
+
+test('an insertion longer than 24 letters is skipped, matching its validation warning; a long read is truncated as warned', () => {
+  const p = {...plain(C.PANEL_TEMPLATES.reads), id:'aln', type:'reads'};
+  const start = p.start || 1;
+  const state = {reads:[{id:'ok', at:start, seq:'ACGT'},{id:'long', at:start, seq:'A'.repeat(241)}],
+    inserts:[{read:'ok', after:start + 1, seq:'GG'},{read:'ok', after:start + 1, seq:'G'.repeat(25)}]};
+  const m = model(p, state);
+  assert.equal(m.inserts.length, 1);
+  assert.equal(m.inserts[0].seq, 'GG');
+  const long = m.rows.find(row => row.id === 'long');
+  assert.ok(long, 'the long read still renders');
+  assert.equal(long.length, 240);
+  const d = {nodes:{n:{}}, rows:[['n']], panels:[{...p, initial:state}]};
+  const w = plain(C.validate(C.normalize(d))).warnings.join('\n');
+  assert.match(w, /reads\[1\]\.seq: only the first 240 letters render/);
+  assert.match(w, /inserts\[1\]\.seq: expected 1–24 inserted dna letters — insertion skipped/);
+  assert.doesNotMatch(C.readsHTML(p, state), /G{25}/);
+});

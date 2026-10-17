@@ -66,9 +66,11 @@ test('local handoffs switch spec tabs in place, return to the source beat and su
  await expect(orders).toBeVisible();expect(page.url()).toContain('s=beat2');
 });
 
-test('workbench authors a local handoff atomically, previews its arrow tip and undoes it',async({page,server})=>{
+test('workbench authors a local handoff atomically, previews its arrow tip and undoes it',async({page,server,audit})=>{
  const raw=structuredClone(example);delete raw.page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff;
  const source=JSON.stringify(raw,null,2);
+ // Opening Add → Referenced topology reads this site's diagram index (#592); this fixture site publishes none.
+ const indexURL=server.origin+'/diagrams.json';audit.allowStatus(404,url=>url===indexURL);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  await inspectPageElement(page,page.locator('[data-dv-node="continue"] .t1').first());
  await openInspectorGroup(page.locator('#guide .node-handoff-editor'));

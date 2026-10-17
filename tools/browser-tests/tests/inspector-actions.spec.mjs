@@ -302,6 +302,7 @@ const LEGACY_CARD={
    K6 selected | every preset, every editor skin: all nodes selected with Enter / Shift+Enter | each styled card's stroke is the dashed ring (stroke-dasharray set, width >= 2, opacity >= .9) and contrasts with the card fill at >= 1.5:1; Escape clears it | a preset whose border hides the selection ring
    K7 export | Download SVG of the styled section (editor, current skin) | the file contains g.node.ns-<token> for every token; reopened, each styled card's computed fill and stroke equal the live card's; the default card keeps the skin card colors | an export that loses or flattens the preset paint
    K8 tone | every preset, every skin (editor canvas and the reader pages): a step whose `tone` marks every node `alert` | each styled card's computed fill, stroke and title color equal the plain card's under the same tone (the semantic tone replaces the preset) | a preset that hides or recolors a step tone
+   K9 step member | every preset, every editor skin: the selected step's member cards (dv-instep) | each styled member card carries the same dash pattern and stroke width as the plain member card, and its stroke contrasts with its fill at >= 1.5:1 (Blueprint's own card rule already recolors the plain card's membership stroke, so color equality is not the contract) | a preset that hides the dashed step-membership mark
    H1 Confluence | the Forge viewer page with a pasted styled spec (skin aurora) | rows K1–K4 hold on #docview | a host whose stylesheet lacks the presets
    H2 Backstage | the native host fixture (its camera node carries style rose, skin pastel) | the card has class ns-rose; its fill and title differ from the sibling default card; title contrast >= 4.5:1; the sibling keeps the pastel legacy colors | a scoped host stylesheet that drops or mangles the preset rules */
 const STYLE_TOKENS=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
@@ -396,6 +397,15 @@ test('every node style preset stays readable, bordered and distinct in the edito
     await section.locator('button.schip').last().click();await expect(section.locator('[data-dv-node="plain"]')).toHaveClass(/\btone-alert\b/);
     await auditTone(page,'#section-overview',skin);
     await section.getByRole('button',{name:'Ambient',exact:true}).click();await expect(section.locator('[data-dv-node="rose"]')).not.toHaveClass(/\blit\b/);
+    // K9: the chosen step stays selected in the editor; every member card shows the same dashed membership stroke.
+    await expect(section.locator('[data-dv-node="plain"]')).toHaveClass(/\bdv-instep\b/);
+    const members=await page.evaluate(()=>{const out={};for(const g of document.querySelectorAll('#section-overview [data-dv-node]')){const c=getComputedStyle(g.querySelector('.card'));out[g.dataset.dvNode]={classes:g.getAttribute('class'),fill:c.fill,stroke:c.stroke,dash:c.strokeDasharray,width:c.strokeWidth};}return out;});
+    expect(members.plain.dash).not.toBe('none');
+    for(const token of STYLE_TOKENS){
+      const m=members[token];expect(m.classes,skin+' '+token+' member').toMatch(/\bdv-instep\b/);
+      expect({dash:m.dash,width:m.width},skin+' '+token+' membership dashes').toEqual({dash:members.plain.dash,width:members.plain.width});
+      expect(contrastRatio(m.stroke,m.fill),skin+' '+token+' membership stroke contrast').toBeGreaterThanOrEqual(1.5);
+    }
     // Choosing a step chip also selects that step in the editor, whose member cards keep the editor's dashed
     // membership stroke; the fill and text return to rest here, and the reader page below checks the stroke.
     await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);

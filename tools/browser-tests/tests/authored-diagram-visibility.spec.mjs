@@ -44,8 +44,8 @@ for(const width of [1280,1800])test('chapter diagram visibility saves and restor
   for(const profile of ['default','backstage','confluence']){
     const reader=await exportReader(context,server,exploreHidden,'visibility-'+width+'-'+profile,profile);
     const sec=reader.locator('.doc-sec[data-dv-section="0"]');await expect(sec.locator('.board')).toBeHidden();await expect(reader.locator('[data-layout-flow]')).toHaveCount(0);
-    await reader.locator('.explore-navigation').getByRole('button',{name:'Service flow',exact:true}).click();await expect(sec.locator('.boardcanvas>svg')).toBeHidden();await expect(sec.locator('.explore-canvas-objects [data-explore-panel="outcome"]')).toBeVisible();await expect(sec.locator('.explore-player')).toBeVisible();
-    await reader.locator('.explore-navigation').getByRole('button',{name:'Home story',exact:true}).click();await expect(sec.locator('.board')).toBeHidden();await reader.close();
+    await reader.locator('.explore-navigation .reader-contents-tab:has(.reader-tree-view[aria-current="page"])').getByRole('button',{name:'Service flow',exact:true}).click();await expect(sec.locator('.boardcanvas>svg')).toBeHidden();await expect(sec.locator('.explore-canvas-objects [data-explore-panel="outcome"]')).toBeVisible();await expect(sec.locator('.explore-player')).toBeVisible();
+    await reader.locator('.explore-navigation .reader-contents-tab:has(.reader-tree-view[aria-current="page"])').getByRole('button',{name:'Home story',exact:true}).click();await expect(sec.locator('.board')).toBeHidden();await reader.close();
   }
 });
 for(const savedLayout of [false,true])test('legacy '+(savedLayout?'saved':'automatic')+' chapters gain undoable visibility without a reader reveal override',async({page,server})=>{

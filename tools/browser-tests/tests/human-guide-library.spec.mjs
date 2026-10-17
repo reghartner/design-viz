@@ -235,6 +235,28 @@ test('Canon edit and browser Back retain the canonical owner View and its select
   await page.reload();await expect(navigation.getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#section-c')).toBeVisible();
 });
 
+/* #607 hosted reader row (contract matrix in reader-contents.spec.mjs):
+   H1 ?diagram= deep link | tab-views example published as "delivery", its Notes Tab given two Views (Notes pages: 2 sections, Notes brief: 1); fresh load of workbench.html?diagram=delivery#d=c&v=explore-bc at 1440x900 | #canon-reader Contents: Section C row in explore-bc aria-current=page and #section-c visible; Product and Notes Tab rows aria-expanded=true; every View disclosure in both Tabs aria-expanded=true with its own member rows | a hosted reader that expands only the linked Tab, or a deep link that loses its section */
+test('#607 a ?diagram= deep link lands on its section with every Contents Tab and View expanded',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const spec=JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
+  spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
+  const notes=spec.page.blocks[0].tabs.find(tab=>tab.label==='Notes');notes.sections.push({id:'notes-more',heading:'More notes',text:['A second Notes section.']});
+  notes.views=[{id:'notes-pages',name:'Notes pages',presentation:'standard',sections:['notes','notes-more']},{id:'notes-brief',name:'Notes brief',presentation:'standard',sections:['notes-more']}];
+  const data={version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.goto(server.origin+'/workbench.html?diagram=delivery#d=c&v=explore-bc');
+  const reader=page.locator('#canon-reader'),navigation=reader.locator(':scope>.explore-navigation');
+  const group=label=>navigation.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab').filter({hasText:label})});
+  await expect(navigation.locator('.reader-contents')).toBeVisible();await expect(reader.locator('#section-c')).toBeVisible();
+  await expect(navigation.locator('.reader-tree-sections[data-reader-view="explore-bc"]').getByRole('button',{name:'Section C',exact:true})).toHaveAttribute('aria-current','page');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(group('Product').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-view')).toHaveText(['Notes pages','Notes brief']);
+  for(const [label,id,count] of [['Product','standard-ac',2],['Product','explore-bc',2],['Product','explore-a',1],['Notes','notes-pages',2],['Notes','notes-brief',1]]){
+    await expect(group(label).locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure'),id).toHaveAttribute('aria-expanded','true');
+    await expect(group(label).locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);
+  }
+});
+
 test('Canon edit and browser Back preserve Ambient mode while stale modes use the authored default',async({page,server})=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();

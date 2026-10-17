@@ -275,7 +275,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
 | `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, Radar sensing geometry and authored alerts, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
 | `workbench/flowspec.html` | Generated locally, not tracked. Interactive workbench: the same engine plus an editable JSON panel with a Render button, click-to-definition selection with per-element inspector forms (field edits, id renames with reference rewrite, deletes with reference pruning, step reorder, undo), snippet INSERT buttons, schema reference, and known-limits notes. For hand-tuning specs. |
-| `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output. |
+| `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output, built from `cumulus-flow.spec.json` (the v2 spec with five diagram rows listed in reverse order). |
 | `mockups/` | The hand-built design explorations that defined the target: `flowline-mockups.html` (four visual treatments; mockup 04 "Aurora Combined" is the chosen direction), `device-lens.html` (click-through with a device-internals inspector), `doorbell-northstar.html` (the northstar: three synchronized panels — flow board, two-chip hardware view with wake states, camera viewfinder that visibly starts recording). |
 
 Panel modules are discovered through `src/source-bundles.json`, including a
@@ -330,9 +330,16 @@ input validates and all geometry has been computed.
 
 ```
 python3 tools/build.py
-python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json \
+python3 tools/inject.py examples/cumulus/cumulus-flow.spec.json \
     template/flowview.html examples/cumulus/cumulus-flow.html
 ```
+
+Committed pages under `examples/` and `docs/diagrams/` embed a copy of the engine, so
+they go stale when `src/` changes. To refresh one, rebuild it from the spec beside it:
+`python3 tools/inject.py <dir>/<name>.spec.json template/flowview.html <dir>/<name>.html`.
+A page whose folder has its own `build.py` (such as `examples/flowview-product-tour/`)
+is rebuilt with that script instead, because it adds more than the spec.
+`examples/index.html` comes from `python3 tools/build_index.py` and has no engine.
 
 ## Using this repo as a tool from another project
 

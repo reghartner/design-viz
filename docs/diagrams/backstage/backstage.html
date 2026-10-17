@@ -913,12 +913,6 @@ html.dv-commenting .docview>:not(.explore-navigation),html.dv-commenting .docvie
 .dv-tour-discovery[hidden]{display:none;}
 .dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
 @media print{.dv-tour-discovery{display:none!important;}}
-
-/* Reader utilities follow the fixed navigation's spacer in Standard. Explore
-   keeps the same controls together at the bottom, clear of the top navigation. */
-.reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
-.reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
-@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -2710,7 +2704,7 @@ body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-t
   .sec-eyebrow{color:#555555;}
 }
 @media print{
-  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-tour-replay{display:none !important;}
+  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-tour-replay, .dv-shortcuts, .reader-shortcuts{display:none !important;}
 }
 @media print{
   .sec-prose[hidden]{display:block !important;}
@@ -7539,7 +7533,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .wire-contract-preview{display:block;font:400 12px/1.5 'IBM Plex Sans',sans-serif;position:fixed;inset:auto;margin:0;z-index:10000;box-sizing:border-box;width:440px;max-width:calc(100vw - 16px);max-height:min(460px,calc(100vh - 16px));overflow:auto;padding:10px;border:1px solid var(--muted,#68788f);border-radius:12px;box-shadow:0 12px 40px #0003;}
 .wire-contract-preview[hidden]{display:none;}
 .wire-contract-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;}
-.wire-contract-heading button{cursor:pointer;border:0;border-radius:5px;background:transparent;color:inherit;font-size:22px;width:30px;height:30px;}
+.wire-contract-heading .wire-contract-close{cursor:pointer;border:0;border-radius:5px;background:transparent;color:inherit;font-size:22px;width:30px;height:30px;}
 .wire-contract-heading button:focus-visible{outline:2px solid var(--acc,#38bdf8);}
 .wire-contract-preview .ctcard{margin:4px 0 0;overflow-wrap:anywhere;}
 .wire-contract-preview .cttable{table-layout:fixed;}
@@ -7582,6 +7576,30 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 
 .handoff-destinations{position:fixed;z-index:10000;left:24px;top:24px;box-sizing:border-box;max-width:min(420px,calc(100% - 48px));padding:16px;border:1px solid var(--line,#ccd2df);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#172236);box-shadow:0 8px 32px #0003;display:flex;gap:8px;flex-wrap:wrap;}
 .handoff-destinations p{flex-basis:100%;margin:0 0 8px;font:14px/1.5 system-ui,sans-serif;}
+
+.wire-contract-caption{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere;}
+.wire-contract-caption small{display:block;font-weight:400;color:var(--dfaint,#68788f);}
+.wire-contract-context{color:var(--dfaint,#68788f);font-size:11px;}
+.wire-contract-preview [role=status]:not(:empty){margin-top:8px;}
+.wire-contract-copy{flex:none;cursor:pointer;padding:5px 10px;border:1px solid currentColor;border-radius:6px;color:inherit;background:transparent;font:inherit;}
+.wire-contract-json{font:12px/1.6 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;margin:8px 0;padding:10px;background:#80808012;border-radius:6px;}
+
+/* Reader utilities and the "?" shortcut sheet (viewer/shortcuts.js). Core, not
+   tour styles: the native and Forge viewers load only page and core (#602).
+   Reader utilities follow the fixed navigation's spacer in Standard. Explore
+   keeps the same controls together at the bottom, clear of the top navigation. */
+.reader-shortcuts{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:20px 22px 22px;border:1px solid #d5d8e3;border-radius:12px;background:#fff;color:#1f2433;font:14px/1.45 'IBM Plex Sans',sans-serif;box-shadow:0 18px 50px rgba(20,24,40,.28);}
+.reader-shortcuts::backdrop{background:rgba(15,18,30,.4);}
+.reader-shortcuts header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 4px;}
+.reader-shortcuts h2{margin:0;font:600 18px/1.3 'Sora','IBM Plex Sans',sans-serif;}
+.reader-shortcuts h3{margin:16px 0 8px;color:#5f6578;font:600 11px/1.4 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;}
+.reader-shortcuts dl{display:grid;grid-template-columns:7.5rem 1fr;align-items:baseline;gap:7px 18px;margin:0;}
+.reader-shortcuts dt{white-space:nowrap;color:#5f6578;}.reader-shortcuts dd{margin:0;}
+.reader-shortcuts kbd{display:inline-block;min-width:1.5em;box-sizing:border-box;padding:1px 6px;border:1px solid #c9ccd8;border-bottom-width:2px;border-radius:5px;background:#f6f7fb;color:#1f2433;font:600 12px/18px 'IBM Plex Mono',monospace;text-align:center;}
+.reader-shortcuts-close{min-height:32px;padding:5px 12px;border:1px solid #d5d8e3;border-radius:7px;background:#fff;color:#1f2433;font:500 13px/20px 'IBM Plex Sans',sans-serif;cursor:pointer;}.reader-shortcuts-close:hover{background:#f1f2f7;}
+.reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}
 
 /* Section-local viewing chrome; floating defaults belong to each named view. */
 .section-viewport{position:relative;min-width:0;isolation:isolate;}
@@ -11621,6 +11639,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
     'document.tab-views':['Tab-owned Views and section membership','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
@@ -11732,6 +11751,7 @@ var FlowviewCompatibility = (function(){
           if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
         });
       });
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && e.contract!=null;}) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.contracts!=null;}))used['content.edge-json-contracts']=true;
       if(d.storyTime!=null)used['flow.story-time']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || p.type!=='battery')return;
@@ -12299,7 +12319,7 @@ var FlowTopology = (function(){
     (d.edges || []).forEach(function(e){node(e.from,'edge '+edgeKey(e));node(e.to,'edge '+edgeKey(e));});
     (d.steps || []).forEach(function(s,i){
       var where='step '+(s.id || i);
-      stepKeys(s).forEach(function(id){edge(id,where);});Object.keys(stepFailures(s)).forEach(function(id){edge(id,where+' failures');});
+      stepKeys(s).forEach(function(id){edge(id,where);});Object.keys(s.contracts || {}).forEach(function(id){edge(id,where+' contracts');});Object.keys(stepFailures(s)).forEach(function(id){edge(id,where+' failures');});
       stepNodes(s).concat(Object.keys(stepTonePatch(s) || {})).forEach(function(id){node(id,where);});
       Object.keys(stepPanelPatch(s) || {}).concat(Object.keys(s.panelVisibility || {})).forEach(function(id){
         if(!(d.panels || []).some(function(p){return p && p.id===id;}))fail(at,where+' references missing panel '+id);
@@ -13024,6 +13044,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
       errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
@@ -13076,6 +13097,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
     var failures = stepFailures(st);
+    if(st && st.contracts!=null){
+      var CP=DP+'.steps['+ti+'].contracts';
+      if(!specObject(st.contracts))warnings.push(CP+': expected an object mapping edge keys to JSON contracts — ignored');
+      else Object.keys(st.contracts).forEach(function(key){
+        if(!Object.prototype.hasOwnProperty.call(edgeKeys,key) || keys.indexOf(key)<0)warnings.push(CP+'.'+key+': edge must be declared and used by this step — skipped');
+        if(st.contracts[key]!==null && !validJsonContract(st.contracts[key]))warnings.push(CP+'.'+key+': expected {json: JSON value, title?: string} or null — skipped');
+      });
+    }
     if (st && st.failures != null){
       var FP = DP + '.steps[' + ti + '].failures';
       if (typeof st.failures !== 'object' || Array.isArray(st.failures)) errors.push(FP + ': expected an object mapping edge keys to dropped or blocked');
@@ -13663,6 +13692,29 @@ function stepWireContracts(section, step, pathId){
       if(contractWireProblem(section.diagram,wire) || wire.step!==step.id || wire.path!=null && wire.path!==pathId || stepDeliveredKeys(step).indexOf(wire.edge)<0 || seen[wire.edge])return;
       seen[wire.edge]=true;out.push({record:rec,edge:wire.edge});
     });
+  });
+  return out;
+}
+
+/* JSON wire contracts are independent of section cards. Null suppresses a
+   contract; {json:null} is a real JSON payload. Invalid overrides fail closed. */
+function validJsonContract(value){
+  return !!value && typeof value==='object' && !Array.isArray(value) &&
+    Object.prototype.hasOwnProperty.call(value,'json') && value.json!==undefined &&
+    (value.title==null || typeof value.title==='string');
+}
+function edgeJsonContracts(diagram,step){
+  var out=[],seen=Object.create(null),edges=diagram && Array.isArray(diagram.edges)?diagram.edges:[];
+  var keys=step?stepDeliveredKeys(step):null;
+  edges.forEach(function(edge){
+    if(!edge)return;
+    var key=edge.from+'->'+edge.to;
+    // Duplicate edge declarations have ambiguous ownership: never show a payload.
+    if(seen[key] || edges.filter(function(e){return e && e.from+'->'+e.to===key;}).length!==1)return;
+    seen[key]=true;if(keys && keys.indexOf(key)<0)return;
+    var overrides=step && step.contracts,value=edge.contract;
+    if(overrides && typeof overrides==='object' && !Array.isArray(overrides) && Object.prototype.hasOwnProperty.call(overrides,key))value=overrides[key];
+    if(validJsonContract(value))out.push({edge:key,jsonContract:value,overridden:!!(overrides && Object.prototype.hasOwnProperty.call(overrides,key)),record:{key:'edge-json',value:value}});
   });
   return out;
 }
@@ -32806,10 +32858,10 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
   if(!entries.length)return null;
   var pop=document.createElement('div');pop.className='nbackpop wire-contract-preview';pop.id=prefix+'-wire-contract';
   pop.setAttribute('popover','manual');pop.setAttribute('role','dialog');pop.hidden=true;host.appendChild(pop);
-  var markers=[],active=null,pinned=false,closeTimer=null,retired=false,suppressFocus=false;
+  var markers=[],active=null,pinned=false,closeTimer=null,retired=false,suppressFocus=false,generation=0,visibilityObserver=null;
   function cancelClose(){if(closeTimer!=null)clearTimeout(closeTimer);closeTimer=null;}
   function close(focus){
-    cancelClose();var previous=active;active=null;pinned=false;
+    cancelClose();generation++;if(visibilityObserver){visibilityObserver.disconnect();visibilityObserver=null;}var previous=active;active=null;pinned=false;
     if(previous){previous.setAttribute('aria-expanded','false');previous.setAttribute('aria-pressed','false');}
     document.removeEventListener('keydown',escape,true);document.removeEventListener('pointerdown',outsideSection,true);document.removeEventListener('focusin',outsideSection,true);document.removeEventListener('scroll',position,true);window.removeEventListener('resize',position);
     if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;
@@ -32852,12 +32904,37 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
     cancelClose();
     if(active!==marker){
       close(false);active=marker;
-      pop.innerHTML='<div class="wire-contract-heading"><span>On this wire</span><button type="button" aria-label="Close wire contract">×</button></div>'+contractCardHTML(entry.record.value,null,entry.record);
+      var payload=entry.jsonContract?JSON.stringify(entry.jsonContract.json,null,2):null;
+      pop.innerHTML='<div class="wire-contract-heading"><div class="wire-contract-caption"><span>'+esc(entry.jsonContract && entry.jsonContract.title || 'On this wire')+'</span>'+
+        (entry.jsonContract?'<small>'+esc(entry.edge)+'</small>':'')+'</div>'+
+        (entry.jsonContract?'<button type="button" class="wire-contract-copy">Copy JSON</button>':'')+
+        '<button type="button" class="wire-contract-close" aria-label="Close wire contract">×</button></div>'+
+        (entry.jsonContract?'<pre class="wire-contract-json" tabindex="0" aria-label="Contract JSON">'+esc(payload)+'</pre><div class="wire-contract-context">'+(entry.overridden?'Step override':'Connection default')+'</div><div role="status" aria-live="polite"></div>':contractCardHTML(entry.record.value,null,entry.record));
+      if(entry.jsonContract){
+        var copy=pop.querySelector('.wire-contract-copy'),status=pop.querySelector('[role="status"]'),version=generation,copying=false;
+        copy.addEventListener('click',function(){
+          if(copying)return;
+          copying=true;copy.setAttribute('aria-disabled','true');status.textContent='Copying…';
+          function finish(ok){
+            if(retired || generation!==version || active!==marker)return;
+            copying=false;copy.setAttribute('aria-disabled','false');status.textContent=ok?'JSON copied.':'Copy unavailable. Select the JSON below and copy it manually.';
+            position();
+          }
+          try{
+            if(!navigator.clipboard || !navigator.clipboard.writeText){finish(false);return;}
+            Promise.resolve(navigator.clipboard.writeText(payload)).then(function(){finish(true);},function(){finish(false);});
+          }catch(error){finish(false);}
+        });
+      }
       pop.setAttribute('aria-label',entry.record.value.title || 'Wire contract');
-      pop.querySelector('button').addEventListener('click',function(){close(true);});
+      pop.querySelector('.wire-contract-close').addEventListener('click',function(){close(true);});
       setFragmentStep(pop,stepIndex,true);
       pop.hidden=false;if(pop.showPopover)pop.showPopover();
       active.setAttribute('aria-expanded','true');
+      // Static diagrams have no stepper onHide hook. Retire their top-layer
+      // preview as soon as navigation hides any containing section/tab.
+      visibilityObserver=new MutationObserver(function(){if(active && !active.getClientRects().length)close(false);});
+      for(var ancestor=host;ancestor;ancestor=ancestor.parentElement)visibilityObserver.observe(ancestor,{attributes:true,attributeFilter:['hidden','style','class']});
       document.addEventListener('keydown',escape,true);document.addEventListener('pointerdown',outsideSection,true);document.addEventListener('focusin',outsideSection,true);document.addEventListener('scroll',position,true);window.addEventListener('resize',position);
     }
     if(pin){pinned=true;active.setAttribute('aria-pressed','true');if(onPin)onPin();}
@@ -32882,8 +32959,8 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
     marker.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
     marker.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);});
     marker.addEventListener('keydown',function(ev){
-      if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);pop.querySelector('button').focus({preventScroll:true});}
-      else if(ev.key==='Tab' && !ev.shiftKey && active===marker){ev.preventDefault();pop.querySelector('button').focus({preventScroll:true});}
+      if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);pop.querySelector('.wire-contract-copy,.wire-contract-close').focus({preventScroll:true});}
+      else if(ev.key==='Tab' && !ev.shiftKey && active===marker){ev.preventDefault();pop.querySelector('.wire-contract-copy,.wire-contract-close').focus({preventScroll:true});}
     });
     board.svg.appendChild(marker);markers.push(marker);
   });
@@ -36211,7 +36288,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function clearWireContracts(){if(wireContracts)wireContracts.destroy();wireContracts=null;}
   function paintWireContracts(){
     clearWireContracts();
-    if(options && options.section && mode==='step' && !hidden)wireContracts=wireStepContracts(secBox,board,stepWireContracts(options.section,d.steps[cur],selectedPath.id),prefix,cur,stopAuto);
+    if(!hidden){
+      var step=mode==='step'?d.steps[cur]:null;
+      var entries=mode==='step' && !step?[]:edgeJsonContracts(d,step);
+      if(step && options && options.section)entries=entries.concat(stepWireContracts(options.section,step,selectedPath.id));
+      wireContracts=wireStepContracts(secBox,board,entries,prefix,cur,stopAuto);
+    }
   }
 
   var btnAmb = termbar.btnAmb, btnStep = termbar.btnStep;
@@ -36618,6 +36700,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     renderRuntimeConditions(board,termbar.runtimeStatus,[]);
     bar.hidden = true;
     setFragmentStep(secBox, 0, false);
+    paintWireContracts();
     syncToggle();
     if (panelCtl) panelCtl.setStep(0, false, true);
     if (onChange) onChange();
@@ -37630,8 +37713,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
-  var standardViewport=null;
-  result.destroy=function(){if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
+  var standardViewport=null,staticWireContracts=null;
+  result.destroy=function(){if(staticWireContracts)staticWireContracts.destroy();if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 
@@ -37701,6 +37784,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       deltaTog.appendChild(btnDelta); (boardLayout.modesHost || lg).appendChild(deltaTog);
     }
     addFocusControl();
+    staticWireContracts=wireStepContracts(box,board,edgeJsonContracts(activeDiagram),prefix,0);
     return result;
   }
 
@@ -39206,6 +39290,67 @@ function wireExternalHandoffs(ctl,options){
   ctl.view.addEventListener('click',follow);ctl.view.addEventListener('keydown',follow);ctl.view.addEventListener('keydown',escape);
   return {destroy:function(){disposed=true;close(false);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);ctl.view.removeEventListener('keydown',escape);}};
 }
+/* ---- src/viewer/shortcuts.js ---- */
+/* Reader keyboard shortcuts. "?" opens this sheet on every reader surface
+   (#562); the rows list only keys the reader handles: presenter and focused
+   step keys (engine.js), tab-bar keys, and Esc for menus and popovers.
+   Embedded readers (Backstage native, Forge) have no presenter, so they pass
+   {presenter:false} and omit the rows marked 'presenter' (#602). Lookups stay
+   under doc.body: the native viewer's bounded document has no querySelector. */
+var READER_SHORTCUT_GROUPS=[
+  ['Anywhere',[['?','Open this shortcut sheet'],['Esc','Close this sheet, an open menu or a popover']]],
+  ['Diagram focused, or in Present',[['← / →','Previous or next step'],['Space','Play or pause the steps']],'presenter'],
+  ['In Present',[['1–9','Switch to that tab'],['Esc','Exit Present']],'presenter'],
+  ['Tab bar focused',[['← / →','Previous or next tab'],['Home / End','First or last tab']]]
+];
+function readerShortcutTextTarget(target){
+  return !!(target && target.closest && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'));
+}
+function wireReaderShortcuts(ctl,view,win,options){
+  var doc=win.document,opener=null,destroyed=false,presenter=!(options && options.presenter===false);
+  function el(tag,cls,text){var node=doc.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
+  var dialog=el('dialog','reader-shortcuts');dialog.id='reader-shortcuts';dialog.setAttribute('aria-labelledby','reader-shortcuts-title');
+  var header=el('header'),title=el('h2',null,'Keyboard shortcuts'),close=el('button','reader-shortcuts-close','Close');
+  title.id='reader-shortcuts-title';close.type='button';header.append(title,close);dialog.appendChild(header);
+  READER_SHORTCUT_GROUPS.forEach(function(group){
+    if(group[2]==='presenter' && !presenter)return;
+    var section=el('section'),list=el('dl');section.appendChild(el('h3',null,group[0]));
+    group[1].forEach(function(row){
+      var dt=el('dt');
+      row[0].split(/( \/ |–)/).forEach(function(part,i){dt.append(i%2?part:el('kbd',null,part));});
+      list.append(dt,el('dd',null,row[1]));
+    });
+    section.appendChild(list);dialog.appendChild(section);
+  });
+  doc.body.appendChild(dialog);
+  var button=el('button','tbtn dv-shortcuts','?');button.type='button';
+  button.setAttribute('aria-label','Keyboard shortcuts');button.title='Keyboard shortcuts (?)';
+  button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',dialog.id);button.setAttribute('aria-keyshortcuts','?');
+  var pageActions=readerPageActions(view,ctl);pageActions.appendChild(button);
+  function show(){
+    if(destroyed || dialog.open || doc.body.querySelector('dialog[open]'))return false;
+    opener=doc.activeElement;dialog.showModal();close.focus({preventScroll:true});return true;
+  }
+  function keydown(ev){
+    if(ev.key!=='?' || ev.defaultPrevented || ev.isComposing || ev.altKey || ev.ctrlKey || ev.metaKey)return;
+    if(!view.isConnected || !view.getClientRects().length || readerShortcutTextTarget(ev.target))return;
+    var tour=doc.body.querySelector('.dv-tour');if(tour && !tour.hidden)return;
+    if(show())ev.preventDefault();
+  }
+  function closed(){var target=opener;opener=null;if(target && target.isConnected && target.focus)target.focus({preventScroll:true});}
+  button.addEventListener('click',show);
+  close.addEventListener('click',function(){dialog.close();});
+  /* Keys inside the sheet stay there: Esc closes it without leaving Present. */
+  dialog.addEventListener('keydown',function(ev){ev.stopPropagation();});
+  dialog.addEventListener('close',closed);
+  doc.addEventListener('keydown',keydown);
+  return {show:show,destroy:function(){
+    if(destroyed)return;destroyed=true;opener=null;
+    doc.removeEventListener('keydown',keydown);
+    if(dialog.open)dialog.close();dialog.remove();button.remove();
+    if(!pageActions.children.length){if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();pageActions.remove();}
+  }};
+}
 /* ---- src/viewer/artifact-comments.js ---- */
 /* claude.ai artifact comment anchoring. Tab panels and Views hide content
    with `hidden`, so the shell's own CSS-path anchoring cannot show or reach a
@@ -39658,8 +39803,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the ? button.',
-        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the Tour button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the Tour button.'
       }
     },
     {
@@ -39668,8 +39813,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.',
-        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.'
       }
     }
   ]
@@ -40999,7 +41144,7 @@ function wireTour(ctl, view, win, config, options){
   var replay = doc.createElement('button');
   replay.type = 'button';
   replay.className = 'tbtn dv-tour-replay';
-  replay.textContent = '?';
+  replay.textContent = 'Tour';
   replay.setAttribute('aria-label', 'Replay the tour');
   replay.addEventListener('click', function(){ disabled = false; guarded(start); });
   var pageActions=readerPageActions(view,ctl);
@@ -41223,6 +41368,8 @@ function boot(raw){
              {request: tourRequest, deepLink: tourDeferredByLink,
               autostart: !artifactHost, tourButton: artifactHost});
   }
+  /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
+  if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);
 }
 
 var raw = null, parseErr = null;

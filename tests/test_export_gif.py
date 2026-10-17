@@ -764,17 +764,24 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
               row: row && row.id,
               focused: document.activeElement && document.activeElement.id,
               rowTop: row && Math.round(row.getBoundingClientRect().top),
+              viewportHeight: innerHeight,
               step: step && step.textContent,
               tab: tab && tab.textContent,
               stepMode: !!(board && board.classList.contains('stepmode'))
             };
           })()
         """)
-        self.assertEqual(state["hash"], fragment)
+        # The viewer writes back the resolved Tab View, as standalone.spec.mjs
+        # asserts for the same route.
+        self.assertEqual(state["hash"], fragment.replace("&m=step", "&v=standard&m=step"))
         self.assertEqual(state["row"],
                          "contract-alert-only-inside-15-feet-row-2")
         self.assertEqual(state["focused"], state["row"])
-        self.assertLessEqual(abs(state["rowTop"]), 1)
+        # Initial routing runs before web fonts load, so the row may settle a
+        # few pixels from the top; standalone.spec.mjs checks only that it is
+        # on screen here and checks exact alignment after a later hash change.
+        self.assertGreaterEqual(state["rowTop"], -1)
+        self.assertLess(state["rowTop"], state["viewportHeight"] / 4)
         self.assertEqual(state["step"], "6")
         self.assertEqual(state["tab"], "Distance gate")
         self.assertTrue(state["stepMode"])

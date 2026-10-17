@@ -56,6 +56,12 @@ function spmPercent(num, den) {
 function spmRound(v) {
   return Math.round(v * 10) / 10;
 }
+/* Cheap string hash (FNV-1a, 32-bit) for change detection keys. */
+function spmHash(text) {
+  var h = 0x811c9dc5;
+  for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return text.length + ':' + h.toString(16);
+}
 /* Relative luminance of #RRGGBB, 0 (black) to 1 (white); invalid → 0.5. */
 function spmHexLuma(hex) {
   if (typeof hex !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return 0.5;

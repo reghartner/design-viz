@@ -12,11 +12,13 @@
   <rect id="ice" x="150" y="100" width="100" height="60" fill="#dff"/>
   <path id="stage-outline" d="M0 0 H400 V260 H0 Z" fill="none"/>
   <g id="1" transform="translate(20, 30) scale(2)">
+    <style>#101 { fill: red }</style>
     <path id="101" class="sec" d="m0 0 l40 0 l0 20 l-40 0 z" data-capacity="480" data-zone="end"/>
     <polygon id="102" points="50,0 90,0 90,20 50,20" data-capacity="450"/>
     <rect data-section="103" x="100" y="0" width="40" height="20" data-capacity="400" data-zone="corner"/>
   </g>
   <g id="2" transform="matrix(1 0 0 1 20 120)">
+    <script>/* nested: must not pop the group */ var x = '</g>';</script>
     <circle id="201A" cx="30" cy="30" r="25"/>
     <rect id="202" x="80" y="10" width="60" height="40" data-capacity="900"/>
     <g transform="skewX(20)">

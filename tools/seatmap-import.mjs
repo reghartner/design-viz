@@ -227,6 +227,26 @@ function elementPath(name, attrs, S) {
   }
   return null;
 }
+/* Drop polyline vertices by smallest triangle area until the path text fits
+   the panel limit. Only M/L/Z paths qualify; returns null for curves. */
+export function fitPolyline(commands, S) {
+  if (!commands.every(c => c.cmd === 'M' || c.cmd === 'L' || c.cmd === 'Z')) return null;
+  const closed = commands[commands.length - 1].cmd === 'Z';
+  let pts = commands.filter(c => c.cmd !== 'Z').map(c => [c.args[0], c.args[1]]);
+  const text = list => S.spmPathText(list.map((p, i) => ({ cmd: i ? 'L' : 'M', args: p })).concat(closed ? [{ cmd: 'Z', args: [] }] : []));
+  let removed = 0, d = text(pts);
+  while (d.length > S.SPM_PATH_MAX_CHARS && pts.length > 3) {
+    let best = -1, bestArea = Infinity;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+      const area = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]));
+      if (area < bestArea) { bestArea = area; best = i; }
+    }
+    pts.splice(best, 1); removed++;
+    d = text(pts);
+  }
+  return d.length > S.SPM_PATH_MAX_CHARS ? null : { d, removed };
+}
 function inferRing(id) {
   const digits = (id.match(/\d+/) || [''])[0];
   if (!digits) return null;
@@ -247,7 +267,7 @@ export function parseLevelMap(text) {
 export function importSvg(text, options = {}) {
   const S = sports();
   const levelMap = options.levelMap instanceof Map ? options.levelMap : parseLevelMap(options.levelMap);
-  const report = { input: 'svg', found: 0, kinds: {}, skipped: [], ignored: [], capacities: { given: 0, defaulted: 0 } };
+  const report = { input: 'svg', found: 0, kinds: {}, skipped: [], ignored: [], simplified: [], capacities: { given: 0, defaulted: 0 } };
   /* Drop everything that is not element markup; nothing here is executed. */
   let src = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '').replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, '').replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '');
   const tagRe = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[^\s=\/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*(\/?)>/g;
@@ -258,10 +278,13 @@ export function importSvg(text, options = {}) {
     const closing = m[1] === '/', name = m[2].toLowerCase(), selfClosing = m[4] === '/';
     if (closing) { if (stack.length > 1) stack.pop(); continue; }
     if (name === 'style' || name === 'script') {
+      /* Skip the whole subtree including its closing tag, so the ancestor
+         stack (transforms, level-map groups) is left exactly as it was. */
       report.ignored.push('<' + name + '>');
       if (!selfClosing) {
-        const end = src.toLowerCase().indexOf('</' + name, tagRe.lastIndex);
-        tagRe.lastIndex = end < 0 ? src.length : end;
+        const lower = src.toLowerCase(), close = lower.indexOf('</' + name, tagRe.lastIndex);
+        const end = close < 0 ? -1 : src.indexOf('>', close);
+        tagRe.lastIndex = end < 0 ? src.length : end + 1;
       }
       continue;
     }
@@ -314,7 +337,10 @@ export function importSvg(text, options = {}) {
   const bbox = S.spmPathBBox(all);
   if (!bbox || bbox.width <= 0 || bbox.height <= 0) throw new Error('sections have no area');
   const scale = S.SPM_VIEW / bbox.width;
-  const viewBox = { width: S.SPM_VIEW, height: Math.max(1, Math.round(bbox.height * scale)) };
+  /* The panel accepts viewBox sides of 100–4000; a very flat or very tall
+     chart is clamped so the fragment is never rejected (the content then
+     sits in a strip of the box). */
+  const viewBox = { width: S.SPM_VIEW, height: Math.min(4000, Math.max(100, Math.round(bbox.height * scale))) };
   /* Numeric ring keys sort inside → out; named groups keep first-seen order after them. */
   const seenKeys = [...new Set(sections.map(s => s.ring))];
   const ringKeys = seenKeys.filter(k => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b)).concat(seenKeys.filter(k => !/^\d+$/.test(k)));
@@ -325,14 +351,28 @@ export function importSvg(text, options = {}) {
     const split = options.capacityTotal != null ? evenSplit(options.capacityTotal, blank.length) : blank.map(() => 1);
     blank.forEach((s, i) => { s.capacity = split[i]; });
   }
-  const out = sections.map(s => {
+  /* Never emit a path the panel would reject: simplify long polylines
+     (Visvalingam, smallest-area vertex first) to fit the 2,000-character
+     limit, and skip anything else that fails the panel's own tokenizer. */
+  const out = [];
+  sections.forEach(s => {
     const normalised = S.spmNormalizePath(s.commands, bbox);
-    const section = { id: s.id, ring: slug(s.ring), path: normalised.d, capacity: s.capacity };
+    let d = normalised.d, simplified = 0;
+    if (d.length > S.SPM_PATH_MAX_CHARS) {
+      const fitted = fitPolyline(S.spmAbsolutePath(S.spmParsePath(d, { relative: true, maxChars: 1 << 20 }).commands), S);
+      if (!fitted) { report.skipped.push({ id: s.id, element: s.element, reason: 'path is ' + d.length + ' characters after normalisation (limit ' + S.SPM_PATH_MAX_CHARS + ') and uses curves that cannot be simplified — redraw it with fewer commands' }); return; }
+      simplified = fitted.removed; d = fitted.d;
+    }
+    const check = S.spmParsePath(d, { range: [0, S.SPM_VIEW] });
+    if (check.error) { report.skipped.push({ id: s.id, element: s.element, reason: 'normalised path rejected by the panel: ' + check.error }); return; }
+    const section = { id: s.id, ring: slug(s.ring), path: d, capacity: s.capacity };
     if (s.zone) section.zone = s.zone;
     if (s.label) section.label = s.label;
     report.kinds[s.element] = (report.kinds[s.element] || 0) + 1;
-    return section;
+    if (simplified) report.simplified.push({ id: s.id, removed: simplified, length: d.length });
+    out.push(section);
   });
+  if (!out.length) throw new Error('every section was skipped; see the report');
   const fragment = { geometry: 'paths', viewBox, rings, sections: out };
   const note = capacityNote(blank.length, options.capacityTotal, options.capacityTotal != null);
   if (note) fragment.capacityNote = note;
@@ -378,6 +418,7 @@ export function formatReport(report, inputName) {
     const c = report.capacities;
     lines.push('  capacities: ' + c.given + ' from data-capacity, ' + c.defaulted + (c.defaulted ? (c.total != null ? ' filled as an illustrative even split of ' + c.total : ' defaulted to 1 (no --capacity-total)') : ' defaulted'));
     if (report.ignored.length) lines.push('  ignored: ' + [...new Set(report.ignored)].join(', '));
+    if (report.simplified.length) lines.push('  simplified to fit the 2,000-character path limit: ' + report.simplified.map(s => s.id + ' (−' + s.removed + ' points, ' + s.length + ' chars)').join(', '));
   }
   lines.push('  skipped: ' + (report.skipped.length ? report.skipped.length + ' element' + (report.skipped.length === 1 ? '' : 's') : 'none'));
   report.skipped.forEach(s => lines.push('    - ' + (s.line ? 'line ' + s.line + ' ' : '') + (s.element ? '<' + s.element + '> ' : '') + (s.id ? '"' + s.id + '" ' : '') + '— ' + s.reason));

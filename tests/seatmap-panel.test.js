@@ -453,3 +453,57 @@ test('the fold accepts a previous snapshot as its starting state, so an engine-l
   const result = render(host, swapped, after, 'aurora', [], 1, true);
   assert.equal(result.patch, null, 'a changed declaration forces a full re-render instead of an in-place patch');
 });
+
+test('the in-place patch is refused whenever path data, labels, landmarks or tiers change, not only when section centres move', () => {
+  const render = C.PanelRegistry.get('seatmap').render;
+  const base = panel(); base.geometry = 'paths'; base.viewBox = {width:1000, height:1000};
+  base.sections = [
+    {id:'A',ring:'lower',capacity:10,path:'M0 0 L200 0 L200 200 L0 200 Z'},
+    {id:'B',ring:'lower',capacity:10,path:'M300 0 L500 0 L500 200 L300 200 Z'},
+    {id:'C',ring:'upper',capacity:10,path:'M0 300 L200 300 L200 500 L0 500 Z'},
+    {id:'D',ring:'upper',capacity:10,path:'M300 300 L500 300 L500 500 L300 500 Z'},
+  ];
+  const host = {};
+  render(host, base, {sold:{A:1}}, 'aurora', [], 0, true);
+  assert.equal(typeof render(host, base, {sold:{A:5}}, 'aurora', [], 1, true).patch, 'function', 'same declaration: patch in place');
+  /* Same bounding-box centre, different outline. */
+  const reshaped = JSON.parse(JSON.stringify(base)); reshaped.sections[0].path = 'M0 0 L200 0 L200 200 L100 100 L0 200 Z';
+  assert.equal(render(host, reshaped, {sold:{A:5}}, 'aurora', [], 2, true).patch, null, 'changed path data forces a full render');
+  render(host, base, {sold:{A:5}}, 'aurora', [], 3, true);
+  const relabelled = JSON.parse(JSON.stringify(base)); relabelled.sections[1].label = 'B2';
+  assert.equal(render(host, relabelled, {sold:{A:5}}, 'aurora', [], 4, true).patch, null, 'changed label text forces a full render');
+  render(host, base, {sold:{A:5}}, 'aurora', [], 5, true);
+  const marked = JSON.parse(JSON.stringify(base)); marked.landmarks = [{id:'x', label:'stage', x:600, y:600}];
+  assert.equal(render(host, marked, {sold:{A:5}}, 'aurora', [], 6, true).patch, null, 'changed landmarks force a full render');
+  render(host, base, {sold:{A:5}}, 'aurora', [], 7, true);
+  const retiered = JSON.parse(JSON.stringify(base)); retiered.tiers[0].color = '#000000';
+  assert.equal(render(host, retiered, {sold:{A:5}}, 'aurora', [], 8, true).patch, null, 'changed tier definitions force a full render');
+  render(host, base, {sold:{A:5}}, 'aurora', [], 9, true);
+  assert.equal(typeof render(host, base, {sold:{A:9}, mode:'held'}, 'aurora', [], 10, true).patch, 'function', 'state-only changes still patch in place');
+  assert.match(C.seatmapModel(base, {}).geometryKey, /^\d+:[0-9a-f]+$/, 'the key is a compact hash');
+});
+
+test('a finite price whose sold × price overflows makes revenue unavailable instead of Infinity', () => {
+  const p = panel();
+  const huge = {sold:{101:100, 102:50}, price:{101:Number.MAX_VALUE, 102:80}};
+  const m = C.seatmapModel(p, Object.assign({mode:'revenue'}, huge));
+  const s101 = m.sections.find(s => s.id === '101'), s102 = m.sections.find(s => s.id === '102');
+  assert.equal(s101.revenue, null); assert.equal(s101.revenueOverflow, true); assert.equal(s101.intensity, 0); assert.equal(s101.known, false);
+  assert.equal(s102.revenue, 4000); assert.equal(s102.intensity, 1);
+  assert.equal(m.totals.revenueKnown, false); assert.equal(m.totals.revenueOverflow, true); assert.equal(m.totals.revenue, 0);
+  for (const s of m.sections) assert.ok(Number.isFinite(s.intensity));
+  const html = C.seatmapHTML(p, Object.assign({mode:'revenue'}, huge));
+  assert.doesNotMatch(html, /Infinity|NaN|undefined/);
+  assert.match(html, /<b>—<\/b><span>revenue<\/span>/);
+  assert.match(C.seatmapHTML(p, Object.assign({mode:'sold'}, huge)), /aria-label="Venue map, sold view: 150 of 1,500 seats sold \(10%\)\."/, 'the aria label omits unavailable revenue');
+  const priceMode = C.seatmapModel(p, Object.assign({mode:'price'}, huge));
+  assert.equal(priceMode.sections.find(s => s.id === '101').intensity, 1);
+  assert.ok(Number.isFinite(priceMode.sections.find(s => s.id === '102').intensity));
+  /* Many large but finite products whose sum overflows. */
+  const wide = panel(); wide.sections = wide.sections.map(s => Object.assign({}, s, {capacity: 1000}));
+  const sum = {sold:{101:1000, 102:1000, 103:1000}, price:{101:Number.MAX_VALUE / 1500, 102:Number.MAX_VALUE / 1500, 103:Number.MAX_VALUE / 1500}};
+  const sm = C.seatmapModel(wide, Object.assign({mode:'revenue'}, sum));
+  assert.ok(sm.sections.every(s => s.revenue === null || Number.isFinite(s.revenue)));
+  assert.equal(sm.totals.revenueKnown, false, 'an overflowing sum is unavailable too');
+  assert.doesNotMatch(C.seatmapHTML(wide, Object.assign({mode:'revenue'}, sum)), /Infinity|NaN/);
+});

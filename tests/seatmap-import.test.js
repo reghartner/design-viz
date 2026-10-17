@@ -167,7 +167,7 @@ test('rings are inferred from leading digits without a level map; a level map na
   assert.equal(sized.fragment.capacityNote, 'illustrative even split');
 });
 
-test('oversized output is refused and unknown options fail with usage', () => {
+test('a 160-section chart of long polylines imports under the 512 KiB cap with every path simplified under the panel limit; unknown options fail with usage', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'seatmap-import-'));
   try {
     let svg = '<svg>';
@@ -178,10 +178,15 @@ test('oversized output is refused and unknown options fail with usage', () => {
     }
     const big = path.join(dir, 'big.svg');
     fs.writeFileSync(big, svg + '</svg>');
-    const run = cli([big, '--out', path.join(dir, 'big.json')]);
-    assert.equal(run.code, 1);
-    assert.match(run.stderr, /refusing to write \d+ KiB; the limit is 512 KiB/);
-    assert.ok(!fs.existsSync(path.join(dir, 'big.json')));
+    const out = path.join(dir, 'big.json');
+    const run = cli([big, '--out', out]);
+    assert.equal(run.code, 0, run.stderr);
+    const fragment = JSON.parse(fs.readFileSync(out, 'utf8'));
+    assert.equal(fragment.sections.length, 160);
+    assert.ok(fragment.sections.every(s => s.path.length <= 2000), 'every path fits the panel limit');
+    assert.ok(fs.statSync(out).size < 512 * 1024, 'the whole fragment stays under the 512 KiB cap');
+    assert.match(run.stderr, /simplified to fit the 2,000-character path limit: 100 \(−\d+ points, \d+ chars\)/);
+    assert.deepEqual(validates(fragment), {errors:[], warnings:[]});
   } finally { fs.rmSync(dir, {recursive:true, force:true}); }
   const usage = cli([]);
   assert.equal(usage.code, 2); assert.match(usage.stderr, /usage: node tools\/seatmap-import\.mjs/);
@@ -189,4 +194,58 @@ test('oversized output is refused and unknown options fail with usage', () => {
   assert.equal(unknown.code, 2); assert.match(unknown.stderr, /unknown option --bogus/);
   const missing = cli([path.join(ROOT, 'nope.csv')]);
   assert.equal(missing.code, 2); assert.match(missing.stderr, /cannot read/);
+});
+
+test('nested <script>/<style> inside transformed or level-mapped groups never pop the ancestor stack', async () => {
+  const {importSvg} = await importer();
+  const svg = '<svg><g id="1" transform="translate(100 0) scale(2)"><style>.a{}</style><rect id="101" width="10" height="10"/>' +
+    '<g transform="translate(0 50)"><script>var s = "</g>";</script><rect id="102" width="10" height="10"/></g><rect id="103" x="20" width="10" height="10"/></g>' +
+    '<g id="2"><script type="text/javascript"><![CDATA[ if (a < b) { } ]]></script><rect id="7" x="300" width="10" height="10"/></g></svg>';
+  const {fragment, report} = importSvg(svg, {levelMap:'1:Lower,2:Upper'});
+  const by = Object.fromEntries(fragment.sections.map(s => [s.id, s]));
+  assert.deepEqual(fragment.rings, [{id:'1',label:'Lower'},{id:'2',label:'Upper'}]);
+  assert.equal(by['101'].path, by['101'].path.replace(/[^ML0-9. Z]/g, ''));
+  /* 101 at (100,0) scaled 2 → x 100..120; 102 inherits the nested translate 50; 103 inherits the outer transform (x 140..160); 7 is at 300 in group 2. */
+  const xs = id => by[id].path.match(/[-\d.]+/g).map(Number).filter((v, i) => i % 2 === 0);
+  const span = id => [Math.min(...xs(id)), Math.max(...xs(id))];
+  const scale = 1000 / (310 - 100);
+  const close = (a, b) => assert.ok(Math.abs(a - b) <= 1, a + ' ≈ ' + b);
+  close(span('101')[0], 0); close(span('101')[1], 20 * scale);
+  close(span('103')[0], 40 * scale); close(span('103')[1], 60 * scale);
+  close(by['102'].path.match(/[-\d.]+/g).map(Number).filter((v, i) => i % 2 === 1)[0], 100 * scale, '102 keeps the nested translate(0 50) scaled by 2');
+  assert.equal(by['7'].ring, '2', 'the level-map group survives a nested script with a fake closing tag');
+  assert.deepEqual(report.skipped, []);
+  assert.deepEqual([...new Set(report.ignored)].sort(), ['<script>', '<style>']);
+  /* The committed fixture now carries both cases too. */
+  const fixture = importSvg(fs.readFileSync(SVG, 'utf8'), {levelMap:'1:100 level,2:200 level'});
+  const fb = Object.fromEntries(fixture.fragment.sections.map(s => [s.id, s]));
+  assert.equal(fb['101'].path, 'M0 0L222.2 0L222.2 111.1L0 111.1Z', '101 still carries translate+scale past a nested <style>');
+  assert.equal(fb['201A'].ring, '2', '201A still sits in group 2 past a nested <script> containing </g>');
+});
+
+test('normalised paths never exceed the panel limit: long polylines are simplified, long curves are skipped with a reason, and every emitted path passes the panel tokenizer', async () => {
+  const {importSvg, fitPolyline} = await importer();
+  let points = '';
+  for (let i = 0; i < 700; i++) points += (100 + 50 * Math.cos(i / 700 * 2 * Math.PI)).toFixed(3) + ',' + (100 + 50 * Math.sin(i / 700 * 2 * Math.PI)).toFixed(3) + ' ';
+  let curve = 'M0 0';
+  for (let i = 0; i < 200; i++) curve += ' C' + (i + 0.123) + ' 1 ' + (i + 0.456) + ' 2 ' + (i + 1) + ' 0';
+  const svg = '<svg><polygon id="101" points="' + points + '"/><path id="102" d="' + curve + ' Z"/><rect id="103" x="0" y="0" width="200" height="10"/>' +
+    '<rect id="104" x="0" y="180" width="60" height="20"/><rect id="105" x="140" y="180" width="60" height="20"/></svg>';
+  const {fragment, report} = importSvg(svg);
+  const by = Object.fromEntries(fragment.sections.map(s => [s.id, s]));
+  assert.ok(by['101'], 'the polygon survives');
+  assert.ok(by['101'].path.length <= 2000, 'simplified under the limit: ' + by['101'].path.length);
+  assert.ok(by['101'].path.length > 1500, 'but keeps most of its detail');
+  assert.ok(!C.spmParsePath(by['101'].path, {range:[0,1000]}).error);
+  assert.equal(by['102'], undefined, 'the curve-only long path is skipped');
+  assert.match(report.skipped.find(s => s.id === '102').reason, /path is \d+ characters after normalisation \(limit 2000\) and uses curves/);
+  assert.equal(report.simplified.length, 1); assert.equal(report.simplified[0].id, '101'); assert.ok(report.simplified[0].removed > 100);
+  for (const s of fragment.sections) assert.ok(!C.spmParsePath(s.path, {range:[0,1000]}).error, s.id);
+  assert.deepEqual(validates(fragment), {errors:[], warnings:[]}, 'the fragment validates clean in the real validator');
+  const S = {spmPathText: C.spmPathText, SPM_PATH_MAX_CHARS: 2000};
+  const square = fitPolyline([{cmd:'M',args:[0,0]},{cmd:'L',args:[10,0]},{cmd:'L',args:[10,10]},{cmd:'L',args:[0,10]},{cmd:'Z',args:[]}], S);
+  assert.deepEqual(square, {d:'M0 0L10 0L10 10L0 10Z', removed:0});
+  assert.equal(fitPolyline([{cmd:'M',args:[0,0]},{cmd:'C',args:[1,1,2,2,3,3]}], S), null);
+  const run = cli([SVG, '--level-map', '1:100 level,2:200 level']);
+  assert.doesNotMatch(run.stderr, /simplified/);
 });

@@ -15622,6 +15622,12 @@ function spmPercent(num, den) {
 function spmRound(v) {
   return Math.round(v * 10) / 10;
 }
+/* Cheap string hash (FNV-1a, 32-bit) for change detection keys. */
+function spmHash(text) {
+  var h = 0x811c9dc5;
+  for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return text.length + ':' + h.toString(16);
+}
 /* Relative luminance of #RRGGBB, 0 (black) to 1 (white); invalid → 0.5. */
 function spmHexLuma(hex) {
   if (typeof hex !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return 0.5;
@@ -29276,14 +29282,17 @@ function seatmapModel(panel, state) {
     var p = isFiniteNum(price[s.id]) && price[s.id] >= 0 ? price[s.id] : null;
     var tierId = typeof tierOf[s.id] === 'string' && tiers.some(function (t) { return t.id === tierOf[s.id]; }) ? tierOf[s.id] : s.tier;
     var tier = tierId ? tiers.filter(function (t) { return t.id === tierId; })[0] : null;
+    /* sold × price can overflow for a valid finite price; an overflowing
+       product makes that section's revenue unavailable rather than Infinity. */
     var revenue = p === null ? null : soldN * p;
+    if (revenue !== null && !isFiniteNum(revenue)) revenue = null;
     if (p !== null) maxPrice = Math.max(maxPrice, p);
     if (revenue !== null) maxRevenue = Math.max(maxRevenue, revenue);
     if (s.zone) { if (!panelOwn(zones, s.zone)) { zones[s.zone] = 0; zoneOrder.push(s.zone); } zones[s.zone]++; }
     var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
     return {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
-      sold: soldN, held: hold, price: p, revenue: revenue, tier: tier, tierId: tierId,
+      sold: soldN, held: hold, price: p, revenue: revenue, revenueOverflow: p !== null && revenue === null, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
       d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
       kind: s.kind, range: bowl ? placement[s.id] : null,
@@ -29309,13 +29318,19 @@ function seatmapModel(panel, state) {
   sections.forEach(function (s) {
     totals.sold += s.sold; totals.capacity += s.capacity;
     if (s.held) totals.held += s.held.count;
-    if (s.price !== null) { totals.revenue += s.revenue; totals.priced++; totals.pricedSold += s.sold; }
+    if (s.price !== null) { totals.priced++; totals.pricedSold += s.sold; }
+    if (s.revenue !== null && totals.revenue !== null) { totals.revenue += s.revenue; if (!isFiniteNum(totals.revenue)) totals.revenue = null; }
+    else if (s.revenueOverflow) totals.revenue = null;
     var ring = ringTotals[s.ring];
     ring.sold += s.sold; ring.capacity += s.capacity; ring.sections++;
     if (s.held) ring.held += s.held.count;
   });
   totals.pct = spmPercent(totals.sold, totals.capacity);
-  totals.revenueKnown = totals.priced > 0;
+  /* Revenue is unavailable when any priced section's product, or the sum,
+     overflowed; the totals strip then shows a dash instead of Infinity. */
+  totals.revenueOverflow = totals.revenue === null;
+  if (totals.revenue === null) totals.revenue = 0;
+  totals.revenueKnown = totals.priced > 0 && !totals.revenueOverflow;
   totals.allPriced = totals.priced === sections.length && sections.length > 0;
   ringTotals.forEach(function (ring) { ring.pct = spmPercent(ring.sold, ring.capacity); });
   var tierCounts = tiers.map(function (tier, i) {
@@ -29329,7 +29344,11 @@ function seatmapModel(panel, state) {
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
     priceRange: prices.length ? { min: Math.min.apply(null, prices), max: Math.max.apply(null, prices) } : null,
     complete: sections.length >= SEATMAP_MIN_SECTIONS, hasHolds: totals.held > 0,
-    geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id + '@' + s.x + ',' + s.y; }).join(','),
+    /* Everything the in-place patch would otherwise keep stale: ids, path
+       data, label text and lines, landmarks and tier definitions. */
+    geometryKey: spmHash(geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) {
+      return s.id + '@' + s.x + ',' + s.y + '|' + s.d + '|' + s.lines.join('/') + '|' + s.font;
+    }).join(',') + ';' + JSON.stringify(seatmapLandmarks(panel)) + ';' + JSON.stringify(tiers) + ';' + (bowl ? bowl.field : '')),
   };
 }
 function seatmapTierPalette(i) {

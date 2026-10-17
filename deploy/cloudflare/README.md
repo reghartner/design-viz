@@ -38,8 +38,8 @@ Upstream tracks only `README.md`, `deploy.sh` and `local.env.example` in this
 folder; `.gitignore` excludes everything else here, so an ordinary `git add`
 cannot pick up local settings or generated files. `tests/cloudflare-deploy.test.js`
 fails if those ignore rules stop applying or if a Worker name, `workers.dev`
-address, Access team address or 32-hex identifier appears in the three tracked
-files. A private company fork may still choose to force-add its own `local.env`;
+address, Access team address, email address, `account_id` or 32-hex identifier
+appears in the three tracked files. A private company fork may still choose to force-add its own `local.env`;
 the test does not reject that. The Worker name lives in the gitignored
 `local.env` (or the `FLOWVIEW_CF_WORKER` environment variable). Wrangler keeps
 its login token in your user profile, outside the repository. Do not paste the

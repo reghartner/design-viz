@@ -39,6 +39,11 @@ action. Existing copy, paste, duplicate, delete, nudge, object-menu,
 pan, and quick-connect keys are listed there too. These navigation and selection
 actions do not edit the JSON or add Undo history.
 
+Readers work the same way: in a published page and in the library reader, the
+**?** button and the **?** key open the reader's keyboard shortcuts (step,
+Present and tab keys). **Tour** replays the guided tour, and the library reader's
+**User guide** button opens this guide.
+
 Start with **Your first diagram** for a complete walkthrough. The chapter list
 then covers the workspace, rows and free placement, quick connections, step
 playback, alternate paths, panels, Home editing, named views, catalogs and code

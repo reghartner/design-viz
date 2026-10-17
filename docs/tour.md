@@ -403,7 +403,7 @@ is restored when the tour finishes or is skipped.
 ## Runtime behavior (fixed, not configurable)
 
 - Shown once per browser (`localStorage["dv_tour_v1"]`, cookie fallback);
-  replay via the `?` pill or `window.dvStartTour()`; `#tour=1` forces,
+  replay via the **Tour** button or `window.dvStartTour()`; `#tour=1` forces,
   `#tour=0` suppresses; deep-linked opens never auto-start; never wired on
   `#embed=` pages; printing hides it.
 - Fragment writes are suppressed while the tour runs; the pre-tour snapshot

@@ -42,7 +42,8 @@
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",
-    "viewer/handoffs.js"
+    "viewer/handoffs.js",
+    "viewer/shortcuts.js"
   ],
   "builder.workbench.js": [
     "workbench/source-edit.js",

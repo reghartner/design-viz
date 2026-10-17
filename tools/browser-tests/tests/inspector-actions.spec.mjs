@@ -301,7 +301,7 @@ const LEGACY_CARD={
    K5 lit | every preset, every skin (editor canvas and the Daylight/Editorial reader pages): a step that lights every node | each styled card's lit stroke differs from its resting stroke by an OKLab distance >= 0.05 or grows by >= 1px, and contrasts with its fill at >= 1.5:1; leaving step mode restores the resting fill and text (editor) and the resting stroke (reader; the editor keeps its dashed step-membership stroke on member cards) | an imperceptible or missing lit highlight on any preset
    K6 selected | every preset, every editor skin: all nodes selected with Enter / Shift+Enter | each styled card's stroke is the dashed ring (stroke-dasharray set, width >= 2, opacity >= .9) and contrasts with the card fill at >= 1.5:1; Escape clears it | a preset whose border hides the selection ring
    K7 export | Download SVG of the styled section (editor, current skin) | the file contains g.node.ns-<token> for every token; reopened, each styled card's computed fill and stroke equal the live card's; the default card keeps the skin card colors | an export that loses or flattens the preset paint
-   K8 tone | every preset, every skin (editor canvas and the reader pages): a step whose `tone` marks every node `alert` | each styled card's computed fill, stroke and title color equal the plain card's under the same tone (the semantic tone replaces the preset) | a preset that hides or recolors a step tone
+   K8 tone | every preset, every skin (editor canvas and the reader pages): a step whose `tone` marks every node `alert` | each styled card's computed fill, stroke, title color and subtitle color equal the plain card's under the same tone (the semantic tone replaces the preset) | a preset that hides or recolors a step tone, or leaves its own subtitle color on the tone fill
    K9 step member | every preset, every editor skin: the selected step's member cards (dv-instep) | each styled member card carries the plain member card's dash pattern and stroke width; where the plain card's membership stroke differs from its resting stroke (the editor accent shows), the styled card's stroke equals it — except Ink on the dark skins, whose light card takes a dark stroke contrasting >= 1.5:1; where the skin's own card rule already recolors the plain mark (Blueprint), the styled stroke must still contrast >= 1.5:1 | a preset that keeps its own border color under the membership dashes
    H1 Confluence | the Forge viewer page with a pasted styled spec (skin aurora) | rows K1–K4 hold on #docview | a host whose stylesheet lacks the presets
    H2 Backstage | the native host fixture (its camera node carries style rose, skin pastel) | the card has class ns-rose; its fill and title differ from the sibling default card; title contrast >= 4.5:1; the sibling keeps the pastel legacy colors | a scoped host stylesheet that drops or mangles the preset rules */
@@ -320,12 +320,12 @@ async function auditTone(page,scope,skin){
   const seen=await page.evaluate(scope=>{
     const out={};for(const g of document.querySelectorAll(scope+' [data-dv-node]')){
       const card=getComputedStyle(g.querySelector('.card'));
-      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,t1:getComputedStyle(g.querySelector('.t1')).fill,classes:g.getAttribute('class')};
+      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,t1:getComputedStyle(g.querySelector('.t1')).fill,t2:getComputedStyle(g.querySelector('.t2')).fill,classes:g.getAttribute('class')};
     }return out;},scope);
   expect(seen.plain.classes).toMatch(/\btone-alert\b/);
   for(const token of STYLE_TOKENS){
     expect(seen[token].classes,skin+' '+token+' toned').toMatch(/\btone-alert\b/);
-    expect({fill:seen[token].fill,stroke:seen[token].stroke,t1:seen[token].t1},skin+' '+token+' alert tone paint').toEqual({fill:seen.plain.fill,stroke:seen.plain.stroke,t1:seen.plain.t1});
+    expect({fill:seen[token].fill,stroke:seen[token].stroke,t1:seen[token].t1,t2:seen[token].t2},skin+' '+token+' alert tone paint').toEqual({fill:seen.plain.fill,stroke:seen.plain.stroke,t1:seen.plain.t1,t2:seen.plain.t2});
   }
 }
 /* Rows K5/K6: compares the lit (or selected) stroke of every styled card with its resting stroke. */

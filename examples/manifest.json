@@ -335,7 +335,7 @@
     {
       "file": "panel-declare/panel-declare.html",
       "spec": "panel-declare/panel-declare.spec.json",
-      "title": "Pump telemetry \u2014 panels that change what they measure",
+      "title": "Pump telemetry — panels that change what they measure",
       "family": "panel-declare",
       "description": "A flow gauge switches to hourly volume, a readings table gains a column on the offline path and a latency budget adds a span, all through per-step declaration overrides.",
       "tags": [

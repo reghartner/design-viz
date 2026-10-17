@@ -389,6 +389,13 @@
         "title": "Lookout Feature Atlas"
       }
     ],
+    "Fleet cloud": [
+      {
+        "file": "panel-declare/panel-declare.html",
+        "family": "panel-declare",
+        "title": "Pump telemetry — panels that change what they measure"
+      }
+    ],
     "Fleetd": [
       {
         "file": "basecraft-keep/keep.html",
@@ -401,6 +408,13 @@
         "file": "wrenlight-perch/perch.html",
         "family": "wrenlight-perch",
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Flow sensor": [
+      {
+        "file": "panel-declare/panel-declare.html",
+        "family": "panel-declare",
+        "title": "Pump telemetry — panels that change what they measure"
       }
     ],
     "Foreign DNA": [
@@ -776,6 +790,13 @@
         "file": "doorbell/doorbell-from-spec.html",
         "family": "doorbell",
         "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Pump controller": [
+      {
+        "file": "panel-declare/panel-declare.html",
+        "family": "panel-declare",
+        "title": "Pump telemetry — panels that change what they measure"
       }
     ],
     "Quartermaster": [

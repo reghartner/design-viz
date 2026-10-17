@@ -393,6 +393,9 @@ const SWEEP = {
   reads: t => ({maxReads: 6}),
   locus: t => ({unit: 'bp'}),
   funnel: t => ({unit: 'fragments'}),
+  seatmap: t => ({currency: 'EUR', bowl: 'oval'}),
+  strandscene: t => ({label: 'override label'}),
+  cellscene: t => ({label: 'override label'}),
   grid: t => ({decimals: 1})
 };
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';

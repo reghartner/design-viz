@@ -949,31 +949,45 @@ perspectives" of one timeline). Types:
 - `seatmap` — a venue map: a bowl (or imported chart) of seating sections
   coloured by sell-through, holds, price, tier or revenue, step by step. Declare
   `geometry:"bowl"` (default; generic rings generated from `bowl`, `rings` and
-  `ringSlots`) or `"paths"` (every section carries its own `path`). `bowl` is
-  `oval` (default), `horseshoe` (open on the right), `rectangle` or `pitch`;
-  these are generic shapes, never a real venue. `rings` are 1–4 `{id,label}`
-  from the inside out; for paths geometry they only group sections in the
-  legend and totals. `ringSlots` is 8–32 (default 16) equal arc-length slots
-  per ring; slot 0 is centred on the left end and slots run clockwise.
-  `sections` are 4–160 `{id,label?,ring,slot?,span?,path?,capacity,zone?,tier?}`:
-  `id` matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` (≤ 32 characters; it keys the
-  state maps); `ring` references a ring id; `slot` is a number from 0 to below
-  `ringSlots` (fractions allowed; an omitted slot continues after the previous
-  section of the same ring); `span` is the number of slots covered (default 1,
-  fractions allowed, trimmed at the ring end); `capacity` is a whole number of
-  seats ≥ 1; `zone` is free text ≤ 24 characters (sideline, corner, end, club…)
-  shown in tooltips and legend counts; `tier` references `tiers`. For
-  `geometry:"paths"` every section needs `path`: an SVG `d` string ≤ 2,000
-  characters using only absolute `M L H V C S Q T A Z` commands and finite
-  numbers inside 0–1000. Anything else (relative commands, other letters,
-  quotes, angle brackets, non-finite numbers) skips that section with a warning
-  naming `sections[i].path`, so an authored path can never inject markup.
-  `tiers` are ≤ 8 `{id,label,color?}` with `color` as `#RRGGBB` (a default
-  palette otherwise). `landmarks` are ≤ 8 `{id,label,x,y}` text labels inside
-  the viewBox (for example `home bench`). `viewBox` `{width,height}` (100–4000)
-  applies to paths geometry only, default 1000×1000 with aspect preserved; the
-  bowl viewBox is 1000×770. `currency` is a three-letter ISO code (default
-  `USD`, no conversion); `showTotals` (default true) shows sold / capacity,
+  each section's `zone`) or `"paths"` (every section carries its own `path`).
+  `bowl` is `rink` (default: two straight sidelines joined by rounded ends
+  around a 2:1 rink), `oval`, `rectangle` or `pitch`; these are generic
+  shapes, never a real venue. `rings` are 1–4 `{id,label}` from the inside
+  out; for paths geometry they only group sections in the legend and totals.
+  Bowl placement walks each ring's sections in declaration order from the
+  left end, `direction:"clockwise"` (default) or `"counterclockwise"`
+  (mirrored top to bottom), starting in the region named by `startAt`:
+  `"end"` (default, the left end) or `"sideline"` (the top sideline). Each
+  outline has eight regions clockwise: left end, corner, top sideline,
+  corner, right end, corner, bottom sideline, corner. A section's `zone`
+  text chooses its kind: sideline (also `club`, `bench`, `centre`), `corner`
+  or `end` (also `goal`); the walk moves to the next region of that kind,
+  sections that match the first region after the last one join it as its
+  leading sections (so `118–121` then `101` share one end), each region is
+  split evenly among its sections, and regions that receive none give half
+  their arc to each neighbour. Sidelines keep straight edges on a rink. A
+  ring whose sections carry an authored `slot` is placed by slots instead
+  (`ringSlots` 8–32, default 16, slot 0 centred on the left end, `span`
+  slots covered, default 1, fractions allowed); a ring with no recognised
+  zone and no slots is split evenly from the start region. `sections` are
+  4–160 `{id,label?,ring,zone?,slot?,span?,path?,capacity,tier?}`: `id`
+  matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` (≤ 32 characters; it keys the state
+  maps); `ring` references a ring id; `capacity` is a whole number of seats
+  ≥ 1; `zone` is free text ≤ 24 characters shown in tooltips and legend
+  counts (an unrecognised zone warns and keeps the walk order); `tier`
+  references `tiers`. For `geometry:"paths"` every section needs `path`: an
+  SVG `d` string ≤ 2,000 characters using only absolute `M L H V C S Q T A Z`
+  commands and finite numbers inside 0–1000. Anything else (relative
+  commands, other letters, quotes, angle brackets, non-finite numbers) skips
+  that section with a warning naming `sections[i].path`, so an authored path
+  can never inject markup. `tiers` are ≤ 8 `{id,label,color?}` with `color`
+  as `#RRGGBB` (a default palette otherwise). `landmarks` are ≤ 8
+  `{id,label,x,y}` pills inside the viewBox (for example `home bench`); a
+  pill that would cover a section label slides toward the field centre until
+  clear. `viewBox` `{width,height}` (100–4000) applies to paths geometry
+  only, default 1000×1000 with aspect preserved; the bowl viewBox is
+  1000×770. `currency` is a three-letter ISO code (default `USD`, no
+  conversion); `showTotals` (default true) shows sold / capacity,
   sell-through, held seats and revenue. Starting and step state accept `sold`
   (section id → whole number 0–capacity), `held` (section id →
   `{count,label?,until?}` with `count` 0–capacity, drawn as an amber hatch),
@@ -986,7 +1000,9 @@ perspectives" of one timeline). Types:
   `enterOnce` applies for the current step only. Alternate paths fold
   independently from the starting state. Fill intensity is sold ÷ capacity,
   held ÷ capacity, price ÷ top price, sold × price ÷ top section, or the tier
-  colour; unpriced sections render dashed in price and revenue modes. Revenue
+  colour, drawn in the skin accent (`--seatmap-accent`, cyan in aurora, indigo
+  in daylight) from faint to full with label colour switching at the high
+  end; unpriced sections render dashed in price and revenue modes. Revenue
   is Σ sold × price where price is known and the totals say so until every
   section is priced; held seats count against capacity, never against sold.
   Each section has a tooltip with label, ring, zone, sold / capacity, hold,

@@ -12,9 +12,9 @@ state and never forecasts. The complete teaching page is
 
 | You have… | Do this | Result |
 |---|---|---|
-| a list of sections (spreadsheet, seating guide) | write a CSV `id,level,zone,capacity[,label]` and run the importer | `geometry:"bowl"` — a generic oval with one ring per level |
+| a list of sections (spreadsheet, seating guide) | write a CSV `id,level,zone,capacity[,label]` and run the importer | `geometry:"bowl"` — a generic rink with one ring per level, sections placed by zone |
 | the venue's own SVG seating chart | run the importer on the SVG | `geometry:"paths"` — every section keeps its real outline |
-| nothing yet | start from the picker template (two rings × eight slots) | a small bowl to edit by hand |
+| nothing yet | start from the picker template (two rings × eight zoned sections) | a small bowl to edit by hand |
 
 ```sh
 node tools/seatmap-import.mjs sections.csv --capacity-total 17250 --out sections.json
@@ -32,17 +32,17 @@ field it cannot accept.
 
 - One ring per distinct `level` value, in file order (inside → out). `level`
   becomes the ring label; the ring id is its slug (`100 level` → `100-level`).
-- `ringSlots` is the largest level's section count (capped at 32). Each level's
-  sections walk clockwise around the ring in file order with an even fractional
-  `slot`/`span`, so rings with fewer sections get wider wedges and a level with
-  more than 32 sections shares slots by `span`.
+- `bowl:"rink"` and sections in file order with their `zone`; the panel places
+  them (next section). No `slot`/`span` is written, so the CSV order and zones
+  are the whole placement input. The report names sections whose zone is not
+  recognised.
 - Blank capacities are filled from `--capacity-total` as an even split across
   the blank rows (remainder on the first rows) and the fragment carries
   `"capacityNote": "illustrative even split"`. Without the flag they become 1
   and the note says so. **Either way the capacities are not venue data**; say
   so on the page, as the example does.
 - Nothing else is inferred: no prices, no sold counts, no tiers, no geometry
-  beyond the generic `oval` bowl (switch `bowl` to `horseshoe`, `rectangle` or
+  beyond the generic `rink` bowl (switch `bowl` to `oval`, `rectangle` or
   `pitch` by hand).
 
 ### What the SVG import infers
@@ -68,6 +68,52 @@ field it cannot accept.
 - Every emitted path passes the panel's strict tokenizer (absolute
   `M L H V C S Q T A Z`, finite numbers inside 0–1000), so an imported chart can
   never inject markup into the page.
+
+## How zones drive placement
+
+Every bowl outline has eight regions, clockwise from the left end: **left
+end**, corner, **top sideline**, corner, **right end**, corner, **bottom
+sideline**, corner. The panel walks each ring's sections in declaration order
+and reads the section's `zone` as a kind: `sideline` (also `club`, `bench`,
+`centre`), `corner`, or `end` (also `goal`). Each section goes to the next
+region of its kind; sections that match the first region after the walk has
+passed it (the `118–121` that follow the last corner) join the first region
+ahead of its leading sections, so `118, 119, 120, 121, 101` share the left end
+in that order. Every region is split evenly among its sections; a region that
+receives none (the 300 level has no left-end sections) gives half its arc to
+each neighbour, so its corner groups stretch around the end. On a rink the
+sidelines are straight runs, so sideline sections keep straight edges and the
+corner and end sections take the curves. Rings may have different counts and
+asymmetric sides: the seed's 100 level has 3 sideline sections on top
+(`103–105`) and 4 club sections below (`113–116`).
+
+The seed bowl therefore reads like the public seating guides: `101` at the
+left end beside the top corner `102`, `103–105` along the top sideline with
+the `home bench` landmark, `107–111` on the right end, `113–116` on the bottom
+sideline and `118–121` back on the left end. Zone placement, not slots, is why
+`201A/201B/202/203` share one corner. If a ring has no recognised zones it is
+split evenly from the start region; a ring whose sections carry an authored
+`slot` is placed by slots instead (`ringSlots`, `span`).
+
+### Fixing numbering direction for another venue
+
+Public guides describe where sections sit (ends, sidelines, benches) more often
+than which way the numbers run, so check one against the render:
+
+- `direction:"clockwise"` (default) walks left end → top sideline → right end
+  → bottom sideline. `direction:"counterclockwise"` mirrors the bowl top to
+  bottom, so the walk goes left end → bottom sideline → right end → top
+  sideline while the first sections stay on the left end.
+- `startAt:"end"` (default) begins the walk in the left end; `startAt:"sideline"`
+  begins it on the top sideline for venues whose numbering starts at centre
+  ice or midfield.
+- To put the bench on a particular sideline, choose the direction that places
+  the bench sections' sideline on top, then author the `home bench` landmark
+  there; a landmark pill that would cover a section label slides toward the
+  field until it is clear.
+
+Combine the two fields to match any guide: for a venue numbered counterclockwise
+from a sideline, declare `"direction":"counterclockwise","startAt":"sideline"`.
 
 ## Telling the story
 
@@ -96,7 +142,7 @@ totals say "where price known" until every section is priced.
         "rows": [["crm", "tix"]],
         "edges": [{"from": "crm", "to": "tix", "kind": "https", "label": "presale codes"}],
         "panels": [{
-          "id": "map", "type": "seatmap", "title": "Venue map · illustrative", "bowl": "oval", "ringSlots": 8, "currency": "USD",
+          "id": "map", "type": "seatmap", "title": "Venue map · illustrative", "bowl": "rink", "currency": "USD",
           "rings": [{"id": "lower", "label": "Lower"}, {"id": "upper", "label": "Upper"}],
           "sections": [
             {"id": "101", "ring": "lower", "capacity": 400, "zone": "end"},
@@ -116,7 +162,7 @@ totals say "where price known" until every section is priced.
             {"id": "207", "ring": "upper", "capacity": 600, "zone": "sideline"},
             {"id": "208", "ring": "upper", "capacity": 600, "zone": "corner"}
           ],
-          "landmarks": [{"id": "bench", "label": "home bench", "x": 500, "y": 290}],
+          "landmarks": [{"id": "bench", "label": "home bench", "x": 420, "y": 322}],
           "initial": {
             "price": {"101": 95, "102": 95, "103": 120, "104": 95, "105": 95, "106": 95, "107": 120, "108": 95, "201": 40, "202": 40, "203": 48, "204": 40, "205": 40, "206": 40, "207": 48, "208": 40},
             "note": "Before the presale. Prices are fictional."

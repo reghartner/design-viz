@@ -6,10 +6,11 @@
      node tools/seatmap-import.mjs <input.csv|input.svg> [--out file]
           [--capacity-total N] [--level-map "1:100 level,2:200 level"]
 
-   CSV (header id,level,zone,capacity[,label]) produces a generic bowl: one
-   ring per distinct level in file order, sections walked around the ring in
-   file order. Blank capacities are an illustrative even split of
-   --capacity-total (or 1 each without it) and the output says so.
+   CSV (header id,level,zone,capacity[,label]) produces a generic rink bowl:
+   one ring per distinct level in file order, sections kept in file order and
+   placed by the panel from their zone (sideline, corner, end, club). Blank
+   capacities are an illustrative even split of --capacity-total (or 1 each
+   without it) and the output says so.
 
    SVG produces geometry "paths": every <path>, <polygon>, <rect> or <circle>
    whose id or data-section looks like a section id becomes a section with a
@@ -50,8 +51,8 @@ function positiveInt(text) {
   const n = Number(text);
   return n >= 1 ? n : null;
 }
-function round3(n) {
-  return Math.round(n * 1000) / 1000;
+function zoneKind(zone) {
+  return sports().spmZoneKind(zone);
 }
 /* Even split of `total` over `count` blank rows, remainder on the first rows. */
 export function evenSplit(total, count) {
@@ -121,8 +122,6 @@ export function importCsv(text, options = {}) {
     const split = options.capacityTotal != null ? evenSplit(options.capacityTotal, blank.length) : blank.map(() => 1);
     blank.forEach((e, i) => { e.capacity = split[i]; });
   }
-  const largest = Math.max(...levels.map(level => byLevel.get(level).length));
-  const ringSlots = Math.max(8, Math.min(32, largest));
   const ringIds = new Map();
   const rings = levels.map(level => {
     let id = slug(level), n = 2;
@@ -130,22 +129,24 @@ export function importCsv(text, options = {}) {
     ringIds.set(level, id);
     return { id, label: level };
   });
-  const sections = [];
+  /* Sections keep CSV order; the panel places them by zone (sideline, corner,
+     end, club) walking each ring from the left end, so no slots are emitted. */
+  const sections = [], zoneless = [];
   levels.forEach(level => {
-    const list = byLevel.get(level), span = ringSlots / list.length;
-    list.forEach((e, i) => {
-      const section = { id: e.id, ring: ringIds.get(level), slot: round3(i * span), span: round3(span), capacity: e.capacity };
+    byLevel.get(level).forEach(e => {
+      const section = { id: e.id, ring: ringIds.get(level), capacity: e.capacity };
       if (e.zone) section.zone = e.zone;
       if (e.label) section.label = e.label;
+      if (!zoneKind(e.zone)) zoneless.push(e.id);
       sections.push(section);
     });
   });
-  const fragment = { geometry: 'bowl', bowl: 'oval', ringSlots, rings, sections };
+  const fragment = { geometry: 'bowl', bowl: 'rink', rings, sections };
   const note = capacityNote(blank.length, options.capacityTotal, options.capacityTotal != null);
   if (note) fragment.capacityNote = note;
   Object.assign(report, {
     rings: rings.map(r => ({ id: r.id, label: r.label, sections: byLevel.get(r.label).length })),
-    ringSlots, sections: sections.length,
+    sections: sections.length, zoneless,
     capacities: { given: entries.length - blank.length, filled: blank.length, total: options.capacityTotal ?? null, note },
   });
   return { fragment, report };
@@ -364,8 +365,9 @@ export function parseArgs(argv) {
 export function formatReport(report, inputName) {
   const lines = ['seatmap-import: ' + report.input.toUpperCase() + ' ' + inputName];
   if (report.input === 'csv') {
-    lines.push('  rings: ' + report.rings.length + ' (' + report.rings.map(r => r.label + ': ' + r.sections).join(', ') + ') · ringSlots ' + report.ringSlots);
-    lines.push('  sections: ' + report.sections + ' of ' + report.rows + ' rows');
+    lines.push('  rings: ' + report.rings.length + ' (' + report.rings.map(r => r.label + ': ' + r.sections).join(', ') + ')');
+    lines.push('  sections: ' + report.sections + ' of ' + report.rows + ' rows · placed by zone' +
+      (report.zoneless.length ? '; ' + report.zoneless.length + ' without a recognised zone (sideline/corner/end/club): ' + report.zoneless.slice(0, 8).join(', ') + (report.zoneless.length > 8 ? ', …' : '') : ''));
     const c = report.capacities;
     lines.push('  capacities: ' + c.given + ' given, ' + c.filled + (c.filled ? (c.total != null ? ' filled as an illustrative even split of ' + c.total : ' defaulted to 1 (no --capacity-total)') : ' blank'));
     if (report.extraColumns.length) lines.push('  ignored columns: ' + report.extraColumns.join(', '));

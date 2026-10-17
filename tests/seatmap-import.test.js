@@ -29,29 +29,34 @@ function validates(fragment, initial) {
   return plain(C.validate(C.normalize(d)));
 }
 
-test('the seed CSV imports to a bowl with one ring per level, even slots, an illustrative capacity split and a note', () => {
+test('the seed CSV imports to a rink bowl with one ring per level, zoned sections in file order, an illustrative capacity split and a note', () => {
   const run = cli([CSV, '--capacity-total', '17250']);
   assert.equal(run.code, 0, run.stderr);
   const fragment = JSON.parse(run.stdout);
   assert.equal(fragment.geometry, 'bowl');
-  assert.equal(fragment.ringSlots, 32);
+  assert.equal(fragment.bowl, 'rink');
+  assert.equal(fragment.ringSlots, undefined);
   assert.deepEqual(fragment.rings, [{id:'100-level',label:'100 level'},{id:'200-level',label:'200 level'},{id:'300-level',label:'300 level'}]);
   assert.equal(fragment.sections.length, 80);
   assert.equal(fragment.sections.reduce((sum, s) => sum + s.capacity, 0), 17250);
   assert.equal(fragment.capacityNote, 'illustrative even split');
-  const first = fragment.sections[0];
-  assert.deepEqual(first, {id:'101', ring:'100-level', slot:0, span:1.524, capacity:216, zone:'end'});
-  const upper = fragment.sections.filter(s => s.ring === '200-level');
-  assert.equal(upper.length, 33);
-  assert.ok(upper.every(s => s.span < 1), 'more sections than slots share slots by span');
+  assert.deepEqual(fragment.sections[0], {id:'101', ring:'100-level', capacity:216, zone:'end'});
+  assert.ok(fragment.sections.every(s => s.slot === undefined && s.span === undefined), 'zones, not slots, place the sections');
+  assert.deepEqual(fragment.sections.filter(s => s.ring === '100-level').map(s => s.id), ['101','102','103','104','105','106','107','108','109','110','111','112','113','114','115','116','117','118','119','120','121']);
+  assert.equal(fragment.sections.filter(s => s.ring === '200-level').length, 33);
   assert.equal(fragment.sections.find(s => s.id === '113').zone, 'club');
-  assert.ok(fragment.sections.slice(0, 21).every((s, i) => Math.abs(s.slot - i * 32 / 21) < 0.001), 'slots walk the ring evenly in file order');
-  assert.match(run.stderr, /rings: 3 \(100 level: 21, 200 level: 33, 300 level: 26\) · ringSlots 32/);
-  assert.match(run.stderr, /sections: 80 of 80 rows/);
+  assert.match(run.stderr, /rings: 3 \(100 level: 21, 200 level: 33, 300 level: 26\)/);
+  assert.match(run.stderr, /sections: 80 of 80 rows · placed by zone\n/);
   assert.match(run.stderr, /capacities: 0 given, 80 filled as an illustrative even split of 17250/);
   assert.match(run.stderr, /skipped: none/);
   assert.deepEqual(validates(fragment), {errors:[], warnings:[]});
   assert.deepEqual(JSON.parse(fs.readFileSync(SEED, 'utf8')), fragment, 'the committed seed declaration is the importer output');
+  const model = C.seatmapModel(Object.assign({id:'map', type:'seatmap'}, fragment), {});
+  const by = Object.fromEntries(model.sections.map(s => [s.id, s]));
+  assert.ok(by['103'].x < by['104'].x && by['104'].x < by['105'].x && by['104'].y < 385, '103–105 run left to right along the top sideline');
+  assert.ok(by['109'].x > 650 && Math.abs(by['109'].y - 385) < 40 && by['107'].y < by['109'].y && by['109'].y < by['111'].y, '107–111 run down the right end');
+  assert.ok(by['101'].x < 330 && by['120'].x < 330 && by['101'].y < by['120'].y, '101 and 118–121 share the left end, 101 nearer the top');
+  assert.ok(by['114'].y > 385 && by['115'].y > 385, 'club sections 113–116 take the bottom sideline');
 });
 
 test('without --capacity-total blank capacities become 1 and the note says so; --out writes the file', async () => {
@@ -75,13 +80,13 @@ test('without --capacity-total blank capacities become 1 and the note says so; -
 });
 
 test('CSV rows with bad ids, duplicate ids, bad capacities or missing columns are reported, never guessed', async () => {
-  const {importCsv} = await importer();
+  const {importCsv, formatReport} = await importer();
   const {fragment, report} = importCsv('id,level,zone,capacity,label,extra\n101,Lower,end,,Row A,x\n101,Lower,end,10,,\n1 02,Lower,end,,,\n103,Lower,"end, far",abc,,\n104,Upper,' + 'z'.repeat(30) + ',12,,\n\n', {capacityTotal: 100});
   assert.deepEqual(fragment.sections.map(s => s.id), ['101','104']);
   assert.equal(fragment.sections[0].capacity, 100);
   assert.equal(fragment.sections[0].label, 'Row A');
   assert.equal(fragment.sections[1].zone.length, 24);
-  assert.equal(fragment.ringSlots, 8);
+  assert.equal(fragment.bowl, 'rink');
   assert.deepEqual(report.skipped.map(s => [s.line, s.id, s.reason]), [
     [3, '101', 'duplicate id'],
     [4, '1 02', 'id must be letters/digits/-/_ starting with a letter or digit'],
@@ -92,6 +97,11 @@ test('CSV rows with bad ids, duplicate ids, bad capacities or missing columns ar
   assert.throws(() => importCsv('id,level,capacity\n1,a,1'), /missing "zone"/);
   assert.throws(() => importCsv('id,level,zone,capacity\n' + ['a','b','c','d','e'].map((l, i) => `${i + 1},${l},end,1`).join('\n')), /more than 4 distinct levels/);
   assert.throws(() => importCsv('id,level,zone,capacity\n'), /no usable rows/);
+  const zoneless = importCsv('id,level,zone,capacity\n1,Lower,,10\n2,Lower,,10\n3,Lower,,10\n4,Lower,mezzanine,10\n', {});
+  assert.deepEqual(zoneless.report.zoneless, ['1','2','3','4']);
+  assert.ok(zoneless.fragment.sections.every(s => s.zone === undefined || s.zone === 'mezzanine'));
+  assert.deepEqual(validates(zoneless.fragment).errors, []);
+  assert.match(formatReport(zoneless.report, 'x.csv'), /4 without a recognised zone \(sideline\/corner\/end\/club\): 1, 2, 3, 4/);
   const run = cli([CSV, '--capacity-total', '5']);
   assert.equal(run.code, 1);
   assert.match(run.stderr, /--capacity-total must be a whole number of at least 80/);

@@ -6,6 +6,17 @@ var SEATMAP_MODES = ['sold', 'held', 'price', 'tier', 'revenue'];
 var SEATMAP_MIN_SECTIONS = 4, SEATMAP_MAX_SECTIONS = 160, SEATMAP_MAX_RINGS = 4;
 var SEATMAP_MAX_TIERS = 8, SEATMAP_MAX_LANDMARKS = 8, SEATMAP_MAX_HIGHLIGHT = 8;
 var SEATMAP_ZONE_CHARS = 24, SEATMAP_LABEL_CHARS = 40;
+var SEATMAP_DIRECTIONS = ['clockwise', 'counterclockwise'], SEATMAP_STARTS = ['end', 'sideline'];
+var SEATMAP_CENTRE = [500, SPM_VIEW_HEIGHT / 2];
+function seatmapBowl(panel) {
+  return SPM_BOWLS.indexOf(panel.bowl) >= 0 ? panel.bowl : 'rink';
+}
+function seatmapMirror(panel) {
+  return panel.direction === 'counterclockwise';
+}
+function seatmapStartRegion(panel) {
+  return panel.startAt === 'sideline' ? 2 : 0;
+}
 function seatmapCount(v) {
   return typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 }
@@ -48,11 +59,11 @@ function seatmapPathOk(d) {
   return !spmParsePath(d, { range: [0, SPM_VIEW] }).error;
 }
 /* Usable sections only: safe unique ids, a declared ring, a capacity and (for
-   paths geometry) a strict path. Omitted slots continue after the previous
-   section of the same ring so authors may list sections in ring order. */
+   paths geometry) a strict path. `slot` stays null unless authored; bowl
+   placement then follows zones (see seatmapPlacement). */
 function seatmapSections(panel) {
   var rings = seatmapRings(panel), tiers = seatmapTiers(panel), geometry = seatmapGeometry(panel), slots = seatmapRingSlots(panel);
-  var cursor = {}, out = [];
+  var out = [];
   panelCollectionItems(panel, 'sections', SEATMAP_MAX_SECTIONS).forEach(function (s) {
     if (!spmSafeId(s.id) || !seatmapCount(s.capacity) || s.capacity < 1) return;
     var ringIndex = -1;
@@ -60,18 +71,62 @@ function seatmapSections(panel) {
     if (ringIndex < 0) return;
     if (geometry === 'paths' && !seatmapPathOk(s.path)) return;
     var span = isFiniteNum(s.span) && s.span > 0 && s.span <= slots ? s.span : 1;
-    var slot = isFiniteNum(s.slot) && s.slot >= 0 && s.slot < slots ? s.slot : (cursor[s.ring] || 0);
-    if (slot + span > slots) span = Math.max(0.25, slots - slot);
-    cursor[s.ring] = slot + span;
+    var slot = isFiniteNum(s.slot) && s.slot >= 0 && s.slot < slots ? s.slot : null;
+    if (slot !== null && slot + span > slots) span = Math.max(0.25, slots - slot);
     out.push({
       id: s.id, label: seatmapText(s.label, SEATMAP_LABEL_CHARS) && s.label.trim() ? s.label : s.id,
       ring: ringIndex, ringId: s.ring, slot: slot, span: span, capacity: s.capacity,
       path: geometry === 'paths' ? s.path : null,
       zone: seatmapText(s.zone, SEATMAP_ZONE_CHARS) && s.zone.trim() ? s.zone.trim() : '',
+      kind: spmZoneKind(s.zone),
       tier: tiers.some(function (tier) { return tier.id === s.tier; }) ? s.tier : null,
     });
   });
   return out;
+}
+/* Per-ring arc ranges on the inner outline. A ring with any authored slot
+   uses slots (slot 0 centred on the left end); otherwise zones drive the
+   walk from the start region, and a ring without recognised zones splits
+   evenly. Returns {sectionId: [u0, u1]}. */
+function seatmapPlacement(panel, sections, bowl) {
+  var slots = seatmapRingSlots(panel), start = seatmapStartRegion(panel), out = {};
+  var leftMiddle = bowl.marks[1] / 2;
+  var byRing = {};
+  sections.forEach(function (s) { (byRing[s.ring] = byRing[s.ring] || []).push(s); });
+  Object.keys(byRing).forEach(function (ring) {
+    var list = byRing[ring];
+    if (list.some(function (s) { return s.slot !== null; })) {
+      var cursor = 0;
+      list.forEach(function (s) {
+        var slot = s.slot !== null ? s.slot : cursor;
+        cursor = slot + s.span;
+        out[s.id] = [leftMiddle + (slot - 0.5) / slots, leftMiddle + (slot - 0.5 + s.span) / slots];
+      });
+    } else {
+      var ranges = spmBowlAllocate(list.map(function (s) { return s.kind; }), bowl.marks, start);
+      list.forEach(function (s, i) { out[s.id] = ranges[i]; });
+    }
+  });
+  return out;
+}
+/* Landmarks are authored points; a pill that would sit on a section label
+   at the default size slides toward the field centre until it is clear. */
+function seatmapPlaceLandmarks(landmarks, sections, centre) {
+  function box(x, y, w, h) { return { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 }; }
+  function hits(a, b) { return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0; }
+  var labels = sections.filter(function (s) { return s.font; }).map(function (s) {
+    return box(s.x, s.y, Math.max(1, s.label.length) * 0.62 * s.font + 6, s.font + 6);
+  });
+  return landmarks.map(function (mark) {
+    var width = Math.round(mark.label.length * 8.6 + 20), height = 26, x = mark.x, y = mark.y, moved = 0;
+    for (var i = 0; i < 40; i++) {
+      var pill = box(x, y, width, height);
+      if (!labels.some(function (label) { return hits(label, pill); })) break;
+      var dx = centre[0] - x, dy = centre[1] - y, dist = Math.hypot(dx, dy) || 1;
+      x += (dx / dist) * 10; y += (dy / dist) * 10; moved++;
+    }
+    return { id: mark.id, label: mark.label, x: spmRound(x), y: spmRound(y), width: width, height: height, nudged: moved > 0 };
+  });
 }
 function seatmapSectionIds(panel) {
   return seatmapSections(panel).map(function (s) { return s.id; });
@@ -88,7 +143,11 @@ function seatmapDeclarationWarnings(panel, path, warnings) {
   if (panel.geometry !== undefined && panel.geometry !== 'bowl' && panel.geometry !== 'paths')
     warnings.push(path + '.geometry: expected bowl or paths — using bowl');
   if (panel.bowl !== undefined && SPM_BOWLS.indexOf(panel.bowl) < 0)
-    warnings.push(path + '.bowl: expected ' + SPM_BOWLS.join('|') + ' — using oval');
+    warnings.push(path + '.bowl: expected ' + SPM_BOWLS.join('|') + ' — using rink');
+  if (panel.direction !== undefined && SEATMAP_DIRECTIONS.indexOf(panel.direction) < 0)
+    warnings.push(path + '.direction: expected clockwise or counterclockwise — using clockwise');
+  if (panel.startAt !== undefined && SEATMAP_STARTS.indexOf(panel.startAt) < 0)
+    warnings.push(path + '.startAt: expected end or sideline — using end');
   if (panel.ringSlots !== undefined && !(isFiniteNum(panel.ringSlots) && panel.ringSlots >= 8 && panel.ringSlots <= 32))
     warnings.push(path + '.ringSlots: expected a number 8–32 — using 16');
   if (panel.currency !== undefined && !/^[A-Z]{3}$/.test(String(panel.currency)))
@@ -141,7 +200,9 @@ function seatmapDeclarationWarnings(panel, path, warnings) {
       if (parsed.error) { warnings.push(at + '.path: ' + parsed.error + ' — section skipped'); ok = false; }
     } else {
       if (s.slot !== undefined && !(isFiniteNum(s.slot) && s.slot >= 0 && s.slot < slots))
-        warnings.push(at + '.slot: expected a number from 0 to below ringSlots (' + slots + ') — placed after the previous section of its ring');
+        warnings.push(at + '.slot: expected a number from 0 to below ringSlots (' + slots + ') — placed by zone instead');
+      if (s.zone !== undefined && seatmapText(s.zone, SEATMAP_ZONE_CHARS) && s.zone.trim() && !spmZoneKind(s.zone))
+        warnings.push(at + '.zone: "' + s.zone.trim() + '" is not recognised as sideline, corner, end or club — placed in the walk order without a zone');
       if (s.span !== undefined && !(isFiniteNum(s.span) && s.span > 0 && s.span <= slots))
         warnings.push(at + '.span: expected a positive number of slots — using 1');
       else if (isFiniteNum(s.slot) && isFiniteNum(s.span) && s.slot + s.span > slots)
@@ -289,7 +350,8 @@ function seatmapLabelFont(label, geom) {
 function seatmapModel(panel, state) {
   state = panelObject(state) ? state : {};
   var geometry = seatmapGeometry(panel), rings = seatmapRings(panel), tiers = seatmapTiers(panel), decl = seatmapSections(panel);
-  var bowl = geometry === 'bowl' ? spmBowl(SPM_BOWLS.indexOf(panel.bowl) >= 0 ? panel.bowl : 'oval', rings, seatmapRingSlots(panel)) : null;
+  var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
+  var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null;
   var view = bowl ? { width: bowl.width, height: bowl.height } : seatmapViewBox(panel);
   var mode = SEATMAP_MODES.indexOf(state.mode) >= 0 ? state.mode : 'sold';
   var sold = panelObject(state.sold) ? state.sold : {}, held = panelObject(state.held) ? state.held : {};
@@ -313,12 +375,13 @@ function seatmapModel(panel, state) {
     if (p !== null) maxPrice = Math.max(maxPrice, p);
     if (revenue !== null) maxRevenue = Math.max(maxRevenue, revenue);
     if (s.zone) { if (!panelOwn(zones, s.zone)) { zones[s.zone] = 0; zoneOrder.push(s.zone); } zones[s.zone]++; }
-    var geom = bowl ? bowl.wedge(s.ring, s.slot, s.span) : seatmapPathGeometry(s.path);
+    var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
     return {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
       sold: soldN, held: hold, price: p, revenue: revenue, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
       d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom), intensity: 0, known: true,
+      kind: s.kind, range: bowl ? placement[s.id] : null,
     };
   });
   var tierIndex = {};
@@ -332,6 +395,9 @@ function seatmapModel(panel, state) {
     if (!isFiniteNum(s.intensity)) s.intensity = 0;
     s.intensity = Math.max(0, Math.min(1, s.intensity));
     s.color = mode === 'tier' && s.tier ? (s.tier.color || seatmapTierPalette(tierIndex[s.tier.id])) : null;
+    /* Label colour: accent fills switch at a threshold per skin; tier fills
+       use the tier colour's own luminance. */
+    s.labelTone = s.color ? (spmHexLuma(s.color) > 0.5 ? 'dark' : 'light') : (s.intensity >= 0.55 && s.known ? 'on' : '');
   });
   var totals = { sold: 0, capacity: 0, held: 0, revenue: 0, priced: 0, pricedSold: 0 };
   var ringTotals = rings.map(function (ring) { return { id: ring.id, label: ring.label, sold: 0, capacity: 0, held: 0, sections: 0 }; });
@@ -352,9 +418,10 @@ function seatmapModel(panel, state) {
   });
   var prices = sections.filter(function (s) { return s.price !== null; }).map(function (s) { return s.price; });
   return {
-    geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: bowl ? bowl.field : null, mode: mode, currency: currency,
+    geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: bowl ? bowl.field : null, fieldLines: bowl ? bowl.fieldLines : '', mode: mode, currency: currency,
     sections: sections, rings: ringTotals, tiers: tierCounts, zones: zoneOrder.map(function (z) { return { zone: z, sections: zones[z] }; }),
-    landmarks: seatmapLandmarks(panel), highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
+    landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2]),
+    highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
     priceRange: prices.length ? { min: Math.min.apply(null, prices), max: Math.max.apply(null, prices) } : null,
     complete: sections.length >= SEATMAP_MIN_SECTIONS, hasHolds: totals.held > 0,
     geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id; }).join(','),
@@ -388,14 +455,13 @@ function seatmapAria(model) {
   return text + '.';
 }
 function seatmapSectionMarkup(s, model, hid) {
-  var dark = s.intensity >= 0.55 || (model.mode === 'tier' && s.known);
-  var fill = s.color ? s.color : 'var(--dink)';
+  var fill = s.color ? s.color : 'var(--seatmap-accent)';
   var opacity = s.known ? 0.1 + 0.9 * s.intensity : 0.04;
   var cls = 'seatmap-sec' + (s.highlighted ? ' seatmap-hi' : '') + (s.known ? '' : ' seatmap-unknown') + (s.held ? ' seatmap-held' : '');
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
-  if (s.font) h += '<text class="seatmap-lbl' + (dark ? ' seatmap-lbl-dark' : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="0.35em">' + esc(s.label) + '</text>';
+  if (s.font) h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="0.35em">' + esc(s.label) + '</text>';
   return h + '</g>';
 }
 function seatmapLegend(model) {
@@ -437,13 +503,15 @@ function seatmapHTML(panel, state, model, hid, pulse) {
     '<rect width="9" height="9" class="seatmap-hatch-bg"/><rect width="3.5" height="9" class="seatmap-hatch-bar"/></pattern></defs>';
   if (!model.complete) h += '<text class="seatmap-empty" x="' + model.view.width / 2 + '" y="' + model.view.height / 2 + '">Declare ' + SEATMAP_MIN_SECTIONS + '–' + SEATMAP_MAX_SECTIONS + ' sections to draw the map.</text>';
   if (model.field) h += '<path class="seatmap-field" d="' + model.field + '"/>';
+  if (model.fieldLines) h += '<path class="seatmap-field-line" d="' + model.fieldLines + '"/>';
   h += '<g class="seatmap-sections">';
   model.sections.forEach(function (s) { h += seatmapSectionMarkup(s, model, hid); });
   h += '</g><g class="seatmap-outlines">';
   model.sections.forEach(function (s) { if (s.highlighted) h += '<path class="seatmap-outline" d="' + s.d + '"/>'; });
   h += '</g><g class="seatmap-landmarks">';
   model.landmarks.forEach(function (mark) {
-    h += '<text class="seatmap-landmark" x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text>';
+    h += '<g class="seatmap-landmark"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
+      '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g></svg>' + seatmapLegend(model) + '</div>';
   return softwarePanelShell(h, state || {});
@@ -498,8 +566,8 @@ function seatmapPatch(host, model, html, hid) {
 }
 function seatmapTemplateSections() {
   var zones = ['end', 'corner', 'sideline', 'corner', 'end', 'corner', 'sideline', 'corner'], out = [];
-  zones.forEach(function (zone, i) { out.push({ id: '10' + (i + 1), ring: 'lower', slot: i, capacity: 420, zone: zone }); });
-  zones.forEach(function (zone, i) { out.push({ id: '20' + (i + 1), ring: 'upper', slot: i, capacity: 640, zone: zone }); });
+  zones.forEach(function (zone, i) { out.push({ id: '10' + (i + 1), ring: 'lower', capacity: 420, zone: zone }); });
+  zones.forEach(function (zone, i) { out.push({ id: '20' + (i + 1), ring: 'upper', capacity: 640, zone: zone }); });
   return out;
 }
 PanelRegistry.define('seatmap', {
@@ -524,32 +592,35 @@ PanelRegistry.define('seatmap', {
     large: true, height: 16, fallbackHeight: 16,
   },
   styles: String.raw`
-.seatmap{font-size:11px;color:var(--dtext);min-width:0}
+.seatmap{font-size:11px;color:var(--dtext);min-width:0;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A}
+.sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .seatmap-totals{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 8px}
 .seatmap-stat b{display:block;font:700 15px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dink)}
 .seatmap-stat span{font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--dfaint)}
 .seatmap-stat-warn b{color:#D7A34F}
 .seatmap-svg{display:block;width:100%;height:auto}
 .seatmap-field{fill:color-mix(in srgb,var(--dtext) 7%,transparent);stroke:color-mix(in srgb,var(--dtext) 22%,transparent);stroke-width:1.5}
+.seatmap-field-line{fill:none;stroke:color-mix(in srgb,var(--dtext) 18%,transparent);stroke-width:2}
 .seatmap-fill{stroke:color-mix(in srgb,var(--dtext) 30%,transparent);stroke-width:1.5;transition:fill-opacity .3s ease,fill .3s ease}
 .seatmap-unknown .seatmap-fill{stroke-dasharray:6 5}
 .seatmap-hold{pointer-events:none;opacity:.9}
 .seatmap-hatch-bg{fill:#D7A34F;fill-opacity:.18}.seatmap-hatch-bar{fill:#D7A34F;fill-opacity:.85}
 .seatmap-lbl{font-family:'IBM Plex Mono',monospace;font-weight:600;text-anchor:middle;fill:var(--dink);pointer-events:none;transition:fill .3s ease}
-.seatmap-lbl-dark{fill:#0B1220}.sk-daylight .seatmap-lbl-dark{fill:#FFFFFF}
-.seatmap-mode-tier .seatmap-lbl-dark{fill:#0B1220}
+.seatmap-lbl-on{fill:var(--seatmap-label-on)}.seatmap-lbl-dark{fill:#0B1220}.seatmap-lbl-light{fill:#FFFFFF}
 .seatmap-hi .seatmap-fill{stroke:var(--dink);stroke-width:3}
 .seatmap-outline{fill:none;stroke:var(--dink);stroke-width:4;stroke-linejoin:round;pointer-events:none}
 .seatmap-pulse .seatmap-outline{animation:seatmap-pulse .6s ease-out}
 @keyframes seatmap-pulse{0%{stroke-width:4;opacity:1}40%{stroke-width:14;opacity:.55}100%{stroke-width:4;opacity:1}}
-.seatmap-landmark{font:600 15px 'IBM Plex Sans',sans-serif;fill:var(--dfaint);text-anchor:middle;letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
+.seatmap-landmark{pointer-events:none}
+.seatmap-landmark rect{fill:color-mix(in srgb,var(--dtext) 14%,transparent);stroke:color-mix(in srgb,var(--dtext) 35%,transparent);stroke-width:1.5}
+.seatmap-landmark text{font:600 14px 'IBM Plex Sans',sans-serif;fill:var(--dtext);text-anchor:middle;letter-spacing:.06em;text-transform:uppercase}
 .seatmap-empty{font:500 24px 'IBM Plex Sans',sans-serif;fill:var(--dfaint);text-anchor:middle}
 .seatmap-legend,.seatmap-rings{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font:500 10px 'IBM Plex Mono',monospace;color:var(--dfaint)}
 .seatmap-legend b,.seatmap-rings b{color:var(--dtext);font-weight:600}
 .seatmap-legend small,.seatmap-rings small{font-size:9px;opacity:.8}
-.seatmap-sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px;background:var(--dink)}
-.seatmap-sw-low{background:color-mix(in srgb,var(--dink) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 30%,transparent)}
-.seatmap-sw-high{background:var(--dink)}
+.seatmap-sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px;background:var(--seatmap-accent)}
+.seatmap-sw-low{background:color-mix(in srgb,var(--seatmap-accent) 18%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 30%,transparent)}
+.seatmap-sw-high{background:var(--seatmap-accent)}
 .seatmap-sw-hold{background:repeating-linear-gradient(45deg,#D7A34F 0 2px,rgba(215,163,79,.2) 2px 6px)}
 .seatmap-sw-unknown{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 50%,transparent);border-style:dashed}
 .seatmap-zones{flex-basis:100%}
@@ -560,13 +631,13 @@ PanelRegistry.define('seatmap', {
     initialFields: true,
     transientFields: ['sold', 'held', 'price', 'tierOf', 'mode', 'highlight', 'note'],
     template: {
-      title: 'Venue map', bowl: 'oval', ringSlots: 8, currency: 'USD',
+      title: 'Venue map', bowl: 'rink', currency: 'USD',
       rings: [{ id: 'lower', label: 'Lower bowl' }, { id: 'upper', label: 'Upper bowl' }],
       sections: seatmapTemplateSections(),
       initial: { sold: { 101: 380, 102: 300, 103: 410, 104: 405, 105: 290, 106: 240, 107: 400, 108: 395, 201: 320, 202: 180, 203: 420, 204: 390, 205: 150, 206: 120, 207: 260, 208: 200 } },
     },
     setupFields: [
-      ['geometry', 'text'], ['bowl', 'text'], ['ringSlots', 'num'], ['currency', 'text'], ['showTotals', 'jsonAny'],
+      ['geometry', 'text'], ['bowl', 'text'], ['direction', 'text'], ['startAt', 'text'], ['ringSlots', 'num'], ['currency', 'text'], ['showTotals', 'jsonAny'],
       ['rings', 'rows', { max: SEATMAP_MAX_RINGS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['sections', 'rows', { wide: true, max: SEATMAP_MAX_SECTIONS, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'ring', req: true }, { k: 'slot', kind: 'num' }, { k: 'span', kind: 'num' }, { k: 'capacity', kind: 'num', req: true }, { k: 'zone' }, { k: 'tier' }, { k: 'path' }] }],
       ['tiers', 'rows', { max: SEATMAP_MAX_TIERS, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'color' }] }],
@@ -578,13 +649,15 @@ PanelRegistry.define('seatmap', {
       ['mode', 'enum', SEATMAP_MODES], ['highlight', 'jsonAny', { nullable: true }], ['note', 'text'],
     ],
     fieldMeta: {
-      geometry: { label: 'Geometry', help: 'bowl draws generic rings from bowl, rings and ringSlots. paths uses each section’s own SVG path (imported with tools/seatmap-import.mjs).' },
-      bowl: { label: 'Bowl shape', help: 'oval (default), horseshoe (open on the right), rectangle or pitch. Generic shapes only; no real venue is drawn.' },
-      ringSlots: { label: 'Slots per ring', help: '8–32 equal arc-length slots around every ring; default 16. Sections may span several slots or a fraction of one.' },
+      geometry: { label: 'Geometry', help: 'bowl draws generic rings from bowl, rings and each section’s zone. paths uses each section’s own SVG path (imported with tools/seatmap-import.mjs).' },
+      bowl: { label: 'Bowl shape', help: 'rink (default: two straight sidelines joined by rounded ends), oval, rectangle or pitch. Generic shapes only; no real venue is drawn.' },
+      direction: { label: 'Numbering direction', help: 'clockwise (default) or counterclockwise: the order sections walk around the bowl from the left end.' },
+      startAt: { label: 'Walk starts at', help: 'end (default): the first sections sit on the left end; sideline: the walk starts on the top sideline.' },
+      ringSlots: { label: 'Slots per ring', help: 'Only for rings whose sections carry an explicit slot: 8–32 equal arc-length slots, default 16. Rings without slots are placed by zone.' },
       currency: { label: 'Currency', help: 'Three-letter ISO code used for prices and revenue; default USD. No conversion.' },
       showTotals: { label: 'Show totals strip', help: 'Sold / capacity, sell-through, held seats and revenue where price is known. Default on.' },
       rings: { label: 'Rings', help: '1–4 rings from the inside out, e.g. 100 level, 200 level, 300 level. Ring ids group sections in the legend.' },
-      sections: { label: 'Sections', help: '4–160 sections. ring is a ring id; slot (0 to below ringSlots) and span (slots covered, default 1) place a bowl wedge; path is the SVG path for paths geometry; capacity is seats; zone is free text such as sideline, corner, end or club; tier is a tier id.' },
+      sections: { label: 'Sections', help: '4–160 sections in numbering order. ring is a ring id; zone (sideline, corner, end or club) decides where the wedge sits; optional slot/span place a ring by slots instead; path is the SVG path for paths geometry; capacity is seats; tier is a tier id.' },
       tiers: { label: 'Price tiers', help: 'Up to 8 tiers with optional #RRGGBB colours, shown in tier mode.' },
       landmarks: { label: 'Landmarks', help: 'Up to 8 text labels inside the viewBox, e.g. home bench or stage.' },
       viewBox: { label: 'viewBox (paths)', help: '{"width","height"} for paths geometry; default 1000×1000. Aspect is preserved.' },
@@ -603,8 +676,7 @@ PanelRegistry.define('seatmap', {
     example: function (sample) {
       var panel = sample.panel, state = sample.state;
       panel.title = 'Venue map';
-      panel.bowl = 'oval';
-      panel.ringSlots = 12;
+      panel.bowl = 'rink';
       panel.rings = [{ id: 'lower', label: 'Lower' }, { id: 'club', label: 'Club' }, { id: 'upper', label: 'Upper' }];
       panel.tiers = [{ id: 'p1', label: 'Premium', color: '#D7A34F' }, { id: 'p2', label: 'Plus', color: '#7D9BC6' }, { id: 'p3', label: 'Value', color: '#55A896' }];
       panel.sections = [];
@@ -613,12 +685,12 @@ PanelRegistry.define('seatmap', {
       [['lower', 'L', 480, 'p1', 0.8], ['club', 'C', 320, 'p2', 0.6], ['upper', 'U', 720, 'p3', 0.35]].forEach(function (ring) {
         zones.forEach(function (zone, i) {
           var id = ring[1] + (101 + i);
-          panel.sections.push({ id: id, ring: ring[0], slot: i, capacity: ring[2], zone: zone, tier: ring[3] });
+          panel.sections.push({ id: id, ring: ring[0], capacity: ring[2], zone: zone, tier: ring[3] });
           sold[id] = Math.round(ring[2] * Math.min(1, ring[4] + ((i * 7) % 5) * 0.045));
           price[id] = ring[3] === 'p1' ? 145 : ring[3] === 'p2' ? 98 : 42;
         });
       });
-      panel.landmarks = [{ id: 'bench', label: 'home bench', x: 500, y: 290 }];
+      panel.landmarks = [{ id: 'bench', label: 'home bench', x: 420, y: 322 }];
       state.sold = sold;
       state.price = price;
       state.held = { U108: { count: 400, label: 'School night group', until: 'T-7d' } };

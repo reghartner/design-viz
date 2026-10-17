@@ -61,6 +61,8 @@ test('seatmap template, picker, example, feature label and styles use ordinary d
   assert.equal(definition.layout.canvasSizing.mode, 'fixed-aspect');
   assert.match(readStyles('style.core.css'), /\.seatmap-svg/);
   assert.match(readStyles('style.core.css'), /prefers-reduced-motion[^}]*\.seatmap-fill/);
+  assert.match(readStyles('style.core.css'), /\.seatmap\{[^}]*--seatmap-accent:#38E1FF/);
+  assert.match(readStyles('style.core.css'), /\.sk-daylight \.seatmap\{--seatmap-accent:#4956C9/);
   assert.deepEqual(validate(diagram()), {errors:[],warnings:[]});
 });
 
@@ -79,12 +81,91 @@ test('shared sports helpers format money, compact counts and safe percentages', 
   assert.equal(C.spmPercent(9, 4), 100);
   assert.deepEqual(plain(C.SPM_STATUS), ['planned','confirmed','live','done','cancelled','late']);
   assert.equal(C.spmTone('bogus'), 'neutral');
-  const bowl = C.spmBowl('oval', [{},{},{}], 16);
+  const bowl = C.spmBowl('oval', [{},{},{}]);
   assert.equal(bowl.width, 1000);
-  const wedge = bowl.wedge(0, 0, 1);
+  const wedge = bowl.wedge(0, 0.02, 0.1);
   assert.match(wedge.d, /^M[\d.]+,[\d.]+(L[\d.]+,[\d.]+)+Z$/);
-  assert.ok(wedge.x < 320, 'slot 0 sits on the left end');
-  for (const shape of ['horseshoe','rectangle','pitch']) assert.match(C.spmBowl(shape, [{}], 8).wedge(0, 3, 2).d, /^M/);
+  assert.ok(wedge.x < 320, 'the walk starts on the left end');
+  for (const shape of ['rink','rectangle','pitch']) assert.match(C.spmBowl(shape, [{}]).wedge(0, 0.3, 0.4).d, /^M/);
+  assert.equal(C.spmBowl('horseshoe', [{}]).bowl, 'rink', 'unknown shapes fall back to the rink');
+  assert.equal(C.spmZoneKind('Club'), 'sideline'); assert.equal(C.spmZoneKind('End zone'), 'end'); assert.equal(C.spmZoneKind('corner'), 'corner'); assert.equal(C.spmZoneKind('mezzanine'), null);
+  near(C.spmHexLuma('#FFFFFF'), 1); near(C.spmHexLuma('#000000'), 0); assert.equal(C.spmHexLuma('red'), 0.5);
+});
+
+test('the rink is a pure racetrack: straight sidelines, curved ends, region marks that cover the perimeter', () => {
+  const bowl = C.spmBowl('rink', [{},{},{}]);
+  const marks = plain(bowl.marks);
+  assert.equal(marks.length, 9); assert.equal(marks[0], 0); assert.equal(marks[8], 1);
+  for (let i = 1; i < 9; i++) assert.ok(marks[i] > marks[i - 1], 'regions are ordered');
+  near(marks[2] + (1 - marks[7]), marks[6] - marks[3], 'left and right halves of the walk are symmetric');
+  /* A sideline wedge in the top-sideline region has a flat outer edge. */
+  const top = bowl.wedge(2, marks[2] + (marks[3] - marks[2]) * 0.3, marks[2] + (marks[3] - marks[2]) * 0.6);
+  const ys = top.outerPoints.map(p => p[1]);
+  assert.ok(Math.max(...ys) - Math.min(...ys) < 0.2, 'outer edge is straight: ' + ys.join(','));
+  assert.ok(top.y < 385 && top.x > 300 && top.x < 700, 'top sideline sits above the rink centre');
+  const bottom = bowl.wedge(0, marks[6] + 0.01, marks[7] - 0.01);
+  assert.ok(bottom.y > 385 && Math.max(...bottom.outerPoints.map(p => p[1])) - Math.min(...bottom.outerPoints.map(p => p[1])) < 0.2);
+  const end = bowl.wedge(1, marks[4], marks[5]);
+  const xs = end.outerPoints.map(p => p[0]), eys = end.outerPoints.map(p => p[1]);
+  assert.ok(Math.max(...xs) - Math.min(...xs) > 20 && Math.max(...eys) - Math.min(...eys) > 150, 'an end wedge curves');
+  assert.ok(end.x > 700, 'the right end is on the right');
+  /* The field is a 2:1 racetrack inside the inner ring. */
+  const field = bowl.field.match(/-?[\d.]+/g).map(Number);
+  const fx = field.filter((v, i) => i % 2 === 0), fy = field.filter((v, i) => i % 2 === 1);
+  const aspect = (Math.max(...fx) - Math.min(...fx)) / (Math.max(...fy) - Math.min(...fy));
+  assert.ok(Math.abs(aspect - 2) < 0.15, 'the rink is about 2:1, got ' + aspect.toFixed(2));
+  assert.match(bowl.fieldLines, /^M500,[\d.]+L500,[\d.]+$/);
+  /* Counterclockwise mirrors top to bottom, keeping the left end on the left. */
+  const mirrored = C.spmBowl('rink', [{},{},{}], {mirror:true});
+  const mTop = mirrored.wedge(2, marks[2] + (marks[3] - marks[2]) * 0.3, marks[2] + (marks[3] - marks[2]) * 0.6);
+  assert.ok(mTop.y > 385, 'the walk\'s first sideline is now at the bottom');
+  near(mTop.x, top.x);
+});
+
+test('zone allocation covers the whole ring, honours asymmetric sides, wraps the trailing end sections and falls back to even slots', () => {
+  const bowl = C.spmBowl('rink', [{}]), marks = bowl.marks;
+  const seed = ['end','corner','sideline','sideline','sideline','corner','end','end','end','end','end','corner','sideline','sideline','sideline','sideline','corner','end','end','end','end'];
+  const ranges = plain(C.spmBowlAllocate(seed, marks, 0));
+  assert.equal(ranges.length, seed.length);
+  const contiguous = list => {
+    const sorted = list.slice().sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < sorted.length; i++) near(sorted[i][0], sorted[i - 1][1]);
+    near(sorted[sorted.length - 1][1] - sorted[0][0], 1, 'allocation sums to the full perimeter');
+  };
+  contiguous(ranges);
+  const leftCurve = [marks[7] - 1, marks[2]], top = [marks[2], marks[3]], rightCurve = [marks[3], marks[6]], bottom = [marks[6], marks[7]];
+  const within = (i, span) => ranges[i][0] >= span[0] - 1e-9 && ranges[i][1] <= span[1] + 1e-9;
+  assert.ok([2,3,4].every(i => within(i, top)), '103–105 share the top sideline');
+  assert.ok([12,13,14,15].every(i => within(i, bottom)), '113–116 share the bottom sideline');
+  assert.ok([5,6,7,8,9,10,11].every(i => within(i, rightCurve)), '106, 107–111 and 112 share the right curve');
+  assert.ok([16,17,18,19,20,0,1].every(i => within(i, leftCurve)), '117, 118–121, 101 and 102 share the left curve');
+  const order = [16,17,18,19,20,0,1];
+  for (let k = 1; k < order.length; k++) near(ranges[order[k]][0], ranges[order[k - 1]][1], 'the left curve runs 117 → 118–121 → 101 → 102 clockwise');
+  const seven = (marks[2] + 1 - marks[7]) / 7;
+  for (const i of order) near(ranges[i][1] - ranges[i][0], seven, 'seven sections split the left curve evenly by count');
+  near(ranges[2][1] - ranges[2][0], (marks[3] - marks[2]) / 3);
+  near(ranges[12][1] - ranges[12][0], (marks[7] - marks[6]) / 4, 'four club sections split the bottom run four ways');
+  const outerEdge = C.spmBowl('rink', [{}]).wedge(0, ranges[3][0], ranges[3][1]).outerPoints.map(p => p[1]);
+  assert.ok(Math.max(...outerEdge) - Math.min(...outerEdge) < 0.2, 'a zone-placed sideline section has a straight outer edge');
+  /* No left-end sections: the two left corner groups share that curve. */
+  const upper = ['corner','corner','corner','sideline','sideline','sideline','sideline','sideline','corner','corner','corner','end','end','end','end','corner','corner','corner','sideline','sideline','sideline','sideline','sideline','corner','corner','corner'];
+  const u = plain(C.spmBowlAllocate(upper, marks, 0));
+  contiguous(u);
+  near(u[25][1], u[0][0], 'the last corner meets the first corner');
+  near(u[0][0], (marks[7] - 1 + marks[2]) / 2, 'the groups meet at the middle of the left end');
+  /* Corners first (the 200 level starts at a corner). */
+  const corners = plain(C.spmBowlAllocate(['corner','corner','sideline','corner','end','corner','sideline','corner','end'], marks, 0));
+  contiguous(corners);
+  assert.ok(corners[0][0] < corners[1][0] && corners[1][1] <= corners[2][0] + 1e-9, 'leading corners take corner-tl before the top sideline');
+  assert.ok(corners[8][1] <= corners[0][0] + 1e-9 && corners[8][0] >= corners[7][1] - 1e-9, 'the trailing end wraps onto the left end between the last corner and the first');
+  /* Zone-less rings split evenly; startAt sideline rotates the origin. */
+  const even = plain(C.spmBowlAllocate([null,null,null,null], marks, 0));
+  assert.deepEqual(even, [[0,0.25],[0.25,0.5],[0.5,0.75],[0.75,1]]);
+  const side = plain(C.spmBowlAllocate([null,null], marks, 2));
+  near(side[0][0], marks[2]);
+  const sideZones = plain(C.spmBowlAllocate(['sideline','corner','end','corner','sideline','corner','end','corner'], marks, 2));
+  assert.ok(sideZones[0][0] >= marks[2] - 1e-9 && sideZones[0][1] <= marks[3] + 1e-9, 'startAt sideline begins on the top run');
+  assert.deepEqual(plain(C.spmBowlAllocate([], marks, 0)), []);
 });
 
 test('the strict path tokenizer refuses anything that is not a plain path', () => {
@@ -130,16 +211,40 @@ test('the model computes totals, intensities, revenue where price is known and l
   assert.doesNotMatch(C.seatmapHTML({...p, sections:[]}, {}), /NaN|Infinity|undefined/);
 });
 
-test('bowl placement follows slots and spans; omitted slots continue after the previous section', () => {
+test('bowl placement follows zones by default, slots when a ring authors them, and nudges landmarks off labels', () => {
   const sections = C.seatmapSections(panel());
-  assert.deepEqual(plain(sections.map(s => [s.id, s.slot, s.span])), [['101',0,1],['102',1,1],['103',2,2],['201',0,1],['202',1,1]]);
+  assert.deepEqual(plain(sections.map(s => [s.id, s.slot, s.span, s.kind])), [['101',0,1,'end'],['102',1,1,'corner'],['103',2,2,'sideline'],['201',null,1,'end'],['202',null,1,'corner']]);
+  const bowl = C.spmBowl('rink', [{},{}]);
+  const placed = C.seatmapPlacement(panel(), sections, bowl);
+  near(placed['102'][0], bowl.marks[1] / 2 + 0.5 / 8, 'authored slots place the lower ring');
+  near(placed['103'][1] - placed['103'][0], 2 / 8);
+  assert.ok(placed['201'][0] <= 0.02 && placed['201'][1] >= 0.02, 'zone places the upper ring: 201 covers the left end');
+  near(placed['201'][1], placed['202'][0], 'the two upper sections share the whole ring between them');
+  near(placed['202'][1] - placed['201'][0], 1);
   const over = panel(); over.sections[2].span = 9;
   assert.equal(C.seatmapSections(over)[2].span, 1);
   const trimmed = panel(); trimmed.sections[2].slot = 7; trimmed.sections[2].span = 3;
   assert.equal(C.seatmapSections(trimmed)[2].span, 1);
   const fractional = panel(); fractional.sections[1].slot = 1.5; fractional.sections[1].span = 0.5;
   assert.deepEqual(validate({...diagram(), panels:[fractional]}).warnings, []);
-  assert.equal(C.seatmapSections(fractional)[1].span, 0.5);
+  const odd = panel(); odd.sections[3].zone = 'mezzanine';
+  assert.match(validate({...diagram(), panels:[odd]}).warnings.join('\n'), /panels\[0\]\.sections\[3\]\.zone: "mezzanine" is not recognised/);
+  const directed = panel(); directed.direction = 'counterclockwise'; directed.startAt = 'sideline';
+  assert.deepEqual(validate({...diagram(), panels:[directed]}).warnings, []);
+  const bad = panel(); bad.direction = 'widdershins'; bad.startAt = 'corner';
+  const bw = validate({...diagram(), panels:[bad]}).warnings.join('\n');
+  assert.match(bw, /panels\[0\]\.direction: expected clockwise or counterclockwise/); assert.match(bw, /panels\[0\]\.startAt: expected end or sideline/);
+  const normal = C.seatmapModel(panel(), {}), flipped = C.seatmapModel(directed, {});
+  const n103 = normal.sections.find(s => s.id === '103'), f103 = flipped.sections.find(s => s.id === '103');
+  assert.ok(n103.y < 385 && f103.y > 385, 'counterclockwise mirrors the bowl top to bottom');
+  /* Landmarks: an authored point on a label slides toward the field. */
+  const onLabel = panel(); onLabel.landmarks = [{id:'bench', label:'home bench', x:n103.x, y:n103.y}];
+  const mark = C.seatmapModel(onLabel, {}).landmarks[0];
+  assert.equal(mark.nudged, true);
+  assert.ok(Math.hypot(mark.x - 500, mark.y - 385) < Math.hypot(n103.x - 500, n103.y - 385), 'moved toward the centre');
+  const clear = C.seatmapModel(panel(), {}).landmarks[0];
+  assert.equal(clear.nudged, false); assert.equal(clear.x, 500); assert.equal(clear.y, 270);
+  assert.match(C.seatmapHTML(panel(), {}), /<g class="seatmap-landmark"><rect x="[\d.]+" y="[\d.]+" width="\d+" height="26" rx="13"\/><text x="500" y="270" dy="0.35em">home bench<\/text><\/g>/);
 });
 
 test('paths geometry draws authored paths and refuses anything else', () => {
@@ -239,10 +344,13 @@ test('all authored text is escaped; the markup carries titles, aria totals, hatc
   assert.match(html, /<pattern id="spm-static"/);
   assert.match(html, /class="seatmap-hold" d="M[\d.,L]+Z" fill="url\(#spm-static\)"/);
   assert.match(html, /class="seatmap-sec seatmap-hi" data-sec="101"/);
+  assert.match(html, /fill="var\(--seatmap-accent\)" fill-opacity="0.640"/);
+  assert.match(html, /class="seatmap-lbl seatmap-lbl-on"/);
+  assert.match(C.seatmapHTML(p, {mode:'tier'}), /fill="#D7A34F"[^>]*><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-dark"/);
   assert.match(html, /class="seatmap-outline"/);
   assert.match(html, /seatmap-stat-warn/);
   assert.match(html, /class="swnote">&lt;img/);
-  assert.match(html, /seatmap-landmark[^>]*>&lt;img/);
+  assert.match(html, /<g class="seatmap-landmark"><rect[^>]*\/><text[^>]*>&lt;img/);
   const tier = C.seatmapHTML(p, {mode:'tier'});
   assert.match(tier, /fill="#D7A34F"/);
   assert.match(tier, /seatmap-sw" style="background:#D7A34F"/);

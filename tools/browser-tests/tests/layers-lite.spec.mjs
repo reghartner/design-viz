@@ -58,3 +58,31 @@ test('mixed Shift/Meta and Alt-marquee selections keep pins fixed during pointer
  const arranged=JSON.parse(await source(page)).page.blocks[0].diagram;expect(arranged.floats.find(f=>f.id==='b').x).toBe(480);expect(arranged.floats.find(f=>f.id==='b').y).toBe(150);const pinAfter=await graphCenter(node(page,'b'));expect(pinAfter.x).toBeCloseTo(pinBefore.x,3);expect(pinAfter.y).toBeCloseTo(pinBefore.y,3);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeArrange);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
+
+/* #628 File import keeps locked nodes in place when the file is the same
+ document (same diagram ID, or same title when neither has an ID); a
+ different document is imported exactly as written.
+ row | fixture | assertion (scoped) | rejects
+ same document | paste "Browser contract" with b locked; import the same title with z added before a (moves b when unlocked) | b's rendered graph center unchanged, b still locked, z rendered, source differs from the file only by b's pin; one Undo restores the pasted source | an import that skips the guard
+ different document | same file retitled "Other story" | source equals the file byte-for-byte and b's center moved | a guard that pins across documents by node id */
+test('importing the same document keeps a locked node in place; a different document imports exactly',async({page,server})=>{
+ const raw=editorSpec();raw.page.blocks[0].diagram.nodes.b.locked=true;const original=JSON.stringify(raw,null,2);
+ const file=title=>{const next=structuredClone(raw),d=next.page.blocks[0].diagram;next.page.title=title;d.nodes.z={title:'Zulu'};d.rows[0].unshift('z');return JSON.stringify(next,null,2);};
+ const importFile=async text=>{
+  await page.locator('#editor-tab-file').click();await page.locator('#file-import-input').setInputFiles({name:'story.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
+  const preview=page.locator('.file-import-dialog:visible');await expect(preview).toContainText('story.spec.json · Flowview JSON');
+  await preview.getByRole('button',{name:'Import'}).click();await expect(preview).toBeHidden();await expect(node(page,'z')).toBeVisible();
+ };
+ await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');const start=await graphCenter(node(page,'b'));
+
+ const same=file('Browser contract');await importFile(same);
+ const imported=JSON.parse(await source(page)),d=imported.page.blocks[0].diagram;
+ expect(d.nodes.z).toEqual({title:'Zulu'});expect(d.nodes.b.locked).toBe(true);expect(d.rows[0]).toEqual(['z','a','c']);
+ expect(d.floats.filter(f=>f.id==='b')).toEqual([{id:'b',side:'below',x:start.x,y:start.y,noSpread:true}]);
+ await expect.poll(()=>graphCenter(node(page,'b'))).toEqual(start);await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(node(page,'z')).toHaveCount(0);
+
+ const other=file('Other story');await importFile(other);
+ await expect(page.locator('#src')).toHaveValue(other);expect(await graphCenter(node(page,'b'))).not.toEqual(start);
+});

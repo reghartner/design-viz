@@ -184,3 +184,21 @@ for(const [label,options,edit] of pinCases)test('#617 lock pins b through: '+lab
  const after=JSON.parse(locked.text);assert.equal(diagram(after).nodes.b.locked,true);assert.deepEqual(allCenters(locked.text).b,before);
  assert.notDeepEqual(contentOnly(unlocked.text),contentOnly(text),'the edit changes content');assert.deepEqual(contentOnly(locked.text),contentOnly(unlocked.text),'the locked edit still happens');
 });
+
+/* #617 guard: row slots are spaced by slot count and fixed card height, never
+ by content, so Inspector field edits on a neighbour (title, subtitle, icon,
+ text-box text and size) cannot re-space a row and need no pin lift. */
+test('#617 content and size edits on a row neighbour leave b in place, locked or not',()=>{
+ const raw=pinFixture(),d=diagram(raw);d.nodes.a={type:'text',text:'Short',textStyle:{width:120,height:40}};
+ const text=JSON.stringify(raw,null,2),before=allCenters(text).b,path=['page','sections',0,'diagram','nodes','c'];
+ const edits=[
+  (t,r)=>C.planSetField(t,r,path,'title',JSON.stringify('A much longer title '.repeat(8))),
+  (t,r)=>C.planSetField(t,r,path,'sub',JSON.stringify('long subtitle '.repeat(20))),
+  (t,r)=>C.planSetField(t,r,path,'icon','"db"'),
+  (t,r)=>C.planEditTextBox(t,r,0,'a',{text:'x'.repeat(400),textStyle:{width:900,height:600,fontSize:48}})
+ ];
+ for(const start of [text,C.planSetNodeLocked(text,JSON.parse(text),0,'b',true).text])for(const edit of edits){
+  const plan=edit(start,JSON.parse(start));assert.equal(plan.error,undefined);assert.notEqual(plan.text,start);
+  assert.deepEqual(allCenters(plan.text).b,before);assert.deepEqual(diagram(JSON.parse(plan.text)).rows,diagram(JSON.parse(start)).rows);
+ }
+});

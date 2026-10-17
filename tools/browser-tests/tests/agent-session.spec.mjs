@@ -79,14 +79,13 @@ test('local helper automatically acquires an unloaded pinned topology provider w
   const catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))},hits=[];
   await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
   for(const spec of providers)await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
+  // #592: a draft that never opened the picker still resolves a proposed import from this site's index.
   await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
-  await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await page.locator('#topology-connect').click();
-  await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-cancel').click();
-  const current=await state(server,s=>s.open && s.source===source && s.topologyRevision>1);
+  const current=await state(server,s=>s.open && s.source===source);
   const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
   await propose(server,{id:'topology',baseRevision:current.revision,source:edited,topologyContext:{catalogURL:'https://untrusted.invalid/diagrams.json'}});
   await result(server,'topology','applied');await expect(page.locator('#src')).toHaveValue(edited);
-  await expect(page.locator('#docview [data-dv-node="shared::api"]')).toBeVisible();expect(hits).toEqual(['browsed','submitted']);
+  await expect(page.locator('#docview [data-dv-node="shared::api"]')).toBeVisible();expect(hits).toEqual(['submitted']);
   expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await disconnect();

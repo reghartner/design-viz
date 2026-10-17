@@ -153,6 +153,13 @@ test('output aliases cannot overwrite discovered specs or an explicit registry s
 });
 
 
+test('published entries list several topology exports sorted by name, not in authoring order',async t=>{
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs');
+  const f=discoveryFixture(t),provider=namedSpec('provider'),nodes=Object.keys(provider.page.sections[0].diagram.nodes);
+  provider.page.sections[0].diagram.topologyExports={zeta:{nodes:[nodes[0]],edges:[]},alpha:{nodes:[nodes[1]],edges:[]}};
+  f.write('provider.json',provider);
+  assert.deepEqual((await buildLibraryFromDirectory(f.directory)).diagrams[0].exports,['alpha','zeta']);
+});
 test('version 2 and 3 indexes validate metadata and URLs without embedding or mutating source content',async()=>{
   const {buildLibrary}=await import('../tools/canon/library.mjs');
   const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
@@ -160,6 +167,14 @@ test('version 2 and 3 indexes validate metadata and URLs without embedding or mu
   assert.equal(context.parseCanonLibrary({...raw,version:2}).length,1);
   assert.throws(()=>context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],revision:'bad'}]}),/revision/);
   assert.equal(entry.spec,undefined);assert.ok(entry.counts.nodes>0);assert.ok(entry.counts.steps>0);
+  // #592: entries name their topology exports so pickers can list only real providers.
+  assert.deepEqual(entry.exports,[]);
+  assert.deepEqual(context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],exports:['core',7,'edge']}]})[0].exports,['core','edge']);
+  assert.equal(context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],exports:undefined}]})[0].exports,undefined);
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs'),topology=path.join(__dirname,'../examples/canon/topology');
+  const published=(await buildLibraryFromDirectory(topology)).diagrams;
+  assert.deepEqual(published.find(item=>item.id==='platform').exports,['core']);
+  assert.deepEqual(published.find(item=>item.id==='checkout').exports,[]);
   const original=structuredClone(spec);original.page.canon={id:'old',kind:'design'};
   const before=JSON.stringify(original),resolved=context.canonLibrarySpec(original,entry);
   assert.equal(resolved.page.canon.id,'doorbell');assert.equal(JSON.stringify(original),before);

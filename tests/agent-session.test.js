@@ -142,11 +142,12 @@ test('retired operation and dry-run envelopes never apply, including envelopes c
 });
 
 
-test('local helper serves only indexed lazy specs and rejects unlisted files and escaping symlinks',async t=>{
+// #592: the published index is version 3 now; the helper must serve specs listed by either version.
+for(const version of [2,3])test('local helper serves only lazy specs indexed by a version '+version+' library and rejects unlisted files and escaping symlinks',async t=>{
   const h=await helper(t),folder=path.join(h.root,'diagrams/doorbell');await fs.mkdir(folder,{recursive:true});
   const file=path.join(folder,'doorbell.spec.json');await fs.writeFile(file,'{"page":{"title":"Doorbell"}}');
   await fs.writeFile(path.join(folder,'private.json'),'{}');
-  const index={version:2,diagrams:[{id:'doorbell',specUrl:'../diagrams/doorbell/doorbell.spec.json'}]};
+  const index={version,diagrams:[{id:'doorbell',specUrl:'../diagrams/doorbell/doorbell.spec.json'}]};
   await fs.writeFile(path.join(h.root,'workbench/diagrams.json'),JSON.stringify(index));
   const response=await fetch(h.server.origin+'/diagrams/doorbell/doorbell.spec.json');
   assert.equal(response.status,200);assert.equal((await response.json()).page.title,'Doorbell');

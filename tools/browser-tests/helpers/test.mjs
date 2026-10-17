@@ -34,14 +34,22 @@ export const test=base.extend({
     finally{await new Promise(resolve=>server.close(resolve));}
   },{scope:'worker'}],
   audit:[async({context,server},use,testInfo)=>{
-    const failures=[],allowedAborts=new WeakSet(),expectedAborts=[];
+    const failures=[],allowedAborts=new WeakSet(),expectedAborts=[],allowedStatuses=[];
+    // A test may deliberately serve an HTTP error for one URL (for example a
+    // site without a published diagram library). Only that status/URL is allowed.
+    failures.allowStatus=(status,matches)=>allowedStatuses.push({status,matches});
     // A test may deliberately cancel a particular in-flight request. Only that
     // identity's ERR_ABORTED is allowed; timeouts, HTTP errors and other requests
     // remain failures. Keep cancellations visible in the audit artifact.
     failures.allowAbort=request=>allowedAborts.add(request);
     function watch(page){
       page.on('pageerror',error=>failures.push('page: '+error.message));
-      page.on('console',message=>{if(message.type()==='error')failures.push('console: '+message.text());});
+      page.on('console',message=>{
+        if(message.type()!=='error')return;
+        const url=message.location()?.url || '';
+        if(allowedStatuses.some(allowed=>url && allowed.matches(url)))return;
+        failures.push('console: '+message.text());
+      });
     }
     context.on('page',watch);
     context.on('request',request=>{
@@ -51,9 +59,11 @@ export const test=base.extend({
     context.on('requestfailed',request=>{
       const reason=request.failure()?.errorText;
       if(allowedAborts.has(request) && reason==='net::ERR_ABORTED'){allowedAborts.delete(request);expectedAborts.push(request.url());return;}
+      // A deliberately served HTTP error is reported by Chromium as a failed resource load.
+      if(allowedStatuses.some(allowed=>allowed.matches(request.url())))return;
       failures.push('request failed: '+request.url()+' '+reason);
     });
-    context.on('response',response=>{if(response.status()>=400)failures.push('HTTP '+response.status()+': '+response.url());});
+    context.on('response',response=>{if(response.status()>=400 && !allowedStatuses.some(allowed=>allowed.status===response.status() && allowed.matches(response.url())))failures.push('HTTP '+response.status()+': '+response.url());});
     await context.route('**/*',route=>{
       const url=route.request().url();
       if(/^https?:/.test(url)&&new URL(url).origin!==server.origin)return route.abort();
@@ -64,7 +74,7 @@ export const test=base.extend({
       for(const [index,page] of context.pages().entries())if(!page.isClosed())await testInfo.attach('page-'+index,{body:await page.screenshot(),contentType:'image/png'});
     }
     if(expectedAborts.length)await testInfo.attach('intentional-request-cancellations',{body:JSON.stringify(expectedAborts,null,2),contentType:'application/json'});
-    delete failures.allowAbort;
+    delete failures.allowAbort;delete failures.allowStatus;
     await testInfo.attach('browser-audit',{body:JSON.stringify(failures,null,2),contentType:'application/json'});
     expect(failures,'No page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],

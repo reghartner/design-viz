@@ -323,10 +323,20 @@ function initWorkbenchWelcome(opts){
       if(await builder.chooseWorkingFile(function(){return token===operation && root.isConnected;},function(message){error('welcome-file-error',message);}) && token===operation)enterEditor();
     }else{file.value='';file.click();}
   }); });
+  /* Paste takes the same staged path as opening a file, so a consumer that
+     references topology acquires its providers from this site's index. */
   el('welcome-paste-form').addEventListener('submit', function(ev){
     ev.preventDefault();
-    try { builder.loadText(json.value); error('welcome-paste-error', ''); json.removeAttribute('aria-invalid'); enterEditor(); }
-    catch (ex){ error('welcome-paste-error', ex.message || 'This JSON could not be opened.'); json.setAttribute('aria-invalid', 'true'); json.focus(); }
+    retireRead();var token=operation;
+    function current(){return token===operation && root.isConnected;}
+    var opening=builder.beginFileOpen(current,false);
+    error('welcome-paste-error', '');
+    opening.open(json.value).then(function(ok){
+      if(ok && current()){json.removeAttribute('aria-invalid');enterEditor();}
+    },function(ex){
+      if(!opening.current())return;
+      error('welcome-paste-error', ex.message || 'This JSON could not be opened.'); json.setAttribute('aria-invalid', 'true'); json.focus();
+    });
   });
   json.addEventListener('input', function(){ error('welcome-paste-error', ''); json.removeAttribute('aria-invalid'); });
   /* The established Open action remains an immediate Flowview JSON open.

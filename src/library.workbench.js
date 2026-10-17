@@ -46,7 +46,8 @@ function parseCanonLibrary(raw){
     if(!entry.counts || ['nodes','steps','panels'].some(function(key){return !Number.isSafeInteger(entry.counts[key]) || entry.counts[key]<0;}))throw new Error('Invalid diagram counts: '+entry.id);
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
-    return {id:entry.id,title:title,description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
+    return {id:entry.id,title:title,description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -82,8 +83,40 @@ async function readCanonLibraryJSON(response,label){
   return JSON.parse(text);
 }
 
-/* Explicit authoring acquisition only. Canon entry, repository connection, or
-   folder opening pins the catalog; never reload it or replace frozen providers. */
+/* One read of this site's diagrams.json per page, shared by Browse, the
+   reference picker, agent proposals and file opening, made on first need (a
+   page that already browsed or read a diagram has it). Only a successful read
+   is kept; a 404, a transport failure or a bad body is retried on demand, so
+   nothing is ever cached as "unavailable". `fresh` re-reads for Browse, and
+   only Browse may `follow` a redirect (as it always has); every other read
+   aborts on redirect, so topology never requests another origin, and a
+   redirected body Browse did read is refused for topology use. */
+var siteRepositoryIndex=(function(){
+  var cached=null,pending=null;
+  return function(options){
+    if(!/^https?:$/.test(new URL(location.href).protocol))return Promise.reject(new Error('Referenced topology needs a deployed Workbench. This offline editor has no published diagram library.'));
+    if(pending)return pending;
+    if(cached && !(options && options.fresh))return Promise.resolve(cached);
+    var url=new URL('diagrams.json',location.href).href,redirect=options && options.follow?'follow':'error';
+    pending=(async function(){
+      var response=await fetch(url,{cache:'no-cache',redirect:redirect}),raw=null;
+      if(response.status!==404){
+        // Only a body shaped like a diagram library counts as a read; any
+        // other JSON (for example a placeholder) is "no library" and is not kept.
+        var body=await readCanonLibraryJSON(response,'Repository catalog');
+        if(body && [1,2,3].includes(body.version) && Array.isArray(body.diagrams))raw=body;
+      }
+      return {status:response.status,redirected:!!response.redirected,raw:raw,url:url};
+    })();
+    pending.then(function(result){if(result.raw)cached=result;pending=null;},function(){pending=null;});
+    return pending;
+  };
+})();
+
+/* Acquisition pins this site's index automatically wherever providers are
+   needed; frozen providers are never reloaded or replaced. Only an explicit
+   refresh (below) may adopt a later index, and only when every frozen
+   provider keeps its revision. */
 function createTopologyCatalogLoader(context){
   var catalog=context && context.catalog;
   if(!catalog || catalog.version!==3 || !context.catalogURL || !/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology is unavailable. Loading missing providers requires a deployed version 3 authored-source repository catalog. Offline and legacy libraries do not provide one.');
@@ -98,7 +131,7 @@ function createTopologyCatalogLoader(context){
         var response=await fetch(canonLibrarySpecURL(entry.specUrl,base),{cache:'no-cache',redirect:'error'});
         var raw=canonLibrarySpec(await readCanonLibraryJSON(response,'Provider '+entry.id),entry);
         try{await verifyWorkspaceHandoff(raw,{id:entry.id,revision:entry.revision},window.crypto);}
-        catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen the diagram after deployment to pin the updated catalog; your draft has not changed.');}
+        catch(ex){var mismatch=new Error('Source revision mismatch for '+entry.id+': it was republished after this session pinned the library. Use the latest published library, or reopen the diagram; your draft has not changed.');mismatch.revisionMismatch=true;throw mismatch;}
         return raw;
       })().catch(function(ex){
         // Share in-flight work, but cache only verified successful sources.
@@ -133,11 +166,13 @@ function authoredTopologyDependencies(raw){
 }
 
 /* Prepare a private review context from the browser's approved catalog only.
-   Proposal JSON supplies provider IDs, never catalog addresses or snapshots. */
+   Proposal JSON supplies provider IDs, never catalog addresses or snapshots.
+   A draft without a context pins this site's index here, so an agent never
+   receives an instruction that only a human at the UI could follow. */
 async function prepareTopologyProposal(raw,context){
   var dependencies=authoredTopologyDependencies(raw);
   if(!dependencies.length)return context;
-  if(!context)throw Error('Connect repository catalog in Add → Referenced topology, then review this update again.');
+  if(!context)context=await connectTopologyRepository({page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}});
   var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
   if(!missing.length)return context;
   var loader=createTopologyCatalogLoader(context),prepared=context;
@@ -173,14 +208,15 @@ async function prepareAuthoredTopology(raw,context){
   return prepareTopologyProposal(raw,context);
 }
 
-/* A local draft may explicitly pin the deployed authored-source catalog.
+/* A local draft pins this site's authored-source catalog automatically.
    Its synthetic consumer membership exists only in this auxiliary context;
    saved JSON remains an ordinary local document with topologyImports. */
 async function connectTopologyRepository(raw){
-  if(!/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology requires the deployed repository catalog. Local provider files are not supported.');
-  var catalogURL=new URL('diagrams.json',location.href),response=await fetch(catalogURL.href,{cache:'no-cache',redirect:'error'});
-  var catalog=await readCanonLibraryJSON(response,'Repository catalog');
-  if(!catalog || catalog.version!==3)throw new Error('Referenced topology requires a version 3 authored-source repository catalog.');
+  var index=await siteRepositoryIndex();
+  if(index.redirected)throw new Error('This Workbench redirects its diagram library elsewhere, so referenced topology is unavailable here.');
+  if(!index.raw)throw new Error('This Workbench has no published diagram library, so referenced topology is unavailable here. Local exports still work.');
+  var catalog=index.raw,catalogURL=new URL(index.url);
+  if(!catalog || catalog.version!==3)throw new Error('Referenced topology is unavailable here: this Workbench publishes a version '+(catalog && catalog.version)+' diagram library, and a version 3 authored-source repository catalog is required.');
   var entries=parseCanonLibrary(catalog),ids=new Set(entries.map(function(entry){return entry.id;})),id='workbench-draft',suffix=2;
   while(ids.has(id))id='workbench-draft-'+suffix++;
   var value=JSON.parse(JSON.stringify(raw)),spec;
@@ -190,6 +226,27 @@ async function connectTopologyRepository(raw){
   if(!spec.page || typeof spec.page!=='object' || Array.isArray(spec.page))throw new Error('Open a valid diagram before connecting the repository catalog.');
   spec.page.canon={version:1,id:id,kind:'design',owner:'group:default/workbench-draft'};
   return {version:1,id:id,ephemeral:true,specs:[spec],catalog:JSON.parse(JSON.stringify(catalog)),catalogURL:catalogURL.href};
+}
+
+/* Adopt a later deployment of the index without touching frozen providers:
+   every provider already frozen in the session must keep its published
+   revision, otherwise the draft has to be reopened. */
+function frozenRevisionsUnchanged(context,catalog){
+  var before=new Map(((context.catalog || {}).diagrams || []).map(function(entry){return [entry.id,entry.revision];}));
+  var after=new Map(((catalog || {}).diagrams || []).map(function(entry){return [entry.id,entry.revision];}));
+  return (context.specs || []).every(function(spec){
+    var id=spec.page.canon.id;return !before.has(id) || after.get(id)===before.get(id);
+  });
+}
+async function refreshTopologyRepository(context){
+  if(!context || !context.catalog || context.catalog.version!==3 || !context.catalogURL)throw new Error('Referenced topology is unavailable. There is no pinned repository catalog to refresh.');
+  var index=await siteRepositoryIndex({fresh:true});
+  if(index.redirected || !index.raw || index.raw.version!==3)throw new Error('This Workbench no longer publishes a version 3 diagram library.');
+  if(index.url!==context.catalogURL)throw new Error('The pinned catalog address differs from this site. Reopen the diagram here.');
+  parseCanonLibrary(index.raw);
+  if(!frozenRevisionsUnchanged(context,index.raw))throw new Error('A provider frozen in this session was republished. Reopen the diagram to use the latest deployment; your draft has not changed.');
+  // Frozen specs are shared by reference, never copied or replaced; only the catalog changes.
+  return Object.assign({},context,{catalog:JSON.parse(JSON.stringify(index.raw))});
 }
 
 function initWorkbenchLibrary(opts){
@@ -236,9 +293,10 @@ function initWorkbenchLibrary(opts){
         if(context.source)backendContext=context;
         raw={version:1,diagrams:[{id:opts.legacyCanon,spec:context.spec}]};published=true;origin=/*@company:name*/'Company repository snapshot';
       }else if(location.protocol!=='file:'){
-        var response=await fetch('diagrams.json',{cache:'no-cache'});
-        if(response.status!==404){
-          raw=await readCanonLibraryJSON(response,'Library');origin='Published repository snapshot';published=true;
+        // Browse re-reads the index; the editor shares whatever it read last.
+        var index=await siteRepositoryIndex({fresh:true,follow:true});
+        if(index.status!==404){
+          raw=index.raw;origin='Published repository snapshot';published=true;
         }
       }else origin='Bundled fictional example · offline';
       entries=parseCanonLibrary(raw);return entries;

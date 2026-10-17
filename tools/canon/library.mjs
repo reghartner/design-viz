@@ -29,7 +29,8 @@ async function libraryFromEntries(entries,output){
     const rendered=entry.resolvedSpec || entry.spec;
     const errors=C.validate(rendered).concat(C.validateSpec(rendered).errors);
     if(errors.length)throw new Error('Invalid diagram '+label+': '+errors.join('; '));
-    const counts={nodes:0,steps:0,panels:0},services=[];
+    const counts={nodes:0,steps:0,panels:0},services=[],exports=new Set();
+    for(const section of C.sections(entry.spec))for(const name of Object.keys(section.diagram.topologyExports || {}))exports.add(name);
     for(const section of C.sections(rendered)){
       for(const node of Object.values(section.diagram.nodes || {}))if(typeof node?.title==='string' && node.title.trim() && !services.includes(node.title))services.push(node.title);
       counts.nodes+=Object.keys(section.diagram.nodes || {}).length;
@@ -42,7 +43,7 @@ async function libraryFromEntries(entries,output){
     const {description,tags}=entry.spec.page;
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
       ...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
-      canon:entry.spec.page.canon,counts,services,specUrl,revision:digest(entry.spec)};
+      canon:entry.spec.page.canon,counts,services,exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
   }))};
 }
 export async function buildLibrary(registryPath,output='workbench/diagrams.json'){return libraryFromEntries((await registry(registryPath)).entries,await physicalPath(output));}

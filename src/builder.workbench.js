@@ -774,7 +774,30 @@ function initWorkbenchBuilder(opts){
     session.noteInput();
     inspector.sourceChanged();
     hideDiff();
+    acquireTypedTopology();
   });
+  /* A reference typed into the JSON source acquires its provider from this
+     site's index and re-renders. The text is never changed by acquisition; a
+     reference that cannot be resolved keeps the ordinary render error. */
+  var typedTopology=null;
+  function acquireTypedTopology(){
+    var snap=session.snapshot();if(snap.error || !snap.raw || typeof prepareAuthoredTopology!=='function')return;
+    var context=session.topologyContext(),missing;
+    try{missing=authoredTopologyDependencies(snap.raw).filter(function(id){return !context || !context.specs.some(function(spec){return spec.page.canon.id===id;});});}
+    catch(ex){return;}
+    if(!missing.length)return;
+    var key=JSON.stringify([snap.project,snap.topologyRevision,missing]);if(typedTopology===key)return;typedTopology=key;
+    var stale=false;
+    prepareAuthoredTopology(snap.raw,context).then(function(next){
+      if(!life.alive() || typedTopology!==key)return;
+      var now=session.snapshot();
+      if(now.text!==snap.text || now.project!==snap.project || now.topologyRevision!==snap.topologyRevision){stale=true;return;}
+      if(next && session.connectTopology(next,now))render({origin:'edit'});
+    }).catch(function(){}).then(function(){
+      if(typedTopology===key)typedTopology=null;
+      if(stale && life.alive())acquireTypedTopology();
+    });
+  }
   (function offerDraft(){
     var bar = document.getElementById('draftbar');
     var draft = session.draft(); /* captured once — later autosaves cannot swap it */
@@ -1299,6 +1322,7 @@ function initWorkbenchBuilder(opts){
   var topologyPicker=initTopologyPicker({document:document,src:src,pause:pausePreview,
     context:function(){return Object.assign(additionContext(),{topologyContext:session.topologyContext()});},
     connect:function(raw){return connectTopologyRepository(raw);},
+    refresh:function(context){return refreshTopologyRepository(context);},
     connected:function(context,snapshot){return session.connectTopology(context,snapshot);},
     insert:function(plan,snapshot,context){
       if(!session.accept(plan,{snapshot:snapshot,topologyContext:context,beforePublish:clearMultiSelect}))return false;

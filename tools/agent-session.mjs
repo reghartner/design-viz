@@ -133,7 +133,7 @@ export async function startAgentSession({root=ROOT,scratch,port=0,leaseMs=10000}
         try{index=JSON.parse(await readFile(path.join(root,'workbench/diagrams.json'),'utf8'));}
         catch(ex){if(ex.code!=='ENOENT')throw ex;}
         const base=origin+'/workbench/diagrams.json';
-        const entry=index?.version===2 && index.diagrams?.find(item=>{
+        const entry=[2,3].includes(index?.version) && index.diagrams?.find(item=>{
           if(typeof item.specUrl!=='string')return false;
           const target=new URL(item.specUrl,base);
           return target.origin===origin && target.pathname===route && !target.search && !target.hash;

@@ -5,8 +5,11 @@ export async function startConfluenceApp(document, bridge, core){
   const host = el('docview'), input = el('spec-input'), file = el('spec-file');
   const section = el('section'), focus = el('focus'), skin = el('skin');
   const save = el('save'), status = el('import-status'), appStatus = el('app-status');
-  let controller = null, context = null, revision = 0, busy = false, reading = false;
-  const destroy = () => { if (controller) controller.destroy(); controller = null; host.replaceChildren(); };
+  let controller = null, shortcuts = null, context = null, revision = 0, busy = false, reading = false;
+  const destroy = () => {
+    if (shortcuts) shortcuts.destroy(); shortcuts = null;
+    if (controller) controller.destroy(); controller = null; host.replaceChildren();
+  };
   function message(text, error = false){ status.textContent = text; status.classList.toggle('error',error); }
   function fail(text){ appStatus.hidden = false; appStatus.textContent = text; appStatus.classList.add('error'); }
   function selections(){ return {section:section.value,focus:focus.value,skin:skin.value}; }
@@ -30,6 +33,8 @@ export async function startConfluenceApp(document, bridge, core){
     core.applySkinClasses(document.body,host,selectedSkin);
     controller = core.renderPage(host,page,selectedSkin,{}, {autoplay:!configuring,layoutTarget:'confluence'});
     controller.onChange = protectLinks;
+    // "?" opens the reader shortcut sheet; Forge runs no presenter.
+    shortcuts = core.wireReaderShortcuts(controller,host,document.defaultView,{presenter:false});
     protectLinks();
   }
   function preview(){

@@ -1,26 +1,30 @@
 /* Reader keyboard shortcuts. "?" opens this sheet on every reader surface
    (#562); the rows list only keys the reader handles: presenter and focused
-   step keys (engine.js), tab-bar keys, and Esc for menus and popovers. */
+   step keys (engine.js), tab-bar keys, and Esc for menus and popovers.
+   Embedded readers (Backstage native, Forge) have no presenter, so they pass
+   {presenter:false} and omit the rows marked 'presenter' (#602). Lookups stay
+   under doc.body: the native viewer's bounded document has no querySelector. */
 var READER_SHORTCUT_GROUPS=[
   ['Anywhere',[['?','Open this shortcut sheet'],['Esc','Close this sheet, an open menu or a popover']]],
-  ['Diagram focused, or in Present',[['← / →','Previous or next step'],['Space','Play or pause the steps']]],
-  ['In Present',[['1–9','Switch to that tab'],['Esc','Exit Present']]],
+  ['Diagram focused, or in Present',[['← / →','Previous or next step'],['Space','Play or pause the steps']],'presenter'],
+  ['In Present',[['1–9','Switch to that tab'],['Esc','Exit Present']],'presenter'],
   ['Tab bar focused',[['← / →','Previous or next tab'],['Home / End','First or last tab']]]
 ];
 function readerShortcutTextTarget(target){
   return !!(target && target.closest && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'));
 }
-function wireReaderShortcuts(ctl,view,win){
-  var doc=win.document,opener=null,destroyed=false;
+function wireReaderShortcuts(ctl,view,win,options){
+  var doc=win.document,opener=null,destroyed=false,presenter=!(options && options.presenter===false);
   function el(tag,cls,text){var node=doc.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
   var dialog=el('dialog','reader-shortcuts');dialog.id='reader-shortcuts';dialog.setAttribute('aria-labelledby','reader-shortcuts-title');
   var header=el('header'),title=el('h2',null,'Keyboard shortcuts'),close=el('button','reader-shortcuts-close','Close');
   title.id='reader-shortcuts-title';close.type='button';header.append(title,close);dialog.appendChild(header);
   READER_SHORTCUT_GROUPS.forEach(function(group){
+    if(group[2]==='presenter' && !presenter)return;
     var section=el('section'),list=el('dl');section.appendChild(el('h3',null,group[0]));
     group[1].forEach(function(row){
       var dt=el('dt');
-      row[0].split(/( \/ |–)/).forEach(function(part,i){dt.appendChild(i%2?doc.createTextNode(part):el('kbd',null,part));});
+      row[0].split(/( \/ |–)/).forEach(function(part,i){dt.append(i%2?part:el('kbd',null,part));});
       list.append(dt,el('dd',null,row[1]));
     });
     section.appendChild(list);dialog.appendChild(section);
@@ -31,13 +35,13 @@ function wireReaderShortcuts(ctl,view,win){
   button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',dialog.id);button.setAttribute('aria-keyshortcuts','?');
   var pageActions=readerPageActions(view,ctl);pageActions.appendChild(button);
   function show(){
-    if(destroyed || dialog.open || doc.querySelector('dialog[open]'))return false;
+    if(destroyed || dialog.open || doc.body.querySelector('dialog[open]'))return false;
     opener=doc.activeElement;dialog.showModal();close.focus({preventScroll:true});return true;
   }
   function keydown(ev){
     if(ev.key!=='?' || ev.defaultPrevented || ev.isComposing || ev.altKey || ev.ctrlKey || ev.metaKey)return;
     if(!view.isConnected || !view.getClientRects().length || readerShortcutTextTarget(ev.target))return;
-    var tour=doc.querySelector('.dv-tour');if(tour && !tour.hidden)return;
+    var tour=doc.body.querySelector('.dv-tour');if(tour && !tour.hidden)return;
     if(show())ev.preventDefault();
   }
   function closed(){var target=opener;opener=null;if(target && target.isConnected && target.focus)target.focus({preventScroll:true});}

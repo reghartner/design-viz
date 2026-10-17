@@ -238,7 +238,8 @@
         "skinLabel": "skinLabel",
         "DEFAULT_SKIN": "DEFAULT_SKIN",
         "renderPage": "renderPage",
-        "applySkinClasses": "applySkinClasses"
+        "applySkinClasses": "applySkinClasses",
+        "wireReaderShortcuts": "wireReaderShortcuts"
       },
       "styles": [
         "page",

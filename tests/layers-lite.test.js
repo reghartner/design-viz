@@ -139,8 +139,9 @@ test('#617 documents saved with older locks render unchanged',()=>{
 
 /* #617 a lock stays a pin under every non-placement edit that would re-space
  its row or band. Each row: fixture | edit | the same edit WITHOUT the lock
- moves 'b' (precondition) | with 'b' locked, 'b' keeps its cx/cy. Rejects a
- flag-only lock that leaves the node to re-space with its row. */
+ moves 'b' (precondition) | with 'b' locked, 'b' keeps its cx/cy AND the edit's
+ content change equals the unlocked one. Rejects a flag-only lock that leaves
+ the node to re-space with its row, and a plan that skips edits near locks. */
 function pinFixture(options={}){
  const raw=reflowFixture(!!options.lanes),d=diagram(raw);
  if(!options.lanes){d.rows=[['a','b','c','h'],['d','e','f','i']];delete d.groups;delete d.nodes.b.group;delete d.nodes.x;delete d.floats;d.edges=d.edges.filter(e=>e.from!=='x');}
@@ -165,10 +166,15 @@ const pinCases=[
  ['lanes: delete edge',{lanes:true,sameRowEdge:true},(t,r)=>C.planDeleteEdge(t,r,0,5)],
  ['lanes: change edge endpoint',{lanes:true},(t,r)=>C.planSetEdgeEndpoint(t,r,0,3,'to','h')]
 ];
+/* Everything but placement and lock flags: the locked edit must make the same
+ content change as the unlocked one, so a plan that refuses or drops the edit
+ when a lock exists cannot pass. */
+function contentOnly(text){const raw=JSON.parse(text),d=diagram(raw);delete d.rows;delete d.floats;Object.values(d.nodes).forEach(n=>delete n.locked);return raw;}
 for(const [label,options,edit] of pinCases)test('#617 lock pins b through: '+label,()=>{
  const raw=pinFixture(options),text=JSON.stringify(raw,null,2),before=allCenters(text).b;
  const unlocked=edit(text,JSON.parse(text));assert.equal(unlocked.error,undefined);assert.notDeepEqual(allCenters(unlocked.text).b,before,'precondition: the edit re-spaces b when unlocked');
  const lock=C.planSetNodeLocked(text,JSON.parse(text),0,'b',true);assert.equal(lock.error,undefined);assert.deepEqual(allCenters(lock.text).b,before);
  const locked=edit(lock.text,JSON.parse(lock.text));assert.equal(locked.error,undefined);
  const after=JSON.parse(locked.text);assert.equal(diagram(after).nodes.b.locked,true);assert.deepEqual(allCenters(locked.text).b,before);
+ assert.notDeepEqual(contentOnly(unlocked.text),contentOnly(text),'the edit changes content');assert.deepEqual(contentOnly(locked.text),contentOnly(unlocked.text),'the locked edit still happens');
 });

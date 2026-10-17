@@ -41,6 +41,9 @@ function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
   for(const file of fs.readdirSync(path.join(ROOT,'tools/arrange'))){
     if(/\.(?:cjs|js|json)$/.test(file))fs.copyFileSync(path.join(ROOT,'tools/arrange',file),path.join(directory,'tools/arrange',file));
   }
+  fs.mkdirSync(path.join(directory,'tools/browser-tests'),{recursive:true});
+  for(const file of ['package.json','package-lock.json'])
+    fs.copyFileSync(path.join(ROOT,'tools/browser-tests',file),path.join(directory,'tools/browser-tests',file));
   assert.equal(fs.existsSync(path.join(directory,'template/flowview.html')),false);
   const spec=JSON.parse(fs.readFileSync(path.join(ROOT,'examples/canon/specs/doorbell.json')));
   spec.page.canon.id='old-spec-id';
@@ -55,16 +58,32 @@ function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
   return {source,spec,manifest};
 }
 
-test('image fixture contains every literal Docker COPY source without requiring Docker',t=>{
-  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-inputs-'));
-  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
-  prepareImageContext(directory);
+function assertImageCopyInputs(directory){
   const dockerfile=fs.readFileSync(path.join(ROOT,'deploy/workbench/Dockerfile'),'utf8');
   for(const line of dockerfile.split('\n').filter(line=>/^COPY\s/.test(line)&&!line.includes('--from='))){
     for(const source of line.trim().split(/\s+/).slice(1,-1)){
-      if(!/[?*[]/.test(source))assert.ok(fs.existsSync(path.join(directory,source)),`Missing image fixture input: ${source}`);
+      // Expand against the real checkout so a partly populated fixture cannot
+      // hide a missing wildcard member (especially package-lock.json).
+      const inputs=/[?*[]/.test(source)?fs.globSync(source,{cwd:ROOT}):[source];
+      assert.ok(inputs.length,`Docker COPY source matches no inputs: ${source}`);
+      for(const input of inputs)assert.ok(fs.existsSync(path.join(directory,input)),`Missing image fixture input: ${input}`);
     }
   }
+}
+
+test('image fixture contains every literal and wildcard Docker COPY source without requiring Docker',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-inputs-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  prepareImageContext(directory);
+  assertImageCopyInputs(directory);
+  const browserInputs=path.join(directory,'tools/browser-tests');
+  assert.deepEqual(fs.readdirSync(browserInputs).sort(),['package-lock.json','package.json']);
+  for(const file of fs.readdirSync(browserInputs))
+    assert.deepEqual(fs.readFileSync(path.join(browserInputs,file)),fs.readFileSync(path.join(ROOT,'tools/browser-tests',file)));
+  fs.rmSync(path.join(browserInputs,'package-lock.json'));
+  assert.throws(()=>assertImageCopyInputs(directory),/Missing image fixture input: tools\/browser-tests\/package-lock\.json/);
+  fs.rmSync(browserInputs,{recursive:true});
+  assert.throws(()=>assertImageCopyInputs(directory),/Missing image fixture input: tools\/browser-tests\/package/);
 });
 
 test('image source fixture builds without Docker or preexisting generated arrangement inputs',t=>{
@@ -127,6 +146,22 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(library.diagrams[0].spec,undefined);
   assert.equal(library.diagrams[0].specUrl,'../diagrams/product-area/feature/feature.spec.json');
   assert.deepEqual(library.diagrams[0].canon,expected.page.canon);
+  const preview=library.diagrams[0].preview;
+  assert.equal(preview.version,1);assert.equal(preview.revision,library.diagrams[0].revision);
+  assert.match(preview.url,/^library-thumbnails\/[a-f0-9]{64}\/[a-f0-9]{64}\.png$/);
+  const previewResponse=await probeHttp(new URL(preview.url,url).href,2000);
+  assert.equal(previewResponse.status,200);assert.match(previewResponse.headers['content-type'],/^image\/png/);
+  assert.deepEqual(previewResponse.bytes.subarray(0,8),Buffer.from([137,80,78,71,13,10,26,10]));
+  assert.equal(previewResponse.bytes.toString('ascii',12,16),'IHDR');
+  assert.equal(previewResponse.bytes.readUInt32BE(16),960);assert.equal(preview.width,960);
+  assert.equal(previewResponse.bytes.readUInt32BE(20),600);assert.equal(preview.height,600);
+  assert.ok(previewResponse.bytes.length<=750*1024,'Published thumbnail stays within its byte budget');
+  // The final nginx stage must not ship the browser, package manager, or build tree.
+  docker(['exec',name,'sh','-ec',[
+    'test ! -e /build','test ! -e /root/.cache/ms-playwright',
+    'test ! -e /usr/share/nginx/html/tools','test ! -e /usr/share/nginx/html/node_modules',
+    'for tool in node npm python3 chromium; do if command -v "$tool"; then exit 1; fi; done'
+  ].join('\n')]);
   const specResponse=await probeHttp(new URL(library.diagrams[0].specUrl,url).href,2000);
   assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
   // The lazy library serves authored JSON. Membership is applied in memory.

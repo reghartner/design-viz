@@ -14,7 +14,10 @@ function probeHttp(url,timeoutMs){
       response.on('data',chunk=>chunks.push(chunk));
       response.on('error',error=>finish(error));
       response.on('aborted',()=>finish(Error('HTTP response was aborted: '+url)));
-      response.on('end',()=>finish(null,{status:response.statusCode,headers:response.headers,body:Buffer.concat(chunks).toString('utf8')}));
+      response.on('end',()=>{
+        const bytes=Buffer.concat(chunks);
+        finish(null,{status:response.statusCode,headers:response.headers,body:bytes.toString('utf8'),bytes});
+      });
     });
     request.on('error',error=>finish(error));
     timer=setTimeout(()=>{

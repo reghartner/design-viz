@@ -16,6 +16,12 @@ test('image HTTP probe fails a stalled body at its enforced deadline',async t=>{
   const url=await serve(t,(_,res)=>{res.writeHead(200);res.write('incomplete');});
   await assert.rejects(probeHttp(url,40),/timed out after 40ms/);
 });
+test('image HTTP probe preserves binary bytes across response chunks',async t=>{
+  const bytes=Buffer.from([137,80,78,71,13,10,26,10,0,255,128]);
+  const url=await serve(t,(_,res)=>{res.write(bytes.subarray(0,5));setTimeout(()=>res.end(bytes.subarray(5)),15);});
+  const result=await probeHttp(url,1000);
+  assert.deepEqual(result.bytes,bytes);
+});
 test('image HTTP probe rejects an interrupted body',async t=>{
   const url=await serve(t,(_,res)=>{res.writeHead(200,{'Content-Length':'100'});res.write('short');setTimeout(()=>res.destroy(),15);});
   await assert.rejects(probeHttp(url,1000),/aborted/);

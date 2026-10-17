@@ -547,12 +547,8 @@ with no `title` shows its id:
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
 - `locked` — optional boolean. `true` pins this ordinary graph node's center at
-  its current graph coordinates. A newly locked row node keeps its row slot, so
-  locking or unlocking moves no other node. Any Workbench edit that would move
-  a locked node (re-spacing its row, the group band, lane gaps or spread
-  floats) instead lifts it into explicit free placement at its prior center in
-  the same undoable edit. Hand-typed JSON, file import and accepted Agent
-  proposals are published exactly as written. Mixed selections keep the
+  its current graph coordinates and moves no other node; a later edit that
+  would move it pins it there as free placement. Mixed selections keep the
   locked node selected while moving only unlocked members, and Auto arrange
   routes unlocked nodes around pins. It does not lock the node's size/content,
   links, edges, story state, copy, playback, or deletion. The lock border and

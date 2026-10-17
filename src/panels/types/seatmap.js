@@ -277,49 +277,52 @@ function seatmapPatchWarnings(state, path, panel, warnings) {
   });
 }
 /* Pure sparse merge for the per-section maps. `patch === null` clears the
-   map; a key set to null forgets that section; invalid entries are skipped.
-   Never mutates its inputs. */
-function seatmapMergeMap(base, patch, capacities, ok) {
+   map; a key set to null forgets that section; entries keep their authored
+   value when the key is a safe id and the value has the right shape. The
+   fold knows nothing about the declaration: capacities and tiers are checked
+   when the model is given the declaration a step actually shows, so an
+   engine-merged declaration change between steps just works. Never mutates. */
+function seatmapMergeMap(base, patch, ok) {
   var out = {};
   if (patch === null) return out;
   Object.keys(panelObject(base) ? base : {}).forEach(function (id) { out[id] = base[id]; });
   if (!panelObject(patch)) return out;
   Object.keys(patch).forEach(function (id) {
-    if (!(id in capacities)) return;
+    if (!spmSafeId(id)) return;
     var value = patch[id];
     if (value === null) delete out[id];
-    else if (ok(value, capacities[id])) out[id] = value;
+    else if (ok(value)) out[id] = value;
   });
   return out;
 }
-function seatmapMapRules(panel) {
-  var tiers = seatmapTiers(panel);
-  return {
-    sold: function (v, cap) { return seatmapCount(v) && v <= cap; },
-    held: seatmapHeldOk,
-    price: function (v) { return isFiniteNum(v) && v >= 0; },
-    tierOf: function (v) { return tiers.some(function (tier) { return tier.id === v; }); },
-  };
-}
-function seatmapCleanState(raw, capacities, allowOnce) {
+var SEATMAP_MAP_SHAPES = {
+  sold: seatmapCount,
+  held: function (v) { return seatmapHeldOk(v, Number.MAX_SAFE_INTEGER); },
+  price: function (v) { return isFiniteNum(v) && v >= 0; },
+  tierOf: function (v) { return typeof v === 'string' && spmSafeId(v); },
+};
+/* Highlight ids are resolved against the declaration at model time (and
+   warned by the validator), so the fold only checks shapes. */
+function seatmapCleanState(raw, allowOnce) {
   var out = {};
   if (!panelObject(raw)) return out;
   if (panelOwn(raw, 'mode') && (raw.mode === null || SEATMAP_MODES.indexOf(raw.mode) >= 0)) out.mode = raw.mode;
-  if (panelOwn(raw, 'highlight') && seatmapHighlightOk(raw.highlight, capacities))
+  if (panelOwn(raw, 'highlight') && (raw.highlight === null || typeof raw.highlight === 'string' ||
+      (Array.isArray(raw.highlight) && raw.highlight.length <= SEATMAP_MAX_HIGHLIGHT && raw.highlight.every(function (id) { return typeof id === 'string'; }))))
     out.highlight = Array.isArray(raw.highlight) ? raw.highlight.slice() : raw.highlight;
   if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
-  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = seatmapCleanState(raw.enterOnce, capacities, false);
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = seatmapCleanState(raw.enterOnce, false);
   return out;
 }
 function seatmapFold(panel, steps) {
-  var capacities = seatmapCapacities(panel), rules = seatmapMapRules(panel), keys = Object.keys(rules);
-  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return seatmapCleanState(raw, capacities, once); });
+  var keys = Object.keys(SEATMAP_MAP_SHAPES);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return seatmapCleanState(raw, once); });
   var carried = {}, initial = panelObject(panel.initial) ? panel.initial : {};
-  keys.forEach(function (key) { carried[key] = seatmapMergeMap({}, panelOwn(initial, key) ? initial[key] : undefined, capacities, rules[key]); });
+  keys.forEach(function (key) { carried[key] = seatmapMergeMap({}, panelOwn(initial, key) ? initial[key] : undefined, SEATMAP_MAP_SHAPES[key]); });
   function apply(base, patch) {
     var next = {};
     keys.forEach(function (key) {
-      next[key] = panelObject(patch) && panelOwn(patch, key) ? seatmapMergeMap(base[key], patch[key], capacities, rules[key]) : base[key];
+      next[key] = panelObject(patch) && panelOwn(patch, key) ? seatmapMergeMap(base[key], patch[key], SEATMAP_MAP_SHAPES[key]) : base[key];
     });
     return next;
   }
@@ -338,11 +341,19 @@ function seatmapPathGeometry(d) {
   if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0 };
   return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height };
 }
+/* Label size from the wedge: up to 22 units, hidden below 9 (the tooltip
+   still carries the id). A short id with a trailing letter (201A) stacks the
+   letter on a second line when that renders larger. Returns {font, lines}. */
 function seatmapLabelFont(label, geom) {
-  var font = Math.min(22, geom.arc * 0.34, geom.depth * 0.45);
-  var width = Math.max(1, label.length) * 0.62;
-  font = Math.min(font, (geom.arc * 0.96) / width);
-  return font >= 9 ? Math.round(font * 2) / 2 : 0;
+  function fit(text, cap) {
+    return Math.min(22, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
+  }
+  var single = fit(label, geom.arc * 0.34), stacked = /^(\d{1,4})([A-Za-z])$/.exec(label);
+  if (stacked && single < 17) {
+    var two = Math.min(fit(stacked[1], geom.arc * 0.55), geom.depth * 0.22);
+    if (two > single && two >= 9) return { font: Math.round(two * 2) / 2, lines: [stacked[1], stacked[2]] };
+  }
+  return { font: single >= 9 ? Math.round(single * 2) / 2 : 0, lines: [label] };
 }
 /* Per-section fill intensity for the mode, totals, legend entries and the
    highlight set. Prices and revenue are "where price known": a section without
@@ -364,9 +375,11 @@ function seatmapModel(panel, state) {
   });
   var maxPrice = 0, maxRevenue = 0, zones = {}, zoneOrder = [];
   var sections = decl.map(function (s) {
-    var soldN = seatmapCount(sold[s.id]) && sold[s.id] <= s.capacity ? sold[s.id] : 0;
-    var hold = seatmapHeldOk(held[s.id], s.capacity) ? {
-      count: held[s.id].count, label: typeof held[s.id].label === 'string' ? held[s.id].label : '', until: typeof held[s.id].until === 'string' ? held[s.id].until : '',
+    /* Maps may carry ids and counts from an earlier declaration: ids absent
+       here are simply not drawn and counts clamp to this capacity. */
+    var soldN = seatmapCount(sold[s.id]) ? Math.min(sold[s.id], s.capacity) : 0;
+    var hold = seatmapHeldOk(held[s.id], Number.MAX_SAFE_INTEGER) ? {
+      count: Math.min(held[s.id].count, s.capacity), label: typeof held[s.id].label === 'string' ? held[s.id].label : '', until: typeof held[s.id].until === 'string' ? held[s.id].until : '',
     } : null;
     var p = isFiniteNum(price[s.id]) && price[s.id] >= 0 ? price[s.id] : null;
     var tierId = typeof tierOf[s.id] === 'string' && tiers.some(function (t) { return t.id === tierOf[s.id]; }) ? tierOf[s.id] : s.tier;
@@ -380,7 +393,7 @@ function seatmapModel(panel, state) {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
       sold: soldN, held: hold, price: p, revenue: revenue, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
-      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom), intensity: 0, known: true,
+      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
       kind: s.kind, range: bowl ? placement[s.id] : null,
     };
   });
@@ -424,7 +437,7 @@ function seatmapModel(panel, state) {
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
     priceRange: prices.length ? { min: Math.min.apply(null, prices), max: Math.max.apply(null, prices) } : null,
     complete: sections.length >= SEATMAP_MIN_SECTIONS, hasHolds: totals.held > 0,
-    geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id; }).join(','),
+    geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id + '@' + s.x + ',' + s.y; }).join(','),
   };
 }
 function seatmapTierPalette(i) {
@@ -461,7 +474,11 @@ function seatmapSectionMarkup(s, model, hid) {
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
-  if (s.font) h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="0.35em">' + esc(s.label) + '</text>';
+  if (s.font) {
+    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '">';
+    if (s.lines.length > 1) h += esc(s.lines[0]) + '<tspan x="' + s.x + '" dy="1.05em">' + esc(s.lines[1]) + '</tspan>'; else h += esc(s.lines[0]);
+    h += '</text>';
+  }
   return h + '</g>';
 }
 function seatmapLegend(model) {

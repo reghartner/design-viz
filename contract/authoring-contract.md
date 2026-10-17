@@ -996,8 +996,10 @@ perspectives" of one timeline). Types:
   `tier` or `revenue`), `highlight` (one section id, an array of ≤ 8 ids, or
   null) and `note`. The four maps merge key by key across steps: a key set to
   `null` forgets that section, a whole field set to `null` clears the map,
-  unknown ids and invalid values warn with their path and are ignored, and
-  `enterOnce` applies for the current step only. Alternate paths fold
+  unknown ids and invalid values warn with their path, and `enterOnce`
+  applies for the current step only. The maps keep well-shaped authored
+  entries; when drawn, ids absent from the declaration are ignored and counts
+  clamp to that section's capacity. Alternate paths fold
   independently from the starting state. Fill intensity is sold ÷ capacity,
   held ÷ capacity, price ÷ top price, sold × price ÷ top section, or the tier
   colour, drawn in the skin accent (`--seatmap-accent`, cyan in aurora, indigo

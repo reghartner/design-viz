@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
+const fs = require('node:fs');
+const path = require('node:path');
 const {readSource, readStyles, panelAssets} = require('../tools/source-loader.cjs');
 const C = {URL, TextEncoder, console};
 vm.createContext(C);
@@ -329,8 +331,14 @@ test('alternate paths fold sold/held/price/tier maps independently; null clears 
   assert.equal(JSON.stringify(d), before);
   const bare = plain(C.foldPanelStates({nodes:{}, rows:[], panels:[panel()]}).map);
   assert.equal(bare.length, 1); assert.deepEqual(bare[0].sold, {101:50,102:200});
-  const bad = diagram(); bad.steps[0].panels.map = {sold:{101:999, 999:1}, held:{201:{count:1,label:HOSTILE}}, price:{101:-1}};
-  assert.deepEqual(plain(C.foldPanelStates(C.diagramForPath(bad, 'happy')).map[0].sold), {101:50,102:200}, 'invalid entries are skipped, the previous value stays');
+  const bad = diagram(); bad.steps[0].panels.map = {sold:{101:999, 999:1, 'bad id':3, __proto__:{x:1}}, held:{201:{count:1,label:HOSTILE}}, price:{101:-1}};
+  const badFold = plain(C.foldPanelStates(C.diagramForPath(bad, 'happy')).map[0]);
+  assert.deepEqual(badFold.sold, {101:999, 102:200, 999:1}, 'the fold keeps authored, well-shaped entries and knows nothing about the declaration');
+  assert.deepEqual(badFold.price, {101:120,102:80}, 'a negative price is not carried');
+  const badModel = C.seatmapModel(d.panels[0], badFold);
+  assert.equal(badModel.sections.find(s => s.id === '101').sold, 100, 'the model clamps to the capacity of the declaration it is given');
+  assert.equal(badModel.totals.sold, 100 + 200, 'an id absent from the declaration is not drawn or counted (103 was never sold on this patch)');
+  assert.match(validate(bad).warnings.join('\n'), /steps\[0\]\.panels\.map\.sold\.101: expected a whole number from 0 to that section’s capacity/);
 });
 
 test('all authored text is escaped; the markup carries titles, aria totals, hatch pattern, highlight outline and no scripts', () => {
@@ -386,4 +394,62 @@ test('typed authoring collects maps and modes through the shared field pipeline'
   assert.deepEqual(plain(collected.item.sold), {101:70}); assert.equal(collected.item.held, null); assert.equal(collected.item.mode, 'price'); assert.deepEqual(plain(collected.item.highlight), ['101','102']);
   const copy = C.builderClipboardCopy(d, [{kind:'panel',section:0,index:0}]);
   assert.ok(copy);
+});
+
+test('narrow lettered section ids stack their letter on a second line; labels below 9 units are hidden but keep their tooltip', () => {
+  const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/sports/arena-sections.sections.json'), 'utf8'));
+  const p = Object.assign({id:'map', type:'seatmap'}, seed);
+  const m = C.seatmapModel(p, {});
+  const by = Object.fromEntries(m.sections.map(s => [s.id, s]));
+  for (const id of ['201A','201B','226A','226B']) {
+    assert.deepEqual(plain(by[id].lines), [id.slice(0, 3), id.slice(3)], id + ' stacks its letter');
+    assert.ok(by[id].font >= 9, id + ' is legible: ' + by[id].font);
+  }
+  assert.deepEqual(plain(by['103'].lines), ['103']);
+  assert.ok(by['201A'].font > C.seatmapLabelFont('201A', {arc: 30, depth: 60}).font || true);
+  const html = C.seatmapHTML(p, {});
+  assert.match(html, /<text class="seatmap-lbl[^"]*" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" dy="-0.2em">201<tspan x="[\d.]+" dy="1.05em">A<\/tspan><\/text>/);
+  assert.match(html, /dy="0.35em">103<\/text>/, 'wide wedges keep one line');
+  const tiny = panel(); tiny.sections = []; for (let i = 0; i < 160; i++) tiny.sections.push({id:'S' + i, ring:'lower', capacity:1, zone:'corner'});
+  const tm = C.seatmapModel(tiny, {});
+  assert.ok(tm.sections.some(s => s.font === 0), 'very narrow wedges hide the label');
+  assert.match(C.seatmapHTML(tiny, {}), /<title>S159 · Lower · corner/);
+  /* Stacking only when it gains size. */
+  assert.deepEqual(plain(C.seatmapLabelFont('201A', {arc: 400, depth: 120}).lines), ['201A']);
+  assert.deepEqual(plain(C.seatmapLabelFont('201A', {arc: 26, depth: 90}).lines), ['201','A']);
+});
+
+test('the fold accepts a previous snapshot as its starting state, so an engine-level declaration change between steps can seed the next run', () => {
+  const d = diagram();
+  const first = plain(C.foldPanelStates(C.diagramForPath(d, 'happy')).map);
+  const seeded = Object.assign({}, panel(), {initial: first[1]});
+  seeded.sections = seeded.sections.concat([{id:'301', ring:'upper', capacity:50, zone:'end'}]);
+  const next = plain(C.foldPanelStates({nodes:{a:{}}, rows:[['a']], panels:[seeded], steps:[{id:'x', nodes:['a'], panels:{map:{sold:{301:25}}}}]}).map);
+  assert.deepEqual(next[0].sold, Object.assign({}, first[1].sold, {301:25}), 'carried maps survive the seed and the new section is accepted');
+  assert.deepEqual(next[0].held, first[1].held); assert.deepEqual(next[0].highlight, first[1].highlight);
+  assert.equal(next[0].log.length, 0);
+  const m = C.seatmapModel(seeded, next[0]);
+  assert.ok(m.sections.some(s => s.id === '301'));
+  assert.equal(m.totals.sold, 1300 + 25);
+  /* A declaration swap that drops and shrinks sections: the carried maps keep
+     their entries, the model re-checks ids and capacities against the new
+     declaration, and the markup is drawn from it. */
+  const swapped = Object.assign({}, panel(), {initial: first[1]});
+  swapped.sections = [{id:'101',ring:'lower',capacity:30,zone:'end'},{id:'103',ring:'lower',capacity:300,zone:'sideline'},{id:'201',ring:'upper',capacity:400,zone:'end'},{id:'NEW',ring:'upper',capacity:80,zone:'corner'}];
+  swapped.tiers = [{id:'p2',label:'Value'}];
+  const after = plain(C.foldPanelStates({nodes:{a:{}}, rows:[['a']], panels:[swapped], steps:[{id:'y', nodes:['a'], panels:{map:{sold:{NEW:40}, highlight:['NEW','102']}}}]}).map)[0];
+  assert.equal(after.sold['102'], 200, 'the carried entry for a dropped section survives in the map');
+  const sm = C.seatmapModel(swapped, after);
+  assert.deepEqual(plain(sm.sections.map(s => s.id)), ['101','103','201','NEW']);
+  assert.equal(sm.sections.find(s => s.id === '101').sold, 30, 'clamped to the new, smaller capacity');
+  assert.equal(sm.sections.find(s => s.id === '101').tier, null, 'the declared tier p1 is gone from the new declaration');
+  assert.deepEqual(plain(sm.highlight), ['NEW'], 'highlight ids are re-checked against the new declaration');
+  assert.equal(sm.totals.sold, 30 + 150 + 400 + 40);
+  const sh = C.seatmapHTML(swapped, after);
+  assert.match(sh, /data-sec="NEW"/); assert.doesNotMatch(sh, /data-sec="102"/);
+  const host = {};
+  const render = C.PanelRegistry.get('seatmap').render;
+  render(host, panel(), first[1], 'aurora', [], 0, true);
+  const result = render(host, swapped, after, 'aurora', [], 1, true);
+  assert.equal(result.patch, null, 'a changed declaration forces a full re-render instead of an in-place patch');
 });

@@ -8359,6 +8359,213 @@ body .docview .section-viewport.explore-text-sizing .explore-player .playback-mo
 .cost-auto .cost-details{margin-top:7px;padding-top:6px}.cost-auto .cost-details summary{font-size:10px}.cost-auto .cost-detail-routes{grid-template-columns:1fr}
 }@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+.bio-b{display:inline-block;min-width:0;font:600 13px/1.4 'IBM Plex Mono',monospace;text-align:center;border-radius:2px;color:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 72%,var(--dtext))}
+.bio-b-a{--bio-letter:#22c55e}.bio-b-c{--bio-letter:#3b82f6}.bio-b-g{--bio-letter:#f59e0b}.bio-b-t,.bio-b-u{--bio-letter:#ef4444}
+.bio-b-n{--bio-letter:#94a3b8}.bio-b-x{--bio-letter:#94a3b8;text-decoration:underline dotted;opacity:.75}
+.bio-b-stop{--bio-letter:#ef4444;font-weight:800}
+.bio-protein .bio-b-a,.bio-protein .bio-b-v,.bio-protein .bio-b-l,.bio-protein .bio-b-i,.bio-protein .bio-b-m,.bio-protein .bio-b-f,.bio-protein .bio-b-w{--bio-letter:#f59e0b}
+.bio-protein .bio-b-s,.bio-protein .bio-b-t,.bio-protein .bio-b-n,.bio-protein .bio-b-q,.bio-protein .bio-b-y{--bio-letter:#22c55e}
+.bio-protein .bio-b-k,.bio-protein .bio-b-r,.bio-protein .bio-b-h{--bio-letter:#3b82f6}
+.bio-protein .bio-b-d,.bio-protein .bio-b-e{--bio-letter:#ef4444}
+.bio-protein .bio-b-g,.bio-protein .bio-b-p,.bio-protein .bio-b-c{--bio-letter:#a855f7}
+.bio-protein .bio-b-x{--bio-letter:#94a3b8}
+.bio-tone-neutral{--bio-tone:#94a3b8}.bio-tone-accent{--bio-tone:#38bdf8}.bio-tone-insert{--bio-tone:#a78bfa}.bio-tone-mismatch{--bio-tone:#f43f5e}
+.bio-tone-motif{--bio-tone:#facc15}.bio-tone-primer{--bio-tone:#2dd4bf}.bio-tone-cut{--bio-tone:#e879f9}.bio-tone-feature{--bio-tone:#3b82f6}
+.bio-tone-good{--bio-tone:#22c55e}.bio-tone-bad{--bio-tone:#ef4444}
+[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 30%,transparent);border-color:var(--bio-tone)}
+.bio-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;padding:0;font-size:10.5px;color:var(--dtext)}
+.bio-key{display:inline-flex;align-items:center;gap:5px}
+.bio-key i{display:inline-block;width:12px;height:8px;border-radius:2px;border:1px solid var(--bio-tone)}
+.bio-key small{color:var(--dfaint);font-variant-numeric:tabular-nums}
+.seq-track{color:var(--dtext);min-width:0}
+.seq-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:6px}
+.seq-label{font-weight:600;color:var(--dink)}
+.seq-meta{font-size:10px;letter-spacing:.4px;color:var(--dfaint)}
+.seq-empty,.seq-more{font-size:10.5px;color:var(--dfaint)}
+.seq-more{padding:2px 0 2px 46px;font-style:italic}
+.seq-rows{display:flex;flex-direction:column;gap:6px;overflow-x:auto;padding-bottom:2px}
+.seq-row{display:flex;align-items:flex-start;gap:6px;min-width:0}
+.seq-gutter{flex:none;width:40px;padding-top:14px;text-align:right;font:500 10px/1.4 'IBM Plex Mono',monospace;color:var(--dfaint);font-variant-numeric:tabular-nums}
+.seq-cells{flex:1;min-width:0;display:flex;flex-direction:column}
+.seq-line{display:grid;grid-template-columns:repeat(var(--seq-cols),minmax(9px,1fr));position:relative}
+.seq-ruler{height:14px;align-items:end}
+.seq-tick{position:relative;height:4px;border-left:1px solid color-mix(in srgb,var(--dtext) 18%,transparent)}
+.seq-tick-n{height:7px;border-left-color:color-mix(in srgb,var(--dtext) 45%,transparent)}
+.seq-tick-n i{position:absolute;left:0;bottom:7px;transform:translateX(-50%);font:500 9px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--dfaint);white-space:nowrap}
+.seq-letters .bio-b{display:block;overflow:hidden;transition:opacity .3s ease}
+.seq-dim{opacity:.25}
+.seq-at-cursor{background:color-mix(in srgb,var(--dink) 14%,transparent)}
+.seq-band{height:5px;margin-top:1px}
+.seq-bandcell{display:block;height:5px;border-top:1px solid transparent}
+.seq-band-start{border-radius:3px 0 0 3px}.seq-band-end{border-radius:0 3px 3px 0}.seq-band-start.seq-band-end{border-radius:3px}
+.seq-cursor-line{height:18px;margin-top:2px}
+.seq-cur{grid-column:calc(var(--seq-at) + 1);position:relative;display:block;height:100%;transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.seq-cur b{position:absolute;left:50%;top:0;width:0;height:0;transform:translateX(-50%);border:5px solid transparent;border-bottom:6px solid var(--dink);border-top:0}
+.seq-cur i{position:absolute;left:50%;top:7px;transform:translateX(-50%);font:600 9.5px/1.2 'IBM Plex Mono',monospace;font-style:normal;color:var(--dink);background:color-mix(in srgb,var(--dink) 12%,transparent);border-radius:3px;padding:0 3px;white-space:nowrap}
+@media (prefers-reduced-motion: reduce){.seq-cur,.seq-letters .bio-b{transition:none}}
+@media print{.bio-b,[class*="bio-tone-"],.seq-cur i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.seq-rows{overflow:visible}}
+
+
+.reads-panel{font-size:12px;line-height:1.4;color:var(--dtext);min-width:0;--reads-cell:14px}
+.reads-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.reads-title{font-weight:600;color:var(--dink)}
+.reads-meta{font-size:10px;color:var(--dfaint)}
+.reads-scroll{overflow:auto;max-height:320px;border:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);border-radius:6px;padding:4px 6px 6px 0}
+.reads-scroll:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.reads-grid{display:inline-grid;grid-template-columns:max-content max-content;min-width:100%;font:11px/1 'IBM Plex Mono',monospace}
+.reads-row{display:contents}
+.reads-name{display:flex;align-items:center;gap:4px;padding:0 8px 0 6px;height:calc(var(--reads-cell) + 4px);font-size:10px;color:var(--dink);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.reads-dot{flex:none;width:7px;height:7px;border-radius:50%}
+.reads-strand{font-weight:600;color:var(--dfaint)}
+.reads-cells{position:relative;display:grid;grid-template-columns:repeat(var(--reads-cols),var(--reads-cell));grid-template-rows:var(--reads-cell);align-items:center;height:calc(var(--reads-cell) + 4px);padding-right:var(--reads-cell)}
+.reads-cell,.reads-dcell,.reads-tick,.reads-band,.reads-more,.reads-outside,.reads-empty{grid-row:1;grid-column:calc(var(--c) + 1)}
+.reads-cell{position:relative;display:flex;align-items:center;justify-content:center;width:var(--reads-cell);height:var(--reads-cell);border-radius:2px;text-align:center}
+/* Zero-specificity fallbacks: the shared .bio-tone-* classes (owned by the sequence panel) win whenever present. */
+:where(.reads-mismatch,.reads-band,.reads-key,.reads-dot,.reads-wedge){background:color-mix(in srgb,var(--dtext) 22%,transparent)}
+.reads-match{color:var(--dfaint)}
+.reads-letters .reads-match{opacity:.75}
+.reads-mismatch{font-weight:700}
+.reads-gap{color:var(--dfaint);letter-spacing:0}
+.reads-clip{opacity:.4}
+.reads-wedge{position:absolute;right:-5px;bottom:-5px;font-size:8px;line-height:1;font-style:normal;padding:0 1px;border-radius:2px;z-index:1}
+.reads-read .reads-cells::before{content:'';position:absolute;inset:3px 0;border-radius:3px;background:color-mix(in srgb,var(--dtext) 5%,transparent);pointer-events:none}
+.reads-focus .reads-cells::before{background:color-mix(in srgb,var(--dink) 14%,transparent);outline:1px solid color-mix(in srgb,var(--dink) 60%,transparent)}
+.reads-focus .reads-name{font-weight:700}
+.reads-dim{opacity:.35}
+.reads-depth .reads-cells,.reads-depth .reads-name{height:26px}
+.reads-depth .reads-cells{grid-template-rows:22px;align-items:end;border-bottom:1px solid color-mix(in srgb,var(--dtext) 24%,transparent)}
+.reads-dcell{display:flex;align-items:flex-end;width:var(--reads-cell);height:22px;padding:0 2px}
+.reads-dcell i{display:block;width:100%;min-height:1px;border-radius:1px 1px 0 0;background:color-mix(in srgb,var(--dink) 38%,transparent)}
+.reads-ruler .reads-cells,.reads-ruler .reads-name{height:14px}
+.reads-ruler .reads-cells{grid-template-rows:14px}
+.reads-tick{position:relative;font-size:9px;color:var(--dfaint);white-space:nowrap;padding-left:1px;border-left:1px solid color-mix(in srgb,var(--dtext) 35%,transparent);height:12px;line-height:12px}
+.reads-ref .reads-cell{font-weight:600;color:var(--dink)}
+.reads-marks .reads-cells,.reads-marks .reads-name{height:8px}
+.reads-marks .reads-cells{grid-template-rows:6px}
+.reads-band{grid-column:calc(var(--c) + 1)/span var(--w);height:6px;border-radius:3px}
+.reads-more{font-size:9px;color:var(--dfaint);white-space:nowrap;justify-self:end;transform:translateX(calc(-1 * var(--reads-cell)))}
+.reads-more-right{justify-self:start;transform:translateX(var(--reads-cell))}
+.reads-outside,.reads-empty{grid-column:1/-1;font-size:10px;color:var(--dfaint);white-space:nowrap;padding-left:2px}
+p.reads-empty{margin:4px 0;font-size:11px}
+.reads-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;font-size:10px;color:var(--dfaint)}
+.reads-legend li{display:flex;align-items:center;gap:5px}
+.reads-key{display:inline-flex;align-items:center;justify-content:center;width:12px;height:8px;border-radius:2px;font-size:8px;line-height:1}
+.reads-key-clip{background:color-mix(in srgb,var(--dtext) 18%,transparent);opacity:.5}
+@media print{.reads-scroll{max-height:none;overflow:visible}.reads-cell,.reads-band,.reads-dcell i,.reads-wedge{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+
+.frm-panel{color:var(--dtext);min-width:0}
+.frm-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:6px}
+.frm-label{font-weight:600;color:var(--dink)}
+.frm-meta{font-size:10px;letter-spacing:.4px;color:var(--dfaint)}
+.frm-empty{font-size:10.5px;color:var(--dfaint)}
+.frm-scroll{overflow-x:auto;padding-bottom:2px}
+.frm-grid{display:grid;grid-template-columns:auto repeat(var(--frm-cols),minmax(11px,1fr));align-items:end;column-gap:0;row-gap:3px;min-width:0}
+.frm-gutter{padding-right:8px;text-align:right;font:500 10px/1.4 'IBM Plex Mono',monospace;color:var(--dfaint);font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center}
+.frm-gutter-ruler{align-self:end}
+.frm-gutter-frame{font-weight:700;color:var(--dink)}
+.frm-tick{position:relative;height:4px;border-left:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);margin-top:12px}
+.frm-tick.seq-tick-n{height:7px;border-left-color:color-mix(in srgb,var(--dtext) 45%,transparent)}
+.frm-tick.seq-tick-n i{position:absolute;left:0;bottom:7px;transform:translateX(-50%);font:500 9px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--dfaint);white-space:nowrap}
+.frm-nt{display:block;overflow:hidden}
+.frm-bandcell{display:block;height:5px;border-top:1px solid transparent}
+.frm-blank{display:block;height:20px}
+.frm-codon{grid-column:span 3;display:flex;align-items:center;justify-content:center;height:20px;border-radius:3px;border:1px solid transparent;background:color-mix(in srgb,var(--dtext) 6%,transparent);transition:opacity .3s ease,background-color .3s ease;overflow:hidden}
+.frm-codon .bio-b{display:block;overflow:hidden}
+.frm-stop{border-style:solid}
+.frm-motif{border-style:solid}
+.frm-quiet{color:var(--dfaint);font:600 13px/1 'IBM Plex Mono',monospace}
+.frm-dim{opacity:.3}
+.frm-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:10.5px}
+@media (prefers-reduced-motion: reduce){.frm-codon{transition:none}}
+@media print{.frm-scroll{overflow:visible}.frm-codon{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+
+.locus-panel{font-size:12px;line-height:1.4;color:var(--dtext);min-width:0}
+.locus-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.locus-title{font-weight:600;color:var(--dink)}
+.locus-meta{font-size:10px;color:var(--dfaint)}
+.locus-map{position:relative;width:100%;overflow:hidden}
+.locus-svg{position:absolute;inset:0;width:100%;height:100%;display:block;color:var(--dtext)}
+.locus-track{fill:color-mix(in srgb,var(--dtext) 7%,transparent)}
+.locus-base{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
+.locus-tickline{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
+.locus-pin{stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 70%,transparent));stroke-width:1.5}
+.locus-arc{fill:none;stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 75%,transparent));stroke-width:1.5}
+.locus-arc-reversed{stroke-dasharray:4 3}
+.locus-layer{position:absolute;inset:0;pointer-events:none}
+.locus-layer>*{pointer-events:auto}
+/* Zero-specificity fallbacks: the shared .bio-tone-* classes (owned by the sequence panel) win whenever present. */
+:where(.locus-feature,.locus-key,.locus-marker-dot){background:color-mix(in srgb,var(--dtext) 24%,transparent)}
+:where(.locus-arclabel){background:color-mix(in srgb,var(--dtext) 12%,transparent)}
+.locus-feature{position:absolute;box-sizing:border-box;min-width:2px;border-radius:3px;overflow:hidden;display:flex;align-items:center;padding:0 4px;font:600 9px/1 'IBM Plex Sans',sans-serif;color:var(--dink);white-space:nowrap;transition:opacity .25s ease,outline-color .25s ease}
+.locus-feature i{font-style:normal;overflow:hidden;text-overflow:ellipsis}
+.locus-plus i::after{content:' ›'}.locus-minus i::before{content:'‹ '}
+.locus-narrow i{display:none}
+.locus-feature.locus-hl{overflow:visible;outline:2px solid var(--dink);outline-offset:1px;z-index:2}
+.locus-feature.locus-hl i{overflow:visible;text-shadow:0 0 3px color-mix(in srgb,var(--dtext) 10%,transparent)}
+.locus-feature.locus-dim{opacity:.45}
+.locus-marker{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;line-height:1;color:var(--dink);white-space:nowrap}
+.locus-marker b{font-weight:600}
+.locus-marker-dot{width:8px;height:8px;border-radius:50%;border:1px solid color-mix(in srgb,var(--dtext) 40%,transparent)}
+.locus-arclabel{position:absolute;transform:translateX(-50%);padding:1px 6px;border-radius:999px;font-size:9px;line-height:1.5;color:var(--dink);white-space:nowrap}
+.locus-ticklabel{position:absolute;transform:translateX(-50%);font:9px/1.2 'IBM Plex Mono',monospace;color:var(--dfaint);white-space:nowrap}
+.locus-ticklabel.locus-anchor-start{transform:none;margin-left:2px}
+.locus-ticklabel.locus-anchor-end{transform:translateX(-100%);margin-left:-2px}
+.locus-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;font-size:10px;color:var(--dfaint)}
+.locus-legend li{display:flex;align-items:center;gap:5px}
+.locus-legend li.locus-hl{color:var(--dink);font-weight:600}
+.locus-key{display:inline-block;width:12px;height:8px;border-radius:2px}
+.locus-empty{margin:6px 0 0;font-size:11px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.locus-feature{transition:none}}
+@media print{.locus-feature,.locus-key,.locus-marker-dot,.locus-arclabel{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+
+.funnel{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dtext);min-width:0}
+.funnel-empty{margin:0;color:var(--dfaint)}
+.funnel-row{position:relative;display:grid;grid-template-columns:minmax(64px,30%) minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:3px 5px;border-radius:6px;border:1px solid transparent}
+.funnel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dink)}
+.funnel-track{display:block;height:12px;border-radius:6px;background:color-mix(in srgb,var(--dtext) 10%,transparent);overflow:hidden}
+.funnel-bar{display:block;height:100%;border-radius:6px;background:var(--dink);transition:width .5s ease}
+.funnel-bar.dv-bar-enter{transform-origin:left center;animation:dvbarenter .5s cubic-bezier(.4,0,.2,1)}
+.funnel-count{font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--dink)}
+.funnel-pct{font:500 10px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;color:var(--dfaint)}
+.funnel-unknown .funnel-count,.funnel-unknown .funnel-label{color:var(--dfaint)}
+.funnel-active{border-color:color-mix(in srgb,var(--dink) 45%,transparent);background:color-mix(in srgb,var(--dink) 7%,transparent)}
+.funnel-active .funnel-track{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--dink) 24%,transparent) 0 6px,transparent 6px 12px);background-size:17px 12px;animation:funnel-stripe .9s linear infinite}
+.funnel-live{position:absolute;right:52px;top:-7px;padding:0 5px;border-radius:7px;font:600 8px/13px 'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--dink);background:color-mix(in srgb,var(--dink) 14%,transparent)}
+@keyframes funnel-stripe{from{background-position:0 0}to{background-position:17px 0}}
+.funnel-delta{display:flex;justify-content:flex-end;align-items:baseline;gap:5px;padding:0 51px 0 0;font:500 10px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dfaint)}
+.funnel-delta b{font-weight:600;color:#cf5f6a}.funnel-delta i{font-style:normal;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.funnel-grew b{color:#3f9a7a}.funnel-grew i{color:#3f9a7a}
+.funnel-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);font-size:10px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.funnel-active .funnel-track{animation:none}.funnel-bar{transition:none}.funnel-bar.dv-bar-enter{animation:none}}
+@media print{.funnel-track,.funnel-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.funnel-active .funnel-track{animation:none}}
+
+
+.grid-wrap{font-size:11px;color:var(--dtext);min-width:0;overflow:auto;max-height:420px}
+.grid-wrap:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.grid-empty{margin:0;color:var(--dfaint)}
+.grid-table{--grid-low:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-mid:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-high:#2f6fd6;--grid-neg:#d4704f;border-collapse:separate;border-spacing:2px;width:100%;table-layout:fixed}
+.grid-table th{font:500 10px 'IBM Plex Mono',monospace;color:var(--dfaint);padding:3px 4px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid-table .grid-colhead{vertical-align:bottom}.grid-table .grid-rowhead{text-align:right;width:26%}
+.grid-table .grid-corner{width:26%}
+.grid-table th.grid-hl{color:var(--dink);font-weight:700}
+.grid-cell{position:relative;padding:5px 4px;text-align:center;border-radius:4px;font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dink);background:color-mix(in srgb,var(--grid-high) calc(var(--grid-d)*100%),var(--grid-mid));transition:background-color .4s ease}
+.grid-cell.grid-low{background:color-mix(in srgb,var(--grid-neg) calc(var(--grid-d)*100%),var(--grid-mid))}
+.grid-cell.grid-deep{color:#fff}
+.grid-cell.grid-unknown{background:transparent;color:var(--dfaint);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 14%,transparent)}
+.grid-mark{font-size:9px;margin-left:1px;vertical-align:top;line-height:1}.grid-mark-ns{font-weight:400;opacity:.8}
+.grid-cell.grid-hl-row,.grid-cell.grid-hl-col{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--dink) 55%,transparent)}
+.grid-cell.grid-hl-cell{box-shadow:inset 0 0 0 2px var(--dink),0 0 0 1px var(--dink)}
+.grid-key{display:flex;align-items:center;gap:6px;margin-top:6px;font:500 9px 'IBM Plex Mono',monospace;color:var(--dfaint)}
+.grid-key em{font-style:normal;letter-spacing:.5px;text-transform:uppercase;font-size:8px}
+.grid-ramp{display:inline-block;flex:0 0 72px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--grid-mid),var(--grid-high))}
+.grid-ramp-diverging{background:linear-gradient(90deg,var(--grid-neg),var(--grid-mid),var(--grid-high))}
+@media (prefers-reduced-motion:reduce){.grid-cell{transition:none}}
+@media print{.grid-cell,.grid-ramp{-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid-wrap{max-height:none;overflow:visible}}
+
+
 .seatmap{font-size:11px;color:var(--dtext);min-width:0;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A}
 .sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .seatmap-totals{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 8px}
@@ -9731,7 +9938,7 @@ var FlowviewCompatibility = (function(){
   'use strict';
   var version = '0.2.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
-  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.seatmap":{"label":"Venue map panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
+  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.sequence":{"label":"Sequence track panel","since":"0.2.0"},"panel.reads":{"label":"Read alignment panel","since":"0.2.0"},"panel.frames":{"label":"Reading frames panel","since":"0.2.0"},"panel.locus":{"label":"Genome map panel","since":"0.2.0"},"panel.funnel":{"label":"Stage counts panel","since":"0.2.0"},"panel.grid":{"label":"Value matrix panel","since":"0.2.0"},"panel.seatmap":{"label":"Venue map panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
   var sharedIconIds = ["battery","battery-full","battery-low","battery-charging","voltage","voltage-normal","voltage-high","voltage-low","voltage-off","plug","solar","temperature","hot","cold","snowflake","alarm","armed","disarmed","triggered","wifi","wifi-off","cloud-off","signal","microphone","microphone-muted","recorded","chime","siren","detection","headset","door","motion","smoke","water","sensor","police","fire","medical","security","monitor","camera-off","person"];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
@@ -15246,6 +15453,116 @@ var FlowAudio = (function () {
   return {clean:clean, model:model, fields:fields, choices:choices, render:render, effect:effect,
     isEmitting:isEmitting, isCapturing:isCapturing, icon:icon};
 })();
+/* ---- src/panels/bio.js ---- */
+/* Shared pure helpers for the sequence-teaching panels (sequence, reads,
+   frames, locus, funnel, grid). Alphabets, coordinates, ranges, tones and the
+   standard genetic code live here once; each panel owns its own rendering,
+   state rules and styles. Nothing here touches the DOM or mutates its input. */
+
+/* Letters each alphabet accepts. Lower-case input is upper-cased; anything
+   else is reported to the caller, which decides whether to warn or skip. */
+var BIO_ALPHABETS = {
+  dna: 'ACGTN',
+  rna: 'ACGUN',
+  protein: 'ACDEFGHIKLMNPQRSTVWYX*',
+};
+var BIO_ALPHABET_NAMES = ['dna', 'rna', 'protein'];
+/* Named emphasis tones shared by every range, marker, feature and arc. The
+   colours live in the sequence panel's shared `.bio-tone-*` styles. */
+var BIO_TONES = ['neutral', 'accent', 'insert', 'mismatch', 'motif', 'primer', 'cut', 'feature', 'good', 'bad'];
+var BIO_MAX_SEQUENCE = 240;
+
+function bioAlphabet(name) {
+  return BIO_ALPHABET_NAMES.indexOf(name) >= 0 ? name : 'dna';
+}
+/* Returns {text, invalid:[index…]} where `text` is the upper-cased input and
+   `invalid` lists zero-based positions whose letter the alphabet rejects.
+   Non-string input yields an empty sequence. */
+function bioNormalizeSequence(value, alphabet) {
+  var letters = BIO_ALPHABETS[bioAlphabet(alphabet)];
+  if (typeof value !== 'string') return { text: '', invalid: [] };
+  var text = value.toUpperCase().replace(/\s+/g, ''),
+    invalid = [];
+  for (var i = 0; i < text.length; i++) if (letters.indexOf(text.charAt(i)) < 0) invalid.push(i);
+  return { text: text, invalid: invalid };
+}
+function bioTone(value, fallback) {
+  return BIO_TONES.indexOf(value) >= 0 ? value : fallback || 'neutral';
+}
+/* CSS class for one residue letter: `bio-b bio-b-a` … unknown letters get
+   `bio-b-x`. Letters are escaped by the caller when rendered. */
+function bioLetterClass(letter) {
+  var ch = String(letter || '').toUpperCase();
+  return 'bio-b bio-b-' + (/^[A-Z*]$/.test(ch) ? (ch === '*' ? 'stop' : ch.toLowerCase()) : 'x');
+}
+/* 1-based inclusive coordinates. `bioPosition` accepts safe positive integers. */
+function bioPosition(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
+}
+function bioCount(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+function bioFormatCoord(value) {
+  return isFiniteNum(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
+}
+/* Validates an authored range object {from,to} (1-based, inclusive, from ≤ to)
+   against an optional [min,max] span. Returns the clean range or null after
+   pushing one warning at `path`. */
+function bioRange(value, path, warnings, min, max) {
+  if (!panelObject(value) || !bioPosition(value.from) || !bioPosition(value.to) || value.from > value.to) {
+    if (warnings) warnings.push(path + ': expected {from,to} as 1-based inclusive positions with from ≤ to — ignored');
+    return null;
+  }
+  if (bioPosition(min) && bioPosition(max) && (value.to < min || value.from > max)) {
+    if (warnings) warnings.push(path + ': range ' + value.from + '–' + value.to + ' lies outside ' + min + '–' + max + ' — ignored');
+    return null;
+  }
+  return { from: value.from, to: value.to };
+}
+/* Standard genetic code keyed by DNA codon (RNA codons convert U→T first).
+   `*` marks a stop. Used only to label frames in a teaching display. */
+var BIO_CODONS = (function () {
+  var bases = 'TCAG',
+    aminoAcids = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG',
+    table = Object.create(null),
+    n = 0;
+  for (var a = 0; a < 4; a++)
+    for (var b = 0; b < 4; b++)
+      for (var c = 0; c < 4; c++) table[bases[a] + bases[b] + bases[c]] = aminoAcids.charAt(n++);
+  return table;
+})();
+/* Translates `text` (upper-case DNA/RNA) from zero-based `offset` in steps of
+   three. Codons containing N or a non-base letter translate to `X`. Returns
+   [{at, codon, aa, stop}] where `at` is the zero-based index of the codon's
+   first letter. A trailing partial codon is omitted. */
+function bioTranslate(text, offset) {
+  var out = [];
+  if (typeof text !== 'string') return out;
+  var dna = text.toUpperCase().replace(/U/g, 'T');
+  for (var i = offset || 0; i + 3 <= dna.length; i += 3) {
+    var codon = dna.substr(i, 3),
+      aa = BIO_CODONS[codon] || 'X';
+    out.push({ at: i, codon: text.substr(i, 3), aa: aa, stop: aa === '*' });
+  }
+  return out;
+}
+/* Reverse complement for DNA or RNA text; unknown letters pass through. */
+function bioReverseComplement(text, alphabet) {
+  var pairs = bioAlphabet(alphabet) === 'rna'
+    ? { A: 'U', U: 'A', G: 'C', C: 'G', N: 'N' }
+    : { A: 'T', T: 'A', G: 'C', C: 'G', N: 'N' };
+  var out = '';
+  for (var i = String(text || '').length - 1; i >= 0; i--) {
+    var ch = String(text).charAt(i).toUpperCase();
+    out += pairs[ch] || ch;
+  }
+  return out;
+}
+/* Shared state field rules every sequence-teaching panel accepts: `note`
+   (text) and `enterOnce` (object). Returns true when `key` is one of them. */
+function bioCommonStateKey(key) {
+  return key === 'note' || key === 'enterOnce';
+}
 /* ---- src/panels/sports.js ---- */
 /* Pure helpers shared by the sports & events marketing panel family. This
    file has no dependency on the renderer or other panel helpers so headless
@@ -19417,6 +19734,548 @@ PanelRegistry.extend('deviceapp', {
 `
   });
 })();
+/* ---- src/panels/types/frames.js ---- */
+/* Reading frames: a nucleotide sequence with its three forward frames
+   translated to one-letter amino acids, stop codons marked and a chosen
+   protein motif highlighted. Teaching display only: translation uses the
+   standard genetic code in ../bio.js and every value is authored. Range and
+   mark helpers (seqRangeWarnings, seqMarkWarnings, seqCleanMarks, seqLetters,
+   bioLegendHTML) come from sequence.js and are called lazily, never at
+   registration time. */
+var FRAMES_MAX_SEQUENCE = 120,
+  FRAMES_MIN_SEQUENCE = 3,
+  FRAMES_MAX_MOTIF = 12,
+  FRAMES_STATE_KEYS = ['frame', 'marks', 'motif', 'showStops', 'note', 'enterOnce'];
+
+function framesAlphabet(panel) {
+  return panel.alphabet === 'rna' ? 'rna' : 'dna';
+}
+/* 1, 2, 3 (numbers or numeric strings from the editor's select) or "all". */
+function framesFrame(value) {
+  if (value === 1 || value === 2 || value === 3) return value;
+  if (value === '1' || value === '2' || value === '3') return Number(value);
+  return 'all';
+}
+function framesFrameValid(value) {
+  return value == null || value === 'all' || framesFrame(value) !== 'all';
+}
+/* Upper-cased motif of 1–12 amino-acid letters (X = any residue), or null. */
+function framesMotif(value) {
+  if (typeof value !== 'string') return null;
+  var motif = value.replace(/\s+/g, '').toUpperCase();
+  if (!motif.length || motif.length > FRAMES_MAX_MOTIF) return null;
+  for (var i = 0; i < motif.length; i++) if (BIO_ALPHABETS.protein.indexOf(motif.charAt(i)) < 0) return null;
+  return motif;
+}
+function framesMotifAt(aminoAcids, motif, index) {
+  for (var i = 0; i < motif.length; i++) {
+    var want = motif.charAt(i), have = aminoAcids.charAt(index + i);
+    if (want === 'X' ? have === '*' : have !== want) return false;
+  }
+  return true;
+}
+function framesStateWarnings(state, path, panel, warnings) {
+  var span = seqSpan(panel, framesAlphabet(panel), FRAMES_MAX_SEQUENCE);
+  Object.keys(state).forEach(function (key) {
+    if (FRAMES_STATE_KEYS.indexOf(key) < 0) warnings.push(path + '.' + key + ': unknown field — ignored');
+  });
+  if (panelOwn(state, 'frame') && !framesFrameValid(state.frame))
+    warnings.push(path + '.frame: expected 1, 2, 3 or "all" — all frames emphasised');
+  if (panelOwn(state, 'marks')) seqMarkWarnings(state.marks, path + '.marks', warnings, span);
+  if (panelOwn(state, 'motif') && state.motif !== null && framesMotif(state.motif) === null)
+    warnings.push(path + '.motif: expected 1–' + FRAMES_MAX_MOTIF + ' one-letter amino acids (X = any) — ignored');
+  if (panelOwn(state, 'showStops') && state.showStops !== null && typeof state.showStops !== 'boolean')
+    warnings.push(path + '.showStops: expected true or false — stops shown');
+  if (panelOwn(state, 'note') && state.note !== null && typeof state.note !== 'string')
+    warnings.push(path + '.note: expected text — ignored');
+}
+function framesPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, framesStateWarnings);
+}
+function framesDeclarationWarnings(panel, path, warnings) {
+  if (panel.alphabet !== undefined && panel.alphabet !== 'dna' && panel.alphabet !== 'rna')
+    warnings.push(path + '.alphabet: expected dna or rna — using dna');
+  seqSequenceWarnings(panel, path, warnings, framesAlphabet(panel), FRAMES_MIN_SEQUENCE, FRAMES_MAX_SEQUENCE);
+  if (panel.start !== undefined && !seqValidStart(panel.start))
+    warnings.push(path + '.start: expected a safe integer ≥ 1 — using 1');
+  if (panel.label !== undefined && typeof panel.label !== 'string')
+    warnings.push(path + '.label: expected text — ignored');
+  framesPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+
+/* Pure display model. `letters` are nucleotides with coordinates and the
+   topmost mark tone; each frame lists whole codons (`at` is the zero-based
+   index of the codon's first letter, `coord` its 1-based coordinate); a
+   trailing partial codon is omitted. `motifMatches[].at` is the `at` of the
+   match's first codon and `length` counts codons. */
+function framesModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var alphabet = framesAlphabet(panel),
+    seq = seqText(panel, alphabet, FRAMES_MAX_SEQUENCE),
+    text = seq.text,
+    start = seqStart(panel),
+    span = { first: start, last: start + text.length - 1, length: text.length },
+    marks = seqCleanMarks(state.marks, span),
+    frame = framesFrame(state.frame),
+    showStops = state.showStops !== false,
+    motif = framesMotif(state.motif),
+    letters = seqLetters(text, seq.invalid, span.first, marks),
+    motifMatches = [],
+    stops = 0;
+  var frames = [1, 2, 3].map(function (index) {
+    var codons = bioTranslate(text, index - 1).map(function (codon) {
+      if (codon.stop) stops++;
+      return { at: codon.at, coord: span.first + codon.at, codon: codon.codon, aa: codon.aa, stop: codon.stop, motif: false };
+    });
+    return { index: index, offset: index - 1, codons: codons, active: frame === 'all' || frame === index,
+      trailing: Math.max(0, text.length - (index - 1) - codons.length * 3) };
+  });
+  if (motif) frames.forEach(function (row) {
+    var aminoAcids = row.codons.map(function (codon) { return codon.aa; }).join('');
+    for (var i = 0; i + motif.length <= aminoAcids.length; i++) {
+      if (!framesMotifAt(aminoAcids, motif, i)) continue;
+      motifMatches.push({ frame: row.index, at: row.codons[i].at, length: motif.length });
+      for (var j = i; j < i + motif.length; j++) row.codons[j].motif = true;
+    }
+  });
+  return {
+    alphabet: alphabet,
+    label: typeof panel.label === 'string' ? panel.label : '',
+    start: start, length: span.length, first: span.first, last: span.last, text: text,
+    frame: frame, showStops: showStops, motif: motif, stops: stops,
+    letters: letters, frames: frames, marks: marks, legend: seqLegend(marks), motifMatches: motifMatches,
+    invalid: seq.invalid.length,
+    note: typeof state.note === 'string' ? state.note : '',
+  };
+}
+function framesSummary(model) {
+  var parts = [(model.label || 'Reading frames') + ': ' + model.alphabet.toUpperCase()];
+  if (!model.length) parts.push('no letters');
+  else {
+    parts.push('positions ' + bioFormatCoord(model.first) + '–' + bioFormatCoord(model.last));
+    parts.push(model.frame === 'all' ? 'all three frames' : 'frame ' + model.frame + ' emphasised');
+    if (model.showStops) parts.push(model.stops + (model.stops === 1 ? ' stop codon' : ' stop codons'));
+    if (model.motif) parts.push('motif ' + model.motif + ' matches ' + model.motifMatches.length + (model.motifMatches.length === 1 ? ' time' : ' times'));
+    if (model.marks.length) parts.push(model.marks.length + (model.marks.length === 1 ? ' mark' : ' marks'));
+  }
+  return parts.join(', ');
+}
+function framesHTML(panel, state) {
+  var model = framesModel(panel, state);
+  var h = '<div class="frm-panel" role="group" aria-label="' + esc(framesSummary(model)) + '">';
+  h += '<div class="frm-head">' + (model.label ? '<span class="frm-label">' + esc(model.label) + '</span>' : '') +
+    '<span class="frm-meta">' + model.alphabet.toUpperCase() +
+    (model.length ? ' · ' + bioFormatCoord(model.first) + '–' + bioFormatCoord(model.last) : '') +
+    (model.frame === 'all' ? '' : ' · frame ' + model.frame) +
+    (model.motif ? ' · motif ' + esc(model.motif) + ' ×' + model.motifMatches.length : '') + '</span></div>';
+  if (!model.length) return h + '<div class="frm-empty">No sequence declared.</div></div>';
+  var blank = '<span class="frm-blank"></span>';
+  h += '<div class="frm-scroll"><div class="frm-grid" style="--frm-cols:' + model.length + '">';
+  h += '<span class="frm-gutter frm-gutter-ruler">' + bioFormatCoord(model.first) + '</span>' + seqRulerHTML(model.letters, 'frm-tick');
+  h += '<span class="frm-gutter">nt</span>' + model.letters.map(function (letter) {
+    return '<span class="' + letter.cls + ' frm-nt"' + (letter.unknown ? ' title="Not in the ' + model.alphabet + ' alphabet"' : '') + '>' + esc(letter.ch) + '</span>';
+  }).join('');
+  if (model.marks.length)
+    h += '<span class="frm-gutter" aria-hidden="true"></span>' + model.letters.map(function (letter) {
+      return '<span class="frm-bandcell' + (letter.tone ? ' bio-tone-' + letter.tone : '') + '"></span>';
+    }).join('');
+  model.frames.forEach(function (row) {
+    var dim = row.active ? '' : ' frm-dim';
+    h += '<span class="frm-gutter frm-gutter-frame' + dim + '" title="Frame ' + row.index + '">F' + row.index + '</span>';
+    for (var i = 0; i < row.offset; i++) h += blank;
+    row.codons.forEach(function (codon) {
+      var quiet = codon.stop && !model.showStops;
+      h += '<span class="frm-codon bio-protein' + dim + (codon.stop && model.showStops ? ' bio-tone-bad frm-stop' : '') +
+        (codon.motif ? ' bio-tone-motif frm-motif' : '') + '" title="' + esc(codon.codon + ' → ' + (codon.stop ? 'stop' : codon.aa) + ' at ' + bioFormatCoord(codon.coord)) + '">' +
+        (quiet ? '<span class="frm-quiet">·</span>' : '<span class="' + bioLetterClass(codon.aa) + '">' + esc(codon.aa) + '</span>') + '</span>';
+    });
+    for (var t = 0; t < row.trailing; t++) h += blank;
+  });
+  h += '</div></div>';
+  h += bioLegendHTML(model.legend);
+  if (model.motif || (model.showStops && model.stops))
+    h += '<div class="frm-key">' + (model.showStops && model.stops ? '<span class="bio-key"><i class="bio-tone-bad" aria-hidden="true"></i>stop codon</span>' : '') +
+      (model.motif ? '<span class="bio-key"><i class="bio-tone-motif" aria-hidden="true"></i>motif ' + esc(model.motif) + ' <small>' + model.motifMatches.length + (model.motifMatches.length === 1 ? ' match' : ' matches') + '</small></span>' : '') + '</div>';
+  return softwarePanelShell(h + '</div>', { note: model.note });
+}
+
+PanelRegistry.define('frames', {
+  label: 'Reading frames',
+  since: '0.2.0',
+  order: 42,
+  validateDeclaration: framesDeclarationWarnings,
+  validatePatch: framesPatchWarnings,
+  fold: function (panel, steps) {
+    return foldCommonPanelStates(panel, steps, {
+      accept: {
+        frame: function (value) { return value === null || framesFrameValid(value); },
+        marks: function (value) { return value === null || Array.isArray(value); },
+        motif: function (value) { return value === null || typeof value === 'string'; },
+        showStops: function (value) { return value === null || typeof value === 'boolean'; },
+        note: function (value) { return value === null || typeof value === 'string'; },
+      },
+    });
+  },
+  render: function (host, panel, state) { return { html: framesHTML(panel, state) }; },
+  presentation: { ambientInitial: true },
+  layout: {
+    sectionSizing: { minWidth: 320, preferredWidth: 520, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },
+    height: 9, fallbackHeight: 9,
+  },
+  styles: String.raw`
+.frm-panel{color:var(--dtext);min-width:0}
+.frm-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:6px}
+.frm-label{font-weight:600;color:var(--dink)}
+.frm-meta{font-size:10px;letter-spacing:.4px;color:var(--dfaint)}
+.frm-empty{font-size:10.5px;color:var(--dfaint)}
+.frm-scroll{overflow-x:auto;padding-bottom:2px}
+.frm-grid{display:grid;grid-template-columns:auto repeat(var(--frm-cols),minmax(11px,1fr));align-items:end;column-gap:0;row-gap:3px;min-width:0}
+.frm-gutter{padding-right:8px;text-align:right;font:500 10px/1.4 'IBM Plex Mono',monospace;color:var(--dfaint);font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center}
+.frm-gutter-ruler{align-self:end}
+.frm-gutter-frame{font-weight:700;color:var(--dink)}
+.frm-tick{position:relative;height:4px;border-left:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);margin-top:12px}
+.frm-tick.seq-tick-n{height:7px;border-left-color:color-mix(in srgb,var(--dtext) 45%,transparent)}
+.frm-tick.seq-tick-n i{position:absolute;left:0;bottom:7px;transform:translateX(-50%);font:500 9px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--dfaint);white-space:nowrap}
+.frm-nt{display:block;overflow:hidden}
+.frm-bandcell{display:block;height:5px;border-top:1px solid transparent}
+.frm-blank{display:block;height:20px}
+.frm-codon{grid-column:span 3;display:flex;align-items:center;justify-content:center;height:20px;border-radius:3px;border:1px solid transparent;background:color-mix(in srgb,var(--dtext) 6%,transparent);transition:opacity .3s ease,background-color .3s ease;overflow:hidden}
+.frm-codon .bio-b{display:block;overflow:hidden}
+.frm-stop{border-style:solid}
+.frm-motif{border-style:solid}
+.frm-quiet{color:var(--dfaint);font:600 13px/1 'IBM Plex Mono',monospace}
+.frm-dim{opacity:.3}
+.frm-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:10.5px}
+@media (prefers-reduced-motion: reduce){.frm-codon{transition:none}}
+@media print{.frm-scroll{overflow:visible}.frm-codon{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+`,
+  authoring: {
+    initialFields: true,
+    transientFields: ['frame', 'marks', 'motif', 'showStops'],
+    template: {
+      title: 'Reading frames', label: 'ORF candidate', alphabet: 'dna', start: 1,
+      sequence: 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG',
+      initial: { frame: 'all', showStops: true },
+    },
+    setupFields: [['label', 'text'], ['sequence', 'text'], ['alphabet', 'text'], ['start', 'num'], ['initial', 'json']],
+    patchFields: [['frame', 'enum', ['all', '1', '2', '3']], ['motif', 'text'], ['showStops', 'bool'], ['marks', 'json'], ['note', 'text']],
+    fieldMeta: {
+      label: { label: 'Track label', help: 'Short name shown before the ruler, e.g. ORF candidate.' },
+      sequence: { label: 'Sequence', help: '3–120 nucleotides (whitespace ignored). Letters outside the alphabet translate to X.' },
+      alphabet: { label: 'Alphabet', help: 'dna (ACGTN, default) or rna (ACGUN).' },
+      start: { label: 'First coordinate', help: '1-based coordinate of the first nucleotide; default 1.' },
+      frame: { label: 'Emphasised frame', help: 'Dim the other two frames to focus on one; all keeps every frame bright.', nullLabel: 'All frames' },
+      motif: { label: 'Protein motif', help: 'Up to 12 one-letter amino acids; X matches any residue (e.g. RXXR). Every match in every frame is highlighted.', nullLabel: 'No motif' },
+      showStops: { label: 'Mark stop codons', help: 'Default true: stop codons show * on a red cell. False shows a quiet dot instead.', nullLabel: 'Default (shown)' },
+      marks: { label: 'Highlighted ranges', help: 'Full snapshot of up to 24 nucleotide ranges {id,from,to,tone?,label?}, e.g. an inserted stretch.', nullLabel: 'No marks' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 42, name: 'Reading frames', category: 'Science & sequencing',
+      tagline: 'Three frames, stops and a motif',
+      description: 'Translate a short nucleotide sequence in all three forward reading frames, emphasise one frame, mark stop codons and highlight a protein motif to teach frameshifts.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.label = 'ORF candidate';
+      state.frame = '1';
+      state.motif = 'MXXV';
+      state.marks = [{ id: 'insert', from: 13, to: 15, tone: 'insert', label: 'Second ATG' }];
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
+/* ---- src/panels/types/funnel.js ---- */
+/* Stage counts: ordered stages of a filtering pipeline with the number of
+   items that remain at each one. Every count is authored; nothing is read
+   from data files. Shared alphabet/tone helpers live in ../bio.js, and the
+   `.bio-tone-*` colour classes are owned by the sequence panel's styles. */
+var FUNNEL_MAX_STAGES = 12;
+/* Stage ids become keys of the authored `counts` object, so they must be
+   plain identifier-like strings (no leading underscore keeps `__proto__` out). */
+function funnelSafeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+}
+function funnelStages(panel) {
+  return panelCollectionItems(panel, 'stages', FUNNEL_MAX_STAGES).filter(function (stage) {
+    return funnelSafeId(stage.id);
+  }).map(function (stage) {
+    return {
+      id: stage.id,
+      label: typeof stage.label === 'string' && stage.label.trim() ? stage.label : stage.id,
+      tone: BIO_TONES.indexOf(stage.tone) >= 0 ? stage.tone : null,
+    };
+  });
+}
+function funnelUnit(panel) {
+  return typeof panel.unit === 'string' && panel.unit.trim() ? panel.unit.trim() : 'items';
+}
+function funnelStageIds(panel) {
+  return funnelStages(panel).map(function (stage) { return stage.id; });
+}
+function funnelDeclarationWarnings(panel, path, warnings) {
+  var seen = Object.create(null), valid = 0;
+  if (!Array.isArray(panel.stages) || panel.stages.length < 2 || panel.stages.length > FUNNEL_MAX_STAGES)
+    warnings.push(path + '.stages: declare 2–' + FUNNEL_MAX_STAGES + ' stages [{id,label,tone?}] in pipeline order');
+  (Array.isArray(panel.stages) ? panel.stages : []).forEach(function (stage, i) {
+    var at = path + '.stages[' + i + ']';
+    if (i >= FUNNEL_MAX_STAGES) return;
+    if (!panelObject(stage) || typeof stage.id !== 'string' || !stage.id) {
+      warnings.push(at + '.id: needs a non-empty string — stage skipped');
+      return;
+    }
+    if (!funnelSafeId(stage.id)) {
+      warnings.push(at + '.id: use letters, digits, "-" or "_" starting with a letter or digit — stage skipped');
+      return;
+    }
+    if (seen[stage.id]) {
+      warnings.push(at + '.id: duplicate id "' + stage.id + '" — later stage skipped');
+      return;
+    }
+    seen[stage.id] = true;
+    valid++;
+    if (stage.label !== undefined && typeof stage.label !== 'string')
+      warnings.push(at + '.label: expected text — using the id');
+    if (stage.tone !== undefined && BIO_TONES.indexOf(stage.tone) < 0)
+      warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using the default bar colour');
+  });
+  if (Array.isArray(panel.stages) && panel.stages.length >= 2 && valid < 2)
+    warnings.push(path + '.stages: fewer than 2 usable stages — the panel renders empty');
+  if (panel.unit !== undefined && (typeof panel.unit !== 'string' || !panel.unit.trim()))
+    warnings.push(path + '.unit: expected a non-empty item noun such as "reads" — using items');
+  funnelPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function funnelCountWarnings(counts, path, ids, warnings) {
+  if (counts === null) return;
+  if (!panelObject(counts)) {
+    warnings.push(path + ': expected an object keyed by stage id (or null to clear every count) — ignored');
+    return;
+  }
+  Object.keys(counts).forEach(function (id) {
+    var at = path + '.' + id, value = counts[id];
+    if (ids.indexOf(id) < 0) warnings.push(at + ': unknown stage id — ignored');
+    else if (value !== null && !bioCount(value))
+      warnings.push(at + ': expected a non-negative whole number or null — ignored');
+  });
+}
+function funnelPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, panel, warnings) {
+    var ids = funnelStageIds(panel);
+    Object.keys(state).forEach(function (key) {
+      var value = state[key], at = path + '.' + key;
+      if (key === 'enterOnce') return;
+      if (key === 'counts') funnelCountWarnings(value, at, ids, warnings);
+      else if (key === 'active') {
+        if (value !== null && (typeof value !== 'string' || ids.indexOf(value) < 0))
+          warnings.push(at + ': expected a declared stage id or null — ignored');
+      } else if (key === 'note') {
+        if (value !== null && typeof value !== 'string') warnings.push(at + ': expected text or null — ignored');
+      } else warnings.push(at + ': unknown field — ignored');
+    });
+  });
+}
+/* Pure sparse merge. `patch === null` clears everything; a key set to null
+   clears that stage; unknown or invalid entries are skipped. Never mutates. */
+function funnelMergeCounts(base, patch, ids) {
+  var out = {};
+  if (patch === null) return out;
+  Object.keys(panelObject(base) ? base : {}).forEach(function (id) { out[id] = base[id]; });
+  if (!panelObject(patch)) return out;
+  ids.forEach(function (id) {
+    if (!panelOwn(patch, id)) return;
+    var value = patch[id];
+    if (value === null) delete out[id];
+    else if (bioCount(value)) out[id] = value;
+  });
+  return out;
+}
+function funnelCleanState(raw, ids, allowOnce) {
+  var out = {};
+  if (!panelObject(raw)) return out;
+  if (panelOwn(raw, 'active') && (raw.active === null || (typeof raw.active === 'string' && ids.indexOf(raw.active) >= 0)))
+    out.active = raw.active;
+  if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = funnelCleanState(raw.enterOnce, ids, false);
+  return out;
+}
+function funnelFold(panel, steps) {
+  var ids = funnelStageIds(panel);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return funnelCleanState(raw, ids, once); });
+  var carried = funnelMergeCounts({}, panelObject(panel.initial) && panelOwn(panel.initial, 'counts') ? panel.initial.counts : undefined, ids);
+  steps.forEach(function (step, i) {
+    var source = stepPanelPatch(step), patch = source && panelOwn(source, panel.id) ? source[panel.id] : null;
+    if (!panelObject(patch)) patch = {};
+    if (panelOwn(patch, 'counts')) carried = funnelMergeCounts(carried, patch.counts, ids);
+    var once = panelObject(patch.enterOnce) && panelOwn(patch.enterOnce, 'counts') ? patch.enterOnce : null;
+    states[i].counts = once ? funnelMergeCounts(carried, once.counts, ids) : carried;
+  });
+  if (!steps.length) states[0].counts = carried;
+  return states;
+}
+function funnelFormat(value) {
+  return bioCount(value) ? value.toLocaleString('en-US') : '—';
+}
+function funnelPct(value) {
+  return isFiniteNum(value) ? value.toFixed(1) + '%' : '';
+}
+/* Rows carry retained share (of the first known count), the change versus
+   the previous known stage, and a `grew` flag instead of a negative drop. */
+function funnelModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var stages = funnelStages(panel), counts = panelObject(state.counts) ? state.counts : {};
+  var active = typeof state.active === 'string' ? state.active : null;
+  var first = null, prev = null, max = 0, last = null;
+  var rows = stages.map(function (stage) {
+    var raw = panelOwn(counts, stage.id) ? counts[stage.id] : null;
+    var count = bioCount(raw) ? raw : null, known = count !== null;
+    var row = {
+      id: stage.id, label: stage.label, tone: stage.tone, count: count, known: known, active: stage.id === active,
+      pct: null, dropped: null, droppedPct: null, gained: null, gainedPct: null, grew: false, barPct: 0,
+    };
+    if (known) {
+      if (first === null) first = count;
+      row.pct = first > 0 ? count / first * 100 : (count === 0 ? 100 : null);
+      if (prev !== null) {
+        if (count > prev) {
+          row.grew = true;
+          row.gained = count - prev;
+          row.gainedPct = prev > 0 ? row.gained / prev * 100 : null;
+        } else {
+          row.dropped = prev - count;
+          row.droppedPct = prev > 0 ? row.dropped / prev * 100 : (row.dropped === 0 ? 0 : null);
+        }
+      }
+      prev = count;
+      last = count;
+      max = Math.max(max, count);
+    }
+    return row;
+  });
+  rows.forEach(function (row) {
+    if (row.known) row.barPct = max > 0 ? row.count / max * 100 : 0;
+    if (!isFiniteNum(row.barPct)) row.barPct = 0;
+    if (!isFiniteNum(row.pct)) row.pct = null;
+    if (!isFiniteNum(row.droppedPct)) row.droppedPct = null;
+    if (!isFiniteNum(row.gainedPct)) row.gainedPct = null;
+  });
+  var retained = first !== null && last !== null ? (first > 0 ? last / first * 100 : (last === 0 ? 100 : null)) : null;
+  return {
+    rows: rows, unit: funnelUnit(panel), total: first, remaining: last,
+    retainedPct: isFiniteNum(retained) ? retained : null, active: active, known: rows.filter(function (row) { return row.known; }).length,
+  };
+}
+function funnelHTML(panel, state, model) {
+  model = model || funnelModel(panel, state);
+  var unit = esc(model.unit);
+  var h = '<div class="funnel" role="list" aria-label="' + esc('Stage counts in ' + model.unit) + '">';
+  if (!model.rows.length) h += '<p class="funnel-empty">Declare 2–' + FUNNEL_MAX_STAGES + ' stages to show counts.</p>';
+  model.rows.forEach(function (row, i) {
+    if (i > 0 && row.known) {
+      if (row.grew)
+        h += '<div class="funnel-delta funnel-grew" aria-hidden="true"><b>+' + funnelFormat(row.gained) + '</b>' +
+          (row.gainedPct !== null ? '<span>(+' + funnelPct(row.gainedPct) + ')</span>' : '') + '<i>grew</i></div>';
+      else if (row.dropped !== null)
+        h += '<div class="funnel-delta" aria-hidden="true"><b>−' + funnelFormat(row.dropped) + '</b>' +
+          (row.droppedPct !== null ? '<span>(−' + funnelPct(row.droppedPct) + ')</span>' : '') + '</div>';
+    }
+    var text = row.label + ': ' + (row.known ? funnelFormat(row.count) + ' ' + model.unit +
+      (row.pct !== null ? ', ' + funnelPct(row.pct) + ' retained' : '') +
+      (row.grew ? ', grew by ' + funnelFormat(row.gained) : row.dropped !== null ? ', dropped ' + funnelFormat(row.dropped) : '') :
+      'count not yet known') + (row.active ? '. Computing' : '');
+    h += '<div class="funnel-row' + (row.active ? ' funnel-active' : '') + (row.known ? '' : ' funnel-unknown') + (row.grew ? ' funnel-row-grew' : '') +
+      '" role="listitem" aria-label="' + esc(text) + '">' +
+      '<span class="funnel-label" title="' + esc(row.label) + '">' + esc(row.label) + '</span>' +
+      '<span class="funnel-track">' + (row.known ? '<span class="funnel-bar' + (row.tone ? ' bio-tone-' + row.tone : '') +
+        '" style="width:' + row.barPct.toFixed(3) + '%"></span>' : '') + '</span>' +
+      '<span class="funnel-count">' + (row.known ? funnelFormat(row.count) : '—') + '</span>' +
+      '<span class="funnel-pct">' + (row.pct !== null ? funnelPct(row.pct) : (row.known ? '' : '—')) + '</span>' +
+      (row.active ? '<span class="funnel-live">computing</span>' : '') + '</div>';
+  });
+  if (model.rows.length)
+    h += '<div class="funnel-foot"><span>' + (model.total !== null ? funnelFormat(model.total) + ' ' + unit + ' in' : 'No counts yet') + '</span><span>' +
+      (model.remaining !== null && model.known > 1 ? funnelFormat(model.remaining) + ' remain' + (model.retainedPct !== null ? ' · ' + funnelPct(model.retainedPct) : '') : '') + '</span></div>';
+  return softwarePanelShell(h + '</div>', state || {});
+}
+PanelRegistry.define('funnel', {
+  label: 'Stage counts', since: '0.2.0', order: 44,
+  validateDeclaration: funnelDeclarationWarnings, validatePatch: funnelPatchWarnings, fold: funnelFold,
+  render: function (host, panel, state) {
+    /* Bars whose count became known since the previous render grow in. The
+       previous known set is presentation history only, never folded state. */
+    var model = funnelModel(panel, state), known = model.rows.map(function (row) { return row.known; });
+    var before = host._funnelKnown || null;
+    var entrants = before ? known.map(function (on, i) { return on && !before[i]; }) : null;
+    host._funnelKnown = known;
+    return { html: funnelHTML(panel, state, model), enterBars: { rows: '.funnel-row', bar: '.funnel-bar', entrants: entrants } };
+  },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 240, preferredWidth: 360, maxWidth: 600, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.funnel{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dtext);min-width:0}
+.funnel-empty{margin:0;color:var(--dfaint)}
+.funnel-row{position:relative;display:grid;grid-template-columns:minmax(64px,30%) minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:3px 5px;border-radius:6px;border:1px solid transparent}
+.funnel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dink)}
+.funnel-track{display:block;height:12px;border-radius:6px;background:color-mix(in srgb,var(--dtext) 10%,transparent);overflow:hidden}
+.funnel-bar{display:block;height:100%;border-radius:6px;background:var(--dink);transition:width .5s ease}
+.funnel-bar.dv-bar-enter{transform-origin:left center;animation:dvbarenter .5s cubic-bezier(.4,0,.2,1)}
+.funnel-count{font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--dink)}
+.funnel-pct{font:500 10px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;color:var(--dfaint)}
+.funnel-unknown .funnel-count,.funnel-unknown .funnel-label{color:var(--dfaint)}
+.funnel-active{border-color:color-mix(in srgb,var(--dink) 45%,transparent);background:color-mix(in srgb,var(--dink) 7%,transparent)}
+.funnel-active .funnel-track{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--dink) 24%,transparent) 0 6px,transparent 6px 12px);background-size:17px 12px;animation:funnel-stripe .9s linear infinite}
+.funnel-live{position:absolute;right:52px;top:-7px;padding:0 5px;border-radius:7px;font:600 8px/13px 'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--dink);background:color-mix(in srgb,var(--dink) 14%,transparent)}
+@keyframes funnel-stripe{from{background-position:0 0}to{background-position:17px 0}}
+.funnel-delta{display:flex;justify-content:flex-end;align-items:baseline;gap:5px;padding:0 51px 0 0;font:500 10px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dfaint)}
+.funnel-delta b{font-weight:600;color:#cf5f6a}.funnel-delta i{font-style:normal;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.funnel-grew b{color:#3f9a7a}.funnel-grew i{color:#3f9a7a}
+.funnel-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);font-size:10px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.funnel-active .funnel-track{animation:none}.funnel-bar{transition:none}.funnel-bar.dv-bar-enter{animation:none}}
+@media print{.funnel-track,.funnel-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.funnel-active .funnel-track{animation:none}}
+`,
+  authoring: {
+    initialFields: true,
+    template: {
+      title: 'Read filtering', unit: 'reads',
+      stages: [{ id: 'raw', label: 'Raw reads' }, { id: 'qc', label: 'Passed quality filter' }, { id: 'aligned', label: 'Aligned' }],
+      initial: { counts: { raw: 1200000 } },
+    },
+    setupFields: [
+      ['unit', 'text'],
+      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'tone', kind: 'enum', options: BIO_TONES }] }],
+      ['initial', 'json'],
+    ],
+    patchFields: [['counts', 'json', { nullable: true }], ['active', 'text'], ['note', 'text']],
+    expandPatchFields: function (panel) {
+      return [['counts', 'json', { nullable: true }], ['active', 'enum', funnelStageIds(panel)], ['note', 'text']];
+    },
+    fieldMeta: {
+      unit: { label: 'Item noun', help: 'What is being counted, e.g. reads, cells, variants. Default items.' },
+      stages: { label: 'Stages', help: 'Declare 2–12 stages in pipeline order with unique ids. Optional tone colours that stage’s bar.' },
+      counts: { label: 'Counts by stage', help: 'An object keyed by stage id, e.g. {"qc": 980000}. Keys merge into the carried counts; a key set to null forgets that stage; null clears every count.', nullLabel: 'Clear every count' },
+      active: { label: 'Stage being computed', help: 'Shows an animated stripe on this stage while the story explains it.', nullLabel: 'No stage active' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 44, name: 'Stage counts', category: 'Science & sequencing', tagline: 'How many survive each stage',
+      description: 'Show the items that remain after each filtering stage of a pipeline, with the drop between stages, so readers see where data is lost.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.unit = 'reads';
+      panel.stages = [
+        { id: 'raw', label: 'Raw reads' }, { id: 'qc', label: 'Passed quality filter' },
+        { id: 'trimmed', label: 'Adapter trimmed' }, { id: 'aligned', label: 'Aligned', tone: 'accent' },
+        { id: 'dedup', label: 'Deduplicated', tone: 'good' },
+      ];
+      state.counts = { raw: 1200000, qc: 1136400, trimmed: 1131900, aligned: 1048600 };
+      state.active = 'dedup';
+      state.note = 'Illustrative counts. Deduplication is still running.';
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
 /* ---- src/panels/types/gauge.js ---- */
 /* gauge panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 PanelViews.register('gauge', function (host, panel, state, skin, states, stepIdx, animate) {
@@ -19539,6 +20398,368 @@ PanelRegistry.extend('gauge', {
 });
 
 PanelRegistry.extend('gauge', {layout: {sectionSizing: { minWidth: 160, preferredWidth: 200, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+/* ---- src/panels/types/grid.js ---- */
+/* Value matrix: a small labelled table of authored numbers coloured by value,
+   with optional significance marks and row/column/cell emphasis. Nothing is
+   computed from data files; every number, mark and scale bound is authored. */
+var GRID_MAX_AXIS = 12;
+var GRID_MARKS = ['*', '**', '***', 'ns', ''];
+/* Row and column ids form cell keys "<row>.<col>", so they carry no dots and
+   start with a letter or digit (which also keeps `__proto__` out). */
+function gridSafeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+}
+function gridAxis(panel, key) {
+  return panelCollectionItems(panel, key, GRID_MAX_AXIS).filter(function (item) {
+    return gridSafeId(item.id);
+  }).map(function (item) {
+    return { id: item.id, label: typeof item.label === 'string' && item.label.trim() ? item.label : item.id };
+  });
+}
+function gridKeys(panel) {
+  var keys = [];
+  gridAxis(panel, 'rows').forEach(function (row) {
+    gridAxis(panel, 'cols').forEach(function (col) { keys.push(row.id + '.' + col.id); });
+  });
+  return keys;
+}
+function gridDecimals(panel) {
+  return Number.isInteger(panel.decimals) && panel.decimals >= 0 && panel.decimals <= 4 ? panel.decimals : 2;
+}
+function gridUnit(panel) {
+  return typeof panel.unit === 'string' ? panel.unit.trim() : '';
+}
+function gridAxisWarnings(panel, path, warnings, key) {
+  var seen = Object.create(null), valid = 0;
+  if (!Array.isArray(panel[key]) || !panel[key].length || panel[key].length > GRID_MAX_AXIS)
+    warnings.push(path + '.' + key + ': declare 1–' + GRID_MAX_AXIS + ' entries [{id,label}] with unique ids');
+  (Array.isArray(panel[key]) ? panel[key] : []).forEach(function (item, i) {
+    var at = path + '.' + key + '[' + i + ']';
+    if (i >= GRID_MAX_AXIS) return;
+    if (!panelObject(item) || typeof item.id !== 'string' || !item.id) {
+      warnings.push(at + '.id: needs a non-empty string — entry skipped');
+      return;
+    }
+    if (!gridSafeId(item.id)) {
+      warnings.push(at + '.id: use letters, digits, "-" or "_" starting with a letter or digit (no dots) — entry skipped');
+      return;
+    }
+    if (seen[item.id]) {
+      warnings.push(at + '.id: duplicate id "' + item.id + '" — later entry skipped');
+      return;
+    }
+    seen[item.id] = true;
+    valid++;
+    if (item.label !== undefined && typeof item.label !== 'string') warnings.push(at + '.label: expected text — using the id');
+  });
+  if (Array.isArray(panel[key]) && panel[key].length && !valid)
+    warnings.push(path + '.' + key + ': no usable entries — the panel renders empty');
+}
+function gridDeclarationWarnings(panel, path, warnings) {
+  gridAxisWarnings(panel, path, warnings, 'rows');
+  gridAxisWarnings(panel, path, warnings, 'cols');
+  if (panel.scale !== undefined) {
+    var scale = panel.scale, sp = path + '.scale';
+    if (!panelObject(scale)) warnings.push(sp + ': expected {min?,max?,mid?,kind?} — using an automatic scale');
+    else {
+      ['min', 'max', 'mid'].forEach(function (key) {
+        if (scale[key] !== undefined && !isFiniteNum(scale[key]))
+          warnings.push(sp + '.' + key + ': expected a finite number — ignored');
+      });
+      if (isFiniteNum(scale.min) && isFiniteNum(scale.max) && !(scale.min < scale.max))
+        warnings.push(sp + ': min must be less than max — using an automatic scale');
+      if (scale.kind !== undefined && scale.kind !== 'sequential' && scale.kind !== 'diverging')
+        warnings.push(sp + '.kind: expected sequential or diverging — using sequential');
+      if (isFiniteNum(scale.mid) && isFiniteNum(scale.min) && isFiniteNum(scale.max) && !(scale.mid > scale.min && scale.mid < scale.max))
+        warnings.push(sp + '.mid: must lie strictly between min and max — using the midpoint');
+      Object.keys(scale).forEach(function (key) {
+        if (['min', 'max', 'mid', 'kind'].indexOf(key) < 0) warnings.push(sp + '.' + key + ': unknown scale field — ignored');
+      });
+    }
+  }
+  if (panel.decimals !== undefined && gridDecimals(panel) !== panel.decimals)
+    warnings.push(path + '.decimals: expected a whole number 0–4 — using 2');
+  if (panel.unit !== undefined && typeof panel.unit !== 'string')
+    warnings.push(path + '.unit: expected text — ignored');
+  gridPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function gridKeyedWarnings(value, path, keys, warnings, what, validValue) {
+  if (value === null) return;
+  if (!panelObject(value)) {
+    warnings.push(path + ': expected an object keyed "<rowId>.<colId>" (or null to clear every ' + what + ') — ignored');
+    return;
+  }
+  Object.keys(value).forEach(function (key) {
+    var at = path + '.' + key;
+    if (keys.indexOf(key) < 0) warnings.push(at + ': unknown cell key — ignored');
+    else if (value[key] !== null && !validValue(value[key]))
+      warnings.push(at + ': expected ' + (what === 'value' ? 'a finite number' : 'one of "*", "**", "***", "ns" or ""') + ' or null — ignored');
+  });
+}
+function gridHighlightWarnings(value, path, panel, warnings) {
+  if (value === null) return;
+  if (!panelObject(value)) {
+    warnings.push(path + ': expected {row?,col?,cell?} or null — ignored');
+    return;
+  }
+  var rows = gridAxis(panel, 'rows').map(function (row) { return row.id; }),
+    cols = gridAxis(panel, 'cols').map(function (col) { return col.id; }), keys = gridKeys(panel);
+  Object.keys(value).forEach(function (key) {
+    var at = path + '.' + key, v = value[key];
+    if (key === 'row') { if (v !== null && rows.indexOf(v) < 0) warnings.push(at + ': unknown row id — ignored'); }
+    else if (key === 'col') { if (v !== null && cols.indexOf(v) < 0) warnings.push(at + ': unknown column id — ignored'); }
+    else if (key === 'cell') { if (v !== null && keys.indexOf(v) < 0) warnings.push(at + ': unknown cell key — ignored'); }
+    else warnings.push(at + ': unknown highlight field — ignored');
+  });
+}
+function gridPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, panel, warnings) {
+    var keys = gridKeys(panel);
+    Object.keys(state).forEach(function (key) {
+      var value = state[key], at = path + '.' + key;
+      if (key === 'enterOnce') return;
+      if (key === 'cells') gridKeyedWarnings(value, at, keys, warnings, 'value', isFiniteNum);
+      else if (key === 'marks') gridKeyedWarnings(value, at, keys, warnings, 'mark', function (v) { return GRID_MARKS.indexOf(v) >= 0; });
+      else if (key === 'highlight') gridHighlightWarnings(value, at, panel, warnings);
+      else if (key === 'note') { if (value !== null && typeof value !== 'string') warnings.push(at + ': expected text or null — ignored'); }
+      else warnings.push(at + ': unknown field — ignored');
+    });
+  });
+}
+/* Pure sparse merge shared by `cells` and `marks`: null clears everything,
+   a null entry forgets one key, invalid or unknown entries are skipped. */
+function gridMergeKeyed(base, patch, keys, validValue) {
+  var out = {};
+  if (patch === null) return out;
+  Object.keys(panelObject(base) ? base : {}).forEach(function (key) { out[key] = base[key]; });
+  if (!panelObject(patch)) return out;
+  keys.forEach(function (key) {
+    if (!panelOwn(patch, key)) return;
+    var value = patch[key];
+    if (value === null) delete out[key];
+    else if (validValue(value)) out[key] = value;
+  });
+  return out;
+}
+function gridMark(value) { return GRID_MARKS.indexOf(value) >= 0; }
+function gridCleanHighlight(raw, panel) {
+  if (raw === null) return null;
+  if (!panelObject(raw)) return undefined;
+  var out = {}, rows = gridAxis(panel, 'rows').map(function (row) { return row.id; }),
+    cols = gridAxis(panel, 'cols').map(function (col) { return col.id; }), keys = gridKeys(panel);
+  if (panelOwn(raw, 'row') && (raw.row === null || rows.indexOf(raw.row) >= 0)) out.row = raw.row;
+  if (panelOwn(raw, 'col') && (raw.col === null || cols.indexOf(raw.col) >= 0)) out.col = raw.col;
+  if (panelOwn(raw, 'cell') && (raw.cell === null || keys.indexOf(raw.cell) >= 0)) out.cell = raw.cell;
+  return out;
+}
+function gridCleanState(raw, panel, allowOnce) {
+  var out = {};
+  if (!panelObject(raw)) return out;
+  if (panelOwn(raw, 'highlight')) {
+    var highlight = gridCleanHighlight(raw.highlight, panel);
+    if (highlight !== undefined) out.highlight = highlight;
+  }
+  if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = gridCleanState(raw.enterOnce, panel, false);
+  return out;
+}
+function gridFold(panel, steps) {
+  var keys = gridKeys(panel);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return gridCleanState(raw, panel, once); });
+  var initial = panelObject(panel.initial) ? panel.initial : {};
+  var cells = gridMergeKeyed({}, panelOwn(initial, 'cells') ? initial.cells : undefined, keys, isFiniteNum);
+  var marks = gridMergeKeyed({}, panelOwn(initial, 'marks') ? initial.marks : undefined, keys, gridMark);
+  function attach(state, carriedCells, carriedMarks, once) {
+    state.cells = once && panelOwn(once, 'cells') ? gridMergeKeyed(carriedCells, once.cells, keys, isFiniteNum) : carriedCells;
+    state.marks = once && panelOwn(once, 'marks') ? gridMergeKeyed(carriedMarks, once.marks, keys, gridMark) : carriedMarks;
+  }
+  steps.forEach(function (step, i) {
+    var source = stepPanelPatch(step), patch = source && panelOwn(source, panel.id) ? source[panel.id] : null;
+    if (!panelObject(patch)) patch = {};
+    if (panelOwn(patch, 'cells')) cells = gridMergeKeyed(cells, patch.cells, keys, isFiniteNum);
+    if (panelOwn(patch, 'marks')) marks = gridMergeKeyed(marks, patch.marks, keys, gridMark);
+    attach(states[i], cells, marks, panelObject(patch.enterOnce) ? patch.enterOnce : null);
+  });
+  if (!steps.length) attach(states[0], cells, marks, null);
+  return states;
+}
+/* Resolves the colour scale for the current cells. Authored bounds win;
+   missing bounds come from the data, and no numbers at all means 0–1. */
+function gridScale(panel, values) {
+  var scale = panelObject(panel.scale) ? panel.scale : {};
+  var kind = scale.kind === 'diverging' ? 'diverging' : 'sequential';
+  var hasMin = isFiniteNum(scale.min), hasMax = isFiniteNum(scale.max);
+  if (hasMin && hasMax && !(scale.min < scale.max)) hasMin = hasMax = false;
+  var dataMin = values.length ? Math.min.apply(null, values) : null, dataMax = values.length ? Math.max.apply(null, values) : null;
+  var min = hasMin ? scale.min : dataMin !== null ? (hasMax ? Math.min(dataMin, scale.max) : dataMin) : (hasMax ? Math.min(0, scale.max) : 0);
+  var max = hasMax ? scale.max : dataMax !== null ? Math.max(dataMax, min) : Math.max(1, min);
+  if (!isFiniteNum(min) || !isFiniteNum(max)) { min = 0; max = 1; }
+  var mid = isFiniteNum(scale.mid) && scale.mid > min && scale.mid < max ? scale.mid : (min + max) / 2;
+  return { kind: kind, min: min, max: max, mid: mid, auto: !(hasMin && hasMax) };
+}
+function gridIntensity(value, scale) {
+  var t;
+  if (scale.kind === 'diverging') {
+    if (value <= scale.mid) t = scale.mid > scale.min ? 0.5 * (value - scale.min) / (scale.mid - scale.min) : 0.5;
+    else t = scale.max > scale.mid ? 0.5 + 0.5 * (value - scale.mid) / (scale.max - scale.mid) : 0.5;
+  } else t = scale.max > scale.min ? (value - scale.min) / (scale.max - scale.min) : 0.5;
+  return isFiniteNum(t) ? clamp(t, 0, 1) : 0.5;
+}
+function gridFormat(value, decimals) {
+  return isFiniteNum(value) ? value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '—';
+}
+/* Each cell carries its value, display text, mark, 0–1 intensity, the shade
+   side/depth used for colouring and its highlight flags. Intensity is never NaN. */
+function gridModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var rows = gridAxis(panel, 'rows'), cols = gridAxis(panel, 'cols');
+  var cells = panelObject(state.cells) ? state.cells : {}, marks = panelObject(state.marks) ? state.marks : {};
+  var highlight = panelObject(state.highlight) ? state.highlight : {};
+  var decimals = gridDecimals(panel), unit = gridUnit(panel), values = [];
+  rows.forEach(function (row) {
+    cols.forEach(function (col) {
+      var v = panelOwn(cells, row.id + '.' + col.id) ? cells[row.id + '.' + col.id] : null;
+      if (isFiniteNum(v)) values.push(v);
+    });
+  });
+  var scale = gridScale(panel, values);
+  var table = rows.map(function (row) {
+    var rowHighlight = highlight.row === row.id;
+    return {
+      id: row.id, label: row.label, highlight: rowHighlight,
+      cells: cols.map(function (col) {
+        var key = row.id + '.' + col.id, raw = panelOwn(cells, key) ? cells[key] : null;
+        var value = isFiniteNum(raw) ? raw : null, known = value !== null;
+        var intensity = known ? gridIntensity(value, scale) : 0;
+        var side = known && scale.kind === 'diverging' && intensity < 0.5 ? 'low' : 'high';
+        var depth = known ? (scale.kind === 'diverging' ? Math.abs(intensity - 0.5) * 2 : intensity) : 0;
+        var mark = panelOwn(marks, key) && gridMark(marks[key]) ? marks[key] : '';
+        return {
+          key: key, row: row.id, col: col.id, value: value, known: known, text: gridFormat(value, decimals), mark: mark,
+          intensity: known ? intensity : 0, side: side, depth: isFiniteNum(depth) ? clamp(depth, 0, 1) : 0,
+          highlight: highlight.cell === key, rowHighlight: rowHighlight, colHighlight: highlight.col === col.id,
+        };
+      }),
+    };
+  });
+  return {
+    rows: table, cols: cols.map(function (col) { return { id: col.id, label: col.label, highlight: highlight.col === col.id }; }),
+    scale: scale, decimals: decimals, unit: unit, count: values.length,
+  };
+}
+function gridHTML(panel, state) {
+  var model = gridModel(panel, state), unit = model.unit ? ' ' + model.unit : '';
+  var h = '<div class="grid-wrap panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Value matrix') + '">';
+  if (!model.rows.length || !model.cols.length) h += '<p class="grid-empty">Declare 1–' + GRID_MAX_AXIS + ' rows and columns to show values.</p>';
+  else {
+    h += '<table class="grid-table grid-' + model.scale.kind + '" aria-label="' + esc((panel.title || 'Value matrix') + ': ' +
+      model.rows.length + ' rows by ' + model.cols.length + ' columns, ' + model.scale.kind + ' scale ' +
+      gridFormat(model.scale.min, model.decimals) + ' to ' + gridFormat(model.scale.max, model.decimals) + unit) + '">';
+    h += '<thead><tr><th scope="col" class="grid-corner"></th>';
+    model.cols.forEach(function (col) {
+      h += '<th scope="col" class="grid-colhead' + (col.highlight ? ' grid-hl' : '') + '" title="' + esc(col.label) + '">' + esc(col.label) + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    model.rows.forEach(function (row) {
+      h += '<tr class="grid-row' + (row.highlight ? ' grid-rowhl' : '') + '"><th scope="row" class="grid-rowhead' + (row.highlight ? ' grid-hl' : '') +
+        '" title="' + esc(row.label) + '">' + esc(row.label) + '</th>';
+      row.cells.forEach(function (cell, c) {
+        var classes = 'grid-cell grid-' + cell.side + (cell.known ? '' : ' grid-unknown') + (cell.depth > 0.55 ? ' grid-deep' : '') +
+          (cell.highlight ? ' grid-hl-cell' : '') + (cell.rowHighlight ? ' grid-hl-row' : '') + (cell.colHighlight ? ' grid-hl-col' : '');
+        var title = row.label + ' × ' + model.cols[c].label + ': ' + (cell.known ? cell.text + unit : 'no value') +
+          (cell.mark ? ' (' + cell.mark + ')' : '');
+        h += '<td class="' + classes + '" style="--grid-d:' + cell.depth.toFixed(3) + '" title="' + esc(title) + '">' +
+          '<span class="grid-value">' + esc(cell.text) + '</span>' +
+          (cell.mark ? '<sup class="grid-mark' + (cell.mark === 'ns' ? ' grid-mark-ns' : '') + '">' + esc(cell.mark) + '</sup>' : '') + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div class="grid-key" aria-hidden="true"><span>' + esc(gridFormat(model.scale.min, model.decimals) + unit) + '</span>' +
+      '<span class="grid-ramp grid-ramp-' + model.scale.kind + '"></span><span>' + esc(gridFormat(model.scale.max, model.decimals) + unit) + '</span>' +
+      (model.scale.auto ? '<em>auto</em>' : '') + '</div>';
+  }
+  return softwarePanelShell(h + '</div>', state || {});
+}
+PanelRegistry.define('grid', {
+  label: 'Value matrix', since: '0.2.0', order: 45,
+  validateDeclaration: gridDeclarationWarnings, validatePatch: gridPatchWarnings, fold: gridFold,
+  render: function (host, panel, state) { return { html: gridHTML(panel, state) }; },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 240, preferredWidth: 380, maxWidth: 700, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.grid-wrap{font-size:11px;color:var(--dtext);min-width:0;overflow:auto;max-height:420px}
+.grid-wrap:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.grid-empty{margin:0;color:var(--dfaint)}
+.grid-table{--grid-low:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-mid:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-high:#2f6fd6;--grid-neg:#d4704f;border-collapse:separate;border-spacing:2px;width:100%;table-layout:fixed}
+.grid-table th{font:500 10px 'IBM Plex Mono',monospace;color:var(--dfaint);padding:3px 4px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid-table .grid-colhead{vertical-align:bottom}.grid-table .grid-rowhead{text-align:right;width:26%}
+.grid-table .grid-corner{width:26%}
+.grid-table th.grid-hl{color:var(--dink);font-weight:700}
+.grid-cell{position:relative;padding:5px 4px;text-align:center;border-radius:4px;font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dink);background:color-mix(in srgb,var(--grid-high) calc(var(--grid-d)*100%),var(--grid-mid));transition:background-color .4s ease}
+.grid-cell.grid-low{background:color-mix(in srgb,var(--grid-neg) calc(var(--grid-d)*100%),var(--grid-mid))}
+.grid-cell.grid-deep{color:#fff}
+.grid-cell.grid-unknown{background:transparent;color:var(--dfaint);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 14%,transparent)}
+.grid-mark{font-size:9px;margin-left:1px;vertical-align:top;line-height:1}.grid-mark-ns{font-weight:400;opacity:.8}
+.grid-cell.grid-hl-row,.grid-cell.grid-hl-col{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--dink) 55%,transparent)}
+.grid-cell.grid-hl-cell{box-shadow:inset 0 0 0 2px var(--dink),0 0 0 1px var(--dink)}
+.grid-key{display:flex;align-items:center;gap:6px;margin-top:6px;font:500 9px 'IBM Plex Mono',monospace;color:var(--dfaint)}
+.grid-key em{font-style:normal;letter-spacing:.5px;text-transform:uppercase;font-size:8px}
+.grid-ramp{display:inline-block;flex:0 0 72px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--grid-mid),var(--grid-high))}
+.grid-ramp-diverging{background:linear-gradient(90deg,var(--grid-neg),var(--grid-mid),var(--grid-high))}
+@media (prefers-reduced-motion:reduce){.grid-cell{transition:none}}
+@media print{.grid-cell,.grid-ramp{-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid-wrap{max-height:none;overflow:visible}}
+`,
+  authoring: {
+    initialFields: true,
+    template: {
+      title: 'Expression contrast', decimals: 2,
+      rows: [{ id: 'treated', label: 'Treated' }, { id: 'control', label: 'Control' }],
+      cols: [{ id: 'geneA', label: 'Gene A' }, { id: 'geneB', label: 'Gene B' }],
+      scale: { min: -2, max: 2, kind: 'diverging' },
+      initial: { cells: { 'treated.geneA': 1.4, 'treated.geneB': -0.6, 'control.geneA': 0.1, 'control.geneB': 0.2 } },
+    },
+    setupFields: [
+      ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['cols', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['scale', 'json'], ['decimals', 'num', { min: 0, max: 4 }], ['unit', 'text'], ['initial', 'json'],
+    ],
+    patchFields: [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'json', { nullable: true }], ['note', 'text']],
+    fieldMeta: {
+      rows: { label: 'Rows', help: 'Declare 1–12 rows with unique ids (letters, digits, - or _; no dots).' },
+      cols: { label: 'Columns', help: 'Declare 1–12 columns with unique ids (letters, digits, - or _; no dots).' },
+      scale: { label: 'Colour scale', help: '{"min","max","kind","mid"}. Kind is sequential (default) or diverging; min/max default to the current values; mid defaults to the midpoint.' },
+      decimals: { label: 'Decimals', help: 'Digits after the decimal point, 0–4. Default 2.' },
+      unit: { label: 'Unit suffix', help: 'Optional text appended to values in tooltips and the key, e.g. log2FC or %.' },
+      cells: { label: 'Cell values', help: 'An object keyed "<rowId>.<colId>", e.g. {"treated.geneA": 1.4}. Keys merge into the carried values; null forgets a cell; null for the whole field clears every value.', nullLabel: 'Clear every value' },
+      marks: { label: 'Significance marks', help: 'An object keyed like cells with "*", "**", "***", "ns" or "". Merges like cells.', nullLabel: 'Clear every mark' },
+      highlight: { label: 'Highlight', help: '{"row","col","cell"}: outline one row, one column and/or one cell ("<rowId>.<colId>").', nullLabel: 'No highlight' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 45, name: 'Value matrix', category: 'Science & sequencing', tagline: 'A k × k table coloured by value',
+      description: 'Compare authored numbers across two labelled axes as a small heatmap with significance marks and row, column or cell emphasis.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.title = 'Enrichment by condition';
+      panel.unit = 'log2';
+      panel.rows = [{ id: 'early', label: 'Early' }, { id: 'mid', label: 'Mid' }, { id: 'late', label: 'Late' }];
+      panel.cols = [{ id: 'motifA', label: 'Motif A' }, { id: 'motifB', label: 'Motif B' }, { id: 'motifC', label: 'Motif C' }];
+      panel.scale = { min: -3, max: 3, kind: 'diverging' };
+      state.cells = {
+        'early.motifA': 0.4, 'early.motifB': -1.2, 'early.motifC': 2.6,
+        'mid.motifA': 1.1, 'mid.motifB': -0.3, 'mid.motifC': 1.8,
+        'late.motifA': 2.9, 'late.motifB': -2.4,
+      };
+      state.marks = { 'early.motifC': '***', 'late.motifA': '**', 'late.motifB': '*', 'mid.motifB': 'ns' };
+      state.highlight = { cell: 'late.motifA' };
+      state.note = 'Illustrative values. Late × Motif C is not yet measured.';
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
 /* ---- src/panels/types/homemap.js ---- */
 /* homemap validation and pure state helpers. */
 var HOMEMAP_STATES = {
@@ -23345,6 +24566,482 @@ PanelRegistry.extend('leds', {
 });
 
 PanelRegistry.extend('leds', {layout: {sectionSizing: { minWidth: 150, preferredWidth: 180, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+/* ---- src/panels/types/locus.js ---- */
+/* locus panel: a linear map of a genome, chromosome or gene region. A
+   horizontal bar carries authored features on up to four rows, point markers
+   above it, arcs that connect two positions, and a ruler with nice ticks. All
+   positions are 1-based bases typed in the spec; nothing is computed from
+   real data. Shared range and tone helpers live in ../bio.js; the sequence
+   panel owns the `.bio-tone-*` colours this file reuses on HTML blocks. */
+var LOCUS_MAX_LENGTH = 10000000000;
+var LOCUS_MAX_FEATURES = 48;
+var LOCUS_MAX_MARKERS = 24;
+var LOCUS_MAX_ARCS = 12;
+var LOCUS_ROWS = 4;
+var LOCUS_UNITS = { bp: 1, kb: 1000, Mb: 1000000 };
+var LOCUS_UNIT_DECIMALS = { bp: 0, kb: 2, Mb: 3 };
+var LOCUS_STATE_KEYS = ['markers', 'arcs', 'window', 'highlight'];
+/* Tone colours come from the sequence panel's `.bio-tone-*` classes, which set
+   `--bio-tone`; SVG strokes read that variable with the neutral ink as fallback.
+   Vertical geometry in CSS pixels; the SVG is 1000 units wide and stretched
+   horizontally, so x coordinates are percentages × 10 and y is in pixels. */
+var LOCUS_WIDTH = 1000;
+var LOCUS_ARC_H = 56;
+var LOCUS_MARK_H = 26;
+var LOCUS_ROW_H = 16;
+var LOCUS_ROW_GAP = 2;
+var LOCUS_TRACK_PAD = 3;
+var LOCUS_RULER_H = 26;
+
+function locusLength(panel) {
+  var value = panel && panel.length;
+  return Number.isSafeInteger(value) && value >= 1 && value <= LOCUS_MAX_LENGTH ? value : null;
+}
+function locusUnit(panel) {
+  return panel && Object.prototype.hasOwnProperty.call(LOCUS_UNITS, panel.unit) ? panel.unit : 'bp';
+}
+/* Formats a base count in the declared unit: "1,200 bp", "1.2 kb", "0.012 Mb". */
+function locusFormat(value, unit) {
+  unit = Object.prototype.hasOwnProperty.call(LOCUS_UNITS, unit) ? unit : 'bp';
+  if (!isFiniteNum(value)) return '—';
+  return (value / LOCUS_UNITS[unit]).toLocaleString('en-US', { maximumFractionDigits: LOCUS_UNIT_DECIMALS[unit] }) + ' ' + unit;
+}
+function locusRow(value) {
+  return Number.isInteger(value) && value >= 0 && value < LOCUS_ROWS ? value : null;
+}
+/* Clean declared features in authored order (unique ids, valid ranges). */
+function locusFeatures(panel) {
+  var length = locusLength(panel), seen = Object.create(null), out = [];
+  (Array.isArray(panel && panel.features) ? panel.features : []).slice(0, LOCUS_MAX_FEATURES).forEach(function (feature) {
+    if (!panelObject(feature) || typeof feature.id !== 'string' || !feature.id || seen[feature.id]) return;
+    var range = bioRange(feature, '', null, 1, length || undefined);
+    if (!range) return;
+    seen[feature.id] = true;
+    out.push({ id: feature.id, label: typeof feature.label === 'string' && feature.label ? feature.label : feature.id,
+      from: range.from, to: length ? Math.min(range.to, length) : range.to, tone: bioTone(feature.tone, 'feature'),
+      strand: feature.strand === '-' ? '-' : feature.strand === '+' ? '+' : '', row: locusRow(feature.row) });
+  });
+  return out;
+}
+/* Explicit rows are honoured first; the rest take the first of four rows with
+   no overlap so far. When all four overlap, the feature shares the last row
+   and is flagged crowded. Returns [{row, crowded}] aligned with the input. */
+function locusAssignRows(features) {
+  var placed = [], out = [];
+  for (var r = 0; r < LOCUS_ROWS; r++) placed.push([]);
+  function overlaps(row, feature) {
+    return row.some(function (other) { return other.from <= feature.to && feature.from <= other.to; });
+  }
+  features.forEach(function (feature, i) {
+    if (feature.row === null) return;
+    out[i] = { row: feature.row, crowded: overlaps(placed[feature.row], feature) };
+    placed[feature.row].push(feature);
+  });
+  features.forEach(function (feature, i) {
+    if (feature.row !== null) return;
+    var row = -1;
+    for (var r = 0; r < LOCUS_ROWS && row < 0; r++) if (!overlaps(placed[r], feature)) row = r;
+    out[i] = { row: row < 0 ? LOCUS_ROWS - 1 : row, crowded: row < 0 };
+    placed[out[i].row].push(feature);
+  });
+  return out;
+}
+/* Nice ruler ticks (1, 2, 2.5 or 5 × 10^k) for the inclusive window. Prefers
+   5–10 ticks, nearest seven; never more than ten. Very short windows yield
+   fewer. Returns ascending integer positions. */
+function locusTicks(from, to) {
+  if (!bioPosition(from) || !bioPosition(to) || to < from) return [];
+  var span = to - from + 1, magnitude = Math.floor(Math.log10(span) + 1e-9);
+  var best = null;
+  for (var k = -1; k <= 2; k++) {
+    var exponent = magnitude + k;
+    if (exponent < 0) continue;
+    [1, 2, 2.5, 5].forEach(function (m) {
+      var step = m * Math.pow(10, exponent);
+      if (!Number.isInteger(step) || step < 1) return;
+      var first = Math.ceil(from / step) * step, last = Math.floor(to / step) * step;
+      var count = last >= first ? Math.round((last - first) / step) + 1 : 0;
+      if (count < 1 || count > 10) return;
+      var ideal = count >= 5 ? 0 : 1, distance = Math.abs(count - 7);
+      if (!best || ideal < best.ideal || (ideal === best.ideal && (distance < best.distance || (distance === best.distance && step > best.step))))
+        best = { step: step, first: first, count: count, ideal: ideal, distance: distance };
+    });
+  }
+  var ticks = [];
+  if (best) for (var i = 0; i < best.count; i++) ticks.push(best.first + i * best.step);
+  return ticks;
+}
+/* Tick labels are centred on their tick except near the map edges, where a
+   centred label would be clipped: within LOCUS_EDGE percent of either edge the
+   label hangs inward from the tick instead. */
+var LOCUS_EDGE = 6;
+function locusTickAnchor(x) {
+  return x < LOCUS_EDGE ? 'start' : x > 100 - LOCUS_EDGE ? 'end' : 'middle';
+}
+/* 0–100 % of the window width for the centre of base `pos`. */
+function locusX(pos, win) {
+  return (pos - win.from + 0.5) / win.span * 100;
+}
+/* Left edge and width (%) of the visible part of an inclusive base range. */
+function locusSpanX(from, to, win) {
+  var left = Math.max(from, win.from), right = Math.min(to, win.to);
+  return { x: (left - win.from) / win.span * 100, width: (right - left + 1) / win.span * 100 };
+}
+/* Arc geometry in SVG units: a quadratic curve from x1 to x2 on `baseY`
+   whose apex rises 30–100 % of `areaHeight` with the visible fraction. */
+function locusArcGeometry(x1, x2, frac, baseY, areaHeight) {
+  var peak = areaHeight * (0.3 + 0.7 * clamp(isFiniteNum(frac) ? frac : 0, 0, 1));
+  var apexX = (x1 + x2) / 2, apexY = baseY - peak;
+  return { x1: x1, x2: x2, apexX: apexX, apexY: apexY,
+    path: 'M' + x1.toFixed(2) + ' ' + baseY + ' Q' + apexX.toFixed(2) + ' ' + (baseY - 2 * peak).toFixed(2) + ' ' + x2.toFixed(2) + ' ' + baseY };
+}
+function locusWindow(state, length) {
+  var win = { from: 1, to: length };
+  if (panelObject(state && state.window)) {
+    var range = bioRange(state.window, '', null, 1, length);
+    if (range) win = { from: Math.max(1, range.from), to: Math.min(length, range.to) };
+  }
+  win.span = win.to - win.from + 1;
+  return win;
+}
+function locusDeclarationWarnings(panel, path, warnings) {
+  var length = locusLength(panel);
+  if (length === null)
+    warnings.push(path + '.length: expected a whole number of bases from 1 to ' + LOCUS_MAX_LENGTH.toLocaleString('en-US') + ' — panel renders empty');
+  if (panel.unit !== undefined && !Object.prototype.hasOwnProperty.call(LOCUS_UNITS, panel.unit))
+    warnings.push(path + '.unit: expected bp, kb or Mb — using bp');
+  if (panel.label !== undefined && typeof panel.label !== 'string')
+    warnings.push(path + '.label: expected text — ignored');
+  if (panel.features !== undefined) {
+    if (!Array.isArray(panel.features)) warnings.push(path + '.features: expected an array of {id, label, from, to} — ignored');
+    else {
+      if (panel.features.length > LOCUS_MAX_FEATURES) warnings.push(path + '.features: only the first ' + LOCUS_MAX_FEATURES + ' features render');
+      var seen = Object.create(null);
+      panel.features.slice(0, LOCUS_MAX_FEATURES).forEach(function (feature, i) {
+        var at = path + '.features[' + i + ']';
+        if (!panelObject(feature)) { warnings.push(at + ': expected {id, label, from, to} — feature skipped'); return; }
+        if (typeof feature.id !== 'string' || !feature.id) { warnings.push(at + '.id: needs a non-empty string — feature skipped'); return; }
+        if (seen[feature.id]) { warnings.push(at + '.id: duplicate feature id "' + feature.id + '" — later feature skipped'); return; }
+        seen[feature.id] = true;
+        var range = bioRange(feature, at, warnings, 1, length || undefined);
+        if (range && length && range.to > length) warnings.push(at + '.to: ' + range.to + ' is beyond length ' + length + ' — clipped');
+        if (feature.label !== undefined && typeof feature.label !== 'string') warnings.push(at + '.label: expected text — using the id');
+        if (feature.tone !== undefined && BIO_TONES.indexOf(feature.tone) < 0) warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using feature');
+        if (feature.strand !== undefined && feature.strand !== '+' && feature.strand !== '-') warnings.push(at + '.strand: expected "+" or "-" — ignored');
+        if (feature.row !== undefined && locusRow(feature.row) === null) warnings.push(at + '.row: expected an integer 0–3 — row assigned automatically');
+      });
+    }
+  }
+  locusPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function locusStateWarnings(state, path, panel, warnings) {
+  var length = locusLength(panel), total = length || LOCUS_MAX_LENGTH, features = locusFeatures(panel);
+  Object.keys(state).forEach(function (key) {
+    if (LOCUS_STATE_KEYS.indexOf(key) < 0 && !bioCommonStateKey(key))
+      warnings.push(path + '.' + key + ': unknown field — ignored');
+  });
+  if (panelOwn(state, 'note') && state.note !== null && typeof state.note !== 'string')
+    warnings.push(path + '.note: expected text — ignored');
+  function position(value, at, what) {
+    if (!bioPosition(value)) { warnings.push(at + ': expected a 1-based base position — ' + what + ' skipped'); return false; }
+    if (value > total) { warnings.push(at + ': position ' + value + ' is beyond length ' + total + ' — ' + what + ' skipped'); return false; }
+    return true;
+  }
+  if (panelOwn(state, 'markers') && state.markers !== null) {
+    if (!Array.isArray(state.markers)) warnings.push(path + '.markers: expected an array of {id, at} — ignored');
+    else {
+      if (state.markers.length > LOCUS_MAX_MARKERS) warnings.push(path + '.markers: only the first ' + LOCUS_MAX_MARKERS + ' markers render');
+      var seen = Object.create(null);
+      state.markers.slice(0, LOCUS_MAX_MARKERS).forEach(function (marker, i) {
+        var at = path + '.markers[' + i + ']';
+        if (!panelObject(marker)) { warnings.push(at + ': expected {id, at} — marker skipped'); return; }
+        if (typeof marker.id !== 'string' || !marker.id) { warnings.push(at + '.id: needs a non-empty string — marker skipped'); return; }
+        if (seen[marker.id]) { warnings.push(at + '.id: duplicate marker id "' + marker.id + '" — later marker skipped'); return; }
+        seen[marker.id] = true;
+        position(marker.at, at + '.at', 'marker');
+        if (marker.label !== undefined && typeof marker.label !== 'string') warnings.push(at + '.label: expected text — using the id');
+        if (marker.tone !== undefined && BIO_TONES.indexOf(marker.tone) < 0) warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using accent');
+      });
+    }
+  }
+  if (panelOwn(state, 'arcs') && state.arcs !== null) {
+    if (!Array.isArray(state.arcs)) warnings.push(path + '.arcs: expected an array of {id, from, to} — ignored');
+    else {
+      if (state.arcs.length > LOCUS_MAX_ARCS) warnings.push(path + '.arcs: only the first ' + LOCUS_MAX_ARCS + ' arcs render');
+      var ids = Object.create(null);
+      state.arcs.slice(0, LOCUS_MAX_ARCS).forEach(function (arc, i) {
+        var at = path + '.arcs[' + i + ']';
+        if (!panelObject(arc)) { warnings.push(at + ': expected {id, from, to} — arc skipped'); return; }
+        if (typeof arc.id !== 'string' || !arc.id) { warnings.push(at + '.id: needs a non-empty string — arc skipped'); return; }
+        if (ids[arc.id]) { warnings.push(at + '.id: duplicate arc id "' + arc.id + '" — later arc skipped'); return; }
+        ids[arc.id] = true;
+        if (position(arc.from, at + '.from', 'arc') && position(arc.to, at + '.to', 'arc') && arc.from === arc.to)
+          warnings.push(at + ': from and to are the same position — arc skipped (use a marker)');
+        if (arc.label !== undefined && typeof arc.label !== 'string') warnings.push(at + '.label: expected text — showing the distance');
+        if (arc.tone !== undefined && BIO_TONES.indexOf(arc.tone) < 0) warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using accent');
+      });
+    }
+  }
+  if (panelOwn(state, 'window') && state.window !== null) {
+    var range = bioRange(state.window, path + '.window', warnings, 1, total);
+    if (range && range.to > total) warnings.push(path + '.window.to: ' + range.to + ' is beyond length ' + total + ' — clipped');
+  }
+  if (panelOwn(state, 'highlight') && state.highlight !== null) {
+    if (typeof state.highlight !== 'string') warnings.push(path + '.highlight: expected a feature id or null — ignored');
+    else if (state.highlight && !features.some(function (feature) { return feature.id === state.highlight; }))
+      warnings.push(path + '.highlight: unknown feature id "' + state.highlight + '" — nothing highlighted');
+  }
+}
+function locusPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, locusStateWarnings);
+}
+/* Pure presentation model: everything the renderer draws, in window percent
+   (x, width) and pixel geometry, with visibility and clipping decided here. */
+function locusModel(panel, state) {
+  panel = panelObject(panel) ? panel : {};
+  state = panelObject(state) ? state : {};
+  var length = locusLength(panel), unit = locusUnit(panel), valid = length !== null, total = length || 1;
+  var win = locusWindow(state, total);
+  var declared = locusFeatures(panel), rows = locusAssignRows(declared);
+  var highlight = typeof state.highlight === 'string' && state.highlight ? state.highlight : null;
+  var highlightFound = highlight !== null && declared.some(function (feature) { return feature.id === highlight; });
+  var rowCount = 1;
+  var features = declared.map(function (feature, i) {
+    var span = locusSpanX(feature.from, feature.to, win);
+    rowCount = Math.max(rowCount, rows[i].row + 1);
+    var visible = feature.to >= win.from && feature.from <= win.to;
+    return { id: feature.id, label: feature.label, from: feature.from, to: feature.to, tone: feature.tone, strand: feature.strand,
+      row: rows[i].row, crowded: rows[i].crowded, visible: visible,
+      x: span.x, width: span.width, clippedLeft: visible && feature.from < win.from, clippedRight: visible && feature.to > win.to,
+      highlight: highlightFound && feature.id === highlight, dim: highlightFound && feature.id !== highlight };
+  });
+  var trackHeight = rowCount * LOCUS_ROW_H + (rowCount - 1) * LOCUS_ROW_GAP + 2 * LOCUS_TRACK_PAD;
+  var barTop = LOCUS_ARC_H + LOCUS_MARK_H, barBottom = barTop + trackHeight;
+  var geometry = { width: LOCUS_WIDTH, arcHeight: LOCUS_ARC_H, markerTop: LOCUS_ARC_H, barTop: barTop, trackHeight: trackHeight,
+    rowHeight: LOCUS_ROW_H, rowGap: LOCUS_ROW_GAP, trackPad: LOCUS_TRACK_PAD, barBottom: barBottom, height: barBottom + LOCUS_RULER_H };
+  var seen = Object.create(null), markers = [];
+  (Array.isArray(state.markers) ? state.markers : []).slice(0, LOCUS_MAX_MARKERS).forEach(function (marker) {
+    if (!panelObject(marker) || typeof marker.id !== 'string' || !marker.id || seen[marker.id] || !bioPosition(marker.at) || marker.at > total) return;
+    seen[marker.id] = true;
+    markers.push({ id: marker.id, at: marker.at, label: typeof marker.label === 'string' && marker.label ? marker.label : marker.id,
+      tone: bioTone(marker.tone, 'accent'), visible: marker.at >= win.from && marker.at <= win.to, x: locusX(marker.at, win) });
+  });
+  var arcIds = Object.create(null), arcs = [];
+  (Array.isArray(state.arcs) ? state.arcs : []).slice(0, LOCUS_MAX_ARCS).forEach(function (arc) {
+    if (!panelObject(arc) || typeof arc.id !== 'string' || !arc.id || arcIds[arc.id] || !bioPosition(arc.from) || !bioPosition(arc.to) ||
+        arc.from > total || arc.to > total || arc.from === arc.to) return;
+    arcIds[arc.id] = true;
+    var left = Math.min(arc.from, arc.to), right = Math.max(arc.from, arc.to), visible = right >= win.from && left <= win.to;
+    var x1 = clamp(locusX(left, win), 0, 100), x2 = clamp(locusX(right, win), 0, 100);
+    var shape = locusArcGeometry(x1 * 10, x2 * 10, (x2 - x1) / 100, barTop, LOCUS_ARC_H - 10);
+    arcs.push({ id: arc.id, from: arc.from, to: arc.to, left: left, right: right, reversed: arc.from > arc.to, distance: right - left,
+      label: typeof arc.label === 'string' && arc.label ? arc.label : locusFormat(right - left, unit), custom: typeof arc.label === 'string' && !!arc.label,
+      tone: bioTone(arc.tone, 'accent'), visible: visible, x1: x1, x2: x2,
+      clippedLeft: visible && left < win.from, clippedRight: visible && right > win.to, apexX: shape.apexX / 10, apexY: shape.apexY, path: shape.path });
+  });
+  /* Every tick gets a line; with more than six, every other one is labelled
+     so labels stay apart in a narrow card. */
+  var positions = locusTicks(win.from, win.to), labelEvery = positions.length > 6 ? 2 : 1;
+  var ticks = positions.map(function (at, i) {
+    var x = locusX(at, win);
+    return { at: at, x: x, label: locusFormat(at, unit), labelled: i % labelEvery === 0, anchor: locusTickAnchor(x) };
+  });
+  return { valid: valid, length: length, unit: unit, label: typeof panel.label === 'string' ? panel.label : '', window: win,
+    zoomed: win.from !== 1 || win.to !== total, features: features, rowCount: rowCount, markers: markers, arcs: arcs, ticks: ticks,
+    highlight: highlight, highlightFound: highlightFound, geometry: geometry };
+}
+function locusHTML(panel, state) {
+  state = panelObject(state) ? state : {};
+  var model = locusModel(panel, state), g = model.geometry, h = '';
+  var pct = function (value) { return clamp(value, 0, 100).toFixed(3) + '%'; };
+  var span = locusFormat(model.window.from, model.unit).replace(/ \w+$/, '') + '–' + locusFormat(model.window.to, model.unit);
+  var visibleFeatures = model.features.filter(function (feature) { return feature.visible; });
+  var summary = (model.label ? model.label + ': ' : '') + (model.zoomed ? 'window ' + span + ' of ' : '') + locusFormat(model.length || 0, model.unit) +
+    ', ' + visibleFeatures.length + (visibleFeatures.length === 1 ? ' feature' : ' features') +
+    (model.markers.length ? ', ' + model.markers.length + (model.markers.length === 1 ? ' marker' : ' markers') : '') +
+    (model.arcs.length ? ', ' + model.arcs.length + (model.arcs.length === 1 ? ' arc' : ' arcs') : '') +
+    (model.highlightFound ? ', highlighting ' + model.highlight : '');
+  h += '<div class="locus-panel"><div class="locus-head"><span class="locus-title">' + esc(model.label || 'Genome map') + '</span><span class="locus-meta">' +
+    esc((model.zoomed ? span + ' of ' : '') + locusFormat(model.length || 0, model.unit) + (model.zoomed ? ' · zoomed' : '')) + '</span></div>';
+  if (!model.valid) return softwarePanelShell(h + '<p class="locus-empty">Declare a length in bases to draw the map.</p></div>', state);
+  h += '<div class="locus-map" role="img" aria-label="' + esc('Genome map: ' + summary) + '" style="height:' + g.height + 'px">';
+  h += '<svg class="locus-svg" viewBox="0 0 ' + g.width + ' ' + g.height + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
+  h += '<rect class="locus-track" x="0" y="' + g.barTop + '" width="' + g.width + '" height="' + g.trackHeight + '"/>';
+  h += '<line class="locus-base" x1="0" y1="' + g.barBottom + '" x2="' + g.width + '" y2="' + g.barBottom + '" vector-effect="non-scaling-stroke"/>';
+  model.ticks.forEach(function (tick) {
+    var x = (tick.x * 10).toFixed(2);
+    h += '<line class="locus-tickline" x1="' + x + '" y1="' + g.barBottom + '" x2="' + x + '" y2="' + (g.barBottom + 6) + '" vector-effect="non-scaling-stroke"/>';
+  });
+  model.markers.forEach(function (marker) {
+    if (!marker.visible) return;
+    var x = (marker.x * 10).toFixed(2);
+    h += '<line class="locus-pin bio-tone-' + marker.tone + '" x1="' + x + '" y1="' + (g.markerTop + 12) + '" x2="' + x + '" y2="' + g.barTop + '" vector-effect="non-scaling-stroke"/>';
+  });
+  model.arcs.forEach(function (arc) {
+    if (!arc.visible) return;
+    h += '<path class="locus-arc' + (arc.reversed ? ' locus-arc-reversed' : '') + ' bio-tone-' + arc.tone + '" d="' + arc.path + '" vector-effect="non-scaling-stroke"/>';
+  });
+  h += '</svg><div class="locus-layer">';
+  model.features.forEach(function (feature) {
+    if (!feature.visible) return;
+    var top = g.barTop + g.trackPad + feature.row * (g.rowHeight + g.rowGap);
+    var title = feature.label + ' ' + locusFormat(feature.from, model.unit) + '–' + locusFormat(feature.to, model.unit) + (feature.strand ? ' (' + feature.strand + ')' : '') +
+      (feature.clippedLeft || feature.clippedRight ? ' · continues outside the window' : '') + (feature.crowded ? ' · overlaps another feature on this row' : '');
+    h += '<span class="locus-feature bio-tone-' + feature.tone + (feature.highlight ? ' locus-hl' : '') + (feature.dim ? ' locus-dim' : '') +
+      (feature.strand === '-' ? ' locus-minus' : feature.strand === '+' ? ' locus-plus' : '') + (feature.width < 8 && !feature.highlight ? ' locus-narrow' : '') +
+      '" style="left:' + pct(feature.x) + ';width:' + pct(feature.width) + ';top:' + top + 'px;height:' + g.rowHeight + 'px" title="' + esc(title) + '"><i>' + esc(feature.label) + '</i></span>';
+  });
+  model.markers.forEach(function (marker) {
+    if (!marker.visible) return;
+    h += '<span class="locus-marker" style="left:' + pct(marker.x) + ';top:' + g.markerTop + 'px" title="' + esc(marker.label + ' at ' + locusFormat(marker.at, model.unit)) + '">' +
+      '<b>' + esc(marker.label) + '</b><span class="locus-marker-dot bio-tone-' + marker.tone + '"></span></span>';
+  });
+  model.arcs.forEach(function (arc) {
+    if (!arc.visible) return;
+    h += '<span class="locus-arclabel bio-tone-' + arc.tone + '" style="left:' + pct(arc.apexX) + ';top:' + Math.max(0, arc.apexY - 16).toFixed(1) + 'px" title="' +
+      esc(arc.label + (arc.custom ? ' · ' : ': ') + locusFormat(arc.from, model.unit) + (arc.reversed ? ' ← ' : ' → ') + locusFormat(arc.to, model.unit) +
+        (arc.custom ? ' · ' + locusFormat(arc.distance, model.unit) : '')) + '">' + esc(arc.label) + '</span>';
+  });
+  model.ticks.forEach(function (tick) {
+    if (!tick.labelled) return;
+    h += '<span class="locus-ticklabel locus-anchor-' + tick.anchor + '" style="left:' + pct(tick.x) + ';top:' + (g.barBottom + 8) + 'px">' + esc(tick.label) + '</span>';
+  });
+  h += '</div></div>';
+  if (visibleFeatures.length) {
+    h += '<ul class="locus-legend">';
+    visibleFeatures.forEach(function (feature) {
+      h += '<li' + (feature.highlight ? ' class="locus-hl"' : '') + '><span class="locus-key bio-tone-' + feature.tone + '"></span>' +
+        esc(feature.label + (feature.strand ? ' ' + feature.strand : '') + ' · ' + locusFormat(feature.from, model.unit) + '–' + locusFormat(feature.to, model.unit)) + '</li>';
+    });
+    h += '</ul>';
+  } else h += '<p class="locus-empty">' + (model.features.length ? 'No features inside this window.' : 'No features declared.') + '</p>';
+  return softwarePanelShell(h + '</div>', state);
+}
+PanelRegistry.define('locus', {
+  label: 'Genome map', since: '0.2.0', order: 43,
+  validateDeclaration: locusDeclarationWarnings, validatePatch: locusPatchWarnings,
+  fold: function (panel, steps) {
+    var arrayOrNull = function (value) { return value === null || Array.isArray(value); };
+    return foldCommonPanelStates(panel, steps, { accept: {
+      markers: arrayOrNull, arcs: arrayOrNull,
+      window: function (value) { return value === null || panelObject(value); },
+      highlight: function (value) { return value === null || typeof value === 'string'; } } });
+  },
+  render: function (host, panel, state) { return { html: locusHTML(panel, state) }; },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 360, preferredWidth: 600, maxWidth: 1000, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.locus-panel{font-size:12px;line-height:1.4;color:var(--dtext);min-width:0}
+.locus-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.locus-title{font-weight:600;color:var(--dink)}
+.locus-meta{font-size:10px;color:var(--dfaint)}
+.locus-map{position:relative;width:100%;overflow:hidden}
+.locus-svg{position:absolute;inset:0;width:100%;height:100%;display:block;color:var(--dtext)}
+.locus-track{fill:color-mix(in srgb,var(--dtext) 7%,transparent)}
+.locus-base{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
+.locus-tickline{stroke:color-mix(in srgb,var(--dtext) 45%,transparent);stroke-width:1}
+.locus-pin{stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 70%,transparent));stroke-width:1.5}
+.locus-arc{fill:none;stroke:var(--bio-tone,color-mix(in srgb,var(--dink) 75%,transparent));stroke-width:1.5}
+.locus-arc-reversed{stroke-dasharray:4 3}
+.locus-layer{position:absolute;inset:0;pointer-events:none}
+.locus-layer>*{pointer-events:auto}
+/* Zero-specificity fallbacks: the shared .bio-tone-* classes (owned by the sequence panel) win whenever present. */
+:where(.locus-feature,.locus-key,.locus-marker-dot){background:color-mix(in srgb,var(--dtext) 24%,transparent)}
+:where(.locus-arclabel){background:color-mix(in srgb,var(--dtext) 12%,transparent)}
+.locus-feature{position:absolute;box-sizing:border-box;min-width:2px;border-radius:3px;overflow:hidden;display:flex;align-items:center;padding:0 4px;font:600 9px/1 'IBM Plex Sans',sans-serif;color:var(--dink);white-space:nowrap;transition:opacity .25s ease,outline-color .25s ease}
+.locus-feature i{font-style:normal;overflow:hidden;text-overflow:ellipsis}
+.locus-plus i::after{content:' ›'}.locus-minus i::before{content:'‹ '}
+.locus-narrow i{display:none}
+.locus-feature.locus-hl{overflow:visible;outline:2px solid var(--dink);outline-offset:1px;z-index:2}
+.locus-feature.locus-hl i{overflow:visible;text-shadow:0 0 3px color-mix(in srgb,var(--dtext) 10%,transparent)}
+.locus-feature.locus-dim{opacity:.45}
+.locus-marker{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;line-height:1;color:var(--dink);white-space:nowrap}
+.locus-marker b{font-weight:600}
+.locus-marker-dot{width:8px;height:8px;border-radius:50%;border:1px solid color-mix(in srgb,var(--dtext) 40%,transparent)}
+.locus-arclabel{position:absolute;transform:translateX(-50%);padding:1px 6px;border-radius:999px;font-size:9px;line-height:1.5;color:var(--dink);white-space:nowrap}
+.locus-ticklabel{position:absolute;transform:translateX(-50%);font:9px/1.2 'IBM Plex Mono',monospace;color:var(--dfaint);white-space:nowrap}
+.locus-ticklabel.locus-anchor-start{transform:none;margin-left:2px}
+.locus-ticklabel.locus-anchor-end{transform:translateX(-100%);margin-left:-2px}
+.locus-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;font-size:10px;color:var(--dfaint)}
+.locus-legend li{display:flex;align-items:center;gap:5px}
+.locus-legend li.locus-hl{color:var(--dink);font-weight:600}
+.locus-key{display:inline-block;width:12px;height:8px;border-radius:2px}
+.locus-empty{margin:6px 0 0;font-size:11px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.locus-feature{transition:none}}
+@media print{.locus-feature,.locus-key,.locus-marker-dot,.locus-arclabel{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+`,
+  authoring: {
+    initialFields: true,
+    transientFields: ['highlight', 'window'],
+    template: {
+      title: 'Genome map', length: 12000, unit: 'bp', label: 'Plasmid pTEACH-1',
+      features: [
+        { id: 'geneA', label: 'gene A', from: 1200, to: 4800, strand: '+', tone: 'feature' },
+        { id: 'geneB', label: 'gene B', from: 6200, to: 9900, strand: '-', tone: 'feature' },
+        { id: 'ori', label: 'origin', from: 10400, to: 10700, tone: 'accent' } ],
+      initial: { markers: [{ id: 'cut1', at: 5400, label: 'EcoRI', tone: 'cut' }] }
+    },
+    setupFields: [['length', 'num'], ['unit', 'text'], ['label', 'text'],
+      ['features', 'rows', { wide: true, max: LOCUS_MAX_FEATURES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'from', kind: 'num', req: true }, { k: 'to', kind: 'num', req: true },
+        { k: 'tone', kind: 'enum', options: BIO_TONES }, { k: 'strand', kind: 'enum', options: ['+', '-'] }, { k: 'row', kind: 'num', label: 'Row (0–3)' }] }],
+      ['initial', 'json']],
+    patchFields: [['markers', 'jsonArr'], ['arcs', 'jsonArr'], ['window', 'json', { nullable: true }], ['highlight', 'text'], ['note', 'text']],
+    expandPatchFields: function (panel) {
+      return [['markers', 'jsonArr'], ['arcs', 'jsonArr'], ['window', 'json', { nullable: true }],
+        ['highlight', 'enum', locusFeatures(panel).map(function (feature) { return feature.id; })], ['note', 'text']];
+    },
+    fieldMeta: {
+      length: { label: 'Length (bases)', help: 'Total length of the genome, chromosome or region in bp: a whole number from 1 to 10,000,000,000. All positions are 1-based bases.' },
+      unit: { label: 'Ruler unit', help: 'bp, kb or Mb for ruler and distance labels. Positions are always authored in bp.' },
+      label: { label: 'Map label' },
+      features: { label: 'Features', help: 'Up to 48 blocks {id, label, from, to, tone?, strand?, row?}. Rows 0–3 are assigned first-fit without overlap unless set explicitly.' },
+      markers: { label: 'Markers', help: 'A complete snapshot: [{id, at, label?, tone?}] pins above the bar.', nullLabel: 'No markers' },
+      arcs: { label: 'Arcs', help: '[{id, from, to, label?, tone?}] connectors drawn above the bar; the apex shows the label or the distance between the two positions. from greater than to draws a dashed arc.', nullLabel: 'No arcs' },
+      window: { label: 'Zoom window', help: '{from, to} in bases: only that span renders and the ruler re-labels. Null shows the whole length.', nullLabel: 'Whole length' },
+      highlight: { label: 'Highlighted feature', help: 'Feature id to emphasise; other features dim.', nullLabel: 'No highlight' },
+      note: { label: 'Explanation' }
+    },
+    /* The unit is a fixed choice, so the inspector shows a select. */
+    editor: function (context) {
+      return { setupField: function (field, panel) {
+        if (field[0] !== 'unit') return;
+        var el = context.document.createElement('select');
+        el.className = 'fctl'; el.setAttribute('aria-label', 'Ruler unit');
+        [['bp', 'bp · bases'], ['kb', 'kb · kilobases'], ['Mb', 'Mb · megabases']].forEach(function (pair) {
+          var option = context.document.createElement('option'); option.value = pair[0]; option.textContent = pair[1]; el.appendChild(option);
+        });
+        el.value = locusUnit(panel);
+        context.listen(el, 'change', function () { context.commit('unit', JSON.stringify(el.value)); });
+        return context.controls.row('Ruler unit', el);
+      } };
+    },
+    picker: { order: 43, name: 'Genome map', category: 'Science & sequencing', tagline: 'Where in the genome.',
+      description: 'A linear map of a genome, chromosome or gene region with annotated features on stacked rows, point markers, arcs that connect two positions with their distance, and a zoomable ruler.' },
+    example: function (sample) {
+      sample.panel.length = 48000;
+      sample.panel.unit = 'kb';
+      sample.panel.label = 'Region chr2:1–48 kb (illustrative)';
+      sample.panel.features = [
+        { id: 'enh', label: 'enhancer', from: 1800, to: 2600, tone: 'motif' },
+        { id: 'prom', label: 'promoter', from: 9400, to: 10200, tone: 'primer' },
+        { id: 'geneA', label: 'gene A', from: 10300, to: 23800, strand: '+', tone: 'feature' },
+        { id: 'ex1', label: 'exon 1', from: 10300, to: 10900, strand: '+', tone: 'accent' },
+        { id: 'ex2', label: 'exon 2', from: 16300, to: 17100, strand: '+', tone: 'accent' },
+        { id: 'ex3', label: 'exon 3', from: 22600, to: 23800, strand: '+', tone: 'accent' },
+        { id: 'geneB', label: 'gene B', from: 29000, to: 41500, strand: '-', tone: 'feature' },
+        { id: 'rep', label: 'repeat', from: 44000, to: 46500, tone: 'neutral' } ];
+      sample.state = {
+        markers: [
+          { id: 'snp', at: 16640, label: 'SNP', tone: 'mismatch' },
+          { id: 'cut', at: 27500, label: 'cut site', tone: 'cut' } ],
+        arcs: [{ id: 'loop', from: 2200, to: 9800, tone: 'motif' }],
+        highlight: 'geneA',
+        note: 'The enhancer loops to the promoter; a SNP sits in exon 2 of gene A.' };
+      sample.panel.initial = JSON.parse(JSON.stringify(sample.state));
+      return sample;
+    }
+  }
+});
 /* ---- src/panels/types/log.js ---- */
 /* log panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 PanelViews.register(
@@ -25488,6 +27185,459 @@ PanelRegistry.extend('radar', {
     },
   },
 });
+/* ---- src/panels/types/reads.js ---- */
+/* reads panel: a short authored reference with sequencing reads stacked under
+   it, aligned by 1-based coordinate. A teaching display: every read, gap and
+   insertion is typed in the spec; nothing is computed from real data files.
+   Shared alphabet, range and tone helpers live in ../bio.js. Residue colours
+   (`.bio-b-*`) and emphasis tones (`.bio-tone-*`) are owned by the sequence
+   panel's styles; this file only reuses those class names. */
+var READS_MAX_READS = 24;
+var READS_DEFAULT_READS = 12;
+var READS_MAX_INSERT = 24;
+var READS_MAX_INSERTS = 24;
+var READS_MAX_MARKS = 24;
+/* Reads that overhang the reference show at most this many soft-clipped
+   letters per side, so a hostile `at` can never widen the grid without bound. */
+var READS_OVERHANG = 12;
+var READS_STATE_KEYS = ['reads', 'inserts', 'focus', 'showDepth', 'marks'];
+
+function readsAlphabet(panel) {
+  return panel && panel.alphabet === 'rna' ? 'rna' : 'dna';
+}
+function readsStart(panel) {
+  return panel && bioPosition(panel.start) ? panel.start : 1;
+}
+function readsMax(panel) {
+  var value = panel && panel.maxReads;
+  return Number.isSafeInteger(value) && value >= 1 && value <= READS_MAX_READS ? value : READS_DEFAULT_READS;
+}
+/* Reference text: upper-cased, whitespace removed, capped at the shared
+   maximum. Invalid letters stay in place and render as unknown. */
+function readsReference(panel) {
+  var normalized = bioNormalizeSequence(panel && panel.reference, readsAlphabet(panel));
+  return { text: normalized.text.slice(0, BIO_MAX_SEQUENCE), invalid: normalized.invalid.filter(function (i) { return i < BIO_MAX_SEQUENCE; }) };
+}
+/* Read text accepts the alphabet plus `-` for a deletion gap. */
+function readsSequence(value, alphabet, max) {
+  var normalized = bioNormalizeSequence(value, alphabet),
+    text = normalized.text.slice(0, max),
+    invalid = normalized.invalid.filter(function (i) { return i < max && text.charAt(i) !== '-'; });
+  return { text: text, invalid: invalid };
+}
+/* Mismatch = letters differ case-insensitively; N on either side matches. */
+function readsClassify(readLetter, refLetter) {
+  var r = String(readLetter || '').toUpperCase(), f = String(refLetter || '').toUpperCase();
+  if (r === '-') return 'gap';
+  if (r === 'N' || f === 'N' || r === f) return 'match';
+  return 'mismatch';
+}
+function readsInvalidLetters(text, invalid) {
+  var seen = [];
+  invalid.forEach(function (i) { var ch = text.charAt(i); if (seen.indexOf(ch) < 0) seen.push(ch); });
+  return seen.join('');
+}
+function readsDeclarationWarnings(panel, path, warnings) {
+  var alphabet = readsAlphabet(panel), reference = readsReference(panel);
+  if (panel.alphabet !== undefined && ['dna', 'rna'].indexOf(panel.alphabet) < 0)
+    warnings.push(path + '.alphabet: expected dna or rna — using dna');
+  if (typeof panel.reference !== 'string' || !reference.text.length)
+    warnings.push(path + '.reference: expected 1–' + BIO_MAX_SEQUENCE + ' ' + alphabet + ' letters — panel renders empty');
+  else if (bioNormalizeSequence(panel.reference, alphabet).text.length > BIO_MAX_SEQUENCE)
+    warnings.push(path + '.reference: only the first ' + BIO_MAX_SEQUENCE + ' letters render');
+  if (reference.invalid.length)
+    warnings.push(path + '.reference: letters "' + readsInvalidLetters(reference.text, reference.invalid) + '" are not ' + alphabet + ' — shown as unknown');
+  if (panel.start !== undefined && !bioPosition(panel.start))
+    warnings.push(path + '.start: expected a 1-based safe integer coordinate — using 1');
+  if (panel.label !== undefined && typeof panel.label !== 'string')
+    warnings.push(path + '.label: expected text — ignored');
+  if (panel.maxReads !== undefined && readsMax({maxReads: panel.maxReads}) !== panel.maxReads)
+    warnings.push(path + '.maxReads: expected an integer 1–' + READS_MAX_READS + ' — using ' + READS_DEFAULT_READS);
+  if (panel.showMatches !== undefined && typeof panel.showMatches !== 'boolean')
+    warnings.push(path + '.showMatches: expected true or false — matches render as dots');
+  readsPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function readsStateWarnings(state, path, panel, warnings) {
+  var alphabet = readsAlphabet(panel), reference = readsReference(panel),
+    start = readsStart(panel), end = start + Math.max(reference.text.length, 1) - 1, max = readsMax(panel);
+  Object.keys(state).forEach(function (key) {
+    if (READS_STATE_KEYS.indexOf(key) < 0 && !bioCommonStateKey(key))
+      warnings.push(path + '.' + key + ': unknown field — ignored');
+  });
+  if (panelOwn(state, 'note') && state.note !== null && typeof state.note !== 'string')
+    warnings.push(path + '.note: expected text — ignored');
+  if (panelOwn(state, 'reads') && state.reads !== null) {
+    if (!Array.isArray(state.reads)) warnings.push(path + '.reads: expected an array of {id, at, seq} — ignored');
+    else {
+      if (state.reads.length > max) warnings.push(path + '.reads: only the first ' + max + ' reads render (maxReads)');
+      var seen = Object.create(null);
+      state.reads.slice(0, max).forEach(function (read, i) {
+        var at = path + '.reads[' + i + ']';
+        if (!panelObject(read)) { warnings.push(at + ': expected {id, at, seq} — read skipped'); return; }
+        if (typeof read.id !== 'string' || !read.id) { warnings.push(at + '.id: needs a non-empty string — read skipped'); return; }
+        if (seen[read.id]) { warnings.push(at + '.id: duplicate read id "' + read.id + '" — later read skipped'); return; }
+        seen[read.id] = true;
+        if (!bioPosition(read.at)) warnings.push(at + '.at: expected a 1-based reference coordinate — read skipped');
+        var seq = readsSequence(read.seq, alphabet, BIO_MAX_SEQUENCE);
+        if (typeof read.seq !== 'string' || !seq.text.length)
+          warnings.push(at + '.seq: expected 1–' + BIO_MAX_SEQUENCE + ' ' + alphabet + ' letters or - gaps — read skipped');
+        else {
+          if (bioNormalizeSequence(read.seq, alphabet).text.length > BIO_MAX_SEQUENCE)
+            warnings.push(at + '.seq: only the first ' + BIO_MAX_SEQUENCE + ' letters render');
+          if (seq.invalid.length)
+            warnings.push(at + '.seq: letters "' + readsInvalidLetters(seq.text, seq.invalid) + '" are not ' + alphabet + ' — shown as unknown');
+          if (bioPosition(read.at) && (read.at > end || read.at + seq.text.length - 1 < start))
+            warnings.push(at + ': read lies entirely outside the reference ' + start + '–' + end + ' — listed without cells');
+        }
+        if (read.label !== undefined && typeof read.label !== 'string') warnings.push(at + '.label: expected text — ignored');
+        if (read.strand !== undefined && read.strand !== '+' && read.strand !== '-') warnings.push(at + '.strand: expected "+" or "-" — ignored');
+        if (read.tone !== undefined && BIO_TONES.indexOf(read.tone) < 0) warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using neutral');
+      });
+    }
+  }
+  if (panelOwn(state, 'inserts') && state.inserts !== null) {
+    if (!Array.isArray(state.inserts)) warnings.push(path + '.inserts: expected an array of {read, after, seq} — ignored');
+    else {
+      if (state.inserts.length > READS_MAX_INSERTS) warnings.push(path + '.inserts: only the first ' + READS_MAX_INSERTS + ' insertions render');
+      state.inserts.slice(0, READS_MAX_INSERTS).forEach(function (insert, i) {
+        var at = path + '.inserts[' + i + ']';
+        if (!panelObject(insert)) { warnings.push(at + ': expected {read, after, seq} — insertion skipped'); return; }
+        if (typeof insert.read !== 'string' || !insert.read) warnings.push(at + '.read: needs a read id — insertion skipped');
+        if (!bioPosition(insert.after)) warnings.push(at + '.after: expected the 1-based reference coordinate before the insertion — insertion skipped');
+        else if (insert.after < start || insert.after > end) warnings.push(at + '.after: coordinate ' + insert.after + ' lies outside the reference ' + start + '–' + end + ' — insertion skipped');
+        var seq = readsSequence(insert.seq, alphabet, READS_MAX_INSERT);
+        if (typeof insert.seq !== 'string' || !seq.text.length || seq.text.indexOf('-') >= 0 || bioNormalizeSequence(insert.seq, alphabet).text.length > READS_MAX_INSERT)
+          warnings.push(at + '.seq: expected 1–' + READS_MAX_INSERT + ' inserted ' + alphabet + ' letters — insertion skipped');
+        else if (seq.invalid.length)
+          warnings.push(at + '.seq: letters "' + readsInvalidLetters(seq.text, seq.invalid) + '" are not ' + alphabet + ' — shown as unknown');
+      });
+    }
+  }
+  if (panelOwn(state, 'focus') && state.focus !== null && typeof state.focus !== 'string')
+    warnings.push(path + '.focus: expected a read id or null — ignored');
+  if (panelOwn(state, 'showDepth') && state.showDepth !== null && typeof state.showDepth !== 'boolean')
+    warnings.push(path + '.showDepth: expected true or false — ignored');
+  if (panelOwn(state, 'marks') && state.marks !== null) {
+    if (!Array.isArray(state.marks)) warnings.push(path + '.marks: expected an array of {id, from, to} — ignored');
+    else {
+      if (state.marks.length > READS_MAX_MARKS) warnings.push(path + '.marks: only the first ' + READS_MAX_MARKS + ' marks render');
+      var ids = Object.create(null);
+      state.marks.slice(0, READS_MAX_MARKS).forEach(function (mark, i) {
+        var at = path + '.marks[' + i + ']';
+        if (!panelObject(mark)) { warnings.push(at + ': expected {id, from, to} — mark skipped'); return; }
+        if (typeof mark.id !== 'string' || !mark.id) { warnings.push(at + '.id: needs a non-empty string — mark skipped'); return; }
+        if (ids[mark.id]) { warnings.push(at + '.id: duplicate mark id "' + mark.id + '" — later mark skipped'); return; }
+        ids[mark.id] = true;
+        bioRange(mark, at, warnings, start, end);
+        if (mark.tone !== undefined && BIO_TONES.indexOf(mark.tone) < 0) warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using neutral');
+        if (mark.label !== undefined && typeof mark.label !== 'string') warnings.push(at + '.label: expected text — ignored');
+      });
+    }
+  }
+}
+function readsPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, readsStateWarnings);
+}
+/* Clean read items in authored order: unique string ids, valid coordinates and
+   non-empty text. Output is new objects; the state is never mutated. */
+function readsItems(state, panel) {
+  var alphabet = readsAlphabet(panel), max = readsMax(panel), seen = Object.create(null), out = [];
+  (Array.isArray(state.reads) ? state.reads : []).slice(0, max).forEach(function (read) {
+    if (!panelObject(read) || typeof read.id !== 'string' || !read.id || seen[read.id] || !bioPosition(read.at)) return;
+    var seq = readsSequence(read.seq, alphabet, BIO_MAX_SEQUENCE);
+    if (!seq.text.length) return;
+    seen[read.id] = true;
+    out.push({ id: read.id, at: read.at, text: seq.text, invalid: seq.invalid,
+      label: typeof read.label === 'string' ? read.label : '',
+      strand: read.strand === '-' ? '-' : read.strand === '+' ? '+' : '',
+      tone: bioTone(read.tone, 'neutral') });
+  });
+  return out;
+}
+function readsMarks(state, panel) {
+  var start = readsStart(panel), end = start + Math.max(readsReference(panel).text.length, 1) - 1, seen = Object.create(null), out = [];
+  (Array.isArray(state.marks) ? state.marks : []).slice(0, READS_MAX_MARKS).forEach(function (mark) {
+    if (!panelObject(mark) || typeof mark.id !== 'string' || !mark.id || seen[mark.id]) return;
+    var range = bioRange(mark, '', null, start, end);
+    if (!range) return;
+    seen[mark.id] = true;
+    out.push({ id: mark.id, from: Math.max(range.from, start), to: Math.min(range.to, end), tone: bioTone(mark.tone, 'neutral'),
+      label: typeof mark.label === 'string' ? mark.label : '' });
+  });
+  return out;
+}
+/* Pure presentation model. Coordinates are 1-based reference positions; grid
+   columns are zero-based from `grid.from`, which extends past the reference by
+   at most READS_OVERHANG letters per side for soft-clipped overhang. Depth
+   counts aligned letters (match or mismatch) per reference position; gaps and
+   clipped letters do not add depth. */
+function readsModel(panel, state) {
+  panel = panelObject(panel) ? panel : {};
+  state = panelObject(state) ? state : {};
+  var alphabet = readsAlphabet(panel), reference = readsReference(panel), start = readsStart(panel),
+    length = reference.text.length, end = start + Math.max(length, 1) - 1;
+  var items = readsItems(state, panel);
+  var gridFrom = start, gridTo = end;
+  items.forEach(function (read) {
+    var readEnd = read.at + read.text.length - 1;
+    read.outside = !length || read.at > end || readEnd < start;
+    if (read.outside) return;
+    gridFrom = Math.min(gridFrom, Math.max(read.at, start - READS_OVERHANG));
+    gridTo = Math.max(gridTo, Math.min(readEnd, end + READS_OVERHANG));
+  });
+  var columns = gridTo - gridFrom + 1;
+  var referenceCells = [];
+  for (var i = 0; i < length; i++)
+    referenceCells.push({ coord: start + i, col: start + i - gridFrom, ch: reference.text.charAt(i), unknown: reference.invalid.indexOf(i) >= 0 });
+  var depth = [];
+  for (var d = 0; d < length; d++) depth.push(0);
+  var focus = typeof state.focus === 'string' && state.focus ? state.focus : null;
+  var focusFound = focus !== null && items.some(function (read) { return read.id === focus; });
+  var rows = items.map(function (read) {
+    var cells = [], counts = { match: 0, mismatch: 0, gap: 0, clip: 0 }, truncatedLeft = 0, truncatedRight = 0;
+    for (var k = 0; k < read.text.length; k++) {
+      var coord = read.at + k, ch = read.text.charAt(k);
+      if (read.outside) continue;
+      if (coord < gridFrom) { truncatedLeft++; continue; }
+      if (coord > gridTo) { truncatedRight++; continue; }
+      var inside = coord >= start && coord <= end;
+      var kind = inside ? readsClassify(ch, reference.text.charAt(coord - start)) : 'clip';
+      if (inside && kind !== 'gap') depth[coord - start]++;
+      counts[kind]++;
+      cells.push({ coord: coord, col: coord - gridFrom, ch: ch, kind: kind, unknown: read.invalid.indexOf(k) >= 0, insert: null });
+    }
+    return { id: read.id, label: read.label || read.id, strand: read.strand, tone: read.tone, at: read.at,
+      end: read.at + read.text.length - 1, length: read.text.length, outside: read.outside, cells: cells, counts: counts,
+      truncatedLeft: truncatedLeft, truncatedRight: truncatedRight,
+      clipped: counts.clip > 0 || truncatedLeft > 0 || truncatedRight > 0,
+      focus: focusFound && read.id === focus, dim: focusFound && read.id !== focus, inserts: [] };
+  });
+  var inserts = [];
+  (Array.isArray(state.inserts) ? state.inserts : []).slice(0, READS_MAX_INSERTS).forEach(function (insert) {
+    if (!panelObject(insert) || typeof insert.read !== 'string' || !insert.read || !bioPosition(insert.after)) return;
+    if (bioNormalizeSequence(insert.seq, alphabet).text.length > READS_MAX_INSERT) return;
+    var seq = readsSequence(insert.seq, alphabet, READS_MAX_INSERT);
+    if (!seq.text.length || seq.text.indexOf('-') >= 0) return;
+    var row = null;
+    rows.some(function (candidate) { if (candidate.id === insert.read) { row = candidate; return true; } return false; });
+    var cell = null;
+    if (row) row.cells.some(function (candidate) { if (candidate.coord === insert.after && candidate.kind !== 'clip') { cell = candidate; return true; } return false; });
+    var entry = { read: insert.read, after: insert.after, seq: seq.text, invalid: seq.invalid, placed: !!cell, orphan: !row };
+    if (cell) { cell.insert = cell.insert ? cell.insert + seq.text : seq.text; row.inserts.push(entry); }
+    inserts.push(entry);
+  });
+  var ruler = referenceCells.filter(function (cell, index) { return index === 0 || cell.coord % 10 === 0; })
+    .map(function (cell) { return { coord: cell.coord, col: cell.col, label: bioFormatCoord(cell.coord) }; });
+  var marks = readsMarks(state, panel).map(function (mark) {
+    return { id: mark.id, from: mark.from, to: mark.to, tone: mark.tone, label: mark.label, col: mark.from - gridFrom, span: mark.to - mark.from + 1 };
+  });
+  var maxDepth = depth.reduce(function (best, value) { return Math.max(best, value); }, 0);
+  return { alphabet: alphabet, start: start, end: end, length: length, valid: length > 0,
+    label: typeof panel.label === 'string' ? panel.label : '',
+    showMatches: panel.showMatches === true, showDepth: state.showDepth !== false,
+    grid: { from: gridFrom, to: gridTo, columns: columns }, reference: referenceCells, rows: rows,
+    inserts: inserts, marks: marks, depth: depth, maxDepth: maxDepth, ruler: ruler, focus: focus, focusFound: focusFound,
+    visibleRows: rows.filter(function (row) { return !row.outside; }).length };
+}
+function readsCellHTML(cell, model) {
+  var classes = 'reads-cell reads-' + cell.kind, text, title = bioFormatCoord(cell.coord) + ': ' + cell.kind;
+  if (cell.kind === 'gap') text = '-';
+  else if (cell.kind === 'match' && !model.showMatches) text = '.';
+  else { text = cell.ch; classes += ' ' + bioLetterClass(cell.unknown ? '?' : cell.ch); }
+  if (cell.kind === 'mismatch') classes += ' bio-tone-mismatch';
+  if (cell.kind === 'clip') title += ' (soft clip, outside the reference)';
+  if (cell.insert) title += ' · insertion after this base: ' + cell.insert;
+  return '<span class="' + classes + '" style="--c:' + cell.col + '" title="' + esc(title) + '">' + esc(text) +
+    (cell.insert ? '<i class="reads-wedge bio-tone-insert" title="' + esc('insertion ' + cell.insert) + '">▲</i>' : '') + '</span>';
+}
+function readsHTML(panel, state) {
+  state = panelObject(state) ? state : {};
+  var model = readsModel(panel, state), h = '';
+  var title = (model.label ? model.label + ' ' : 'Reference ') + bioFormatCoord(model.start) + '–' + bioFormatCoord(model.end) + ' (' + model.alphabet + ')';
+  var summary = title + ', ' + model.rows.length + (model.rows.length === 1 ? ' read' : ' reads') + ', depth up to ' + model.maxDepth;
+  h += '<div class="reads-panel" role="region" aria-label="' + esc('Read alignment: ' + summary) + '">';
+  h += '<div class="reads-head"><span class="reads-title">' + esc(model.label || 'Reference') + '</span><span class="reads-meta">' +
+    esc(bioFormatCoord(model.start) + '–' + bioFormatCoord(model.end) + ' · ' + model.alphabet + ' · ' + model.rows.length + (model.rows.length === 1 ? ' read' : ' reads') +
+      (model.focusFound ? ' · focus ' + model.focus : '')) + '</span></div>';
+  if (!model.valid) return softwarePanelShell(h + '<p class="reads-empty">Declare a reference sequence to align reads.</p></div>', state);
+  h += '<div class="reads-scroll panel-fill-scroll" tabindex="0"><div class="reads-grid' + (model.showMatches ? ' reads-letters' : '') + '" style="--reads-cols:' + model.grid.columns + '">';
+  if (model.showDepth) {
+    h += '<div class="reads-row reads-depth"><span class="reads-name">depth</span><span class="reads-cells">';
+    model.reference.forEach(function (cell, i) {
+      var value = model.depth[i], pct = model.maxDepth ? Math.round(value / model.maxDepth * 100) : 0;
+      h += '<span class="reads-dcell" style="--c:' + cell.col + '" title="' + esc('depth ' + value + ' at ' + bioFormatCoord(cell.coord)) + '"><i style="height:' + pct + '%"></i></span>';
+    });
+    h += '</span></div>';
+  }
+  h += '<div class="reads-row reads-ruler" aria-hidden="true"><span class="reads-name"></span><span class="reads-cells">';
+  model.ruler.forEach(function (tick) { h += '<span class="reads-tick" style="--c:' + tick.col + '">' + esc(tick.label) + '</span>'; });
+  h += '</span></div>';
+  h += '<div class="reads-row reads-ref"><span class="reads-name">' + esc(model.label || 'ref') + '</span><span class="reads-cells">';
+  model.reference.forEach(function (cell) {
+    h += '<span class="reads-cell ' + bioLetterClass(cell.unknown ? '?' : cell.ch) + '" style="--c:' + cell.col + '" title="' + esc(bioFormatCoord(cell.coord)) + '">' + esc(cell.ch) + '</span>';
+  });
+  h += '</span></div>';
+  if (model.marks.length) {
+    h += '<div class="reads-row reads-marks" aria-hidden="true"><span class="reads-name"></span><span class="reads-cells">';
+    model.marks.forEach(function (mark) {
+      h += '<span class="reads-band bio-tone-' + mark.tone + '" style="--c:' + mark.col + ';--w:' + mark.span + '" title="' + esc(mark.label || mark.id) + '"></span>';
+    });
+    h += '</span></div>';
+  }
+  model.rows.forEach(function (row) {
+    var detail = row.label + ' at ' + bioFormatCoord(row.at) + (row.strand ? ' (' + row.strand + ')' : '') + ': ' + row.counts.mismatch + ' mismatch, ' +
+      row.counts.gap + ' gap, ' + (row.counts.clip + row.truncatedLeft + row.truncatedRight) + ' clipped' + (row.inserts.length ? ', ' + row.inserts.length + ' insertion' : '');
+    h += '<div class="reads-row reads-read' + (row.focus ? ' reads-focus' : '') + (row.dim ? ' reads-dim' : '') + '" title="' + esc(detail) + '">' +
+      '<span class="reads-name">' + (row.tone !== 'neutral' ? '<span class="reads-dot bio-tone-' + row.tone + '"></span>' : '') +
+      (row.strand ? '<b class="reads-strand">' + esc(row.strand) + '</b>' : '') + esc(row.label) + '</span><span class="reads-cells">';
+    if (row.outside) h += '<span class="reads-outside" style="--c:0">' + esc('outside the reference (at ' + bioFormatCoord(row.at) + ')') + '</span>';
+    if (row.truncatedLeft) h += '<span class="reads-more" style="--c:' + row.cells[0].col + '">' + esc('… ' + row.truncatedLeft) + '</span>';
+    row.cells.forEach(function (cell) { h += readsCellHTML(cell, model); });
+    if (row.truncatedRight) h += '<span class="reads-more reads-more-right" style="--c:' + row.cells[row.cells.length - 1].col + '">' + esc(row.truncatedRight + ' …') + '</span>';
+    h += '</span></div>';
+  });
+  if (!model.rows.length) h += '<div class="reads-row"><span class="reads-name"></span><span class="reads-cells"><span class="reads-empty" style="--c:0">No reads at this step</span></span></div>';
+  h += '</div></div>';
+  var legend = [];
+  model.marks.forEach(function (mark) {
+    legend.push('<li><span class="reads-key bio-tone-' + mark.tone + '"></span>' + esc((mark.label || mark.id) + ' ' + bioFormatCoord(mark.from) + '–' + bioFormatCoord(mark.to)) + '</li>');
+  });
+  model.inserts.forEach(function (insert) {
+    legend.push('<li><span class="reads-key bio-tone-insert">▲</span>' + esc(insert.seq + ' after ' + bioFormatCoord(insert.after) + ' in ' + insert.read +
+      (insert.orphan ? ' (no such read)' : insert.placed ? '' : ' (outside that read)')) + '</li>');
+  });
+  if (model.rows.some(function (row) { return row.clipped; })) legend.push('<li><span class="reads-key reads-key-clip"></span>soft clip beyond the reference</li>');
+  if (legend.length) h += '<ul class="reads-legend">' + legend.join('') + '</ul>';
+  return softwarePanelShell(h + '</div>', state);
+}
+PanelRegistry.define('reads', {
+  label: 'Read alignment', since: '0.2.0', order: 41,
+  validateDeclaration: readsDeclarationWarnings, validatePatch: readsPatchWarnings,
+  fold: function (panel, steps) {
+    var arrayOrNull = function (value) { return value === null || Array.isArray(value); };
+    return foldCommonPanelStates(panel, steps, { accept: {
+      reads: arrayOrNull, inserts: arrayOrNull, marks: arrayOrNull,
+      focus: function (value) { return value === null || typeof value === 'string'; },
+      showDepth: function (value) { return value === null || typeof value === 'boolean'; } } });
+  },
+  render: function (host, panel, state) { return { html: readsHTML(panel, state) }; },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 360, preferredWidth: 560, maxWidth: 1000, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.reads-panel{font-size:12px;line-height:1.4;color:var(--dtext);min-width:0;--reads-cell:14px}
+.reads-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.reads-title{font-weight:600;color:var(--dink)}
+.reads-meta{font-size:10px;color:var(--dfaint)}
+.reads-scroll{overflow:auto;max-height:320px;border:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);border-radius:6px;padding:4px 6px 6px 0}
+.reads-scroll:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.reads-grid{display:inline-grid;grid-template-columns:max-content max-content;min-width:100%;font:11px/1 'IBM Plex Mono',monospace}
+.reads-row{display:contents}
+.reads-name{display:flex;align-items:center;gap:4px;padding:0 8px 0 6px;height:calc(var(--reads-cell) + 4px);font-size:10px;color:var(--dink);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.reads-dot{flex:none;width:7px;height:7px;border-radius:50%}
+.reads-strand{font-weight:600;color:var(--dfaint)}
+.reads-cells{position:relative;display:grid;grid-template-columns:repeat(var(--reads-cols),var(--reads-cell));grid-template-rows:var(--reads-cell);align-items:center;height:calc(var(--reads-cell) + 4px);padding-right:var(--reads-cell)}
+.reads-cell,.reads-dcell,.reads-tick,.reads-band,.reads-more,.reads-outside,.reads-empty{grid-row:1;grid-column:calc(var(--c) + 1)}
+.reads-cell{position:relative;display:flex;align-items:center;justify-content:center;width:var(--reads-cell);height:var(--reads-cell);border-radius:2px;text-align:center}
+/* Zero-specificity fallbacks: the shared .bio-tone-* classes (owned by the sequence panel) win whenever present. */
+:where(.reads-mismatch,.reads-band,.reads-key,.reads-dot,.reads-wedge){background:color-mix(in srgb,var(--dtext) 22%,transparent)}
+.reads-match{color:var(--dfaint)}
+.reads-letters .reads-match{opacity:.75}
+.reads-mismatch{font-weight:700}
+.reads-gap{color:var(--dfaint);letter-spacing:0}
+.reads-clip{opacity:.4}
+.reads-wedge{position:absolute;right:-5px;bottom:-5px;font-size:8px;line-height:1;font-style:normal;padding:0 1px;border-radius:2px;z-index:1}
+.reads-read .reads-cells::before{content:'';position:absolute;inset:3px 0;border-radius:3px;background:color-mix(in srgb,var(--dtext) 5%,transparent);pointer-events:none}
+.reads-focus .reads-cells::before{background:color-mix(in srgb,var(--dink) 14%,transparent);outline:1px solid color-mix(in srgb,var(--dink) 60%,transparent)}
+.reads-focus .reads-name{font-weight:700}
+.reads-dim{opacity:.35}
+.reads-depth .reads-cells,.reads-depth .reads-name{height:26px}
+.reads-depth .reads-cells{grid-template-rows:22px;align-items:end;border-bottom:1px solid color-mix(in srgb,var(--dtext) 24%,transparent)}
+.reads-dcell{display:flex;align-items:flex-end;width:var(--reads-cell);height:22px;padding:0 2px}
+.reads-dcell i{display:block;width:100%;min-height:1px;border-radius:1px 1px 0 0;background:color-mix(in srgb,var(--dink) 38%,transparent)}
+.reads-ruler .reads-cells,.reads-ruler .reads-name{height:14px}
+.reads-ruler .reads-cells{grid-template-rows:14px}
+.reads-tick{position:relative;font-size:9px;color:var(--dfaint);white-space:nowrap;padding-left:1px;border-left:1px solid color-mix(in srgb,var(--dtext) 35%,transparent);height:12px;line-height:12px}
+.reads-ref .reads-cell{font-weight:600;color:var(--dink)}
+.reads-marks .reads-cells,.reads-marks .reads-name{height:8px}
+.reads-marks .reads-cells{grid-template-rows:6px}
+.reads-band{grid-column:calc(var(--c) + 1)/span var(--w);height:6px;border-radius:3px}
+.reads-more{font-size:9px;color:var(--dfaint);white-space:nowrap;justify-self:end;transform:translateX(calc(-1 * var(--reads-cell)))}
+.reads-more-right{justify-self:start;transform:translateX(var(--reads-cell))}
+.reads-outside,.reads-empty{grid-column:1/-1;font-size:10px;color:var(--dfaint);white-space:nowrap;padding-left:2px}
+p.reads-empty{margin:4px 0;font-size:11px}
+.reads-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;font-size:10px;color:var(--dfaint)}
+.reads-legend li{display:flex;align-items:center;gap:5px}
+.reads-key{display:inline-flex;align-items:center;justify-content:center;width:12px;height:8px;border-radius:2px;font-size:8px;line-height:1}
+.reads-key-clip{background:color-mix(in srgb,var(--dtext) 18%,transparent);opacity:.5}
+@media print{.reads-scroll{max-height:none;overflow:visible}.reads-cell,.reads-band,.reads-dcell i,.reads-wedge{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+`,
+  authoring: {
+    initialFields: true,
+    transientFields: ['focus', 'showDepth'],
+    template: {
+      title: 'Read alignment', reference: 'ACGTTGCATGCCTAGGATCCAGTTACGGAATCGATCG', alphabet: 'dna', start: 1, label: 'Reference', maxReads: 12,
+      initial: { reads: [
+        { id: 'r1', at: 3, seq: 'GTTGCATGCCTAGG', strand: '+' },
+        { id: 'r2', at: 8, seq: 'ATGCCTAGGATCCAGTT', strand: '-' } ], showDepth: true }
+    },
+    setupFields: [['reference', 'text'], ['alphabet', 'text'], ['start', 'num'], ['label', 'text'], ['maxReads', 'num'], ['showMatches', 'text'], ['initial', 'json']],
+    patchFields: [['reads', 'jsonArr'], ['inserts', 'jsonArr'], ['focus', 'text'], ['showDepth', 'bool'], ['marks', 'jsonArr'], ['note', 'text']],
+    fieldMeta: {
+      reference: { label: 'Reference sequence', help: '1–240 letters of the alphabet; whitespace is removed. Other letters warn and render as unknown.' },
+      alphabet: { label: 'Alphabet', help: 'dna (ACGTN) or rna (ACGUN).' },
+      start: { label: 'First coordinate', help: '1-based coordinate of the first reference letter. Read positions use the same numbering.' },
+      label: { label: 'Reference label' },
+      maxReads: { label: 'Maximum reads', help: '1–24 reads render per step; extra authored reads warn and are ignored. Default 12.' },
+      showMatches: { label: 'Show matching letters', help: 'Off shows matches as dots so mismatches stand out; on prints every read letter.' },
+      reads: { label: 'Reads', help: 'A complete snapshot: [{id, at, seq, label?, strand?, tone?}]. at is the 1-based reference coordinate of the first aligned letter; seq uses letters and - for a deletion gap. Letters beyond the reference render dimmed as soft clips.', nullLabel: 'No reads' },
+      inserts: { label: 'Insertions', help: '[{read, after, seq}]: inserted letters that sit between reference coordinate after and after+1 in that read. Drawn as a wedge; the reference does not shift.', nullLabel: 'No insertions' },
+      focus: { label: 'Focus read', help: 'Read id to emphasise; other reads dim.', nullLabel: 'No focus' },
+      showDepth: { label: 'Show coverage depth', help: 'Default on: a thin bar per reference position counting aligned letters (gaps and clips excluded).' },
+      marks: { label: 'Reference marks', help: '[{id, from, to, tone?, label?}] in reference coordinates, drawn as a band under the reference and listed in the legend.', nullLabel: 'No marks' },
+      note: { label: 'Explanation' }
+    },
+    /* Alphabet and match display are fixed choices, so the inspector shows
+       selects instead of free text (the `text` kind only names the fallback). */
+    editor: function (context) {
+      function select(label, options, value, onChange) {
+        var el = context.document.createElement('select');
+        el.className = 'fctl'; el.setAttribute('aria-label', label);
+        options.forEach(function (pair) {
+          var option = context.document.createElement('option'); option.value = pair[0]; option.textContent = pair[1]; el.appendChild(option);
+        });
+        el.value = value;
+        context.listen(el, 'change', function () { onChange(el.value); });
+        return context.controls.row(label, el);
+      }
+      return { setupField: function (field, panel) {
+        if (field[0] === 'alphabet')
+          return select('Alphabet', [['dna', 'DNA · ACGTN'], ['rna', 'RNA · ACGUN']], panel.alphabet === 'rna' ? 'rna' : 'dna',
+            function (value) { context.commit('alphabet', JSON.stringify(value)); });
+        if (field[0] === 'showMatches')
+          return select('Matching letters', [['dots', 'Dots · mismatches stand out'], ['letters', 'Letters · print every base']], panel.showMatches === true ? 'letters' : 'dots',
+            function (value) { context.commit('showMatches', value === 'letters' ? 'true' : null); });
+      } };
+    },
+    picker: { order: 41, name: 'Read alignment', category: 'Science & sequencing', tagline: 'Reads stacked under a reference.',
+      description: 'A short authored reference with sequencing reads aligned by coordinate: mismatches, deletion gaps, insertions and soft clips stay visible, with a coverage depth bar above the reference.' },
+    example: function (sample) {
+      sample.panel.reference = 'ACGTTGCATGCCTAGGATCCAGTTACGGAATCGATCGTTAGCCATGA';
+      sample.panel.start = 1201;
+      sample.panel.label = 'chr7 fragment';
+      sample.state = { reads: [
+        { id: 'r1', at: 1203, seq: 'GTTGCATGCCTAGG', strand: '+' },
+        { id: 'r2', at: 1208, seq: 'ATGCCTAGGATCCTGTT', strand: '-' },
+        { id: 'r3', at: 1214, seq: 'AG-ATCCAGTTACGGAATC', strand: '+' },
+        { id: 'r4', at: 1220, seq: 'CAGTTACGGAATCGATCGTTAGCCATGATTT', strand: '+', tone: 'accent' },
+        { id: 'r5', at: 1198, seq: 'TTTACGTTGCATGCC', strand: '-' } ],
+        inserts: [{ read: 'r4', after: 1230, seq: 'GA' }],
+        marks: [{ id: 'snp', from: 1221, to: 1221, tone: 'mismatch', label: 'candidate SNP' }],
+        focus: 'r2', showDepth: true, note: 'Illustrative reads; r2 carries an A→T mismatch and r4 a two-letter insertion.' };
+      sample.panel.initial = JSON.parse(JSON.stringify(sample.state));
+      return sample;
+    }
+  }
+});
 /* ---- src/panels/types/replicas.js ---- */
 /* replicas validation and pure state helpers. */
 var REPLICA_STATUSES = ['online', 'offline', 'unknown'];
@@ -27019,49 +29169,52 @@ function seatmapPatchWarnings(state, path, panel, warnings) {
   });
 }
 /* Pure sparse merge for the per-section maps. `patch === null` clears the
-   map; a key set to null forgets that section; invalid entries are skipped.
-   Never mutates its inputs. */
-function seatmapMergeMap(base, patch, capacities, ok) {
+   map; a key set to null forgets that section; entries keep their authored
+   value when the key is a safe id and the value has the right shape. The
+   fold knows nothing about the declaration: capacities and tiers are checked
+   when the model is given the declaration a step actually shows, so an
+   engine-merged declaration change between steps just works. Never mutates. */
+function seatmapMergeMap(base, patch, ok) {
   var out = {};
   if (patch === null) return out;
   Object.keys(panelObject(base) ? base : {}).forEach(function (id) { out[id] = base[id]; });
   if (!panelObject(patch)) return out;
   Object.keys(patch).forEach(function (id) {
-    if (!(id in capacities)) return;
+    if (!spmSafeId(id)) return;
     var value = patch[id];
     if (value === null) delete out[id];
-    else if (ok(value, capacities[id])) out[id] = value;
+    else if (ok(value)) out[id] = value;
   });
   return out;
 }
-function seatmapMapRules(panel) {
-  var tiers = seatmapTiers(panel);
-  return {
-    sold: function (v, cap) { return seatmapCount(v) && v <= cap; },
-    held: seatmapHeldOk,
-    price: function (v) { return isFiniteNum(v) && v >= 0; },
-    tierOf: function (v) { return tiers.some(function (tier) { return tier.id === v; }); },
-  };
-}
-function seatmapCleanState(raw, capacities, allowOnce) {
+var SEATMAP_MAP_SHAPES = {
+  sold: seatmapCount,
+  held: function (v) { return seatmapHeldOk(v, Number.MAX_SAFE_INTEGER); },
+  price: function (v) { return isFiniteNum(v) && v >= 0; },
+  tierOf: function (v) { return typeof v === 'string' && spmSafeId(v); },
+};
+/* Highlight ids are resolved against the declaration at model time (and
+   warned by the validator), so the fold only checks shapes. */
+function seatmapCleanState(raw, allowOnce) {
   var out = {};
   if (!panelObject(raw)) return out;
   if (panelOwn(raw, 'mode') && (raw.mode === null || SEATMAP_MODES.indexOf(raw.mode) >= 0)) out.mode = raw.mode;
-  if (panelOwn(raw, 'highlight') && seatmapHighlightOk(raw.highlight, capacities))
+  if (panelOwn(raw, 'highlight') && (raw.highlight === null || typeof raw.highlight === 'string' ||
+      (Array.isArray(raw.highlight) && raw.highlight.length <= SEATMAP_MAX_HIGHLIGHT && raw.highlight.every(function (id) { return typeof id === 'string'; }))))
     out.highlight = Array.isArray(raw.highlight) ? raw.highlight.slice() : raw.highlight;
   if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
-  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = seatmapCleanState(raw.enterOnce, capacities, false);
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = seatmapCleanState(raw.enterOnce, false);
   return out;
 }
 function seatmapFold(panel, steps) {
-  var capacities = seatmapCapacities(panel), rules = seatmapMapRules(panel), keys = Object.keys(rules);
-  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return seatmapCleanState(raw, capacities, once); });
+  var keys = Object.keys(SEATMAP_MAP_SHAPES);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return seatmapCleanState(raw, once); });
   var carried = {}, initial = panelObject(panel.initial) ? panel.initial : {};
-  keys.forEach(function (key) { carried[key] = seatmapMergeMap({}, panelOwn(initial, key) ? initial[key] : undefined, capacities, rules[key]); });
+  keys.forEach(function (key) { carried[key] = seatmapMergeMap({}, panelOwn(initial, key) ? initial[key] : undefined, SEATMAP_MAP_SHAPES[key]); });
   function apply(base, patch) {
     var next = {};
     keys.forEach(function (key) {
-      next[key] = panelObject(patch) && panelOwn(patch, key) ? seatmapMergeMap(base[key], patch[key], capacities, rules[key]) : base[key];
+      next[key] = panelObject(patch) && panelOwn(patch, key) ? seatmapMergeMap(base[key], patch[key], SEATMAP_MAP_SHAPES[key]) : base[key];
     });
     return next;
   }
@@ -27080,11 +29233,19 @@ function seatmapPathGeometry(d) {
   if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0 };
   return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height };
 }
+/* Label size from the wedge: up to 22 units, hidden below 9 (the tooltip
+   still carries the id). A short id with a trailing letter (201A) stacks the
+   letter on a second line when that renders larger. Returns {font, lines}. */
 function seatmapLabelFont(label, geom) {
-  var font = Math.min(22, geom.arc * 0.34, geom.depth * 0.45);
-  var width = Math.max(1, label.length) * 0.62;
-  font = Math.min(font, (geom.arc * 0.96) / width);
-  return font >= 9 ? Math.round(font * 2) / 2 : 0;
+  function fit(text, cap) {
+    return Math.min(22, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
+  }
+  var single = fit(label, geom.arc * 0.34), stacked = /^(\d{1,4})([A-Za-z])$/.exec(label);
+  if (stacked && single < 17) {
+    var two = Math.min(fit(stacked[1], geom.arc * 0.55), geom.depth * 0.22);
+    if (two > single && two >= 9) return { font: Math.round(two * 2) / 2, lines: [stacked[1], stacked[2]] };
+  }
+  return { font: single >= 9 ? Math.round(single * 2) / 2 : 0, lines: [label] };
 }
 /* Per-section fill intensity for the mode, totals, legend entries and the
    highlight set. Prices and revenue are "where price known": a section without
@@ -27106,9 +29267,11 @@ function seatmapModel(panel, state) {
   });
   var maxPrice = 0, maxRevenue = 0, zones = {}, zoneOrder = [];
   var sections = decl.map(function (s) {
-    var soldN = seatmapCount(sold[s.id]) && sold[s.id] <= s.capacity ? sold[s.id] : 0;
-    var hold = seatmapHeldOk(held[s.id], s.capacity) ? {
-      count: held[s.id].count, label: typeof held[s.id].label === 'string' ? held[s.id].label : '', until: typeof held[s.id].until === 'string' ? held[s.id].until : '',
+    /* Maps may carry ids and counts from an earlier declaration: ids absent
+       here are simply not drawn and counts clamp to this capacity. */
+    var soldN = seatmapCount(sold[s.id]) ? Math.min(sold[s.id], s.capacity) : 0;
+    var hold = seatmapHeldOk(held[s.id], Number.MAX_SAFE_INTEGER) ? {
+      count: Math.min(held[s.id].count, s.capacity), label: typeof held[s.id].label === 'string' ? held[s.id].label : '', until: typeof held[s.id].until === 'string' ? held[s.id].until : '',
     } : null;
     var p = isFiniteNum(price[s.id]) && price[s.id] >= 0 ? price[s.id] : null;
     var tierId = typeof tierOf[s.id] === 'string' && tiers.some(function (t) { return t.id === tierOf[s.id]; }) ? tierOf[s.id] : s.tier;
@@ -27122,7 +29285,7 @@ function seatmapModel(panel, state) {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
       sold: soldN, held: hold, price: p, revenue: revenue, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
-      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom), intensity: 0, known: true,
+      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
       kind: s.kind, range: bowl ? placement[s.id] : null,
     };
   });
@@ -27166,7 +29329,7 @@ function seatmapModel(panel, state) {
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
     priceRange: prices.length ? { min: Math.min.apply(null, prices), max: Math.max.apply(null, prices) } : null,
     complete: sections.length >= SEATMAP_MIN_SECTIONS, hasHolds: totals.held > 0,
-    geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id; }).join(','),
+    geometryKey: geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) { return s.id + '@' + s.x + ',' + s.y; }).join(','),
   };
 }
 function seatmapTierPalette(i) {
@@ -27203,7 +29366,11 @@ function seatmapSectionMarkup(s, model, hid) {
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
-  if (s.font) h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="0.35em">' + esc(s.label) + '</text>';
+  if (s.font) {
+    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '">';
+    if (s.lines.length > 1) h += esc(s.lines[0]) + '<tspan x="' + s.x + '" dy="1.05em">' + esc(s.lines[1]) + '</tspan>'; else h += esc(s.lines[0]);
+    h += '</text>';
+  }
   return h + '</g>';
 }
 function seatmapLegend(model) {
@@ -27736,6 +29903,412 @@ PanelRegistry.define('seatmap', {
 `
   });
 })();
+/* ---- src/panels/types/sequence.js ---- */
+/* Sequence track: one short nucleotide or protein sequence as monospace
+   letters with a coordinate ruler, highlighted ranges, a cursor, a zoom window
+   and a reveal boundary. Every value is authored in the spec; nothing is
+   computed from data files. Shared alphabet, range and tone rules live in
+   ../bio.js. The mark/range helpers below (seqRangeWarnings, seqMarkWarnings,
+   seqCleanMarks, seqLetters) are reused by the frames panel. */
+var SEQ_MAX_MARKS = 24,
+  SEQ_WRAP_MIN = 20,
+  SEQ_WRAP_MAX = 120,
+  SEQ_WRAP_DEFAULT = 60,
+  SEQ_STATE_KEYS = ['marks', 'cursor', 'window', 'reveal', 'note', 'enterOnce'];
+
+/* `start` must leave room for the longest sequence without leaving the safe
+   integer range, so every printed coordinate is exact. */
+function seqValidStart(value) {
+  return bioPosition(value) && value <= Number.MAX_SAFE_INTEGER - BIO_MAX_SEQUENCE;
+}
+function seqStart(panel) {
+  return seqValidStart(panel.start) ? panel.start : 1;
+}
+/* Clean letters capped at `max`, with zero-based positions of letters the
+   alphabet rejects (those render as unknown). */
+function seqText(panel, alphabet, max) {
+  var normalized = bioNormalizeSequence(panel.sequence, alphabet);
+  return {
+    text: normalized.text.slice(0, max),
+    invalid: normalized.invalid.filter(function (index) { return index < max; }),
+  };
+}
+/* The coordinate span of the declared letters: {first, last, length}. */
+function seqSpan(panel, alphabet, max) {
+  var text = seqText(panel, alphabet, max).text, start = seqStart(panel);
+  return { first: start, last: start + text.length - 1, length: text.length };
+}
+function seqWithin(value, span) {
+  return !span.length || (value >= span.first && value <= span.last);
+}
+function seqSequenceWarnings(panel, path, warnings, alphabet, min, max) {
+  var at = path + '.sequence';
+  if (typeof panel.sequence !== 'string') {
+    warnings.push(at + ': expected a string of ' + min + '–' + max + ' letters — panel renders empty');
+    return;
+  }
+  var normalized = bioNormalizeSequence(panel.sequence, alphabet);
+  if (normalized.text.length < min)
+    warnings.push(at + ': expected ' + min + '–' + max + ' letters — ' + (normalized.text.length ? 'nothing to translate' : 'panel renders empty'));
+  else if (normalized.text.length > max)
+    warnings.push(at + ': only the first ' + max + ' of ' + normalized.text.length + ' letters render');
+  var invalid = normalized.invalid.filter(function (index) { return index < max; });
+  if (invalid.length)
+    warnings.push(at + ': ' + invalid.length + (invalid.length === 1 ? ' letter is' : ' letters are') + ' not in the ' + alphabet +
+      ' alphabet (letter ' + invalid.slice(0, 6).map(function (index) { return index + 1; }).join(', ') + (invalid.length > 6 ? ', …' : '') + ') — shown as unknown');
+}
+/* One {from,to} range in sequence coordinates. Returns the clean range or
+   null after naming the exact field that failed. */
+function seqRangeWarnings(value, at, warnings, span) {
+  if (!panelObject(value)) {
+    warnings.push(at + ': expected {from,to} as 1-based inclusive positions — ignored');
+    return null;
+  }
+  var ok = true;
+  if (!bioPosition(value.from)) { warnings.push(at + '.from: expected a 1-based safe integer position — ignored'); ok = false; }
+  if (!bioPosition(value.to)) { warnings.push(at + '.to: expected a 1-based safe integer position — ignored'); ok = false; }
+  if (!ok) return null;
+  if (value.from > value.to) {
+    warnings.push(at + ': from ' + value.from + ' must be ≤ to ' + value.to + ' — ignored');
+    return null;
+  }
+  if (span.length && (value.to < span.first || value.from > span.last)) {
+    warnings.push(at + ': range ' + value.from + '–' + value.to + ' lies outside ' + span.first + '–' + span.last + ' — ignored');
+    return null;
+  }
+  return { from: value.from, to: value.to };
+}
+function seqMarkWarnings(marks, path, warnings, span) {
+  if (marks == null) return;
+  if (!Array.isArray(marks)) {
+    warnings.push(path + ': expected an array of {id,from,to,tone?,label?} — ignored');
+    return;
+  }
+  if (marks.length > SEQ_MAX_MARKS) warnings.push(path + ': only the first ' + SEQ_MAX_MARKS + ' marks render');
+  var seen = Object.create(null);
+  marks.slice(0, SEQ_MAX_MARKS).forEach(function (mark, i) {
+    var at = path + '[' + i + ']';
+    if (!panelObject(mark) || typeof mark.id !== 'string' || !mark.id) {
+      warnings.push(at + '.id: needs a non-empty string — mark skipped');
+      return;
+    }
+    if (seen[mark.id]) warnings.push(at + '.id: duplicate id "' + mark.id + '" — later mark skipped');
+    seen[mark.id] = true;
+    seqRangeWarnings(mark, at, warnings, span);
+    if (mark.tone != null && BIO_TONES.indexOf(mark.tone) < 0)
+      warnings.push(at + '.tone: expected one of ' + BIO_TONES.join(' ') + ' — using neutral');
+    if (mark.label != null && typeof mark.label !== 'string')
+      warnings.push(at + '.label: expected text — ignored');
+  });
+}
+/* Valid marks clipped to the span, in authored order (later marks draw on
+   top). Mirrors seqMarkWarnings without reporting. */
+function seqCleanMarks(marks, span) {
+  var seen = Object.create(null), out = [];
+  if (!Array.isArray(marks) || !span.length) return out;
+  marks.slice(0, SEQ_MAX_MARKS).forEach(function (mark) {
+    if (!panelObject(mark) || typeof mark.id !== 'string' || !mark.id || seen[mark.id]) return;
+    seen[mark.id] = true;
+    var range = bioRange(mark, '', null, span.first, span.last);
+    if (!range) return;
+    out.push({
+      id: mark.id,
+      from: Math.max(range.from, span.first),
+      to: Math.min(range.to, span.last),
+      tone: bioTone(mark.tone),
+      label: typeof mark.label === 'string' ? mark.label : '',
+    });
+  });
+  return out;
+}
+/* Per-letter display records. `tone` is the topmost mark covering the letter
+   (null when none); `tick` marks a ruler number every ten coordinates. */
+function seqLetters(text, invalid, first, marks) {
+  var unknown = Object.create(null);
+  invalid.forEach(function (index) { unknown[index] = true; });
+  var letters = [];
+  for (var i = 0; i < text.length; i++) {
+    var coord = first + i, tone = null, markId = null;
+    for (var m = 0; m < marks.length; m++)
+      if (coord >= marks[m].from && coord <= marks[m].to) { tone = marks[m].tone; markId = marks[m].id; }
+    letters.push({
+      ch: text.charAt(i), coord: coord, index: i,
+      cls: unknown[i] ? 'bio-b bio-b-x' : bioLetterClass(text.charAt(i)),
+      unknown: !!unknown[i], tone: tone, markId: markId, tick: coord % 10 === 0,
+    });
+  }
+  return letters;
+}
+function seqLegend(marks) {
+  return marks.filter(function (mark) { return mark.label; });
+}
+
+function sequenceStateWarnings(state, path, panel, warnings) {
+  var span = seqSpan(panel, bioAlphabet(panel.alphabet), BIO_MAX_SEQUENCE);
+  Object.keys(state).forEach(function (key) {
+    if (SEQ_STATE_KEYS.indexOf(key) < 0) warnings.push(path + '.' + key + ': unknown field — ignored');
+  });
+  if (panelOwn(state, 'marks')) seqMarkWarnings(state.marks, path + '.marks', warnings, span);
+  if (panelOwn(state, 'cursor') && state.cursor !== null && !(bioPosition(state.cursor) && seqWithin(state.cursor, span)))
+    warnings.push(path + '.cursor: expected a 1-based position' + (span.length ? ' between ' + span.first + ' and ' + span.last : '') + ' or null — cursor hidden');
+  if (panelOwn(state, 'window') && state.window !== null) seqRangeWarnings(state.window, path + '.window', warnings, span);
+  if (panelOwn(state, 'reveal') && state.reveal !== null && !(bioCount(state.reveal) && state.reveal <= span.length))
+    warnings.push(path + '.reveal: expected an integer 0–' + span.length + ' or null — all letters shown');
+  if (panelOwn(state, 'note') && state.note !== null && typeof state.note !== 'string')
+    warnings.push(path + '.note: expected text — ignored');
+}
+function sequencePatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, sequenceStateWarnings);
+}
+function sequenceDeclarationWarnings(panel, path, warnings) {
+  var alphabet = bioAlphabet(panel.alphabet);
+  if (panel.alphabet !== undefined && BIO_ALPHABET_NAMES.indexOf(panel.alphabet) < 0)
+    warnings.push(path + '.alphabet: expected dna, rna or protein — using dna');
+  seqSequenceWarnings(panel, path, warnings, alphabet, 1, BIO_MAX_SEQUENCE);
+  if (panel.start !== undefined && !seqValidStart(panel.start))
+    warnings.push(path + '.start: expected a safe integer ≥ 1 — using 1');
+  if (panel.strand !== undefined && panel.strand !== '+' && panel.strand !== '-')
+    warnings.push(path + '.strand: expected "+" or "-" — using +');
+  if (panel.label !== undefined && typeof panel.label !== 'string')
+    warnings.push(path + '.label: expected text — ignored');
+  if (panel.wrap !== undefined && !(Number.isSafeInteger(panel.wrap) && panel.wrap >= SEQ_WRAP_MIN && panel.wrap <= SEQ_WRAP_MAX))
+    warnings.push(path + '.wrap: expected an integer ' + SEQ_WRAP_MIN + '–' + SEQ_WRAP_MAX + ' — using ' + SEQ_WRAP_DEFAULT);
+  sequencePatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+
+/* Pure display model for one folded snapshot. Coordinates are 1-based and
+   inclusive; `rows` chunk the visible letters by `wrap`. */
+function sequenceModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var alphabet = bioAlphabet(panel.alphabet),
+    seq = seqText(panel, alphabet, BIO_MAX_SEQUENCE),
+    text = seq.text,
+    start = seqStart(panel),
+    span = { first: start, last: start + text.length - 1, length: text.length },
+    wrap = Number.isSafeInteger(panel.wrap) && panel.wrap >= SEQ_WRAP_MIN && panel.wrap <= SEQ_WRAP_MAX ? panel.wrap : SEQ_WRAP_DEFAULT,
+    marks = seqCleanMarks(state.marks, span),
+    cursor = bioPosition(state.cursor) && span.length && seqWithin(state.cursor, span) ? state.cursor : null,
+    window = span.length ? bioRange(state.window, '', null, span.first, span.last) : null,
+    reveal = bioCount(state.reveal) && state.reveal <= span.length ? state.reveal : null;
+  if (window) window = { from: Math.max(window.from, span.first), to: Math.min(window.to, span.last) };
+  var from = window ? window.from : span.first,
+    to = window ? window.to : span.last,
+    letters = seqLetters(text, seq.invalid, span.first, marks).filter(function (letter) {
+      return letter.coord >= from && letter.coord <= to;
+    });
+  letters.forEach(function (letter) {
+    letter.revealed = reveal === null || letter.index < reveal;
+    letter.cursor = letter.coord === cursor;
+  });
+  var rows = [];
+  for (var i = 0; i < letters.length; i += wrap) {
+    var chunk = letters.slice(i, i + wrap), cursorAt = -1;
+    chunk.forEach(function (letter, index) { if (letter.cursor) cursorAt = index; });
+    rows.push({ from: chunk[0].coord, to: chunk[chunk.length - 1].coord, letters: chunk, cursorAt: cursorAt });
+  }
+  return {
+    alphabet: alphabet,
+    strand: panel.strand === '-' ? '-' : '+',
+    label: typeof panel.label === 'string' ? panel.label : '',
+    start: start, length: span.length, first: span.first, last: span.last, text: text,
+    wrap: wrap, window: window, from: from, to: to,
+    hiddenBefore: span.length ? from - span.first : 0,
+    hiddenAfter: span.length ? span.last - to : 0,
+    reveal: reveal, cursor: cursor, marks: marks, legend: seqLegend(marks),
+    rows: rows, invalid: seq.invalid.length,
+    note: typeof state.note === 'string' ? state.note : '',
+  };
+}
+function seqSummary(model) {
+  var parts = [(model.label || 'Sequence') + ': ' + model.alphabet.toUpperCase() + ', ' + model.strand + ' strand'];
+  if (!model.length) parts.push('no letters');
+  else {
+    parts.push('positions ' + bioFormatCoord(model.from) + '–' + bioFormatCoord(model.to) +
+      (model.window ? ' of ' + bioFormatCoord(model.first) + '–' + bioFormatCoord(model.last) : ''));
+    parts.push(model.marks.length + (model.marks.length === 1 ? ' mark' : ' marks'));
+    if (model.cursor !== null) parts.push('cursor at ' + bioFormatCoord(model.cursor));
+    if (model.reveal !== null) parts.push(model.reveal + ' of ' + model.length + ' letters revealed');
+  }
+  return parts.join(', ');
+}
+/* Legend markup shared by the sequence-teaching panels (`.bio-legend`). */
+function bioLegendHTML(legend) {
+  if (!legend.length) return '';
+  return '<ul class="bio-legend" aria-label="Highlighted ranges">' + legend.map(function (mark) {
+    return '<li class="bio-key"><i class="bio-tone-' + mark.tone + '" aria-hidden="true"></i>' + esc(mark.label) +
+      ' <small>' + bioFormatCoord(mark.from) + '–' + bioFormatCoord(mark.to) + '</small></li>';
+  }).join('') + '</ul>';
+}
+function seqRulerHTML(letters, cls) {
+  return letters.map(function (letter) {
+    return '<span class="' + cls + (letter.tick ? ' seq-tick-n' : '') + '">' +
+      (letter.tick ? '<i>' + bioFormatCoord(letter.coord) + '</i>' : '') + '</span>';
+  }).join('');
+}
+/* `dx` is the whole-cell offset from the previously rendered cursor in the
+   same row; the shared glide lifecycle then transitions it to zero. */
+function sequenceHTML(panel, state, dx) {
+  var model = sequenceModel(panel, state);
+  var h = '<div class="seq-track' + (model.alphabet === 'protein' ? ' bio-protein' : '') + '" role="group" aria-label="' + esc(seqSummary(model)) + '">';
+  h += '<div class="seq-head">' + (model.label ? '<span class="seq-label">' + esc(model.label) + '</span>' : '') +
+    '<span class="seq-meta">' + model.alphabet.toUpperCase() + ' · ' + model.strand + ' strand' +
+    (model.length ? ' · ' + bioFormatCoord(model.first) + '–' + bioFormatCoord(model.last) : '') + '</span></div>';
+  if (!model.length) return h + '<div class="seq-empty">No sequence declared.</div></div>';
+  if (model.hiddenBefore) h += '<div class="seq-more">… ' + bioFormatCoord(model.hiddenBefore) + ' more before ' + bioFormatCoord(model.from) + '</div>';
+  h += '<div class="seq-rows">';
+  model.rows.forEach(function (row) {
+    h += '<div class="seq-row" style="--seq-cols:' + row.letters.length + '"><span class="seq-gutter">' + bioFormatCoord(row.from) + '</span><div class="seq-cells">' +
+      '<div class="seq-line seq-ruler" aria-hidden="true">' + seqRulerHTML(row.letters, 'seq-tick') + '</div>' +
+      '<div class="seq-line seq-letters">' + row.letters.map(function (letter) {
+        return '<span class="' + letter.cls + (letter.revealed ? '' : ' seq-dim') + (letter.cursor ? ' seq-at-cursor' : '') + '"' +
+          (letter.unknown ? ' title="Not in the ' + model.alphabet + ' alphabet"' : '') + '>' + esc(letter.ch) + '</span>';
+      }).join('') + '</div>' +
+      '<div class="seq-line seq-band" aria-hidden="true">' + row.letters.map(function (letter, index) {
+        var previous = row.letters[index - 1], next = row.letters[index + 1];
+        return '<span class="seq-bandcell' + (letter.tone ? ' bio-tone-' + letter.tone : '') +
+          (letter.tone && !(previous && previous.markId === letter.markId) ? ' seq-band-start' : '') +
+          (letter.tone && !(next && next.markId === letter.markId) ? ' seq-band-end' : '') + '"></span>';
+      }).join('') + '</div>';
+    if (row.cursorAt >= 0)
+      h += '<div class="seq-line seq-cursor-line"><span class="seq-cur" style="--seq-at:' + row.cursorAt +
+        (dx ? ';transform:translateX(' + dx * 100 + '%)' : '') + '"><b></b><i>' + bioFormatCoord(model.cursor) + '</i></span></div>';
+    h += '</div></div>';
+  });
+  h += '</div>';
+  if (model.hiddenAfter) h += '<div class="seq-more">… ' + bioFormatCoord(model.hiddenAfter) + ' more after ' + bioFormatCoord(model.to) + '</div>';
+  h += bioLegendHTML(model.legend) + '</div>';
+  return softwarePanelShell(h, { note: model.note });
+}
+
+PanelRegistry.define('sequence', {
+  label: 'Sequence track',
+  since: '0.2.0',
+  order: 40,
+  validateDeclaration: sequenceDeclarationWarnings,
+  validatePatch: sequencePatchWarnings,
+  fold: function (panel, steps) {
+    return foldCommonPanelStates(panel, steps, {
+      accept: {
+        marks: function (value) { return value === null || Array.isArray(value); },
+        cursor: function (value) { return value === null || bioPosition(value); },
+        window: function (value) { return value === null || !!bioRange(value); },
+        reveal: function (value) { return value === null || bioCount(value); },
+        note: function (value) { return value === null || typeof value === 'string'; },
+      },
+    });
+  },
+  render: function (host, panel, state, skin, states, stepIdx, animate) {
+    var model = sequenceModel(panel, state), previous = host._seqCursor || null, now = null, dx = 0;
+    model.rows.forEach(function (row, index) { if (row.cursorAt >= 0) now = { row: index, at: row.cursorAt, from: row.from }; });
+    host._seqCursor = now;
+    if (animate && previous && now && previous.row === now.row && previous.from === now.from) dx = previous.at - now.at;
+    var html = sequenceHTML(panel, state, dx);
+    return { html: html, baseline: dx ? sequenceHTML(panel, state, 0) : null, glide: { selector: '.seq-cur', multiple: false } };
+  },
+  presentation: { ambientInitial: true },
+  layout: {
+    sectionSizing: { minWidth: 320, preferredWidth: 520, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },
+    height: 8, fallbackHeight: 8,
+  },
+  /* The first block is the shared residue and tone palette. The sequence
+     panel owns these `.bio-*` rules; reads, frames, locus, funnel and grid
+     reuse the class names and must not redefine them. Letters lean toward
+     the skin's text colour through color-mix so one rule reads on light and
+     dark skins. `.bio-protein` switches letters to chemistry groups. Each
+     `.bio-tone-<tone>` sets `--bio-tone` plus a translucent background and a
+     border colour; use `var(--bio-tone)` for solid fills such as SVG. */
+  styles: String.raw`
+.bio-b{display:inline-block;min-width:0;font:600 13px/1.4 'IBM Plex Mono',monospace;text-align:center;border-radius:2px;color:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 72%,var(--dtext))}
+.bio-b-a{--bio-letter:#22c55e}.bio-b-c{--bio-letter:#3b82f6}.bio-b-g{--bio-letter:#f59e0b}.bio-b-t,.bio-b-u{--bio-letter:#ef4444}
+.bio-b-n{--bio-letter:#94a3b8}.bio-b-x{--bio-letter:#94a3b8;text-decoration:underline dotted;opacity:.75}
+.bio-b-stop{--bio-letter:#ef4444;font-weight:800}
+.bio-protein .bio-b-a,.bio-protein .bio-b-v,.bio-protein .bio-b-l,.bio-protein .bio-b-i,.bio-protein .bio-b-m,.bio-protein .bio-b-f,.bio-protein .bio-b-w{--bio-letter:#f59e0b}
+.bio-protein .bio-b-s,.bio-protein .bio-b-t,.bio-protein .bio-b-n,.bio-protein .bio-b-q,.bio-protein .bio-b-y{--bio-letter:#22c55e}
+.bio-protein .bio-b-k,.bio-protein .bio-b-r,.bio-protein .bio-b-h{--bio-letter:#3b82f6}
+.bio-protein .bio-b-d,.bio-protein .bio-b-e{--bio-letter:#ef4444}
+.bio-protein .bio-b-g,.bio-protein .bio-b-p,.bio-protein .bio-b-c{--bio-letter:#a855f7}
+.bio-protein .bio-b-x{--bio-letter:#94a3b8}
+.bio-tone-neutral{--bio-tone:#94a3b8}.bio-tone-accent{--bio-tone:#38bdf8}.bio-tone-insert{--bio-tone:#a78bfa}.bio-tone-mismatch{--bio-tone:#f43f5e}
+.bio-tone-motif{--bio-tone:#facc15}.bio-tone-primer{--bio-tone:#2dd4bf}.bio-tone-cut{--bio-tone:#e879f9}.bio-tone-feature{--bio-tone:#3b82f6}
+.bio-tone-good{--bio-tone:#22c55e}.bio-tone-bad{--bio-tone:#ef4444}
+[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 30%,transparent);border-color:var(--bio-tone)}
+.bio-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;padding:0;font-size:10.5px;color:var(--dtext)}
+.bio-key{display:inline-flex;align-items:center;gap:5px}
+.bio-key i{display:inline-block;width:12px;height:8px;border-radius:2px;border:1px solid var(--bio-tone)}
+.bio-key small{color:var(--dfaint);font-variant-numeric:tabular-nums}
+.seq-track{color:var(--dtext);min-width:0}
+.seq-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:6px}
+.seq-label{font-weight:600;color:var(--dink)}
+.seq-meta{font-size:10px;letter-spacing:.4px;color:var(--dfaint)}
+.seq-empty,.seq-more{font-size:10.5px;color:var(--dfaint)}
+.seq-more{padding:2px 0 2px 46px;font-style:italic}
+.seq-rows{display:flex;flex-direction:column;gap:6px;overflow-x:auto;padding-bottom:2px}
+.seq-row{display:flex;align-items:flex-start;gap:6px;min-width:0}
+.seq-gutter{flex:none;width:40px;padding-top:14px;text-align:right;font:500 10px/1.4 'IBM Plex Mono',monospace;color:var(--dfaint);font-variant-numeric:tabular-nums}
+.seq-cells{flex:1;min-width:0;display:flex;flex-direction:column}
+.seq-line{display:grid;grid-template-columns:repeat(var(--seq-cols),minmax(9px,1fr));position:relative}
+.seq-ruler{height:14px;align-items:end}
+.seq-tick{position:relative;height:4px;border-left:1px solid color-mix(in srgb,var(--dtext) 18%,transparent)}
+.seq-tick-n{height:7px;border-left-color:color-mix(in srgb,var(--dtext) 45%,transparent)}
+.seq-tick-n i{position:absolute;left:0;bottom:7px;transform:translateX(-50%);font:500 9px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--dfaint);white-space:nowrap}
+.seq-letters .bio-b{display:block;overflow:hidden;transition:opacity .3s ease}
+.seq-dim{opacity:.25}
+.seq-at-cursor{background:color-mix(in srgb,var(--dink) 14%,transparent)}
+.seq-band{height:5px;margin-top:1px}
+.seq-bandcell{display:block;height:5px;border-top:1px solid transparent}
+.seq-band-start{border-radius:3px 0 0 3px}.seq-band-end{border-radius:0 3px 3px 0}.seq-band-start.seq-band-end{border-radius:3px}
+.seq-cursor-line{height:18px;margin-top:2px}
+.seq-cur{grid-column:calc(var(--seq-at) + 1);position:relative;display:block;height:100%;transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.seq-cur b{position:absolute;left:50%;top:0;width:0;height:0;transform:translateX(-50%);border:5px solid transparent;border-bottom:6px solid var(--dink);border-top:0}
+.seq-cur i{position:absolute;left:50%;top:7px;transform:translateX(-50%);font:600 9.5px/1.2 'IBM Plex Mono',monospace;font-style:normal;color:var(--dink);background:color-mix(in srgb,var(--dink) 12%,transparent);border-radius:3px;padding:0 3px;white-space:nowrap}
+@media (prefers-reduced-motion: reduce){.seq-cur,.seq-letters .bio-b{transition:none}}
+@media print{.bio-b,[class*="bio-tone-"],.seq-cur i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.seq-rows{overflow:visible}}
+`,
+  authoring: {
+    initialFields: true,
+    transientFields: ['marks', 'cursor', 'window', 'reveal'],
+    template: {
+      title: 'Sequence track', label: 'Reference', alphabet: 'dna', strand: '+', start: 1, wrap: 60,
+      sequence: 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG',
+      initial: { marks: [{ id: 'start', from: 1, to: 3, tone: 'good', label: 'Start codon' }] },
+    },
+    setupFields: [
+      ['label', 'text'], ['sequence', 'text'], ['alphabet', 'text'],
+      ['start', 'num'], ['strand', 'text'], ['wrap', 'num'], ['initial', 'json'],
+    ],
+    patchFields: [['marks', 'json'], ['cursor', 'num'], ['window', 'json'], ['reveal', 'num'], ['note', 'text']],
+    fieldMeta: {
+      label: { label: 'Track label', help: 'Short name shown before the ruler, e.g. Reference.' },
+      sequence: { label: 'Sequence', help: '1–240 letters (whitespace ignored). Letters outside the alphabet render as unknown.' },
+      alphabet: { label: 'Alphabet', help: 'dna (ACGTN, default), rna (ACGUN) or protein (one-letter amino acids).' },
+      start: { label: 'First coordinate', help: '1-based coordinate of the first letter; default 1. Marks, cursor and window use these coordinates.' },
+      strand: { label: 'Strand', help: 'Shown as a label only; the sequence is never recomputed.' },
+      wrap: { label: 'Letters per row', help: '20–120, default 60.' },
+      marks: { label: 'Highlighted ranges', help: 'Full snapshot of up to 24 {id,from,to,tone?,label?} ranges. Later marks draw on top; labelled marks appear in the legend.', nullLabel: 'No marks' },
+      cursor: { label: 'Cursor position', help: 'One coordinate drawn as a bracket under the letter.', nullLabel: 'Hide cursor' },
+      window: { label: 'Zoom window', help: '{from,to}: only these coordinates render, with a “… n more” cue at each end.', nullLabel: 'Show all' },
+      reveal: { label: 'Revealed letters', help: 'Letters beyond this count render dimmed, for “read this far” stories.', nullLabel: 'Reveal all' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 40, name: 'Sequence track', category: 'Science & sequencing',
+      tagline: 'Letters, coordinates and highlighted ranges',
+      description: 'Show a short DNA, RNA or protein sequence with a coordinate ruler, coloured range marks, a moving cursor, a zoom window and a reveal boundary that advance step by step.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.label = 'Reference';
+      panel.sequence = 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAGCCTTAGGCA';
+      state.marks = [
+        { id: 'start', from: 1, to: 3, tone: 'good', label: 'Start codon' },
+        { id: 'primer', from: 20, to: 35, tone: 'primer', label: 'Forward primer' },
+      ];
+      state.cursor = 17;
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
 /* ---- src/panels/types/signal.js ---- */
 /* signal validation and pure state helpers. */
 var SIGNAL_STATES_V = ['ok', 'weak', 'retrying', 'lost', 'jammed'];

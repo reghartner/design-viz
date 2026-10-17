@@ -101,6 +101,12 @@ test('sync workflow runs trusted code and proposes only the bundled catalog on a
   const pr=steps.find(s=>s.uses?.startsWith('peter-evans/create-pull-request@'));
   assert.equal(pr.with['add-paths'],'workbench/catalog.json');assert.equal(pr.with.branch,'flowview/catalog-sync');
   assert.match(pr.uses,/@[a-f0-9]{40}$/);assert.equal(pr.with['delete-branch'],true);
+  // Held back for self-hosted runners older than 2.327.1 (see the workflow's header comment).
+  assert.deepEqual(steps.filter(s=>s.uses).map(s=>s.uses),[
+    'actions/checkout@v4','actions/setup-node@v4',
+    'actions/create-github-app-token@v3','actions/create-github-app-token@v3',
+    'peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676',
+  ]);
   const exported=steps.find(s=>s.name==='Export and validate catalog');
   assert.match(exported.run,/--sources/);assert.match(exported.run,/--backstage/);assert.match(exported.env.FLOWVIEW_BACKSTAGE_TOKEN,/secrets\.FLOWVIEW_BACKSTAGE_TOKEN/);
 });

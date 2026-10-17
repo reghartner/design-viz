@@ -30,6 +30,41 @@ function diagramSearchText(values,spec){
    malformed values, still load as if the metadata were absent. */
 function libraryDescription(value){return typeof value==='string'?value:'';}
 function libraryTags(value){return Array.isArray(value)?value.filter(function(tag){return typeof tag==='string' && tag;}):[];}
+/* Optional thumbnail metadata is untrusted. Accept only a small numeric/text
+   vocabulary, copying it before rendering with createElementNS/textContent. */
+function libraryPreviewData(value){
+  if(!value || value.version!==1 || typeof value.label!=='string' || value.label.length>80 || !Number.isSafeInteger(value.total) || value.total<1)return null;
+  var out={version:1,kind:value.kind,label:value.label,total:value.total};
+  if(value.kind==='panels'){
+    if(!Array.isArray(value.panels) || !value.panels.length || value.panels.length>3 || value.total<value.panels.length || value.panels.some(function(p){return !p || typeof p.title!=='string' || p.title.length>80 || typeof p.type!=='string' || p.type.length>40;}))return null;
+    out.panels=value.panels.map(function(p){return {title:p.title,type:p.type};});return out;
+  }
+  if(value.kind!=='graph' || !Array.isArray(value.nodes) || !value.nodes.length || value.nodes.length>12 || value.total<value.nodes.length || !Array.isArray(value.edges) || value.edges.length>20)return null;
+  if(value.nodes.some(function(n){return !n || typeof n.label!=='string' || n.label.length>80 || !['x','y','w','h'].every(function(k){return Number.isFinite(n[k]);}) || n.x<0 || n.y<0 || n.w<=0 || n.h<=0 || n.x+n.w>641 || n.y+n.h>301;}))return null;
+  if(value.edges.some(function(e){return !e || ![e.from,e.to].every(function(i){return Number.isSafeInteger(i) && i>=0 && i<value.nodes.length;});}))return null;
+  out.nodes=value.nodes.map(function(n){return {label:n.label,x:n.x,y:n.y,w:n.w,h:n.h};});out.edges=value.edges.map(function(e){return {from:e.from,to:e.to};});return out;
+}
+function libraryTeamName(raw){
+  var match=/^([^:]+):([^/]+)\/(.+)$/.exec(raw || '');
+  if(!match)return raw || 'Unassigned';
+  var name=match[3].replace(/[-_]+/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+  return name+(match[2]!=='default'?' · '+match[2]:'')+(match[1]!=='group'?' ('+match[1]+')':'');
+}
+function libraryPreviewElement(preview){
+  var box=document.createElement('span');box.className='canon-library-preview';
+  if(!preview){box.classList.add('canon-library-preview-missing');var note=document.createElement('span');note.textContent='Preview unavailable';var hint=document.createElement('small');hint.textContent='Open to explore this diagram';box.append(note,hint);return box;}
+  if(preview.kind==='panels'){
+    box.classList.add('canon-library-preview-panels');
+    var heading=document.createElement('small');heading.textContent='Panel story · '+preview.total+' panel'+(preview.total===1?'':'s');box.append(heading);
+    preview.panels.forEach(function(panel){var line=document.createElement('span'),kind=document.createElement('small');line.textContent=panel.title;kind.textContent=panel.type;line.append(kind);box.append(line);});
+  }else{
+    function svgEl(tag,attrs){var node=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs || {}).forEach(function(k){node.setAttribute(k,attrs[k]);});return node;}
+    var svg=svgEl('svg',{viewBox:'0 0 640 300','aria-hidden':'true',focusable:'false'});
+    preview.edges.forEach(function(edge){var a=preview.nodes[edge.from],b=preview.nodes[edge.to];svg.append(svgEl('line',{x1:a.x+a.w/2,y1:a.y+a.h/2,x2:b.x+b.w/2,y2:b.y+b.h/2}));});
+    preview.nodes.forEach(function(node){var g=svgEl('g'),rect=svgEl('rect',{x:node.x,y:node.y,width:node.w,height:node.h,rx:Math.min(9,node.h/6)}),label=svgEl('text',{x:node.x+node.w/2,y:node.y+node.h/2,'text-anchor':'middle','dominant-baseline':'central','font-size':Math.min(22,node.h/2.5)});var limit=Math.max(4,Math.floor(node.w/Math.min(11,node.h/5))-2);label.textContent=node.label.length>limit?node.label.slice(0,limit-1)+'…':node.label;g.append(rect,label);svg.append(g);});box.append(svg);
+  }
+  var caption=document.createElement('span');caption.className='canon-library-preview-caption';caption.textContent=preview.kind==='graph'?(preview.total>preview.nodes.length?preview.nodes.length+' of '+preview.total+' nodes · ':'Topology · ')+preview.label:'Panel summary · '+preview.label;box.append(caption);return box;
+}
 function parseCanonLibrary(raw){
   if(!raw || ![1,2,3].includes(raw.version) || !Array.isArray(raw.diagrams))throw new Error('Expected a version 1, 2 or 3 diagram library.');
   var ids=new Set();
@@ -47,7 +82,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -355,40 +390,83 @@ function initWorkbenchLibrary(opts){
       var loaded=await loadSpec(entry);if(signal.aborted)throw new Error('Detail request cancelled.');return loaded.spec;
     }};
   }
+  var facets={team:document.getElementById('welcome-library-team'),service:document.getElementById('welcome-library-service'),topic:document.getElementById('welcome-library-topic')};
+  var count=document.getElementById('welcome-library-count'),activeFilters=document.getElementById('welcome-library-active'),filterChips=document.getElementById('welcome-library-filter-chips');
+  var recentSection=document.getElementById('welcome-library-recent'),recentItems=document.getElementById('welcome-library-recent-items');
+  var recentKey='flowview-library-recent-v1:'+new URL('diagrams.json',location.href).href,recent=[],recentLoaded=false;
+  function saveRecent(){try{if(recent.length)localStorage.setItem(recentKey,JSON.stringify(recent));else localStorage.removeItem(recentKey);}catch(ignored){}}
+  function readRecent(){
+    if(!recentLoaded){recentLoaded=true;try{var stored=JSON.parse(localStorage.getItem(recentKey) || '[]');recent=Array.isArray(stored)?stored.filter(function(id){return typeof id==='string';}):[];}catch(ignored){recent=[];}}
+    recent=Array.from(new Set(recent)).filter(function(id){return entries.some(function(entry){return entry.id===id;});}).slice(0,6);saveRecent();
+  }
+  function remember(entry){if(!published || opts.legacyCanon)return;readRecent();recent=[entry.id].concat(recent.filter(function(id){return id!==entry.id;})).slice(0,6);saveRecent();}
+  function link(entry,className){
+    var el=document.createElement(published?'a':'button');el.className=className;
+    if(published)el.href=canonDiagramURL(location.href,entry.id);else el.type='button';
+    el.setAttribute('aria-label',entry.title);
+    el.addEventListener('click',function(event){
+      if(published && (event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey))return;
+      event.preventDefault();opts.open(entry.id,published);
+    });return el;
+  }
+  function services(entry){
+    if(entry.services)return entry.services;
+    var names=[];if(entry.spec)FlowCanon.sections(entry.spec).forEach(function(section){Object.values(section.diagram.nodes || {}).forEach(function(node){if(typeof node.title==='string')names.push(node.title);});});return names;
+  }
+  function matches(entry){
+    return (!search.value.trim() || entry.searchText.includes(search.value.trim().toLowerCase())) &&
+      (!facets.team.value || entry.canon.owner===facets.team.value) &&
+      (!facets.service.value || entry.serviceNames.includes(facets.service.value)) &&
+      (!facets.topic.value || (entry.tags || []).includes(facets.topic.value));
+  }
   function cards(){
     grid.replaceChildren();
     entries.forEach(function(entry){
-      var button=document.createElement(published?'a':'button');button.className='canon-library-card';
-      if(published)button.href=canonDiagramURL(location.href,entry.id);else button.type='button';
-      var badge=document.createElement('span');badge.className='canon-library-badge';badge.textContent=entry.canon.kind==='canonical'?'CANONICAL · READ ONLY':'DESIGN · READ ONLY';
-      var name=document.createElement('strong');name.textContent=entry.title;
-      var detail=document.createElement('span');detail.textContent=entry.spec?starterCountLine(entry.spec):['nodes','steps','panels'].map(function(key){return entry.counts[key]+' '+(entry.counts[key]===1?key.slice(0,-1):key);}).join(' · ');
-      var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=entry.canon.owner || entry.id;
-      var action=document.createElement('span');action.className='canon-library-action';action.textContent='View diagram →';
-      button.append(badge,name);
-      if(entry.description){var description=document.createElement('span');description.className='canon-library-description';description.textContent=entry.description;button.append(description);}
-      button.append(detail,owner);
-      if(entry.tags && entry.tags.length){
-        var tags=document.createElement('span');tags.className='canon-library-tags';
-        entry.tags.forEach(function(tag){var chip=document.createElement('span');chip.className='canon-library-tag';chip.textContent=tag;tags.appendChild(chip);});
-        button.append(tags);
-      }
-      button.append(action);
-      button.dataset.search=diagramSearchText([entry.title,entry.id,entry.canon.owner,entry.description].concat(entry.tags || [],entry.services || []),entry.spec);
-      button.addEventListener('click',function(event){
-        if(published && (event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey))return;
-        event.preventDefault();opts.open(entry.id,published);
-      });grid.appendChild(button);
+      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description].concat(entry.tags || [],entry.serviceNames));
+      var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
+      var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
+      var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);
+      if(entry.description){var description=document.createElement('span');description.className='canon-library-description';description.textContent=entry.description;open.append(description);}
+      var metadata=document.createElement('div');metadata.className='canon-library-metadata';
+      var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=libraryTeamName(entry.canon.owner);owner.title=entry.canon.owner || entry.id;
+      var detail=document.createElement('span');detail.className='canon-library-counts';detail.textContent=entry.spec?starterCountLine(entry.spec):['nodes','steps','panels'].map(function(key){return entry.counts[key]+' '+(entry.counts[key]===1?key.slice(0,-1):key);}).join(' · ');
+      var tags=document.createElement('div');tags.className='canon-library-tags';
+      (entry.tags || []).forEach(function(tag){var chip=document.createElement('button');chip.type='button';chip.className='canon-library-tag';chip.textContent=tag;chip.setAttribute('aria-label','Filter by topic: '+tag);chip.setAttribute('aria-pressed',String(facets.topic.value===tag));chip.addEventListener('click',function(){facets.topic.value=facets.topic.value===tag?'':tag;filterCards();});tags.append(chip);});
+      metadata.append(owner,tags,detail);card.append(open,metadata);grid.append(card);
     });
-    filterCards();
+    Object.keys(facets).forEach(function(key){
+      var select=facets[key],current=select.value,values=Array.from(new Set(entries.flatMap(function(entry){return key==='team'?[entry.canon.owner]:key==='service'?entry.serviceNames:entry.tags || [];}))).filter(Boolean);
+      values.sort(function(a,b){return a.toLowerCase()<b.toLowerCase()?-1:a.toLowerCase()>b.toLowerCase()?1:0;});
+      select.replaceChildren();var all=document.createElement('option');all.value='';all.textContent='All '+({team:'teams',service:'services',topic:'topics'}[key]);select.append(all);
+      values.forEach(function(value){var option=document.createElement('option');option.value=value;option.textContent=key==='team'?libraryTeamName(value):value;if(key==='team' && values.some(function(other){return other!==value && libraryTeamName(other)===option.textContent;}))option.textContent+=' ('+value+')';option.title=value;select.append(option);});
+      select.value=values.includes(current)?current:'';
+    });
+    if(published)readRecent();filterCards();
+  }
+  function renderRecent(){
+    recentItems.replaceChildren();
+    var shown=published?recent.map(function(id){return entries.find(function(entry){return entry.id===id;});}).filter(function(entry){return entry && matches(entry);}):[];
+    recentSection.hidden=!shown.length;
+    shown.forEach(function(entry){var item=link(entry,'canon-recent-link');var title=document.createElement('span');title.textContent=entry.title;var team=document.createElement('small');team.textContent=libraryTeamName(entry.canon.owner);item.append(title,team);recentItems.append(item);});
   }
   function filterCards(){
-    var query=search.value.trim(),needle=query.toLowerCase(),shown=0;
-    grid.querySelectorAll('.canon-library-card').forEach(function(card){card.hidden=!!needle && card.dataset.search.indexOf(needle)<0;if(!card.hidden)shown++;});
-    empty.hidden=!needle || !entries.length || shown>0;
-    empty.textContent=empty.hidden?'':'No diagrams match “'+query+'”. Try a title, description, tag, owner or service name.';
+    var query=search.value.trim(),shown=0;
+    Array.from(grid.children).forEach(function(card,i){card.hidden=!matches(entries[i]);if(!card.hidden)shown++;});
+    count.textContent=shown+' of '+entries.length+' diagrams';
+    empty.hidden=!entries.length || shown>0;
+    empty.textContent=empty.hidden?'':'No diagrams match'+(query?' “'+query+'”':' these filters')+'. Try another keyword or clear your filters.';
+    filterChips.replaceChildren();
+    var filters=[{label:'Search',value:query,clear:function(){search.value='';}}];
+    Object.keys(facets).forEach(function(key){filters.push({label:key[0].toUpperCase()+key.slice(1),value:key==='team' && facets[key].value?libraryTeamName(facets[key].value):facets[key].value,clear:function(){facets[key].value='';}});});
+    filters.filter(function(filter){return filter.value;}).forEach(function(filter){var chip=document.createElement('button');chip.type='button';chip.textContent=filter.label+': '+filter.value+' ×';chip.setAttribute('aria-label','Remove '+filter.label.toLowerCase()+' filter: '+filter.value);chip.addEventListener('click',function(){filter.clear();filterCards();search.focus();});filterChips.append(chip);});
+    activeFilters.hidden=!filterChips.children.length;
+    grid.querySelectorAll('.canon-library-tag').forEach(function(chip){chip.setAttribute('aria-pressed',String(chip.textContent===facets.topic.value));});
+    renderRecent();
   }
-  search.addEventListener('input',filterCards);
+  search.addEventListener('input',filterCards);Object.values(facets).forEach(function(select){select.addEventListener('change',filterCards);});
+  document.getElementById('welcome-library-clear').addEventListener('click',function(){search.value='';Object.values(facets).forEach(function(select){select.value='';});filterCards();search.focus();});
+  document.getElementById('welcome-library-clear-recent').addEventListener('click',function(){recent=[];saveRecent();renderRecent();search.focus();});
+  ['grid','list'].forEach(function(mode){document.getElementById('welcome-library-'+mode+'-view').addEventListener('click',function(){grid.classList.toggle('canon-library-list',mode==='list');['grid','list'].forEach(function(name){document.getElementById('welcome-library-'+name+'-view').setAttribute('aria-pressed',String(name===mode));});});});
   async function show(screen,id){
     stop();active=screen;var token=sequence;
     pending=null;specRequests.clear();
@@ -453,10 +531,11 @@ function initWorkbenchLibrary(opts){
         };
         positionChange={prior:priorChange,wrapped:wrapped};ctl.onChange=wrapped;
       }
+      remember(current);
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;copy.disabled=true;retireViewer();reader.replaceChildren();
-      if(screen==='library'){grid.replaceChildren();status.textContent='Could not load published diagrams. '+ex.message;retry.hidden=false;}
+      if(screen==='library'){grid.replaceChildren();recentSection.hidden=true;count.textContent='';status.textContent='Could not load published diagrams. '+ex.message;retry.hidden=false;}
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
   }

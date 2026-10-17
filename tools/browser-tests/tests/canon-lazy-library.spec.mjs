@@ -551,11 +551,11 @@ test('the real metadata index fetches only the opened spec and imports the same 
   await page.goto(fixture.url);await page.locator('#welcome-library').click();
   await expect(page.locator('.canon-library-card')).toHaveCount(2);expect(requests).toEqual([]);
   await expect(page.locator('.canon-library-card').first()).toContainText('nodes');
-  await page.getByRole('link',{name:/First story/}).click();await expect(page.locator('#canon-reader-title')).toHaveText('First story');
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'First story',exact:true}).click();await expect(page.locator('#canon-reader-title')).toHaveText('First story');
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();expect(requests).toEqual([fixture.specURL('first')]);
-  await page.goBack();await page.getByRole('link',{name:/Second story/}).click();await expect(page.locator('#canon-reader-title')).toHaveText('Second story');
+  await page.goBack();await page.locator('#welcome-library-grid').getByRole('link',{name:'Second story',exact:true}).click();await expect(page.locator('#canon-reader-title')).toHaveText('Second story');
   expect(requests).toEqual([fixture.specURL('first'),fixture.specURL('second')]);
-  await page.goBack();await page.getByRole('link',{name:/First story/}).click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await page.goBack();await page.locator('#welcome-library-grid').getByRole('link',{name:'First story',exact:true}).click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
   expect(requests).toHaveLength(3);await page.locator('#canon-reader-edit').click();
   const expected=structuredClone(fixture.specs.first);expected.page.canon=fixture.index.diagrams[0].canon;
   await expect(page.locator('#src')).toHaveValue(JSON.stringify(expected,null,2));await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -576,8 +576,8 @@ test('a late spec response cannot replace another reader or an edited draft',asy
   const fixture=await publish(server);let release,started;
   const held=new Promise(resolve=>release=resolve),requested=new Promise(resolve=>started=resolve);
   await page.route(fixture.specURL('first'),async route=>{started();await held;await route.fulfill({json:fixture.specs.first});});
-  await page.goto(fixture.url);await page.locator('#welcome-library').click();await page.getByRole('link',{name:/First story/}).click();await requested;
-  await expect(page.locator('#canon-reader-edit')).toBeDisabled();await page.goBack();await page.getByRole('link',{name:/Second story/}).click();
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();await page.locator('#welcome-library-grid').getByRole('link',{name:'First story',exact:true}).click();await requested;
+  await expect(page.locator('#canon-reader-edit')).toBeDisabled();await page.goBack();await page.locator('#welcome-library-grid').getByRole('link',{name:'Second story',exact:true}).click();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
   const before=await page.locator('#src').inputValue();
   const received=page.waitForResponse(fixture.specURL('first'));release();await received;
@@ -749,4 +749,94 @@ test('Browse diagrams cards show the published description and tag chips, and se
   await query('CHIME');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['First story']);
   await query('billing');await expect.poll(()=>visibleLibraryTitles(page)).toEqual(['Second story']);
   expect(requests).toEqual([]);
+});
+
+async function explorationFixture(server){
+  const fixture=await publish(server),definitions=[
+    ['first','Order to doorstep','Follow an order from checkout through payment, fulfillment and delivery.',['commerce','onboarding'],'group:default/commerce-platform'],
+    ['second','When a payment needs another try','How a declined charge is retried safely without charging a customer twice.',['commerce','resilience'],'group:default/payments'],
+    ['third','A quieter home','Doorbell activity, visitor alerts and the household view.',['connected-home'],'group:default/home-experience'],
+    ['fourth','Events find their way','From event intake to durable storage, subscriptions and downstream consumers.',['platform','resilience'],'group:europe/platform'],
+    ['fifth','Signing in across services','How a session is created and verified across product boundaries.',['security','onboarding'],'group:default/identity-and-access-management'],
+    ['sixth','Inventory, without surprises','Stock reservations and the path back when an item is unavailable.',['commerce','resilience'],'group:default/commerce-platform'],
+    ['seventh','From signal to response','How an operational signal reaches the right responders.',['operations'],'group:default/platform'],
+    ['eighth','Analytics pipeline',null,['platform'],'group:default/data-platform'],
+  ];
+  for(const [i,[id,title,description,tags]] of definitions.entries()){
+    const spec=editorSpec();spec.page.title=title;if(description)spec.page.description=description;spec.page.tags=tags;
+    const d=spec.page.blocks[0].diagram;delete d.layouts;delete d.defaultLayout;d.primaryPanel=undefined;
+    const names=[['Checkout','Payments','Fulfillment'],['Payment API','Risk review','Ledger'],['Doorbell','Home hub','App'],['Event intake','Stream','Consumers'],['Sign in','Identity API','Session store'],['Reservation','Inventory API','Warehouse'],['Signal','Routing','On-call'],['Events','Warehouse','Reports']][i];
+    Object.values(d.nodes).forEach((node,j)=>node.title=names[j]);d.rows=i%2?[['a'],['b','c']]:[['a','b','c']];d.edges=[{from:'a',to:'b',kind:'https'},{from:'b',to:'c',kind:'https'}];
+    if(id==='third'){d.nodes={};d.rows=[[]];d.edges=[];d.steps=[];delete d.paths;d.panels[0].title='Household activity';d.primaryPanel='home';}
+    const folder=path.join(fixture.root,'diagrams',id);await mkdir(folder,{recursive:true});await writeFile(path.join(folder,id+'.spec.json'),JSON.stringify(spec));await writeFile(path.join(folder,id+'.html'),'<!doctype html>');fixture.specs[id]=spec;
+  }
+  await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:definitions.map(([id,,,,owner])=>({folder:'diagrams/'+id,owner}))}));
+  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});return fixture;
+}
+const mainLibrary=page=>page.locator('#welcome-library-grid');
+const recentIDs=page=>page.locator('#welcome-library-recent-items a').evaluateAll(links=>links.map(link=>new URL(link.href).searchParams.get('diagram')));
+
+test('Browse exploration combines facets, keyboard topics and search; grid/list and reader return retain context',async({page,server},testInfo)=>{
+  const fixture=await explorationFixture(server),requests=[];
+  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.setViewportSize({width:1440,height:900});await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const grid=mainLibrary(page),search=page.getByRole('searchbox',{name:'Search diagrams'}),count=page.locator('#welcome-library-count');
+  await expect(grid.locator('.canon-library-card')).toHaveCount(8);await expect(count).toHaveText('8 of 8 diagrams');
+  await expect(grid.locator('svg')).toHaveCount(7);await expect(grid.locator('.canon-library-preview-panels')).toContainText('Household activity');
+  await expect(page.getByLabel('Team',{exact:true}).locator('option')).toContainText(['All teams','Commerce Platform','Data Platform','Home Experience','Identity And Access Management','Payments','Platform','Platform · europe']);
+  const width=await grid.locator('.canon-library-card').first().evaluate(el=>el.getBoundingClientRect().width);
+  for(const size of [{width:1440,height:900},{width:1280,height:800}]){await page.setViewportSize(size);await testInfo.attach('browse-grid-'+size.width,{body:await page.screenshot(),contentType:'image/png'});}
+  await page.setViewportSize({width:1440,height:900});
+  await page.getByLabel('Team',{exact:true}).selectOption('group:default/commerce-platform');await expect(count).toHaveText('2 of 8 diagrams');
+  await page.getByLabel('Topic',{exact:true}).selectOption('commerce');await search.fill('FULFILLMENT');await expect(count).toHaveText('1 of 8 diagrams');
+  await page.getByLabel('Service',{exact:true}).selectOption('Checkout');await expect(count).toHaveText('1 of 8 diagrams');
+  expect(await grid.locator('.canon-library-card:visible').evaluate(el=>el.getBoundingClientRect().width)).toBe(width);
+  await page.getByLabel('Service',{exact:true}).selectOption('Ledger');await expect(count).toHaveText('0 of 8 diagrams');await expect(page.locator('#welcome-library-empty')).toContainText('FULFILLMENT');
+  await page.getByRole('button',{name:'Remove service filter: Ledger',exact:true}).click();await expect(count).toHaveText('1 of 8 diagrams');
+  await page.getByRole('button',{name:'Clear all',exact:true}).click();await expect(count).toHaveText('8 of 8 diagrams');
+  const chip=grid.locator('.canon-library-card').first().getByRole('button',{name:'Filter by topic: commerce',exact:true});await chip.focus();await page.keyboard.press('Enter');await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');
+  const order=await visibleLibraryTitles(page);expect(order).toEqual(['Order to doorstep','When a payment needs another try','Inventory, without surprises']);
+  await page.getByRole('button',{name:'List',exact:true}).click();await expect(page.getByRole('button',{name:'List',exact:true})).toHaveAttribute('aria-pressed','true');expect(await visibleLibraryTitles(page)).toEqual(order);
+  const heights=await grid.locator('.canon-library-card:visible').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().height));expect(Math.max(...heights)).toBeLessThan(160);
+  await testInfo.attach('browse-list-filtered',{body:await page.screenshot(),contentType:'image/png'});
+  expect(requests).toEqual([]);await expect(grid.locator('a button,button a')).toHaveCount(0);
+  const target=grid.getByRole('link',{name:'Order to doorstep',exact:true});await expect(target).toHaveAttribute('href',fixture.url+'?diagram=first');
+  await target.click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();
+  await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');await expect(page.getByRole('button',{name:'List',exact:true})).toHaveAttribute('aria-pressed','true');expect(await visibleLibraryTitles(page)).toEqual(order);
+  await target.click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('.canon-reader-toolbar [data-welcome-back]').click();
+  await expect(count).toHaveText('3 of 8 diagrams');expect(await recentIDs(page)).toEqual(['first']);
+});
+
+test('recently viewed records successful published reads, bounds and deduplicates history, prunes removals and clears locally',async({page,server})=>{
+  const fixture=await explorationFixture(server),key='flowview-library-recent-v1:'+new URL('diagrams.json',fixture.url).href;
+  const otherKey='flowview-library-recent-v1:'+server.origin+'/other/workbench/diagrams.json';
+  await page.addInitScript(key=>localStorage.setItem(key,JSON.stringify(['second'])),otherKey);
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  await expect(page.locator('#welcome-library-recent')).toBeHidden();
+  for(const id of ['first','second','fourth','fifth','sixth','seventh','eighth','first']){
+    await mainLibrary(page).locator('article[data-id="'+id+'"] a').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();await expect(mainLibrary(page)).toBeVisible();
+  }
+  expect(await recentIDs(page)).toEqual(['first','eighth','seventh','sixth','fifth','fourth']);
+  await page.reload();await expect(mainLibrary(page)).toBeVisible();expect(await recentIDs(page)).toEqual(['first','eighth','seventh','sixth','fifth','fourth']);
+  // A successful HTTP response with invalid source/revision is still a failed read.
+  await page.route('**/third.spec.json',route=>route.fulfill({json:{page:{}}}));
+  await mainLibrary(page).locator('article[data-id="third"] a').click();await expect(page.locator('#canon-reader-error')).toBeVisible();await page.goBack();
+  expect(await recentIDs(page)).toEqual(['first','eighth','seventh','sixth','fifth','fourth']);
+  const revised={...fixture.index,diagrams:fixture.index.diagrams.filter(entry=>entry.id!=='eighth')};await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(revised));
+  await page.reload();await expect(mainLibrary(page).locator('article')).toHaveCount(7);expect(await recentIDs(page)).toEqual(['first','seventh','sixth','fifth','fourth']);
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('IDENTITY');expect(await recentIDs(page)).toEqual(['fifth']);await expect(page.locator('#welcome-library-count')).toHaveText('1 of 7 diagrams');
+  await page.getByRole('button',{name:'Clear history',exact:true}).click();await expect(page.locator('#welcome-library-recent')).toBeHidden();expect(await page.evaluate(key=>localStorage.getItem(key),key)).toBeNull();expect(await page.evaluate(key=>localStorage.getItem(key),otherKey)).toBe('["second"]');
+});
+
+test('Browse handles malformed previews and corrupt or unavailable history storage without eager reads or script injection',async({page,server})=>{
+  const fixture=await explorationFixture(server),key='flowview-library-recent-v1:'+new URL('diagrams.json',fixture.url).href;
+  fixture.index.diagrams[0].preview={version:1,kind:'graph',label:'bad',total:1,nodes:[{x:0,y:0,w:999999,h:4,label:'Bad'}],edges:[]};
+  fixture.index.diagrams[1].preview.nodes[0].label='<img src=x onerror=alert(1)>';fixture.index.diagrams[1].preview.svg='<script>alert(1)</script>';
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(fixture.index));
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.addInitScript(key=>{try{localStorage.setItem(key,'{broken');}catch{}},key);await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  await expect(mainLibrary(page).locator('article[data-id="first"] .canon-library-preview')).toContainText('Preview unavailable');await expect(mainLibrary(page).locator('img,script')).toHaveCount(0);await expect(mainLibrary(page).locator('svg')).toHaveCount(6);expect(requests).toEqual([]);
+  await page.addInitScript(()=>{const get=Storage.prototype.getItem,set=Storage.prototype.setItem,remove=Storage.prototype.removeItem;Storage.prototype.getItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return get.call(this,key);};Storage.prototype.setItem=function(key,value){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return set.call(this,key,value);};Storage.prototype.removeItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return remove.call(this,key);};});
+  await page.reload();await expect(mainLibrary(page).locator('article')).toHaveCount(8);await mainLibrary(page).locator('article[data-id="first"] a').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();expect(await recentIDs(page)).toEqual(['first']);
+  await page.getByRole('button',{name:'Clear history',exact:true}).click();await expect(page.locator('#welcome-library-recent')).toBeHidden();
 });

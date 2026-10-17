@@ -296,3 +296,54 @@ test('#583 description and tags leave shared topology imports and document links
   const ref=plain(context.documentReference(withMeta));assert.equal(ref.spec,'consumer');
   assert.equal(context.documentSiteURL(withMeta.documentLinks.siteBaseUrl,{...ref,step:'send'}),context.documentSiteURL(without.documentLinks.siteBaseUrl,{...plain(context.documentReference(without)),step:'send'}));
 });
+
+// #608: thumbnails are bounded structured summaries, not source markup or a
+// second renderer. Selection must respect opening View membership and layouts.
+test('published previews select the authored opening View and visible diagram without mutating inputs',async t=>{
+  const {publishLibrary}=await import('../tools/canon/library.mjs');
+  const graph=title=>({nodes:{a:{title},b:{title:'Worker'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]});
+  const raw={page:{title:'Views',canon:{version:1,id:'views',kind:'canonical',owner:'group:default/home'},sections:[
+    {id:'other',heading:'Hidden from opening view',diagram:graph('PRIVATE')},
+    {id:'intro',heading:'Introduction',text:'Start here'},
+    {id:'chosen',heading:'Actual entry',diagram:graph('Chosen service')},
+  ],views:[{id:'opening',name:'Overview',presentation:'standard',sections:['intro','chosen']},{id:'other',name:'Other',presentation:'standard',sections:['other']}],defaultView:'opening'}};
+  const before=JSON.stringify(raw),preview=C.libraryPreview(raw);
+  assert.equal(JSON.stringify(raw),before);assert.equal(preview.kind,'graph');assert.equal(preview.label,'Actual entry');assert.equal(preview.nodes[0].label,'Chosen service');assert.ok(!JSON.stringify(preview).includes('PRIVATE'));
+  assert.deepEqual(C.libraryPreview(raw),preview);
+  raw.page.views[0].sections=['chosen','other'];assert.equal(C.libraryPreview(raw).label,'Actual entry');
+  const d=raw.page.sections[2].diagram;d.panels=[{id:'summary',type:'code',title:'Order processing',language:'text',code:'received'}];
+  d.sectionLayout={default:[{x:0,y:0,w:12,h:8,hidden:true},{panel:'summary',x:0,y:0,w:12,h:8}]};
+  const panels=C.libraryPreview(raw);assert.equal(panels.kind,'panels');assert.deepEqual(panels.panels,[{title:'Order processing',type:'code'}]);assert.ok(!JSON.stringify(panels).includes('Chosen service'));
+  d.layouts=[{id:'hidden',name:'Panel view',sectionLayout:d.sectionLayout},{id:'graph',name:'Graph view',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]}}];d.defaultLayout='graph';
+  raw.page.views[0].sections=[{section:'chosen',layout:'hidden'}];assert.equal(C.libraryPreview(raw).kind,'panels');
+  d.view='step';d.steps=[{id:'initial',panelVisibility:{summary:false}}];assert.equal(C.libraryPreview(raw),null);
+  d.steps[0].panelVisibility.summary=true;d.panels[0].visible=false;assert.equal(C.libraryPreview(raw).kind,'panels');
+  d.steps[0].panelVisibility={};assert.equal(C.libraryPreview(raw),null);
+  d.view='ambient';assert.equal(C.libraryPreview(raw).kind,'panels');
+  const tabs={page:{blocks:[{tabs:[{label:'Opening',sections:[{id:'prose',heading:'Start',text:'Read this'}]},{label:'Private',sections:[{diagram:graph('Inactive service')}]}]}]}};
+  assert.equal(C.libraryPreview(tabs),null);
+  tabs.page.blocks[0].tabs[0].sections.push({diagram:graph('Visible service')});assert.equal(C.libraryPreview(tabs).nodes[0].label,'Visible service');
+  const f=discoveryFixture(t);f.write('preview.json',JSON.parse(before));
+  const library=await publishLibrary({diagramsDir:f.directory,output:path.join(f.root,'workbench/diagrams.json')});
+  assert.deepEqual(library.diagrams[0].preview,preview);assert.deepEqual(plain(context.parseCanonLibrary(library)[0].preview),preview);
+});
+
+test('large graph previews are bounded, deterministic and honest about truncation',()=>{
+  const nodes=Object.fromEntries(Array.from({length:30},(_,i)=>['n'+i,{title:'Service '+i+' '+'.'.repeat(100)}]));
+  const ids=Object.keys(nodes),raw={page:{sections:[{heading:'Large network',diagram:{nodes,rows:[ids],edges:ids.slice(1).map(id=>({from:'n0',to:id}))}}]}};
+  const preview=C.libraryPreview(raw);assert.equal(preview.total,30);assert.equal(preview.nodes.length,12);assert.ok(preview.edges.length<=20);assert.ok(preview.nodes.every(n=>n.label.length<=80));
+  assert.deepEqual(preview,C.libraryPreview(raw));assert.ok(Buffer.byteLength(JSON.stringify(preview))<4000);assert.ok(context.libraryPreviewData(preview));
+  raw.page.sections[0].diagram.nodes=Object.fromEntries(Array.from({length:501},(_,i)=>['n'+i,{title:'Service'}]));assert.equal(C.libraryPreview(raw),null);
+});
+
+test('legacy and malformed optional previews fall back without breaking library membership',async()=>{
+  const {buildLibrary}=await import('../tools/canon/library.mjs');const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
+  const good=C.libraryPreview({page:{sections:[{diagram:{nodes:{a:{title:'Service'}},rows:[['a']],edges:[]}}]}});assert.equal(good.kind,'graph');
+  for(const preview of [undefined,null,{}, {...good,version:2},{...good,total:-1},{...good,nodes:Array(13).fill(good.nodes[0])},{...good,nodes:[{...good.nodes[0],x:Infinity}]},{...good,nodes:[{...good.nodes[0],label:'x'.repeat(81)}]},{...good,edges:[{from:0,to:900}]},{version:1,kind:'panels',label:'Panels',total:1,panels:[{title:[],type:'code'}]}]){
+    const entry=context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],preview}]})[0];assert.equal(entry.preview,null);assert.equal(entry.id,'doorbell');
+  }
+  const hostile=structuredClone(good);hostile.nodes[0].label='<img src=x onerror=alert(1)>';hostile.svg='<script>alert(1)</script>';
+  const parsed=context.libraryPreviewData(hostile);assert.equal(parsed.nodes[0].label,hostile.nodes[0].label);assert.equal(parsed.svg,undefined);
+  assert.equal(context.parseCanonLibrary(manifest())[0].preview,undefined);
+  assert.equal(context.libraryTeamName('group:default/payments-platform'),'Payments Platform');assert.equal(context.libraryTeamName('group:europe/payments-platform'),'Payments Platform · europe');
+});

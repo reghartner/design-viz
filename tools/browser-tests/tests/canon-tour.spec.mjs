@@ -16,7 +16,7 @@ async function fresh(page){
 }
 async function openReader(page){
   await page.locator('#welcome-library').click();
-  await page.locator('.canon-library-card').first().click();
+  await page.locator('.canon-library-open').first().click();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 }
 
@@ -68,7 +68,7 @@ test('leaving a running demo cancels tour work and an unfinished tour can open a
   await expect.poll(async()=>(await resources()).timers).toBe(0);
   await expect.poll(async()=>(await resources()).frames).toBe(0);
   const baseline=await resources();
-  await page.locator('.canon-library-card').click();
+  await page.locator('.canon-library-open').click();
   await expect(page.locator('.dv-tour-ui .dv-tour-heading')).toHaveText('Company playback');
   await expect(page.locator('.dv-tour-ui')).toBeVisible();
   await expect(page.locator('#canon-reader .schip[aria-current=true]:visible')).toHaveText('2');

@@ -1,10 +1,22 @@
 # Browse canon diagrams in the workbench
 
-Choose **Browse diagrams** on the welcome page. Each card opens a **read-only**
-viewer. Readers can walk the steps, select an alternate, switch views, drill
+Choose **Browse diagrams** on the welcome page. The visual grid introduces each
+story with a static topology preview or an explicitly labeled panel summary,
+its title, authored explanation, team, and topics. Switch to **List** for compact
+scanning. Diagram titles and previews are ordinary links, including Open in new
+tab. Each opens a **read-only** viewer. Readers can walk the steps, select an alternate, switch views, drill
 into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
 a reader restores its selected diagram from the published index and its selected spec.
+Returning from a reader keeps the search, filters, and Grid/List choice for the
+current page session.
+
+**Recently viewed** keeps the last six successful published reads in this browser,
+scoped to the site's library URL. It deduplicates visits, removes diagrams no
+longer published, and follows the same active filters as the collection. Failed
+reads and the bundled fictional demo do not enter history. **Clear history**
+removes the local list; nothing is sent to a server. With browser storage blocked,
+the list lasts only for the current page session.
 
 **Edit in Workbench** opens a local editable copy at the chapter, view, playback
 mode, path, and step currently shown in the reader through the normal import
@@ -100,8 +112,9 @@ author-owned `description` and `tags` (copied from the spec's `page.description`
 and `page.tags` when present), `canon` membership,
 `counts` (resolved nodes, steps, panels), `services` (the distinct resolved node
 titles, used by **Search diagrams**), a relative authored `specUrl`, and a
-`revision` SHA256 of the membership-adjusted authored JSON. They contain no diagram
-rows, steps, panels, or embedded specs. For example:
+`revision` SHA256 of the membership-adjusted authored JSON. They contain no authored diagram
+rows, steps, panel state, or embedded specs. An optional `preview` contains only
+bounded summary data. For example:
 
 ```json
 {
@@ -122,10 +135,31 @@ rows, steps, panels, or embedded specs. For example:
 
 **Search diagrams** filters the cards as you type, case-insensitively, by title,
 ID, description, tags, owner and `services`; it never fetches specs. Cards show the
-description under the title and each tag as a chip. Indexes without
+description under the title and each tag as a keyboard-operable topic filter.
+**Team**, **Service**, and **Topic** selections combine with search; the count
+shows matching diagrams out of the full collection. Remove an active-filter chip
+or choose **Clear all** to reset. Team names are humanized for display, with
+non-default namespaces shown; hover for the raw owner identity, which remains
+searchable. Grid and List use the same ordering and results. Indexes without
 `services`, `description` or `tags` still load and filter on the other fields.
 Authors set description and tags in **Inspect → Document settings**; they live in
 the spec, not in `canon.json`, which still controls only membership, ID and owner.
+The publisher generates `preview.version: 1` using the DOM-free runtime. It
+selects the first diagram member of an opening authored View (skipping prose,
+inactive tabs and detail-only sections), honors layout-hidden tiles and opening
+panel visibility, and uses the shared graph geometry. Named layouts position
+whole tiles; they do not change the shared graph's node placement. Graph
+summaries contain at most 12 nodes and 20 real connections, with simplified
+straight lines and labels limited to 80 characters. A caption identifies the
+section and any truncated node count. Graphs over 500 nodes or 1,000 edges use
+the fallback. Panel-first stories list up to three visible authored panel titles
+and types, explicitly as a **Panel summary**, not a screenshot. Hidden graph
+content is not substituted for a panel-first View. Missing or malformed previews
+show **Preview unavailable** without fetching the source. The browser validates
+this small numeric/text schema and constructs SVG itself; it never inserts
+published markup. Normal Python and Docker builds need no browser or new
+dependency, and generation never changes authored source files.
+
 The browser loads the index for library cards, then fetches only the selected
 authored spec and its provider closure for reading or editing. It verifies source
 revisions and resolves [shared topology](shared-topology.md) in memory. Edit in

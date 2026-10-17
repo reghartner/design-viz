@@ -77,9 +77,8 @@ test('importing the same document keeps a locked node in place; a different docu
  await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');const start=await graphCenter(node(page,'b'));
 
  const same=file('Browser contract');await importFile(same);
- const imported=JSON.parse(await source(page)),d=imported.page.blocks[0].diagram;
- expect(d.nodes.z).toEqual({title:'Zulu'});expect(d.nodes.b.locked).toBe(true);expect(d.rows[0]).toEqual(['z','a','c']);
- expect(d.floats.filter(f=>f.id==='b')).toEqual([{id:'b',side:'below',x:start.x,y:start.y,noSpread:true}]);
+ const expected=JSON.parse(same),ed=expected.page.blocks[0].diagram;ed.rows[0]=['z','a','c'];ed.floats=[{id:'b',side:'below',x:start.x,y:start.y,noSpread:true}];
+ expect(JSON.parse(await source(page))).toEqual(expected);
  await expect.poll(()=>graphCenter(node(page,'b'))).toEqual(start);await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(node(page,'z')).toHaveCount(0);
 

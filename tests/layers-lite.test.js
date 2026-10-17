@@ -228,7 +228,7 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  canon ID wins | same canon.id, different documentLinks.id | b re-pinned | documentLinks.id taking precedence over canon.id
  same ID, different fields | canon.id 'orders' vs documentLinks.id 'orders', both directions | b re-pinned | comparing IDs per field instead of the derived diagram ID
  different title | both untitled-ID, titles differ, b locked in both | state.text === file text | a guard matching nodes by id across documents
- different ID, same title | documentLinks.id differs | state.text === file text | a title match overriding IDs
+ different ID, same title | derived IDs differ: documentLinks/documentLinks, canon/canon, and both cross-field directions | state.text === file text | a title match overriding IDs, or a per-field ID check
  ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
  blank titles | '  ' vs '  ' | state.text === file text | treating whitespace-only titles as an identity
  both untitled | no title, no ID | state.text === file text | treating two untitled documents as the same */
@@ -261,6 +261,9 @@ for(const [label,before,after] of [
 for(const [label,before,after] of [
  ['different title',{title:'Orders'},{title:'Payments'}],
  ['different documentLinks.id, same title',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',documentLinks:{id:'payments'}}],
+ ['different canon.id, same title',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',canon:{version:1,id:'payments',kind:'design',owner:'group:default/local'}}],
+ ['canon.id differs from the imported documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',documentLinks:{id:'payments'}}],
+ ['documentLinks.id differs from the imported canon.id',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',canon:{version:1,id:'payments',kind:'design',owner:'group:default/local'}}],
  ['ID on the current document only',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders'}],
  ['ID on the imported file only',{title:'Orders'},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
  ['whitespace-only titles',{title:'  '},{title:'  '}],

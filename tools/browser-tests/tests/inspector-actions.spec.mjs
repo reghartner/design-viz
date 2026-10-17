@@ -199,10 +199,10 @@ test('Home selection and new rows reveal the intended editor while normal select
 
 /* #610 contract matrix (Node style picker modal, real input)
    row | fixture | assertion (scoped) | rejects
-   P1 open | click button.node-style-browse in the Node style row | dialog.node-style-picker is visible; its .node-style-grid holds one button.node-style-tile per preset plus the default tile (data-style-id=""); each preset tile shows a sample `svg .node.ns-<id> .card`; the current preset's tile is aria-pressed=true | a plain list without rendered samples
+   P1 open | click button.node-style-browse in the Node style row | dialog.node-style-picker is visible; its .node-style-grid tile ids equal ['', ...NODE_STYLE_SET] in order; each preset tile shows a sample `svg .node.ns-<id> .card`; the current preset's tile is aria-pressed=true | a plain list, a missing preset, an invented tile
    P2 keyboard | ArrowRight from the first tile, Enter | focus moves to the next tile; Enter applies that tile: nodes.a.style equals its data-style-id, the dialog closes, focus returns to the browse button | arrows that scroll instead of moving, Enter that does nothing
    P3 render | after apply | #section-overview [data-dv-node="a"] has class ns-<id> and data-dv-style; its .card computed fill differs from node b's .card fill; title .t1 fill differs from b's | a stored field that does not paint
-   P4 selected | the styled node is still selected | g.node.dv-sel .card keeps a visible dashed selection stroke (stroke-dasharray not "none") | a preset that hides the selection ring
+   P4 selected | the styled node is still selected | its .card stroke is the dashed selection ring: stroke-dasharray set, stroke-width >= 2, stroke-opacity >= .9, and the stroke color contrasts with the card fill at >= 1.5:1 | a preset whose border hides or matches the selection ring
    P5 escape | reopen, press Escape | the dialog is gone, the source is unchanged, focus is back on the browse button | a modal that swallows Escape
    P6 click | reopen, click the Default tile | nodes.a has no style field; the node loses ns-/data-dv-style; Undo restores the previous preset | a default tile that writes "style": ""
    P7 bulk | select a and b, open the multi-form picker, click a preset tile | both nodes carry that style; one Undo removes both | bulk edits without the modal */
@@ -221,7 +221,8 @@ test('node style picker applies presets from a modal of rendered samples with mo
   await browse.click();const dialog=page.locator('dialog.node-style-picker');await expect(dialog).toBeVisible();
   const tiles=dialog.locator('.node-style-grid button.node-style-tile');
   const tokens=await tiles.evaluateAll(buttons=>buttons.map(b=>b.dataset.styleId));
-  expect(tokens[0]).toBe('');expect(tokens.length).toBeGreaterThanOrEqual(10);expect(new Set(tokens).size).toBe(tokens.length);
+  const styleSet=await page.evaluate(()=>NODE_STYLE_SET);expect(styleSet.length).toBeGreaterThan(8);
+  expect(tokens).toEqual(['',...styleSet]);
   for(const token of tokens.slice(1))await expect(dialog.locator('.node-style-tile[data-style-id="'+token+'"] svg .node.ns-'+token+' .card')).toHaveCount(1);
   await expect(dialog.locator('.node-style-tile[aria-pressed="true"]')).toHaveAttribute('data-style-id','rose');
   // P2: ArrowRight from the first tile, Enter applies the second tile.
@@ -233,7 +234,9 @@ test('node style picker applies presets from a modal of rendered samples with mo
   await expect(node('a')).toHaveClass(new RegExp('\\bns-'+chosen+'\\b'));await expect(node('a')).toHaveAttribute('data-dv-style',chosen);
   expect(await fill('a','.card')).not.toBe(await fill('b','.card'));expect(await fill('a','.t1')).not.toBe(await fill('b','.t1'));
   await expect(node('a')).toHaveClass(/\bdv-sel\b/);
-  expect(await node('a').locator('.card').evaluate(el=>getComputedStyle(el).strokeDasharray)).not.toBe('none');
+  const ring=await node('a').locator('.card').evaluate(el=>{const s=getComputedStyle(el);return {dash:s.strokeDasharray,width:parseFloat(s.strokeWidth),opacity:parseFloat(s.strokeOpacity),stroke:s.stroke,fill:s.fill};});
+  expect(ring.dash).not.toBe('none');expect(ring.width).toBeGreaterThanOrEqual(2);expect(ring.opacity).toBeGreaterThanOrEqual(.9);
+  expect(contrastRatio(ring.stroke,ring.fill)).toBeGreaterThanOrEqual(1.5);
   // P5
   const afterChoice=await src.inputValue();await browse.click();await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(src).toHaveValue(afterChoice);await expect(browse).toBeFocused();
@@ -251,4 +254,98 @@ test('node style picker applies presets from a modal of rendered samples with mo
   await expect.poll(async()=>{const d=await spec();return [d.nodes.a.style,d.nodes.b.style];}).toEqual([bulkToken,bulkToken]);
   await expect(node('b')).toHaveClass(new RegExp('\\bns-'+bulkToken+'\\b'));
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(beforeBulk);
+});
+
+/* Color helpers for the contracts below: WCAG relative luminance on computed
+   `rgb(r, g, b)` strings, and OKLab distance for "looks different". */
+function rgbTriple(text){const m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(text||'');if(!m)throw new Error('not an rgb color: '+text);return [1,2,3].map(i=>Number(m[i]));}
+function contrastRatio(a,b){
+  const lum=rgb=>{const c=rgb.map(v=>v/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+  const [hi,lo]=[lum(rgbTriple(a)),lum(rgbTriple(b))].sort((x,y)=>y-x);return (hi+.05)/(lo+.05);
+}
+function oklab(text){
+  const [r,g,b]=rgbTriple(text).map(v=>v/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);
+  const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b),s=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  return [.2104542553*l+.7936177850*m-.0040720468*s,1.9779984951*l-2.4285922050*m+.4505937099*s,.0259040371*l+.7827717662*m-.8086757660*s];
+}
+function labDistance(a,b){const p=oklab(a),q=oklab(b);return Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);}
+/* The default card colors each skin shipped before #610, captured from the
+   rendered viewer; a node without `style` must still paint exactly these. */
+const LEGACY_CARD={
+  daylight:{fill:'rgb(255, 255, 255)',stroke:'rgb(224, 220, 209)',t1:'rgb(35, 39, 46)',t2:'rgb(121, 128, 139)'},
+  editorial:{fill:'rgb(255, 253, 248)',stroke:'rgb(200, 190, 174)',t1:'rgb(30, 41, 39)',t2:'rgb(104, 108, 103)'},
+  pastel:{fill:'rgb(255, 255, 255)',stroke:'rgb(216, 224, 235)',t1:'rgb(39, 53, 77)',t2:'rgb(115, 128, 150)'},
+  rose:{fill:'rgb(255, 255, 255)',stroke:'rgb(224, 195, 206)',t1:'rgb(74, 44, 58)',t2:'rgb(122, 95, 108)'},
+  lavender:{fill:'rgb(255, 253, 248)',stroke:'rgb(205, 186, 219)',t1:'rgb(68, 50, 79)',t2:'rgb(114, 93, 123)'},
+  lilac:{fill:'rgb(255, 255, 255)',stroke:'rgb(214, 198, 227)',t1:'rgb(58, 42, 72)',t2:'rgb(110, 92, 126)'},
+  aurora:{fill:'rgb(16, 26, 44)',stroke:'rgb(37, 54, 79)',t1:'rgb(234, 242, 255)',t2:'rgb(126, 147, 184)'},
+  terminal:{fill:'rgb(12, 20, 17)',stroke:'rgb(38, 53, 47)',t1:'rgb(228, 238, 233)',t2:'rgb(116, 135, 126)'},
+  blueprint:{fill:'rgb(8, 54, 109)',stroke:'rgb(166, 231, 243)',t1:'rgb(255, 255, 255)',t2:'rgb(184, 215, 231)'}
+};
+
+/* #610 contract matrix (every preset × every skin, computed on the rendered card)
+   row | fixture | assertion (scoped) | rejects
+   K1 readable | Workbench canvas, one node per token plus a default node, each of the 9 skins chosen through the appearance buttons | for every token: computed .t1 fill and .t2 fill each contrast >= 4.5:1 against the computed .card fill | an unreadable preset in any skin
+   K2 border | same | computed .card stroke differs from its fill, stroke-width >= 1, stroke-opacity 1, and contrasts with the fill at >= 1.3:1 | a border that vanishes into the card
+   K3 distinct | same | every pair of presets differs by an OKLab distance >= 0.05 on the border OR >= 0.05 on the background; every preset differs from the default card on fill or stroke | two presets that look alike, or a preset equal to the skin card
+   K4 legacy | the node without style, every skin | computed fill, stroke, .t1 and .t2 equal the LEGACY_CARD table captured before #610 | a change to older documents
+   K5 lit | standalone viewer page (inject.py), step mode lighting the styled node | the lit card's stroke differs from the same card's stroke out of step mode; the class ns-<token> and data-dv-style are present in the reader | a preset that hides the lit-step highlight, or a reader that drops the field */
+test('every node style preset stays readable, bordered and distinct in all nine skins while default cards are unchanged',async({page,server})=>{
+  const raw=fixture(),diagram=raw.page.sections[0].diagram;
+  const styleSet=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
+  diagram.nodes={plain:{title:'Default card',sub:'no style'}};diagram.rows=[];diagram.edges=[];diagram.steps=[{id:'only',text:'one',nodes:['plain']}];
+  styleSet.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
+  const ids=Object.keys(diagram.nodes);for(let i=0;i<ids.length;i+=4)diagram.rows.push(ids.slice(i,i+4));
+  await start(page,server,raw);
+  const live=await page.evaluate(()=>NODE_STYLE_SET);expect(live).toEqual(styleSet);
+  await page.locator('#workspace-appearance>summary').click();
+  const read=()=>page.evaluate(()=>{
+    const out={};for(const g of document.querySelectorAll('#section-overview [data-dv-node]')){
+      const cs=el=>getComputedStyle(el),card=cs(g.querySelector('.card'));
+      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,width:parseFloat(card.strokeWidth),opacity:parseFloat(card.strokeOpacity),t1:cs(g.querySelector('.t1')).fill,t2:cs(g.querySelector('.t2')).fill,style:g.dataset.dvStyle||null};
+    }return out;});
+  for(const skin of Object.keys(LEGACY_CARD)){
+    await page.locator('#sk-'+skin).click();await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
+    const seen=await read();
+    // K4
+    expect({skin,plain:seen.plain}).toEqual({skin,plain:{...LEGACY_CARD[skin],width:expect.any(Number),opacity:expect.any(Number),style:null}});
+    for(const token of styleSet){
+      const c=seen[token];expect(c.style,skin+' '+token).toBe(token);
+      // K1
+      expect(contrastRatio(c.t1,c.fill),skin+' '+token+' title').toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(c.t2,c.fill),skin+' '+token+' subtitle').toBeGreaterThanOrEqual(4.5);
+      // K2
+      expect(c.stroke,skin+' '+token+' border').not.toBe(c.fill);expect(c.width).toBeGreaterThanOrEqual(1);expect(c.opacity).toBe(1);
+      expect(contrastRatio(c.stroke,c.fill),skin+' '+token+' border contrast').toBeGreaterThanOrEqual(1.3);
+      // K3 vs default
+      expect(c.fill!==seen.plain.fill || c.stroke!==seen.plain.stroke,skin+' '+token+' differs from the skin card').toBe(true);
+    }
+    for(let i=0;i<styleSet.length;i++)for(let j=i+1;j<styleSet.length;j++){
+      const a=seen[styleSet[i]],b=seen[styleSet[j]];
+      const apart=Math.max(labDistance(a.stroke,b.stroke),labDistance(a.fill,b.fill));
+      expect(apart,skin+': '+styleSet[i]+' vs '+styleSet[j]+' OKLab '+apart.toFixed(3)).toBeGreaterThanOrEqual(.05);
+    }
+  }
+});
+
+test('the standalone reader paints presets and keeps the lit-step highlight on a styled card (K5)',async({page,server})=>{
+  const {execFileSync}=await import('node:child_process'),{writeFile}=await import('node:fs/promises'),path=(await import('node:path')).default,{repo}=await import('../helpers/prepare.mjs');
+  const raw={page:{title:'Styled reader',skin:'daylight',sections:[{id:'flow',heading:'Flow',diagram:{view:'ambient',autoplay:false,
+    nodes:{plain:{title:'Default'},rose:{title:'Rose',sub:'styled',style:'rose'},teal:{title:'Teal',sub:'styled',style:'teal'}},rows:[['plain','rose','teal']],edges:[{from:'plain',to:'rose'},{from:'rose',to:'teal'}],
+    steps:[{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}]}}]}};
+  const spec=path.join(server.root,'node-styles.json');await writeFile(spec,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),spec,path.join(repo,'template/flowview.html'),path.join(server.root,'node-styles.html')]);
+  await page.goto(server.origin+'/node-styles.html');
+  const node=id=>page.locator('[data-dv-node="'+id+'"]').first();
+  await expect(node('rose')).toHaveClass(/\bns-rose\b/);await expect(node('rose')).toHaveAttribute('data-dv-style','rose');
+  await expect(node('plain')).not.toHaveAttribute('data-dv-style');
+  const card=async id=>node(id).locator('.card').evaluate(el=>({fill:getComputedStyle(el).fill,stroke:getComputedStyle(el).stroke}));
+  expect((await card('rose')).fill).not.toBe((await card('plain')).fill);
+  await page.getByRole('button',{name:'Step',exact:true}).first().click();await page.locator('button.schip').first().click();
+  await expect(node('rose')).toHaveClass(/\blit\b/);
+  const lit=await card('rose');
+  await page.getByRole('button',{name:'Ambient',exact:true}).first().click();
+  await expect(node('rose')).not.toHaveClass(/\blit\b/);
+  const unlit=await card('rose');
+  expect(lit.stroke).not.toBe(unlit.stroke);expect(unlit.fill).toBe(lit.fill);
 });

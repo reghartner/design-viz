@@ -788,8 +788,8 @@ test('bulk node editing offers the Node style control and icon color beside the 
   assert.ok(!rows.some(row=>labelOf(row)==='Color'),'no separate Color row');
   assert.ok(rows.find(row=>labelOf(row)==='Icon').querySelector('[aria-label="Icon color"]'),'icon color in the bulk Icon row');
   const styleRow=rows.find(row=>labelOf(row)==='Node style');assert.ok(styleRow,'bulk Node style row');
-  const select=styleRow.querySelector('.node-style-control [aria-label="Node style"]');
-  assert.equal(select.children[0].textContent,'Choose a style');assert.deepEqual(select.children.slice(1).map(option=>option.value),e.C.NODE_STYLE_SET);
+  assert.ok(styleRow.querySelector('.node-style-control'),'bulk node style control');const select=styleRow.querySelector('[aria-label="Node style"]');
+  assert.equal(select.children[0].textContent,'Choose a style');assert.deepEqual(select.children.slice(1).map(option=>option.value),[...e.C.NODE_STYLE_SET]);
   select.value='amber';select.fire('change');
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.style),['amber','amber',undefined]);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);

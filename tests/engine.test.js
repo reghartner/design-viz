@@ -4916,10 +4916,13 @@ test('restoring a contract route also restores its diagram after transient navig
    N2 default | node without style | its <g> has neither node-styled nor data-dv-style | a renderer that always emits a style class
    N3 unknown token | node {style:'neon'} | no node-styled/ns- class; validator warns `.nodes.a.style: unknown style "neon" — ignored (valid: …)` | silently inventing a class / an error that blocks rendering
    N4 token set | NODE_STYLE_SET | at least 9 tokens (Chuck: more than 8), all lowercase words, no duplicates | a set of 8 or fewer
-   N5 palette light | style.core.css `.node.ns-<t>{--ns-bg;--ns-line;--ns-ink;--ns-sub}` | every token has one; ink/bg >= 4.5:1 and sub/bg >= 4.5:1 (WCAG AA) | a preset with unreadable text
+   N5 palette light | style.core.css `.node.ns-<t>{--ns-bg;--ns-line;--ns-ink;--ns-sub}` | every token has exactly one light entry; ink/bg >= 4.5:1 and sub/bg >= 4.5:1 (WCAG AA) on the authored values | a preset with unreadable text
    N6 palette dark | the dark-skin override of the same vars | every token has one; same contrast floor | a dark skin left on the light values
-   N7 distinguishable | the light and the dark sets | every pair of preset backgrounds differs by at least 20 RGB units (Euclidean) | two near-identical presets
-   N8 compatibility | spec with a styled node | detect() lists media.node-styles; an older viewer lacking it reports it missing; no styled node → not listed | exports that claim nothing new */
+   N7 (browser) | see inspector-actions.spec.mjs rows K1–K5: computed colors per skin, distinctness in OKLab, legacy defaults | —
+   N8 compatibility | spec with a styled node | detect() lists media.node-styles; an older viewer lacking it reports it missing; no styled node → not listed | exports that claim nothing new
+   N9 hosts | the native and forge entrypoints (Backstage, Confluence, standalone share them) and the core stylesheet | the renderer emits node-styled/ns- in both bundles; NODE_STYLE_SET is defined in both; style.core.css carries the `.node.node-styled .card` paint rule | a Workbench-only feature
+   N10 exports | svgExportClassName (asserted in tests/svg-export.test.js, the export's own seam) | keeps node-styled and ns-<token> while dropping editor-only classes | an export that loses the preset
+   N11 docs | contract/authoring-contract.md, docs/node-styles.md, the Workbench agent prompt (src/boot.workbench.js) | each names the `style` field and every token in NODE_STYLE_SET | a field with no reference or guidance */
 function nodeStyleContrast(a, b){
   const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
   const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + .05) / (lo + .05);
@@ -4952,11 +4955,11 @@ test('node style presets: the renderer marks styled nodes and leaves default and
 
 test('node style presets: unknown tokens warn with the exact field path and the valid list, valid tokens are silent (N3, N4)', () => {
   assert.ok(Array.isArray(C.NODE_STYLE_SET) && C.NODE_STYLE_SET.length >= 9, 'more than 8 presets');
-  assert.deepStrictEqual([...new Set(C.NODE_STYLE_SET)], C.NODE_STYLE_SET);
+  assert.deepStrictEqual([...new Set(C.NODE_STYLE_SET)], [...C.NODE_STYLE_SET]);
   for (const token of C.NODE_STYLE_SET) assert.match(token, /^[a-z]+$/);
   for (const token of C.NODE_STYLE_SET){
     const result = C.validate(C.normalize({nodes: {a: {style: token}}, rows: [['a']]}));
-    assert.deepStrictEqual(plain(result), {errors: [], warnings: []}, token);
+    assert.deepEqual(plain(result), {errors: [], warnings: []}, token);
   }
   for (const style of ['neon', '', 0, 42, {}, ['rose']]){
     const result = C.validate(C.normalize({nodes: {a: {style}}, rows: [['a']]}));
@@ -4965,10 +4968,10 @@ test('node style presets: unknown tokens warn with the exact field path and the 
     assert.strictEqual(warnings.length, 1, JSON.stringify(style));
     assert.ok(warnings[0].endsWith('.nodes.a.style: unknown style "' + (typeof style === 'string' ? style : JSON.stringify(style)) + '" — ignored (valid: ' + C.NODE_STYLE_SET.join(' ') + ')'), warnings[0]);
   }
-  assert.deepStrictEqual(plain(C.validate(C.normalize({nodes: {a: {style: null}}, rows: [['a']]}))), {errors: [], warnings: []});
+  assert.deepEqual(plain(C.validate(C.normalize({nodes: {a: {style: null}}, rows: [['a']]}))), {errors: [], warnings: []});
 });
 
-test('node style presets: every preset is readable (AA) in the light and the dark palette and no two presets look alike (N5–N7)', () => {
+test('node style presets: the authored light and dark palettes cover every token at AA contrast (N5, N6)', () => {
   const {light, dark} = nodeStylePalette();
   for (const [name, set] of [['light', light], ['dark', dark]]){
     assert.deepStrictEqual(Object.keys(set).sort(), [...C.NODE_STYLE_SET].sort(), name + ' palette covers every token');
@@ -4977,13 +4980,26 @@ test('node style presets: every preset is readable (AA) in the light and the dar
       assert.ok(nodeStyleContrast(c.ink, c.bg) >= 4.5, name + ' ' + token + ' title ' + nodeStyleContrast(c.ink, c.bg).toFixed(2));
       assert.ok(nodeStyleContrast(c.sub, c.bg) >= 4.5, name + ' ' + token + ' subtitle ' + nodeStyleContrast(c.sub, c.bg).toFixed(2));
     }
-    const tokens = Object.keys(set);
-    for (let i = 0; i < tokens.length; i++) for (let j = i + 1; j < tokens.length; j++){
-      const a = set[tokens[i]].bg, b = set[tokens[j]].bg;
-      const d = Math.hypot(...[1, 3, 5].map(k => parseInt(a.slice(k, k + 2), 16) - parseInt(b.slice(k, k + 2), 16)));
-      assert.ok(d >= 20, name + ' ' + tokens[i] + ' vs ' + tokens[j] + ' backgrounds differ by ' + d.toFixed(1));
-    }
   }
+});
+
+test('node style presets: the reader hosts and the documentation carry the feature (N9, N11)', () => {
+  for (const name of ['native', 'forge']){
+    const source = entrypoint(name).source;
+    assert.ok(/node-styled ns-/.test(source), name + ' bundle emits the preset classes');
+    assert.ok(/var NODE_STYLE_SET\s*=/.test(source), name + ' bundle defines NODE_STYLE_SET');
+  }
+  assert.ok(/\.docview \.node\.node-styled \.card\{/.test(readStyles('style.core.css')), 'core stylesheet paints styled cards');
+  const docs = {
+    'contract/authoring-contract.md': fs.readFileSync(path.join(ROOT, 'contract/authoring-contract.md'), 'utf8'),
+    'docs/node-styles.md': fs.readFileSync(path.join(ROOT, 'docs/node-styles.md'), 'utf8'),
+    'src/boot.workbench.js': readSource('boot.workbench.js')
+  };
+  for (const [file, text] of Object.entries(docs)){
+    assert.ok(/\bstyle\b/.test(text), file + ' names the style field');
+    for (const token of C.NODE_STYLE_SET) assert.ok(new RegExp('\\b' + token + '\\b').test(text), file + ' lists ' + token);
+  }
+  assert.ok(/`style`/.test(docs['contract/authoring-contract.md']), 'the field reference documents `style`');
 });
 
 test('node style presets: exports declare media.node-styles only when a node carries a style (N8)', () => {

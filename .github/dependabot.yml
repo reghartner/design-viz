@@ -13,10 +13,23 @@ updates:
     directories:
       - /tools/browser-tests
       - /tools/catalog-sync
-      - /apps/backstage
       - /apps/confluence
     schedule: {interval: weekly}
     open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /apps/backstage
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 has no compiler API; rollup-plugin-dts and
+      # verify-backstage-package need it (see #626).
+      - dependency-name: typescript
+        versions: [">=7"]
   - package-ecosystem: docker
     directory: /deploy/workbench
     schedule: {interval: weekly}
+    ignore:
+      # The image stays on a Node LTS line (see #625). Moving to the next LTS
+      # major is a manual change; minor and patch updates still arrive.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

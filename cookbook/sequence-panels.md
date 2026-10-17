@@ -59,8 +59,9 @@ Field references: `python3 tools/widget_doc.py sequence frames reads locus funne
    **Frameshift insert** shows the thirteen-letter product with no stop left
    in frame 1, then the same grid.
 
-Author your own story by replacing the sequences, reads and counts. A range,
-marker or read that lies entirely outside the declared sequence or genome
-warns and is left out; a range or read that only partly overlaps is clipped to
-the declared span without a warning, so check coordinates against `start` and
-`length` when a mark seems short.
+Author your own story by replacing the sequences, reads and counts. Each panel
+handles out-of-span coordinates in its own way (some warn and drop, some clip,
+`reads` lists a read that lies outside the reference without cells); the
+contract bullet printed by `python3 tools/widget_doc.py <type>` states the rule
+for that panel. Run `node tools/validate.js <spec>` after editing: every
+boundary decision that the validator makes is reported with its source path.

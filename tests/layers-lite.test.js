@@ -212,6 +212,73 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  }
  const guarded=textSession(lock);assert.equal(guarded.session.accept({text:moved}),true);assert.deepEqual(allCenters(guarded.text).b,before);
 });
+/* #628 file import runs the lock guard, but only when the imported file is the
+ same document. Rule: a document is identified by its diagram ID
+ (page.canon.id, else page.documentLinks.id: documentReference); when neither
+ side has one, by its trimmed non-empty page.title. Any other pair (different
+ ID, ID on one side only, different or missing titles) is a different
+ document and is imported exactly as written. File import publishes through
+ session.accept with {lockGuard:'same-document'}; Agent proposals keep
+ exactSource (row above).
+ row | fixture | assertion (scoped) | rejects
+ same title, no IDs | lock b, file adds z before a (b moves) | b's center == pre-import; only b's placement differs from the file; one undo restores | an import that skips the guard (today's exactSource)
+ same title after trim | ' Orders ' vs 'Orders' | b re-pinned | raw (untrimmed) title equality
+ same ID, renamed | page.documentLinks.id both sides, titles differ | b re-pinned | a title-only identity that drops renamed files
+ same canon ID | page.canon.id both sides | b re-pinned | ignoring canon.id
+ canon ID wins | same canon.id, different documentLinks.id | b re-pinned | documentLinks.id taking precedence over canon.id
+ same ID, different fields | canon.id 'orders' vs documentLinks.id 'orders', both directions | b re-pinned | comparing IDs per field instead of the derived diagram ID
+ different title | both untitled-ID, titles differ, b locked in both | state.text === file text | a guard matching nodes by id across documents
+ different ID, same title | derived IDs differ: documentLinks/documentLinks, canon/canon, and both cross-field directions | state.text === file text | a title match overriding IDs, or a per-field ID check
+ ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
+ blank titles | '  ' vs '  ' | state.text === file text | treating whitespace-only titles as an identity
+ title on one side | 'Orders' vs none, and the converse | state.text === file text | treating a missing title as a wildcard
+ identity decoy | current page mentions the imported title/ID only in description and tags | state.text === file text | matching identity by searching the whole page
+ both untitled | no title, no ID | state.text === file text | treating two untitled documents as the same */
+function importPair(before,after){
+ const raw=pinFixture(),text=JSON.stringify(raw,null,2),lockRaw=JSON.parse(C.planSetNodeLocked(text,raw,0,'b',true).text);
+ Object.assign(lockRaw.page,before);const lock=JSON.stringify(lockRaw,null,2);
+ const fileRaw=JSON.parse(lock);Object.keys(before).forEach(key=>delete fileRaw.page[key]);Object.assign(fileRaw.page,after);
+ const d=diagram(fileRaw);d.nodes.z={title:'Zulu'};d.rows[0].unshift('z');
+ const file=JSON.stringify(fileRaw,null,2);
+ assert.notDeepEqual(allCenters(file).b,allCenters(lock).b,'precondition: the imported file moves b');
+ assert.equal(diagram(fileRaw).nodes.b.locked,true,'precondition: b is locked in the file too');
+ return {lock,file};
+}
+for(const [label,before,after] of [
+ ['same title, no IDs',{title:'Orders'},{title:'Orders'}],
+ ['same title after trimming',{title:' Orders '},{title:'Orders'}],
+ ['same documentLinks.id, renamed',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders v2',documentLinks:{id:'orders'}}],
+ ['same canon ID',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
+ ['same canon ID, different documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'old'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'new'}}],
+ ['canon.id matches the imported documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',documentLinks:{id:'orders'}}],
+ ['documentLinks.id matches the imported canon.id',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}]
+])test('#628 file import of the same document ('+label+') keeps a locked node in place in one undo step',()=>{
+ const {lock,file}=importPair(before,after),state=textSession(lock),start=allCenters(lock).b;
+ assert.equal(state.session.accept({text:file},{lockGuard:'same-document'}),true);
+ assert.deepEqual(allCenters(state.text).b,start);assert.equal(diagram(JSON.parse(state.text)).nodes.b.locked,true);
+ assert.deepEqual(contentOnly(state.text),contentOnly(file),'the import itself lands; only b\'s placement differs from the file');
+ assert.deepEqual(JSON.parse(state.text).page.title,JSON.parse(file).page.title);
+ assert.equal(state.session.undo(),true);assert.equal(state.text,lock,'import and re-pin are one undo step');
+});
+for(const [label,before,after] of [
+ ['different title',{title:'Orders'},{title:'Payments'}],
+ ['different documentLinks.id, same title',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',documentLinks:{id:'payments'}}],
+ ['different canon.id, same title',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',canon:{version:1,id:'payments',kind:'design',owner:'group:default/local'}}],
+ ['canon.id differs from the imported documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',documentLinks:{id:'payments'}}],
+ ['documentLinks.id differs from the imported canon.id',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',canon:{version:1,id:'payments',kind:'design',owner:'group:default/local'}}],
+ ['ID on the current document only',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders'}],
+ ['ID on the imported file only',{title:'Orders'},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
+ ['whitespace-only titles',{title:'  '},{title:'  '}],
+ ['title on the current document only',{title:'Orders'},{}],
+ ['title on the imported file only',{},{title:'Orders'}],
+ ['the imported identity appears only in other fields',{title:'Orders',description:'Payments',tags:['payments']},{title:'Payments',documentLinks:{id:'payments'}}],
+ ['both untitled',{},{}]
+])test('#628 file import of a different document ('+label+') is imported exactly as written',()=>{
+ const {lock,file}=importPair(before,after),state=textSession(lock);
+ assert.equal(state.session.accept({text:file},{lockGuard:'same-document'}),true);
+ assert.equal(state.text,file);
+ assert.equal(state.session.undo(),true);assert.equal(state.text,lock);
+});
 test('#617 guard: no layout runs for a document without locks',()=>{
  const raw=pinFixture(),text=JSON.stringify(raw,null,2),state=textSession(text),real=C.layout;let calls=0;
  const plan=C.planDeleteNode(text,raw,0,'a');C.layout=d=>{calls++;return real(d);};

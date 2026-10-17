@@ -71,6 +71,18 @@ function builderPinMovedLocks(beforeText,afterText){
   });
   return text===afterText?null:{text:text,edits:edits};
 }
+/* File import re-pins locks only within the same document (#628): the same
+   diagram ID (documentReference: page.canon.id, else page.documentLinks.id)
+   or, when neither side has an ID, the same non-empty trimmed title. Node ids
+   alone say nothing, since another document may reuse them. */
+function builderSameDocument(beforeText,afterText){
+  var a,b;try{a=JSON.parse(beforeText).page;b=JSON.parse(afterText).page;}catch(ex){return false;}
+  if(!a || !b || typeof a!=='object' || typeof b!=='object')return false;
+  var ida=documentReference(a).spec,idb=documentReference(b).spec;
+  if(ida || idb)return ida===idb;
+  var title=function(page){return typeof page.title==='string'?page.title.trim():'';};
+  return !!title(a) && title(a)===title(b);
+}
 function builderPlacementPlan(text,raw,path,before,after){
   var pairs=[];
   if(JSON.stringify(after.rows)!==JSON.stringify(before.rows))pairs.push(['rows',after.rows==null?null:JSON.stringify(after.rows)]);

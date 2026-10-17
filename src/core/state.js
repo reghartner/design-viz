@@ -88,6 +88,18 @@ function foldPanelDeclarations(panel, steps, options){
     : (typeof PanelRegistry !== 'undefined' && panel ? PanelRegistry.get(panel.type) : null);
   var diagram = options.diagram || null;
   var overrides = Object.create(null), current = panel, out = [];
+  /* A panel type whose public state keys already override its declaration
+     (data-contract columns/fields/fieldWidth) exposes `declarationPatch`: the
+     declaration keys a state object implies, already normalised to what the
+     renderer accepts. Those ride the same merge as `declare`, silently (the
+     panel's own validatePatch keeps warning about them) and after `declare`,
+     so authored state keeps winning as it always has. */
+  var implied = descriptor && typeof descriptor.declarationPatch === 'function' ? descriptor.declarationPatch : null;
+  function impliedOps(source){
+    if (!implied || !specObject(source)) return null;
+    var ops = implied(source);
+    return specObject(ops) && Object.keys(ops).length ? ops : null;
+  }
   function merged(keys){
     var names = Object.keys(keys);
     if (!names.length) return panel;
@@ -101,13 +113,13 @@ function foldPanelDeclarations(panel, steps, options){
   }
   function applyOps(base, ops, index, prefix){
     if (!specObject(ops)){
-      if (report) report(index, prefix + ': expected an object of declaration fields — ignored');
+      if (report && prefix) report(index, prefix + ': expected an object of declaration fields — ignored');
       return null;
     }
     var next = Object.assign(Object.create(null), base);
     Object.keys(ops).forEach(function(key){
       if (Object.prototype.hasOwnProperty.call(PANEL_DECLARE_RESERVED, key)){
-        if (report) report(index, prefix + '.' + key + ': reserved key — ignored' +
+        if (report && prefix) report(index, prefix + '.' + key + ': reserved key — ignored' +
           (PANEL_DECLARE_RESERVED[key] ? ' (' + PANEL_DECLARE_RESERVED[key] + ')' : ''));
         return;
       }
@@ -115,6 +127,12 @@ function foldPanelDeclarations(panel, steps, options){
       else next[key] = ops[key];
     });
     return next;
+  }
+  /* State-implied overrides are the panel's own normalised values: merged
+     silently, never rejected. */
+  function withImplied(keys, source, index){
+    var ops = impliedOps(source), next = ops ? applyOps(keys, ops, index, null) : null;
+    return next || keys;
   }
   function accepted(candidate, index, prefix, ops){
     if (candidate === panel || !descriptor || typeof descriptor.validateDeclaration !== 'function') return true;
@@ -133,6 +151,11 @@ function foldPanelDeclarations(panel, steps, options){
     }
     return !errors.length;
   }
+  if (implied && panel){
+    overrides = withImplied(overrides, panel.initial, -1);
+    var seeded = merged(overrides);
+    current = same(seeded, panel) ? panel : seeded;
+  }
   steps.forEach(function(step, i){
     var patch = (stepPanelPatch(step) || {})[panel.id];
     patch = specObject(patch) ? patch : null;
@@ -147,7 +170,15 @@ function foldPanelDeclarations(panel, steps, options){
         }
       }
     }
-    var effective = current;
+    if (patch && implied){
+      var carried = withImplied(overrides, patch, i);
+      if (carried !== overrides){
+        var impliedCandidate = merged(carried);
+        overrides = carried;
+        current = same(impliedCandidate, current) ? current : impliedCandidate;
+      }
+    }
+    var effective = current, effectiveKeys = overrides;
     var once = patch && specObject(patch.enterOnce) && Object.prototype.hasOwnProperty.call(patch.enterOnce, 'declare')
       ? patch.enterOnce.declare : undefined;
     if (once !== undefined){
@@ -155,12 +186,22 @@ function foldPanelDeclarations(panel, steps, options){
       if (onceKeys){
         var onceCandidate = merged(onceKeys);
         if (same(onceCandidate, current)) onceCandidate = current;
-        if (onceCandidate === current || accepted(onceCandidate, i, 'enterOnce.declare', once)) effective = onceCandidate;
+        if (onceCandidate === current || accepted(onceCandidate, i, 'enterOnce.declare', once)){
+          effective = onceCandidate;
+          effectiveKeys = onceKeys;
+        }
+      }
+    }
+    if (patch && implied && specObject(patch.enterOnce)){
+      var onceImplied = withImplied(effectiveKeys, patch.enterOnce, i);
+      if (onceImplied !== effectiveKeys){
+        var onceImpliedCandidate = merged(onceImplied);
+        effective = same(onceImpliedCandidate, effective) ? effective : onceImpliedCandidate;
       }
     }
     out.push(effective);
   });
-  if (!steps.length) out.push(panel);
+  if (!steps.length) out.push(current);
   return out;
 }
 /* The runtime fold never sees `declare`: it is not state. Returns the same

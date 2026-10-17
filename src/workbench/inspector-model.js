@@ -123,18 +123,20 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
     /* Declaration overrides are not state, but the effective declaration at
        this step is part of what the reader sees. Show the overridden keys as
        one opaque field with the steps that authored them. */
-    var effective=foldPanelDeclarations(p,d.steps,{diagram:d})[stepIndex];
+    var inputs=[];
+    for(var di=0;di<=stepIndex;di++){
+      var declared=(stepPanelPatch(d.steps[di])||{})[p.id];
+      if(own(declared,'declare'))inputs.push(input(di,'declare',false));
+      if(di===stepIndex && own(declared && declared.enterOnce,'declare'))inputs.push(input(di,'declare',true));
+    }
+    /* Only authored `declare` keys appear here; overrides a type derives from
+       its own state keys are already listed as that state. */
+    var effective=inputs.length?foldPanelDeclarations(p,d.steps,{diagram:d})[stepIndex]:null;
     if(effective && effective!==p){
       var overrides={};
       Object.keys(effective).forEach(function(key){
         if(!own(p,key) || JSON.stringify(effective[key])!==JSON.stringify(p[key]))overrides[key]=effective[key];
       });
-      var inputs=[];
-      for(var di=0;di<=stepIndex;di++){
-        var declared=(stepPanelPatch(d.steps[di])||{})[p.id];
-        if(own(declared,'declare'))inputs.push(input(di,'declare',false));
-        if(di===stepIndex && own(declared && declared.enterOnce,'declare'))inputs.push(input(di,'declare',true));
-      }
       fields.push({key:'declare',value:overrides,origin:{kind:'history',label:'Declaration overrides',inputs:inputs}});
     }
     return {id:p.id,type:p.type,title:p.title||p.id,index:pi,state:snapshot,fields:fields};

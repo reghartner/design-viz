@@ -457,8 +457,13 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
      engine folds them (foldPanelDeclarations). The step loop below reports an
      override's own findings where it is authored and checks the rest of the
      patch against every distinct effective declaration of that step. Panels
-     with no `declare` anywhere keep the single-declaration checks. */
+     with no `declare` anywhere keep the single-declaration checks, unless
+     their type derives declaration overrides from state (declarationPatch). */
   var panelDeclares = Object.create(null);
+  Object.keys(panelDeclById).forEach(function(pid){
+    var descriptor = PanelRegistry.get(panelDeclById[pid].type);
+    if (descriptor && typeof descriptor.declarationPatch === 'function') panelDeclares[pid] = true;
+  });
   (d.steps || []).forEach(function(st){
     var patch = stepPanelPatch(st);
     if (patch) Object.keys(patch).forEach(function(pid){

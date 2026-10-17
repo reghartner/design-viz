@@ -99,7 +99,10 @@ test('specs without declare fold exactly as before and report the authored decla
         const decls = C.foldDiagramPanelDeclarations(sub);
         (sub.panels || []).forEach(panel => {
           if (!panel || !panel.id) return;
-          assert.ok(decls[panel.id].every(decl => decl === panel), rel + ' ' + panel.id + ' has no overrides');
+          const descriptor = C.PanelRegistry.get(panel.type);
+          /* Types whose state keys imply declaration overrides (data-contract) may report a merged declaration. */
+          if (!(descriptor && descriptor.declarationPatch))
+            assert.ok(decls[panel.id].every(decl => decl === panel), rel + ' ' + panel.id + ' has no overrides');
           assert.equal(decls[panel.id].length, Math.max(1, (sub.steps || []).length));
         });
       }
@@ -428,4 +431,41 @@ test('the effective-state inspector lists the overridden declaration keys with t
   assert.equal(C.builderEffectivePanelStates(d, 3, 'happy').panels.find(p => p.id === 'g').fields.find(f => f.key === 'declare').value.max, undefined, 'null restored max');
   assert.equal(C.builderEffectivePanelStates(d, 4, 'alt').panels.find(p => p.id === 'g').fields.some(f => f.key === 'declare'), false, 'the alternate path never saw it');
   assert.equal(C.builderEffectivePanelStates(d, 0, 'happy').panels.find(p => p.id === 'g').fields.some(f => f.key === 'declare'), false);
+});
+
+/* ---- data-contract: its public override keys ride the shared merge ---- */
+test('data-contract columns, fields and fieldWidth flow through the shared declaration merge with unchanged precedence and warnings', () => {
+  const base = plain(C.panelPickerExample('data-contract').panel);
+  base.id = 'dc'; base.initial = {fields:[{id:'order-id',label:'order_id'},{id:'from-initial',label:'from_initial'}], highlights:{}};
+  const d = {nodes:{a:{title:'A'}}, rows:[['a']], panels:[base],
+    steps:[
+      {id:'s1', text:'One', nodes:['a'], panels:{dc:{highlights:{'from-initial':{color:'blue'}}}}},
+      {id:'s2', text:'Two', nodes:['a'], panels:{dc:{fields:[{id:'late',label:'late'}], fieldWidth:10, columns:'bad', enterOnce:{fieldWidth:240}}}},
+      {id:'s3', text:'Three', nodes:['a'], panels:{dc:{highlights:{'from-initial':{color:'red'}, late:{color:'green'}}}}},
+      {id:'s4', text:'Alt', nodes:['a'], panels:{dc:{highlights:{late:{color:'green'}}}}}
+    ],
+    paths:[{id:'happy', steps:['s1','s2','s3']},{id:'alt', steps:['s1','s4']}]};
+  const decls = C.foldDiagramPanelDeclarations(C.diagramForPath(d, 'happy')).dc;
+  assert.deepEqual(plain(decls.map(x => x.fields.map(f => f.id))), [['order-id','from-initial'],['late'],['late']], 'initial then steps override declared fields');
+  assert.deepEqual(plain(decls.map(x => x.fieldWidth)), [180, 240, 180], 'a width under 40 is ignored, enterOnce applies once');
+  assert.deepEqual(plain(decls.map(x => x.columns.length)), [4, 4, 4], 'a non-array columns value never replaces the declaration');
+  assert.equal(plain(C.foldDiagramPanelDeclarations(C.diagramForPath(d, 'alt')).dc[1].fields.map(f => f.id)).join(), 'order-id,from-initial');
+  const v = validate(d);
+  assert.deepEqual(v.errors, []);
+  assert.deepEqual(v.warnings.filter(w => w.includes('.panels.dc')), [
+    'sections[0].diagram.steps[1].panels.dc.fieldWidth: use a width of at least 40 pixels — using declared width',
+    'sections[0].diagram.steps[1].panels.dc.columns: needs 1–12 entries with unique string ids',
+    'sections[0].diagram.steps[2].panels.dc.highlights.from-initial: unknown declared id — ignored',
+    'sections[0].diagram.steps[3].panels.dc.highlights.late: unknown declared id — ignored'
+  ]);
+  /* State keys keep winning over an explicit declare at the same step; a declare alone also works. */
+  const mixed = plain(d);
+  mixed.steps[1].panels.dc.declare = {fields:[{id:'from-declare',label:'x'}], fieldWidth:300};
+  const mixedDecls = C.foldDiagramPanelDeclarations(C.diagramForPath(mixed, 'happy')).dc;
+  assert.deepEqual(plain([mixedDecls[1].fields.map(f => f.id), mixedDecls[1].fieldWidth, mixedDecls[2].fieldWidth]), [['late'], 240, 300]);
+  const states = C.foldPanelStates(C.diagramForPath(d, 'happy')).dc;
+  assert.deepEqual(plain(states.map(s => s.fieldWidth)), [null, 240, 10], 'state folding is untouched');
+  const folded = C.foldPanelStates(C.diagramForPath(d, 'happy')).dc;
+  assert.deepEqual(plain(folded[1].fields.map(f => f.id)), ['late']);
+  assert.ok(!C.builderEffectivePanelStates(d, 2, 'happy').panels[0].fields.some(f => f.key === 'declare'), 'derived overrides are not shown as declare');
 });

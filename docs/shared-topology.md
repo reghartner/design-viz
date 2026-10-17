@@ -202,8 +202,12 @@ you drag the child. Escape/Cancel, stale source, failed fetches, revision mismat
 or invalid imports leave source and history unchanged.
 
 The dialog deliberately loads a chosen provider and its dependencies from the
-same v3 index/revision lock captured on Canon entry. It never reloads that index
-or refreshes existing providers. Browsing caches successful fetches for this
+same v3 index/revision lock the session pinned when referenced topology was
+first needed (Canon entry, opening this dialog, an agent proposal, a paste or a
+typed reference). It never refreshes existing providers, and it adopts a later
+index only through the guarded **Use the latest published library** action
+described above (offered after a revision mismatch; succeeds only while every
+frozen provider keeps its revision). Browsing caches successful fetches for this
 session; successful insertion, opening a diagram file, pasting or typing a
 reference, opening an agent folder, or a committed agent review extends persisted
 provider context. Undo

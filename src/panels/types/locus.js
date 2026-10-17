@@ -102,6 +102,13 @@ function locusTicks(from, to) {
   if (best) for (var i = 0; i < best.count; i++) ticks.push(best.first + i * best.step);
   return ticks;
 }
+/* Tick labels are centred on their tick except near the map edges, where a
+   centred label would be clipped: within LOCUS_EDGE percent of either edge the
+   label hangs inward from the tick instead. */
+var LOCUS_EDGE = 6;
+function locusTickAnchor(x) {
+  return x < LOCUS_EDGE ? 'start' : x > 100 - LOCUS_EDGE ? 'end' : 'middle';
+}
 /* 0–100 % of the window width for the centre of base `pos`. */
 function locusX(pos, win) {
   return (pos - win.from + 0.5) / win.span * 100;
@@ -266,7 +273,10 @@ function locusModel(panel, state) {
   /* Every tick gets a line; with more than six, every other one is labelled
      so labels stay apart in a narrow card. */
   var positions = locusTicks(win.from, win.to), labelEvery = positions.length > 6 ? 2 : 1;
-  var ticks = positions.map(function (at, i) { return { at: at, x: locusX(at, win), label: locusFormat(at, unit), labelled: i % labelEvery === 0 }; });
+  var ticks = positions.map(function (at, i) {
+    var x = locusX(at, win);
+    return { at: at, x: x, label: locusFormat(at, unit), labelled: i % labelEvery === 0, anchor: locusTickAnchor(x) };
+  });
   return { valid: valid, length: length, unit: unit, label: typeof panel.label === 'string' ? panel.label : '', window: win,
     zoomed: win.from !== 1 || win.to !== total, features: features, rowCount: rowCount, markers: markers, arcs: arcs, ticks: ticks,
     highlight: highlight, highlightFound: highlightFound, geometry: geometry };
@@ -325,7 +335,7 @@ function locusHTML(panel, state) {
   });
   model.ticks.forEach(function (tick) {
     if (!tick.labelled) return;
-    h += '<span class="locus-ticklabel" style="left:' + pct(tick.x) + ';top:' + (g.barBottom + 8) + 'px">' + esc(tick.label) + '</span>';
+    h += '<span class="locus-ticklabel locus-anchor-' + tick.anchor + '" style="left:' + pct(tick.x) + ';top:' + (g.barBottom + 8) + 'px">' + esc(tick.label) + '</span>';
   });
   h += '</div></div>';
   if (visibleFeatures.length) {
@@ -381,6 +391,8 @@ PanelRegistry.define('locus', {
 .locus-marker-dot{width:8px;height:8px;border-radius:50%;border:1px solid color-mix(in srgb,var(--dtext) 40%,transparent)}
 .locus-arclabel{position:absolute;transform:translateX(-50%);padding:1px 6px;border-radius:999px;font-size:9px;line-height:1.5;color:var(--dink);white-space:nowrap}
 .locus-ticklabel{position:absolute;transform:translateX(-50%);font:9px/1.2 'IBM Plex Mono',monospace;color:var(--dfaint);white-space:nowrap}
+.locus-ticklabel.locus-anchor-start{transform:none;margin-left:2px}
+.locus-ticklabel.locus-anchor-end{transform:translateX(-100%);margin-left:-2px}
 .locus-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;font-size:10px;color:var(--dfaint)}
 .locus-legend li{display:flex;align-items:center;gap:5px}
 .locus-legend li.locus-hl{color:var(--dink);font-weight:600}

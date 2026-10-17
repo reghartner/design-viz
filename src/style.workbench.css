@@ -1532,6 +1532,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 .workspace-canvas:not(.welcome-active) #docview.has-reader-contents>.doc-heading:has(.doc-company-brand-authored){justify-content:flex-end;margin:0 0 4px;}
 .workspace-canvas:not(.welcome-active) #docview.has-reader-contents>.doc-heading>.doc-title{display:none;}
 .workspace-canvas #docview .reader-contents{z-index:165;}
+.workspace-canvas #docview .reader-rail{z-index:165;}
 .workspace-canvas #docview .reader-scrim{z-index:164;}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{top:var(--workspace-content-top);}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{left:calc(var(--reader-host-inset,0px) + 84px);}

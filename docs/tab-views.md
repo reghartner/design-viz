@@ -6,16 +6,23 @@ View has an ordered subset of section references and one presentation:
 
 - **Standard** stacks its member sections in the authored order.
 - **Explore** shows one member section at a time, including its prose and one
-  active playback group. The section controls list only that View’s members.
+  active playback group. Contents lists only that View’s members under it.
 
-The reader keeps a stable two-row header: a Contents toggle, active Tab label, visible View choices
-and utilities above centered **‹ Section n of m ›** controls.
+The reader keeps a stable two-row header: a **Contents · N sections** toggle, active Tab label, visible View choices
+and utilities above centered **‹ Section n of m ›** controls. The pager counts the document’s parts, the
+top-level Contents entries (the page’s own sections, then each Tab), and ‹ › move between parts. A
+document whose Contents has one entry pages through its selected View’s sections instead.
 View choices remain available when Contents is closed; on narrow screens they
 wrap within the first header bar. Arrow keys move between View choices, and
 Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**, with every Tab and View expanded when the page opens; full section titles appear
-under Standard Views and under expanded Explore Views. In Standard, a section title or Section arrow scrolls through the intact stack;
-in Explore they select only the current View’s ordered members. Desktop Contents
+under Standard Views and under expanded Explore Views. In Standard, a section title scrolls through the intact stack;
+in Explore it selects only the current View’s ordered members. Desktop Contents
 pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
+With Contents closed on desktop, a 44px rail at the left shows one numbered marker per part
+(the current one filled) and an n/m count; Contents numbers its entries to match. Resting the
+mouse on the rail for a moment shows Contents over the page without moving it, with only the
+current part expanded; it closes when the mouse leaves or on Escape. A marker click goes to that
+part and pins Contents open; the overlay’s **Pin** pins it in place. Phones have no rail.
 Escape closes an open menu first, then Contents, returning focus to its trigger.
 The tree scrolls independently of its pinned theme footer. Zoom is separate from
 Section navigation; phones use the percentage menu at left and Fit at right. In

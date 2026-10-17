@@ -12,6 +12,9 @@
 # (gitignored; copy local.env.example). The Wrangler config is generated into
 # deploy/cloudflare/.generated/ (gitignored) on every run.
 set -eu
+# Byte-wise character ranges, so [a-z] below cannot match uppercase letters.
+LC_ALL=C
+export LC_ALL
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 SITE="$HERE/site"
@@ -20,12 +23,19 @@ GEN="$HERE/.generated"
 if [ -z "${FLOWVIEW_CF_WORKER:-}" ] && [ -f "$HERE/local.env" ]; then
   FLOWVIEW_CF_WORKER="$(sed -n 's/^FLOWVIEW_CF_WORKER=//p' "$HERE/local.env" | tail -n 1)"
 fi
+# Cloudflare Worker names: 1-63 lowercase letters, digits and hyphens, not
+# starting or ending with a hyphen (they become a workers.dev DNS label).
+NAME_OK=yes
 case "${FLOWVIEW_CF_WORKER:-}" in
-  ''|*[!a-z0-9-]*)
-    echo "Set FLOWVIEW_CF_WORKER (lowercase letters, digits, hyphens) in the environment" >&2
-    echo "or in deploy/cloudflare/local.env; see deploy/cloudflare/local.env.example." >&2
-    exit 1;;
+  ''|*[!a-z0-9-]*|-*|*-) NAME_OK=no;;
 esac
+if [ "$NAME_OK" = yes ] && [ "${#FLOWVIEW_CF_WORKER}" -gt 63 ]; then NAME_OK=no; fi
+if [ "$NAME_OK" = no ]; then
+  echo "Set FLOWVIEW_CF_WORKER in the environment or in deploy/cloudflare/local.env" >&2
+  echo "(see local.env.example): 1-63 lowercase letters, digits and hyphens, not" >&2
+  echo "starting or ending with a hyphen." >&2
+  exit 1
+fi
 
 cd "$ROOT"
 python3 tools/build.py

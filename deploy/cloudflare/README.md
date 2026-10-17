@@ -41,8 +41,11 @@ fails if those ignore rules stop applying or if a Worker name, `workers.dev`
 address, Access team address, email address, `account_id` or 32-hex identifier
 appears in the three tracked files. A private company fork may still choose to force-add its own `local.env`;
 the test does not reject that. The Worker name lives in the gitignored
-`local.env` (or the `FLOWVIEW_CF_WORKER` environment variable). Wrangler keeps
-its login token in your user profile, outside the repository. Do not paste the
+`local.env` (or the `FLOWVIEW_CF_WORKER` environment variable). Wrangler and
+the `cf` CLI keep login tokens in your user profile, outside the repository. Both
+also write cache folders (`.wrangler/`, `.cloudflare/`) into the directory they
+run in; `.cloudflare/cache/` holds the account ID and account name. `.gitignore`
+excludes both folder names everywhere in the repository. Do not paste the
 deployed address, account ID or Access team name into commits, PRs or docs.
 
 ## First deploy

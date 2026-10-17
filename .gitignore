@@ -47,5 +47,8 @@ node_modules/
 /wrangler.json
 /wrangler.jsonc
 /wrangler.toml
-/.wrangler/
 /.dev.vars*
+# Cloudflare CLI caches, written into whatever directory the command runs in.
+# .cloudflare/cache/ holds the account ID and account name.
+.cloudflare/
+.wrangler/

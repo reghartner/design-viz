@@ -301,6 +301,18 @@
       ]
     },
     {
+      "file": "membrane-signal/membrane-signal.html",
+      "spec": "membrane-signal/membrane-signal.spec.json",
+      "title": "A signal crosses the membrane and the cell divides",
+      "family": "membrane-signal",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "cellscene",
+        "log"
+      ]
+    },
+    {
       "file": "nestrel-warden/warden.html",
       "spec": "nestrel-warden/warden.spec.json",
       "title": "Nestrel Warden — a cloud camera that remembers the outage",
@@ -403,6 +415,17 @@
       ],
       "widgets": [
         "seatmap"
+      ]
+    },
+    {
+      "file": "strand-cut/strand-cut.html",
+      "spec": "strand-cut/strand-cut.spec.json",
+      "title": "A bacterium cuts foreign DNA",
+      "family": "strand-cut",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "strandscene"
       ]
     },
     {

@@ -130,6 +130,21 @@ test('arcs swap reversed ends, label the distance in the declared unit, rise wit
   assert.match(w, /panels\[0\]\.initial\.arcs\[2\]: from and to are the same position — arc skipped/);
   assert.match(w, /panels\[0\]\.initial\.arcs\[3\]\.from: position 20000 is beyond length 10000 — arc skipped/);
 });
+test('edge tick labels anchor inward so a tick-aligned window never clips its first or last label', () => {
+  assert.equal(C.locusTickAnchor(0.5), 'start'); assert.equal(C.locusTickAnchor(50), 'middle'); assert.equal(C.locusTickAnchor(99.4), 'end');
+  assert.equal(C.locusTickAnchor(6), 'middle'); assert.equal(C.locusTickAnchor(94), 'middle');
+  const m = model({...panel(), unit:'kb'}, {window:{from:2380, to:2460}});
+  assert.deepEqual(m.ticks.filter(t => t.labelled).map(t => [t.label, t.anchor]),
+    [['2.38 kb', 'start'], ['2.4 kb', 'middle'], ['2.42 kb', 'middle'], ['2.44 kb', 'middle'], ['2.46 kb', 'end']]);
+  assert.ok(m.ticks.every(t => t.anchor === C.locusTickAnchor(t.x)));
+  const html = C.locusHTML({...panel(), unit:'kb'}, {window:{from:2380, to:2460}});
+  assert.match(html, /class="locus-ticklabel locus-anchor-start" style="left:0\.6\d\d%[^>]*>2\.38 kb</);
+  assert.match(html, /class="locus-ticklabel locus-anchor-end" style="left:99\.3\d\d%[^>]*>2\.46 kb</);
+  assert.match(html, /class="locus-ticklabel locus-anchor-middle"[^>]*>2\.42 kb</);
+  const whole = model(panel(), {});
+  assert.deepEqual(whole.ticks.map(t => t.anchor), ['middle', 'middle', 'middle', 'middle', 'end'], 'interior ticks stay centred; a tick on the last base anchors inward');
+  assert.equal(model(panel(), {window:{from:2500, to:2500}}).ticks[0].anchor, 'middle');
+});
 test('units format ruler and distance labels without inventing precision', () => {
   assert.equal(C.locusFormat(1200, 'bp'), '1,200 bp');
   assert.equal(C.locusFormat(1200, 'kb'), '1.2 kb');

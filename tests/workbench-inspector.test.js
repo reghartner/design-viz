@@ -439,7 +439,8 @@ test('two inspectors keep group suggestions in their own DOM and retire those no
 test('same multiselection refresh keeps its active field and scroll, while changed targets start fresh',()=>{
   const e=environment(),h=e.mount({nodes:{a:{},b:{},c:{}},rows:[['a','b','c']]}),before=h.text;
   const targets=['a','b'].map(id=>({kind:'node',section:0,id}));h.session.target=null;
-  const tint=()=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Color').querySelector('select');
+  // #610: the icon color select now lives in the Icon row beside the icon picker.
+  const tint=()=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab')?.textContent==='Icon').querySelector('[aria-label="Icon color"]');
   h.inspector.renderMulti(targets);const old=tint();old.focus();h.guide.scrollTop=91;
   old.value='dev';old.fire('change');
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.tint),['dev','dev',undefined]);
@@ -457,14 +458,14 @@ test('node inspector leads with plain fields and preserves expert data behind ta
     rows:[['b']],floats:[{id:'a',x:321,y:123,side:'below'}],groups:{outside:{title:'Outside'}}};
   const e=environment(),h=e.mount(spec),before=h.text;h.session.target={kind:'node',section:0,id:'a'};h.inspector.render();
   const labels=h.guide.querySelector('.iform').children.filter(row=>row.matches('.frow')).map(row=>row.querySelector('.flab')?.textContent);
-  assert.deepEqual(labels.slice(0,5),['Name','Subtitle','Icon','Color','Placement']);
+  assert.deepEqual(labels.slice(0,5),['Name','Subtitle','Icon','Node style','Placement']);
   assert.equal(h.guide.querySelector('.inspector-title').textContent,'Node · '+long);
   assert.equal(h.text,before,'opening the form must preserve unknown tokens and exact source');
   const advanced=h.guide.querySelector('.node-advanced');assert.equal(advanced.open,false);
   assert.ok(advanced.querySelector('.node-source-path').textContent.includes('nodes'));
   for(const label of ['Stable identifier','Float X','Float Y','Service binding JSON','Code references JSON'])
     assert.ok(advanced.querySelectorAll('.flab').some(node=>node.textContent===label),label);
-  const color=h.guide.querySelector('[aria-label="Node color"]');
+  const color=h.guide.querySelector('[aria-label="Icon color"]');
   assert.equal(color.value,'legacy');assert.equal(color.children.at(-1).textContent,'legacy (unknown)');
   assert.ok(color.children.some(option=>option.value==='auth' && option.textContent==='Identity & access · amber'));
   color.value='mqtt';color.fire('change');assert.equal(JSON.parse(h.text).nodes.a.tint,'mqtt');
@@ -744,4 +745,52 @@ test('Explore notes and controls use independent percent text controls with exac
     h.inspector.render();control=aria(h.guide,label);control.value='200';control.fire('change');assert.equal(h.text,after);
     control.value='';control.fire('change');h.flush();assert.equal(JSON.parse(h.text).page.sections[0].diagram.layouts[0].exploreLayout.textScale,undefined);
   }
+});
+
+/* #610 contract matrix (inspector: icon color beside the icon, Node style control, bulk edit)
+   row | fixture | assertion (scoped) | rejects
+   I1 icon row | single node form | the Icon row (.frow whose .flab is "Icon") contains the icon picker control AND the select[aria-label="Icon color"]; no row is labelled "Color" | the old separate Color row
+   I2 style row | single node form | a row labelled "Node style" holds .node-style-control with a hidden select[aria-label="Node style"] and a button.node-style-browse[aria-haspopup="dialog"] | a free-text field or a bare select
+   I3 options | that select | options = '' (labelled "Default · skin card") followed by NODE_STYLE_SET in order, each labelled with its preset name | tokens missing from the control
+   I4 value + commit | node {style:'rose'} | select.value === 'rose'; changing to 'teal' writes nodes.a.style 'teal' in one Undo entry; choosing '' removes the field; undo restores exactly | a commit that stringifies wrongly or leaves "style": "" behind
+   I5 unknown kept | node {style:'legacy'} | the select shows value 'legacy' with a trailing "legacy (unknown)" option; opening the form does not rewrite the source | normalising unknown tokens on open
+   I6 bulk | two nodes selected | the multi form has a "Node style" row with the same control (empty option "Choose a style"); choosing 'amber' sets style on every selected node, undo restores; the Icon row offers select[aria-label="Icon color"] | bulk edit without the picker */
+test('node inspector keeps icon color beside the icon picker and offers the Node style control (I1–I5)',()=>{
+  const spec={nodes:{a:{title:'Gateway',icon:'cloud',tint:'auth',style:'rose'},b:{title:'Store',style:'legacy'}},rows:[['a','b']]};
+  const e=environment(),h=e.mount(spec),before=h.text;h.session.target={kind:'node',section:0,id:'a'};h.inspector.render();
+  const rows=h.guide.querySelector('.iform').children.filter(row=>row.matches('.frow'));
+  const labelOf=row=>row.querySelector('.flab')?.textContent;
+  assert.ok(!rows.some(row=>labelOf(row)==='Color'),'no separate Color row');
+  const iconRow=rows.find(row=>labelOf(row)==='Icon');
+  assert.ok(iconRow.querySelector('.flow-icon-control'),'icon picker in the Icon row');
+  assert.ok(iconRow.querySelector('[aria-label="Icon color"]'),'icon color select in the Icon row');
+  assert.equal(iconRow.querySelector('[aria-label="Icon color"]').value,'auth');
+  const styleRow=rows.find(row=>labelOf(row)==='Node style');
+  const control=styleRow.querySelector('.node-style-control');assert.ok(control,'node style control');
+  const select=control.querySelector('[aria-label="Node style"]');assert.equal(select.tagName,'SELECT');assert.equal(select.hidden,true);
+  const browse=control.querySelector('button.node-style-browse');assert.equal(browse.getAttribute('aria-haspopup'),'dialog');
+  assert.deepEqual(select.children.map(option=>option.value),['',...e.C.NODE_STYLE_SET]);
+  assert.equal(select.children[0].textContent,'Default · skin card');
+  for(const option of select.children.slice(1))assert.match(option.textContent,/^[A-Z][a-z]+$/,option.value+' is labelled with its preset name');
+  assert.equal(select.value,'rose');assert.equal(h.text,before,'opening the form must not rewrite the source');
+  select.value='teal';select.fire('change');assert.equal(JSON.parse(h.text).nodes.a.style,'teal');
+  const changed=h.text;select.value='';select.fire('change');assert.equal('style' in JSON.parse(h.text).nodes.a,false);
+  h.session.undo();assert.equal(h.text,changed);h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+  h.session.target={kind:'node',section:0,id:'b'};h.inspector.render();
+  const legacy=h.guide.querySelector('[aria-label="Node style"]');
+  assert.equal(legacy.value,'legacy');assert.equal(legacy.children.at(-1).textContent,'legacy (unknown)');assert.equal(h.text,before);
+});
+
+test('bulk node editing offers the Node style control and icon color beside the icon (I6)',()=>{
+  const e=environment(),h=e.mount({nodes:{a:{},b:{},c:{}},rows:[['a','b','c']]}),before=h.text;
+  h.session.target=null;h.inspector.renderMulti(['a','b'].map(id=>({kind:'node',section:0,id})));
+  const rows=h.guide.querySelectorAll('.frow'),labelOf=row=>row.querySelector('.flab')?.textContent;
+  assert.ok(!rows.some(row=>labelOf(row)==='Color'),'no separate Color row');
+  assert.ok(rows.find(row=>labelOf(row)==='Icon').querySelector('[aria-label="Icon color"]'),'icon color in the bulk Icon row');
+  const styleRow=rows.find(row=>labelOf(row)==='Node style');assert.ok(styleRow,'bulk Node style row');
+  const select=styleRow.querySelector('.node-style-control [aria-label="Node style"]');
+  assert.equal(select.children[0].textContent,'Choose a style');assert.deepEqual(select.children.slice(1).map(option=>option.value),e.C.NODE_STYLE_SET);
+  select.value='amber';select.fire('change');
+  assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.style),['amber','amber',undefined]);
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
 });

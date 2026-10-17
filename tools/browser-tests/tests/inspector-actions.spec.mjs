@@ -82,10 +82,10 @@ test('node inspector keeps ordinary edits clear and expert source data in Advanc
   const original=await start(page,server,raw),guide=page.locator('#guide'),src=page.locator('#src');
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
   await expect(guide.locator('.inspector-title')).toHaveText('Node · '+long);
-  await expect(guide.locator('.iform>.frow>.flab')).toHaveText(['Name','Subtitle','Icon','Color','Placement','Group','Keep position fixed','Link','Show change marker']);
+  await expect(guide.locator('.iform>.frow>.flab')).toHaveText(['Name','Subtitle','Icon','Node style','Placement','Group','Keep position fixed','Link','Show change marker']);
   const advanced=guide.locator('.node-advanced');await expect(advanced).not.toHaveAttribute('open');
   await expect(src).toHaveValue(original);
-  const color=guide.getByLabel('Node color',{exact:true});
+  const color=guide.getByLabel('Icon color',{exact:true});
   await expect(color.locator('option')).toHaveText(['Default · Command','Command · blue','Identity & access · amber','Data · violet','Messaging · pink','Device · green']);
   await expect(color).toHaveValue('auth');
   const titleBox=await guide.locator('.inspector-title').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));
@@ -108,7 +108,7 @@ test('node inspector keeps ordinary edits clear and expert source data in Advanc
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.title).toContain('North entry entrance');
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"]'));
-  await guide.getByLabel('Node color',{exact:true}).selectOption('mqtt');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('mqtt');
+  await guide.getByLabel('Icon color',{exact:true}).selectOption('mqtt');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('mqtt');
   await page.locator('#undo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('auth');
   await page.locator('#redo-builder').click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.nodes.a.tint).toBe('mqtt');
 
@@ -195,4 +195,60 @@ test('Home selection and new rows reveal the intended editor while normal select
   await inspectPageElement(page,page.locator('#docview [data-dv-panel="0"] .ptitle').first());
   await expect(guide.locator('details[open]')).toHaveCount(0);
   await openInspectorGroup(devices);await expect(devices.locator('.home-element[open]')).toHaveCount(0);
+});
+
+/* #610 contract matrix (Node style picker modal, real input)
+   row | fixture | assertion (scoped) | rejects
+   P1 open | click button.node-style-browse in the Node style row | dialog.node-style-picker is visible; its .node-style-grid holds one button.node-style-tile per preset plus the default tile (data-style-id=""); each preset tile shows a sample `svg .node.ns-<id> .card`; the current preset's tile is aria-pressed=true | a plain list without rendered samples
+   P2 keyboard | ArrowRight from the first tile, Enter | focus moves to the next tile; Enter applies that tile: nodes.a.style equals its data-style-id, the dialog closes, focus returns to the browse button | arrows that scroll instead of moving, Enter that does nothing
+   P3 render | after apply | #section-overview [data-dv-node="a"] has class ns-<id> and data-dv-style; its .card computed fill differs from node b's .card fill; title .t1 fill differs from b's | a stored field that does not paint
+   P4 selected | the styled node is still selected | g.node.dv-sel .card keeps a visible dashed selection stroke (stroke-dasharray not "none") | a preset that hides the selection ring
+   P5 escape | reopen, press Escape | the dialog is gone, the source is unchanged, focus is back on the browse button | a modal that swallows Escape
+   P6 click | reopen, click the Default tile | nodes.a has no style field; the node loses ns-/data-dv-style; Undo restores the previous preset | a default tile that writes "style": ""
+   P7 bulk | select a and b, open the multi-form picker, click a preset tile | both nodes carry that style; one Undo removes both | bulk edits without the modal */
+test('node style picker applies presets from a modal of rendered samples with mouse and keyboard',async({page,server})=>{
+  const raw=fixture(),diagram=raw.page.sections[0].diagram;
+  diagram.nodes.a.style='rose';
+  const original=await start(page,server,raw),guide=page.locator('#guide'),src=page.locator('#src');
+  const node=id=>page.locator('#section-overview [data-dv-node="'+id+'"]');
+  const fill=async(id,part)=>node(id).locator(part).first().evaluate(el=>getComputedStyle(el).fill);
+  const spec=async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram;
+  await inspectPageElement(page,node('a').locator('.t1'));
+  const row=guide.locator('.iform>.frow').filter({has:page.locator('.flab',{hasText:/^Node style$/})});
+  const browse=row.locator('button.node-style-browse');await expect(browse).toHaveAttribute('aria-haspopup','dialog');
+  await expect(node('a')).toHaveClass(/\bns-rose\b/);await expect(node('a')).toHaveAttribute('data-dv-style','rose');
+  // P1
+  await browse.click();const dialog=page.locator('dialog.node-style-picker');await expect(dialog).toBeVisible();
+  const tiles=dialog.locator('.node-style-grid button.node-style-tile');
+  const tokens=await tiles.evaluateAll(buttons=>buttons.map(b=>b.dataset.styleId));
+  expect(tokens[0]).toBe('');expect(tokens.length).toBeGreaterThanOrEqual(10);expect(new Set(tokens).size).toBe(tokens.length);
+  for(const token of tokens.slice(1))await expect(dialog.locator('.node-style-tile[data-style-id="'+token+'"] svg .node.ns-'+token+' .card')).toHaveCount(1);
+  await expect(dialog.locator('.node-style-tile[aria-pressed="true"]')).toHaveAttribute('data-style-id','rose');
+  // P2: ArrowRight from the first tile, Enter applies the second tile.
+  await tiles.first().focus();await page.keyboard.press('ArrowRight');
+  await expect(tiles.nth(1)).toBeFocused();const chosen=tokens[1];
+  await page.keyboard.press('Enter');await expect(dialog).toHaveCount(0);await expect(browse).toBeFocused();
+  await expect.poll(async()=>(await spec()).nodes.a.style).toBe(chosen);
+  // P3 + P4
+  await expect(node('a')).toHaveClass(new RegExp('\\bns-'+chosen+'\\b'));await expect(node('a')).toHaveAttribute('data-dv-style',chosen);
+  expect(await fill('a','.card')).not.toBe(await fill('b','.card'));expect(await fill('a','.t1')).not.toBe(await fill('b','.t1'));
+  await expect(node('a')).toHaveClass(/\bdv-sel\b/);
+  expect(await node('a').locator('.card').evaluate(el=>getComputedStyle(el).strokeDasharray)).not.toBe('none');
+  // P5
+  const afterChoice=await src.inputValue();await browse.click();await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(src).toHaveValue(afterChoice);await expect(browse).toBeFocused();
+  // P6
+  await browse.click();await dialog.locator('.node-style-tile[data-style-id=""]').click();await expect(dialog).toHaveCount(0);
+  await expect.poll(async()=>'style' in (await spec()).nodes.a).toBe(false);
+  await expect(node('a')).not.toHaveClass(/\bns-/);await expect(node('a')).not.toHaveAttribute('data-dv-style');
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(afterChoice);await expect(node('a')).toHaveClass(new RegExp('\\bns-'+chosen+'\\b'));
+  // P7: bulk
+  await node('a').focus();await page.keyboard.press('Enter');await node('b').focus();await page.keyboard.press('Shift+Enter');
+  await expect(guide).toContainText('2 nodes selected');
+  const bulkRow=guide.locator('.frow').filter({has:page.locator('.flab',{hasText:/^Node style$/})});
+  const beforeBulk=await src.inputValue();await bulkRow.locator('button.node-style-browse').click();await expect(dialog).toBeVisible();
+  const bulkToken=tokens[tokens.length-1];await dialog.locator('.node-style-tile[data-style-id="'+bulkToken+'"]').click();await expect(dialog).toHaveCount(0);
+  await expect.poll(async()=>{const d=await spec();return [d.nodes.a.style,d.nodes.b.style];}).toEqual([bulkToken,bulkToken]);
+  await expect(node('b')).toHaveClass(new RegExp('\\bns-'+bulkToken+'\\b'));
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(beforeBulk);
 });

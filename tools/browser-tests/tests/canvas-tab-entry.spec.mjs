@@ -188,7 +188,7 @@ test('Explore top bar keeps every tab block reachable and restricts section navi
  await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Navigation hierarchy','First','Second','Third','Fourth']);
  await chooseNavigation(navigation,'Tab','Fourth');
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();
- await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveCount(0);
+ await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveAttribute('aria-current','false');
  await page.evaluate(()=>{location.hash='d=loose&v=explore';});
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();
  await chooseNavigation(navigation,'Tab','Second');
@@ -199,7 +199,7 @@ test('Explore top bar keeps every tab block reachable and restricts section navi
 test('workbench diagram buttons update editing context without changing source or Undo',async({page,server})=>{
  const raw=navigationFixture(),source=JSON.stringify(raw,null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
- const navigation=page.locator('.explore-navigation');await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveCount(0);
+ const navigation=page.locator('.explore-navigation');await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveAttribute('aria-current','false');
  await chooseAddDestination(page,'3');
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();await expect(page.locator('#diagram-add-target')).toHaveValue('3');
  await chooseNavigation(navigation,'Tab','Second');
@@ -217,7 +217,7 @@ test('native setCanvas preserves persistent tabs and Views and isolates sibling 
  await one.locator('.explore-navigation').evaluate(el=>window.oneNav=el);await two.locator('.explore-navigation').evaluate(el=>window.twoNav=el);
  const sibling=await page.evaluate(()=>two.snapshot());
  await expect(one.getByRole('combobox',{name:'Explore story'})).toHaveCount(0);
- await expect(one.locator('.reader-contents')).toBeVisible();await expect(one.locator('.reader-tree-views')).toBeVisible();
+ await expect(one.locator('.reader-contents')).toBeVisible();await expect(one.locator('.reader-tree-views')).toHaveCount(2);for(const views of await one.locator('.reader-tree-views').all())await expect(views).toBeVisible();
  await readerTab(one,'Explore story');
  await expect(one.locator('#section-explore [data-dv-node="x0"]')).toBeInViewport();
  await expect(one.getByRole('button',{name:'Fresh view',exact:true})).toBeVisible();
@@ -237,7 +237,7 @@ test('native canvas preserves legacy Standard presentation and persistent naviga
  await page.goto(server.origin+'/legacy-native.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);viewer.setCanvas(true);},legacyFixture());
  const host=page.locator('#host');await expect(host.locator('.reader-contents')).toBeVisible();
- await expect(host.locator('.explore-navigation').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(host.locator('.explore-navigation .reader-contents-tab:has(.reader-tree-view[aria-current="page"])').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(host.locator('.viewer-diagram-canvas')).toHaveCount(0);await host.locator('.explore-navigation').evaluate(el=>window.nativeNav=el);
  await readerTab(host,'Large story');
  await expect(host.locator('#section-large [data-dv-node="b0"]')).toBeInViewport();

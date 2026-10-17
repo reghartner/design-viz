@@ -30,6 +30,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |
 | manually exported Figma screens that change with story steps | [app-screens.md](app-screens.md) — upload a collection, select screens per step |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
+| a panel whose unit, range, title, columns or spans change at a step or differ per path | [declaration-overrides.md](declaration-overrides.md) — per-step `declare` for any panel type |
 | a domain overview that opens service internals as focused drilldowns, nested flows, or mapped child outcomes | [domain-drilldowns.md](domain-drilldowns.md) — doorbell domains, boundaries and mailbox |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
 | security monitoring, alarm verification, emergency dispatch, responder assignment or arrival | [security-response.md](security-response.md) — independent assessment and response with alternate outcomes |

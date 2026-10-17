@@ -894,7 +894,18 @@ Compatibility metadata advertises `flow.panel-visibility`.
 
 `"panels": [...]` at the diagram level declares inspector widgets rendered in
 a column beside the board and driven by the same steps (the "different
-perspectives" of one timeline). Types:
+perspectives" of one timeline).
+
+Every panel has one **declaration** (its `title`, `max`, `unit`, `columns`,
+`spans`, … plus `initial`) and receives sparse **state** patches from steps.
+When the story changes what a panel measures, a step patch may carry the
+reserved key `declare`: an object of declaration fields that override the
+authored ones from that step on along the selected path, for example
+`{"panels": {"flow": {"value": 2.1, "declare": {"max": 5, "unit": "m³/h",
+"title": "Volume per hour"}}}}`. It is sparse, carries forward, `null`
+restores an authored value, `enterOnce.declare` applies to one beat, and
+`id`, `type`, `initial` and `visible` cannot be overridden. See the end of
+this section for the exact rules. Types:
 
 - `appscreens` — a collection of exported app screens selected by story steps.
   Declare up to 32 `screens`, each with a unique nonempty `id`, `label`, `alt`,
@@ -2339,6 +2350,28 @@ Patches are SPARSE — a step carries only what changed. The engine folds
 patches into complete per-step state at load time, so jumping to any step is
 always consistent. An `"enterOnce": {...}` sub-object inside a patch applies
 only at its own step and is not carried forward.
+
+**Declaration overrides (`declare`).** Inside any panel patch, `"declare":
+{...}` names declaration fields of that panel type to override. The effective
+declaration at a step is the authored panel shallow-merged with every
+`declare` seen so far on the selected path; later keys replace earlier ones,
+arrays and objects replace whole, and a key set to `null` removes its
+override so the authored value applies again. Alternate paths fold their own
+overrides and never see one authored on another path. `"enterOnce":
+{"declare": {...}}` overrides for that beat only. The keys `id`, `type`,
+`initial` and `visible` are reserved: they warn and are ignored (use
+`panelVisibility` to show or hide a panel). A `declare` that is not an object
+warns and is ignored. The effective declaration is checked with the panel's
+own declaration rules where the override is authored; findings name the exact
+key, e.g. `steps[3].panels.map.declare.features[2].from`, and an override the
+panel rejects with an error is ignored at that step (`… — declaration
+override at this step ignored`). The rest of the patch is validated against
+the effective declaration, so a table row may use a column that only the
+override declares. State is unaffected except through interpretation: panels
+whose fold reads the declaration (device-app fields, Home devices, buffer
+segments) fold the whole path under each effective declaration. A changed
+`title` updates the panel heading; an empty one removes it. Viewers that lack
+the `steps.panel-declare` capability ignore the key.
 
 ### steps — the narrative (powers BOTH modes)
 

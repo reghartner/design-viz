@@ -48,9 +48,204 @@ function foldPanelStates(d){
     if (!panel || !panel.id) return;
     var descriptor = PanelRegistry.get(panel.type);
     var fold = descriptor && descriptor.fold || foldCommonPanelStates;
-    var states = fold(panel, steps);
+    var states = foldDeclaredPanelStates(panel, steps, fold, descriptor, d);
     if (descriptor && descriptor.storyTime) states = descriptor.storyTime(panel, states, steps, story, d) || states;
     out[panel.id] = states;
+  });
+  return out;
+}
+
+/* ---------------- panel declaration overrides ----------------
+   `declare` inside a step's panel patch overrides declaration fields of that
+   panel (max, unit, title, columns, spans, ...) from that step on along the
+   selected path. Rules:
+   - the effective declaration = the authored panel shallow-merged with every
+     accepted `declare` seen so far; later keys replace earlier ones;
+   - a key set to null removes its override (back to the authored value);
+   - `enterOnce.declare` applies to its own step only;
+   - `id`, `type`, `initial` and `visible` are reserved and ignored;
+   - an override whose effective declaration fails the panel's own
+     validateDeclaration with errors is ignored at that step.
+   The fold and the validator share this one helper so they always agree. The
+   returned array holds the authored `panel` object itself (same identity)
+   wherever no override applies, which lets callers detect "unchanged". */
+var PANEL_DECLARE_RESERVED = (function(){
+  var out = Object.create(null);
+  out.id = ''; out.type = ''; out.initial = '';
+  out.visible = 'use panelVisibility to show or hide a panel';
+  ['__proto__', 'constructor', 'prototype'].forEach(function(key){ out[key] = ''; });
+  return out;
+})();
+function panelPatchHasDeclare(patch){
+  return specObject(patch) && (Object.prototype.hasOwnProperty.call(patch, 'declare') ||
+    (specObject(patch.enterOnce) && Object.prototype.hasOwnProperty.call(patch.enterOnce, 'declare')));
+}
+function foldPanelDeclarations(panel, steps, options){
+  options = options || {};
+  steps = Array.isArray(steps) ? steps : [];
+  var report = typeof options.report === 'function' ? options.report : null;
+  var descriptor = options.descriptor !== undefined ? options.descriptor
+    : (typeof PanelRegistry !== 'undefined' && panel ? PanelRegistry.get(panel.type) : null);
+  var diagram = options.diagram || null;
+  var overrides = Object.create(null), current = panel, out = [];
+  /* A panel type whose public state keys already override its declaration
+     (data-contract columns/fields/fieldWidth) exposes `declarationPatch`: the
+     declaration keys a state object implies, already normalised to what the
+     renderer accepts. Those ride the same merge as `declare`, silently (the
+     panel's own validatePatch keeps warning about them) and after `declare`,
+     so authored state keeps winning as it always has. */
+  var implied = descriptor && typeof descriptor.declarationPatch === 'function' ? descriptor.declarationPatch : null;
+  function impliedOps(source){
+    if (!implied || !specObject(source)) return null;
+    var ops = implied(source);
+    return specObject(ops) && Object.keys(ops).length ? ops : null;
+  }
+  function merged(keys){
+    var names = Object.keys(keys);
+    if (!names.length) return panel;
+    var next = Object.assign({}, panel);
+    names.forEach(function(key){ next[key] = keys[key]; });
+    return next;
+  }
+  function same(a, b){
+    if (a === b) return true;
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch (ex) { return false; }
+  }
+  function applyOps(base, ops, index, prefix){
+    if (!specObject(ops)){
+      if (report && prefix) report(index, prefix + ': expected an object of declaration fields — ignored');
+      return null;
+    }
+    var next = Object.assign(Object.create(null), base);
+    Object.keys(ops).forEach(function(key){
+      if (Object.prototype.hasOwnProperty.call(PANEL_DECLARE_RESERVED, key)){
+        if (report && prefix) report(index, prefix + '.' + key + ': reserved key — ignored' +
+          (PANEL_DECLARE_RESERVED[key] ? ' (' + PANEL_DECLARE_RESERVED[key] + ')' : ''));
+        return;
+      }
+      if (ops[key] === null) delete next[key];
+      else next[key] = ops[key];
+    });
+    return next;
+  }
+  /* State-implied overrides are the panel's own normalised values: merged
+     silently, never rejected. */
+  function withImplied(keys, source, index){
+    var ops = impliedOps(source), next = ops ? applyOps(keys, ops, index, null) : null;
+    return next || keys;
+  }
+  function accepted(candidate, index, prefix, ops){
+    if (candidate === panel || !descriptor || typeof descriptor.validateDeclaration !== 'function') return true;
+    var warnings = [], errors = [];
+    try { descriptor.validateDeclaration(candidate, prefix, warnings, errors, diagram); }
+    catch (ex) { errors.push(prefix + ': ' + (ex && ex.message ? ex.message : 'invalid declaration')); }
+    if (report){
+      /* The authored declaration was already checked at panels[i]; only
+         repeat findings about keys this step overrides. */
+      var keys = Object.keys(ops).filter(function(key){ return ops[key] !== null; });
+      warnings.forEach(function(text){
+        if (text.indexOf(prefix + ':') === 0 || keys.some(function(key){ return text.indexOf(prefix + '.' + key) === 0; }))
+          report(index, text);
+      });
+      errors.forEach(function(text){ report(index, text + ' — declaration override at this step ignored'); });
+    }
+    return !errors.length;
+  }
+  if (implied && panel){
+    overrides = withImplied(overrides, panel.initial, -1);
+    var seeded = merged(overrides);
+    current = same(seeded, panel) ? panel : seeded;
+  }
+  steps.forEach(function(step, i){
+    var patch = (stepPanelPatch(step) || {})[panel.id];
+    patch = specObject(patch) ? patch : null;
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'declare')){
+      var next = applyOps(overrides, patch.declare, i, 'declare');
+      if (next){
+        var candidate = merged(next);
+        if (same(candidate, current)) candidate = current;
+        if (candidate === current || accepted(candidate, i, 'declare', patch.declare)){
+          overrides = next;
+          current = candidate;
+        }
+      }
+    }
+    if (patch && implied){
+      var carried = withImplied(overrides, patch, i);
+      if (carried !== overrides){
+        var impliedCandidate = merged(carried);
+        overrides = carried;
+        current = same(impliedCandidate, current) ? current : impliedCandidate;
+      }
+    }
+    var effective = current, effectiveKeys = overrides;
+    var once = patch && specObject(patch.enterOnce) && Object.prototype.hasOwnProperty.call(patch.enterOnce, 'declare')
+      ? patch.enterOnce.declare : undefined;
+    if (once !== undefined){
+      var onceKeys = applyOps(overrides, once, i, 'enterOnce.declare');
+      if (onceKeys){
+        var onceCandidate = merged(onceKeys);
+        if (same(onceCandidate, current)) onceCandidate = current;
+        if (onceCandidate === current || accepted(onceCandidate, i, 'enterOnce.declare', once)){
+          effective = onceCandidate;
+          effectiveKeys = onceKeys;
+        }
+      }
+    }
+    if (patch && implied && specObject(patch.enterOnce)){
+      var onceImplied = withImplied(effectiveKeys, patch.enterOnce, i);
+      if (onceImplied !== effectiveKeys){
+        var onceImpliedCandidate = merged(onceImplied);
+        effective = same(onceImpliedCandidate, effective) ? effective : onceImpliedCandidate;
+      }
+    }
+    out.push(effective);
+  });
+  if (!steps.length) out.push(current);
+  return out;
+}
+/* The runtime fold never sees `declare`: it is not state. Returns the same
+   step object when there is nothing to remove. */
+function stepWithoutPanelDeclare(step, id){
+  var patches = stepPanelPatch(step), patch = patches && patches[id];
+  if (!panelPatchHasDeclare(patch)) return step;
+  var clean = Object.assign({}, patch);
+  delete clean.declare;
+  if (specObject(clean.enterOnce) && Object.prototype.hasOwnProperty.call(clean.enterOnce, 'declare')){
+    var once = Object.assign({}, clean.enterOnce);
+    delete once.declare;
+    if (Object.keys(once).length) clean.enterOnce = once;
+    else delete clean.enterOnce;
+  }
+  var cleanPatches = Object.assign({}, patches);
+  cleanPatches[id] = clean;
+  var next = Object.assign({}, step);
+  next[step.panels === patches ? 'panels' : 'patch'] = cleanPatches;
+  return next;
+}
+/* Without overrides this is exactly `fold(panel, steps)`. With overrides,
+   each distinct effective declaration folds the whole (declare-free) path
+   once and contributes the snapshots of the steps it governs, so appended
+   histories (log, timeline events) and one-step `enterOnce` values keep
+   their ordinary semantics across a declaration change for every fold
+   family, including folds that do not start from `initial`. */
+function foldDeclaredPanelStates(panel, steps, fold, descriptor, d){
+  var decls = foldPanelDeclarations(panel, steps, {descriptor: descriptor, diagram: d});
+  if (!decls.some(function(decl){ return decl !== panel; })) return fold(panel, steps);
+  var clean = steps.map(function(step){ return stepWithoutPanelDeclare(step, panel.id); });
+  var folds = new Map(), states = [];
+  decls.forEach(function(decl, i){
+    if (!folds.has(decl)) folds.set(decl, fold(decl, clean));
+    states.push(folds.get(decl)[i]);
+  });
+  return states;
+}
+/* Effective declaration per panel per step for the player and inspectors. */
+function foldDiagramPanelDeclarations(d){
+  var out = Object.create(null), steps = d.steps || [];
+  (d.panels || []).forEach(function(panel){
+    if (!panel || !panel.id) return;
+    out[panel.id] = foldPanelDeclarations(panel, steps, {descriptor: PanelRegistry.get(panel.type), diagram: d});
   });
   return out;
 }

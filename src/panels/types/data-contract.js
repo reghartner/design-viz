@@ -14,13 +14,20 @@
   function text(value) {
     return value === undefined ? '' : value === null ? 'null' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   }
-  function content(panel, state) {
-    var resolved = Object.assign({}, panel);
+  /* Step-specific columns, fields and name width are public state keys that
+     override the declaration. The same normalisation feeds the engine's
+     shared declaration merge (foldPanelDeclarations) and the render-time
+     resolution below. */
+  function declarationPatch(state) {
+    var out = {};
     ['columns', 'fields'].forEach(function (key) {
-      if (Array.isArray(state && state[key])) resolved[key] = state[key];
+      if (Array.isArray(state && state[key])) out[key] = state[key];
     });
-    if (state && width(state.fieldWidth, null) !== null) resolved.fieldWidth = state.fieldWidth;
-    return resolved;
+    if (state && width(state.fieldWidth, null) !== null) out.fieldWidth = state.fieldWidth;
+    return out;
+  }
+  function content(panel, state) {
+    return Object.assign({}, panel, declarationPatch(state));
   }
   function contentWarnings(value, path, warnings) {
     if (value.fieldWidth != null && width(value.fieldWidth, null) === null)
@@ -253,33 +260,13 @@
         if (field.cells != null && !panelObject(field.cells)) warnings.push(at + '.cells: expected an object keyed by column id — cells ignored');
       });
       patchWarnings(panel.initial, path + '.initial', panel, warnings);
-      // Use the shared folder on each path; future and sibling fields must not
-      // make a missing highlight target appear valid at this stop.
-      var contexts = new Map();
-      if (diagram) diagramPathList(diagram).forEach(function (route) {
-        var steps = route.indices.map(function (index) { return diagram.steps[index]; });
-        var carriedSteps = steps.map(function (step) {
-          var patch = (stepPanelPatch(step) || {})[panel.id], values = {}, patches = Object.create(null);
-          if (panelOwn(patch, 'fields')) values.fields = patch.fields;
-          patches[panel.id] = values;
-          return {panels:patches};
-        });
-        var states = foldCommonPanelStates(panel, carriedSteps);
-        steps.forEach(function (step, index) {
-          var patch = (stepPanelPatch(step) || {})[panel.id];
-          if (!panelObject(patch)) return;
-          if (!contexts.has(patch)) contexts.set(patch, []);
-          contexts.get(patch).push(content(panel, states[index]));
-        });
-      });
-      return contexts;
     },
-    validatePatch:function (state, path, panel, warnings, context) {
-      var candidates = context && context.get(state), found = [];
-      (candidates || [content(panel, panel.initial)]).forEach(function (active) {
-        patchWarnings(state, path, active, found);
-      });
-      Array.from(new Set(found)).forEach(function (warning) { warnings.push(warning); });
+    /* The validator hands each step the declaration in effect on its path
+       (declared < initial < carried steps < this step), so a missing highlight
+       target never looks valid because of a future or sibling field. */
+    declarationPatch:declarationPatch,
+    validatePatch:function (state, path, panel, warnings) {
+      patchWarnings(state, path, panel, warnings);
     }, render:render,
     authoring:{
       initialFields:true, transientFields:['columns','fields','fieldWidth','highlights'],

@@ -32,7 +32,8 @@ var FlowviewCompatibility = (function(){
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
     'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
-    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0']
+    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0'],
+    'steps.panel-declare':['Per-step panel declaration overrides','0.2.0']
   };
   Object.keys(released).forEach(function(id){features[id]={label:released[id][0],since:released[id][1]};});
   // Panel capabilities come from their definitions at build time.
@@ -139,6 +140,7 @@ var FlowviewCompatibility = (function(){
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
       if(object(d.nodes) && Object.keys(d.nodes).some(function(id){return object(d.nodes[id]) && d.nodes[id].style!=null;}))used['media.node-styles']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (object(s.panels)?s.panels:s.patch);return object(patches) && Object.keys(patches).some(function(id){var patch=patches[id];return object(patch) && (Object.prototype.hasOwnProperty.call(patch,'declare') || object(patch.enterOnce) && Object.prototype.hasOwnProperty.call(patch.enterOnce,'declare'));});}))used['steps.panel-declare']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;

@@ -484,28 +484,66 @@ function panelOrder(panels) {
 function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
   var folded = foldPanelStates(d);
   var visibility = foldPanelVisibility(d);
+  /* Per-step declaration overrides: the authored panel stays the host's
+     base; the effective declaration for a step (brand resolved the same
+     way) is what the renderer and the title see. */
+  var declared = foldDiagramPanelDeclarations(d);
+  var diagram = d;
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
+  function effectivePanel(host, index) {
+    var decls = declared[host.source.id] || [];
+    var decl = decls.length ? decls[Math.max(0, Math.min(index, decls.length - 1))] : host.source;
+    if (decl === host.source) return host.panel;
+    var resolved = host.resolved.get(decl);
+    if (!resolved) {
+      resolved = Object.assign({}, decl, {brand: FlowBrand.effective(diagram.brand, decl.brand)});
+      host.resolved.set(decl, resolved);
+    }
+    return resolved;
+  }
+  function syncPanelTitle(host, panel) {
+    var text = panel.title ? String(panel.title) : '';
+    if (!text) {
+      if (host.title) {
+        host.card.removeChild(host.title);
+        host.title = null;
+      }
+      return;
+    }
+    if (!host.title) {
+      var t = document.createElement('div');
+      t.className = 'ptitle';
+      host.card.insertBefore(t, host.body);
+      host.title = t;
+    }
+    if (host.title.textContent !== text) host.title.textContent = text;
+  }
   panelOrder(d.panels).forEach(function (p) {
     if (!p || !p.id) return;
+    var source = p;
     var card = document.createElement('div');
     card.className = 'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown');
     /* spec index, not render order — log panels are reordered to the end */
     card.setAttribute('data-dv-panel', String((d.panels || []).indexOf(p)));
-    if (p.title) {
+    p = Object.assign({}, p, {brand: FlowBrand.effective(d.brand, p.brand)});
+    var host = { source: source, panel: p, body: null, card: card, title: null, resolved: new Map() };
+    var first = effectivePanel(host, 0);
+    if (first.title) {
       var t = document.createElement('div');
       t.className = 'ptitle';
-      t.textContent = p.title;
+      t.textContent = String(first.title);
       card.appendChild(t);
+      host.title = t;
     }
     var body = document.createElement('div');
     body.className = 'pbody';
     card.appendChild(body);
+    host.body = body;
     (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
       card
     );
-    p = Object.assign({}, p, {brand: FlowBrand.effective(d.brand, p.brand)});
-    hosts[p.id] = { panel: p, body: body, card: card };
+    hosts[p.id] = host;
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
     var view = PanelViews.get(p.type),
@@ -513,8 +551,8 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     var home = options.ambientInitial;
     renderPanelBody(
       body,
-      p,
-      home ? p.initial : (folded[p.id] || [])[0],
+      first,
+      home ? first.initial : (folded[p.id] || [])[0],
       skin,
       options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],
       home ? -1 : 0,
@@ -530,16 +568,25 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     setDiagram: function (next) {
       folded = foldPanelStates(next);
       visibility = foldPanelVisibility(next);
+      declared = foldDiagramPanelDeclarations(next);
+      diagram = next;
+      Object.keys(hosts).forEach(function (id) {
+        var source = (next.panels || []).find(function (p) { return p && p.id === id; });
+        if (source) hosts[id].source = source;
+        hosts[id].resolved = new Map();
+      });
       traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
     },
     setStep: function (i, animate, ambient) {
       Object.keys(hosts).forEach(function (pid) {
         var states = folded[pid] || [];
         var si = Math.min(i, states.length - 1);
-        var panel = hosts[pid].panel;
+        var host = hosts[pid];
+        var panel = effectivePanel(host, Math.max(0, si));
         var view = PanelViews.get(panel.type),
           options = view ? view.options : {};
         var homeAmbient = ambient && options.ambientInitial;
+        syncPanelTitle(host, panel);
         // Ambient is an overview of every panel. Layout-level hidden tiles
         // remain hidden independently. Keep attached playback controls usable.
         var shown = ambient || (visibility[pid] || [])[i] !== false;

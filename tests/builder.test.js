@@ -1413,12 +1413,12 @@ test('homemap setup and dynamic patch fields follow declared devices', () => {
   ]);
   const decl = {type: 'homemap', devices: ['camera', 'entry', 'sensor', 'hub'].map((kind, i) => ({id: 'd' + i, kind, x: 20, y: 40}))};
   assert.deepStrictEqual(plain(B.panelPatchFields(decl)), [
-    ['d0', 'jsonAny'], ['d1', 'jsonAny'], ['d2', 'jsonAny'], ['d3', 'jsonAny'], ['signals', 'jsonArr']
+    ['d0', 'jsonAny'], ['d1', 'jsonAny'], ['d2', 'jsonAny'], ['d3', 'jsonAny'], ['signals', 'jsonArr'], plain(B.PANEL_DECLARE_FIELD)
   ]);
   decl.devices.push(null, {}, {...decl.devices[0]}, {id: 'signals', kind: 'camera', x: 1, y: 2},
     {id: 'bad', kind: 'dragon', x: 1, y: 2}, {id: 'nan', kind: 'camera', x: NaN, y: 1});
-  assert.strictEqual(B.panelPatchFields(decl).length, 5);
-  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'homemap'})), [['signals', 'jsonArr']]);
+  assert.strictEqual(B.panelPatchFields(decl).length, 6);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'homemap'})), [['signals', 'jsonArr'], plain(B.PANEL_DECLARE_FIELD)]);
 });
 
 

@@ -74,7 +74,7 @@ test('late registered panel metadata drives insertion, field discovery, and isol
   assert.ok(Object.keys(context.PANEL_TEMPLATES).includes('authoring-fixture'));
   assert.ok(Object.hasOwn(context.PANEL_SETUP_FIELDS,'authoring-fixture'));
   assert.deepEqual(plain(context.PANEL_PATCH_FIELDS['authoring-fixture']),[['value','num']]);
-  assert.deepEqual(plain(context.panelPatchFields({type:'authoring-fixture',states:['ready']})),[['value','num'],['status','enum',['ready']]]);
+  assert.deepEqual(plain(context.panelPatchFields({type:'authoring-fixture',states:['ready']})),[['value','num'],['status','enum',['ready']],plain(context.PANEL_DECLARE_FIELD)]);
   assert.ok(context.PANEL_CATALOG.find(entry=>entry.type==='authoring-fixture'));
   const sample=context.panelPickerExample('authoring-fixture');assert.equal(sample.state.value,7);
   sample.panel.initial.value=99;

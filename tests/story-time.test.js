@@ -151,6 +151,8 @@ test('existing specs fold exactly like the legacy per-panel folds (no story time
       const x = C.diagramForPath(d, route.id), folded = plain(C.foldPanelStates(x));
       for (const p of d.panels || []) {
         if (!p || !p.id) continue;
+        /* Per-step declaration overrides are folded by design, not legacy state. */
+        if (x.steps.some(step => C.panelPatchHasDeclare((C.stepPanelPatch(step) || {})[p.id]))) continue;
         const def = C.PanelRegistry.get(p.type), fold = def && def.fold || C.foldCommonPanelStates;
         assert.deepEqual(folded[p.id], plain(fold(p, x.steps)), path.relative(root, file) + ' ' + route.id + ' ' + p.id);
         compared++;

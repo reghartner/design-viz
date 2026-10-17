@@ -7,6 +7,7 @@ topology, notification or outcome without evidence.
 | Needed behavior | Read |
 |---|---|
 | Shared happy/failure paths, dropped or blocked sends | `cookbook/alternate-paths.md`, `docs/alternate-paths.md`, `docs/failed-communications.md` |
+| A panel whose unit, range, title, columns or spans change at a step or per path (`declare`) | `cookbook/declaration-overrides.md`, `examples/panel-declare/panel-declare.spec.json` |
 | Phone home screen, device app cards, notifications, backend sources, freshness | `cookbook/device-app-sources.md`, `python3 tools/widget_doc.py deviceapp phone` |
 | Shared icons, per-step card icons, company branding | `docs/shared-icons.md`, `examples/shared-icons/shared-icons.spec.json` |
 | Battery drain, low battery, charging | `cookbook/battery-level.md`, `python3 tools/widget_doc.py battery` |

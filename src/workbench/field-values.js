@@ -96,10 +96,16 @@ function patchSummaryLine(patchObj){
   }).join(' · ');
 }
 
+/* Every panel type accepts the reserved `declare` step key (per-step
+   declaration overrides, folded by foldPanelDeclarations). It is appended to
+   the type's own step fields; starting-state forms leave it out. */
+var PANEL_DECLARE_FIELD=['declare','json',null,{label:'Declaration overrides',advanced:true,
+  help:'JSON object of declaration fields to override from this step on, for example {"max":200}. null restores the declared value. This step only applies it to one beat.'}];
 function panelPatchFields(decl){
   var authoring=decl && panelAuthoring(decl.type), fields=authoring && authoring.patchFields;
   if (!authoring || fields === undefined) return null;
-  return authoring.expandPatchFields ? authoring.expandPatchFields(decl) : fields;
+  var list=authoring.expandPatchFields ? authoring.expandPatchFields(decl) : fields;
+  return Array.isArray(list) ? list.concat([PANEL_DECLARE_FIELD]) : list;
 }
 
 /* Collect only the supplied fields. Blank values omit keys; callers merge

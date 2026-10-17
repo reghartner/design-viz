@@ -59,7 +59,7 @@ scrollable map. Short viewports may scroll the page; the text is not scaled down
 ## Paths and decisions
 
 **Create (8 per source):** landing action → audience detail → Copy & paste →
-empty folder → setup paste and first Copy request → source question → agreed
+empty folder → setup paste and first request in Claude → source question → agreed
 scope → proposal ready. The source's answer now advances Claude → Proposed
 draft. Repeated setup close-ups and the redundant draft recap were removed.
 Initial conversation guidance is labeled NOTE; authored exchanges are explicitly

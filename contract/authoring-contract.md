@@ -1161,6 +1161,38 @@ perspectives" of one timeline). Types:
   Linked engineering node counts deduplicate node ids per route. Node removal
   removes the reference, retaining the cost line. No tiering, currency conversion
   or engineering labor is inferred. See [messaging costs](../cookbook/messaging-cost.md).
+- `locus` — a linear genome map: a horizontal bar with features on up to four
+  stacked rows, point markers above it, arcs that connect two positions, and a
+  ruler with nice ticks. Every position is a 1-based base typed in the spec;
+  nothing is computed from data files. Declare `length` (required safe integer
+  1–10,000,000,000; an invalid length warns and renders an empty card),
+  optional `unit` `"bp"` (default) | `"kb"` | `"Mb"` for ruler and distance
+  labels (positions are still authored in bp), optional `label`, and up to 48
+  `features:[{id,label?,from,to,tone?,strand?,row?}]` with unique string ids
+  and `from ≤ to`. A range entirely outside the length warns and is skipped; a
+  range past the end warns and clips. `tone` is a shared bio tone (default
+  `feature`), `strand` `"+"`/`"-"` adds a chevron, `row` is 0–3. Explicit rows
+  are placed first; the rest take the first row with no overlap in authored
+  order, and when all four rows overlap the feature shares the last row and
+  is flagged crowded in its tooltip. Starting and step state accept `markers`
+  (full snapshot ≤ 24 `{id,at,label?,tone?}` pins above the bar, default tone
+  `accent`), `arcs` (≤ 12 `{id,from,to,label?,tone?}` connectors above the bar;
+  `from > to` draws a dashed arc; the apex label is `label` or the distance
+  `|to − from|` in the declared unit; `from === to` warns and is skipped),
+  `window` (`{from,to}` zoom: only that span renders, the ruler re-labels and
+  features or arcs crossing an edge clip; `null` shows the whole length; a
+  window outside the length warns and is ignored, one past the end clips),
+  `highlight` (feature id emphasised while the rest dim; unknown ids warn) and
+  `note`. Positions beyond the length warn and are skipped; markers and arcs
+  outside the window are hidden. Unknown state fields warn. A patch field with
+  the wrong shape is ignored and the carried value stays. Sparse patches and
+  `enterOnce` follow normal panel state. The ruler picks 5–10 ticks at 1, 2,
+  2.5 or 5 × 10ⁿ (fewer for very short windows). `locusModel(panel, state)`
+  exposes the pure geometry (percent positions, rows, arcs, ticks). Rendering
+  is a stretched inline SVG (`viewBox 0 0 1000 H`, `preserveAspectRatio="none"`,
+  non-scaling strokes) under HTML overlays for blocks and labels so text keeps
+  its size, plus a legend of the visible features; the map has `role="img"`
+  with a summary `aria-label`. Editing is desktop-only.
 - `log` — appending monospace event lines: `{"id":"log","type":"log",
   "tags":{"NET":"#38E1FF"}}`. Patched via
   `{"log":[{"tag":"NET","text":"line"}]}` — log patches APPEND. Log panels
@@ -1189,6 +1221,39 @@ perspectives" of one timeline). Types:
   `reason` is ignored (both with validator warnings). Under reduced motion
   the message and its context labels render statically; in print the held
   state shows the label and the reason line.
+- `reads` — a read alignment: a short authored reference with sequencing reads
+  stacked under it, aligned by coordinate, with mismatches, deletion gaps,
+  insertions and soft clips visible and a coverage depth bar above the
+  reference. A teaching display: nothing is computed from data files. Declare
+  `reference` (1–240 letters; whitespace is removed; invalid letters warn and
+  render as unknown; longer text truncates with a warning), `alphabet` `"dna"`
+  (default) | `"rna"`, `start` (1-based coordinate of the first reference
+  letter, default 1), optional `label`, `maxReads` 1–24 (default 12) and
+  `showMatches` (default false: matching letters render as `.`). Starting and
+  step state accept `reads` (full snapshot of at most `maxReads`
+  `{id,at,seq,label?,strand?,tone?}`; `at` is the reference coordinate of the
+  first aligned letter; `seq` uses alphabet letters and `-` for a deletion gap;
+  letters beyond the reference render dimmed as soft clips, at most 12 per
+  side with further letters counted as "… n"; a read entirely outside the
+  reference warns and is listed without cells; extra reads warn and are
+  ignored), `inserts` (≤ 24 `{read,after,seq}` with 1–24 inserted letters that
+  sit between reference coordinate `after` and `after+1` in that read, drawn as
+  a `▲` wedge on the read cell with the letters in its tooltip and the legend;
+  the reference never shifts; an insertion naming a missing read or a
+  coordinate the read does not cover stays in the legend as unplaced), `focus`
+  (read id to emphasise while the rest dim; `null` none), `showDepth` (default
+  true), `marks` (≤ 24 `{id,from,to,tone?,label?}` reference ranges drawn as a
+  band under the reference and listed in the legend; ranges partly outside
+  clip, ranges entirely outside warn and are skipped) and `note`. A mismatch is
+  a read letter that differs from the reference letter case-insensitively; `N`
+  on either side matches. Depth counts aligned letters (match or mismatch) per
+  reference position, never gaps or clips. Unknown state fields warn; a patch
+  field with the wrong shape is ignored and the carried value stays. Sparse
+  patches and `enterOnce` follow normal panel state. `readsModel(panel, state)`
+  exposes rows with per-cell `match|mismatch|gap|clip`, insertions, depth and
+  the grid. The grid scrolls horizontally when wider than the card; residue
+  colours and tones reuse the sequence panel's shared classes. Editing is
+  desktop-only.
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
   `{"mode":"off|boot|active|live|rec|save|playing|unavailable", "banner":"<save-banner text>"}`.

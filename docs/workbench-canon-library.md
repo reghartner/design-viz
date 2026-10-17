@@ -39,7 +39,8 @@ The leaf folder name supplies the ID. Namespace folders do not appear in public
 IDs, so every leaf ID must be unique across the manifest. Keep it stable after publishing links. The link
 opens the latest published version; renaming the folder or removing its canon
 entry makes an old link unavailable.
-Unknown IDs or a missing published snapshot show an error with Retry.
+An unknown ID (or any value that is not a published ID) returns to the home page
+with a message naming it. A missing published snapshot shows an error with Retry.
 
 The toolbar **Copy link** shares the document at its authored opening state.
 The chain-link controls beside tabs, chapters, steps, and contract cards keep

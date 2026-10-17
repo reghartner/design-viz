@@ -169,7 +169,7 @@ test('Canon success keeps its document title in a compact unobscured app header 
   await page.locator('.canon-reader-toolbar .welcome-back').click();await expect(screen(page,'library')).toBeVisible();
   await expect(page.locator('#workbench-reader-title')).toBeHidden();await expect(page.locator('#canon-reader-intro>#canon-reader-title')).toHaveCount(1);
   await page.goto(server.origin+'/workbench.html?diagram=missing');
-  await expect(page.getByRole('heading',{name:'Diagram unavailable',exact:true})).toBeVisible();await expect(page.locator('#canon-reader-error')).toBeVisible();
+  await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#welcome-link-error')).toContainText('“missing”');
   await expect(page.locator('body')).not.toHaveClass(/canon-reader-active/);await expect(page.locator('#workbench-reader-title')).toBeHidden();
 });
 
@@ -272,7 +272,7 @@ test('Canon edit and browser Back preserve Ambient mode while stale modes use th
 // 4   | library screen                            | #welcome-library-screen h1 has exact text "Browse diagrams."                        | card renamed but the screen heading still says "Canon diagrams."
 // 5   | in-app user guide, §09 (#hg-evidence)     | its first <b> is exactly "Browse diagrams" and the section text has no "Canon diagrams" | guide still telling users to choose "Canon diagrams"
 // 6   | library load fails (version 99 snapshot)  | #welcome-library-status says "Could not load" and contains no "canon" (any case)     | failure status still naming the internal term
-// 7   | ?diagram=missing direct reader            | #canon-reader-error names "Browse diagrams" and not "Canon diagrams"                 | stale-diagram recovery still pointing at the old label
+// 7   | ?diagram=missing direct link              | #welcome-link-error names "Browse diagrams" and not "Canon diagrams"                 | stale-diagram recovery still pointing at the old label
 test('the published-library entry, its screen, the user guide and its recovery text use the plain "Browse diagrams" label',async({page,server})=>{
   let data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
@@ -289,7 +289,7 @@ test('the published-library entry, its screen, the user guide and its recovery t
   data={version:99,diagrams:[]};await page.reload();await expect(screen(page,'library')).toBeVisible();
   const status=page.locator('#welcome-library-status');await expect(status).toContainText('Could not load');await expect(status).not.toContainText(/canon/i);
   data=library();await page.goto(server.origin+'/workbench.html?diagram=missing');
-  const error=page.locator('#canon-reader-error');await expect(error).toContainText('no longer in the published library');
+  const error=page.locator('#welcome-link-error');await expect(error).toContainText('“missing”');
   await expect(error).toContainText('Browse diagrams');await expect(error).not.toContainText('Canon diagrams');
 });
 
@@ -371,7 +371,7 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
   expect(fallbackURL.origin+fallbackURL.pathname+fallbackURL.search).toBe(server.origin+'/workbench.html?diagram=delivery');expect(fallbackURL.hash).toContain('d=delivery');
   await expect(fallback).toBeVisible();expect(await fallback.evaluate(el=>{const r=el.getBoundingClientRect(),u=el.parentElement.getBoundingClientRect();el.focus();el.select();return {contained:r.left>=u.left && r.right<=u.right && r.top>=u.top && r.bottom<=u.bottom && r.left>=0 && r.right<=innerWidth,selected:el.selectionStart===0 && el.selectionEnd===el.value.length};})).toEqual({contained:true,selected:true});
   await page.goto(server.origin+'/workbench.html?diagram=missing');
-  await expect(page.locator('#canon-reader-error')).toContainText('no longer in the published library');
+  await expect(page.locator('#welcome-link-error')).toContainText('“missing”');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await expect(page.locator('#canon-reader-copy')).toBeDisabled();
   missing=true;await page.goto(server.origin+'/workbench.html?diagram=delivery');
   await expect(page.locator('#canon-reader-error')).toContainText('No published diagram library');
@@ -382,4 +382,93 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
   const expected=['HTTP 404: '+server.origin+'/diagrams.json','console: Failed to load resource: the server responded with a status of 404 (Not Found)'];
   for(const message of expected){expect(audit).toContain(message);audit.splice(audit.indexOf(message),1);}
   missing=false;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+});
+
+// #548 (Chuck 2026-10-16) — `?diagram=<published ID>` opens one published diagram
+// read-only with an Edit action. Every form that opens a diagram on main keeps
+// working; an unknown value, including any address- or path-shaped value, lands
+// on Welcome with one message naming it, and nothing else opens.
+// row | fixture                                              | assertion (scoped)                                                                                        | rejects
+// 1   | 1440×900, no query                                   | precondition: #welcome-home visible, #welcome-link-error hidden, #canon-reader-title hidden                | a vacuous pass that already starts elsewhere or shows the error
+// 2   | ?diagram=delivery                                    | #canon-reader-title "Reviewed delivery"; #canon-reader-edit enabled "Edit in Workbench →"; workspace hidden; #welcome-link-error hidden | the plain ID form broken, or opening straight into the editor
+// 3   | ?diagram=team.delivery_v2 (dots/underscore)          | #canon-reader-title "Team delivery v2"; Edit enabled; #welcome-link-error hidden                          | a stricter ID check that drops legal canon/document-link IDs
+// 4   | ?diagram=Ops.Delivery-2 (mixed case, hyphen)         | #canon-reader-title "Ops delivery 2"; Edit enabled; #welcome-link-error hidden                            | case-folding or lower-case-only checks
+// 4b  | ?diagram=2024.q3-review_1 (digit-leading)            | #canon-reader-title "Q3 review"; Edit enabled; #welcome-link-error hidden                                 | a letter-first shape check
+// 4d  | ?diagram=7 (one character, the shortest legal ID)    | #canon-reader-title "Seven"; Edit enabled; #welcome-link-error hidden                                    | a minimum-length check
+// 4c  | ?diagram=<200-character ID> (library maximum)        | #canon-reader-title "Longest ID"; Edit enabled; #welcome-link-error hidden                                | a length cap below the library's 200
+// 5   | ?diagram=team%2Edelivery%5Fv2 (percent-encoded)      | #canon-reader-title "Team delivery v2"                                                                    | matching the raw query bytes instead of the decoded value
+// 6   | ?layout=backstage&diagram=delivery#d=delivery&p=failed (other query + deep-link fragment) | #canon-reader-title "Reviewed delivery"; #welcome-link-error hidden                  | extra parameters or a fragment breaking the link
+// 7   | row 2, real click on #canon-reader-edit              | #workbench-workspace visible                                                                              | a reader with a dead Edit action
+// 8   | ?diagram=never-published                             | #welcome-home visible; #welcome-link-error visible and names “never-published”; #canon-reader-title hidden; body not .canon-reader-active; #workbench-workspace hidden; #welcome-{paste,new,agent,library,reader}-screen each hidden | the old reader error screen; an error that does not name the value; an editor opened
+// 9   | row 8, every Welcome home action (#welcome-agent, tour, #welcome-example-expand, #welcome-catalog, #welcome-paste, #welcome-open, #welcome-new, #welcome-library, #welcome-agent-prompt) | each is visible, enabled and the top element at its own centre (not covered by the message); real clicks on each, from a fresh unknown-link landing, reach its own destination: paste/new/library/agent screens; #welcome-agent → #workbench-workspace; tour and #welcome-example-expand → dialog.workbench-tour-host open; #welcome-catalog → #catalog-picker open; #welcome-open (stubbed native picker returning the fixture file) → #src holds that file | an error state that hides, disables or covers any Welcome action
+// 10  | ?diagram=https://evil.example/x.spec.json            | as row 8, and #welcome-link-error text equals row 8's text with the value substituted                    | a separate refusal path that looks different from unknown
+// 11  | ?diagram=//evil.example/x.spec.json                  | as row 10                                                                                                 | protocol-relative addresses handled differently
+// 12  | ?diagram=diagrams/delivery/delivery.spec.json        | as row 10                                                                                                 | same-origin paths handled differently
+// 12c | ?diagram=DELIVERY (wrong case of published "delivery") | as row 10                                                                                               | case-folded matching instead of the exact match main uses
+// 12b | ?diagram= (empty value)                              | as row 10 (message names “”)                                                                              | an empty value silently treated as a plain Welcome visit
+// 13  | rows 10–12                                           | 0 requests to evil.example; 0 requests whose path ends in delivery.spec.json                              | values used as a spec transport
+// 14  | in-app user guide §09 (#hg-evidence)                 | exactly one <code> in #hg-evidence contains "?diagram="                                                    | the parameter left undocumented in the guide
+// 15  | docs/workbench-user-guide.md                         | exactly one paragraph names `?diagram=<diagram ID>`; it says published diagram, read-only, Edit in Workbench, home page | the written guide left without the parameter or its error behaviour
+// Cross-document link compatibility (Claude artifacts, hosted site, Backstage) stays
+// owned by document-links, handoffs, context-handoffs, canon-lazy-library and
+// backstage-workspace specs; rows 2–6 (with 4b, 4c) pin the ?diagram= forms that open today.
+test('a ?diagram= link opens one published diagram read-only, and unknown values land on Welcome with a message naming them',async({page,server})=>{
+  const data=library();
+  const longId='L'+'o'.repeat(198)+'9';
+  for(const [id,title] of [['team.delivery_v2','Team delivery v2'],['Ops.Delivery-2','Ops delivery 2'],['2024.q3-review_1','Q3 review'],['7','Seven'],[longId,'Longest ID']]){
+    const entry=library().diagrams[0];entry.id=id;entry.title=title;entry.spec.page.title=title;entry.spec.page.canon.id=id;data.diagrams.push(entry);
+  }
+  await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  const foreign=[],specFetches=[];
+  // Match by host: a glob would also match the Workbench URL whose query holds the address.
+  await page.route(url=>url.hostname==='evil.example',route=>{foreign.push(route.request().url());return route.fulfill({json:{}});});
+  page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('delivery.spec.json'))specFetches.push(request.url());});
+  // Native file picker stand-in, as in working-file.spec.mjs: returns the fixture spec.
+  await page.addInitScript(({source})=>{
+    window.showOpenFilePicker=async()=>{
+      const root=await navigator.storage.getDirectory(),handle=await root.getFileHandle('linked.spec.json',{create:true});
+      const stream=await handle.createWritable();await stream.write(source);await stream.close();return [handle];
+    };
+  },{source});
+  await page.setViewportSize({width:1440,height:900});
+  const home=page.locator('#welcome-home'),linkError=page.locator('#welcome-link-error'),title=page.locator('#canon-reader-title');
+  const edit=page.locator('#canon-reader-edit'),workspace=page.locator('#workbench-workspace');
+  await page.goto(server.origin+'/workbench.html');
+  await expect(home).toBeVisible();await expect(linkError).toBeHidden();await expect(title).toBeHidden();
+  for(const [query,expected] of [['?diagram=delivery','Reviewed delivery'],['?diagram=team.delivery_v2','Team delivery v2'],['?diagram=Ops.Delivery-2','Ops delivery 2'],
+    ['?diagram=2024.q3-review_1','Q3 review'],['?diagram=7','Seven'],['?diagram='+longId,'Longest ID'],['?diagram=team%2Edelivery%5Fv2','Team delivery v2'],['?layout=backstage&diagram=delivery#d=delivery&p=failed','Reviewed delivery']]){
+    await page.goto(server.origin+'/workbench.html'+query);
+    await expect(title).toHaveText(expected);await expect(edit).toBeEnabled();await expect(edit).toHaveText('Edit in Workbench →');
+    await expect(workspace).toBeHidden();await expect(linkError).toBeHidden();
+  }
+  await page.goto(server.origin+'/workbench.html?diagram=delivery');await expect(title).toHaveText('Reviewed delivery');
+  await edit.click();await expect(workspace).toBeVisible();
+  async function landsOnWelcome(value){
+    // Raw query bytes, as a person would paste them (none of these values contains & # + or %).
+    await page.goto(server.origin+'/workbench.html?diagram='+value);
+    await expect(home).toBeVisible();await expect(linkError).toBeVisible();await expect(linkError).toContainText('“'+value+'”');
+    await expect(title).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/canon-reader-active/);await expect(workspace).toBeHidden();
+    for(const other of ['paste','new','agent','library','reader'])await expect(page.locator('#welcome-'+other+'-screen')).toBeHidden();
+    return await linkError.textContent();
+  }
+  const unknown=await landsOnWelcome('never-published');
+  for(const selector of ['#welcome-agent','#welcome-home [data-workbench-tour]','#welcome-example-expand','#welcome-catalog','#welcome-paste','#welcome-open','#welcome-new','#welcome-library','#welcome-agent-prompt']){
+    const action=page.locator(selector);await expect(action).toBeVisible();await expect(action).toBeEnabled();
+    expect(await action.evaluate(el=>{el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!top && el.contains(top);}),selector).toBe(true);
+  }
+  for(const [action,target] of [['#welcome-paste','#welcome-paste-screen'],['#welcome-new','#welcome-new-screen'],['#welcome-library','#welcome-library-screen'],['#welcome-agent-prompt','#welcome-agent-screen'],
+    ['#welcome-agent','#workbench-workspace'],['#welcome-home [data-workbench-tour]','dialog.workbench-tour-host'],['#welcome-example-expand','dialog.workbench-tour-host'],['#welcome-catalog','#catalog-picker'],['#welcome-open','#workbench-workspace']]){
+    if(action!=='#welcome-paste')await landsOnWelcome('never-published');
+    await page.locator(action).click();await expect(page.locator(target),action).toBeVisible();
+    if(action==='#welcome-open')await expect(page.locator('#src')).toHaveValue(source);
+  }
+  for(const value of ['https://evil.example/x.spec.json','//evil.example/x.spec.json','diagrams/delivery/delivery.spec.json','','DELIVERY'])
+    expect(await landsOnWelcome(value)).toBe(unknown.replace('never-published',value));
+  expect(foreign).toEqual([]);expect(specFetches).toEqual([]);
+  await openGuide(page);
+  await expect(guide(page).locator('#hg-evidence code',{hasText:'?diagram='})).toHaveCount(1);
+  const written=await readFile(path.join(repo,'docs/workbench-user-guide.md'),'utf8');
+  const paragraphs=written.split(/\n\s*\n/).filter(block=>block.includes('`?diagram=<diagram ID>`'));
+  expect(paragraphs).toHaveLength(1);
+  for(const phrase of ['published diagram','read-only','Edit in Workbench','home page'])expect(paragraphs[0]).toContain(phrase);
 });

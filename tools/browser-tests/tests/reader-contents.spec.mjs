@@ -45,7 +45,7 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
   await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
-  await root.locator('.reader-tree-tab').getByText('Reference',{exact:true}).click();const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 1');
+  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 1');
 });
 
 test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
@@ -59,6 +59,80 @@ test('desktop Contents expands every View by default and preserves independent d
   await choose(root,'explore');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
   await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
   await disclosure('full').click();await disclosure('explore').click();await expect(sections('full')).toHaveCount(3);await expect(sections('explore')).toHaveCount(3);
+});
+
+/* #607 — Contents lands with every Tab and View expanded (desktop widths only).
+   row | fixture | assertion (scoped) | rejects
+   L0 precondition | twoTabs(): Product journey (3 Views) + Reference (2 Views, 2 sections), 1440x900, no hash | .reader-tab-label = Product journey; the current page row sits inside the Product journey group | a test whose landing Tab is already the second group
+   L1 every Tab expanded | same | each .reader-tree-tab aria-expanded=true; each group's own .reader-tree-view names = its authored Views | expanding only the current Tab (today's initial frame)
+   L2 every View expanded | same | each View's own disclosure aria-expanded=true and its own .reader-tree-sections rows = its authored members, in both groups | expanding Tabs but leaving non-current Views collapsed
+   M1 Tab toggles by hand | real clicks on the Reference Tab row | aria-expanded false + 0 View rows in that group while Product journey keeps its 3; second click restores both Views | a landing default re-applied on every draw
+   M2 View toggles by hand | real Enter/click on a Reference View disclosure | that View's sections 0 and aria-expanded false, the sibling View keeps 2; click restores | disclosure state shared across Views or reset by the default
+   N1 moving keeps groups | Next section, then a real click on a Reference View row | after each move the other group stays aria-expanded=true with its View rows | collapsing every group except the new owner on navigation
+   D1 deep link lands | fresh load of #t=reference&d=glossary&v=ref-explore | tab label Reference, glossary row in ref-explore aria-current=page, #section-glossary is the Explore section; both Tabs expanded | a deep-link landing that expands only the linked Tab
+   D2 hash change | real same-document navigation to #d=review&v=explore | Product journey owns, review row current, Reference still expanded | hashchange routing that recollapses groups
+   R1 restore() wins | Workbench re-render (workbench-navigation.spec.mjs) | a Tab the reader collapsed stays collapsed after the preview re-renders | the landing default overriding saved state
+   E1 native + Forge | twoTabs() through Backstage nativeViewer and the Forge viewer resource | same L1/L2 assertions inside each host | fixing only the standalone viewer */
+function twoTabs(){
+  const raw=story(),[journey,reference]=raw.page.sections[0].tabs,base=journey.sections[0];
+  const section=(id,heading)=>({...structuredClone(base),id,heading});
+  reference.sections=[section('reference','Reference material'),section('glossary','Glossary terms')];
+  reference.defaultView='ref-standard';reference.views=[{id:'ref-standard',name:'Reference pages',presentation:'standard',sections:['reference','glossary']},{id:'ref-explore',name:'Reference map',presentation:'explore',sections:['glossary','reference']}];
+  return raw;
+}
+const authored={'Product journey':{full:3,explore:3,subset:2},'Reference':{'ref-standard':2,'ref-explore':2}};
+async function expectAllExpanded(root){
+  for(const [label,views] of Object.entries(authored)){
+    const group=root.locator('.reader-contents-tab').filter({has:root.page().locator('.reader-tree-tab').filter({hasText:label})});
+    await expect(group.locator('.reader-tree-tab'),label+' Tab').toHaveAttribute('aria-expanded','true');
+    await expect(group.locator('.reader-tree-view')).toHaveCount(Object.keys(views).length);
+    for(const [id,count] of Object.entries(views)){
+      await expect(group.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure'),label+' '+id).toHaveAttribute('aria-expanded','true');
+      await expect(group.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);
+    }
+  }
+}
+test('#607 desktop Contents lands with every Tab and View expanded and keeps reader choices',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await openRaw(page,server,twoTabs(),'contents-expanded');
+  const group=label=>root.locator('.reader-contents-tab').filter({has:root.page().locator('.reader-tree-tab').filter({hasText:label})}),tabRow=label=>group(label).locator('.reader-tree-tab');
+  const views=label=>group(label).locator('.reader-tree-view'),sections=id=>root.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>root.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
+  await expect(root.locator('.reader-contents')).toBeVisible();
+  await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(group('Product journey').locator('.reader-tree-view[aria-current="page"]')).toHaveText('Full story');
+  // The landing default is applied after the first frame; settle it before asserting.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectAllExpanded(root);
+  await expect(group('Reference').locator('.reader-tree-sections[data-reader-view="ref-explore"] .reader-tree-section')).toHaveText(['Glossary terms','Reference material']);
+  await tabRow('Reference').click();await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','false');await expect(views('Reference')).toHaveCount(0);await expect(views('Product journey')).toHaveCount(3);
+  await tabRow('Reference').click();await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveText(['Reference pages','Reference map']);
+  await disclosure('ref-standard').focus();await page.keyboard.press('Enter');await expect(disclosure('ref-standard')).toHaveAttribute('aria-expanded','false');await expect(sections('ref-standard')).toHaveCount(0);await expect(sections('ref-explore')).toHaveCount(2);
+  await disclosure('ref-standard').click();await expect(disclosure('ref-standard')).toHaveAttribute('aria-expanded','true');await expect(sections('ref-standard')).toHaveCount(2);
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
+  await group('Reference').locator('.reader-tree-view[data-tab-view="ref-explore"]').click();await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(tabRow('Product journey')).toHaveAttribute('aria-expanded','true');await expect(views('Product journey')).toHaveCount(3);
+  await page.goto(server.origin+'/contents-expanded.html#t=reference&d=glossary&v=ref-explore');await page.reload();
+  await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(sections('ref-explore').filter({hasText:'Glossary terms'})).toHaveAttribute('aria-current','page');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-glossary');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectAllExpanded(root);
+  await page.goto(server.origin+'/contents-expanded.html#d=review&v=explore');
+  await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(sections('explore').filter({hasText:'Decide what becomes the accepted diagram'})).toHaveAttribute('aria-current','page');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
+});
+
+test('#607 Backstage native and Forge readers land with every Tab and View expanded',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await writeFile(path.join(server.root,'expanded-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+  await writeFile(path.join(server.root,'expanded-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./expanded-native.js";window.mount=mountNativeViewer;</script>');
+  await page.goto(server.origin+'/expanded-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.one=mount(document.querySelector('#one'),raw);},twoTabs());
+  const native=page.locator('#one');await expect(native.locator('.reader-contents')).toBeVisible();await expect(native.locator('.reader-tab-label')).toHaveText('Product journey');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectAllExpanded(native);
+  await page.addInitScript(config=>{window.__bridge={callBridge:async method=>{
+    if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:false}}};
+    if(['submit','close','navigate'].includes(method))return true;
+    throw Error('Unexpected Forge bridge call: '+method);
+  }};},{specJson:JSON.stringify(twoTabs())});
+  await page.goto(server.origin+'/forge/index.html');await expect(page.locator('#app-status')).toBeHidden();
+  const forge=page.locator('#docview');await expect(forge.locator('.reader-contents')).toBeVisible();await expect(forge.locator('.reader-tab-label')).toHaveText('Product journey');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectAllExpanded(forge);
 });
 
 for(const width of [1440,390,320,286])test('Contents geometry, overlay and bounded theme menu at '+width,async({page,server})=>{
@@ -123,7 +197,7 @@ for(const width of [1440,390])test('top Views route with Contents closed and ret
   await page.keyboard.press('Space');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);await expect(root.locator('#section-review .termbar')).toContainText('Paused');await page.evaluate(()=>document.body.classList.remove('presenting'));
   await toggle.click();await expect(root.locator('.reader-tree-view[data-tab-view=explore]')).toHaveAttribute('aria-current','page');await choose(root,'full');await expect(full).toHaveAttribute('aria-selected','true');
   await page.evaluate(()=>location.hash='d=review&v=explore');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toHaveAttribute('aria-selected','true');await expect(root.locator('#section-build')).toBeHidden();await expect(root.locator('#section-review')).toBeVisible();
-  if(!await root.locator('.reader-contents').isVisible())await toggle.click();await root.locator('.reader-tree-tab').filter({hasText:'Reference'}).click();await root.locator('.reader-tree-tab').filter({hasText:'Reference'}).locator('..').locator('.reader-tree-view').first().click();
+  if(!await root.locator('.reader-contents').isVisible())await toggle.click();await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');await root.locator('.reader-tree-tab').filter({hasText:'Reference'}).locator('..').locator('.reader-tree-view').first().click();
   await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(strip.getByRole('tab')).toHaveCount(1);await expect(strip.getByRole('tab',{selected:true})).toHaveText('Standard');await expect(root.locator('#section-reference')).toBeVisible();
 });
 

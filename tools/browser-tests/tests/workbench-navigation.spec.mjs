@@ -207,13 +207,23 @@ test('#564 buttons share one UI font, never fall back to Arial, and keep monospa
  expect(await arial()).toEqual([]);
 });
 
+/* #607 Workbench rows (contract matrix in reader-contents.spec.mjs):
+   W1 landing | this fixture, 1440x1000, Main story current | Main story and Notes Tab rows aria-expanded=true, Notes shows its View row | expanding only the current Tab in the Workbench reader
+   R1 restore() wins | real click collapses Notes, then a document-title edit re-renders the preview (capture -> restore) | Notes stays aria-expanded=false with 0 View rows; Main story stays expanded | the landing default overriding the saved navigation state */
 test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await open(page,server);const contents=nav(page),sections=id=>contents.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>contents.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
+ const group=label=>contents.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab').filter({hasText:label})}),tabRow=label=>group(label).locator('.reader-tree-tab');
+ await expect(contents.locator('.reader-tab-label')).toHaveText('Main story');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await expect(tabRow('Main story')).toHaveAttribute('aria-expanded','true');await expect(tabRow('Notes')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-view')).toHaveCount(1);await expect(group('Main story').locator('.reader-tree-view')).toHaveCount(2);
  await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','true');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','true');
  await disclosure('engineering').focus();await page.keyboard.press('Enter');await expect(disclosure('engineering')).toBeFocused();await expect(disclosure('engineering')).toHaveAccessibleName('Expand Engineering');await expect(sections('engineering')).toHaveCount(0);await expect(sections('overview')).toHaveCount(2);
  await chooseNavigation(contents,'View','Overview');await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','false');await disclosure('overview').click();await expect(disclosure('overview')).toHaveAccessibleName('Expand Overview');await expect(sections('overview')).toHaveCount(0);
  await chooseNavigation(contents,'View','Engineering');await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','false');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','false');
  await disclosure('engineering').click();await disclosure('overview').click();await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);
+ await tabRow('Notes').click();await expect(tabRow('Notes')).toHaveAttribute('aria-expanded','false');await expect(group('Notes').locator('.reader-tree-view')).toHaveCount(0);
+ await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Edited Product journey');await title.press('Enter');
+ await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await expect(tabRow('Notes')).toHaveAttribute('aria-expanded','false');await expect(group('Notes').locator('.reader-tree-view')).toHaveCount(0);await expect(tabRow('Main story')).toHaveAttribute('aria-expanded','true');await expect(sections('engineering')).toHaveCount(2);
 });
 
 test('Add follows prose tabs and deliberate destination changes while stale source remains blocked',async({page,server})=>{

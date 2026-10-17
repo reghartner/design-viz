@@ -146,7 +146,7 @@ test('reader entering Explore through an ordinary document tab frames its diagra
 
 test('keyboard Contents entry opens the default Explore view of a stepped story',async({page,server})=>{
  await standalone(page,server,steppedFixture());
- const tab=page.locator('.reader-tree-tab').filter({hasText:'Explore story'});await tab.focus();await page.keyboard.press('Enter');
+ const tab=page.locator('.reader-tree-tab').filter({hasText:'Explore story'});await expect(tab).toHaveAttribute('aria-expanded','true');
  const view=page.locator('.reader-tree-view').filter({hasText:/^Explore$/});await view.focus();await page.keyboard.press('Enter');
  await expect(page.locator('#tab-0-1')).toHaveAttribute('aria-selected','true');await expect(view).toBeFocused();
  await expect(page.locator('body')).toHaveClass(/viewer-exploring/);

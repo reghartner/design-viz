@@ -73,7 +73,7 @@ test('Forge Explore height converges when the host resizes its iframe to content
 // 5 listed tab keys work | tab bar focused | each listed key on the two-tab bar: ArrowRight selects+focuses "IoT reconciliation", ArrowLeft "Software request", End "IoT reconciliation", Home "Software request" | a roster row for keys that are not handled
 // 6 button opens the sheet | real click on the "?" button | dialog open; Esc closes it and focuses the "?" button | button unwired
 // 7 bridge untouched | same | the simulated bridge saw only getContext (no navigate/submit/close) while the sheet opened and closed | a "?" handler that routes through the Confluence bridge
-// 8 text input | configuring macro: JSON pasted, Preview rendered (its "?" control visible = contrasting precondition); real click in #spec-input, Ctrl/Meta+End, type "?" | #spec-input value is the pasted JSON + "?"; no dialog open | a "?" that is stolen from the import textarea
+// 8 text input | configuring macro: JSON pasted, Preview rendered (its "?" control visible = contrasting precondition); real click in #spec-input, Ctrl/Meta+A selects its text, type "?" | #spec-input value is exactly "?" (the key reached the field and replaced the selection); no dialog open | a "?" that is stolen from the import textarea
 const FORGE_KEYS=[
   ['?','Open this shortcut sheet'],
   ['Esc','Close this sheet, an open menu or a popover'],
@@ -122,7 +122,7 @@ test('Forge viewer: "?" opens the reader shortcut sheet listing only its keys, n
   const input=configure.locator('#spec-input'),json=JSON.stringify(raw);
   await input.fill(json);await configure.locator('#validate').click();
   await expect(configure.locator('#docview').locator('button:visible').filter({hasText:/^\s*\?\s*$/})).toHaveCount(1);
-  await input.click();await configure.keyboard.press('ControlOrMeta+End');await configure.keyboard.type('?');
-  await expect(input).toHaveValue(json+'?');
+  await input.click();await configure.keyboard.press('ControlOrMeta+a');await configure.keyboard.type('?');
+  await expect(input).toHaveValue('?');
   await expect(configure.locator('dialog[open]')).toHaveCount(0);
 });

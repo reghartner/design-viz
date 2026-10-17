@@ -27,7 +27,7 @@ test('sequencing walkthrough drives all six sequence panels through both endings
   // Steps 6–7: filter, then the in-frame product is explained.
   await next.click();await next.click();
   const frames=panel('frames');
-  await expect(frames.filter({hasText:'12-letter'}).locator('.swnote')).toContainText('keeps the frame');
+  await expect(frames.filter({hasText:'12-letter'}).locator('.swnote')).toContainText('keeps its reading');
   // Step 8: the junction grid fills.
   await next.click();
   await expect(panel('grid').locator('.grid-mark')).toHaveCount(4);

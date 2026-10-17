@@ -413,16 +413,18 @@ function spmPathBBox(commands) {
   if (!box) return null;
   return { x: box.x, y: box.y, width: box.right - box.x, height: box.bottom - box.y };
 }
-/* Scale a chart's absolute path into the 1000-wide viewBox, preserving
-   aspect: `bbox` is the bounding box of the WHOLE chart so every section
-   shares one scale. Accepts a `d` string (absolute commands) or parsed
-   commands; returns {d, scale} or {error}. */
-function spmNormalizePath(d, bbox) {
+/* Scale a chart's absolute path into the panel viewBox, preserving aspect:
+   `bbox` is the bounding box of the WHOLE chart so every section shares one
+   scale. By default the longer side of the chart becomes 1000 units, so both
+   axes land inside the tokenizer's 0–1000 range; `options.scale` overrides
+   the factor. Accepts a `d` string (absolute commands) or parsed commands;
+   returns {d, scale} or {error}. */
+function spmNormalizePath(d, bbox, options) {
   var parsed = typeof d === 'string' ? spmParsePath(d, { relative: true, maxChars: 65536 }) : { commands: d };
   if (parsed.error) return parsed;
-  if (!bbox || !spmFinite(bbox.width) || !spmFinite(bbox.height) || bbox.width <= 0)
+  if (!bbox || !spmFinite(bbox.width) || !spmFinite(bbox.height) || bbox.width <= 0 || bbox.height < 0)
     return { error: 'chart bounding box must have a positive width' };
-  var scale = SPM_VIEW / bbox.width;
+  var scale = options && spmFinite(options.scale) && options.scale > 0 ? options.scale : SPM_VIEW / Math.max(bbox.width, bbox.height);
   var moved = spmTransformPath(spmAbsolutePath(parsed.commands), [scale, 0, 0, scale, -bbox.x * scale, -bbox.y * scale]);
   if (moved.error) return moved;
   return { d: spmPathText(moved.commands), scale: scale };

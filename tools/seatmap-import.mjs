@@ -14,7 +14,7 @@
 
    SVG produces geometry "paths": every <path>, <polygon>, <rect> or <circle>
    whose id or data-section looks like a section id becomes a section with a
-   normalised path in a 1000-wide viewBox. translate/scale/matrix transforms
+   path normalised so the chart's longer side is 1000 units (aspect preserved). translate/scale/matrix transforms
    (own and inherited) are applied; any other transform fails loudly for that
    element. <style> and <script> are ignored, nothing external is read, and no
    script runs. Rings come from --level-map group ids or from the leading
@@ -227,25 +227,42 @@ function elementPath(name, attrs, S) {
   }
   return null;
 }
-/* Drop polyline vertices by smallest triangle area until the path text fits
-   the panel limit. Only M/L/Z paths qualify; returns null for curves. */
+/* Simplify an overlong M/L/Z path to fit the panel limit by dropping the
+   smallest-area vertex across all of its subpaths, one at a time. Every M
+   and Z is kept, so compound sections (an outer ring with a hole, a split
+   section) keep their subpath count and closures; a closed subpath never
+   drops below three points and an open one below two. Curves return null;
+   so does a path that still does not fit at that minimum. */
 export function fitPolyline(commands, S) {
-  if (!commands.every(c => c.cmd === 'M' || c.cmd === 'L' || c.cmd === 'Z')) return null;
-  const closed = commands[commands.length - 1].cmd === 'Z';
-  let pts = commands.filter(c => c.cmd !== 'Z').map(c => [c.args[0], c.args[1]]);
-  const text = list => S.spmPathText(list.map((p, i) => ({ cmd: i ? 'L' : 'M', args: p })).concat(closed ? [{ cmd: 'Z', args: [] }] : []));
-  let removed = 0, d = text(pts);
-  while (d.length > S.SPM_PATH_MAX_CHARS && pts.length > 3) {
-    let best = -1, bestArea = Infinity;
-    for (let i = 1; i < pts.length - 1; i++) {
-      const a = pts[i - 1], b = pts[i], c = pts[i + 1];
-      const area = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]));
-      if (area < bestArea) { bestArea = area; best = i; }
-    }
-    pts.splice(best, 1); removed++;
-    d = text(pts);
+  if (!commands.length || !commands.every(c => c.cmd === 'M' || c.cmd === 'L' || c.cmd === 'Z')) return null;
+  const subs = [];
+  let cur = null, start = null;
+  commands.forEach(c => {
+    if (c.cmd === 'M') { start = [c.args[0], c.args[1]]; cur = { pts: [start.slice()], closed: false }; subs.push(cur); }
+    else if (c.cmd === 'L') {
+      if (!cur) { cur = { pts: [start ? start.slice() : [c.args[0], c.args[1]]], closed: false }; subs.push(cur); }
+      cur.pts.push([c.args[0], c.args[1]]);
+    } else if (cur) { cur.closed = true; cur = null; }
+  });
+  const text = () => S.spmPathText([].concat(...subs.map(sub =>
+    sub.pts.map((p, i) => ({ cmd: i ? 'L' : 'M', args: p })).concat(sub.closed ? [{ cmd: 'Z', args: [] }] : []))));
+  const area = (a, b, c) => Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]));
+  let removed = 0, d = text();
+  while (d.length > S.SPM_PATH_MAX_CHARS) {
+    let best = null, bestArea = Infinity;
+    subs.forEach(sub => {
+      const n = sub.pts.length;
+      if (sub.closed ? n <= 3 : n <= 2) return;
+      for (let i = sub.closed ? 0 : 1; i < (sub.closed ? n : n - 1); i++) {
+        const a = sub.pts[(i + n - 1) % n], b = sub.pts[i], c = sub.pts[(i + 1) % n], v = area(a, b, c);
+        if (v < bestArea) { bestArea = v; best = { sub, i }; }
+      }
+    });
+    if (!best) return null;
+    best.sub.pts.splice(best.i, 1); removed++;
+    d = text();
   }
-  return d.length > S.SPM_PATH_MAX_CHARS ? null : { d, removed };
+  return { d, removed, subpaths: subs.length };
 }
 function inferRing(id) {
   const digits = (id.match(/\d+/) || [''])[0];
@@ -336,11 +353,13 @@ export function importSvg(text, options = {}) {
   const all = [].concat(...sections.map(s => s.commands));
   const bbox = S.spmPathBBox(all);
   if (!bbox || bbox.width <= 0 || bbox.height <= 0) throw new Error('sections have no area');
-  const scale = S.SPM_VIEW / bbox.width;
-  /* The panel accepts viewBox sides of 100–4000; a very flat or very tall
-     chart is clamped so the fragment is never rejected (the content then
-     sits in a strip of the box). */
-  const viewBox = { width: S.SPM_VIEW, height: Math.min(4000, Math.max(100, Math.round(bbox.height * scale))) };
+  /* Scale by the longer side so BOTH axes land inside the tokenizer's 0–1000
+     range while preserving aspect; the viewBox takes the scaled dimensions,
+     each clamped to the panel's 100–4000 range. Clamping only ever enlarges
+     a side, so coordinates stay inside the box. */
+  const scale = S.SPM_VIEW / Math.max(bbox.width, bbox.height);
+  const side = v => Math.min(4000, Math.max(100, Math.round(v * scale)));
+  const viewBox = { width: side(bbox.width), height: side(bbox.height) };
   /* Numeric ring keys sort inside → out; named groups keep first-seen order after them. */
   const seenKeys = [...new Set(sections.map(s => s.ring))];
   const ringKeys = seenKeys.filter(k => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b)).concat(seenKeys.filter(k => !/^\d+$/.test(k)));
@@ -356,7 +375,7 @@ export function importSvg(text, options = {}) {
      limit, and skip anything else that fails the panel's own tokenizer. */
   const out = [];
   sections.forEach(s => {
-    const normalised = S.spmNormalizePath(s.commands, bbox);
+    const normalised = S.spmNormalizePath(s.commands, bbox, { scale });
     let d = normalised.d, simplified = 0;
     if (d.length > S.SPM_PATH_MAX_CHARS) {
       const fitted = fitPolyline(S.spmAbsolutePath(S.spmParsePath(d, { relative: true, maxChars: 1 << 20 }).commands), S);
@@ -414,7 +433,7 @@ export function formatReport(report, inputName) {
   } else {
     lines.push('  sections found: ' + report.found + ' (' + Object.entries(report.kinds).map(([k, v]) => k + ' ' + v).join(', ') + ')');
     lines.push('  rings: ' + report.rings.map(r => r.id + ' "' + r.label + '": ' + r.sections).join(', ') + ' · from ' + report.ringSource);
-    lines.push('  viewBox: ' + report.viewBox.width + '×' + report.viewBox.height + ' (aspect preserved)');
+    lines.push('  viewBox: ' + report.viewBox.width + '×' + report.viewBox.height + ' (aspect preserved; the longer side is 1000 units)');
     const c = report.capacities;
     lines.push('  capacities: ' + c.given + ' from data-capacity, ' + c.defaulted + (c.defaulted ? (c.total != null ? ' filled as an illustrative even split of ' + c.total : ' defaulted to 1 (no --capacity-total)') : ' defaulted'));
     if (report.ignored.length) lines.push('  ignored: ' + [...new Set(report.ignored)].join(', '));

@@ -244,8 +244,70 @@ test('normalised paths never exceed the panel limit: long polylines are simplifi
   assert.deepEqual(validates(fragment), {errors:[], warnings:[]}, 'the fragment validates clean in the real validator');
   const S = {spmPathText: C.spmPathText, SPM_PATH_MAX_CHARS: 2000};
   const square = fitPolyline([{cmd:'M',args:[0,0]},{cmd:'L',args:[10,0]},{cmd:'L',args:[10,10]},{cmd:'L',args:[0,10]},{cmd:'Z',args:[]}], S);
-  assert.deepEqual(square, {d:'M0 0L10 0L10 10L0 10Z', removed:0});
+  assert.deepEqual(square, {d:'M0 0L10 0L10 10L0 10Z', removed:0, subpaths:1});
   assert.equal(fitPolyline([{cmd:'M',args:[0,0]},{cmd:'C',args:[1,1,2,2,3,3]}], S), null);
   const run = cli([SVG, '--level-map', '1:100 level,2:200 level']);
   assert.doesNotMatch(run.stderr, /simplified/);
+});
+
+test('tall and flat charts are scaled by their longer side so every section lands inside 0–1000 and the fragment validates', async () => {
+  const {importSvg} = await importer();
+  const tall = importSvg('<svg viewBox="0 0 10 100"><rect id="101" x="0" y="0" width="10" height="20"/><rect id="102" x="0" y="25" width="10" height="20"/><rect id="103" x="0" y="50" width="10" height="20"/><rect id="104" x="0" y="80" width="10" height="20"/></svg>');
+  assert.deepEqual(tall.fragment.viewBox, {width:100, height:1000});
+  assert.deepEqual(tall.fragment.sections.map(s => s.id), ['101','102','103','104'], 'every section kept');
+  assert.deepEqual(tall.report.skipped, []);
+  for (const s of tall.fragment.sections) {
+    assert.ok(!C.spmParsePath(s.path, {range:[0,1000]}).error, s.id);
+    const nums = s.path.match(/[-\d.]+/g).map(Number);
+    assert.ok(nums.every(v => v >= 0 && v <= 1000), s.id + ' inside the box');
+  }
+  assert.match(tall.fragment.sections[3].path, /1000Z$/, 'the bottom edge reaches 1000');
+  assert.deepEqual(validates(tall.fragment), {errors:[], warnings:[]});
+  const flat = importSvg('<svg><rect id="201" x="0" y="0" width="20" height="10"/><rect id="202" x="25" y="0" width="20" height="10"/><rect id="203" x="50" y="0" width="20" height="10"/><rect id="204" x="80" y="0" width="20" height="10"/></svg>');
+  assert.deepEqual(flat.fragment.viewBox, {width:1000, height:100});
+  assert.equal(flat.fragment.sections.length, 4);
+  assert.deepEqual(validates(flat.fragment), {errors:[], warnings:[]});
+  /* An extremely flat strip: the height is clamped up to 100 without moving coordinates. */
+  const strip = importSvg('<svg><rect id="301" x="0" y="0" width="400" height="1"/><rect id="302" x="500" y="0" width="100" height="1"/><rect id="303" x="700" y="0" width="100" height="1"/><rect id="304" x="900" y="0" width="100" height="1"/></svg>');
+  assert.deepEqual(strip.fragment.viewBox, {width:1000, height:100});
+  assert.ok(strip.fragment.sections.every(s => s.path.match(/[-\d.]+/g).map(Number).filter((v, i) => i % 2 === 1).every(y => y >= 0 && y <= 1)));
+  assert.deepEqual(validates(strip.fragment), {errors:[], warnings:[]});
+  assert.match(C.spmNormalizePath('M0 0 L10 100', {x:0,y:0,width:10,height:100}).d, /^M0 0L100 1000$/, 'the shared helper scales by the longer side by default');
+  assert.equal(C.spmNormalizePath('M0 0 L10 100', {x:0,y:0,width:10,height:100}, {scale: 2}).d, 'M0 0L20 200');
+});
+
+test('compound overlong sections are simplified per subpath: every M and Z survives and each ring keeps its extent', async () => {
+  const {importSvg, fitPolyline} = await importer();
+  const ring = (cx, cy, r, n) => { let d = ''; for (let i = 0; i < n; i++) d += (i ? ' L' : 'M') + (cx + r * Math.cos(i / n * 2 * Math.PI)).toFixed(3) + ' ' + (cy + r * Math.sin(i / n * 2 * Math.PI)).toFixed(3); return d + ' Z'; };
+  const compound = ring(100, 100, 90, 320) + ' ' + ring(100, 100, 40, 320);
+  const svg = '<svg><path id="101" d="' + compound + '"/><rect id="102" x="200" y="0" width="50" height="50"/><rect id="103" x="200" y="60" width="50" height="50"/><rect id="104" x="200" y="120" width="50" height="50"/></svg>';
+  const {fragment, report} = importSvg(svg);
+  const sec = fragment.sections.find(s => s.id === '101');
+  assert.ok(sec, 'the compound section is kept');
+  assert.ok(sec.path.length <= 2000);
+  assert.equal((sec.path.match(/M/g) || []).length, 2, 'both subpaths survive');
+  assert.equal((sec.path.match(/Z/g) || []).length, 2, 'both closures survive');
+  const parts = sec.path.split('M').filter(Boolean).map(part => part.match(/[-\d.]+/g).map(Number));
+  const bbox = nums => ({x0: Math.min(...nums.filter((v, i) => i % 2 === 0)), x1: Math.max(...nums.filter((v, i) => i % 2 === 0)), y0: Math.min(...nums.filter((v, i) => i % 2 === 1)), y1: Math.max(...nums.filter((v, i) => i % 2 === 1))});
+  /* Chart bbox: x 10..250 (outer ring to the rects), y 0..190; the longer side (240) becomes 1000. */
+  const scale = 1000 / 240, ox = 10, oy = 0;
+  const outer = bbox(parts[0]), inner = bbox(parts[1]);
+  for (const [got, want] of [[outer.x0, (10 - ox) * scale], [outer.x1, (190 - ox) * scale], [outer.y0, (10 - oy) * scale], [outer.y1, (190 - oy) * scale], [inner.x0, (60 - ox) * scale], [inner.x1, (140 - ox) * scale], [inner.y0, (60 - oy) * scale], [inner.y1, (140 - oy) * scale]])
+    assert.ok(Math.abs(got - want) < 6, got + ' ≈ ' + want);
+  assert.equal(report.simplified[0].id, '101'); assert.ok(report.simplified[0].removed > 0);
+  assert.deepEqual(validates(fragment), {errors:[], warnings:[]});
+  const S = {spmPathText: C.spmPathText, SPM_PATH_MAX_CHARS: 2000};
+  const two = fitPolyline(C.spmAbsolutePath(C.spmParsePath('M0 0 L10 0 L10 10 L0 10 Z M20 20 L30 20 L30 30 Z', {relative:true}).commands), S);
+  assert.deepEqual(two, {d:'M0 0L10 0L10 10L0 10ZM20 20L30 20L30 30Z', removed:0, subpaths:2});
+  /* An L after Z starts a new subpath at the previous start point. */
+  const after = fitPolyline(C.spmAbsolutePath(C.spmParsePath('M0 0 L10 0 L10 10 Z L5 5 L0 5', {relative:true}).commands), S);
+  assert.equal(after.subpaths, 2); assert.equal(after.d, 'M0 0L10 0L10 10ZM0 0L5 5L0 5');
+  /* Three tiny closed subpaths that cannot shrink below three points each: too long is reported, never merged. */
+  let many = '';
+  for (let i = 0; i < 120; i++) many += 'M' + (i * 7) + ' 0 L' + (i * 7 + 3) + ' 0 L' + (i * 7 + 3) + ' 3 Z ';
+  const tooMany = fitPolyline(C.spmAbsolutePath(C.spmParsePath(many.trim(), {relative:true, maxChars: 1 << 20}).commands), {spmPathText: C.spmPathText, SPM_PATH_MAX_CHARS: 1000});
+  assert.equal(tooMany, null);
+  const skipped = importSvg('<svg><path id="101" d="' + many.trim() + '"/><rect id="102" x="0" y="20" width="10" height="10"/><rect id="103" x="20" y="20" width="10" height="10"/><rect id="104" x="40" y="20" width="10" height="10"/></svg>');
+  assert.equal(skipped.fragment.sections.find(s => s.id === '101'), undefined);
+  assert.match(skipped.report.skipped.find(s => s.id === '101').reason, /characters after normalisation/);
 });

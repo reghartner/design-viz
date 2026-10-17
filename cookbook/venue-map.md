@@ -53,9 +53,17 @@ field it cannot accept.
   with other ids are listed as skipped; shapes without an id are ignored.
 - Shapes are converted to path commands, `translate`/`scale`/`matrix`
   transforms on the element and its ancestors are applied, and all coordinates
-  are normalised to a 1000-wide viewBox preserving aspect. `rotate`, `skewX`,
+  are normalised preserving aspect so that the chart's longer side is 1000
+  units (both axes stay inside the panel's 0–1000 range; the emitted `viewBox`
+  takes the scaled width and height, each at least 100). `rotate`, `skewX`,
   `skewY` and arcs under a rotating matrix fail loudly for that element and
   appear in the report; fix the chart or redraw that section.
+- The panel accepts at most 2,000 characters per path. An overlong straight-edged
+  path (`M`/`L`/`Z`, including compound sections with holes or splits) is
+  simplified by dropping its least significant vertices, every subpath and
+  closure kept, and the report lists each simplified section with the points
+  removed; an overlong path that uses curves (`C`/`Q`/`A`) is skipped with a
+  reason instead, so redraw it with fewer commands.
 - Rings: an ancestor `<g id>` named in `--level-map` wins; otherwise the leading
   digits of the id are the ring (`101` → `1`, `201A` → `2`, `1203` → `12`),
   which is how most arena charts number. The map's labels name the rings

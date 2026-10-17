@@ -58,15 +58,19 @@ the spec and portable HTML. The archive also retains captures omitted from the
 shorter tour; the spec identifies active screens.
 
 - New-build captures came from the local landing page and Workbench on
-  2026-10-07. `agent-first-request-*`, `agent-working-empty-diagram`, and
+  2026-10-07. `agent-working-empty-diagram` and
   `agent-review-ready-empty-diagram` show actual states of a local disk-backed
-  empty-folder fixture. Copy request registers the request before Agent working
-  appears; the ready state follows submission of a candidate spec and ledger.
-  These captures predate #591: the Agent window no longer has a request box,
-  Copy request, Focus/Detail disclosures or Stop accepting this turn. Requests
-  now start in the agent's own conversation (the folder helper's `begin`), and
-  Re-establish session releases a stuck turn. Re-capture the tour before
-  relying on its Agent-window screens or step text.
+  empty-folder fixture: a registered request turns on Agent working, and the
+  ready state follows submission of a candidate spec and ledger. They use an
+  earlier Workbench layout. `agent-connected-empty-diagram` and
+  `reconnect-agent-focused` were retaken on 2026-10-17 from `main` at
+  `003b6f628ebc5ef791b2e927692a043ec4afd751` after #591 removed the Agent
+  window's request box, Copy request, Focus/Detail disclosures and Stop
+  accepting this turn. They show the connected Agent window as it is now:
+  requests start in the agent's own conversation (the folder helper's
+  `begin`), and Re-establish session releases a stuck turn. The setup dialog's
+  focus select was kept by #591, so the `agent-setup-*` and `agent-focus-*`
+  captures are unchanged.
 - `reconnect-*` and `resume-folder.png` show a real saved-folder fixture.
   Focused captures omit one-time connection IDs. Adjacent YOU/CLAUDE dialogue
   is illustrative, not a captured transcript.

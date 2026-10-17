@@ -72,7 +72,6 @@
     "workbench/lifetime.js",
     "workbench/image-nodes.js",
     "workbench/diagram-import.js",
-    "workbench/layers.js",
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",

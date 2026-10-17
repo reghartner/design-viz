@@ -7,32 +7,13 @@ const node=(page,id)=>page.locator('#docview [data-dv-node="'+id+'"]');
 const center=async locator=>{const r=await locator.boundingBox();return {x:r.x+r.width/2,y:r.y+r.height/2};};
 const graphCenter=locator=>locator.evaluate(el=>{const card=el.querySelector('.card'),b=card.getBBox(),m=el.transform.baseVal.consolidate().matrix;return {x:m.e+b.x+b.width/2,y:m.f+b.y+b.height/2};});
 
-test('Layers syncs selection, row and node lock history, source lifecycle, keyboard, read-only preview, SVG export, and Standard/Explore',async({page,server})=>{
- const raw=editorSpec();raw.page.blocks.push({heading:'Notes only',text:'No diagram in this section.'});
- const original=JSON.stringify(raw,null,2);
- await page.goto(server.origin+'/workbench.html');await paste(page,original);
- await page.locator('#editor-tab-layers').click();
- const win=page.locator('#workspace-window-layers'),rows=win.locator('.layer-row');
- await expect(win).toBeVisible();await expect(rows).toHaveCount(3);
- await expect(rows.locator('.layer-title')).toHaveText(['Doorbell','Backend','Storage']);
-
- const search=win.locator('#layers-search');await search.focus();await page.keyboard.press('ArrowDown');
- await expect(rows.first().locator('.layer-select')).toBeFocused();
- await rows.filter({hasText:'Backend'}).locator('.layer-select').click();
- await expect(rows.filter({hasText:'Backend'})).toHaveClass(/is-selected/);
- await expect(node(page,'b')).toHaveClass(/dv-sel/);
- await node(page,'c').locator('.t1').click();
- await expect(rows.filter({hasText:'Storage'})).toHaveClass(/is-selected/);
-
- // A row lock is one source edit and uses the same per-node flags/pins.
- await win.getByRole('button',{name:'Lock all nodes in row 1',exact:true}).click();
- let locked=JSON.parse(await source(page)).page.blocks[0].diagram;
- expect(['a','b','c'].every(id=>locked.nodes[id].locked===true)).toBe(true);
- expect(locked.floats.map(f=>f.id).sort()).toEqual(['a','b','c']);
- await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
-
- const storage=rows.filter({hasText:'Storage'}),lock=storage.locator('.layer-lock');await lock.click();
- await expect(lock).toHaveAttribute('aria-pressed','true');
+// The Layers tab was removed in #611; locks are set from the node's object menu (and Inspect).
+test('object-menu position lock writes one undoable edit and stays out of reader preview and SVG export',async({page,server})=>{
+ const original=JSON.stringify(editorSpec(),null,2);
+ await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ await expect(node(page,'c')).not.toHaveAttribute('data-dv-position-locked','true');await expect(node(page,'c').locator('.dv-position-lock-badge')).toHaveCount(0);
+ await node(page,'c').locator('.t1').click({button:'right'});
+ await page.getByRole('menu',{name:'Object actions'}).getByRole('menuitem',{name:'Lock position',exact:true}).click();
  expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.c.locked).toBe(true);
  await expect(node(page,'c')).toHaveAttribute('data-dv-position-locked','true');
  await expect(node(page,'c').locator('.dv-position-lock-badge')).toHaveAccessibleName('Position locked');
@@ -44,37 +25,19 @@ test('Layers syncs selection, row and node lock history, source lifecycle, keybo
  await page.locator('#close-page-preview').click();
  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
  const svg=await readFile(await (await download).path(),'utf8');expect(svg).not.toMatch(/dv-position-lock|Position locked|data-dv-position-locked/);
- await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
- await expect(storage.locator('.layer-lock')).toHaveAttribute('aria-pressed','false');await expect(page.locator('#undo-builder')).toBeDisabled();
-
- await search.fill('back');await expect(rows).toHaveCount(1);await expect(rows.first()).toContainText('Backend');await search.fill('');
- const navigation=page.locator('#docview .explore-navigation');
- await navigation.getByRole('button',{name:'Next section',exact:true}).click();
- await expect(navigation.locator('.reader-page-label')).toHaveText('Section 2 of 2');
- await expect(win.locator('.layers-empty')).toContainText('no diagram');
- await navigation.getByRole('button',{name:'Previous section',exact:true}).click();
- await expect(navigation.locator('.reader-page-label')).toHaveText('Section 1 of 2');
- await expect(rows).toHaveCount(3);
-
- await page.locator('#src').evaluate(el=>{const raw=JSON.parse(el.value);delete raw.page.blocks[0].diagram;el.value=JSON.stringify(raw,null,2);el.dispatchEvent(new Event('input',{bubbles:true}));});
- await expect(win.locator('.layers-empty')).toContainText('no diagram');
- await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},original);await expect(rows).toHaveCount(3);
-
- await page.locator('#src').evaluate(el=>{const raw=JSON.parse(el.value);raw.page.blocks[0].diagram.layouts[0].presentation='explore';el.value=JSON.stringify(raw,null,2);el.dispatchEvent(new Event('input',{bubbles:true}));});
- await expect(rows).toHaveCount(3);await page.locator('#editor-tab-json').click();await page.locator('#go').click();await expect(page.locator('.workspace-active-section .explore-stage')).toBeVisible();
- await expect(win).toBeVisible();await expect(rows).toHaveCount(3);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await expect(node(page,'c')).not.toHaveAttribute('data-dv-position-locked','true');
 });
 
 test('mixed Shift/Meta and Alt-marquee selections keep pins fixed during pointer drag, nudge, and Auto arrange',async({page,server},info)=>{
  const raw=editorSpec(),d=raw.page.blocks[0].diagram;
  d.rows=[[]];d.floats=[{id:'a',side:'below',x:180,y:120,noSpread:true},{id:'b',side:'below',x:480,y:150,noSpread:true},{id:'c',side:'below',x:760,y:310,noSpread:true}];d.nodes.b.locked=true;
  const base=structuredClone(d.layouts[0]);d.layouts=[{...base,id:'standard',name:'Standard',presentation:'standard'},{...base,id:'explore',name:'Explore',presentation:'explore'}];d.defaultLayout='standard';
- await page.setViewportSize({width:1440,height:950});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await page.locator('#editor-tab-layers').click();
- const win=page.locator('#workspace-window-layers');await expect(win).toBeVisible();await expect(node(page,'b').locator('.dv-position-lock-badge')).toHaveCount(1);
+ await page.setViewportSize({width:1440,height:950});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+ await expect(node(page,'b').locator('.dv-position-lock-badge')).toHaveCount(1);
 
  await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});await expect(page.locator('#docview .dv-sel[data-dv-node]')).toHaveCount(2);
  const platformModifier=process.platform==='darwin'?'Meta':'Control';await node(page,'c').click({modifiers:[platformModifier]});await expect(page.locator('#docview .dv-sel[data-dv-node]')).toHaveCount(3);await node(page,'c').click({modifiers:[platformModifier]});await expect(page.locator('#docview .dv-sel[data-dv-node]')).toHaveCount(2);
- await expect(win.locator('.layer-row').filter({hasText:'Backend'})).toHaveClass(/is-selected/);
  await page.screenshot({path:'/tmp/layers-lite-mixed-selection.png'});await info.attach('locked-and-unlocked-mixed-selection',{body:await page.screenshot(),contentType:'image/png'});
 
  const beforeDrag=await source(page),diagramBefore=JSON.parse(beforeDrag).page.blocks[0].diagram,beforeB=await center(node(page,'b').locator('.card')),box=await node(page,'a').locator('.card').boundingBox();

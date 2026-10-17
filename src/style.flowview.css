@@ -18,23 +18,6 @@ body.sk-daylight{background:#F4F2EC;}
 .errbox{font:500 12px/1.6 'IBM Plex Mono',monospace; color:#FF8B7A; background:#1A0F12;
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 .tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
-.layers-pane{padding:14px;}
-.layers-pane .editor-pane-heading{margin-bottom:12px;}
-.layers-search-label{display:block;margin:8px 0 5px;font:600 11px 'IBM Plex Mono',monospace;color:var(--dtext);}
-.layers-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
-.layer-row-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px;padding:2px 3px;color:var(--dtext);font:600 10px 'IBM Plex Mono',monospace;}
-.layer-row-lock{border:0;background:transparent;color:inherit;padding:4px 6px;border-radius:6px;font:inherit;cursor:pointer;}
-.layer-row-lock:hover{background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--ink);}
-.layer-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:stretch;border:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);border-radius:9px;background:color-mix(in srgb,var(--paper,#fff) 88%,transparent);}
-.layer-row.is-selected{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc);}
-.layer-select,.layer-lock{border:0;background:transparent;color:inherit;cursor:pointer;}
-.layer-select{min-width:0;padding:9px 10px;text-align:left;display:flex;flex-direction:column;gap:2px;border-radius:8px;}
-.layer-title{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.layer-meta{font:10px 'IBM Plex Mono',monospace;color:var(--dtext);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.layer-lock{align-self:center;margin-right:6px;padding:6px 8px;border-radius:7px;font:600 9px 'IBM Plex Mono',monospace;color:var(--dtext);}
-.layer-lock[aria-pressed="true"]{color:var(--ink);background:color-mix(in srgb,var(--acc) 15%,transparent);}
-.layer-select:focus-visible,.layer-lock:focus-visible,.layer-row-lock:focus-visible{outline:2px solid var(--acc);outline-offset:1px;}
-.layers-empty{margin:12px 0;}
 /* claude.ai comment mode with page-owned anchors: the shell's pin cursor and
    hover ring stand down inside the artifact, so the page supplies both.
    Document navigation stays an ordinary control surface. */

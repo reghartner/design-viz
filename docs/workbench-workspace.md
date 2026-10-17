@@ -183,7 +183,7 @@ cancel without changing the spec. Render handwritten JSON edits before starting.
 Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
 Finish **ADD TO STEP** before using the quick connection shortcut.
 
-The left rail opens independent **Agent**, **Inspect**, **Layers**, **Steps**, **Find objects**,
+The left rail opens independent **Agent**, **Inspect**, **Steps**, **Find objects**,
 **JSON**, and **File** windows. Multiple windows can stay open. Drag a header to
 move it, drag its corner to resize, or use arrow keys on those handles (Shift
 moves farther). Close a window with × and reopen it from the rail. Existing
@@ -196,14 +196,10 @@ and ID details. Duplicate section headings retain their section numbers; hover a
 result for its exact source path. Selecting a result keeps the list open;
 **Inspect selection** opens its properties.
 
-**Layers** is a searchable active-section list of ordinary graph nodes in their
-authored placement order. Selecting a layer selects the rendered node without
-adding history. **Lock position** is available in Layers, Inspect, and the node's
-right-click menu; multiple selected nodes expose explicit **Lock selected
-positions** and **Unlock selected positions** commands. Each writes `locked: true`
-as one undoable edit and pins the node's center as explicit free placement. **Lock row**
-does the same for every member with one Undo; it does not create a second kind of
-lock. Unlocking retains the pinned position. Mixed Shift/Ctrl/Cmd selections and
+**Lock position** is available in Inspect and the node's right-click menu;
+multiple selected nodes expose explicit **Lock selected positions** and **Unlock
+selected positions** commands. Each writes `locked: true` as one undoable edit and
+pins the node's center as explicit free placement. Unlocking retains the pinned position. Mixed Shift/Ctrl/Cmd selections and
 box selections keep locked members selected while drag, arrow movement,
 alignment, and distribution move only unlocked members. Auto arrange preserves
 pins and arranges unlocked nodes around them; an all-locked action is a no-op.

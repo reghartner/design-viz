@@ -64,7 +64,7 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080]])test(`desktop pa
 test('Contents changes, tool restoration and the single dock keep desktop controls usable',async({page,server})=>{
   await page.setViewportSize({width:1280,height:720});await page.goto(server.origin+'/workbench.html');
   const source=JSON.stringify(editorSpec(),null,2);await paste(page,source);
-  for(const name of ['brief','layers','steps','outline','json','file']){
+  for(const name of ['brief','steps','outline','json','file']){
     await page.locator('#editor-tab-'+name).click();const win=page.locator('#workspace-window-'+name);
     for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize','.workspace-window-dock'])await hit(win.locator(control));
     await win.locator('.workspace-window-close').click();

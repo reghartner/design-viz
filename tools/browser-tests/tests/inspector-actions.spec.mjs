@@ -301,6 +301,7 @@ const LEGACY_CARD={
    K5 lit | every preset, every skin (editor canvas and the Daylight/Editorial reader pages): a step that lights every node | each styled card's lit stroke differs from its resting stroke by an OKLab distance >= 0.05 or grows by >= 1px, and contrasts with its fill at >= 1.5:1; leaving step mode restores the resting fill and text (editor) and the resting stroke (reader; the editor keeps its dashed step-membership stroke on member cards) | an imperceptible or missing lit highlight on any preset
    K6 selected | every preset, every editor skin: all nodes selected with Enter / Shift+Enter | each styled card's stroke is the dashed ring (stroke-dasharray set, width >= 2, opacity >= .9) and contrasts with the card fill at >= 1.5:1; Escape clears it | a preset whose border hides the selection ring
    K7 export | Download SVG of the styled section (editor, current skin) | the file contains g.node.ns-<token> for every token; reopened, each styled card's computed fill and stroke equal the live card's; the default card keeps the skin card colors | an export that loses or flattens the preset paint
+   K8 tone | every preset, every skin (editor canvas and the reader pages): a step whose `tone` marks every node `alert` | each styled card's computed fill, stroke and title color equal the plain card's under the same tone (the semantic tone replaces the preset) | a preset that hides or recolors a step tone
    H1 Confluence | the Forge viewer page with a pasted styled spec (skin aurora) | rows K1–K4 hold on #docview | a host whose stylesheet lacks the presets
    H2 Backstage | the native host fixture (its camera node carries style rose, skin pastel) | the card has class ns-rose; its fill and title differ from the sibling default card; title contrast >= 4.5:1; the sibling keeps the pastel legacy colors | a scoped host stylesheet that drops or mangles the preset rules */
 const STYLE_TOKENS=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
@@ -309,8 +310,22 @@ function styledDiagram(){
   STYLE_TOKENS.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
   const ids=Object.keys(diagram.nodes);for(let i=0;i<ids.length;i+=4)diagram.rows.push(ids.slice(i,i+4));
   diagram.edges=[{from:'plain',to:'rose'},{from:'rose',to:'teal'}];
-  diagram.steps=[{id:'all',text:'every card lit',nodes:ids},{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}];
+  diagram.steps=[{id:'all',text:'every card lit',nodes:ids},{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'},
+    {id:'tones',text:'every card alert',nodes:ids,tone:Object.fromEntries(ids.map(id=>[id,'alert']))}];
   return diagram;
+}
+/* Row K8: with every node toned `alert`, a styled card must paint exactly like the plain card. */
+async function auditTone(page,scope,skin){
+  const seen=await page.evaluate(scope=>{
+    const out={};for(const g of document.querySelectorAll(scope+' [data-dv-node]')){
+      const card=getComputedStyle(g.querySelector('.card'));
+      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,t1:getComputedStyle(g.querySelector('.t1')).fill,classes:g.getAttribute('class')};
+    }return out;},scope);
+  expect(seen.plain.classes).toMatch(/\btone-alert\b/);
+  for(const token of STYLE_TOKENS){
+    expect(seen[token].classes,skin+' '+token+' toned').toMatch(/\btone-alert\b/);
+    expect({fill:seen[token].fill,stroke:seen[token].stroke,t1:seen[token].t1},skin+' '+token+' alert tone paint').toEqual({fill:seen.plain.fill,stroke:seen.plain.stroke,t1:seen.plain.t1});
+  }
 }
 /* Rows K5/K6: compares the lit (or selected) stroke of every styled card with its resting stroke. */
 async function auditState(page,scope,skin,resting,label){
@@ -377,6 +392,9 @@ test('every node style preset stays readable, bordered and distinct in the edito
     await section.getByRole('button',{name:'Step',exact:true}).click();await section.locator('button.schip').first().click();
     await expect(section.locator('[data-dv-node="rose"]')).toHaveClass(/\blit\b/);
     await auditState(page,'#section-overview',skin,resting,'lit');
+    // K8: the last step tones every card alert.
+    await section.locator('button.schip').last().click();await expect(section.locator('[data-dv-node="plain"]')).toHaveClass(/\btone-alert\b/);
+    await auditTone(page,'#section-overview',skin);
     await section.getByRole('button',{name:'Ambient',exact:true}).click();await expect(section.locator('[data-dv-node="rose"]')).not.toHaveClass(/\blit\b/);
     // Choosing a step chip also selects that step in the editor, whose member cards keep the editor's dashed
     // membership stroke; the fill and text return to rest here, and the reader page below checks the stroke.
@@ -418,6 +436,9 @@ test('the standalone reader paints presets in Daylight and Editorial and keeps t
     await page.getByRole('button',{name:'Step',exact:true}).first().click();await page.locator('button.schip').first().click();
     await expect(page.locator('[data-dv-node="rose"]').first()).toHaveClass(/\blit\b/);
     await auditState(page,'#section-flow',skin,resting,'lit');
+    // K8 in the reader.
+    await page.locator('button.schip').last().click();await expect(page.locator('[data-dv-node="plain"]').first()).toHaveClass(/\btone-alert\b/);
+    await auditTone(page,'#section-flow',skin);
     await page.getByRole('button',{name:'Ambient',exact:true}).first().click();
     await expect(page.locator('[data-dv-node="rose"]').first()).not.toHaveClass(/\blit\b/);
   }

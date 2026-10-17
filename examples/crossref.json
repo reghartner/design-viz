@@ -314,6 +314,13 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
+    "Division": [
+      {
+        "file": "membrane-signal/membrane-signal.html",
+        "family": "membrane-signal",
+        "title": "A signal crosses the membrane and the cell divides"
+      }
+    ],
     "Doorbell": [
       {
         "file": "panel-visibility/panel-visibility.html",
@@ -396,6 +403,13 @@
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
       }
     ],
+    "Foreign DNA": [
+      {
+        "file": "strand-cut/strand-cut.html",
+        "family": "strand-cut",
+        "title": "A bacterium cuts foreign DNA"
+      }
+    ],
     "Forge": [
       {
         "file": "gridseye-bastion/bastion.html",
@@ -408,6 +422,13 @@
         "file": "nestrel-warden/warden.html",
         "family": "nestrel-warden",
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Fragments cleared": [
+      {
+        "file": "strand-cut/strand-cut.html",
+        "family": "strand-cut",
+        "title": "A bacterium cuts foreign DNA"
       }
     ],
     "Frozen + Paged": [
@@ -567,6 +588,13 @@
         "title": "Mirrorline — Event-Store Replication"
       }
     ],
+    "Messenger": [
+      {
+        "file": "membrane-signal/membrane-signal.html",
+        "family": "membrane-signal",
+        "title": "A signal crosses the membrane and the cell divides"
+      }
+    ],
     "Motif": [
       {
         "file": "auralis-presence/presence.html",
@@ -598,6 +626,13 @@
         "file": "panel-visibility/panel-visibility.html",
         "family": "panel-visibility",
         "title": "Show the right panel at the right moment"
+      }
+    ],
+    "Nucleus": [
+      {
+        "file": "membrane-signal/membrane-signal.html",
+        "family": "membrane-signal",
+        "title": "A signal crosses the membrane and the cell divides"
       }
     ],
     "OS Push Network": [
@@ -750,6 +785,20 @@
         "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
       }
     ],
+    "Receptor": [
+      {
+        "file": "membrane-signal/membrane-signal.html",
+        "family": "membrane-signal",
+        "title": "A signal crosses the membrane and the cell divides"
+      }
+    ],
+    "Recognition site": [
+      {
+        "file": "strand-cut/strand-cut.html",
+        "family": "strand-cut",
+        "title": "A bacterium cuts foreign DNA"
+      }
+    ],
     "Recording service": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
@@ -857,6 +906,13 @@
         "file": "halovista-mirrorline/mirrorline.html",
         "family": "halovista-mirrorline",
         "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Restriction enzyme": [
+      {
+        "file": "strand-cut/strand-cut.html",
+        "family": "strand-cut",
+        "title": "A bacterium cuts foreign DNA"
       }
     ],
     "Retry 1": [
@@ -1026,6 +1082,13 @@
         "file": "chime-radar/chime-radar.html",
         "family": "chime-radar",
         "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      }
+    ],
+    "Signal": [
+      {
+        "file": "membrane-signal/membrane-signal.html",
+        "family": "membrane-signal",
+        "title": "A signal crosses the membrane and the cell divides"
       }
     ],
     "Skybridge": [

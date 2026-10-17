@@ -920,6 +920,80 @@ perspectives" of one timeline). Types:
   imported screen as the start. Replacement preserves IDs; removal clears step
   references across paths in one undoable edit. See [App screens](../cookbook/app-screens.md)
   for the complete manual Figma workflow and the illustrative example.
+- `cellscene` — a cell scene: nested compartments in a 560×315 (16:9) frame with
+  authored items that sit in a compartment, cross a membrane, bud into and fuse
+  from vesicles, signal, and a cell that divides. A teaching cartoon: every
+  position, count and event is authored, nothing is simulated, and the panel
+  names no real organism. Declare `label` (scene title inside the frame, ≤40
+  characters, e.g. "a plant cell"), 1–8 `compartments:[{id,kind,label?,parent?,
+  x?,y?,rx?,ry?}]` and 1–8 `items:[{id,role,shape?,label?,size?,start:{in,x?,y?,
+  count?,state?}}]`. Ids are letter-led (letters, digits, `-`, `_`). Compartment
+  `kind` is `outside` (the frame itself; its label sits bottom-right), `cell`
+  (membrane outline, default centre 312,160 and radii 150×102), `nucleus` (a
+  circle with a dashed envelope, default 352,158 r 42, nested in the cell unless
+  `parent` says otherwise), `vesicle` (small dashed circle, r 18), `organelle`
+  (small ellipse 26×15) or `region` (an unfilled labelled area, default left of
+  the nucleus). `parent` nests; unknown parents and parent cycles warn and
+  render flat. One cell, one nucleus and at most four vesicles/organelles
+  render; later ones warn and are skipped. `x,y` are scene units (0–560 ×
+  0–315) and `rx,ry` positive radii; omitted geometry follows the cell. Item
+  `role` is a shared mechanism role (`enzyme polymerase ribosome primer cap
+  protein particle cargo vesicle virus ion`; unknown warns and uses
+  `particle`), `shape` one of `blob clamp lobes wedge cap dot pill spiky box`
+  (default from the role), `label` ≤16 characters (default the id), `size`
+  `s|m|l`. `start.in` names a declared compartment (unknown warns and uses the
+  first), `x,y` place the item (omitted: the compartment's anchor), `count` is
+  0–50 (default 1; 0 or `state:"hidden"` hides the item; 2 or more draws a
+  deterministic golden-angle cluster of dots, > 12 at 3.5 px, > 30 with a
+  "×N" tag) and `state` is `free|bound|active|released|hidden`. Starting and
+  step state accept `items`, `events`, `zoom`, `highlight`, `labels`,
+  `caption` and `note`. `items` is an object keyed by item id that merges per
+  id into the carried item: `{in?,x?,y?,count?,state?,label?,daughter?:1|2|
+  null}`; an id set to `null` returns that item to its declared `start`;
+  unknown ids and invalid values warn and are ignored without touching the
+  other keys, and an item whose `in` names an unknown compartment warns and
+  falls back to its declared start compartment. `events` (≤4, run in order on
+  that step only, never carried) are `{kind:"enter",item,to,via?}` (sets the
+  item's `in`; while animating the item travels to the membrane of `via` or
+  `to`, shrinks, a crossing ripple plays and it settles at its new `x,y`;
+  author `in` directly to relocate without the crossing),
+  `{kind:"bud",vesicle,from,items?}` (a dashed vesicle appears around the listed
+  items, which now sit in it; it follows its contents' positions and is carried
+  until it fuses), `{kind:"fuse",vesicle,with,to?}` (removes the vesicle and
+  moves its contents' `in` to `to`, default `with`; a ripple plays on the
+  boundary of `with`), `{kind:"divide",daughters?:[{items:[ids]},{items:[ids]}]}`
+  (carried as `divided`; the cell is drawn as two daughters, 0.54 rx × 0.8 ry
+  at ±(0.62 rx + 14), with a nucleus each; nested compartments and items follow
+  the daughter named by the event or their `daughter` field, else the nearer
+  one; a second divide on the same path warns and is skipped) and
+  `{kind:"signal",at:itemId|compartmentId,rings?:1–3}` (pure transient rings).
+  Events naming unknown ids, a fuse of a vesicle that has not budded on that
+  path, and more than four events warn with the exact path. `zoom` frames one
+  compartment with a 12 % margin and glides there (`null` = whole scene);
+  `highlight` outlines one compartment; `labels` are ≤4 `{at:{x,y} | item or
+  compartment id, text}` callouts (a full list each time); `caption` is one
+  line under the title inside the frame. `enterOnce` applies any of these for
+  one step. The model and renderer read the declaration from the panel on
+  every call. Item and callout ids are resolved at render; events are
+  resolved against the declaration the fold is given, so an engine-level
+  per-step declaration change applies without panel code. Under that rule
+  an event that validation reports as skipped never changes carried state.
+  The host keeps only glide history and the last settled scene markup, which
+  is recomputed from the current declaration on every render and decides
+  whether an overlay-only change can patch: a change to the scene (from
+  state or from the declaration, such as compartments, items or their labels)
+  rebuilds it, and an overlay-only change patches with the new text. Markup is always the
+  settled end state: moved items, vesicles, nuclei and daughters glide from
+  their previous place; crossing ripples, signal rings, bud/fuse ripples and
+  the pinching parent outline are one-shot transients emitted only while
+  animating; seeking, reduced motion and `animate:false` land instantly with no
+  panel timers. The legend lists `particle · cytoplasm`, `cargo ×6 · vesicle`,
+  the nucleus and `cell · 1` / `1 → 2` / `2` as real text, and the frame's
+  `aria-label` narrates the settled state. Alternate paths fold independently.
+  `cellsceneModel(panel, state)` returns the resolved geometry `{compartments,
+  geom, daughters, items:[{id,role,shape,x,y,w,h,count,state,in,inLabel,
+  visible,daughter,cluster}], vesicles, zoom, highlight, labels, transients,
+  legend, aria}`.
 - `image` — a static embedded screenshot or illustration:
   `{"id":"ui","type":"image","title":"Backstage preview","src":"data:image/jpeg;base64,...","alt":"Service page showing its inline diagram","caption":"Local preview with fictional data","link":"https://example.com/source"}`.
   `src` accepts only base64 PNG, JPEG or WebP data URLs, up to 512 KiB decoded
@@ -1158,6 +1232,95 @@ perspectives" of one timeline). Types:
   sourced read/write policy outcomes. This panel does not elect a leader,
   simulate consensus, compare opaque LSN/version strings, or infer freshness.
   See [replication recipe](../cookbook/replica-positions.md).
+- `strandscene` — strand scene: one or two lettered (or beaded) nucleotide
+  strands as an animated 560×315 cartoon with named sites and actors that
+  scan, bind, cut, join, extend, pair and unwind them, one beat per step, for
+  teaching "a protein recognises this site and does this to it":
+  `{"id":"cut","type":"strandscene","label":"restriction cut",
+  "sequence":"ACGTTGCAGAATTCTAGGCATCGA","strands":2,"sites":[{"id":"s1",
+  "from":9,"to":14,"label":"cleavage site","cutAfter":{"upper":9,"lower":13}}],
+  "actors":[{"id":"enz","role":"enzyme","label":"enzyme","start":{"at":{"x":470,
+  "y":60},"state":"free"}}],"initial":{"caption":"Recognition site marked."}}`.
+  Declare `sequence` (string, 6–60 letters after whitespace removal, upper-cased;
+  missing or empty warns and the panel renders empty; fewer than 6 warns and
+  still renders; more than 60 warns and renders the first 60; letters outside
+  the alphabet warn and render as unknown), `alphabet` (`dna` ACGTN default or
+  `rna` ACGUN; `protein` only with `beads:true`, otherwise it warns and uses
+  dna), `beads` (`true` draws numbered beads instead of letters for
+  protein-level cartoons), `strands` (`1` default or `2`; with 2 the lower
+  strand is the reverse complement unless `lower` gives letters of the same
+  length — a different length or non-string warns and uses the complement),
+  `start` (1-based coordinate of letter 1, safe integer ≥ 1, default 1),
+  optional `label` (title drawn inside the frame), `sites` (≤ 8
+  `{id,from,to,label?,tone?,cutAfter?:{upper,lower?}}`: 1-based inclusive
+  ranges within the strand; `cutAfter` names the letter after which each
+  strand is cut, `lower` defaulting to `upper` for a blunt cut and both
+  defaulting to the site's middle letter; a position outside
+  `start`…`last−1`, a bad range, tone or label, a missing or duplicate id
+  warns by exact path such as `panels[0].sites[1].cutAfter.upper`; more than
+  8 warns and the rest are dropped), `actors` (array of up to 6
+  `{id,role,shape?,label?,size?,start?:{at?,state?}}`: letter-led unique ids;
+  `role` one of `enzyme polymerase ribosome primer cap protein particle cargo
+  vesicle virus ion` (unknown warns and uses protein), `shape` one of `blob
+  clamp lobes wedge cap dot pill spiky box` (default from the role), `size`
+  `s|m|l` (default m), `label` ≤ 16 characters shown on the shape (default
+  the role name); `[]` is valid while authoring, a missing array warns, more
+  than 6 warns) and `initial`. State (sparse, carried; `null` clears):
+  `actors` — an object keyed by actor id whose entries `{at?,state?,label?}`
+  **merge per id** over the carried value (`at` is a strand coordinate, which
+  places the actor on the upper strand at that letter and makes it follow
+  that piece after a cut, or `{x,y}` in scene units 0–560 × 0–315; `state`
+  one of `free scanning binding bound active released` — `bound`/`active`
+  grip the strand and light the site letters, `scanning` dims letters already
+  passed, `released` lifts and fades; `null` for an id resets it to its
+  declared start; an unknown id warns `steps[2].panels.cut.actors.zz` and is
+  ignored; an all-invalid patch keeps the carried actor). `events` — ≤ 4
+  one-shot `{kind,…}` that belong only to the step that authored them:
+  `{kind:"cut",site}` (appends `{site,upper,lower}` to the carried `cuts`
+  once per site), `{kind:"join",site}` (removes that cut), `{kind:"extend",
+  strand:"upper"|"lower",letters}` (1–12 letters appended to that strand's
+  carried `extended` text, ≤ 24 per strand; `lower` needs `strands:2`),
+  `{kind:"pair"}` (sets carried `paired:true`; needs two strands),
+  `{kind:"unwind",from,to}` (sets carried `unwound` so the lower letters in
+  that range drop away and lose their rungs) and `{kind:"flash",at}`; an
+  unknown kind, site (`….events[0].site`), strand, letter count or range
+  warns and that event is ignored; more than 4 warns. `paired` — boolean;
+  `false` hides the second strand until a `pair` event. `camera` — `{from,
+  to}` window: only those coordinates render and the strand re-centres on
+  them; `null` shows all. `highlight` — a site id drawn brighter; `null`
+  none; unknown ids warn against the effective sites. `labels` — full
+  snapshot of ≤ 4 `{at: coordinate | {x,y}, text}` callouts drawn as tags
+  (coordinate callouts follow their piece). `caption` (one line under the
+  title inside the frame, ≤ 90 characters), `note`, `enterOnce`. Unknown
+  state fields warn and are ignored; a step may change only state, never
+  the declaration fields. The model, renderer and fold read the declaration
+  from the panel on every call and cache nothing derived from it. Display: two backbone rails with rungs between paired letters
+  (letters coloured by residue through the shared `.bio-b-*` classes), a
+  ruler every five letters that disappears once pieces drift, dashed site
+  boxes with a tag, actors drawn from the shared shape library with the role
+  label inside, and legend chips such as `enzyme · bound` under the frame. A
+  cut splits the strands into persistent pieces that glide apart (±28 x,
+  ±22 y) keeping the single-stranded overhang visible, with a red cut mark
+  and ripple that fade; `extend` appends letters that fade in with a 120 ms
+  stagger as the scene re-centres; `pair` fades the second strand in with
+  its rungs appearing left to right; a `bind` ripple plays when an actor
+  becomes bound and its legend chip pulses. Motion is described to the
+  shared lifecycle (glide, transient, pulse, settle, patch): the markup is
+  always the settled end state, seek and reduced motion land instantly, the
+  panel owns no timers, and an overlay-only change (caption, highlight,
+  labels, note) swaps the overlay without rebuilding the scene. The host keeps
+  only glide history and the last settled scene markup, recomputed from the
+  current declaration on every render: a declaration change that alters the
+  scene (sequence, strands, sites, actors) rebuilds it, and one that alters
+  only overlay text (such as `label`) patches the overlay. The `<svg>`
+  carries `role="img"` with an `aria-label` narrating the settled state
+  ("Double strand 1 to 24; cleavage site 9 to 14; enzyme bound at 11; cut
+  after 9 and 13; product A …"); legend chips and the note are real text.
+  `strandsceneModel(panel,state)` returns the resolved geometry (`layout`,
+  `pieces`, `letters`, `lowerLetters`, `rungs`, `sites`, `actors`, `labels`,
+  `cuts`, `legend`, `aria`) and `strandsceneHTML(panel,state)` the settled
+  markup. This panel owns the shared `.mech-*` rules reused by `cellscene`.
+  Desktop-only editing.
 - `table` — a data snapshot for database records, cache entries, payloads,
   or desired/reported device state. Declare 1–4 columns with unique string
   ids: `{"id":"data","type":"table","title":"Order record",

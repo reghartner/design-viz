@@ -189,14 +189,19 @@ test('hostile declare values never throw, never mutate the spec and never pollut
     {constructor:{prototype:{polluted:true}}, prototype:{polluted:true}},
     Object.fromEntries(Array.from({length:5000}, (_, i) => ['k' + i, i])),
     {max:Infinity, unit:NaN, title:'<img src=x onerror=alert(1)>'},
+    {unit:'<img src=x onerror=alert(1)>', columns:[{id:'k', label:'<img src=x onerror=alert(1)>'}]},
     null, 7, 'text', true,
   ];
   /* Specs are parsed JSON, so every hostile value is JSON-representable. */
+  let escaped = 0;
   for (const value of hostile) {
     const d = fixture();
     d.steps[1].panels.g.declare = value;
     d.steps[2].panels.t.declare = value;
     d.steps[2].panels.g.enterOnce = {declare: value};
+    /* The alternate path (s1, s5) must exercise hostile values too. */
+    d.steps[4].panels.g = {declare: value, enterOnce: {declare: value}};
+    d.steps[4].panels.t.declare = value;
     const before = JSON.stringify(d), frozen = freeze(d);
     assert.doesNotThrow(() => validate(frozen));
     for (const route of ['happy', 'alt']) {
@@ -204,9 +209,15 @@ test('hostile declare values never throw, never mutate the spec and never pollut
       let folded, decls;
       assert.doesNotThrow(() => { folded = C.foldPanelStates(sub); decls = C.foldDiagramPanelDeclarations(sub); });
       (sub.panels || []).forEach(panel => {
-        const states = folded[panel.id] || [], host = {querySelector(){ return null; }, querySelectorAll(){ return []; }};
-        states.forEach((state, i) => assert.doesNotThrow(() => C.renderPanelBody(host, decls[panel.id][i] || panel, state, 'aurora', states, i, false)));
-        if (host.innerHTML) assert.doesNotMatch(host.innerHTML, /<img src=x/);
+        const states = folded[panel.id] || [];
+        states.forEach((state, i) => {
+          const host = {querySelector(){ return null; }, querySelectorAll(){ return []; }};
+          assert.doesNotThrow(() => C.renderPanelBody(host, decls[panel.id][i] || panel, state, 'aurora', states, i, false));
+          if (host.innerHTML) assert.doesNotMatch(host.innerHTML, /<img src=x/, route + ' ' + panel.id + ' step ' + i);
+          const decl = decls[panel.id][i];
+          if (decl && typeof decl.unit === 'string' && decl.unit.includes('<img') && panel.id === 'g') { escaped++; assert.match(host.innerHTML, /&lt;img src=x/); }
+          if (decl && Array.isArray(decl.columns) && decl.columns.some(c => c && String(c.label).includes('<img')) && panel.id === 't') { escaped++; assert.match(host.innerHTML, /&lt;img src=x/); }
+        });
       });
     }
     assert.equal(JSON.stringify(d), before, 'spec untouched');
@@ -214,6 +225,7 @@ test('hostile declare values never throw, never mutate the spec and never pollut
     assert.equal(C.Object ? C.Object.prototype.polluted : undefined, undefined);
     assert.equal(vm.runInContext('({}).polluted', C), undefined, 'context Object.prototype not polluted');
   }
+  assert.ok(escaped >= 4, 'rendered markup payloads were checked on both paths (' + escaped + ')');
 });
 
 test('the rest of a patch is validated against the effective declaration on its own path', () => {

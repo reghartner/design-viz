@@ -129,6 +129,16 @@ function createBuilderSession(options){
       if(disposed || !plan || plan.error)return false;
       var before=text(),expected=hooks && hooks.snapshot;
       if(expected && (expected.text!==before || expected.project!==project))return false;
+      /* Locks are pins (#617): re-pin locked nodes this plan moved, in the same
+         undo step. exactSource paths (file import, Agent proposals) publish the
+         reviewed text unchanged. */
+      if(!(hooks && hooks.exactSource) && typeof builderPinMovedLocks==='function'){
+        var pinned=builderPinMovedLocks(before,plan.text);
+        if(pinned){
+          pinned.edits.forEach(function(edit){if(typeof plan.start==='number' && edit.at<=plan.start){plan.start+=edit.delta;if(typeof plan.end==='number')plan.end+=edit.delta;}});
+          plan.text=pinned.text;
+        }
+      }
       var nextContext=hooks && hooks.topologyContext || topologyContext;
       if(nextContext){
         try{

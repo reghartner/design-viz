@@ -1449,7 +1449,7 @@ function initWorkbenchBuilder(opts){
         return {raw:raw,topologyContext:nextContext};
       },
       publish:function(text,prepared){
-        return session.accept({text:text},{topologyContext:prepared.topologyContext,
+        return session.accept({text:text},{topologyContext:prepared.topologyContext,exactSource:true,
           beforePublish:function(){beforeImported('file');},afterRender:function(){afterImported(prepared.raw);}});
       }
     },current);
@@ -1557,7 +1557,7 @@ function initWorkbenchBuilder(opts){
           var restored=session.restoreHistoryText(value.source);rehighlight();if(stepList)stepList.sync();if(storyBrief)storyBrief.refresh();return restored;
         }};
       }
-      var accepted=session.accept({text:text},{snapshot:snapshot,history:history,topologyContext:context,beforePublish:function(){
+      var accepted=session.accept({text:text},{snapshot:snapshot,history:history,topologyContext:context,exactSource:true,beforePublish:function(){
         if(paired)agentOptions.setLedger(proposal.ledger);
         clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();if(guide)guide.hidden=true;
       },afterRender:function(plan,result){

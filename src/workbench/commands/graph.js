@@ -28,12 +28,14 @@ function planSetNodesLocked(text,raw,sectionIdx,nodeIds,locked){
   var changed=ids.filter(function(id){return (got.d.nodes[id].locked===true)!==locked;});
   if(!changed.length)return {noop:true};
   var positions=layout(got.d).pos;
+  /* The flag alone pins the node where it is: a row node keeps its slot, so
+     no neighbour re-spaces. The session lock guard lifts it to a float when a
+     later edit would move it (builderPinMovedLocks). */
   return builderRewrite(text,raw,got.path,function(d){
     changed.forEach(function(id){if(locked)d.nodes[id].locked=true;else delete d.nodes[id].locked;});
     if(locked){
       var missing=changed.find(function(id){return !positions[id];});
       if(missing)return {error:'Place “'+missing+'” in the diagram before locking its position.'};
-      builderFreezeLockedPositions(d,positions,ids);
     }
   });
 }

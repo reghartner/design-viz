@@ -6,8 +6,10 @@ function builderLockedNodeIds(d,ids){
   return Object.keys(nodes).filter(function(id){return (!wanted || wanted.has(id)) && nodes[id] && nodes[id].locked===true;});
 }
 function builderNodePositionLocked(d,id){return !!(d && d.nodes && d.nodes[id] && d.nodes[id].locked===true);}
-/* A pin is an absolute float. Lifting raw-authored locked row nodes here makes
-   old/manual JSON obey the same invariant as the Inspect and object-menu controls. */
+/* A lock keeps a row node in its slot, so locking moves no neighbour. A plan
+   that would move a locked node lifts it here into an absolute noSpread float
+   at its current position (placement plans directly, every other accepted plan
+   through builderPinMovedLocks); old locks already are floats. */
 function builderFreezeLockedPositions(d,positions,onlyIds){
   var locked=builderLockedNodeIds(d,onlyIds),wanted=new Set(locked);if(!locked.length)return false;
   var before=JSON.stringify([d.rows,d.floats]);
@@ -29,6 +31,45 @@ function builderFreezeLockedPositions(d,positions,onlyIds){
   });
   locked.forEach(function(id){var p=positions[id];if(p && !found.has(id))d.floats.push({id:id,side:'below',x:p.cx,y:p.cy,noSpread:true});});
   return JSON.stringify([d.rows,d.floats])!==before;
+}
+/* Session lock guard (#617). Any accepted plan may re-space a row, the group
+   band, lane gaps or spread floats. Every node locked before AND after the plan
+   whose center moved returns to its pre-plan center as a noSpread float; only
+   those nodes' placement entries change. Sections pair by index and heading.
+   Returns null when nothing moved; edits lists each rewrite's start and length
+   change so callers can keep a plan's source range. */
+function builderPinMovedLocks(beforeText,afterText){
+  if(typeof beforeText!=='string' || typeof afterText!=='string' || beforeText.indexOf('"locked"')<0)return null;
+  var beforeRaw,afterRaw;try{beforeRaw=JSON.parse(beforeText);afterRaw=JSON.parse(afterText);}catch(ex){return null;}
+  function layoutable(d){return !!d && typeof d==='object' && d.nodes && typeof d.nodes==='object' && Array.isArray(d.rows) && d.rows.length>0 && d.rows.every(Array.isArray);}
+  var afterRecs=specSectionPaths(afterRaw),text=afterText,edits=[];
+  specSectionPaths(beforeRaw).forEach(function(rec,i){
+    var next=afterRecs[i];if(!next)return;
+    var bs=specValueAt(beforeRaw,rec.section),as=specValueAt(afterRaw,next.section);
+    if((bs && bs.heading)!==(as && as.heading))return;
+    var bd=specValueAt(beforeRaw,rec.diagram),ad=specValueAt(afterRaw,next.diagram);
+    if(!layoutable(bd) || !layoutable(ad))return;
+    var ids=builderLockedNodeIds(bd).filter(function(id){return builderNodePositionLocked(ad,id);});if(!ids.length)return;
+    var copy=builderClone(ad),changed=false;
+    try{
+      var before=layout(bd).pos;
+      /* Lifting one pin can shift another locked row node; each round pins at
+         least one more, so this ends within ids.length rounds. */
+      for(var round=0;round<ids.length;round++){
+        var now=layout(copy).pos,moved=ids.filter(function(id){return before[id] && now[id] && (now[id].cx!==before[id].cx || now[id].cy!==before[id].cy);});
+        if(!moved.length)break;
+        builderFreezeLockedPositions(copy,before,moved);changed=true;
+      }
+    }catch(ex){return;}
+    if(!changed)return;
+    ['rows','floats'].forEach(function(key){
+      if(JSON.stringify(copy[key])===JSON.stringify(ad[key]))return;
+      var r=planSetFields(text,JSON.parse(text),next.diagram,[[key,JSON.stringify(copy[key])]]);if(r.error)return;
+      var at=0;while(at<text.length && text.charCodeAt(at)===r.text.charCodeAt(at))at++;
+      edits.push({at:at,delta:r.text.length-text.length});text=r.text;
+    });
+  });
+  return text===afterText?null:{text:text,edits:edits};
 }
 function builderPlacementPlan(text,raw,path,before,after){
   var pairs=[];

@@ -229,7 +229,12 @@ try {
   const first=await preview(external);
   await page.locator('#agent-update-close').click();
   for(let index=0;index<40;index++)human=await edit(external,doc=>doc.page.title='Live trial '+index);
+  // The browser re-merges the proposal on a later 250 ms poll than the state.json publication;
+  // a merge landing while the preview is open asks for a fresh review, so reopen it once.
+  await delay(2000);
   await page.locator('#agent-update-open').click();
+  await delay(1000);
+  if(await page.locator('#agent-update-review-refresh').isVisible()){await page.locator('#agent-update-close').click();await page.locator('#agent-update-open').click();}
   await expect(page.locator('#agent-update-note')).toContainText('separate changes');
   await expect(page.locator('#agent-update-view')).toContainText('Front door camera');
   await expect(page.locator('#agent-update-view')).toContainText('Delivery API');

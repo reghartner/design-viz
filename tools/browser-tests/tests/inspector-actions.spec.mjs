@@ -1,4 +1,4 @@
-import {test,expect,paste,inspectPageElement,openInspectorGroup} from '../helpers/test.mjs';
+import {test,expect,paste,inspectPageElement,openInspectorGroup,closeTools} from '../helpers/test.mjs';
 
 const fixture=()=>({page:{title:'Inspector actions',sections:[
   {id:'overview',heading:'Overview',diagram:{autoplay:false,
@@ -221,8 +221,9 @@ test('node style picker applies presets from a modal of rendered samples with mo
   await browse.click();const dialog=page.locator('dialog.node-style-picker');await expect(dialog).toBeVisible();
   const tiles=dialog.locator('.node-style-grid button.node-style-tile');
   const tokens=await tiles.evaluateAll(buttons=>buttons.map(b=>b.dataset.styleId));
-  const styleSet=await page.evaluate(()=>NODE_STYLE_SET);expect(styleSet.length).toBeGreaterThan(8);
-  expect(tokens).toEqual(['',...styleSet]);
+  // The hidden select is the field's own list of tokens; the modal must offer exactly those, default first.
+  const styleSet=(await row.locator('select[aria-label="Node style"] option').evaluateAll(options=>options.map(o=>o.value))).filter(Boolean);
+  expect(styleSet.length).toBeGreaterThan(8);expect(tokens).toEqual(['',...styleSet]);
   for(const token of tokens.slice(1))await expect(dialog.locator('.node-style-tile[data-style-id="'+token+'"] svg .node.ns-'+token+' .card')).toHaveCount(1);
   await expect(dialog.locator('.node-style-tile[aria-pressed="true"]')).toHaveAttribute('data-style-id','rose');
   // P2: ArrowRight from the first tile, Enter applies the second tile.
@@ -297,7 +298,10 @@ test('every node style preset stays readable, bordered and distinct in all nine 
   styleSet.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
   const ids=Object.keys(diagram.nodes);for(let i=0;i<ids.length;i+=4)diagram.rows.push(ids.slice(i,i+4));
   await start(page,server,raw);
-  const live=await page.evaluate(()=>NODE_STYLE_SET);expect(live).toEqual(styleSet);
+  // The hidden Node style select lists the field's tokens; this matrix must cover exactly those.
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="plain"] .t1'));
+  const live=(await page.locator('#guide select[aria-label="Node style"] option').evaluateAll(options=>options.map(o=>o.value))).filter(Boolean);
+  expect(live).toEqual(styleSet);await closeTools(page);
   await page.locator('#workspace-appearance>summary').click();
   const read=()=>page.evaluate(()=>{
     const out={};for(const g of document.querySelectorAll('#section-overview [data-dv-node]')){

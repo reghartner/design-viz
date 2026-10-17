@@ -32,13 +32,36 @@ test('local settings, generated config and upload output are gitignored', () => 
   }
 });
 
+// Each pattern describes one way account or Worker identity could be written down.
+const IDENTITY = [
+  [/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/i, 'a workers.dev address'],
+  [/[a-z0-9-]+\.cloudflareaccess\.com/i, 'an Access team address'],
+  [/\b[0-9a-f]{32}\b/i, 'a 32-hex identifier'],
+  [/^[ \t]*(?:export[ \t]+)?FLOWVIEW_CF_WORKER[ \t]*=[ \t]*["']?[a-z0-9-]+["']?[ \t]*(?:#.*)?$/im, 'a Worker name assignment'],
+  [/FLOWVIEW_CF_WORKER[ \t]*:[=-][ \t]*["']?[a-z0-9-]+/i, 'a Worker name default'],
+  [/"name"\s*:\s*"[a-z0-9-]+"/, 'a hardcoded Worker name'],
+  [/^\s*name\s*=\s*["'][a-z0-9-]+["']/m, 'a wrangler.toml Worker name'],
+  [/--name[=\s]+["']?[a-z0-9-]+/, 'a Wrangler --name argument'],
+  [/\baccount_id\b\s*[:=]/i, 'an account_id setting'],
+];
+function identityIn(text) {
+  return IDENTITY.filter(([re]) => re.test(text)).map(([, what]) => what);
+}
+
+test('the identity check catches each planted form', () => {
+  const planted = [
+    'FLOWVIEW_CF_WORKER=my-worker', 'export FLOWVIEW_CF_WORKER=my-worker', 'FLOWVIEW_CF_WORKER="my-worker"',
+    "FLOWVIEW_CF_WORKER='my-worker' # mine", ': "${FLOWVIEW_CF_WORKER:=my-worker}"', '${FLOWVIEW_CF_WORKER:-my-worker}',
+    '{"name": "my-worker"}', 'name = "my-worker"', 'npx wrangler deploy --name my-worker', 'account_id = "x"',
+    'https://my-worker.team.workers.dev/', 'https://team.cloudflareaccess.com/', '0123456789abcdef0123456789abcdef',
+  ];
+  for (const text of planted) assert.ok(identityIn(text).length, 'missed: ' + text);
+  assert.deepStrictEqual(identityIn('FLOWVIEW_CF_WORKER=\nFLOWVIEW_CF_WORKER="$(sed -n x)"\n"name": "$FLOWVIEW_CF_WORKER"'), []);
+});
+
 test('tracked deploy files name no Worker, address or account', () => {
   for (const rel of ALLOWED) {
-    const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-    assert.doesNotMatch(text, /[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/i, rel + ' contains a workers.dev address');
-    assert.doesNotMatch(text, /[a-z0-9-]+\.cloudflareaccess\.com/i, rel + ' contains an Access team address');
-    assert.doesNotMatch(text, /\b[0-9a-f]{32}\b/i, rel + ' contains a 32-hex identifier');
-    assert.doesNotMatch(text, /^\s*FLOWVIEW_CF_WORKER=[a-z0-9-]+\s*$/m, rel + ' sets a Worker name');
-    assert.doesNotMatch(text, /"name"\s*:\s*"[a-z0-9-]+"/, rel + ' hardcodes a Worker name');
+    const found = identityIn(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+    assert.deepStrictEqual(found, [], rel + ' contains ' + found.join(', '));
   }
 });

@@ -281,3 +281,41 @@ test('hostile strings are escaped everywhere and never become attributes', () =>
   assert.doesNotMatch(C.cellsceneHTML(p, s), /<img/);
   same(plain(s.vesicles), {});
 });
+
+test('events that validation reports as skipped never change carried state', () => {
+  const steps = [
+    {id:'bad-enter', panels:{cell:{events:[{kind:'enter',item:'p',to:'nowhere'},{kind:'enter',item:'ghost',to:'cyt'}]}}},
+    {id:'bad-bud', panels:{cell:{events:[{kind:'bud',vesicle:'v9',from:'nowhere',items:['c']},{kind:'bud',vesicle:'v8',from:'cyt',items:['ghost']}]}}},
+    {id:'fuse', panels:{cell:{events:[{kind:'fuse',vesicle:'v9',with:'cell',to:'out'},{kind:'signal',at:'ghost'}]}}},
+  ];
+  const d = diagram(steps), states = folded(d);
+  const w = validate(d).warnings.join('\n');
+  assert.match(w, /steps\[0\]\.panels\.cell\.events\[0\]\.to: unknown compartment — event skipped/);
+  assert.match(w, /steps\[0\]\.panels\.cell\.events\[1\]\.item: unknown item id — event skipped/);
+  assert.match(w, /steps\[1\]\.panels\.cell\.events\[0\]\.from: unknown compartment — event skipped/);
+  same(states[0].items, {}, 'neither enter event moved anything');
+  same(states[0].events, []);
+  same(Object.keys(states[1].vesicles), ['v8'], 'the bud from an unknown compartment created no vesicle');
+  same(states[1].vesicles.v8.items, [], 'unknown items are not packed into a vesicle');
+  same(Object.keys(states[2].vesicles), ['v8'], 'fusing a vesicle that never budded changes nothing');
+  same(states[2].events, [], 'the signal at an unknown id is skipped');
+  same(C.cellsceneModel(panel(), states[2]).items.find(i => i.id === 'p').in, 'out');
+});
+
+test('a declaration change between renders rebuilds the scene; an overlay-only state change patches', () => {
+  const p = panel(), states = folded(diagram([]));
+  same(states[0].events, [], 'the resting cell has no one-shot event to play');
+  const host = fakeHost();
+  C.renderPanelBody(host, p, states[0], 'aurora', states, 0, false);
+  const first = host.writes;
+  C.renderPanelBody(host, p, {...states[0], caption:'Only the caption.'}, 'aurora', states, 0, true);
+  assert.equal(host.writes, first, 'overlay-only state change patched in place');
+  const relabeled = panel(); relabeled.compartments[2].label = 'cell interior';
+  C.renderPanelBody(host, relabeled, {...states[0], caption:'Only the caption.'}, 'aurora', states, 0, true);
+  assert.equal(host.writes, first + 1, 'a relabelled compartment rebuilt the scene');
+  assert.match(host.html, /cell interior/);
+  const added = panel(); added.compartments[2].label = 'cell interior'; added.items.push({id:'w', role:'virus', label:'intruder', start:{in:'cyt'}});
+  C.renderPanelBody(host, added, {...states[0], caption:'Only the caption.'}, 'aurora', states, 0, true);
+  assert.equal(host.writes, first + 2, 'an added item rebuilt the scene');
+  assert.match(host.html, /data-id="w"/);
+});

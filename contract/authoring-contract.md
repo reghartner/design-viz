@@ -976,7 +976,12 @@ perspectives" of one timeline). Types:
   one step. The model and renderer read the declaration from the panel on
   every call and the fold carries only authored state (ids are resolved at
   render), so an engine-level per-step declaration change applies without
-  panel code; nothing persists on the host except glide history. Markup is always the
+  panel code. Events are resolved against the declaration the fold is given:
+  an event that validation reports as skipped never changes carried state.
+  The host keeps only glide history and the last settled scene markup, which
+  is recomputed from the current declaration on every render and decides
+  whether an overlay-only change can patch; a declaration change always
+  rebuilds the scene. Markup is always the
   settled end state: moved items, vesicles, nuclei and daughters glide from
   their previous place; crossing ripples, signal rings, bud/fuse ripples and
   the pinching parent outline are one-shot transients emitted only while
@@ -1302,7 +1307,10 @@ perspectives" of one timeline). Types:
   shared lifecycle (glide, transient, pulse, settle, patch): the markup is
   always the settled end state, seek and reduced motion land instantly, the
   panel owns no timers, and an overlay-only change (caption, highlight,
-  labels, note) swaps the overlay without rebuilding the scene. The `<svg>`
+  labels, note) swaps the overlay without rebuilding the scene. The host keeps
+  only glide history and the last settled scene markup, recomputed from the
+  current declaration on every render; a declaration change always rebuilds
+  the scene. The `<svg>`
   carries `role="img"` with an `aria-label` narrating the settled state
   ("Double strand 1 to 24; cleavage site 9 to 14; enzyme bound at 11; cut
   after 9 and 13; product A …"); legend chips and the note are real text.

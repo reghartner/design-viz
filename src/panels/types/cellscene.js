@@ -194,31 +194,35 @@ function cellsceneItemPatch(raw) {
      empty object is accepted as a no-op rather than a reset. */
   return any || !Object.keys(raw).length ? out : undefined;
 }
-/* Events are cleaned by shape only; ids are resolved against the declaration
-   by the model, so the fold carries nothing derived from the declaration. */
-function cellsceneCleanEvent(raw) {
+/* Events are resolved against the declaration the fold is given, so an event
+   that validation reports as skipped (unknown item, compartment or vesicle
+   source) never changes carried state. Under per-step declaration overrides
+   the engine folds once per effective declaration, so this stays correct. */
+function cellsceneCleanEvent(raw, decl) {
   if (!panelObject(raw) || CELLSCENE_EVENTS.indexOf(raw.kind) < 0) return null;
   var id = function (value) { return mechId(value) ? value : null; };
+  var comp = function (value) { return id(value) && (!decl || decl.byId[value]) ? value : null; };
+  var item = function (value) { return id(value) && (!decl || decl.itemById[value]) ? value : null; };
   if (raw.kind === 'enter') {
-    if (!id(raw.item) || !id(raw.to)) return null;
-    return { kind: 'enter', item: raw.item, to: raw.to, via: id(raw.via) };
+    if (!item(raw.item) || !comp(raw.to)) return null;
+    return { kind: 'enter', item: raw.item, to: raw.to, via: comp(raw.via) };
   }
   if (raw.kind === 'bud') {
-    if (!id(raw.vesicle) || !id(raw.from)) return null;
-    return { kind: 'bud', vesicle: raw.vesicle, from: raw.from, items: (Array.isArray(raw.items) ? raw.items : []).filter(mechId) };
+    if (!id(raw.vesicle) || !comp(raw.from)) return null;
+    return { kind: 'bud', vesicle: raw.vesicle, from: raw.from, items: (Array.isArray(raw.items) ? raw.items : []).filter(item) };
   }
   if (raw.kind === 'fuse') {
-    if (!id(raw.vesicle) || !id(raw.with)) return null;
-    return { kind: 'fuse', vesicle: raw.vesicle, with: raw.with, to: id(raw.to) || raw.with };
+    if (!id(raw.vesicle) || !comp(raw.with)) return null;
+    return { kind: 'fuse', vesicle: raw.vesicle, with: raw.with, to: comp(raw.to) || raw.with };
   }
   if (raw.kind === 'divide') {
     var daughters = {};
     if (Array.isArray(raw.daughters)) raw.daughters.slice(0, 2).forEach(function (d, i) {
-      if (panelObject(d) && Array.isArray(d.items)) d.items.filter(mechId).forEach(function (iid) { daughters[iid] = i + 1; });
+      if (panelObject(d) && Array.isArray(d.items)) d.items.filter(item).forEach(function (iid) { daughters[iid] = i + 1; });
     });
     return { kind: 'divide', daughters: daughters };
   }
-  if (!id(raw.at)) return null;
+  if (!item(raw.at) && !comp(raw.at)) return null;
   return { kind: 'signal', at: raw.at, rings: isFiniteNum(raw.rings) ? Math.round(clamp(raw.rings, 1, 3)) : 1 };
 }
 function cellsceneCleanLabel(raw) {
@@ -243,7 +247,7 @@ function cellsceneCleanScalars(raw, once) {
 }
 /* Applies one patch's item patches and events to the carried record `c` and
    returns a new record; `events` are the cleaned step-local events. Pure. */
-function cellsceneApply(c, patch) {
+function cellsceneApply(c, patch, decl) {
   var next = {
     items: Object.assign({}, c.items), vesicles: Object.assign({}, c.vesicles), divided: c.divided, daughters: Object.assign({}, c.daughters), events: [],
   };
@@ -266,7 +270,7 @@ function cellsceneApply(c, patch) {
     setItem(id, fields);
   });
   (Array.isArray(patch.events) ? patch.events.slice(0, CELLSCENE_MAX_EVENTS) : []).forEach(function (raw) {
-    var event = cellsceneCleanEvent(raw);
+    var event = cellsceneCleanEvent(raw, decl);
     if (!event) return;
     if (event.kind === 'enter') { leaveVesicle(event.item); setItem(event.item, { in: event.to }); }
     else if (event.kind === 'bud') {
@@ -301,15 +305,16 @@ function cellsceneSnapshot(scalars, c) {
    the carried record in force before each step's patch. Pure. */
 function cellsceneWalk(panel, steps) {
   var scalars = foldSanitizedPanelStates(panel, steps, cellsceneCleanScalars);
+  var decl = cellsceneDecl(panel, null, null);
   var c = { items: {}, vesicles: {}, divided: false, daughters: {}, events: [] };
-  c = cellsceneApply(c, panel.initial);
+  c = cellsceneApply(c, panel.initial, decl);
   c.events = [];
   var before = [], states = [];
   steps.forEach(function (step, i) {
     var source = stepPanelPatch(step), patch = source && panelOwn(source, panel.id) ? source[panel.id] : null;
     before.push(c);
-    var after = cellsceneApply(c, patch);
-    var once = panelObject(patch) && panelObject(patch.enterOnce) ? cellsceneApply(after, patch.enterOnce) : null;
+    var after = cellsceneApply(c, patch, decl);
+    var once = panelObject(patch) && panelObject(patch.enterOnce) ? cellsceneApply(after, patch.enterOnce, decl) : null;
     if (once) once.events = after.events.concat(once.events);
     states.push(cellsceneSnapshot(scalars[i], once || after));
     after.events = [];

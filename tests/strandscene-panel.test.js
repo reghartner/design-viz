@@ -273,3 +273,20 @@ test('overlay-only changes patch the overlay, legend and aria-label without rebu
   const same = {}; const settled = render(same, p, states[1], false); render(same, p, states[1], false);
   assert.equal(render(same, p, states[1], false).html, settled.html, 'an unchanged state re-renders byte-identical markup');
 });
+
+test('declaration changes between renders: overlay text patches from the new declaration, scene changes rebuild', () => {
+  const p = panel(), states = fold(diagram(p, story()));
+  const overlay = {innerHTML:''}, aside = {innerHTML:''}, frame = {setAttribute(){}};
+  let writes = 0;
+  const host = {querySelector(selector){ return selector === '.mech-frame' ? frame : selector === '.mech-overlay' ? overlay : selector === '.mech-aside' ? aside : null; },
+    querySelectorAll(){ return []; }, set innerHTML(value){ this.html = value; writes++; }};
+  C.renderPanelBody(host, p, states[1], 'aurora', states, 1, false);
+  assert.equal(writes, 1);
+  C.renderPanelBody(host, panel({label:'a different cut'}), states[1], 'aurora', states, 1, true);
+  assert.equal(writes, 1, 'a label-only declaration change patches the overlay');
+  assert.match(overlay.innerHTML, /a different cut/i);
+  const reseq = panel({label:'a different cut', sequence:SEQ.split('').reverse().join('')});
+  C.renderPanelBody(host, reseq, states[1], 'aurora', states, 1, true);
+  assert.equal(writes, 2, 'a changed sequence rebuilds the scene');
+  assert.equal(host.html, html(reseq, states[1]));
+});

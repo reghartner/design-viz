@@ -35,3 +35,17 @@ node_modules/
 
 # Generated static library screenshots.
 /workbench/library-thumbnails/
+
+# Cloudflare static deploy (deploy/cloudflare/deploy.sh): only the three files
+# below are tracked. Local settings, generated config, upload output and
+# Wrangler state stay out of git. tests/cloudflare-deploy.test.js enforces it.
+/deploy/cloudflare/*
+!/deploy/cloudflare/README.md
+!/deploy/cloudflare/deploy.sh
+!/deploy/cloudflare/local.env.example
+# Wrangler files created by accident at the repository root.
+/wrangler.json
+/wrangler.jsonc
+/wrangler.toml
+/.wrangler/
+/.dev.vars*

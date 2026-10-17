@@ -73,7 +73,8 @@ test('desktop Contents expands every View by default and preserves independent d
    D2 hash change | real same-document navigation to #d=review&v=explore | Product journey owns, review row current, Reference still expanded | hashchange routing that recollapses groups
    R1 restore() wins | Workbench re-render (workbench-navigation.spec.mjs) | a Tab the reader collapsed stays collapsed after the preview re-renders | the landing default overriding saved state
    E1 Backstage native | twoTabs() mounted through apps/backstage nativeViewer.js (shadow root) | same L1/L2 assertions inside the host | fixing only the standalone viewer
-   E2 Confluence Forge | twoTabs() as the Forge macro config served from /forge/index.html | same L1/L2 assertions in #docview | fixing only the standalone viewer */
+   H1 hosted ?diagram= reader | ?diagram=delivery#d=c&v=explore-bc (human-guide-library.spec.mjs) | linked section current and every Tab/View expanded in #canon-reader | a deep-link landing that expands only the linked Tab
+   Forge: not a row. The Confluence Forge viewer renders through core.renderPage without initViewerExploreCanvas, so it has no Contents panel (checked 2026-10-17: #docview .reader-contents count 0). */
 function twoTabs(){
   const raw=story(),[journey,reference]=raw.page.sections[0].tabs,base=journey.sections[0];
   const section=(id,heading)=>({...structuredClone(base),id,heading});
@@ -125,19 +126,6 @@ test('#607 Backstage native reader lands with every Tab and View expanded',async
   const native=page.locator('#one');await expect(native.locator('.reader-contents')).toBeVisible();await expect(native.locator('.reader-tab-label')).toHaveText('Product journey');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expectAllExpanded(native);
-});
-
-test('#607 Forge reader lands with every Tab and View expanded',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(config=>{window.__bridge={callBridge:async method=>{
-    if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:false}}};
-    if(['submit','close','navigate'].includes(method))return true;
-    throw Error('Unexpected Forge bridge call: '+method);
-  }};},{specJson:JSON.stringify(twoTabs())});
-  await page.goto(server.origin+'/forge/index.html');await expect(page.locator('#app-status')).toBeHidden();
-  const forge=page.locator('#docview');await expect(forge.locator('.reader-contents')).toBeVisible();await expect(forge.locator('.reader-tab-label')).toHaveText('Product journey');
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await expectAllExpanded(forge);
 });
 
 for(const width of [1440,390,320,286])test('Contents geometry, overlay and bounded theme menu at '+width,async({page,server})=>{

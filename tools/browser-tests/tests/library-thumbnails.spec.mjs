@@ -1,4 +1,5 @@
 import {test,expect} from '../helpers/test.mjs';
+import * as thumbnails from '../../canon/thumbnails.mjs';
 import {createThumbnailCapture,thumbnailAsset} from '../../canon/thumbnails.mjs';
 import {publishLibrary} from '../../canon/library.mjs';
 import {mkdir,readFile,writeFile,rm,symlink,readdir,stat,chmod} from 'node:fs/promises';
@@ -91,4 +92,30 @@ test('production capture renders embedded app screens and device apps, and bound
     const large=await capture.capture({id:'large',filename:f.file,spec:raw});expect(large.observed.nodes).toHaveLength(45);expect(large.observed.clippedNodes).toBe(0);expect(large.png.readUInt32BE(16)).toBe(960);expect(large.png.readUInt32BE(20)).toBe(600);expect(large.png.length).toBeLessThan(750*1024);
     raw.page.sections[0].diagram.nodes=Object.fromEntries(Array.from({length:1001},(_,i)=>['n'+i,{title:'Service'}]));await expect(capture.capture({id:'too-large',filename:f.file,spec:raw})).rejects.toThrow(/bounded thumbnail workload/);
   }finally{await capture.close();}
+});
+
+/* #637 FLOWVIEW_CHROMIUM_PATH contract (forks on Alpine / corporate images supply their own Chromium).
+ * row | fixture | assertion (scoped) | rejects
+ * unset | env {} | chromiumLaunchOptions(env) deep-equals {headless:true} | an implementation that always adds --no-sandbox or an executablePath
+ * empty | env {FLOWVIEW_CHROMIUM_PATH:''} | same as unset | treating an empty variable as a path
+ * set | env {FLOWVIEW_CHROMIUM_PATH:'/opt/chromium/chrome'} | deep-equals {headless:true,executablePath:that path,args:['--no-sandbox']} | ignoring the variable, or omitting --no-sandbox (containers run as root)
+ * wired | process.env points at a missing file | createThumbnailCapture rejects naming that path | an exported helper that chromium.launch never uses (launch would still succeed with the bundled browser)
+ */
+test('FLOWVIEW_CHROMIUM_PATH selects a custom Chromium without changing the default launch',async()=>{
+  const options=thumbnails.chromiumLaunchOptions;
+  expect(typeof options).toBe('function');
+  expect(options({})).toEqual({headless:true});
+  expect(options({FLOWVIEW_CHROMIUM_PATH:''})).toEqual({headless:true});
+  expect(options({FLOWVIEW_CHROMIUM_PATH:'/opt/chromium/chrome'})).toEqual({headless:true,executablePath:'/opt/chromium/chrome',args:['--no-sandbox']});
+});
+
+test('createThumbnailCapture launches the Chromium named by FLOWVIEW_CHROMIUM_PATH',async({server})=>{
+  const f=await setup(server),missing=path.join(f.root,'no-such-chromium'),previous=process.env.FLOWVIEW_CHROMIUM_PATH;
+  process.env.FLOWVIEW_CHROMIUM_PATH=missing;
+  try{
+    const outcome=await createThumbnailCapture(f.root).then(async capture=>{await capture.close();return 'launched bundled Chromium';},error=>error.message);
+    expect(outcome).toContain(missing);
+  }finally{
+    if(previous===undefined)delete process.env.FLOWVIEW_CHROMIUM_PATH;else process.env.FLOWVIEW_CHROMIUM_PATH=previous;
+  }
 });

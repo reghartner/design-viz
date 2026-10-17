@@ -92,6 +92,15 @@ test('approved cross-repository targets and structured substitutions resolve onl
   await assert.rejects(loadRepositoryCatalog(sources,reader),/path\/operation/);
 });
 
+// Held back for self-hosted runners older than 2.327.1 (see the workflow's header comment).
+function assertPinnedActions(uses){
+  assert.deepEqual(uses,[
+    'actions/checkout@v4','actions/setup-node@v4',
+    'actions/create-github-app-token@v3','actions/create-github-app-token@v3',
+    'peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676',
+  ]);
+}
+
 test('sync workflow runs trusted code and proposes only the bundled catalog on a stable branch',async()=>{
   const workflow=parseDocuments(await readFile(path.join(root,'.github/workflows/catalog-sync.yml'),'utf8'),'workflow')[0];
   assert.deepEqual(Object.keys(workflow.on).sort(),['repository_dispatch','schedule','workflow_dispatch']);
@@ -101,14 +110,40 @@ test('sync workflow runs trusted code and proposes only the bundled catalog on a
   const pr=steps.find(s=>s.uses?.startsWith('peter-evans/create-pull-request@'));
   assert.equal(pr.with['add-paths'],'workbench/catalog.json');assert.equal(pr.with.branch,'flowview/catalog-sync');
   assert.match(pr.uses,/@[a-f0-9]{40}$/);assert.equal(pr.with['delete-branch'],true);
-  // Held back for self-hosted runners older than 2.327.1 (see the workflow's header comment).
-  assert.deepEqual(steps.filter(s=>s.uses).map(s=>s.uses),[
-    'actions/checkout@v4','actions/setup-node@v4',
-    'actions/create-github-app-token@v3','actions/create-github-app-token@v3',
-    'peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676',
-  ]);
+  assertPinnedActions(steps.filter(s=>s.uses).map(s=>s.uses));
   const exported=steps.find(s=>s.name==='Export and validate catalog');
   assert.match(exported.run,/--sources/);assert.match(exported.run,/--backstage/);assert.match(exported.env.FLOWVIEW_BACKSTAGE_TOKEN,/secrets\.FLOWVIEW_BACKSTAGE_TOKEN/);
+});
+
+/* #637 forks on newer runners may bump catalog-sync actions without editing this test.
+ * row | fixture | assertion (scoped) | rejects
+ * bumped | checkout/setup-node @v5, token @v4, PR at another SHA | assertPinnedActions accepts | an exact-version list
+ * order | checkout and setup-node swapped | rejects | comparing only the set of names
+ * missing | create-github-app-token step dropped | rejects | checking only that each listed action is pinned
+ * extra | an added third-party action | rejects | prefix-matching the expected names
+ * branch | actions/checkout@main | rejects | accepting any ref
+ * unpinned | actions/setup-node with no ref | rejects | splitting on @ without requiring a ref
+ * semver | actions/checkout@v4.2.2 | rejects | anything looser than @vN or a full SHA
+ * short SHA | actions/checkout@ + 12 hex | rejects | accepting abbreviated SHAs
+ * PR tag | peter-evans/create-pull-request@v7 | rejects | letting the PR action use @vN like the others
+ * PR short SHA | peter-evans/create-pull-request@ + 39 hex | rejects | an unanchored SHA match
+ */
+test('catalog-sync action pinning allows forks to bump versions but never to unpin',()=>{
+  const sha='0123456789abcdef0123456789abcdef01234567',pr='peter-evans/create-pull-request@'+sha;
+  const actions=(checkout='actions/checkout@v5',setup='actions/setup-node@v5',create=pr)=>[checkout,setup,'actions/create-github-app-token@v4','actions/create-github-app-token@v4',create];
+  assertPinnedActions(actions());
+  const bad={
+    order:['actions/setup-node@v5','actions/checkout@v5',...actions().slice(2)],
+    missing:actions().filter((_,i)=>i!==3),
+    extra:[...actions().slice(0,4),'someone/else@v1',pr],
+    branch:actions('actions/checkout@main'),
+    unpinned:actions(undefined,'actions/setup-node'),
+    semver:actions('actions/checkout@v4.2.2'),
+    shortSha:actions('actions/checkout@'+sha.slice(0,12)),
+    prTag:actions(undefined,undefined,'peter-evans/create-pull-request@v7'),
+    prShortSha:actions(undefined,undefined,'peter-evans/create-pull-request@'+sha.slice(1)),
+  };
+  for(const [row,uses] of Object.entries(bad))assert.throws(()=>assertPinnedActions(uses),assert.AssertionError,row);
 });
 
 test('CLI rebuilds the catalog from the fake repository with no credentials or network',async t=>{

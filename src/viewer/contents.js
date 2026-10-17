@@ -4,6 +4,8 @@
 function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[];
+  // Closed Contents leaves a numbered rail; hovering it floats the panel over the page.
+  var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
     var paths={'☰':'M4 6h16M4 12h16M4 18h16','‹':'m14 6-6 6 6 6','›':'m9 6 6 6-6 6','«':'M9 4H4v16h16V4h-5M14 8l-4 4 4 4','⋯':'M5 12h.01M12 12h.01M19 12h.01'};
@@ -11,6 +13,7 @@ function createReaderContents(ctl,nav,actions,options){
     el.addEventListener('click',fn);return el;}
   nav.classList.add('reader-navigation');view.classList.add('has-reader-contents');
   var top=element('div','reader-top',null,nav),toggle=button('Open Contents','☰',top,function(){setOpen(!opened,true,true);});
+  element('span','reader-toggle-label','Contents',toggle);element('span','reader-toggle-separator',' · ',toggle).setAttribute('aria-hidden','true');var toggleCount=element('span','reader-toggle-count',null,toggle);
   var breadcrumb=element('div','reader-breadcrumb',null,top),tabLabel=element('span','reader-tab-label',null,breadcrumb);
   var detailSeparator=element('span','reader-detail-separator','/'),detailLabel=element('span','reader-detail-label');detailSeparator.setAttribute('aria-hidden','true');
   var viewStrip=element('div','reader-view-strip',null,top);viewStrip.setAttribute('role','tablist');viewStrip.setAttribute('aria-label','Views in selected Tab');top.appendChild(actions);
@@ -23,13 +26,17 @@ function createReaderContents(ctl,nav,actions,options){
   var zoomOptions=element('div','reader-zoom-options',null,zoomMenu);
   [50,75,100,125,150,200].forEach(function(percent){button('Zoom '+percent+'%',percent+'%',zoomOptions,function(){setZoom(percent/100);zoomMenu.open=false;zoomSummary.focus();});});
   var plus=button('Zoom in','+',zoomGroup,function(){zoomBy(1.25);});
-  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');pager.setAttribute('aria-label','Sections in selected View');
+  var pager=element('div','reader-page-index',null,toolbar);pager.setAttribute('role','group');
   var previous=button('Previous section','‹',pager,function(){pageBy(-1);}),pageLabel=element('span','reader-page-label',null,pager),next=button('Next section','›',pager,function(){pageBy(1);});pageLabel.setAttribute('aria-live','polite');
   var fit=button('Fit','Fit',toolbar,function(){var handled=options.fit && options.fit(current,viewportRecord,owner)!==false;if(!handled && viewportRecord && viewportRecord.viewport && viewportRecord.viewport.isExplore())viewportRecord.viewport.fitCanvas();else if(!handled)setZoom(1);updateZoom();});
   var scrim=button('Close Contents','',nav,function(){setOpen(false,true,true);});scrim.classList.add('reader-scrim');scrim.tabIndex=-1;
   var sidebar=element('aside','reader-contents',null,nav);sidebar.setAttribute('aria-label','Contents');
-  var heading=element('div','reader-contents-heading',null,sidebar);element('strong','','Contents',heading);button('Close Contents','«',heading,function(){setOpen(false,true,true);});
+  var heading=element('div','reader-contents-heading',null,sidebar);element('strong','','Contents',heading);
+  var pin=button('Pin Contents open','Pin',heading,function(){setOpen(true,true,true);});pin.classList.add('reader-contents-pin');pin.hidden=true;
+  pin.insertAdjacentHTML('afterbegin','<svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 4H6l4-4zM12 14v6"/></svg>');
+  var unpin=button('Close Contents','«',heading,function(){setOpen(false,true,true);});
   var tree=element('div','reader-contents-tree',null,sidebar);
+  var rail=element('nav','reader-rail',null,nav),railList=element('ol','reader-rail-list',null,rail),railCount=element('div','reader-rail-count',null,rail);rail.setAttribute('aria-label','Section rail');rail.hidden=true;
   var destinations=element('div','reader-document-links',null,sidebar);
   (ctl.documentDestinations || []).forEach(function(item){
     var row=element('div','reader-document-link',null,destinations),link=element('a','reader-button',item.label,row);link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
@@ -49,9 +56,10 @@ function createReaderContents(ctl,nav,actions,options){
   }
   function focusable(){return Array.from(sidebar.querySelectorAll('button,summary,a[href],input')).filter(function(el){return el.getClientRects().length && !el.disabled;});}
   function setOpen(value,focus,remember){
+    var overlay=hovering;if(overlay)hideOverlay(true);
     opened=value;sidebar.hidden=!value;scrim.hidden=!value || !narrow;view.classList.toggle('reader-contents-open',value);toggle.setAttribute('aria-expanded',String(value));toggle.setAttribute('aria-label',value?'Close Contents':'Open Contents');toggle.title=value?'Close Contents':'Open Contents';
     if(remember && options.onOpenChange)options.onOpenChange(value);
-    if(!value)themeMenu.open=false;geometry();
+    if(!value)themeMenu.open=false;if(overlay)drawTree();geometry();
     if(focus)(value?tree.querySelector('[aria-current="page"]') || focusable()[0]:toggle).focus({preventScroll:true});
   }
   function geometry(){
@@ -64,15 +72,29 @@ function createReaderContents(ctl,nav,actions,options){
     var nextNarrow=rect.width<=670;if(nextNarrow!==narrow){narrow=nextNarrow;nav.classList.toggle('reader-narrow',narrow);
       // A desktop push sidebar must not become an unsolicited modal overlay.
       if(narrow && opened){var focused=root.activeElement || doc.activeElement;setOpen(false,sidebar.contains(focused),false);}
+      if(narrow && hovering)hideOverlay();
     }
     if(opened===null){opened=!narrow;sidebar.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));toggle.setAttribute('aria-label',opened?'Close Contents':'Open Contents');toggle.title=opened?'Close Contents':'Open Contents';view.classList.toggle('reader-contents-open',opened);if(options.onOpenChange)options.onOpenChange(opened);}
     var containerRect=options.container && (options.container!==document.body || host) && options.container.getBoundingClientRect();if(containerRect)bottom=Math.min(bottom,containerRect.bottom);
     var width=Math.max(0,Math.min(284,rect.width-42));
-    sidebar.style.left=rect.left+'px';sidebar.style.top=rect.bottom+'px';sidebar.style.width=width+'px';sidebar.style.height=Math.max(0,bottom-rect.bottom)+'px';
+    var railShown=!opened && !narrow && partCount>1;rail.hidden=!railShown;
+    rail.style.left=rect.left+'px';rail.style.top=rect.bottom+'px';rail.style.height=Math.max(0,bottom-rect.bottom)+'px';
+    // A long rail scrolls; keep the current marker in view.
+    if(railShown){var mark=railList.querySelector('[aria-current="page"]'),box=mark && mark.getBoundingClientRect(),list=railList.getBoundingClientRect();if(box && (box.top<list.top || box.bottom>list.bottom))railList.scrollTop+=box.top-list.top-(list.height-box.height)/2;}
+    sidebar.style.left=(hovering?rect.left+RAIL_WIDTH:rect.left)+'px';sidebar.style.top=rect.bottom+'px';sidebar.style.width=width+'px';sidebar.style.height=Math.max(0,bottom-rect.bottom)+'px';
     scrim.style.left=rect.left+'px';scrim.style.top=rect.bottom+'px';scrim.style.width=rect.width+'px';scrim.style.height=Math.max(0,bottom-rect.bottom)+'px';scrim.hidden=!opened || !narrow;
     view.style.setProperty('--reader-left',rect.left+'px');view.style.setProperty('--reader-width',rect.width+'px');
-    var inset=opened && !narrow?width+'px':'0px';view.style.setProperty('--reader-inset',inset);if(options.insetTarget)options.insetTarget.style.setProperty('--reader-host-inset',inset);
+    var inset=opened && !narrow?width+'px':railShown?RAIL_WIDTH+'px':'0px';view.style.setProperty('--reader-inset',inset);if(options.insetTarget)options.insetTarget.style.setProperty('--reader-host-inset',inset);
     themeOptions.style.maxHeight=Math.max(70,bottom-rect.bottom-110)+'px';
+    fitToggle(rect.width);
+  }
+  // A crowded header keeps its row height: the toggle drops its label before
+  // the View strip would wrap. Measured only when the width or labels change.
+  function fitToggle(width){
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
+    top.classList.remove('reader-toggle-compact');if(narrow)return;
+    var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
+    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
   // An open drill-down stays inside its root section; name each open level.
@@ -108,11 +130,14 @@ function createReaderContents(ctl,nav,actions,options){
     var focused=doc.activeElement,root=view.getRootNode();if(root.activeElement)focused=root.activeElement;
     var focusKey=tree.contains(focused) && focused.getAttribute('data-reader-key'),scroll=tree.scrollTop;
     tree.replaceChildren();
-    (ctl.views?ctl.views.owners:[]).forEach(function(item){
-      var embed=embedded();if(!item.views.length || embed && ctl.views.owner(embed)!==item)return;
-      var tab=element('div','reader-contents-tab',null,tree),tabButton=button(ownerLabel(item),ownerLabel(item),tab,function(){if(expandedTabs.has(item.path))expandedTabs.delete(item.path);else expandedTabs.add(item.path);drawTree();});
-      tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('aria-expanded',String(expandedTabs.has(item.path)));tabButton.setAttribute('data-reader-key','tab:'+item.path);
-      if(!expandedTabs.has(item.path))return;
+    // The overlay keeps its own disclosure set: only the current part opens.
+    var shown=hovering?overlayTabs:expandedTabs,numbered=topParts().length>1,number=0;
+    topParts().forEach(function(item){
+      var embed=embedded();
+      var tab=element('div','reader-contents-tab',null,tree),tabButton=button(ownerLabel(item),ownerLabel(item),tab,function(){if(shown.has(item.path))shown.delete(item.path);else shown.add(item.path);drawTree();});
+      tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('aria-expanded',String(shown.has(item.path)));tabButton.setAttribute('data-reader-key','tab:'+item.path);
+      if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);if(item===owner)tabButton.setAttribute('data-current-part','true');}
+      if(!shown.has(item.path))return;
       var views=element('div','reader-tree-views',null,tab);
       item.views.filter(function(definition){return !embed || definition.members.some(function(member){return member.record.runtime===embed;});}).forEach(function(definition){
         var key=item.path+':'+definition.id,selected=item===owner && item.current===definition,explore=definition.presentation==='explore';
@@ -128,7 +153,48 @@ function createReaderContents(ctl,nav,actions,options){
     tree.scrollTop=scroll;
     if(focusKey){var target=Array.from(tree.querySelectorAll('[data-reader-key]')).find(function(el){return el.getAttribute('data-reader-key')===focusKey;});if(target)target.focus({preventScroll:true});}
   }
-  function pageBy(delta){var target=members[members.indexOf(current)+delta];if(target && options.selectSection){options.selectSection(target);pinnedTop=target.sectionEl.getBoundingClientRect().top;}}
+  /* A part is a top-level Contents entry: the page's own sections, then each
+     Tab. A document with a single entry pages through its selected View. */
+  function topParts(){var embed=embedded();return (ctl.views?ctl.views.owners:[]).filter(function(item){return item.views.length && !(embed && ctl.views.owner(embed)!==item);});}
+  function parts(){
+    var owners=topParts();
+    if(owners.length>1)return owners.map(function(item){return {label:ownerLabel(item),owner:item,current:item===owner};});
+    return members.map(function(rec){return {label:title(rec),rec:rec,current:rec===current};});
+  }
+  function goPart(part){
+    if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
+    else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
+  }
+  function pageBy(delta){var list=parts(),target=list[list.findIndex(function(part){return part.current;})+delta];if(target)goPart(target);}
+  function drawParts(){
+    var list=parts(),index=list.findIndex(function(part){return part.current;}),count=list.length;partCount=count;
+    pageLabel.textContent='Section '+(index+1 || 1)+' of '+(count || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=count-1;
+    pager.setAttribute('aria-label',list[0] && list[0].owner?'Document sections':'Sections in selected View');
+    toggleCount.textContent=(count || 1)+(count>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
+    railList.replaceChildren();
+    list.forEach(function(part,i){
+      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);setOpen(true,true,true);});
+      mark.classList.add('reader-rail-mark');if(i<index)mark.classList.add('reader-rail-past');if(i===index)mark.setAttribute('aria-current','page');
+    });
+    railCount.textContent=(index+1 || 1)+'/'+(count || 1);
+  }
+  function showOverlay(){
+    intentTimer=0;if(retired || opened || narrow || hovering)return;
+    hovering=true;overlayTabs=new Set(owner?[owner.path]:[]);sidebar.hidden=false;sidebar.classList.add('reader-contents-overlay');pin.hidden=false;unpin.hidden=true;
+    doc.addEventListener('keydown',overlayKey,true);drawTree();geometry();
+  }
+  function hideOverlay(silent){
+    clearTimeout(intentTimer);clearTimeout(leaveTimer);intentTimer=leaveTimer=0;if(!hovering)return;
+    hovering=false;sidebar.classList.remove('reader-contents-overlay');pin.hidden=true;unpin.hidden=false;doc.removeEventListener('keydown',overlayKey,true);
+    if(silent)return;sidebar.hidden=!opened;drawTree();geometry();
+  }
+  function overlayKey(ev){if(ev.key==='Escape' && hovering){ev.preventDefault();ev.stopPropagation();hideOverlay();}}
+  function leaveSoon(){clearTimeout(intentTimer);intentTimer=0;if(hovering){clearTimeout(leaveTimer);leaveTimer=setTimeout(hideOverlay,300);}}
+  // Hover intent starts only from a buttonless mouse moving over the rail, so
+  // canvas drags and their release over the rail never open the overlay.
+  rail.addEventListener('pointermove',function(ev){if(ev.pointerType!=='mouse' || ev.buttons)return;clearTimeout(leaveTimer);if(!hovering && !intentTimer)intentTimer=setTimeout(showOverlay,200);});
+  rail.addEventListener('pointerleave',leaveSoon);sidebar.addEventListener('pointerleave',leaveSoon);
+  sidebar.addEventListener('pointerenter',function(){if(hovering)clearTimeout(leaveTimer);});
   function zoom(){return viewportRecord && viewportRecord.viewport && viewportRecord.viewport.isExplore()?viewportRecord.viewport.canvasZoom():standardZoom.get(owner && owner.current) || 1;}
   function setZoom(value){if(!current)return;if(viewportRecord && viewportRecord.viewport && viewportRecord.viewport.isExplore())viewportRecord.viewport.canvasZoom(value);else{value=Math.max(.5,Math.min(2,value));standardZoom.set(owner && owner.current,value);members.forEach(function(rec){rec.sectionEl.style.zoom=value;});}updateZoom();}
   function zoomBy(factor){setZoom(zoom()*factor);}
@@ -148,7 +214,8 @@ function createReaderContents(ctl,nav,actions,options){
     else{detailSeparator.remove();detailLabel.remove();}
     top.classList.toggle('reader-detail-open',!!deepest);
     if(owner)expandedTabs.add(owner.path);
-    var index=members.indexOf(current);pageLabel.textContent='Section '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
+    if(hovering && owner && !overlayTabs.has(owner.path))overlayTabs=new Set([owner.path]);
+    drawParts();
     // Shared utility controls remain live. Ordinary readers surface the hidden
     // Tab bar's real copy control; a host-owned share action consolidates it.
     release();
@@ -181,5 +248,5 @@ function createReaderContents(ctl,nav,actions,options){
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
   function snapshot(){return {opened:opened,expanded:Array.from(expandedTabs),collapsed:Array.from(collapsedViews),zoom:(ctl.views?ctl.views.owners:[]).flatMap(function(item){return item.views.map(function(definition){return {owner:item.path,id:definition.id,value:standardZoom.get(definition) || 1};});})};}
   function restore(saved){if(!saved)return;cancelAnimationFrame(initialFrame);expandedTabs=new Set(saved.expanded || []);collapsedViews=new Set(saved.collapsed || []);(saved.zoom || []).forEach(function(entry){var item=ctl.views && ctl.views.owners.find(function(item){return item.path===entry.owner;}),definition=item && item.views.find(function(definition){return definition.id===entry.id;});if(definition)standardZoom.set(definition,entry.value);});setOpen(saved.opened===true,false,false);refresh(current,viewportRecord);}
-  return {snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
+  return {snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

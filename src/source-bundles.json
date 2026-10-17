@@ -25,6 +25,7 @@
     "panels/shared.js",
     "panels/notifications.js",
     "panels/audio.js",
+    "panels/bio.js",
     "@company/panels/*.js",
     "panels/types/*.js",
     "@company/panels/types/*.js"

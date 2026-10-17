@@ -1,3 +1,4 @@
+# Action versions held back: this workflow may run on a self-hosted runner (vars.FLOWVIEW_CATALOG_RUNNER) older than 2.327.1, which the v5+ actions need.
 name: workbench-catalog-sync
 on:
   workflow_dispatch:

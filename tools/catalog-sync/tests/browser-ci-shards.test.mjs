@@ -20,7 +20,7 @@ test('browser CI uses isolated, test-balanced, internally serialized shards',()=
   assert.equal(shards.strategy['fail-fast'],false);
   assert.deepEqual(shards.strategy.matrix.shard,[1,2,3,4,5,6,7,8,9,10,11,12]);
   assert.equal(shards.name,'Browser contracts (shard ${{ matrix.shard }}/12)');
-  assert.equal(stepByUse(shards,'actions/setup-node@v4').with['node-version'],24);
+  assert.equal(stepByUse(shards,'actions/setup-node@v7').with['node-version'],24);
   assert.equal(stepByName(shards,'Install the lockfile-pinned Playwright Chromium and Linux dependencies').run,
     'npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium');
   assert.equal(stepByName(shards,'Required browser contracts (serialized shard, no retries or missing-browser skips)').run,
@@ -34,7 +34,7 @@ test('browser CI uses isolated, test-balanced, internally serialized shards',()=
 });
 
 test('each browser shard always publishes uniquely named reports and diagnostics',()=>{
-  const upload=stepByUse(shards,'actions/upload-artifact@v4');
+  const upload=stepByUse(shards,'actions/upload-artifact@v7');
   assert.equal(upload.if,'always()');
   assert.equal(upload.with.name,'browser-contract-results-${{ matrix.shard }}-of-12');
   assert.deepEqual(artifactPaths(upload),[
@@ -50,9 +50,9 @@ test('aggregate browser check merges useful reports and propagates every shard r
   assert.equal(aggregate['runs-on'],'ubuntu-24.04');
   assert.equal(aggregate.if,'always()');
   assert.equal(aggregate.needs,'browser-contract-shards');
-  assert.equal(stepByUse(aggregate,'actions/setup-node@v4').with['node-version'],24);
+  assert.equal(stepByUse(aggregate,'actions/setup-node@v7').with['node-version'],24);
 
-  const download=stepByUse(aggregate,'actions/download-artifact@v4');
+  const download=stepByUse(aggregate,'actions/download-artifact@v8');
   assert.equal(download.name,'Download every shard report and diagnostic');
   assert.equal(download.with.pattern,'browser-contract-results-*-of-12');
   assert.equal(download.with.path,'tools/browser-tests/shard-results');
@@ -71,7 +71,7 @@ test('aggregate browser check merges useful reports and propagates every shard r
   assert.equal(merge.run,'npx playwright merge-reports --reporter=html,json ./all-blob-reports');
 
   const upload=stepByName(aggregate,'Upload merged report and all shard diagnostics');
-  assert.equal(upload.uses,'actions/upload-artifact@v4');
+  assert.equal(upload.uses,'actions/upload-artifact@v7');
   assert.equal(upload.if,'always()');
   assert.equal(upload.with.name,'browser-contract-results');
   assert.deepEqual(artifactPaths(upload),[
@@ -89,7 +89,7 @@ test('aggregate browser check merges useful reports and propagates every shard r
 });
 
 test('ordinary local browser command remains single-worker and unsharded',()=>{
-  assert.equal(browserPackage.devDependencies['@playwright/test'],'1.63.0');
+  assert.equal(browserPackage.devDependencies['@playwright/test'],'1.64.1');
   assert.equal(browserPackage.scripts.test,'playwright test');
   assert.equal(localConfig.fullyParallel,false);
   assert.equal(localConfig.workers,1);

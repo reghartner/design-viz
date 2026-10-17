@@ -767,11 +767,11 @@ async function explorationFixture(server){
     const d=spec.page.blocks[0].diagram;delete d.layouts;delete d.defaultLayout;d.primaryPanel=undefined;
     const names=[['Checkout','Payments','Fulfillment'],['Payment API','Risk review','Ledger'],['Doorbell','Home hub','App'],['Event intake','Stream','Consumers'],['Sign in','Identity API','Session store'],['Reservation','Inventory API','Warehouse'],['Signal','Routing','On-call'],['Events','Warehouse','Reports']][i];
     Object.values(d.nodes).forEach((node,j)=>node.title=names[j]);d.rows=i%2?[['a'],['b','c']]:[['a','b','c']];d.edges=[{from:'a',to:'b',kind:'https'},{from:'b',to:'c',kind:'https'}];
-    if(id==='third'){d.nodes={};d.rows=[[]];d.edges=[];d.steps=[];delete d.paths;d.panels[0].title='Household activity';d.primaryPanel='home';}
+    if(id==='third')spec.page.blocks[0].diagram=JSON.parse(await readFile(new URL('../../../examples/kestrel-overnight/story.spec.json',import.meta.url),'utf8')).page.blocks[0].diagram;
     const folder=path.join(fixture.root,'diagrams',id);await mkdir(folder,{recursive:true});await writeFile(path.join(folder,id+'.spec.json'),JSON.stringify(spec));await writeFile(path.join(folder,id+'.html'),'<!doctype html>');fixture.specs[id]=spec;
   }
   await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:definitions.map(([id,,,,owner])=>({folder:'diagrams/'+id,owner}))}));
-  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});return fixture;
+  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json'),thumbnails:true});return fixture;
 }
 const mainLibrary=page=>page.locator('#welcome-library-grid');
 const recentIDs=page=>page.locator('#welcome-library-recent-items a').evaluateAll(links=>links.map(link=>new URL(link.href).searchParams.get('diagram')));
@@ -782,7 +782,8 @@ test('Browse exploration combines facets, keyboard topics and search; grid/list 
   await page.setViewportSize({width:1440,height:900});await page.goto(fixture.url);await page.locator('#welcome-library').click();
   const grid=mainLibrary(page),search=page.getByRole('searchbox',{name:'Search diagrams'}),count=page.locator('#welcome-library-count');
   await expect(grid.locator('.canon-library-card')).toHaveCount(8);await expect(count).toHaveText('8 of 8 diagrams');
-  await expect(grid.locator('svg')).toHaveCount(7);await expect(grid.locator('.canon-library-preview-panels')).toContainText('Household activity');
+  await expect(grid.locator('.canon-library-preview img')).toHaveCount(8);
+  for(const img of await grid.locator('.canon-library-preview img').all()){await img.scrollIntoViewIfNeeded();await expect.poll(()=>img.evaluate(el=>el.naturalWidth)).toBe(960);}await page.evaluate(()=>window.scrollTo(0,0));
   await expect(page.getByLabel('Team',{exact:true}).locator('option')).toContainText(['All teams','Commerce Platform','Data Platform','Home Experience','Identity And Access Management','Payments','Platform','Platform · europe']);
   const width=await grid.locator('.canon-library-card').first().evaluate(el=>el.getBoundingClientRect().width);
   for(const size of [{width:1440,height:900},{width:1280,height:800}]){await page.setViewportSize(size);await testInfo.attach('browse-grid-'+size.width,{body:await page.screenshot(),contentType:'image/png'});}
@@ -828,14 +829,16 @@ test('recently viewed records successful published reads, bounds and deduplicate
   await page.getByRole('button',{name:'Clear history',exact:true}).click();await expect(page.locator('#welcome-library-recent')).toBeHidden();expect(await page.evaluate(key=>localStorage.getItem(key),key)).toBeNull();expect(await page.evaluate(key=>localStorage.getItem(key),otherKey)).toBe('["second"]');
 });
 
-test('Browse handles malformed previews and corrupt or unavailable history storage without eager reads or script injection',async({page,server})=>{
+test('Browse handles malformed previews and corrupt or unavailable history storage without eager reads or script injection',async({page,server,audit})=>{
+  audit.allowStatus(404,url=>url.includes('/library-thumbnails/'));
   const fixture=await explorationFixture(server),key='flowview-library-recent-v1:'+new URL('diagrams.json',fixture.url).href;
-  fixture.index.diagrams[0].preview={version:1,kind:'graph',label:'bad',total:1,nodes:[{x:0,y:0,w:999999,h:4,label:'Bad'}],edges:[]};
-  fixture.index.diagrams[1].preview.nodes[0].label='<img src=x onerror=alert(1)>';fixture.index.diagrams[1].preview.svg='<script>alert(1)</script>';
+  fixture.index.diagrams[0].preview={...fixture.index.diagrams[0].preview,url:'https://evil.test/image.png'};
+  fixture.index.diagrams[1].preview.url='library-thumbnails/'+'a'.repeat(64)+'/'+'b'.repeat(64)+'.png';
+  delete fixture.index.diagrams[2].preview;
   await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(fixture.index));
   const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
   await page.addInitScript(key=>{try{localStorage.setItem(key,'{broken');}catch{}},key);await page.goto(fixture.url);await page.locator('#welcome-library').click();
-  await expect(mainLibrary(page).locator('article[data-id="first"] .canon-library-preview')).toContainText('Preview unavailable');await expect(mainLibrary(page).locator('img,script')).toHaveCount(0);await expect(mainLibrary(page).locator('svg')).toHaveCount(6);expect(requests).toEqual([]);
+  await expect(mainLibrary(page).locator('article[data-id="first"] .canon-library-preview')).toContainText('Preview unavailable');await expect(mainLibrary(page).locator('article[data-id="second"] .canon-library-preview')).toContainText('Preview unavailable');await expect(mainLibrary(page).locator('article[data-id="third"] .canon-library-preview')).toContainText('Preview unavailable');await expect(mainLibrary(page).locator('script')).toHaveCount(0);await expect(mainLibrary(page).locator('img')).toHaveCount(5);expect(requests).toEqual([]);
   await page.addInitScript(()=>{const get=Storage.prototype.getItem,set=Storage.prototype.setItem,remove=Storage.prototype.removeItem;Storage.prototype.getItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return get.call(this,key);};Storage.prototype.setItem=function(key,value){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return set.call(this,key,value);};Storage.prototype.removeItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return remove.call(this,key);};});
   await page.reload();await expect(mainLibrary(page).locator('article')).toHaveCount(8);await mainLibrary(page).locator('article[data-id="first"] a').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();expect(await recentIDs(page)).toEqual(['first']);
   await page.getByRole('button',{name:'Clear history',exact:true}).click();await expect(page.locator('#welcome-library-recent')).toBeHidden();

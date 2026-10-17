@@ -73,7 +73,7 @@ test('workbench unified navigation does not hide link controls at mobile width',
 test('canon reader keeps one position-aware share action across tabs and diagram state',async({page,server})=>{
  await captureClipboard(page);const published=spec();published.page.canon={version:1,id:'links',kind:'canonical',owner:'group:default/docs'};
  await page.context().route('**/diagrams.json',route=>route.fulfill({json:{version:1,diagrams:[{id:'links',title:'Link controls',spec:published}]}}));
- await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Link controls/}).click();
+ await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:'Link controls',exact:true}).click();
  const root=page.locator('#canon-reader'),nav=root.locator('.explore-navigation'),copy=controls(root),share=nav.getByRole('button',{name:'Copy link to current position',exact:true});
  await expect(nav.locator('.reader-utility-options').getByRole('button',{name:/^Copy link/})).toHaveCount(1);await expect(copy.step).toBeVisible();
  await chooseNavigation(nav,'Tab','Reference');await share.click();let link=new URL(await copied(page));

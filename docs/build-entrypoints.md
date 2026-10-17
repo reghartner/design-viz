@@ -183,7 +183,7 @@ npm install --ignore-scripts /absolute/path/to/backstage-package/flowview-backst
 ```
 
 **flowview-html** contains the standalone viewer/workbench, adjacent catalog, Canon
-metadata, diagram folders, starter assets and the project `LICENSE`. Open `workbench/flowspec.html` for
+metadata and static library thumbnails, diagram folders, starter assets and the project `LICENSE`. Open `workbench/flowspec.html` for
 offline authoring, or serve the extracted root (for example,
 `python3 -m http.server --directory flowview-html 8000`) to fetch catalog/Canon
 files. HTML already embeds fonts, licenses and the folder-agent kit. The kit's
@@ -198,7 +198,11 @@ The portable Backstage rehearsal likewise builds the package before copying it;
 its host installer repacks prebuilt files without upstream sources or build tools.
 
 `deploy/workbench/Dockerfile` builds from the company fork's source in a Node +
-Python stage, then copies only the web assets into nginx. No local build is
+Python/locked Playwright Chromium stage, then copies only the web assets into nginx.
+The production image and CI site artifact run `tools/canon/library.mjs --thumbnails`
+after the lightweight Python build; browser dependencies stay in the build stage.
+See [library publication](workbench-canon-library.md) for capture bounds and local
+asset restrictions. No local build is
 required before `docker build`. The Backstage rehearsal builds HTML in a
 temporary directory from the pinned checkout's tracked source, ignoring local
 HTML. Its runtime-only package uses `Dockerfile.prebuilt`, installed as its

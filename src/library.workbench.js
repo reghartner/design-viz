@@ -30,19 +30,11 @@ function diagramSearchText(values,spec){
    malformed values, still load as if the metadata were absent. */
 function libraryDescription(value){return typeof value==='string'?value:'';}
 function libraryTags(value){return Array.isArray(value)?value.filter(function(tag){return typeof tag==='string' && tag;}):[];}
-/* Optional thumbnail metadata is untrusted. Accept only a small numeric/text
-   vocabulary, copying it before rendering with createElementNS/textContent. */
-function libraryPreviewData(value){
-  if(!value || value.version!==1 || typeof value.label!=='string' || value.label.length>80 || !Number.isSafeInteger(value.total) || value.total<1)return null;
-  var out={version:1,kind:value.kind,label:value.label,total:value.total};
-  if(value.kind==='panels'){
-    if(!Array.isArray(value.panels) || !value.panels.length || value.panels.length>3 || value.total<value.panels.length || value.panels.some(function(p){return !p || typeof p.title!=='string' || p.title.length>80 || typeof p.type!=='string' || p.type.length>40;}))return null;
-    out.panels=value.panels.map(function(p){return {title:p.title,type:p.type};});return out;
-  }
-  if(value.kind!=='graph' || !Array.isArray(value.nodes) || !value.nodes.length || value.nodes.length>12 || value.total<value.nodes.length || !Array.isArray(value.edges) || value.edges.length>20)return null;
-  if(value.nodes.some(function(n){return !n || typeof n.label!=='string' || n.label.length>80 || !['x','y','w','h'].every(function(k){return Number.isFinite(n[k]);}) || n.x<0 || n.y<0 || n.w<=0 || n.h<=0 || n.x+n.w>641 || n.y+n.h>301;}))return null;
-  if(value.edges.some(function(e){return !e || ![e.from,e.to].every(function(i){return Number.isSafeInteger(i) && i>=0 && i<value.nodes.length;});}))return null;
-  out.nodes=value.nodes.map(function(n){return {label:n.label,x:n.x,y:n.y,w:n.w,h:n.h};});out.edges=value.edges.map(function(e){return {from:e.from,to:e.to};});return out;
+/* Only publisher-owned PNG paths with the matching authored revision are
+   accepted. No raw markup, remote URLs, traversal, queries or fragments. */
+function libraryPreviewData(value,revision){
+  if(!value || value.version!==1 || value.revision!==revision || !/^[a-f0-9]{64}$/.test(revision || '') || typeof value.url!=='string' || value.url!==value.url.trim() || !/^library-thumbnails\/[a-f0-9]{64}\/[a-f0-9]{64}\.png$/.test(value.url) || value.width!==960 || value.height!==600)return null;
+  return {version:1,url:value.url,revision:revision,width:960,height:600};
 }
 function libraryTeamName(raw){
   var match=/^([^:]+):([^/]+)\/(.+)$/.exec(raw || '');
@@ -52,18 +44,10 @@ function libraryTeamName(raw){
 }
 function libraryPreviewElement(preview){
   var box=document.createElement('span');box.className='canon-library-preview';
-  if(!preview){box.classList.add('canon-library-preview-missing');var note=document.createElement('span');note.textContent='Preview unavailable';var hint=document.createElement('small');hint.textContent='Open to explore this diagram';box.append(note,hint);return box;}
-  if(preview.kind==='panels'){
-    box.classList.add('canon-library-preview-panels');
-    var heading=document.createElement('small');heading.textContent='Panel story · '+preview.total+' panel'+(preview.total===1?'':'s');box.append(heading);
-    preview.panels.forEach(function(panel){var line=document.createElement('span'),kind=document.createElement('small');line.textContent=panel.title;kind.textContent=panel.type;line.append(kind);box.append(line);});
-  }else{
-    function svgEl(tag,attrs){var node=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs || {}).forEach(function(k){node.setAttribute(k,attrs[k]);});return node;}
-    var svg=svgEl('svg',{viewBox:'0 0 640 300','aria-hidden':'true',focusable:'false'});
-    preview.edges.forEach(function(edge){var a=preview.nodes[edge.from],b=preview.nodes[edge.to];svg.append(svgEl('line',{x1:a.x+a.w/2,y1:a.y+a.h/2,x2:b.x+b.w/2,y2:b.y+b.h/2}));});
-    preview.nodes.forEach(function(node){var g=svgEl('g'),rect=svgEl('rect',{x:node.x,y:node.y,width:node.w,height:node.h,rx:Math.min(9,node.h/6)}),label=svgEl('text',{x:node.x+node.w/2,y:node.y+node.h/2,'text-anchor':'middle','dominant-baseline':'central','font-size':Math.min(22,node.h/2.5)});var limit=Math.max(4,Math.floor(node.w/Math.min(11,node.h/5))-2);label.textContent=node.label.length>limit?node.label.slice(0,limit-1)+'…':node.label;g.append(rect,label);svg.append(g);});box.append(svg);
-  }
-  var caption=document.createElement('span');caption.className='canon-library-preview-caption';caption.textContent=preview.kind==='graph'?(preview.total>preview.nodes.length?preview.nodes.length+' of '+preview.total+' nodes · ':'Topology · ')+preview.label:'Panel summary · '+preview.label;box.append(caption);return box;
+  function fallback(){box.replaceChildren();box.classList.add('canon-library-preview-missing');var note=document.createElement('span');note.textContent='Preview unavailable';var hint=document.createElement('small');hint.textContent='Open to explore this diagram';box.append(note,hint);}
+  if(!preview){fallback();return box;}
+  var img=document.createElement('img');img.alt='';img.loading='lazy';img.decoding='async';img.width=preview.width;img.height=preview.height;
+  img.addEventListener('error',fallback,{once:true});img.src=new URL(preview.url,new URL('diagrams.json',location.href)).href;box.append(img);return box;
 }
 function parseCanonLibrary(raw){
   if(!raw || ![1,2,3].includes(raw.version) || !Array.isArray(raw.diagrams))throw new Error('Expected a version 1, 2 or 3 diagram library.');
@@ -82,7 +66,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 

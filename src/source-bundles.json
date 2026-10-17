@@ -190,8 +190,7 @@
         "core/arrange/graph.js",
         "core/arrange/groups.js",
         "workbench/auto-arrange-core.js",
-        "core/backend.js",
-        "core/library-preview.js"
+        "core/backend.js"
       ],
       "exports": {
         "compatibility": "FlowviewCompatibility",
@@ -201,8 +200,7 @@
         "autoArrangeCandidates": "autoArrangeCandidates",
         "autoArrangeDiagram": "autoArrangeDiagram",
         "autoArrangeInput": "autoArrangeInput",
-        "arrangeGraph": "autoArrangeGraph",
-        "libraryPreview": "libraryPreview"
+        "arrangeGraph": "autoArrangeGraph"
       },
       "defaultExport": "FlowCanon"
     },

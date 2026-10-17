@@ -43,14 +43,14 @@ async function libraryFromEntries(entries,output){
     const {description,tags}=entry.spec.page;
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
       ...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
-      preview:C.libraryPreview(rendered),canon:entry.spec.page.canon,counts,services,exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
+      canon:entry.spec.page.canon,counts,services,exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
   }))};
 }
 export async function buildLibrary(registryPath,output='workbench/diagrams.json'){return libraryFromEntries((await registry(registryPath)).entries,await physicalPath(output));}
 
 /* Only regular JSON files under the chosen directory are inputs. Never follow
    symlinks into another repository or publish files merely because they exist. */
-export async function buildLibraryFromDirectory(directory,output='workbench/diagrams.json'){
+async function directoryEntries(directory){
   const entries=[];
   async function walk(folder){
     const children=await readdir(folder,{withFileTypes:true});
@@ -67,8 +67,10 @@ export async function buildLibraryFromDirectory(directory,output='workbench/diag
     }
   }
   await walk(await realpath(directory));
-  return libraryFromEntries(entries,await physicalPath(output));
+  return entries;
 }
+
+export async function buildLibraryFromDirectory(directory,output='workbench/diagrams.json'){return libraryFromEntries(await directoryEntries(directory),await physicalPath(output));}
 
 /* Resolve existing ancestors too: a not-yet-created output can still sit
    beneath a symlinked directory that aliases a source location. */
@@ -87,11 +89,11 @@ function withinDirectory(filename,directory){
   return !relative || (relative!=='..' && !relative.startsWith('..'+path.sep) && !path.isAbsolute(relative));
 }
 
-export async function publishLibrary({registryPath,diagramsDir,output='workbench/diagrams.json'}={}){
+export async function publishLibrary({registryPath,diagramsDir,output='workbench/diagrams.json',thumbnails=false}={}){
   if(registryPath && diagramsDir)throw new Error('Choose --diagrams or --registry, not both.');
   if(!registryPath && !diagramsDir)registryPath='canon.json';
   const destination=path.resolve(output),physicalDestination=await physicalPath(destination);
-  let library;
+  let library,entries,assetRoot;
   if(registryPath){
     if(path.resolve(registryPath)===destination || await realpath(registryPath)===physicalDestination)throw new Error('Output must not overwrite the source registry.');
     if(path.basename(registryPath)==='canon.json'){
@@ -100,11 +102,18 @@ export async function publishLibrary({registryPath,diagramsDir,output='workbench
     }
     const source=await registry(registryPath);
     if((await Promise.all(source.entries.map(entry=>realpath(entry.filename)))).includes(physicalDestination))throw new Error('Output must not overwrite a source spec.');
-    library=await libraryFromEntries(source.entries,physicalDestination);
+    entries=source.entries;assetRoot=await realpath(path.dirname(registryPath));
   }else{
     const directory=path.resolve(diagramsDir);
     if(withinDirectory(destination,directory) || withinDirectory(physicalDestination,await realpath(directory)))throw new Error('Output must be outside the diagram source directory.');
-    library=await buildLibraryFromDirectory(directory,destination);
+    entries=await directoryEntries(directory);assetRoot=await realpath(directory);
+  }
+  const snapshots=thumbnails?await Promise.all(entries.map(entry=>readFile(entry.filename))):null;
+  library=await libraryFromEntries(entries,physicalDestination);
+  if(thumbnails){
+    const {captureLibraryThumbnails}=await import('./thumbnails.mjs');
+    await captureLibraryThumbnails({entries:materializeEntries(entries),library,output:physicalDestination,assetRoot});
+    for(let i=0;i<entries.length;i++)if(!(await readFile(entries[i].filename)).equals(snapshots[i]))throw new Error('Source changed during thumbnail publication: '+entries[i].filename);
   }
   if(Buffer.byteLength(JSON.stringify(library,null,2)+'\n')>30*1024*1024)throw new Error('Library exceeds 30 MB.');
   await atomicJSON(destination,library);
@@ -115,6 +124,7 @@ async function main(args){
   const options={},flags={'--registry':'registryPath','--diagrams':'diagramsDir','--out':'output'};
   while(args.length){
     const arg=args.shift();
+    if(arg==='--thumbnails'){if(options.thumbnails)throw new Error('Repeated argument: '+arg);options.thumbnails=true;continue;}
     if(!Object.hasOwn(flags,arg))throw new Error('Unknown argument: '+arg);
     const key=flags[arg];
     const value=args.shift();

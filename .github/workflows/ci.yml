@@ -222,6 +222,12 @@ jobs:
           node-version: 24
       - name: Generate HTML and backend runtime from source
         run: python3 tools/build.py
+      - name: Install locked thumbnail renderer
+        run: |
+          npm ci --prefix tools/browser-tests
+          cd tools/browser-tests && npx playwright install --with-deps chromium
+      - name: Publish static library thumbnails
+        run: node tools/canon/library.mjs --thumbnails
       - name: example pages inject cleanly
         run: |
           python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json template/flowview.html /tmp/cumulus.html
@@ -262,6 +268,7 @@ jobs:
             workbench/flowspec.html
             workbench/catalog.json
             workbench/diagrams.json
+            workbench/library-thumbnails/
             src/starters/
             canon.json
             diagrams/

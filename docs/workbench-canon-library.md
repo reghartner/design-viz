@@ -1,7 +1,7 @@
 # Browse canon diagrams in the workbench
 
 Choose **Browse diagrams** on the welcome page. The visual grid introduces each
-story with a static topology preview or an explicitly labeled panel summary,
+story with a static image of its authored opening view,
 its title, authored explanation, team, and topics. Switch to **List** for compact
 scanning. Diagram titles and previews are ordinary links, including Open in new
 tab. Each opens a **read-only** viewer. Readers can walk the steps, select an alternate, switch views, drill
@@ -91,18 +91,18 @@ the authored JSON and its evidence. The central entry controls ID, owner and
 canonical status even when the source spec carries older metadata.
 
 Review membership and content changes through the normal repository process.
-Both standard builds generate a lightweight `workbench/diagrams.json` index:
+The lightweight Python build generates `workbench/diagrams.json` without installing a browser. Production Docker and CI artifact publication also generate static screenshots:
 
 ```sh
 python3 tools/build.py
 docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
 ```
 
-The Python build validates against its freshly generated runtime. Docker's Node
-build stage reads root `canon.json` and its listed folders; nginx receives the
+The Python build validates against its freshly generated runtime. Docker's build-only Node/Chromium
+stage reads root `canon.json` and its listed folders; nginx receives the
 resulting index beside `flowspec.html` and serves authored JSON from `diagrams/`.
-Full-batch topology resolution is validation-only, in memory; no flattened files
-are written. The final image needs no Node process,
+Full-batch topology is resolved in memory for validation and screenshots; no
+flattened source files are written. The final image needs no Node process,
 API, browser GitHub token or live Backstage connection. The read-only library,
 direct links, Back/Forward and explicit **Edit in Workbench** behavior are unchanged.
 
@@ -114,7 +114,7 @@ and `page.tags` when present), `canon` membership,
 titles, used by **Search diagrams**), a relative authored `specUrl`, and a
 `revision` SHA256 of the membership-adjusted authored JSON. They contain no authored diagram
 rows, steps, panel state, or embedded specs. An optional `preview` contains only
-bounded summary data. For example:
+a same-origin PNG path, source revision and fixed image dimensions. For example:
 
 ```json
 {
@@ -144,21 +144,44 @@ searchable. Grid and List use the same ordering and results. Indexes without
 `services`, `description` or `tags` still load and filter on the other fields.
 Authors set description and tags in **Inspect → Document settings**; they live in
 the spec, not in `canon.json`, which still controls only membership, ID and owner.
-The publisher generates `preview.version: 1` using the DOM-free runtime. It
-selects the first diagram member of an opening authored View (skipping prose,
-inactive tabs and detail-only sections), honors layout-hidden tiles and opening
-panel visibility, and uses the shared graph geometry. Named layouts position
-whole tiles; they do not change the shared graph's node placement. Graph
-summaries contain at most 12 nodes and 20 real connections, with simplified
-straight lines and labels limited to 80 characters. A caption identifies the
-section and any truncated node count. Graphs over 500 nodes or 1,000 edges use
-the fallback. Panel-first stories list up to three visible authored panel titles
-and types, explicitly as a **Panel summary**, not a screenshot. Hidden graph
-content is not substituted for a panel-first View. Missing or malformed previews
-show **Preview unavailable** without fetching the source. The browser validates
-this small numeric/text schema and constructs SVG itself; it never inserts
-published markup. Normal Python and Docker builds need no browser or new
-dependency, and generation never changes authored source files.
+Generate images after the normal build with the locked browser tooling:
+
+```sh
+npm ci --prefix tools/browser-tests
+(cd tools/browser-tests && npx playwright install --with-deps chromium)
+node tools/canon/library.mjs --registry canon.json --out workbench/diagrams.json --thumbnails
+```
+
+The optional `--thumbnails` stage uses the production renderer, styles, fonts and
+company panels in pinned Chromium. It captures the first diagram section within
+the authored opening View, skipping introductory prose and inactive tabs; a
+prose-only opening View is captured as prose. The default layout, initial path,
+step and panel visibility are preserved. Playback and motion are frozen. The
+selected visual composition (without reader toolbars or introductory prose) is
+fitted into a 960 × 600 PNG (at most 750 KB); sections
+larger than 2400 × 6000 fail clearly rather than publishing a cropped image.
+Capture is limited to 30 seconds per document, 100 sections, and at most 1,000
+nodes / 3,000 edges per section.
+Panels-only stories show their actual panels. Sources are never rewritten.
+
+Capture allows embedded data and local PNG/JPEG/WebP/SVG files beneath the source
+registry directory (or `--diagrams` directory), resolved relative to each source
+file. Symlinks escaping that root, remote resources and non-image requests are
+blocked. Unsupported or failed resources fail publication. Keep images local.
+The publisher stages all images under `workbench/library-thumbnails/`, installs
+a content-addressed immutable batch, then atomically replaces the index. Failure
+leaves the previous index/assets usable. Old batches can be removed after readers
+using older indexes have expired; do not delete them during rolling publication.
+Only static assets reach nginx; Chromium and npm dependencies remain in the build
+stage. CI's downloadable site artifact includes this thumbnail directory.
+
+`preview.version: 1` contains `url`, matching authored `revision`, `width: 960`,
+and `height: 600`. Browse accepts only the publisher's relative content-addressed
+PNG paths, loads images lazily, and never fetches specs for cards or filters.
+Missing/malformed metadata and failed images show **Preview unavailable** in the
+same reserved card area. Older v1/v2/v3 indexes remain readable. The lightweight
+Python build omits thumbnails and remains suitable for unit tests and runtime
+regeneration; production publication must invoke the explicit image stage.
 
 The browser loads the index for library cards, then fetches only the selected
 authored spec and its provider closure for reading or editing. It verifies source
@@ -178,11 +201,14 @@ and legacy version 2 snapshot URLs remain readable, including the offline demo.
 An empty `canon.json` list creates a valid empty index.
 Missing files, malformed metadata, duplicate folders, invalid specs, escaping
 paths, incompatible topology imports, a source or in-memory resolved spec over 30 MB, or
-an index over 30 MB fail publication and preserve the prior index. Only the index
-is written, atomically after validation; authored sources are never overwritten.
+an index over 30 MB fail publication and preserve the prior index. Lightweight
+publication writes only the index; `--thumbnails` also writes generated images.
+The index is replaced atomically after validation and capture; authored sources
+are never overwritten.
 Output cannot overwrite the source manifest or anything under `diagrams/`.
 
-Run the publisher directly from the repository root:
+Run lightweight metadata publication directly from the repository root (add
+`--thumbnails` for production image publication):
 
 ```sh
 node tools/canon/library.mjs --out workbench/diagrams.json
@@ -194,7 +220,9 @@ The supplied nginx Dockerfiles recursively copy and serve the complete
 `diagrams/` tree, including namespace folders. A mixed index/source deployment fails
 revision checks before replacing a draft; reload after the deployment completes.
 For a custom deployment, copying only `flowspec.html` and `diagrams.json` is
-insufficient; retain the referenced spec paths too.
+insufficient; retain the referenced spec paths and `library-thumbnails/` directory
+too. The source-based Dockerfile is the production image path; the runtime-only
+`Dockerfile.prebuilt` rehearsal still regenerates a metadata-only index.
 
 No arguments defaults to root `canon.json`. `--registry canon.json` selects an
 explicit central file for a different checkout. Explicit legacy `--registry`

@@ -3,7 +3,7 @@
     {
       "file": "auralis-presence/presence.html",
       "spec": "auralis-presence/presence.spec.json",
-      "title": "Auralis Presence \u2014 mmWave room sensing, fall safety, offline autonomy",
+      "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy",
       "family": "auralis-presence",
       "description": "mmWave room sensing, fall check-in escalation, sleep/inactivity monitoring, and offline autonomy over Atrium",
       "tags": [
@@ -25,7 +25,7 @@
     {
       "file": "basecraft-keep/keep.html",
       "spec": "basecraft-keep/keep.spec.json",
-      "title": "Keep \u2014 Local AI Hub & Camera Fleet",
+      "title": "Keep — Local AI Hub & Camera Fleet",
       "family": "basecraft-keep",
       "description": "Local-first hub pairs with Lookout cameras: face recognition on the Facet NPU, cross-camera tracking, storage rotation, and relay-brokered remote viewing.",
       "tags": [
@@ -48,7 +48,7 @@
     {
       "file": "chime-radar/chime-radar.html",
       "spec": "chime-radar/chime-radar.spec.json",
-      "title": "Chime Radar \u2014 distance-gated alerts, visit paths, early camera wake",
+      "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake",
       "family": "chime-radar",
       "description": "Radar-gated doorbell alerts, aerial visit paths, and radar-before-camera wake sequencing",
       "tags": [
@@ -85,7 +85,7 @@
     {
       "file": "doorbell/doorbell-from-spec.html",
       "spec": "doorbell/doorbell-from-spec.spec.json",
-      "title": "Chime Doorbell \u2014 motion to clip",
+      "title": "Chime Doorbell — motion to clip",
       "family": "doorbell",
       "description": "Two-chip battery doorbell: motion to clip, plus the thermal envelope walkthrough",
       "tags": [
@@ -129,7 +129,7 @@
     {
       "file": "farwatch-sentinel/sentinel.html",
       "spec": "farwatch-sentinel/sentinel.spec.json",
-      "title": "Sentinel \u2014 Cellular Off-Grid Solar Camera",
+      "title": "Sentinel — Cellular Off-Grid Solar Camera",
       "family": "farwatch-sentinel",
       "description": "Sentinel off-grid solar camera: daily energy ledger, continuous ring recording with event indexing, cellular data-cap tiers, and cloudy-week degradation to preservation mode.",
       "tags": [
@@ -150,7 +150,7 @@
     {
       "file": "flowview-product-tour/flowview-product-tour.html",
       "spec": "flowview-product-tour/flowview-product-tour.spec.json",
-      "title": "Flowview \u00b7 from story to shared system understanding",
+      "title": "Flowview · from story to shared system understanding",
       "family": "flowview-product-tour",
       "description": "Interactive product tour: business and engineering entry points, Claude Code authoring, review and approval, Standard and Explore, iteration, and sharing.",
       "tags": [
@@ -169,9 +169,9 @@
     {
       "file": "gridseye-bastion/bastion.html",
       "spec": "gridseye-bastion/bastion.spec.json",
-      "title": "Bastion \u2014 PoE Camera Fleet & Stronghold NVR",
+      "title": "Bastion — PoE Camera Fleet & Stronghold NVR",
       "family": "gridseye-bastion",
-      "description": "Bastion: PoE camera fleet & Stronghold NVR \u2014 edge detection, firmware rollout, UPS power domain, LAN-only viewing",
+      "description": "Bastion: PoE camera fleet & Stronghold NVR — edge detection, firmware rollout, UPS power domain, LAN-only viewing",
       "tags": [
         "camera",
         "nvr",
@@ -197,7 +197,7 @@
     {
       "file": "halovista-aegis/aegis.html",
       "spec": "halovista-aegis/aegis.spec.json",
-      "title": "HaloVista Aegis \u2014 cloud, keys, and a human in the loop",
+      "title": "HaloVista Aegis — cloud, keys, and a human in the loop",
       "family": "halovista-aegis",
       "description": "HaloVista Aegis: E2EE enrollment, AI history search, virtual guard, and plan lapse",
       "tags": [
@@ -218,7 +218,7 @@
     {
       "file": "halovista-mirrorline/mirrorline.html",
       "spec": "halovista-mirrorline/mirrorline.spec.json",
-      "title": "Mirrorline \u2014 Event-Store Replication",
+      "title": "Mirrorline — Event-Store Replication",
       "family": "halovista-mirrorline",
       "description": "Mirrorline event-store replication: quorum writes, read-your-writes, primary election, and WAL tail resync",
       "tags": [
@@ -239,7 +239,7 @@
     {
       "file": "hearthline-failover/failover.html",
       "spec": "hearthline-failover/failover.spec.json",
-      "title": "hearthline Sentry Cloud \u2014 cross-region failover",
+      "title": "hearthline Sentry Cloud — cross-region failover",
       "family": "hearthline-failover",
       "description": "Cross-region failover for hearthline Sentry Cloud: journal-first replication, region loss reconciliation, fencing, and failback",
       "tags": [
@@ -259,7 +259,7 @@
     {
       "file": "hearthline-sentry-panel/sentry-panel.html",
       "spec": "hearthline-sentry-panel/sentry-panel.spec.json",
-      "title": "hearthline Sentry Panel \u2014 Monitored Alarm",
+      "title": "hearthline Sentry Panel — Monitored Alarm",
       "family": "hearthline-sentry-panel",
       "description": "hearthline's monitored alarm panel: broadband-to-cellular failover, walk-test sensor coverage, and the duress disarm's silent-upstream incident.",
       "tags": [
@@ -280,7 +280,7 @@
     {
       "file": "loomworks-trellis/trellis.html",
       "spec": "loomworks-trellis/trellis.spec.json",
-      "title": "loomworks Trellis \u2014 Camera-as-Hub",
+      "title": "loomworks Trellis — Camera-as-Hub",
       "family": "loomworks-trellis",
       "description": "Camera-as-hub: BR failover, Zigbee-to-Matter bridging, offline automations, and dual-fabric commissioning",
       "tags": [
@@ -303,9 +303,9 @@
     {
       "file": "nestrel-warden/warden.html",
       "spec": "nestrel-warden/warden.spec.json",
-      "title": "Nestrel Warden \u2014 a cloud camera that remembers the outage",
+      "title": "Nestrel Warden — a cloud camera that remembers the outage",
       "family": "nestrel-warden",
-      "description": "Warden \u2014 wired cloud camera that buffers up to an hour offline and back-fills with dedup on reconnect",
+      "description": "Warden — wired cloud camera that buffers up to an hour offline and back-fills with dedup on reconnect",
       "tags": [
         "camera",
         "offline-buffer",
@@ -338,9 +338,29 @@
       ]
     },
     {
+      "file": "shared-icons/shared-icons.html",
+      "spec": "shared-icons/shared-icons.spec.json",
+      "title": "Shared icons & company branding",
+      "family": "shared-icons",
+      "description": "A branded doorbell story with colored power, temperature and alarm icons across the app, camera and monitoring desk.",
+      "tags": [
+        "icons",
+        "branding",
+        "doorbell",
+        "monitoring"
+      ],
+      "widgets": [
+        "deviceapp",
+        "screen",
+        "security",
+        "battery",
+        "thermo"
+      ]
+    },
+    {
       "file": "showcase/widgets.html",
       "spec": "showcase/widgets.spec.json",
-      "title": "Widget Showcase \u2014 every panel type on one page",
+      "title": "Widget Showcase — every panel type on one page",
       "family": "showcase",
       "description": "Reference gallery: all 19 inspector widgets on one page, each driven by a step-through",
       "tags": [
@@ -370,9 +390,25 @@
       ]
     },
     {
+      "file": "sports/venue-map.html",
+      "spec": "sports/venue-map.spec.json",
+      "title": "Venue map — a sell-through story",
+      "family": "sports",
+      "description": "A venue map panel: presale fills the lower bowl, a group hold appears and converts, a promo lifts the upper deck, then the story forks between a sellout and a repriced upper tier.",
+      "tags": [
+        "sports",
+        "ticketing",
+        "seatmap",
+        "venue-map"
+      ],
+      "widgets": [
+        "seatmap"
+      ]
+    },
+    {
       "file": "wrenlight-perch/perch.html",
       "spec": "wrenlight-perch/perch.spec.json",
-      "title": "wrenlight Perch \u2014 Two-Year Battery Camera & Loft Module",
+      "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module",
       "family": "wrenlight-perch",
       "description": "wrenlight Perch: battery-day ledger, TwigLink supervision, Loft clip upload, and cold-weather limits",
       "tags": [
@@ -389,26 +425,6 @@
         "signal",
         "state",
         "waterfall"
-      ]
-    },
-    {
-      "file": "shared-icons/shared-icons.html",
-      "spec": "shared-icons/shared-icons.spec.json",
-      "title": "Shared icons & company branding",
-      "family": "shared-icons",
-      "description": "A branded doorbell story with colored power, temperature and alarm icons across the app, camera and monitoring desk.",
-      "tags": [
-        "icons",
-        "branding",
-        "doorbell",
-        "monitoring"
-      ],
-      "widgets": [
-        "deviceapp",
-        "screen",
-        "security",
-        "battery",
-        "thermo"
       ]
     }
   ]

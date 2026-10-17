@@ -1,0 +1,662 @@
+{
+  "geometry": "bowl",
+  "bowl": "oval",
+  "ringSlots": 32,
+  "rings": [
+    {
+      "id": "100-level",
+      "label": "100 level"
+    },
+    {
+      "id": "200-level",
+      "label": "200 level"
+    },
+    {
+      "id": "300-level",
+      "label": "300 level"
+    }
+  ],
+  "sections": [
+    {
+      "id": "101",
+      "ring": "100-level",
+      "slot": 0,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "102",
+      "ring": "100-level",
+      "slot": 1.524,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "103",
+      "ring": "100-level",
+      "slot": 3.048,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "104",
+      "ring": "100-level",
+      "slot": 4.571,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "105",
+      "ring": "100-level",
+      "slot": 6.095,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "106",
+      "ring": "100-level",
+      "slot": 7.619,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "107",
+      "ring": "100-level",
+      "slot": 9.143,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "108",
+      "ring": "100-level",
+      "slot": 10.667,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "109",
+      "ring": "100-level",
+      "slot": 12.19,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "110",
+      "ring": "100-level",
+      "slot": 13.714,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "111",
+      "ring": "100-level",
+      "slot": 15.238,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "112",
+      "ring": "100-level",
+      "slot": 16.762,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "113",
+      "ring": "100-level",
+      "slot": 18.286,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "114",
+      "ring": "100-level",
+      "slot": 19.81,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "115",
+      "ring": "100-level",
+      "slot": 21.333,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "116",
+      "ring": "100-level",
+      "slot": 22.857,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "club"
+    },
+    {
+      "id": "117",
+      "ring": "100-level",
+      "slot": 24.381,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "118",
+      "ring": "100-level",
+      "slot": 25.905,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "119",
+      "ring": "100-level",
+      "slot": 27.429,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "120",
+      "ring": "100-level",
+      "slot": 28.952,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "121",
+      "ring": "100-level",
+      "slot": 30.476,
+      "span": 1.524,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "201A",
+      "ring": "200-level",
+      "slot": 0,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "201B",
+      "ring": "200-level",
+      "slot": 0.97,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "202",
+      "ring": "200-level",
+      "slot": 1.939,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "203",
+      "ring": "200-level",
+      "slot": 2.909,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "204",
+      "ring": "200-level",
+      "slot": 3.879,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "205",
+      "ring": "200-level",
+      "slot": 4.848,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "206",
+      "ring": "200-level",
+      "slot": 5.818,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "207",
+      "ring": "200-level",
+      "slot": 6.788,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "208",
+      "ring": "200-level",
+      "slot": 7.758,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "209",
+      "ring": "200-level",
+      "slot": 8.727,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "210",
+      "ring": "200-level",
+      "slot": 9.697,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "211",
+      "ring": "200-level",
+      "slot": 10.667,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "212",
+      "ring": "200-level",
+      "slot": 11.636,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "213",
+      "ring": "200-level",
+      "slot": 12.606,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "214",
+      "ring": "200-level",
+      "slot": 13.576,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "215",
+      "ring": "200-level",
+      "slot": 14.545,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "216",
+      "ring": "200-level",
+      "slot": 15.515,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "217",
+      "ring": "200-level",
+      "slot": 16.485,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "218",
+      "ring": "200-level",
+      "slot": 17.455,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "219",
+      "ring": "200-level",
+      "slot": 18.424,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "220",
+      "ring": "200-level",
+      "slot": 19.394,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "221",
+      "ring": "200-level",
+      "slot": 20.364,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "222",
+      "ring": "200-level",
+      "slot": 21.333,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "223",
+      "ring": "200-level",
+      "slot": 22.303,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "sideline"
+    },
+    {
+      "id": "224",
+      "ring": "200-level",
+      "slot": 23.273,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "225",
+      "ring": "200-level",
+      "slot": 24.242,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "226A",
+      "ring": "200-level",
+      "slot": 25.212,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "226B",
+      "ring": "200-level",
+      "slot": 26.182,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "corner"
+    },
+    {
+      "id": "227",
+      "ring": "200-level",
+      "slot": 27.152,
+      "span": 0.97,
+      "capacity": 216,
+      "zone": "end"
+    },
+    {
+      "id": "228",
+      "ring": "200-level",
+      "slot": 28.121,
+      "span": 0.97,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "229",
+      "ring": "200-level",
+      "slot": 29.091,
+      "span": 0.97,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "230",
+      "ring": "200-level",
+      "slot": 30.061,
+      "span": 0.97,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "231",
+      "ring": "200-level",
+      "slot": 31.03,
+      "span": 0.97,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "301",
+      "ring": "300-level",
+      "slot": 0,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "302",
+      "ring": "300-level",
+      "slot": 1.231,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "303",
+      "ring": "300-level",
+      "slot": 2.462,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "304",
+      "ring": "300-level",
+      "slot": 3.692,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "305",
+      "ring": "300-level",
+      "slot": 4.923,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "306",
+      "ring": "300-level",
+      "slot": 6.154,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "307",
+      "ring": "300-level",
+      "slot": 7.385,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "308",
+      "ring": "300-level",
+      "slot": 8.615,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "309",
+      "ring": "300-level",
+      "slot": 9.846,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "310",
+      "ring": "300-level",
+      "slot": 11.077,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "311",
+      "ring": "300-level",
+      "slot": 12.308,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "312",
+      "ring": "300-level",
+      "slot": 13.538,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "313",
+      "ring": "300-level",
+      "slot": 14.769,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "314",
+      "ring": "300-level",
+      "slot": 16,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "315",
+      "ring": "300-level",
+      "slot": 17.231,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "end"
+    },
+    {
+      "id": "316",
+      "ring": "300-level",
+      "slot": 18.462,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "317",
+      "ring": "300-level",
+      "slot": 19.692,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "318",
+      "ring": "300-level",
+      "slot": 20.923,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "319",
+      "ring": "300-level",
+      "slot": 22.154,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "320",
+      "ring": "300-level",
+      "slot": 23.385,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "321",
+      "ring": "300-level",
+      "slot": 24.615,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "322",
+      "ring": "300-level",
+      "slot": 25.846,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "323",
+      "ring": "300-level",
+      "slot": 27.077,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "sideline"
+    },
+    {
+      "id": "324",
+      "ring": "300-level",
+      "slot": 28.308,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "325",
+      "ring": "300-level",
+      "slot": 29.538,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    },
+    {
+      "id": "326",
+      "ring": "300-level",
+      "slot": 30.769,
+      "span": 1.231,
+      "capacity": 215,
+      "zone": "corner"
+    }
+  ],
+  "capacityNote": "illustrative even split"
+}

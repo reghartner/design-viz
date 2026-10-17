@@ -361,6 +361,13 @@
         "title": "Keep — Local AI Hub & Camera Fleet"
       }
     ],
+    "Fan CRM": [
+      {
+        "file": "sports/venue-map.html",
+        "family": "sports",
+        "title": "Venue map — a sell-through story"
+      }
+    ],
     "First Contact": [
       {
         "file": "auralis-presence/presence.html",
@@ -696,6 +703,20 @@
         "file": "basecraft-keep/keep.html",
         "family": "basecraft-keep",
         "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Pricing desk": [
+      {
+        "file": "sports/venue-map.html",
+        "family": "sports",
+        "title": "Venue map — a sell-through story"
+      }
+    ],
+    "Promo email": [
+      {
+        "file": "sports/venue-map.html",
+        "family": "sports",
+        "title": "Venue map — a sell-through story"
       }
     ],
     "Proposed draft": [
@@ -1096,6 +1117,13 @@
         "file": "doorbell-atlas/atlas.html",
         "family": "doorbell-atlas",
         "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Ticketing": [
+      {
+        "file": "sports/venue-map.html",
+        "family": "sports",
+        "title": "Venue map — a sell-through story"
       }
     ],
     "Timeline": [

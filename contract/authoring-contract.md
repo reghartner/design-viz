@@ -946,6 +946,56 @@ perspectives" of one timeline). Types:
   reduced motion and print. This panel never plays audio or infers playback
   from a doorbell node or another panel. See the
   [doorbell chime example](../examples/doorbell-chime/doorbell-chime.spec.json).
+- `seatmap` — a venue map: a bowl (or imported chart) of seating sections
+  coloured by sell-through, holds, price, tier or revenue, step by step. Declare
+  `geometry:"bowl"` (default; generic rings generated from `bowl`, `rings` and
+  `ringSlots`) or `"paths"` (every section carries its own `path`). `bowl` is
+  `oval` (default), `horseshoe` (open on the right), `rectangle` or `pitch`;
+  these are generic shapes, never a real venue. `rings` are 1–4 `{id,label}`
+  from the inside out; for paths geometry they only group sections in the
+  legend and totals. `ringSlots` is 8–32 (default 16) equal arc-length slots
+  per ring; slot 0 is centred on the left end and slots run clockwise.
+  `sections` are 4–160 `{id,label?,ring,slot?,span?,path?,capacity,zone?,tier?}`:
+  `id` matches `^[A-Za-z0-9][A-Za-z0-9_-]*$` (≤ 32 characters; it keys the
+  state maps); `ring` references a ring id; `slot` is a number from 0 to below
+  `ringSlots` (fractions allowed; an omitted slot continues after the previous
+  section of the same ring); `span` is the number of slots covered (default 1,
+  fractions allowed, trimmed at the ring end); `capacity` is a whole number of
+  seats ≥ 1; `zone` is free text ≤ 24 characters (sideline, corner, end, club…)
+  shown in tooltips and legend counts; `tier` references `tiers`. For
+  `geometry:"paths"` every section needs `path`: an SVG `d` string ≤ 2,000
+  characters using only absolute `M L H V C S Q T A Z` commands and finite
+  numbers inside 0–1000. Anything else (relative commands, other letters,
+  quotes, angle brackets, non-finite numbers) skips that section with a warning
+  naming `sections[i].path`, so an authored path can never inject markup.
+  `tiers` are ≤ 8 `{id,label,color?}` with `color` as `#RRGGBB` (a default
+  palette otherwise). `landmarks` are ≤ 8 `{id,label,x,y}` text labels inside
+  the viewBox (for example `home bench`). `viewBox` `{width,height}` (100–4000)
+  applies to paths geometry only, default 1000×1000 with aspect preserved; the
+  bowl viewBox is 1000×770. `currency` is a three-letter ISO code (default
+  `USD`, no conversion); `showTotals` (default true) shows sold / capacity,
+  sell-through, held seats and revenue. Starting and step state accept `sold`
+  (section id → whole number 0–capacity), `held` (section id →
+  `{count,label?,until?}` with `count` 0–capacity, drawn as an amber hatch),
+  `price` (section id → finite number ≥ 0), `tierOf` (section id → tier id,
+  overriding the declared tier), `mode` (`sold` default, `held`, `price`,
+  `tier` or `revenue`), `highlight` (one section id, an array of ≤ 8 ids, or
+  null) and `note`. The four maps merge key by key across steps: a key set to
+  `null` forgets that section, a whole field set to `null` clears the map,
+  unknown ids and invalid values warn with their path and are ignored, and
+  `enterOnce` applies for the current step only. Alternate paths fold
+  independently from the starting state. Fill intensity is sold ÷ capacity,
+  held ÷ capacity, price ÷ top price, sold × price ÷ top section, or the tier
+  colour; unpriced sections render dashed in price and revenue modes. Revenue
+  is Σ sold × price where price is known and the totals say so until every
+  section is priced; held seats count against capacity, never against sold.
+  Each section has a tooltip with label, ring, zone, sold / capacity, hold,
+  price and tier; the SVG has `role="img"` and an `aria-label` with the totals;
+  fills transition in 300 ms, highlighted sections pulse once when the set
+  changes, and reduced motion settles instantly. Nothing is forecast. Import a
+  real seating chart with `tools/seatmap-import.mjs`; see
+  [venue map](../cookbook/venue-map.md) and the example page
+  `examples/sports/venue-map.spec.json`.
 - `security` — security monitoring with independently authored sensor health,
   alarms and operator assessment. Declare `site` text and 1–12 `sensors`:
   `{"id":"monitor","type":"security","title":"Security monitoring",

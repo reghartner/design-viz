@@ -1,0 +1,409 @@
+#!/usr/bin/env node
+/* seatmap-import.mjs — turn a seating chart into a `seatmap` panel declaration
+   fragment ({geometry, rings, sections, …}) that an author pastes into a spec.
+
+   Usage:
+     node tools/seatmap-import.mjs <input.csv|input.svg> [--out file]
+          [--capacity-total N] [--level-map "1:100 level,2:200 level"]
+
+   CSV (header id,level,zone,capacity[,label]) produces a generic bowl: one
+   ring per distinct level in file order, sections walked around the ring in
+   file order. Blank capacities are an illustrative even split of
+   --capacity-total (or 1 each without it) and the output says so.
+
+   SVG produces geometry "paths": every <path>, <polygon>, <rect> or <circle>
+   whose id or data-section looks like a section id becomes a section with a
+   normalised path in a 1000-wide viewBox. translate/scale/matrix transforms
+   (own and inherited) are applied; any other transform fails loudly for that
+   element. <style> and <script> are ignored, nothing external is read, and no
+   script runs. Rings come from --level-map group ids or from the leading
+   digits of each section id (101 → 1, 201A → 2).
+
+   No npm dependencies. The strict path tokenizer and normaliser are the same
+   functions the panel uses (src/panels/sports.js). */
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SPORTS = path.join(HERE, '../src/panels/sports.js');
+const OUTPUT_LIMIT = 512 * 1024;
+const SECTION_ID = /^[A-Za-z]{0,3}\d{1,4}[A-Za-z]?$/;
+const MAX_SECTIONS = 160;
+
+let helpers = null;
+function sports() {
+  if (!helpers) {
+    helpers = {};
+    vm.createContext(helpers);
+    vm.runInContext(fs.readFileSync(SPORTS, 'utf8'), helpers, { filename: 'sports.js' });
+  }
+  return helpers;
+}
+function slug(text) {
+  const out = String(text).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return /^[a-z0-9]/.test(out) ? out.slice(0, 32) : 'ring-' + out.slice(0, 27);
+}
+function positiveInt(text) {
+  if (!/^\d{1,9}$/.test(String(text).trim())) return null;
+  const n = Number(text);
+  return n >= 1 ? n : null;
+}
+function round3(n) {
+  return Math.round(n * 1000) / 1000;
+}
+/* Even split of `total` over `count` blank rows, remainder on the first rows. */
+export function evenSplit(total, count) {
+  if (!Number.isSafeInteger(total) || total < count) throw new Error('--capacity-total must be a whole number of at least ' + count + ' (one seat per blank row)');
+  const base = Math.floor(total / count), rem = total - base * count;
+  return Array.from({ length: count }, (_, i) => base + (i < rem ? 1 : 0));
+}
+function capacityNote(blank, total, totalGiven) {
+  if (!blank) return null;
+  return totalGiven ? 'illustrative even split' : 'capacities defaulted to 1 (no --capacity-total given)';
+}
+
+/* ---------- CSV ---------- */
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(cell => cell.trim() !== ''));
+}
+export function importCsv(text, options = {}) {
+  const S = sports();
+  const rows = parseCsv(text.replace(/^﻿/, ''));
+  if (!rows.length) throw new Error('CSV is empty');
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const col = {};
+  ['id', 'level', 'zone', 'capacity', 'label'].forEach(name => { col[name] = header.indexOf(name); });
+  for (const name of ['id', 'level', 'zone', 'capacity'])
+    if (col[name] < 0) throw new Error('CSV header needs id,level,zone,capacity[,label]; missing "' + name + '"');
+  const report = { input: 'csv', rows: rows.length - 1, skipped: [], extraColumns: header.filter(h => !(h in col)) };
+  const levels = [], byLevel = new Map(), seen = new Set(), entries = [];
+  rows.slice(1).forEach((cells, i) => {
+    const line = i + 2, get = name => (col[name] >= 0 ? (cells[col[name]] || '').trim() : '');
+    const id = get('id'), level = get('level'), zone = get('zone'), capacity = get('capacity'), label = get('label');
+    if (!S.spmSafeId(id)) { report.skipped.push({ line, id, reason: 'id must be letters/digits/-/_ starting with a letter or digit' }); return; }
+    if (seen.has(id)) { report.skipped.push({ line, id, reason: 'duplicate id' }); return; }
+    if (!level) { report.skipped.push({ line, id, reason: 'blank level' }); return; }
+    let cap = null;
+    if (capacity !== '') {
+      cap = positiveInt(capacity);
+      if (cap === null) { report.skipped.push({ line, id, reason: 'capacity must be a whole number ≥ 1 or blank' }); return; }
+    }
+    seen.add(id);
+    if (!byLevel.has(level)) { byLevel.set(level, []); levels.push(level); }
+    const entry = { id, level, zone: zone.slice(0, 24), capacity: cap, label: label.slice(0, 40) };
+    if (zone.length > 24) report.skipped.push({ line, id, reason: 'zone longer than 24 characters — truncated' });
+    byLevel.get(level).push(entry);
+    entries.push(entry);
+  });
+  if (!entries.length) throw new Error('no usable rows');
+  if (levels.length > 4) throw new Error('more than 4 distinct levels (' + levels.join(', ') + '); a seatmap has 1–4 rings');
+  if (entries.length > MAX_SECTIONS) throw new Error('more than ' + MAX_SECTIONS + ' sections');
+  const blank = entries.filter(e => e.capacity === null);
+  if (blank.length) {
+    const split = options.capacityTotal != null ? evenSplit(options.capacityTotal, blank.length) : blank.map(() => 1);
+    blank.forEach((e, i) => { e.capacity = split[i]; });
+  }
+  const largest = Math.max(...levels.map(level => byLevel.get(level).length));
+  const ringSlots = Math.max(8, Math.min(32, largest));
+  const ringIds = new Map();
+  const rings = levels.map(level => {
+    let id = slug(level), n = 2;
+    while ([...ringIds.values()].includes(id)) id = slug(level) + '-' + n++;
+    ringIds.set(level, id);
+    return { id, label: level };
+  });
+  const sections = [];
+  levels.forEach(level => {
+    const list = byLevel.get(level), span = ringSlots / list.length;
+    list.forEach((e, i) => {
+      const section = { id: e.id, ring: ringIds.get(level), slot: round3(i * span), span: round3(span), capacity: e.capacity };
+      if (e.zone) section.zone = e.zone;
+      if (e.label) section.label = e.label;
+      sections.push(section);
+    });
+  });
+  const fragment = { geometry: 'bowl', bowl: 'oval', ringSlots, rings, sections };
+  const note = capacityNote(blank.length, options.capacityTotal, options.capacityTotal != null);
+  if (note) fragment.capacityNote = note;
+  Object.assign(report, {
+    rings: rings.map(r => ({ id: r.id, label: r.label, sections: byLevel.get(r.label).length })),
+    ringSlots, sections: sections.length,
+    capacities: { given: entries.length - blank.length, filled: blank.length, total: options.capacityTotal ?? null, note },
+  });
+  return { fragment, report };
+}
+
+/* ---------- SVG ---------- */
+function decodeEntities(text) {
+  return text.replace(/&(amp|lt|gt|quot|apos|#x[0-9a-fA-F]+|#\d+);/g, (m, name) => {
+    if (name === 'amp') return '&';
+    if (name === 'lt') return '<';
+    if (name === 'gt') return '>';
+    if (name === 'quot') return '"';
+    if (name === 'apos') return "'";
+    const code = name[1] === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+    return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : '';
+  });
+}
+function parseAttributes(text) {
+  const attrs = {};
+  const re = /([^\s=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+  let m;
+  while ((m = re.exec(text))) attrs[m[1].toLowerCase()] = decodeEntities(m[2] ?? m[3] ?? m[4] ?? '');
+  return attrs;
+}
+function multiply(a, b) {
+  return [
+    a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5],
+  ];
+}
+/* translate / scale / matrix compose; anything else returns {error}. */
+export function parseTransform(text) {
+  let m = [1, 0, 0, 1, 0, 0];
+  const re = /\s*([A-Za-z]+)\s*\(([^)]*)\)\s*,?/g;
+  let consumed = 0, match;
+  while ((match = re.exec(text))) {
+    consumed = re.lastIndex;
+    const name = match[1], args = match[2].trim().split(/[\s,]+/).filter(Boolean).map(Number);
+    if (args.some(n => !Number.isFinite(n))) return { error: 'non-finite number in transform ' + name };
+    let t;
+    if (name === 'translate' && (args.length === 1 || args.length === 2)) t = [1, 0, 0, 1, args[0], args[1] || 0];
+    else if (name === 'scale' && (args.length === 1 || args.length === 2)) t = [args[0], 0, 0, args.length === 2 ? args[1] : args[0], 0, 0];
+    else if (name === 'matrix' && args.length === 6) t = args;
+    else return { error: 'unsupported transform ' + name + '(' + match[2].trim() + ')' };
+    m = multiply(m, t);
+  }
+  if (consumed !== text.length && text.trim()) return { error: 'unreadable transform "' + text.trim() + '"' };
+  return { matrix: m };
+}
+function num(value) {
+  const n = Number(value);
+  return value !== undefined && value !== '' && Number.isFinite(n) ? n : null;
+}
+function elementPath(name, attrs, S) {
+  if (name === 'path') {
+    const parsed = S.spmParsePath(attrs.d, { relative: true, maxChars: 65536 });
+    if (parsed.error) return { error: 'path ' + parsed.error };
+    return { commands: S.spmAbsolutePath(parsed.commands) };
+  }
+  if (name === 'polygon') {
+    const nums = (attrs.points || '').trim().split(/[\s,]+/).filter(Boolean).map(Number);
+    if (nums.length < 6 || nums.length % 2 || nums.some(n => !Number.isFinite(n))) return { error: 'polygon needs at least three finite x,y pairs' };
+    const commands = [];
+    for (let i = 0; i < nums.length; i += 2) commands.push({ cmd: i ? 'L' : 'M', args: [nums[i], nums[i + 1]] });
+    commands.push({ cmd: 'Z', args: [] });
+    return { commands };
+  }
+  if (name === 'rect') {
+    const x = num(attrs.x) ?? 0, y = num(attrs.y) ?? 0, w = num(attrs.width), h = num(attrs.height);
+    if (w === null || h === null || w <= 0 || h <= 0) return { error: 'rect needs positive width and height' };
+    return { commands: [{ cmd: 'M', args: [x, y] }, { cmd: 'L', args: [x + w, y] }, { cmd: 'L', args: [x + w, y + h] }, { cmd: 'L', args: [x, y + h] }, { cmd: 'Z', args: [] }] };
+  }
+  if (name === 'circle') {
+    const cx = num(attrs.cx) ?? 0, cy = num(attrs.cy) ?? 0, r = num(attrs.r);
+    if (r === null || r <= 0) return { error: 'circle needs a positive r' };
+    return { commands: [{ cmd: 'M', args: [cx - r, cy] }, { cmd: 'A', args: [r, r, 0, 1, 0, cx + r, cy] }, { cmd: 'A', args: [r, r, 0, 1, 0, cx - r, cy] }, { cmd: 'Z', args: [] }] };
+  }
+  return null;
+}
+function inferRing(id) {
+  const digits = (id.match(/\d+/) || [''])[0];
+  if (!digits) return null;
+  return digits.length >= 3 ? digits.slice(0, -2).replace(/^0+(?=\d)/, '') : digits[0];
+}
+export function parseLevelMap(text) {
+  const map = new Map();
+  if (!text) return map;
+  text.split(',').forEach(pair => {
+    const at = pair.indexOf(':');
+    if (at < 0) throw new Error('--level-map entries are key:label, got "' + pair + '"');
+    const key = pair.slice(0, at).trim(), label = pair.slice(at + 1).trim();
+    if (!key || !label) throw new Error('--level-map entries are key:label, got "' + pair + '"');
+    map.set(key, label);
+  });
+  return map;
+}
+export function importSvg(text, options = {}) {
+  const S = sports();
+  const levelMap = options.levelMap instanceof Map ? options.levelMap : parseLevelMap(options.levelMap);
+  const report = { input: 'svg', found: 0, kinds: {}, skipped: [], ignored: [], capacities: { given: 0, defaulted: 0 } };
+  /* Drop everything that is not element markup; nothing here is executed. */
+  let src = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '').replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, '').replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '');
+  const tagRe = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[^\s=\/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*(\/?)>/g;
+  const stack = [{ name: '#root', matrix: [1, 0, 0, 1, 0, 0], bad: null, id: null, defs: false }];
+  const candidates = [];
+  let m;
+  while ((m = tagRe.exec(src))) {
+    const closing = m[1] === '/', name = m[2].toLowerCase(), selfClosing = m[4] === '/';
+    if (closing) { if (stack.length > 1) stack.pop(); continue; }
+    if (name === 'style' || name === 'script') {
+      report.ignored.push('<' + name + '>');
+      if (!selfClosing) {
+        const end = src.toLowerCase().indexOf('</' + name, tagRe.lastIndex);
+        tagRe.lastIndex = end < 0 ? src.length : end;
+      }
+      continue;
+    }
+    const attrs = parseAttributes(m[3]);
+    const parent = stack[stack.length - 1];
+    let matrix = parent.matrix, bad = parent.bad;
+    if (attrs.transform !== undefined && !bad) {
+      const t = parseTransform(attrs.transform);
+      if (t.error) bad = t.error + ' on <' + name + (attrs.id ? ' id="' + attrs.id + '"' : '') + '>';
+      else matrix = multiply(parent.matrix, t.matrix);
+    }
+    const frame = { name, matrix, bad, id: attrs.id || null, defs: parent.defs || name === 'defs' };
+    const sectionId = attrs['data-section'] || attrs.id || '';
+    if (['path', 'polygon', 'rect', 'circle'].includes(name) && sectionId) {
+      if (!SECTION_ID.test(sectionId) || !S.spmSafeId(sectionId)) report.skipped.push({ id: sectionId, element: name, reason: 'id does not look like a section id (letters? digits letter?)' });
+      else if (frame.defs) report.skipped.push({ id: sectionId, element: name, reason: 'inside <defs>; templates are never placed' });
+      else if (bad) report.skipped.push({ id: sectionId, element: name, reason: bad });
+      else {
+        const shape = elementPath(name, attrs, S);
+        if (shape.error) report.skipped.push({ id: sectionId, element: name, reason: shape.error });
+        else {
+          const moved = S.spmTransformPath(shape.commands, matrix);
+          if (moved.error) report.skipped.push({ id: sectionId, element: name, reason: moved.error });
+          else {
+            let ring = null;
+            for (let i = stack.length - 1; i >= 1 && !ring; i--) if (stack[i].id && levelMap.has(stack[i].id)) ring = stack[i].id;
+            if (!ring) ring = inferRing(sectionId);
+            if (!ring) report.skipped.push({ id: sectionId, element: name, reason: 'no ring: the id has no digits and no --level-map group contains it' });
+            else {
+              const capacity = positiveInt(attrs['data-capacity'] || '');
+              if (attrs['data-capacity'] !== undefined && capacity === null)
+                report.skipped.push({ id: sectionId, element: name, reason: 'data-capacity "' + attrs['data-capacity'] + '" is not a whole number ≥ 1 — capacity defaulted' });
+              candidates.push({ id: sectionId, element: name, commands: moved.commands, ring, capacity, zone: (attrs['data-zone'] || '').trim().slice(0, 24), label: (attrs['data-label'] || '').trim().slice(0, 40) });
+            }
+          }
+        }
+      }
+    }
+    if (!selfClosing) stack.push(frame);
+  }
+  const seen = new Set(), sections = [];
+  candidates.forEach(c => {
+    if (seen.has(c.id)) { report.skipped.push({ id: c.id, element: c.element, reason: 'duplicate id' }); return; }
+    seen.add(c.id);
+    sections.push(c);
+  });
+  if (!sections.length) throw new Error('no section elements found (path/polygon/rect/circle with an id or data-section like 101 or 201A)');
+  if (sections.length > MAX_SECTIONS) throw new Error('more than ' + MAX_SECTIONS + ' sections');
+  const all = [].concat(...sections.map(s => s.commands));
+  const bbox = S.spmPathBBox(all);
+  if (!bbox || bbox.width <= 0 || bbox.height <= 0) throw new Error('sections have no area');
+  const scale = S.SPM_VIEW / bbox.width;
+  const viewBox = { width: S.SPM_VIEW, height: Math.max(1, Math.round(bbox.height * scale)) };
+  /* Numeric ring keys sort inside → out; named groups keep first-seen order after them. */
+  const seenKeys = [...new Set(sections.map(s => s.ring))];
+  const ringKeys = seenKeys.filter(k => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b)).concat(seenKeys.filter(k => !/^\d+$/.test(k)));
+  if (ringKeys.length > 4) throw new Error('more than 4 rings inferred (' + ringKeys.join(', ') + '); pass --level-map or edit the ids');
+  const rings = ringKeys.map(key => ({ id: slug(key), label: levelMap.get(key) || 'Level ' + key }));
+  const blank = sections.filter(s => s.capacity === null);
+  if (blank.length) {
+    const split = options.capacityTotal != null ? evenSplit(options.capacityTotal, blank.length) : blank.map(() => 1);
+    blank.forEach((s, i) => { s.capacity = split[i]; });
+  }
+  const out = sections.map(s => {
+    const normalised = S.spmNormalizePath(s.commands, bbox);
+    const section = { id: s.id, ring: slug(s.ring), path: normalised.d, capacity: s.capacity };
+    if (s.zone) section.zone = s.zone;
+    if (s.label) section.label = s.label;
+    report.kinds[s.element] = (report.kinds[s.element] || 0) + 1;
+    return section;
+  });
+  const fragment = { geometry: 'paths', viewBox, rings, sections: out };
+  const note = capacityNote(blank.length, options.capacityTotal, options.capacityTotal != null);
+  if (note) fragment.capacityNote = note;
+  Object.assign(report, {
+    found: out.length, viewBox, ringSource: levelMap.size ? 'level-map groups, else leading digits' : 'leading digits of each section id',
+    rings: rings.map(r => ({ id: r.id, label: r.label, sections: out.filter(s => s.ring === r.id).length })),
+    capacities: { given: sections.length - blank.length, defaulted: blank.length, total: options.capacityTotal ?? null, note },
+  });
+  return { fragment, report };
+}
+
+/* ---------- CLI ---------- */
+export function parseArgs(argv) {
+  const options = { input: null, out: null, capacityTotal: null, levelMap: null };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--out') options.out = argv[++i];
+    else if (arg === '--capacity-total') {
+      const n = Number(argv[++i]);
+      if (!Number.isSafeInteger(n) || n < 1) throw new Error('--capacity-total needs a whole number ≥ 1');
+      options.capacityTotal = n;
+    } else if (arg === '--level-map') options.levelMap = argv[++i];
+    else if (arg.startsWith('--')) throw new Error('unknown option ' + arg);
+    else if (options.input) throw new Error('only one input file');
+    else options.input = arg;
+  }
+  if (!options.input) throw new Error('usage: node tools/seatmap-import.mjs <input.csv|input.svg> [--out file] [--capacity-total N] [--level-map "1:100 level,…"]');
+  return options;
+}
+export function formatReport(report, inputName) {
+  const lines = ['seatmap-import: ' + report.input.toUpperCase() + ' ' + inputName];
+  if (report.input === 'csv') {
+    lines.push('  rings: ' + report.rings.length + ' (' + report.rings.map(r => r.label + ': ' + r.sections).join(', ') + ') · ringSlots ' + report.ringSlots);
+    lines.push('  sections: ' + report.sections + ' of ' + report.rows + ' rows');
+    const c = report.capacities;
+    lines.push('  capacities: ' + c.given + ' given, ' + c.filled + (c.filled ? (c.total != null ? ' filled as an illustrative even split of ' + c.total : ' defaulted to 1 (no --capacity-total)') : ' blank'));
+    if (report.extraColumns.length) lines.push('  ignored columns: ' + report.extraColumns.join(', '));
+  } else {
+    lines.push('  sections found: ' + report.found + ' (' + Object.entries(report.kinds).map(([k, v]) => k + ' ' + v).join(', ') + ')');
+    lines.push('  rings: ' + report.rings.map(r => r.id + ' "' + r.label + '": ' + r.sections).join(', ') + ' · from ' + report.ringSource);
+    lines.push('  viewBox: ' + report.viewBox.width + '×' + report.viewBox.height + ' (aspect preserved)');
+    const c = report.capacities;
+    lines.push('  capacities: ' + c.given + ' from data-capacity, ' + c.defaulted + (c.defaulted ? (c.total != null ? ' filled as an illustrative even split of ' + c.total : ' defaulted to 1 (no --capacity-total)') : ' defaulted'));
+    if (report.ignored.length) lines.push('  ignored: ' + [...new Set(report.ignored)].join(', '));
+  }
+  lines.push('  skipped: ' + (report.skipped.length ? report.skipped.length + ' element' + (report.skipped.length === 1 ? '' : 's') : 'none'));
+  report.skipped.forEach(s => lines.push('    - ' + (s.line ? 'line ' + s.line + ' ' : '') + (s.element ? '<' + s.element + '> ' : '') + (s.id ? '"' + s.id + '" ' : '') + '— ' + s.reason));
+  return lines.join('\n');
+}
+export function run(argv, io = { stdout: process.stdout, stderr: process.stderr }) {
+  let options;
+  try { options = parseArgs(argv); } catch (error) { io.stderr.write(error.message + '\n'); return 2; }
+  let text;
+  try { text = fs.readFileSync(options.input, 'utf8'); } catch (error) { io.stderr.write('cannot read ' + options.input + ': ' + error.message + '\n'); return 2; }
+  const isSvg = /\.svg$/i.test(options.input) || /<svg[\s>]/i.test(text.slice(0, 4096));
+  let result;
+  try {
+    result = isSvg ? importSvg(text, options) : importCsv(text, options);
+  } catch (error) {
+    io.stderr.write('seatmap-import: ' + error.message + '\n');
+    return 1;
+  }
+  const json = JSON.stringify(result.fragment, null, 2) + '\n';
+  io.stderr.write(formatReport(result.report, options.input) + '\n');
+  if (Buffer.byteLength(json) > OUTPUT_LIMIT) {
+    io.stderr.write('seatmap-import: refusing to write ' + Math.round(Buffer.byteLength(json) / 1024) + ' KiB; the limit is 512 KiB. Simplify the chart paths or import fewer sections.\n');
+    return 1;
+  }
+  if (options.out) {
+    fs.writeFileSync(options.out, json);
+    io.stderr.write('  output: ' + options.out + ' (' + (Buffer.byteLength(json) / 1024).toFixed(1) + ' KiB)\n');
+  } else io.stdout.write(json);
+  return 0;
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(run(process.argv.slice(2)));

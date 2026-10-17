@@ -4,6 +4,7 @@
 
 var ICON_SET = FlowIcons.ids.slice();
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
+var NODE_STYLE_SET = ["slate", "rose", "ember", "amber", "moss", "teal", "sky", "indigo", "violet", "magenta", "sand", "ink"];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
@@ -395,6 +396,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.nodes.' + id + '.locked: must be true or false — treating this node as unlocked');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
     if (n.tint && TINT_SET.indexOf(n.tint) < 0) warnings.push(DP + '.nodes.' + id + '.tint: unknown tint "' + n.tint + '" — using "cmd" (valid: ' + TINT_SET.join(' ') + ')');
+    if (n.style != null && NODE_STYLE_SET.indexOf(n.style) < 0)
+      warnings.push(DP + '.nodes.' + id + '.style: unknown style "' + (typeof n.style === 'string' ? n.style : JSON.stringify(n.style)) + '" — ignored (valid: ' + NODE_STYLE_SET.join(' ') + ')');
     if (n.image != null && !embeddedImageKind(n.image))
       errors.push(DP + '.nodes.' + id + '.image: use a real embedded PNG, JPEG or WebP data URL up to 512 KiB; remote URLs, SVG, GIF and mislabeled files are not supported');
     if (n.image != null && (typeof n.alt !== 'string' || !n.alt.trim()))

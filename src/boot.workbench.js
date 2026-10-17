@@ -48,7 +48,7 @@ var CONTRACT = [
   '    "autoplay": false,               // optional; true = advance every 3s on step entry',
   '    "brand": {"app":"<company/app name>", "icon":"house", "accent":"#318585"}, // optional shared panel brand',
   '    "nodes":  {"<id>": {"title":"<name>", "sub":"<one-line detail>",',
-  '                        "icon":"<icon>", "tint":"<tint>",',
+  '                        "icon":"<icon>", "tint":"<tint>", "style":"<node style>", // style optional: preset card colors',
   '                        "image":"data:image/png;base64,...", "alt":"<description>", // optional embedded raster node',
   '                        "group":"<groupId>",          // optional: containment boundary',
   '                        "link":"<permalink URL>"}},   // optional: clickable arrow on the card',
@@ -261,7 +261,9 @@ var CONTRACT = [
   '  A local mark replaces the shared mark. logo is a 1–4 character monogram;',
   '  logoImage is embedded PNG/JPEG/WebP <=512 KiB; colors are #RGB or #RRGGBB.',
   '  Company branding in the panel inspector edits shared or panel-only settings.',
-  '- tints: cmd auth data mqtt dev',
+  '- tints (icon color): cmd auth data mqtt dev',
+  '- node styles (card border, background and text as one preset; omit for the skin default):',
+  '  slate rose ember amber moss teal sky indigo violet magenta sand ink',
   '- Edge labels: protocol verbs and topics (POST /x, PUBLISH a/b/c) read best.'
 ].join('\n');
 

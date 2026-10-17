@@ -72,7 +72,8 @@ test('desktop Contents expands every View by default and preserves independent d
    D1 deep link lands | fresh load of #t=reference&d=glossary&v=ref-explore | tab label Reference, glossary row in ref-explore aria-current=page, #section-glossary is the Explore section; both Tabs expanded | a deep-link landing that expands only the linked Tab
    D2 hash change | real same-document navigation to #d=review&v=explore | Product journey owns, review row current, Reference still expanded | hashchange routing that recollapses groups
    R1 restore() wins | Workbench re-render (workbench-navigation.spec.mjs) | a Tab the reader collapsed stays collapsed after the preview re-renders | the landing default overriding saved state
-   E1 native + Forge | twoTabs() through Backstage nativeViewer and the Forge viewer resource | same L1/L2 assertions inside each host | fixing only the standalone viewer */
+   E1 Backstage native | twoTabs() mounted through apps/backstage nativeViewer.js (shadow root) | same L1/L2 assertions inside the host | fixing only the standalone viewer
+   E2 Confluence Forge | twoTabs() as the Forge macro config served from /forge/index.html | same L1/L2 assertions in #docview | fixing only the standalone viewer */
 function twoTabs(){
   const raw=story(),[journey,reference]=raw.page.sections[0].tabs,base=journey.sections[0];
   const section=(id,heading)=>({...structuredClone(base),id,heading});
@@ -116,7 +117,7 @@ test('#607 desktop Contents lands with every Tab and View expanded and keeps rea
   await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(sections('explore').filter({hasText:'Decide what becomes the accepted diagram'})).toHaveAttribute('aria-current','page');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
 });
 
-test('#607 Backstage native and Forge readers land with every Tab and View expanded',async({page,server})=>{
+test('#607 Backstage native reader lands with every Tab and View expanded',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   await writeFile(path.join(server.root,'expanded-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'expanded-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./expanded-native.js";window.mount=mountNativeViewer;</script>');
@@ -124,6 +125,10 @@ test('#607 Backstage native and Forge readers land with every Tab and View expan
   const native=page.locator('#one');await expect(native.locator('.reader-contents')).toBeVisible();await expect(native.locator('.reader-tab-label')).toHaveText('Product journey');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expectAllExpanded(native);
+});
+
+test('#607 Forge reader lands with every Tab and View expanded',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
   await page.addInitScript(config=>{window.__bridge={callBridge:async method=>{
     if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:false}}};
     if(['submit','close','navigate'].includes(method))return true;

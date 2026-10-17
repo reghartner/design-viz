@@ -1,8 +1,10 @@
 # Build from the company fork root. HTML is generated from source in this stage.
 # Explicit inputs keep local credentials and development dependencies out.
-FROM node:24-alpine AS build
-RUN apk add --no-cache python3
+FROM node:24-bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends python3 && apt-get clean
 WORKDIR /build
+COPY tools/browser-tests/package*.json tools/browser-tests/
+RUN npm ci --prefix tools/browser-tests && cd tools/browser-tests && npx playwright install --with-deps chromium
 COPY LICENSE LICENSE
 COPY src/ src/
 COPY tools/*.py tools/*.cjs tools/*.js tools/
@@ -19,7 +21,7 @@ COPY company/ company/
 COPY canon.json canon.json
 COPY diagrams/ diagrams/
 COPY workbench/ workbench/
-RUN python3 tools/build.py
+RUN python3 tools/build.py && node tools/canon/library.mjs --thumbnails
 
 FROM nginx:stable-alpine
 COPY --from=build /build/LICENSE /usr/share/nginx/html/LICENSE

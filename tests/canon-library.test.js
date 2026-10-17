@@ -296,3 +296,14 @@ test('#583 description and tags leave shared topology imports and document links
   const ref=plain(context.documentReference(withMeta));assert.equal(ref.spec,'consumer');
   assert.equal(context.documentSiteURL(withMeta.documentLinks.siteBaseUrl,{...ref,step:'send'}),context.documentSiteURL(without.documentLinks.siteBaseUrl,{...plain(context.documentReference(without)),step:'send'}));
 });
+
+test('thumbnail metadata is revision-bound and confined to publisher-owned image paths',async()=>{
+  const {buildLibrary}=await import('../tools/canon/library.mjs');const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json')),revision=raw.diagrams[0].revision;
+  const good={version:1,url:'library-thumbnails/'+'a'.repeat(64)+'/'+'b'.repeat(64)+'.png',revision,width:960,height:600};
+  assert.deepEqual(plain(context.libraryPreviewData(good,revision)),good);
+  for(const preview of [undefined,null,{}, {...good,version:2},{...good,revision:'c'.repeat(64)},{...good,width:999999},...['https://evil.test/a.png','//evil.test/a.png','../a.png','/a.png',good.url+'?x',good.url+'#x',good.url+'\n',good.url.replace('library-thumbnails/','library-thumbnails/%2e%2e/')].map(url=>({...good,url}))]){
+    const entry=context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],preview}]})[0];assert.equal(entry.preview,null);assert.equal(entry.id,'doorbell');
+  }
+  assert.equal(context.parseCanonLibrary(manifest())[0].preview,undefined);
+  assert.equal(context.libraryTeamName('group:default/payments-platform'),'Payments Platform');assert.equal(context.libraryTeamName('group:europe/payments-platform'),'Payments Platform · europe');
+});

@@ -47,7 +47,7 @@ test('guide and bundled canon example also work from a downloaded file',async({p
   await expect(guide(page).getByRole('heading',{name:'Usually, it is the editing context.'})).toBeInViewport();
   await page.locator('#human-guide-close').click();await page.locator('#welcome-library').click();
   await expect(page.locator('#welcome-library-status')).toContainText('offline');
-  await page.locator('.canon-library-card').first().click();await expect(page.locator('#canon-reader .doc-sec')).not.toHaveCount(0);
+  await page.locator('.canon-library-open').first().click();await expect(page.locator('#canon-reader .doc-sec')).not.toHaveCount(0);
   await expect(page.locator('#workbench-workspace')).not.toBeVisible();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 });
 
@@ -100,7 +100,7 @@ test('canon browsing is read-only and editing opens a separate project while pre
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-home').click();const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text);
   await page.locator('#welcome-library').click();await expect(page.locator('#welcome-library-status')).toContainText('Published repository snapshot');
-  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}).click();
   await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');await expect(page.locator('#workbench-workspace')).not.toBeVisible();
   await page.locator('#canon-reader [data-dv-node="a"]').click();await page.keyboard.press('Delete');
   await page.locator('#canon-reader .path-chip').filter({hasText:'Failure'}).click();
@@ -162,7 +162,7 @@ test('Canon success keeps its document title in a compact unobscured app header 
   }
   const titleNode=await heading.elementHandle();await page.setViewportSize({width:900,height:900});
   await page.locator('.canon-reader-toolbar .welcome-back').click();await expect(page.locator('#welcome-home')).toBeVisible();await page.locator('#welcome-library').click();await expect(screen(page,'library')).toBeVisible();
-  await page.getByRole('link',{name:/Inventory handoff/}).click();await expect(page.getByRole('heading',{name:'Inventory handoff',exact:true})).toBeVisible();
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'Inventory handoff',exact:true}).click();await expect(page.getByRole('heading',{name:'Inventory handoff',exact:true})).toBeVisible();
   expect(await titleNode.evaluate(node=>node===document.querySelector('#canon-reader-title'))).toBe(true);
   await page.locator('#canon-reader-edit').click();await expect(page.locator('#workbench-workspace')).toBeVisible();
   await page.goBack();await expect(page.getByRole('heading',{name:'Inventory handoff',exact:true})).toBeVisible();
@@ -176,7 +176,7 @@ test('Canon success keeps its document title in a compact unobscured app header 
 test('Canon edit and browser Back preserve the selected chapter, path and step with stale-state fallback',async({page,server},info)=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
-  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}).click();
   const reader=page.locator('#canon-reader');
   await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
   await expect(reader.locator('.stepid')).toHaveText('press');
@@ -223,7 +223,7 @@ test('Canon edit and browser Back retain the canonical owner View and its select
   const spec=JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
   spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
   const data={version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
-  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}).click();
   const reader=page.locator('#canon-reader'),navigation=reader.locator(':scope>.explore-navigation');
   await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await navigation.locator('.reader-tree-sections[data-reader-view="explore-bc"]').getByRole('button',{name:'Section C',exact:true}).click();
   await expect(reader.locator('#section-c')).toBeVisible();await expect(reader.locator('#section-b')).toBeHidden();
@@ -260,7 +260,7 @@ test('#607 a ?diagram= deep link lands on its section with every Contents Tab an
 test('Canon edit and browser Back preserve Ambient mode while stale modes use the authored default',async({page,server})=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
-  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}).click();
   const reader=page.locator('#canon-reader'),editor=page.locator('#docview');
   await reader.getByRole('button',{name:'Ambient',exact:true}).click();
   await expect(reader.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -337,7 +337,7 @@ test('a saved canon document builds into the real served library without registr
   try{
     publish();await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
     await expect(page.locator('#welcome-library-status')).toContainText('Published repository snapshot · 1 diagram');
-    await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+    await page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}).click();
     await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
     await page.locator('#canon-reader-edit').click();await expect(page.locator('#src')).toHaveValue(JSON.stringify(spec,null,2));
     expect(JSON.parse(await readFile(file,'utf8'))).toEqual(spec);
@@ -356,7 +356,7 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   await page.locator('#workspace-home').click();
   const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text);
   await page.locator('#welcome-library').click();
-  const card=page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}),url=server.origin+'/workbench.html?diagram=delivery';
+  const card=page.locator('#welcome-library-grid').getByRole('link',{name:'Reviewed delivery',exact:true}),url=server.origin+'/workbench.html?diagram=delivery';
   await expect(card).toHaveAttribute('href',url);
   // This new browser tab has no workbench history entry or selected diagram state.
   const fresh=await page.context().newPage();await fresh.goto(await card.getAttribute('href'));

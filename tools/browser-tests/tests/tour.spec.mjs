@@ -728,7 +728,7 @@ test('canon reader: one "?" opens the reader shortcut sheet; Tour and User guide
   await page.route('**/diagrams.json',route=>route.fulfill({json:{version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]}}));
   await page.setViewportSize({width:1440,height:900});
   await page.goto(server.origin+'/workbench.html');
-  await page.locator('#welcome-library').click();await page.locator('.canon-library-card').first().click();
+  await page.locator('#welcome-library').click();await page.locator('.canon-library-open').first().click();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
   const guide=page.locator('#human-guide'),editorSheet=page.locator('#keyboard-shortcuts');

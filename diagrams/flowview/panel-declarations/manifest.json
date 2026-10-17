@@ -9,11 +9,14 @@
       "tags": [],
       "widgets": [
         "battery",
+        "buffer",
         "checks",
+        "deviceapp",
         "funnel",
         "gauge",
         "log",
         "radar",
+        "strandscene",
         "table"
       ]
     }

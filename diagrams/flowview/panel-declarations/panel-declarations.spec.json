@@ -19,14 +19,14 @@
         "heading": "How panels change at each step today",
         "accent": "blue",
         "text": [
-         "Click through the steps. Every panel beside the diagram is a real Flowview panel demonstrating the rule its title names, and the JSON panel shows exactly what that step wrote. Battery rates and counts are illustrative."
+         "Click through the steps. Each panel beside the diagram is a real Flowview panel demonstrating the rule its title names; the table shows exactly what that step wrote. Counts and rates are illustrative. The Special fold rules tab covers the remaining operations."
         ],
         "diagram": {
          "view": "step",
          "nodes": {
           "decl": {
            "title": "Declaration",
-           "sub": "panels[]: fixed fields",
+           "sub": "fixed fields",
            "icon": "package"
           },
           "step": {
@@ -57,12 +57,12 @@
           },
           "player": {
            "title": "Player",
-           "sub": "one snapshot per step",
+           "sub": "per step",
            "icon": "monitor"
           },
           "render": {
            "title": "Renderer",
-           "sub": "declaration + snapshot",
+           "sub": "fixed declaration",
            "icon": "monitor",
            "tint": "data"
           }
@@ -125,43 +125,43 @@
            "from": "step",
            "to": "path",
            "kind": "int",
-           "label": "sparse patches"
+           "label": "patches"
           },
           {
            "from": "path",
            "to": "fold",
            "kind": "int",
-           "label": "steps on this path"
+           "label": "this path"
           },
           {
            "from": "decl",
            "to": "fold",
            "kind": "int",
-           "label": "initial + fold rules"
+           "label": "initial + rules"
           },
           {
            "from": "clock",
            "to": "fold",
            "kind": "int",
-           "label": "time-derived fields"
+           "label": "elapsed time"
           },
           {
            "from": "fold",
            "to": "player",
            "kind": "int",
-           "label": "complete snapshots"
+           "label": "snapshots"
           },
           {
            "from": "vis",
            "to": "player",
            "kind": "int",
-           "label": "show / hide card"
+           "label": "show / hide"
           },
           {
            "from": "player",
            "to": "render",
            "kind": "int",
-           "label": "snapshot for this step"
+           "label": "snapshot"
           },
           {
            "from": "decl",
@@ -174,7 +174,7 @@
           {
            "id": "json",
            "type": "table",
-           "title": "What this step wrote",
+           "title": "What this step wrote (this table's rows are replaced every step)",
            "columns": [
             {
              "id": "key",
@@ -196,7 +196,7 @@
           {
            "id": "gauge",
            "type": "gauge",
-           "title": "Gauge: carry and enterOnce",
+           "title": "Gauge: common fold",
            "unit": "mA",
            "max": 400,
            "initial": {
@@ -230,7 +230,7 @@
           {
            "id": "battery",
            "type": "battery",
-           "title": "Battery: derived from story time",
+           "title": "Battery: drains from story time",
            "drainPerHour": 4,
            "initial": {
             "charge": 80,
@@ -240,7 +240,7 @@
           {
            "id": "radar",
            "type": "radar",
-           "title": "Radar: declared threshold re-tuned by a step",
+           "title": "Radar: declared threshold re-tuned",
            "sensor": {
             "x": 160,
             "y": 168
@@ -297,24 +297,24 @@
             "decl"
            ],
            "time": "+0m",
-           "text": "**The declaration is fixed.** Each panel is declared once: its `type`, `title`, fixed fields such as the gauge's `max` and `unit`, and an optional `initial` starting state. Every panel on this page starts from its own `initial`.",
+           "text": "**The declaration is fixed.** Each panel is declared once: `type`, `title`, fixed fields such as the gauge's `max` and `unit`, and an optional `initial` starting state.",
            "panels": {
             "json": {
              "rows": [
               {
-               "id": "gauge.initial",
+               "id": "a",
                "cells": {
                 "key": "gauge.initial",
                 "value": "{\"value\": 12}",
-                "rule": "starting state, before step 1"
+                "rule": "starting state"
                }
               },
               {
-               "id": "gauge.max",
+               "id": "b",
                "cells": {
                 "key": "gauge.max",
-                "value": "400 (declaration)",
-                "rule": "fixed: no step can change it"
+                "value": "400",
+                "rule": "declaration: fixed"
                }
               }
              ]
@@ -330,7 +330,7 @@
             "player->render"
            ],
            "time": "+1h",
-           "text": "**A patch carries forward.** This step writes `{\"value\": 40}` to the gauge. The fold shallow-merges it into the previous snapshot, so 40 stays until another step changes it.",
+           "text": "**A patch carries forward.** The gauge patch is shallow-merged into the previous snapshot, so 40 stays until a later step changes it.",
            "panels": {
             "gauge": {
              "value": 40
@@ -338,11 +338,11 @@
             "json": {
              "rows": [
               {
-               "id": "p",
+               "id": "a",
                "cells": {
                 "key": "panels.gauge",
                 "value": "{\"value\": 40}",
-                "rule": "shallow merge, carried to later steps"
+                "rule": "shallow merge; carried"
                }
               }
              ]
@@ -357,7 +357,7 @@
             "fold->player"
            ],
            "time": "+1h",
-           "text": "**Some keys append.** A `log` patch adds lines instead of replacing them. The gauge has no patch at this step, so it keeps 40.",
+           "text": "**`log` lines append** instead of replacing. The gauge has no patch, so it keeps 40.",
            "panels": {
             "log": {
              "log": [
@@ -370,19 +370,19 @@
             "json": {
              "rows": [
               {
-               "id": "p",
+               "id": "a",
                "cells": {
                 "key": "panels.log",
-                "value": "{\"log\": [\"first line\"]}",
-                "rule": "log lines append"
+                "value": "{\"log\": [{\"tag\": \"STEP\", \"text\": \"first line\"}]}",
+                "rule": "appends"
                }
               },
               {
-               "id": "g",
+               "id": "b",
                "cells": {
                 "key": "panels.gauge",
                 "value": "(no patch)",
-                "rule": "keeps the carried value 40"
+                "rule": "keeps 40"
                }
               }
              ]
@@ -397,7 +397,7 @@
             "fold->player"
            ],
            "time": "+1h",
-           "text": "**enterOnce lasts one step.** The gauge shows 380 at this step only; the carried value stays 40 underneath.",
+           "text": "**`enterOnce` lasts one step.** The gauge shows 380 here only; the carried value stays 40 underneath. In a common-fold panel, appended keys such as `log` cannot be set through `enterOnce`.",
            "panels": {
             "gauge": {
              "enterOnce": {
@@ -415,7 +415,7 @@
             "json": {
              "rows": [
               {
-               "id": "p",
+               "id": "a",
                "cells": {
                 "key": "panels.gauge",
                 "value": "{\"enterOnce\": {\"value\": 380}}",
@@ -423,10 +423,10 @@
                }
               },
               {
-               "id": "l",
+               "id": "b",
                "cells": {
                 "key": "panels.log",
-                "value": "{\"log\": [\"second line\"]}",
+                "value": "{\"log\": [{\"tag\": \"STEP\", \"text\": \"second line\"}]}",
                 "rule": "appends"
                }
               }
@@ -435,14 +435,19 @@
            }
           },
           {
-           "id": "t-after-once",
+           "id": "t-null",
            "edges": [
+            "step->path",
+            "path->fold",
             "fold->player",
             "player->render"
            ],
            "time": "+1h",
-           "text": "**Back to the carried value.** No gauge patch here: it returns to 40. The funnel receives its first count.",
+           "text": "**`null` is stored as a value; each renderer decides what it means.** The gauge renders a missing number as 0. Other types differ: table `rows: []` clears, funnel and grid treat `null` as delete (next steps).",
            "panels": {
+            "gauge": {
+             "value": null
+            },
             "funnel": {
              "counts": {
               "raw": 1000
@@ -451,19 +456,19 @@
             "json": {
              "rows": [
               {
-               "id": "g",
+               "id": "a",
                "cells": {
                 "key": "panels.gauge",
-                "value": "(no patch)",
-                "rule": "enterOnce ended: shows carried 40"
+                "value": "{\"value\": null}",
+                "rule": "stored; gauge shows 0"
                }
               },
               {
-               "id": "f",
+               "id": "b",
                "cells": {
                 "key": "panels.funnel",
                 "value": "{\"counts\": {\"raw\": 1000}}",
-                "rule": "funnel merges key by key"
+                "rule": "first count"
                }
               }
              ]
@@ -477,8 +482,11 @@
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Some panels merge maps key by key.** This patch names only `clean`; the funnel keeps `raw` from the previous step. Funnel `counts`, grid `cells` and seatmap `sold` use this custom fold.",
+           "text": "**Key-by-key merge.** This patch names `clean` and `kept`; the funnel keeps `raw` from the previous step. Funnel `counts`, grid `cells`/`marks` and seatmap `sold`/`held`/`price`/`tierOf` use this rule.",
            "panels": {
+            "gauge": {
+             "value": 40
+            },
             "funnel": {
              "counts": {
               "clean": 920,
@@ -488,11 +496,77 @@
             "json": {
              "rows": [
               {
-               "id": "f",
+               "id": "a",
                "cells": {
                 "key": "panels.funnel",
                 "value": "{\"counts\": {\"clean\": 920, \"kept\": 870}}",
-                "rule": "raw stays 1000; other keys merge in"
+                "rule": "raw stays 1000"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "panels.gauge",
+                "value": "{\"value\": 40}",
+                "rule": "back to 40"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "t-merge-once",
+           "edges": [
+            "step->path",
+            "path->fold"
+           ],
+           "time": "+1h",
+           "text": "**`enterOnce` in a custom fold follows that fold's rule.** The funnel merges one-step counts over the carried counts: `kept` shows 500 here and returns to 870 next step.",
+           "panels": {
+            "funnel": {
+             "enterOnce": {
+              "counts": {
+               "kept": 500
+              }
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.funnel",
+                "value": "{\"enterOnce\": {\"counts\": {\"kept\": 500}}}",
+                "rule": "merged for this step only"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "t-delete",
+           "edges": [
+            "step->path",
+            "path->fold"
+           ],
+           "time": "+1h",
+           "text": "**Per-key delete.** In a merge map, `null` for one key forgets that key; `counts: null` would forget every key.",
+           "panels": {
+            "funnel": {
+             "counts": {
+              "kept": null
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.funnel",
+                "value": "{\"counts\": {\"kept\": null}}",
+                "rule": "kept forgotten; raw and clean stay"
                }
               }
              ]
@@ -506,16 +580,16 @@
             "fold->player"
            ],
            "time": "+5h",
-           "text": "**Some fields come from story time.** This step moves the clock 5 hours. Nobody patches the battery: its fold drains it at `drainPerHour` (4 % per hour, illustrative) from the elapsed time.",
+           "text": "**Story time.** The clock moves 5 hours and nobody patches the battery: its fold drains 4 % per hour (illustrative rate) from elapsed time.",
            "panels": {
             "json": {
              "rows": [
               {
-               "id": "t",
+               "id": "a",
                "cells": {
                 "key": "step.time",
                 "value": "\"+5h\"",
-                "rule": "battery drains 20 % from elapsed hours"
+                "rule": "battery drains 20 %"
                }
               }
              ]
@@ -525,22 +599,37 @@
           {
            "id": "t-hide",
            "edges": [
-            "vis->player"
+            "vis->player",
+            "step->path",
+            "path->fold"
            ],
            "time": "+0m",
            "panelVisibility": {
             "funnel": false
            },
-           "text": "**Visibility is a step-level map, not panel state.** `panelVisibility` hides the funnel card. Its content keeps folding while hidden.",
+           "text": "**Visibility is a step-level map.** `panelVisibility` hides the funnel. Its content keeps folding while hidden: this step also sets `kept` to 860.",
            "panels": {
+            "funnel": {
+             "counts": {
+              "kept": 860
+             }
+            },
             "json": {
              "rows": [
               {
-               "id": "v",
+               "id": "a",
                "cells": {
                 "key": "steps[i].panelVisibility",
                 "value": "{\"funnel\": false}",
-                "rule": "carried until shown again"
+                "rule": "carried until shown"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "panels.funnel",
+                "value": "{\"counts\": {\"kept\": 860}}",
+                "rule": "folds while hidden"
                }
               }
              ]
@@ -553,13 +642,14 @@
             "step->path",
             "path->fold",
             "fold->player",
-            "player->render"
+            "player->render",
+            "vis->player"
            ],
            "time": "+0m",
            "panelVisibility": {
             "funnel": true
            },
-           "text": "**A few panel types already accept declaration-shaped state.** The radar declares `threshold: 80`; this step writes `threshold: 50` and the arc moves. Each such key is built into its own panel type: data-contract `columns` and `fields`, screen and security `scene`, zoneframe `zones`, timeline `events`, strandscene `actors`, cellscene `items`. Every other declaration field cannot change.",
+           "text": "**A few types let a step override a declared value.** The radar declares `threshold: 80`; this step writes 50 and the arc moves. The funnel reappears showing 860. The full list of such keys is on the Panel types tab; each is built into its own type.",
            "panels": {
             "radar": {
              "threshold": 50
@@ -567,19 +657,19 @@
             "json": {
              "rows": [
               {
-               "id": "r",
+               "id": "a",
                "cells": {
                 "key": "panels.radar",
                 "value": "{\"threshold\": 50}",
-                "rule": "replaces the declared 80; radar only"
+                "rule": "overrides declared 80"
                }
               },
               {
-               "id": "v",
+               "id": "b",
                "cells": {
-                "key": "panelVisibility",
+                "key": "steps[i].panelVisibility",
                 "value": "{\"funnel\": true}",
-                "rule": "funnel shown again"
+                "rule": "shown again"
                }
               }
              ]
@@ -593,28 +683,27 @@
             "player->render"
            ],
            "time": "+0m",
-           "text": "**The gap.** The renderer always receives the same declaration. To show this gauge in watts with a 200 maximum later in the story, an author today must declare a second gauge and toggle visibility, or the panel type must add its own state key like data-contract did.",
+           "text": "**The gap.** For most fields the renderer always receives the same declaration. To show this gauge in watts with a 200 maximum later, an author must declare a second gauge and switch visibility, or the type must add its own override key.",
            "panels": {
             "json": {
              "rows": [
               {
-               "id": "m",
+               "id": "a",
                "cells": {
                 "key": "gauge.max",
-                "value": "400 (declaration)",
+                "value": "400",
                 "rule": "no step can change it"
                }
               },
               {
-               "id": "u",
+               "id": "b",
                "cells": {
                 "key": "gauge.unit",
-                "value": "\"mA\" (declaration)",
+                "value": "\"mA\"",
                 "rule": "no step can change it"
                }
               }
-             ],
-             "note": "Most declaration fields cannot change per step today."
+             ]
             }
            }
           },
@@ -625,7 +714,7 @@
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Alternate paths fold independently.** On this path the gauge goes to 5 and the log never receives a line. Steps from the other path never leak in.",
+           "text": "**Alternate paths fold independently.** On this path the gauge goes to 5 and the log never receives a line.",
            "panels": {
             "gauge": {
              "value": 5
@@ -633,11 +722,11 @@
             "json": {
              "rows": [
               {
-               "id": "p",
+               "id": "a",
                "cells": {
-                "key": "panels.gauge (other path)",
+                "key": "panels.gauge",
                 "value": "{\"value\": 5}",
-                "rule": "folded only along this path"
+                "rule": "this path only"
                }
               }
              ]
@@ -648,15 +737,17 @@
          "paths": [
           {
            "id": "main",
-           "label": "Every variant",
+           "label": "Every common variant",
            "color": "#38bdf8",
            "steps": [
             "t-declare",
             "t-carry",
             "t-append",
             "t-once",
-            "t-after-once",
+            "t-null",
             "t-merge",
+            "t-merge-once",
+            "t-delete",
             "t-time",
             "t-hide",
             "t-shaped",
@@ -675,7 +766,7 @@
          ],
          "storyTime": {
           "start": "2026-10-17T08:00",
-          "span": "12h",
+          "span": "16h",
           "clock": "24h",
           "date": "none"
          },
@@ -683,7 +774,7 @@
          "graphFrame": {
           "x": 18,
           "y": 15,
-          "w": 710,
+          "w": 733,
           "h": 379
          },
          "sectionLayout": {
@@ -692,58 +783,747 @@
            {
             "x": 0,
             "y": 0,
-            "w": 14,
-            "h": 21
-           },
-           {
-            "controls": "steps",
-            "x": 0,
-            "y": 14,
-            "w": 14,
-            "h": 7,
-            "attachTo": "diagram"
+            "w": 13,
+            "h": 13
            },
            {
             "panel": "json",
-            "x": 14,
+            "x": 13,
             "y": 0,
-            "w": 10,
-            "h": 9
+            "w": 11,
+            "h": 8
            },
            {
             "panel": "gauge",
-            "x": 14,
-            "y": 9,
+            "x": 13,
+            "y": 8,
             "w": 5,
             "h": 5
            },
            {
             "panel": "radar",
-            "x": 14,
-            "y": 14,
-            "w": 5,
-            "h": 7
+            "x": 18,
+            "y": 8,
+            "w": 6,
+            "h": 5
            },
            {
-            "panel": "battery",
-            "x": 19,
-            "y": 9,
-            "w": 5,
-            "h": 12
+            "controls": "steps",
+            "x": 0,
+            "y": 13,
+            "w": 24,
+            "h": 6
            },
            {
             "panel": "funnel",
             "x": 0,
-            "y": 21,
-            "w": 10,
+            "y": 19,
+            "w": 9,
+            "h": 7
+           },
+           {
+            "panel": "battery",
+            "x": 9,
+            "y": 19,
+            "w": 6,
             "h": 7
            },
            {
             "panel": "log",
-            "x": 10,
-            "y": 21,
-            "w": 14,
+            "x": 15,
+            "y": 19,
+            "w": 9,
             "h": 7
+           }
+          ]
+         }
+        }
+       }
+      ]
+     },
+     {
+      "label": "Special fold rules",
+      "sections": [
+       {
+        "id": "special",
+        "heading": "Special fold rules in custom panel types",
+        "accent": "green",
+        "text": [
+         "Operations that only some types accept. Each is shown with a real panel. Times and rates are illustrative."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "patch": {
+           "title": "Step patch",
+           "sub": "operations",
+           "icon": "terminal"
+          },
+          "clock": {
+           "title": "Story time",
+           "sub": "step.time",
+           "icon": "gear"
+          },
+          "fold": {
+           "title": "Custom fold",
+           "sub": "type's own rules",
+           "icon": "chip",
+           "tint": "data"
+          },
+          "view": {
+           "title": "Snapshot",
+           "sub": "per step",
+           "icon": "monitor"
+          }
+         },
+         "rows": [
+          []
+         ],
+         "floats": [
+          {
+           "id": "clock",
+           "side": "below",
+           "x": 123,
+           "y": 202
+          },
+          {
+           "id": "fold",
+           "side": "below",
+           "x": 349,
+           "y": 202
+          },
+          {
+           "id": "patch",
+           "side": "below",
+           "x": 349,
+           "y": 70
+          },
+          {
+           "id": "view",
+           "side": "below",
+           "x": 349,
+           "y": 334
+          }
+         ],
+         "edges": [
+          {
+           "from": "patch",
+           "to": "fold",
+           "kind": "int",
+           "label": "operations"
+          },
+          {
+           "from": "clock",
+           "to": "fold",
+           "kind": "int",
+           "label": "elapsed time"
+          },
+          {
+           "from": "fold",
+           "to": "view",
+           "kind": "int",
+           "label": "result"
+          }
+         ],
+         "panels": [
+          {
+           "id": "sjson",
+           "type": "table",
+           "title": "What this step wrote (this table's rows are replaced every step)",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          },
+          {
+           "id": "buffer",
+           "type": "buffer",
+           "title": "Buffer: range paint accumulates",
+           "segments": 12,
+           "capacity": "6 s",
+           "initial": {}
+          },
+          {
+           "id": "app",
+           "type": "deviceapp",
+           "title": "Device app: notifications, report times, card overrides",
+           "appName": "Homestead",
+           "device": "Front door camera",
+           "fields": [
+            {
+             "id": "battery",
+             "label": "Battery",
+             "kind": "battery",
+             "badgeMode": "none"
+            },
+            {
+             "id": "model",
+             "label": "Camera model",
+             "icon": "camera",
+             "badgeMode": "none"
+            }
+           ],
+           "initial": {
+            "battery": {
+             "value": 68,
+             "status": "ready"
+            },
+            "model": {
+             "value": "Doorbell camera",
+             "status": "ready"
+            }
+           }
+          },
+          {
+           "id": "cell",
+           "type": "battery",
+           "title": "Battery: anchors and one-step drain",
+           "drainPerHour": 2,
+           "initial": {
+            "charge": 70,
+            "trend": "idle"
+           }
+          },
+          {
+           "id": "strand",
+           "type": "strandscene",
+           "title": "Strand scene: step-local events, carried results",
+           "label": "restriction cut",
+           "sequence": "ACGTTGCAGAATTCTAGGCATCGA",
+           "strands": 2,
+           "sites": [
+            {
+             "id": "s1",
+             "from": 9,
+             "to": 14,
+             "label": "cleavage site",
+             "cutAfter": {
+              "upper": 9,
+              "lower": 13
+             }
+            }
+           ],
+           "actors": [
+            {
+             "id": "enz",
+             "role": "enzyme",
+             "label": "enzyme",
+             "start": {
+              "at": {
+               "x": 470,
+               "y": 60
+              },
+              "state": "free"
+             }
+            }
+           ],
+           "initial": {
+            "caption": "The enzyme is free."
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-paint",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Range paint accumulates.** Buffer `mark` ranges are added to every earlier paint, like `log` lines.",
+           "panels": {
+            "buffer": {
+             "mark": [
+              [
+               0,
+               3,
+               "buffered"
+              ]
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"mark\": [[0, 3, \"buffered\"]]}",
+                "rule": "paint added"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-paint2",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A second paint lands on top** of the first: cells 2–5 become uploading, 0–1 stay buffered.",
+           "panels": {
+            "buffer": {
+             "mark": [
+              [
+               2,
+               5,
+               "uploading"
+              ]
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"mark\": [[2, 5, \"uploading\"]]}",
+                "rule": "applied over earlier paint"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-cells",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**`cells` replaces everything and clears earlier paint.**",
+           "panels": {
+            "buffer": {
+             "cells": [
+              "protected",
+              "protected"
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"cells\": [\"protected\", \"protected\"]}",
+                "rule": "replaces; paints cleared"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-notify",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+10m",
+           "text": "**Notifications accumulate**, newest first.",
+           "panels": {
+            "app": {
+             "notify": {
+              "app": "Homestead",
+              "title": "Motion",
+              "text": "Someone is at the door."
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.notify",
+                "value": "{\"app\": \"Homestead\", \"title\": \"Motion\", …}",
+                "rule": "added to the stack"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-clear",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+10m",
+           "text": "**`clear` then `notify` in one patch:** the stack is cleared first, then the new card is added.",
+           "panels": {
+            "app": {
+             "clear": true,
+             "notify": {
+              "app": "Homestead",
+              "title": "Clip saved",
+              "text": "A 12 s clip is ready."
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app",
+                "value": "{\"clear\": true, \"notify\": {…\"Clip saved\"…}}",
+                "rule": "clear first, then add"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-report",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+10m",
+           "text": "**A report time.** `reportedAt: \"now\"` stamps the battery card with this step's story time.",
+           "panels": {
+            "app": {
+             "battery": {
+              "value": 61,
+              "status": "ready",
+              "reportedAt": "now"
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.battery",
+                "value": "{\"value\": 61, \"reportedAt\": \"now\"}",
+                "rule": "carried; freshness from story time"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-fresh",
+           "edges": [
+            "clock->fold",
+            "fold->view"
+           ],
+           "time": "+2h",
+           "text": "**Freshness and drain come from elapsed time.** Two hours later the card reads \"Updated 2 h ago\" and the battery has drained 4 % (2 % per hour, illustrative), with no patch to either.",
+           "panels": {
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "step.time",
+                "value": "\"+2h\"",
+                "rule": "card ages; battery drains"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-anchor",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**`charge` is an anchor.** The battery shows exactly 90; drift continues from it. A `drain` in the same patch would be ignored.",
+           "panels": {
+            "cell": {
+             "charge": 90
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.cell",
+                "value": "{\"charge\": 90}",
+                "rule": "shown exactly; drift continues"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-drain",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**`drain` is a one-step operation.** 5 % is subtracted at this step (85 %); it is not repeated at later steps.",
+           "panels": {
+            "cell": {
+             "drain": 5
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.cell",
+                "value": "{\"drain\": 5}",
+                "rule": "−5 once; not carried"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-icon",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A card field can override a declared value.** The model card's declared icon is `camera`; this step sets `chip`.",
+           "panels": {
+            "app": {
+             "model": {
+              "icon": "chip"
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.model",
+                "value": "{\"icon\": \"chip\"}",
+                "rule": "overrides the declared icon"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-icon-null",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**`null` restores the declared value** for that card field.",
+           "panels": {
+            "app": {
+             "model": {
+              "icon": null
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.model",
+                "value": "{\"icon\": null}",
+                "rule": "declared camera icon again"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-bind",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Per-item state keyed by declared ids.** The enzyme moves to position 11 and binds. `actors` sets state for the declared actor; it does not replace the declaration.",
+           "panels": {
+            "strand": {
+             "actors": {
+              "enz": {
+               "at": 11,
+               "state": "bound"
+              }
+             },
+             "caption": "The enzyme binds."
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.strand.actors",
+                "value": "{\"enz\": {\"at\": 11, \"state\": \"bound\"}}",
+                "rule": "state for a declared actor"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-cut",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A step-local event with a carried result.** The `cut` event plays at this step only; the cut strand is carried to later steps.",
+           "panels": {
+            "strand": {
+             "events": [
+              {
+               "kind": "cut",
+               "site": "s1"
+              }
+             ],
+             "caption": "The strand is cut."
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.strand.events",
+                "value": "[{\"kind\": \"cut\", \"site\": \"s1\"}]",
+                "rule": "event this step; cut carried"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-after",
+           "edges": [
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Next step, no patch:** the strand stays cut. No event replays.",
+           "panels": {
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.strand",
+                "value": "(no patch)",
+                "rule": "cut result carried"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "paths": [
+          {
+           "id": "special",
+           "label": "Special fold rules",
+           "color": "#34d399",
+           "steps": [
+            "s-paint",
+            "s-paint2",
+            "s-cells",
+            "s-notify",
+            "s-clear",
+            "s-report",
+            "s-fresh",
+            "s-anchor",
+            "s-drain",
+            "s-icon",
+            "s-icon-null",
+            "s-bind",
+            "s-cut",
+            "s-after"
+           ]
+          }
+         ],
+         "storyTime": {
+          "start": "2026-10-17T18:00",
+          "span": "6h",
+          "clock": "24h",
+          "date": "none"
+         },
+         "autoplay": false,
+         "graphFrame": {
+          "x": 18,
+          "y": 15,
+          "w": 551,
+          "h": 374
+         },
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 9
+           },
+           {
+            "panel": "sjson",
+            "x": 10,
+            "y": 0,
+            "w": 14,
+            "h": 9
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 5
+           },
+           {
+            "panel": "buffer",
+            "x": 0,
+            "y": 14,
+            "w": 8,
+            "h": 5
+           },
+           {
+            "panel": "cell",
+            "x": 0,
+            "y": 19,
+            "w": 8,
+            "h": 8
+           },
+           {
+            "panel": "strand",
+            "x": 8,
+            "y": 14,
+            "w": 9,
+            "h": 13
+           },
+           {
+            "panel": "app",
+            "x": 17,
+            "y": 14,
+            "w": 7,
+            "h": 13
            }
           ]
          }
@@ -756,35 +1536,38 @@
       "sections": [
        {
         "id": "catalog",
-        "heading": "Where each of the 40 panel types sits today",
+        "heading": "Where each of the 42 panel types sits today",
         "accent": "slate",
         "text": [
-         "Read from the registered panel definitions on `main` (5744ca77)."
+         "Read from the registered panel definitions on `main` (5744ca77). A step writes panel state under `steps[i].panels.<id>`; the older spelling `steps[i].patch.<id>` is still accepted, and when both are present `panels` is used."
         ],
         "bullets": [
          {
-          "text": "**Common fold** (shallow merge, `log` appends, `enterOnce`): state, leds, gauge, log, image, waterfall, orbit, zoneframe, xray, queue, thermo, buffer, radar, signal, tiles, table, data-contract, checks, budget, cost, trace, replicas."
+          "text": "**Common fold** (22 types): shallow merge per key, `log` appends, buffer `mark` paints accumulate (compacted after 64 operations), `enterOnce` for one step: state, leds, gauge, log, image, waterfall, orbit, zoneframe, xray, queue, thermo, buffer, radar, signal, tiles, table, data-contract, checks, budget, cost, trace, replicas."
          },
          {
-          "text": "**Custom fold**, each with its own rules: screen, battery, homemap, inflight, phone, deviceapp, appscreens, timeline, sequence, reads, frames, locus, funnel, grid, strandscene, cellscene, seatmap, chime, dispatch, security."
+          "text": "**Custom fold** (20 types), each with its own rules: screen, battery, homemap, inflight, phone, deviceapp, appscreens, timeline, sequence, reads, frames, locus, funnel, grid, strandscene, cellscene, seatmap, chime, dispatch, security."
          },
          {
-          "text": "**Key-by-key merge maps**: funnel `counts`; grid `cells` and `marks`; seatmap `sold`, `held`, `price`, `tierOf`."
+          "text": "**Key-by-key merge maps** (`null` deletes one key, a whole-field `null` deletes all): funnel `counts`; grid `cells` and `marks`; seatmap `sold`, `held`, `price`, `tierOf`."
          },
          {
-          "text": "**Append fields** beyond `log`: timeline `events` and `miss`."
+          "text": "**Accumulating fields**: `log` (all common-fold types); buffer `mark`; timeline `events` and `miss` (added to the declared events); phone and deviceapp `notify`, with `clear`."
          },
          {
           "text": "**Step-local events with carried results**: strandscene and cellscene `events`."
          },
          {
-          "text": "**Derived from story time**: battery (drain and charge), phone, deviceapp and appscreens (clock and date)."
+          "text": "**Derived from story time**: battery drain and charge (with `charge` anchors and one-step `drain`); phone, deviceapp and appscreens clock and date; deviceapp card freshness from `reportedAt`."
          },
          {
-          "text": "**Declaration-shaped state keys** (a step replaces or re-tunes a declared value): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; zoneframe `zones`; radar `threshold`; timeline `events`; strandscene `actors`; cellscene `items`. Each is implemented inside its own panel."
+          "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`."
          },
          {
-          "text": "**Never changeable per step**: every other declaration field, for every type (for example gauge `max` and `unit`, funnel `stages`, table `columns`, the card `title`)."
+          "text": "**Per-item state keyed by declared ids** (does not replace the declaration): xray `layers`, zoneframe `zones`, replicas `replicas`, strandscene `actors`, cellscene `items`."
+         },
+         {
+          "text": "**Not changeable per step**: every other declaration field, for example gauge `max` and `unit`, funnel `stages`, table `columns`, and every panel's card `title`."
          }
         ]
        }
@@ -799,14 +1582,14 @@
         "heading": "Proposed change: a step-level panelDeclare map",
         "accent": "violet",
         "text": [
-         "This is a design proposal, not shipped behaviour. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the nine findings of the gpt-6-astra review."
+         "A design proposal, not shipped behaviour. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the gpt-6-astra review of that PR. One decision is open: how folding treats earlier steps (step 4)."
         ],
         "diagram": {
          "view": "step",
          "nodes": {
           "author": {
            "title": "Step",
-           "sub": "steps[i].panelDeclare",
+           "sub": "panelDeclare",
            "icon": "terminal"
           },
           "merge": {
@@ -817,27 +1600,27 @@
           },
           "valid": {
            "title": "Validator",
-           "sub": "type's own checks",
+           "sub": "type's checks",
            "icon": "shield"
           },
           "fold": {
            "title": "Fold",
-           "sub": "once per distinct declaration",
+           "sub": "by segment",
            "icon": "chip"
           },
           "player": {
            "title": "Player",
-           "sub": "declaration + title per step",
+           "sub": "renders it",
            "icon": "monitor"
           },
           "derive": {
-           "title": "Derived data",
-           "sub": "read the same declaration",
+           "title": "Derived",
+           "sub": "time, refs",
            "icon": "gear"
           },
-          "fork": {
-           "title": "Fork types",
-           "sub": "no upstream edits",
+          "compat": {
+           "title": "Viewers",
+           "sub": "feature flag",
            "icon": "package"
           }
          },
@@ -848,26 +1631,26 @@
           {
            "id": "author",
            "side": "below",
-           "x": 123,
+           "x": 349,
+           "y": 70
+          },
+          {
+           "id": "compat",
+           "side": "below",
+           "x": 575,
            "y": 70
           },
           {
            "id": "derive",
            "side": "below",
-           "x": 575,
-           "y": 202
-          },
-          {
-           "id": "fold",
-           "side": "below",
            "x": 349,
            "y": 334
           },
           {
-           "id": "fork",
+           "id": "fold",
            "side": "below",
-           "x": 349,
-           "y": 70
+           "x": 575,
+           "y": 202
           },
           {
            "id": "merge",
@@ -878,7 +1661,7 @@
           {
            "id": "player",
            "side": "below",
-           "x": 123,
+           "x": 575,
            "y": 334
           },
           {
@@ -893,19 +1676,19 @@
            "from": "author",
            "to": "merge",
            "kind": "int",
-           "label": "merge from this step on"
+           "label": "merge"
           },
           {
            "from": "merge",
            "to": "valid",
            "kind": "int",
-           "label": "checked here"
+           "label": "check"
           },
           {
            "from": "merge",
            "to": "fold",
            "kind": "int",
-           "label": "fold rules"
+           "label": "segments"
           },
           {
            "from": "fold",
@@ -917,22 +1700,44 @@
            "from": "merge",
            "to": "player",
            "kind": "int",
-           "label": "this step's declaration"
+           "label": "declaration"
           },
           {
            "from": "merge",
            "to": "derive",
            "kind": "int",
-           "label": "same declaration"
+           "label": "same one"
           },
           {
-           "from": "fork",
-           "to": "merge",
+           "from": "author",
+           "to": "compat",
            "kind": "int",
-           "label": "no registration"
+           "label": "stamped"
           }
          ],
          "panels": [
+          {
+           "id": "pjson",
+           "type": "table",
+           "title": "What this step writes or decides",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          },
           {
            "id": "effective",
            "type": "table",
@@ -983,7 +1788,7 @@
           {
            "id": "guarantees",
            "type": "checks",
-           "title": "What the proposal must guarantee",
+           "title": "What the proposal must guarantee (authored status, not test results)",
            "checks": [
             {
              "id": "noop",
@@ -991,11 +1796,11 @@
             },
             {
              "id": "collide",
-             "label": "No collision with existing state keys"
+             "label": "No collision with any panel state key"
             },
             {
              "id": "forks",
-             "label": "Fork panel types need no upstream edits"
+             "label": "Fork panel types need no upstream registration"
             },
             {
              "id": "agree",
@@ -1007,41 +1812,19 @@
             },
             {
              "id": "shaped",
-             "label": "Existing declaration-shaped keys keep working"
+             "label": "Existing per-type override keys keep working"
             },
             {
-             "id": "cost",
-             "label": "Work bounded by distinct declarations"
+             "id": "viewers",
+             "label": "Older viewers report the missing feature"
             },
             {
-             "id": "docs",
-             "label": "Panel authors told what is required"
+             "id": "history",
+             "label": "Earlier steps are not reinterpreted"
             }
            ],
            "initial": {
             "results": {}
-           }
-          },
-          {
-           "id": "pjson",
-           "type": "table",
-           "title": "What this step writes or changes",
-           "columns": [
-            {
-             "id": "key",
-             "label": "Where"
-            },
-            {
-             "id": "value",
-             "label": "Value"
-            },
-            {
-             "id": "rule",
-             "label": "Rule"
-            }
-           ],
-           "initial": {
-            "rows": []
            }
           }
          ],
@@ -1051,16 +1834,24 @@
            "nodes": [
             "author"
            ],
-           "text": "**New step-level key `panelDeclare`.** It sits beside `panelVisibility`, keyed by panel id, so it never shares a name with any panel's own state keys. Example: `\"panelDeclare\": {\"gauge\": {\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}}`.",
+           "text": "**A step-level map keyed by panel id**, beside `panelVisibility`, so it never shares a name with a panel's own state keys and works with both `panels` and legacy `patch` spellings: `\"panelDeclare\": {\"gauge\": {\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}}`.",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "k",
+               "id": "a",
                "cells": {
                 "key": "steps[i].panelDeclare.gauge",
                 "value": "{\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}",
-                "rule": "step level, keyed by panel id"
+                "rule": "carried from this step"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "steps[i].panelDeclareOnce.gauge",
+                "value": "{\"max\": 50}",
+                "rule": "this step only, over the carried value"
                }
               }
              ]
@@ -1072,7 +1863,7 @@
               },
               "collide": {
                "status": "pass",
-               "detail": "a panel id key outside panel state cannot match a state key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
@@ -1086,10 +1877,10 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
+              "viewers": {
                "status": "pending"
               },
-              "docs": {
+              "history": {
                "status": "pending"
               }
              }
@@ -1101,7 +1892,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**Effective declaration.** From this step on, the declaration is the authored declaration shallow-merged with every `panelDeclare` seen earlier on this path. `null` for a key restores the declared value. `id`, `type`, `initial` and `visible` are reserved and warn.",
+           "text": "**Effective declaration** = the authored declaration shallow-merged with every `panelDeclare` earlier on this path, then this step's `panelDeclareOnce`. `null` for a key restores the declared value. `id`, `type`, `initial` and `visible` are reserved and warn.",
            "panels": {
             "effective": {
              "rows": [
@@ -1110,7 +1901,7 @@
                "cells": {
                 "field": "max",
                 "value": "200",
-                "from": "panelDeclare at this step"
+                "from": "panelDeclare here"
                },
                "status": "changed"
               },
@@ -1119,7 +1910,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare at this step"
+                "from": "panelDeclare here"
                },
                "status": "changed"
               },
@@ -1128,7 +1919,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare at this step"
+                "from": "panelDeclare here"
                },
                "status": "changed"
               }
@@ -1137,15 +1928,15 @@
             "pjson": {
              "rows": [
               {
-               "id": "r",
+               "id": "a",
                "cells": {
                 "key": "reserved keys",
                 "value": "id, type, initial, visible",
-                "rule": "warn and are ignored"
+                "rule": "warn; ignored"
                }
               },
               {
-               "id": "n",
+               "id": "b",
                "cells": {
                 "key": "null",
                 "value": "{\"max\": null}",
@@ -1158,11 +1949,11 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "no panelDeclare: the effective declaration is the authored object itself"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
@@ -1176,10 +1967,10 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
+              "viewers": {
                "status": "pending"
               },
-              "docs": {
+              "history": {
                "status": "pending"
               }
              }
@@ -1191,12 +1982,12 @@
            "edges": [
             "merge->valid"
            ],
-           "text": "**Validated where it was written.** The type's own `validateDeclaration` runs on the effective declaration, with warnings at `steps[i].panelDeclare.<id>.<field>`. An override with errors is ignored. The rest of that step's patch is checked against the effective declaration. Validation contexts are cached per distinct declaration.",
+           "text": "**Validated where written.** The type's `validateDeclaration` runs on the effective declaration; warnings name `steps[i].panelDeclare.<id>.<field>`; an override with errors is ignored. The rest of the step's patch is checked against the effective declaration. Contexts are cached by declaration content.",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "w",
+               "id": "a",
                "cells": {
                 "key": "warning path",
                 "value": "steps[3].panelDeclare.gauge.max",
@@ -1204,7 +1995,7 @@
                }
               },
               {
-               "id": "c",
+               "id": "b",
                "cells": {
                 "key": "cache",
                 "value": "one context per distinct declaration",
@@ -1217,18 +2008,18 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "authored object reused"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
               },
               "agree": {
                "status": "pass",
-               "detail": "fold and validator call one helper"
+               "detail": "one helper builds the effective declaration for both"
               },
               "derived": {
                "status": "pending"
@@ -1236,11 +2027,10 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
-               "status": "pass",
-               "detail": "contexts cached by content, not per step"
+              "viewers": {
+               "status": "pending"
               },
-              "docs": {
+              "history": {
                "status": "pending"
               }
              }
@@ -1253,16 +2043,24 @@
             "merge->fold",
             "fold->player"
            ],
-           "text": "**Folded once per distinct declaration.** Steps governed by equal declarations (compared by content) share one fold over the path, so alternating between two declarations costs two folds, not one per step. Histories such as `log` and timeline events are kept.",
+           "text": "**Folding: a decision is needed.** Option A, segment fold: each declaration change starts a new segment seeded from the previous snapshot, so earlier steps are never reinterpreted; phone, deviceapp, homemap and inflight need a seed rule first. Option B, whole-path refold (PR #643): simpler, but a later declaration can make an earlier ignored patch take effect (for example a grid key declared later).",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "f",
+               "id": "a",
                "cells": {
-                "key": "fold",
-                "value": "1 fold per distinct declaration",
-                "rule": "equal content shares a fold"
+                "key": "Option A",
+                "value": "segments seeded at each change",
+                "rule": "no reinterpretation; 4 folds need a seed rule"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "Option B",
+                "value": "refold whole path per declaration",
+                "rule": "earlier patches can change meaning"
                }
               }
              ]
@@ -1271,18 +2069,18 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "authored object reused"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
               },
               "agree": {
                "status": "pass",
-               "detail": "one helper"
+               "detail": "one helper builds the effective declaration for both"
               },
               "derived": {
                "status": "pending"
@@ -1290,12 +2088,12 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
-               "status": "pass",
-               "detail": "content-keyed cache for folds and contexts"
-              },
-              "docs": {
+              "viewers": {
                "status": "pending"
+              },
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
               }
              }
             }
@@ -1307,12 +2105,12 @@
             "merge->player",
             "fold->player"
            ],
-           "text": "**The player renders the effective declaration and title.** Panel code receives it as the `panel` argument it already uses; renderers that cache declaration data on the host must recompute when it changes, which the extension guide will require.",
+           "text": "**The player renders the effective declaration and its title.** Renderers already read the `panel` argument; ones that cache declaration data on the host must recompute when it changes. The extension guide will say so.",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "t",
+               "id": "a",
                "cells": {
                 "key": "card title",
                 "value": "\"Draw (watts)\"",
@@ -1325,18 +2123,18 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "authored object reused"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
               },
               "agree": {
                "status": "pass",
-               "detail": "one helper"
+               "detail": "one helper builds the effective declaration for both"
               },
               "derived": {
                "status": "pending"
@@ -1344,13 +2142,12 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
-               "status": "pass",
-               "detail": "content-keyed cache"
+              "viewers": {
+               "status": "pending"
               },
-              "docs": {
-               "status": "pass",
-               "detail": "panel-modularity.md lists the purity and cache rules"
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
               }
              }
             }
@@ -1361,32 +2158,32 @@
            "edges": [
             "merge->derive"
            ],
-           "text": "**Everything else reads the same declaration.** Story-time processing (battery rates, freshness), authoring visibility evidence, and workbench node rename/delete all use the effective declaration, including references written inside `panelDeclare`.",
+           "text": "**Story time, evidence and references use the effective declaration.** Interval rule: the time between step N−1 and step N uses the declaration in effect at step N−1. Example: drain 1 %/h, changed to 10 %/h at step 3, steps 2 h apart: step 3 drops 2 %, step 4 drops 20 %.",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "s",
+               "id": "a",
                "cells": {
-                "key": "storyTime facet",
-                "value": "receives the effective declaration",
-                "rule": "battery drainPerHour override applies"
+                "key": "battery interval",
+                "value": "rate in effect at the earlier step",
+                "rule": "step 3: −2 %, step 4: −20 %"
                }
               },
               {
-               "id": "e",
-               "cells": {
-                "key": "visibility evidence",
-                "value": "uses the effective declaration",
-                "rule": "cards added by panelDeclare can be verified"
-               }
-              },
-              {
-               "id": "r",
+               "id": "b",
                "cells": {
                 "key": "node rename / delete",
                 "value": "traverses panelDeclare",
-                "rule": "including references inside it"
+                "rule": "references inside it update"
+               }
+              },
+              {
+               "id": "c",
+               "cells": {
+                "key": "visibility evidence",
+                "value": "uses the effective declaration",
+                "rule": "added cards can be verified"
                }
               }
              ]
@@ -1395,33 +2192,103 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "authored object reused"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pending"
               },
               "agree": {
                "status": "pass",
-               "detail": "one helper"
+               "detail": "one helper builds the effective declaration for both"
               },
               "derived": {
                "status": "pass",
-               "detail": "story time, evidence and references"
+               "detail": "facets, evidence and reference traversal receive the effective declaration"
               },
               "shaped": {
                "status": "pending"
               },
-              "cost": {
-               "status": "pass",
-               "detail": "content-keyed cache"
+              "viewers": {
+               "status": "pending"
               },
-              "docs": {
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+              }
+             }
+            }
+           }
+          },
+          {
+           "id": "p-compat",
+           "edges": [
+            "author->compat"
+           ],
+           "text": "**Viewers and editors.** Specs that use it are stamped `steps.panel-declare`; an older viewer reads the stamp and reports the missing feature, then renders the authored declaration. An unstamped spec in an older viewer ignores the key silently. Backstage and native viewers share the player. The desktop workbench edits it in its own inspector group.",
+           "panels": {
+            "pjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "compatibility",
+                "value": "steps.panel-declare",
+                "rule": "stamped when used"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "older viewer",
+                "value": "reports missing feature",
+                "rule": "renders authored declaration"
+               }
+              },
+              {
+               "id": "c",
+               "cells": {
+                "key": "workbench",
+                "value": "own inspector group",
+                "rule": "not added to each type's patch fields"
+               }
+              }
+             ]
+            },
+            "guarantees": {
+             "results": {
+              "noop": {
                "status": "pass",
-               "detail": "panel-modularity.md"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
+              },
+              "collide": {
+               "status": "pass",
+               "detail": "step-level key outside panel state"
+              },
+              "forks": {
+               "status": "pending"
+              },
+              "agree": {
+               "status": "pass",
+               "detail": "one helper builds the effective declaration for both"
+              },
+              "derived": {
+               "status": "pass",
+               "detail": "facets, evidence and reference traversal receive the effective declaration"
+              },
+              "shaped": {
+               "status": "pending"
+              },
+              "viewers": {
+               "status": "pass",
+               "detail": "steps.panel-declare stamped when used"
+              },
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
               }
              }
             }
@@ -1430,34 +2297,35 @@
           {
            "id": "p-forks",
            "edges": [
-            "fork->merge"
+            "merge->valid",
+            "merge->fold"
            ],
-           "text": "**Forks add panels with no upstream edits.** The repository test that every panel accepts an override checks a title override generically for every discovered type, including `company/panels/types/`; no central table to fill in. The inspector shows overrides in their own group instead of appending a field to every type's patch fields (PR #643 appends one, which breaks tests that list a type's fields). The existing declaration-shaped keys (data-contract `fields`, screen `scene`, …) stay exactly as they are in this change.",
+           "text": "**Forks.** No registration list: the repository test checks a title override for every discovered type, including `company/panels/types/`. A generic title test cannot prove every field works, so panel-modularity.md will state the extension rules and ship a reusable conformance helper a fork runs against its own types. Existing per-type override keys stay as they are.",
            "panels": {
             "pjson": {
              "rows": [
               {
-               "id": "g",
+               "id": "a",
                "cells": {
-                "key": "generic test",
+                "key": "repository test",
                 "value": "title override for every discovered type",
                 "rule": "no per-type table"
                }
               },
               {
-               "id": "i",
+               "id": "b",
                "cells": {
-                "key": "inspector",
-                "value": "own Declaration overrides group",
-                "rule": "not added to each type's patch fields"
+                "key": "fork types",
+                "value": "conformance helper",
+                "rule": "fork runs it on its own fields"
                }
               },
               {
-               "id": "x",
+               "id": "c",
                "cells": {
-                "key": "data-contract fields",
+                "key": "per-type override keys",
                 "value": "unchanged",
-                "rule": "unification is a separate decision"
+                "rule": "unification is separate"
                }
               }
              ]
@@ -1466,35 +2334,35 @@
              "results": {
               "noop": {
                "status": "pass",
-               "detail": "authored object reused; proven against a main baseline through the player"
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
               },
               "collide": {
                "status": "pass",
-               "detail": "step-level key"
+               "detail": "step-level key outside panel state"
               },
               "forks": {
                "status": "pass",
-               "detail": "generic title test"
+               "detail": "no registration list; conformance helper documented"
               },
               "agree": {
                "status": "pass",
-               "detail": "one helper"
+               "detail": "one helper builds the effective declaration for both"
               },
               "derived": {
                "status": "pass",
-               "detail": "story time, evidence and references"
+               "detail": "facets, evidence and reference traversal receive the effective declaration"
               },
               "shaped": {
                "status": "pass",
-               "detail": "left unchanged"
+               "detail": "left as they are in this change"
               },
-              "cost": {
+              "viewers": {
                "status": "pass",
-               "detail": "content-keyed cache"
+               "detail": "steps.panel-declare stamped when used"
               },
-              "docs": {
-               "status": "pass",
-               "detail": "panel-modularity.md"
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
               }
              }
             }
@@ -1505,24 +2373,24 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**Why not a key inside the panel patch (PR #643 today).** A Signal panel can already have a link whose id is `declare`; its patch `{\"declare\": {\"state\": \"ok\"}}` updates that link on `main`. With a reserved `declare` key inside panel patches, that existing patch would be read as a declaration override instead, with no warning.",
+           "text": "**Why not a key inside the panel patch (PR #643).** A Signal link may have id `declare`; on `main` the patch `{\"declare\": {\"state\": \"ok\"}}` updates that link. With a reserved key inside panel patches, the same patch would be read as a declaration override, with no warning.",
            "panels": {
             "pjson": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.signal.declare (main)",
-                "value": "{\"state\": \"ok\", \"bars\": 4}",
+                "key": "main",
+                "value": "{\"declare\": {\"state\": \"ok\"}}",
                 "rule": "updates the link with id declare"
                }
               },
               {
                "id": "b",
                "cells": {
-                "key": "same patch (PR #643)",
-                "value": "{\"state\": \"ok\", \"bars\": 4}",
-                "rule": "taken as a declaration override"
+                "key": "PR #643",
+                "value": "{\"declare\": {\"state\": \"ok\"}}",
+                "rule": "read as a declaration override"
                }
               }
              ],
@@ -1549,10 +2417,10 @@
               "shaped": {
                "status": "pending"
               },
-              "cost": {
+              "viewers": {
                "status": "pending"
               },
-              "docs": {
+              "history": {
                "status": "pending"
               }
              }
@@ -1572,12 +2440,13 @@
             "p-fold",
             "p-render",
             "p-derive",
+            "p-compat",
             "p-forks"
            ]
           },
           {
            "id": "inside",
-           "label": "Rejected: key inside the panel patch",
+           "label": "Rejected: key in panel patch",
            "color": "#f87171",
            "steps": [
             "p-collide"
@@ -1597,35 +2466,34 @@
            {
             "x": 0,
             "y": 0,
-            "w": 14,
-            "h": 21
+            "w": 13,
+            "h": 13
+           },
+           {
+            "panel": "pjson",
+            "x": 13,
+            "y": 0,
+            "w": 11,
+            "h": 8
+           },
+           {
+            "panel": "effective",
+            "x": 13,
+            "y": 8,
+            "w": 11,
+            "h": 5
            },
            {
             "controls": "steps",
             "x": 0,
-            "y": 14,
-            "w": 14,
-            "h": 7,
-            "attachTo": "diagram"
-           },
-           {
-            "panel": "pjson",
-            "x": 14,
-            "y": 0,
-            "w": 10,
-            "h": 12
-           },
-           {
-            "panel": "effective",
-            "x": 14,
-            "y": 12,
-            "w": 10,
-            "h": 9
+            "y": 13,
+            "w": 24,
+            "h": 6
            },
            {
             "panel": "guarantees",
             "x": 0,
-            "y": 21,
+            "y": 19,
             "w": 24,
             "h": 14
            }

@@ -358,7 +358,8 @@ export function importSvg(text, options = {}) {
      each clamped to the panel's 100–4000 range. Clamping only ever enlarges
      a side, so coordinates stay inside the box. */
   const scale = S.SPM_VIEW / Math.max(bbox.width, bbox.height);
-  const side = v => Math.min(4000, Math.max(100, Math.round(v * scale)));
+  /* Round up (never down) so the box always contains the scaled geometry. */
+  const side = v => Math.min(4000, Math.max(100, Math.ceil(v * scale - 1e-9)));
   const viewBox = { width: side(bbox.width), height: side(bbox.height) };
   /* Numeric ring keys sort inside → out; named groups keep first-seen order after them. */
   const seenKeys = [...new Set(sections.map(s => s.ring))];
@@ -379,7 +380,12 @@ export function importSvg(text, options = {}) {
     let d = normalised.d, simplified = 0;
     if (d.length > S.SPM_PATH_MAX_CHARS) {
       const fitted = fitPolyline(S.spmAbsolutePath(S.spmParsePath(d, { relative: true, maxChars: 1 << 20 }).commands), S);
-      if (!fitted) { report.skipped.push({ id: s.id, element: s.element, reason: 'path is ' + d.length + ' characters after normalisation (limit ' + S.SPM_PATH_MAX_CHARS + ') and uses curves that cannot be simplified — redraw it with fewer commands' }); return; }
+      if (!fitted) {
+        const curved = /[CSQTAcsqta]/.test(d);
+        report.skipped.push({ id: s.id, element: s.element, reason: 'path is ' + d.length + ' characters after normalisation (limit ' + S.SPM_PATH_MAX_CHARS + ') and ' +
+          (curved ? 'uses curves that cannot be simplified' : 'stays over the limit even at the minimum points per subpath') + ' — redraw it with fewer commands' });
+        return;
+      }
       simplified = fitted.removed; d = fitted.d;
     }
     const check = S.spmParsePath(d, { range: [0, S.SPM_VIEW] });

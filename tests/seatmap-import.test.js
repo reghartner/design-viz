@@ -310,4 +310,19 @@ test('compound overlong sections are simplified per subpath: every M and Z survi
   const skipped = importSvg('<svg><path id="101" d="' + many.trim() + '"/><rect id="102" x="0" y="20" width="10" height="10"/><rect id="103" x="20" y="20" width="10" height="10"/><rect id="104" x="40" y="20" width="10" height="10"/></svg>');
   assert.equal(skipped.fragment.sections.find(s => s.id === '101'), undefined);
   assert.match(skipped.report.skipped.find(s => s.id === '101').reason, /characters after normalisation/);
+  assert.match(skipped.report.skipped.find(s => s.id === '101').reason, /stays over the limit even at the minimum points per subpath/);
+  assert.doesNotMatch(skipped.report.skipped.find(s => s.id === '101').reason, /curves/);
+});
+
+test('viewBox sides round up so they always contain the scaled geometry', async () => {
+  const {importSvg} = await importer();
+  // 1000 × 100.4: the height must not round down to 100 while paths reach y = 100.4.
+  const {fragment} = importSvg('<svg><rect id="101" x="0" y="0" width="500" height="100.4"/><rect id="102" x="500" y="0" width="250" height="100.4"/><rect id="103" x="750" y="0" width="125" height="100.4"/><rect id="104" x="875" y="0" width="125" height="100.4"/></svg>');
+  assert.ok(fragment.viewBox.height >= 100.4, 'height ' + fragment.viewBox.height);
+  assert.equal(fragment.viewBox.width, 1000);
+  for (const section of fragment.sections) {
+    const ys = (section.path.match(/-?\d+(?:\.\d+)?/g) || []).map(Number).filter((_, i) => i % 2 === 1);
+    for (const y of ys) assert.ok(y <= fragment.viewBox.height, section.id + ' y ' + y + ' inside ' + fragment.viewBox.height);
+  }
+  assert.deepEqual(validates(fragment), {errors:[], warnings:[]});
 });

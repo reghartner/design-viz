@@ -369,7 +369,8 @@ function cellsceneStateWarnings(state, path, context, warnings) {
           (Array.isArray(raw.items) ? raw.items : []).forEach(function (id, j) {
             if (!decl.itemById[id]) cellsceneWarn(warnings, atE + '.items[' + j + ']', 'unknown item id — ignored');
           });
-          if (mechId(raw.vesicle)) vesicles.push(raw.vesicle);
+          /* Only a bud the fold applies creates a vesicle a later fuse may use. */
+          if (mechId(raw.vesicle) && comp(raw.from)) vesicles.push(raw.vesicle);
         } else if (raw.kind === 'fuse') {
           if (!mechId(raw.vesicle)) cellsceneWarn(warnings, atE + '.vesicle', 'needs a letter-led vesicle id — event skipped');
           else if (vesicles.indexOf(raw.vesicle) < 0) cellsceneWarn(warnings, atE + '.vesicle', 'no vesicle "' + raw.vesicle + '" has budded on this path — event skipped');

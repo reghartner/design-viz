@@ -297,6 +297,7 @@ test('events that validation reports as skipped never change carried state', () 
   same(states[0].events, []);
   same(Object.keys(states[1].vesicles), ['v8'], 'the bud from an unknown compartment created no vesicle');
   same(states[1].vesicles.v8.items, [], 'unknown items are not packed into a vesicle');
+  assert.match(w, /steps\[2\]\.panels\.cell\.events\[0\]\.vesicle: no vesicle "v9" has budded on this path — event skipped/, 'validation agrees the skipped bud created no vesicle');
   same(Object.keys(states[2].vesicles), ['v8'], 'fusing a vesicle that never budded changes nothing');
   same(states[2].events, [], 'the signal at an unknown id is skipped');
   same(C.cellsceneModel(panel(), states[2]).items.find(i => i.id === 'p').in, 'out');

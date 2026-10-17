@@ -299,7 +299,7 @@ function nodeStyleControl(value,commit,emptyLabel){
     });
     select.setAttribute('aria-label','Node style');
     return createFlowNodeStylePicker({document:document,select:select,listen:listen,onRetire:function(fn){formLife.own(fn);},
-      skinClasses:function(){var view=document.getElementById('docview');return view?Array.from(view.classList):[];}});
+      skinClasses:function(){var view=typeof document.getElementById==='function'?document.getElementById('docview'):null;return view && view.classList?Array.from(view.classList):[];}});
   }
 function brandControl(val,ctx){
     var target=Object.assign({},session.target),source=session.text();

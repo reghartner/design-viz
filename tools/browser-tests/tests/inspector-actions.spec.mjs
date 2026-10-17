@@ -286,60 +286,72 @@ const LEGACY_CARD={
 
 /* #610 contract matrix (every preset × every skin, computed on the rendered card)
    row | fixture | assertion (scoped) | rejects
-   K1 readable | Workbench canvas, one node per token plus a default node, each of the 9 skins chosen through the appearance buttons | for every token: computed .t1 fill and .t2 fill each contrast >= 4.5:1 against the computed .card fill | an unreadable preset in any skin
+   K1 readable | one node per token plus a default node; the 7 editor skins chosen through the Workbench appearance buttons, plus Daylight and Editorial as standalone reader pages (the editor offers no button for them) — all 9 skins | for every token: computed .t1 fill and .t2 fill each contrast >= 4.5:1 against the computed .card fill | an unreadable preset in any skin
    K2 border | same | computed .card stroke differs from its fill, stroke-width >= 1, stroke-opacity 1, and contrasts with the fill at >= 1.3:1 | a border that vanishes into the card
    K3 distinct | same | every pair of presets differs by an OKLab distance >= 0.05 on the border OR >= 0.05 on the background; every preset differs from the default card on fill or stroke | two presets that look alike, or a preset equal to the skin card
    K4 legacy | the node without style, every skin | computed fill, stroke, .t1 and .t2 equal the LEGACY_CARD table captured before #610 | a change to older documents
    K5 lit | standalone viewer page (inject.py), step mode lighting the styled node | the lit card's stroke differs from the same card's stroke out of step mode; the class ns-<token> and data-dv-style are present in the reader | a preset that hides the lit-step highlight, or a reader that drops the field */
-test('every node style preset stays readable, bordered and distinct in all nine skins while default cards are unchanged',async({page,server})=>{
-  const raw=fixture(),diagram=raw.page.sections[0].diagram;
-  const styleSet=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
-  diagram.nodes={plain:{title:'Default card',sub:'no style'}};diagram.rows=[];diagram.edges=[];diagram.steps=[{id:'only',text:'one',nodes:['plain']}];
-  styleSet.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
+const STYLE_TOKENS=['slate','rose','ember','amber','moss','teal','sky','indigo','violet','magenta','sand','ink'];
+function styledDiagram(){
+  const diagram={autoplay:false,nodes:{plain:{title:'Default card',sub:'no style'}},rows:[],edges:[],steps:[]};
+  STYLE_TOKENS.forEach(token=>{diagram.nodes[token]={title:token,sub:'subtitle',style:token};});
   const ids=Object.keys(diagram.nodes);for(let i=0;i<ids.length;i+=4)diagram.rows.push(ids.slice(i,i+4));
+  diagram.edges=[{from:'plain',to:'rose'},{from:'rose',to:'teal'}];
+  diagram.steps=[{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}];
+  return diagram;
+}
+/* Reads every card in `scope` and checks rows K1–K4 for one skin. */
+async function auditCards(page,scope,skin){
+  const seen=await page.evaluate(scope=>{
+    const out={};for(const g of document.querySelectorAll(scope+' [data-dv-node]')){
+      const cs=el=>getComputedStyle(el),card=cs(g.querySelector('.card'));
+      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,width:parseFloat(card.strokeWidth),opacity:parseFloat(card.strokeOpacity),t1:cs(g.querySelector('.t1')).fill,t2:cs(g.querySelector('.t2')).fill,style:g.dataset.dvStyle||null};
+    }return out;},scope);
+  // K4
+  expect({skin,plain:seen.plain}).toEqual({skin,plain:{...LEGACY_CARD[skin],width:expect.any(Number),opacity:expect.any(Number),style:null}});
+  for(const token of STYLE_TOKENS){
+    const c=seen[token];expect(c.style,skin+' '+token).toBe(token);
+    // K1
+    expect(contrastRatio(c.t1,c.fill),skin+' '+token+' title').toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(c.t2,c.fill),skin+' '+token+' subtitle').toBeGreaterThanOrEqual(4.5);
+    // K2
+    expect(c.stroke,skin+' '+token+' border').not.toBe(c.fill);expect(c.width).toBeGreaterThanOrEqual(1);expect(c.opacity).toBe(1);
+    expect(contrastRatio(c.stroke,c.fill),skin+' '+token+' border contrast').toBeGreaterThanOrEqual(1.3);
+    // K3 vs default
+    expect(c.fill!==seen.plain.fill || c.stroke!==seen.plain.stroke,skin+' '+token+' differs from the skin card').toBe(true);
+  }
+  for(let i=0;i<STYLE_TOKENS.length;i++)for(let j=i+1;j<STYLE_TOKENS.length;j++){
+    const a=seen[STYLE_TOKENS[i]],b=seen[STYLE_TOKENS[j]];
+    const apart=Math.max(labDistance(a.stroke,b.stroke),labDistance(a.fill,b.fill));
+    expect(apart,skin+': '+STYLE_TOKENS[i]+' vs '+STYLE_TOKENS[j]+' OKLab '+apart.toFixed(3)).toBeGreaterThanOrEqual(.05);
+  }
+  return seen;
+}
+test('every node style preset stays readable, bordered and distinct in the editor skins while default cards are unchanged',async({page,server})=>{
+  const raw=fixture();raw.page.sections[0].diagram=styledDiagram();
   await start(page,server,raw);
   // The hidden Node style select lists the field's tokens; this matrix must cover exactly those.
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="plain"] .t1'));
   const live=(await page.locator('#guide select[aria-label="Node style"] option').evaluateAll(options=>options.map(o=>o.value))).filter(Boolean);
-  expect(live).toEqual(styleSet);await closeTools(page);
+  expect(live).toEqual(STYLE_TOKENS);await closeTools(page);
   await page.locator('#workspace-appearance>summary').click();
-  const read=()=>page.evaluate(()=>{
-    const out={};for(const g of document.querySelectorAll('#section-overview [data-dv-node]')){
-      const cs=el=>getComputedStyle(el),card=cs(g.querySelector('.card'));
-      out[g.dataset.dvNode]={fill:card.fill,stroke:card.stroke,width:parseFloat(card.strokeWidth),opacity:parseFloat(card.strokeOpacity),t1:cs(g.querySelector('.t1')).fill,t2:cs(g.querySelector('.t2')).fill,style:g.dataset.dvStyle||null};
-    }return out;});
-  for(const skin of Object.keys(LEGACY_CARD)){
+  const editorSkins=await page.locator('#workspace-appearance-body button[id^="sk-"]').evaluateAll(buttons=>buttons.map(b=>b.id.slice(3)));
+  expect(editorSkins.sort()).toEqual(['aurora','blueprint','lavender','lilac','pastel','rose','terminal']);
+  for(const skin of editorSkins){
     await page.locator('#sk-'+skin).click();await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
-    const seen=await read();
-    // K4
-    expect({skin,plain:seen.plain}).toEqual({skin,plain:{...LEGACY_CARD[skin],width:expect.any(Number),opacity:expect.any(Number),style:null}});
-    for(const token of styleSet){
-      const c=seen[token];expect(c.style,skin+' '+token).toBe(token);
-      // K1
-      expect(contrastRatio(c.t1,c.fill),skin+' '+token+' title').toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(c.t2,c.fill),skin+' '+token+' subtitle').toBeGreaterThanOrEqual(4.5);
-      // K2
-      expect(c.stroke,skin+' '+token+' border').not.toBe(c.fill);expect(c.width).toBeGreaterThanOrEqual(1);expect(c.opacity).toBe(1);
-      expect(contrastRatio(c.stroke,c.fill),skin+' '+token+' border contrast').toBeGreaterThanOrEqual(1.3);
-      // K3 vs default
-      expect(c.fill!==seen.plain.fill || c.stroke!==seen.plain.stroke,skin+' '+token+' differs from the skin card').toBe(true);
-    }
-    for(let i=0;i<styleSet.length;i++)for(let j=i+1;j<styleSet.length;j++){
-      const a=seen[styleSet[i]],b=seen[styleSet[j]];
-      const apart=Math.max(labDistance(a.stroke,b.stroke),labDistance(a.fill,b.fill));
-      expect(apart,skin+': '+styleSet[i]+' vs '+styleSet[j]+' OKLab '+apart.toFixed(3)).toBeGreaterThanOrEqual(.05);
-    }
+    await auditCards(page,'#section-overview',skin);
   }
 });
 
-test('the standalone reader paints presets and keeps the lit-step highlight on a styled card (K5)',async({page,server})=>{
+test('the standalone reader paints presets in Daylight and Editorial and keeps the lit-step highlight on a styled card (K1–K5)',async({page,server})=>{
   const {execFileSync}=await import('node:child_process'),{writeFile}=await import('node:fs/promises'),path=(await import('node:path')).default,{repo}=await import('../helpers/prepare.mjs');
-  const raw={page:{title:'Styled reader',skin:'daylight',sections:[{id:'flow',heading:'Flow',diagram:{view:'ambient',autoplay:false,
-    nodes:{plain:{title:'Default'},rose:{title:'Rose',sub:'styled',style:'rose'},teal:{title:'Teal',sub:'styled',style:'teal'}},rows:[['plain','rose','teal']],edges:[{from:'plain',to:'rose'},{from:'rose',to:'teal'}],
-    steps:[{id:'first',text:'first',edge:'plain->rose'},{id:'second',text:'second',edge:'rose->teal'}]}}]}};
-  const spec=path.join(server.root,'node-styles.json');await writeFile(spec,JSON.stringify(raw));
-  execFileSync('python3',[path.join(repo,'tools/inject.py'),spec,path.join(repo,'template/flowview.html'),path.join(server.root,'node-styles.html')]);
-  await page.goto(server.origin+'/node-styles.html');
+  for(const skin of ['editorial','daylight']){
+    const raw={page:{title:'Styled reader',skin,sections:[{id:'flow',heading:'Flow',diagram:{view:'ambient',...styledDiagram()}}]}};
+    const spec=path.join(server.root,'node-styles-'+skin+'.json');await writeFile(spec,JSON.stringify(raw));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),spec,path.join(repo,'template/flowview.html'),path.join(server.root,'node-styles-'+skin+'.html')]);
+    await page.goto(server.origin+'/node-styles-'+skin+'.html');await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
+    await auditCards(page,'#section-flow',skin);
+  }
   const node=id=>page.locator('[data-dv-node="'+id+'"]').first();
   await expect(node('rose')).toHaveClass(/\bns-rose\b/);await expect(node('rose')).toHaveAttribute('data-dv-style','rose');
   await expect(node('plain')).not.toHaveAttribute('data-dv-style');

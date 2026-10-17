@@ -209,7 +209,7 @@ test('#564 buttons share one UI font, never fall back to Arial, and keep monospa
 
 /* #607 Workbench rows (contract matrix in reader-contents.spec.mjs):
    W1 landing | this fixture with Notes given two Views (Notes pages: 2 sections, Notes brief: 1), 1440x1000, Main story current | Main story and Notes Tab rows aria-expanded=true; every View disclosure in both groups aria-expanded=true with its own member rows | expanding only the current Tab, or non-current Tabs without their Views, in the Workbench reader
-   R1 restore() wins | real click collapses Notes, then a document-title edit re-renders the preview (capture -> restore) | Notes stays aria-expanded=false with 0 View rows; Main story stays expanded | the landing default overriding the saved navigation state */
+   R1 restore() wins | real clicks collapse the Notes Tab and the Overview View, then a document-title edit re-renders the preview (capture -> restore) | Notes stays aria-expanded=false with 0 View rows; Overview stays collapsed with 0 rows; Main story and Engineering stay expanded | the landing default overriding the saved navigation state */
 test('desktop editor Contents preserves Standard and Explore disclosure choices while switching Views',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});
  const raw=fixture(),notes=raw.page.blocks[0].tabs[1];notes.sections.push({id:'notes-more',heading:'More notes',text:'A second prose destination.'});
@@ -225,9 +225,11 @@ test('desktop editor Contents preserves Standard and Explore disclosure choices 
  await chooseNavigation(contents,'View','Engineering');await expect(disclosure('engineering')).toHaveAttribute('aria-expanded','false');await expect(disclosure('overview')).toHaveAttribute('aria-expanded','false');
  await disclosure('engineering').click();await disclosure('overview').click();await expect(sections('engineering')).toHaveCount(2);await expect(sections('overview')).toHaveCount(2);
  await tabRow('Notes').click();await expect(tabRow('Notes')).toHaveAttribute('aria-expanded','false');await expect(group('Notes').locator('.reader-tree-view')).toHaveCount(0);
+ await disclosure('overview').click();await expect(disclosure('overview')).toHaveAttribute('aria-expanded','false');await expect(sections('overview')).toHaveCount(0);
  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Edited Product journey');await title.press('Enter');
  await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await expect(tabRow('Notes')).toHaveAttribute('aria-expanded','false');await expect(group('Notes').locator('.reader-tree-view')).toHaveCount(0);await expect(tabRow('Main story')).toHaveAttribute('aria-expanded','true');await expect(sections('engineering')).toHaveCount(2);
+ await expect(disclosure('overview')).toHaveAttribute('aria-expanded','false');await expect(sections('overview')).toHaveCount(0);
 });
 
 test('Add follows prose tabs and deliberate destination changes while stale source remains blocked',async({page,server})=>{

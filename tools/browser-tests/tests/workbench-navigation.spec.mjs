@@ -166,7 +166,7 @@ test('#564 buttons share one UI font, never fall back to Arial, and keep monospa
  expect(await page.locator('#workspace-appearance').evaluate(el=>el.open)).toBe(false);expect(await page.locator('#workspace-more').evaluate(el=>el.open)).toBe(true);
  const header=page.locator('.workbench-header');
  const roster=[header.locator('#workspace-home'),header.locator('#diagram-add'),header.locator('#workspace-file'),header.locator('#undo-builder'),header.locator('#redo-builder'),header.locator('#workspace-appearance>summary'),header.locator('#open-page-preview'),header.locator('.workspace-help>summary'),header.locator('#workspace-export-trigger'),
-  ...['agent','brief','inspect','layers','steps','outline','json','file'].map(name=>page.locator('#editor-tab-'+name)),page.locator('#workspace-focus-diagram'),page.locator('#workspace-fit-selection')];
+  ...['agent','brief','inspect','steps','outline','json','file'].map(name=>page.locator('#editor-tab-'+name)),page.locator('#workspace-focus-diagram'),page.locator('#workspace-fit-selection')];
  const controls='.workbench-header :is(button,summary), .bbtn, .skbtn, .rbtn, .bexit, .workspace-rail [role="tab"]';
  const families=async()=>{const named=[];for(const control of roster){await expect(control).toBeVisible();named.push(await family(control));}const all=await visibleFamilies(page.locator('body'),controls);for(const f of named)(all[f]??=[]);return Object.keys(all).length===1?Object.keys(all):all;};
  const editorBody=await bodyFamily();expect(editorBody).not.toMatch(/mono/i);

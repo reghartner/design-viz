@@ -8,15 +8,6 @@ const diagram=raw=>raw.page.sections[0].diagram;
 const centers=d=>plain(C.layout(d).pos);
 const xy=p=>({cx:p.cx,cy:p.cy});
 
-test('Layers follows authored visual order, filters, and labels text nodes',()=>{
- const d=diagram(fixture());
- assert.deepEqual(plain(C.builderLayerNodes(d,'')).map(x=>[x.id,x.title,x.placement.kind,x.locked]),[
-  ['a','Alpha','row',false],['b','Beta','row',true],['c','Gamma','row',false],['r','Release notes','row',false],['f','Float','float',true],['x','Extra','float',false],['u','Unused','unplaced',false]
- ]);
- assert.deepEqual(plain(C.builderLayerNodes(d,'gamma')).map(x=>x.id),['c']);
- assert.deepEqual(plain(C.builderLayerNodes(d,' release ')).map(x=>x.id),['r']);
-});
-
 test('locking one node or a row is one edit; undo restores membership and unlock retains its pin',()=>{
  let text=JSON.stringify(fixture(),null,2),original=text;
  const persistence=C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}});

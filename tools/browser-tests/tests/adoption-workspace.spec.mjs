@@ -119,22 +119,26 @@ test('short floating tools keep their close buttons and rail reachable above can
 
 /* #561 contract matrix (desktop editor; editing on phones is out of scope).
    row | fixture | assertion (scoped) | rejects
-   R1 distinct rail icons | editorSpec | each .workspace-rail .editor-tool-icon text is unique; Layers icon != File icon | Layers and File sharing ▱ (or any two tools sharing a glyph)
+   R1 distinct rail icons | editorSpec | each .workspace-rail .editor-tool-icon text is unique | any two tools sharing a glyph
    R2 ⌘K listed | same | #keyboard-shortcuts dt "⌘/Ctrl + K" paired with dd "Find objects" | dialog without Find objects
    R3 Redo listed once | same | exactly one dd starts with Redo and its dt is "⌘/Ctrl + Shift + Z"; no "⌘/Ctrl + Y" row (Chuck 2026-10-16: Redo is only ⌘/Ctrl+Shift+Z) | dialog without Redo, or a second Redo binding
    R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection Shift+F10/ContextMenu, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
    R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
-   R6 Redo is ⌘/Ctrl+Shift+Z only | Storage row lock, then Undo | from a canvas-focused node a real ControlOrMeta+Y leaves nodes.c.locked false and #redo-builder enabled, then ControlOrMeta+Shift+Z re-applies it | a Y alias that still redoes, or a listed Redo that does nothing
+   R6 Redo is ⌘/Ctrl+Shift+Z only | Storage right-click Lock position, then Undo | from a canvas-focused node a real ControlOrMeta+Y leaves nodes.c.locked false and #redo-builder enabled, then ControlOrMeta+Shift+Z re-applies it | a Y alias that still redoes, or a listed Redo that does nothing
    R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Sections in selected View" | "Page 1 of 2" or Page-named arrows
    R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
+/* #611 contract matrix (desktop editor): the Layers tab is removed; position locks stay in Inspect and the object menu.
+   row | fixture | assertion (scoped) | rejects
+   L1 rail roster | editorSpec | .workspace-rail [role=tab] labels (text outside .editor-tool-icon) equal Agent, Brief, Inspect, Steps, Find objects, JSON, File in order | a Layers tab left in the rail, or another tool dropped with it
+   L2 no Layers DOM | same | #editor-tab-layers, #editor-layers and #workspace-window-layers each have count 0 | the tab hidden while its pane or floating window still ships
+   L3 stale saved workspace | localStorage dv-workbench-floating-v1 saved with tool "layers" and open layers + steps windows | after load: no page error, #workspace-window-layers count 0, #workspace-window-steps visible | restoring a Layers window, throwing on the unknown name, or discarding every saved window */
 /* Static rows use soft assertions so one RED run reports every unmet row. */
 test('editor rail icons are distinct, the shortcut sheet lists every global key, and the pager counts sections',async({page,server})=>{
   const raw=spec();raw.page.blocks.push({heading:'Notes only',text:'No diagram in this section.'});
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
-  const icons=page.locator('.workspace-rail .editor-tool-icon');await expect(icons).toHaveCount(8);
+  const icons=page.locator('.workspace-rail .editor-tool-icon');await expect(icons).toHaveCount(7);
   const glyphs=(await icons.allTextContents()).map(text=>text.trim());
   expect.soft(new Set(glyphs).size).toBe(glyphs.length);
-  expect.soft(await page.locator('#editor-tab-layers .editor-tool-icon').textContent()).not.toBe(await page.locator('#editor-tab-file .editor-tool-icon').textContent());
 
   const sheet=page.locator('#keyboard-shortcuts');await expect(sheet).toBeHidden();
   await page.locator('.workspace-help>summary').click();await page.locator('#workspace-shortcuts').click();await expect(sheet).toBeVisible();
@@ -151,8 +155,8 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   await canvasNode.click();await page.keyboard.press('ControlOrMeta+k');await expect(find).toBeVisible();await expect(find).toBeFocused();
 
   const locked=async()=>JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.c.locked===true;
-  await page.locator('#editor-tab-layers').click();const lock=page.locator('#workspace-window-layers .layer-row').filter({hasText:'Storage'}).locator('.layer-lock');
-  await lock.click();await expect.poll(locked).toBe(true);
+  await page.locator('#docview [data-dv-node="c"] .t1').click({button:'right'});await page.getByRole('menu',{name:'Object actions'}).getByRole('menuitem',{name:'Lock position',exact:true}).click();
+  await expect.poll(locked).toBe(true);
   await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);await expect(page.locator('#redo-builder')).toBeEnabled();
   await canvasNode.click();await page.keyboard.press('ControlOrMeta+y');
   expect.soft(await locked()).toBe(false);await expect.soft(page.locator('#redo-builder')).toBeEnabled();
@@ -167,4 +171,17 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   await page.locator('#open-page-preview').click();
   await expect(page.locator('#page-preview-view .reader-page-label')).toHaveText('Section 1 of 2');
   await page.locator('#close-page-preview').click();
+});
+
+test('the rail has no Layers tab and a saved Layers window is ignored',async({page,server})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
+  await page.evaluate(()=>{localStorage.clear();localStorage.setItem('dv-workbench-floating-v1',JSON.stringify({tool:'layers',windows:{layers:{open:true,x:900,y:160,w:380,h:500},steps:{open:true,x:500,y:160,w:380,h:500}}}));});
+  await page.reload();await paste(page,JSON.stringify(spec(),null,2));
+  const tabs=page.locator('.workspace-rail [role="tab"]');
+  await expect(tabs).toHaveCount(7);
+  expect(await tabs.evaluateAll(list=>list.map(tab=>[...tab.childNodes].filter(node=>!(node.classList && node.classList.contains('editor-tool-icon'))).map(node=>node.textContent).join('').trim()))).toEqual(['Agent','Brief','Inspect','Steps','Find objects','JSON','File']);
+  for(const id of ['#editor-tab-layers','#editor-layers','#workspace-window-layers'])await expect(page.locator(id),id).toHaveCount(0);
+  await expect(page.locator('#workspace-window-steps')).toBeVisible();
+  expect(errors).toEqual([]);
 });

@@ -6,6 +6,10 @@ test('floating preferences migrate the selected tool, reject invalid values, and
   const prefs=context.workspacePrefs('{"tool":"steps","windows":{"steps":{"x":200,"y":100,"w":400,"h":500,"open":true},"evil":{"open":true},"file":null}}');
   assert.deepEqual(JSON.parse(JSON.stringify(prefs)),{tool:'steps',windows:{steps:{x:200,y:100,w:400,h:500,open:true}}});
 });
+test('a saved Layers tool or window from before #611 falls back without dropping the other windows',()=>{
+  const prefs=context.workspacePrefs('{"tool":"layers","windows":{"layers":{"x":900,"y":160,"w":380,"h":500,"open":true},"steps":{"x":200,"y":100,"w":400,"h":500,"open":true}}}');
+  assert.deepEqual(JSON.parse(JSON.stringify(prefs)),{tool:'inspect',windows:{steps:{x:200,y:100,w:400,h:500,open:true}}});
+});
 test('docking is a validated browser preference alongside preserved floating geometry',()=>{
   const prefs=context.workspacePrefs('{"windows":{"inspect":{"docked":true,"x":420,"w":500},"agent":{"docked":"true"}}}');
   assert.equal(prefs.windows.inspect.docked,true);assert.equal(prefs.windows.inspect.x,420);assert.equal(prefs.windows.inspect.w,500);

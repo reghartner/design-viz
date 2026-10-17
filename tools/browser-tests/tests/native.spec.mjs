@@ -110,3 +110,59 @@ test('actual React native viewers isolate styles/navigation and retire stale rev
   expect(await page.evaluate(()=>document.body.className)).toBe('host-theme');expect(new URL(page.url()).hash).toBe('#host-route');
   expect(await page.locator('#host-sentinel').evaluate(e=>({font:getComputedStyle(e).fontSize,bg:getComputedStyle(e).backgroundColor}))).toEqual(hostStyle);
 });
+// #602: "?" opens the reader keyboard shortcut sheet in the Backstage native viewer.
+// row | fixture | assertion (scoped) | rejects
+// 1 one "?" control per viewer | native host, alpha+beta InlineFlowview mounted, 1920x1400 | inside EACH of #alpha/#beta: exactly one visible button whose own text is "?", accessible name "Keyboard shortcuts", aria-controls names a closed dialog in that same viewer | no control; one shared control for both mounts
+// 2 key opens that viewer's own sheet | real click on alpha's "Story" tab (both sheets closed first) then keyboard.press('?') | alpha's dialog open, accessible name "Keyboard shortcuts"; beta's dialog not open | key unwired; one key press opening every mounted viewer's sheet
+// 3 roster lists only keys this reader handles | same open alpha sheet | ordered [dt, dd] pairs of its dl rows equal NATIVE_KEYS (Anywhere + Tab bar; no step or Present rows: the native mount has no presenter) | the standalone roster listing Present/step keys that do nothing here; an empty sheet
+// 4 Esc closes, focus returns | same | keyboard.press('Escape'): alpha dialog not open; alpha "Story" tab focused | a sheet that traps the reader or drops focus
+// 5 listed tab keys work | alpha tab bar focused | ArrowRight selects "Notes" (aria-selected), Home selects "Story" | a roster row for keys that are not handled
+// 6 button opens the sheet | real click on beta's "?" button | beta dialog open, alpha dialog not open; Esc closes it and focuses beta's "?" button | button unwired / opens the other viewer's sheet
+// 7 text input in the host page | real click in host #host-search, type "?" | the input value is "?"; no dialog open in either viewer | a handler on the host document that steals "?" from portal search fields
+// 8 linking and cleanup untouched | same | page hash stays "#host-route", history.length unchanged; after unmounting both, tracked resources equal the pre-mount baseline | a "?" handler that writes the URL, or leaks listeners/dialogs after destroy
+const NATIVE_KEYS=[
+  ['?','Open this shortcut sheet'],
+  ['Esc','Close this sheet, an open menu or a popover'],
+  ['← / →','Previous or next tab'],
+  ['Home / End','First or last tab'],
+];
+test('native viewers: "?" opens each viewer\'s own reader shortcut sheet listing only its keys',async({page,server})=>{
+  await page.setViewportSize({width:1920,height:1400});await page.addInitScript(trackResources);
+  await page.goto(server.origin+'/native/index.html#host-route');await page.waitForFunction(()=>!!window.__host);
+  const baseline=await resources(page),history=await page.evaluate(()=>window.history.length);
+  await page.evaluate(()=>{__host.left(true);__host.right(true);});
+  const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+  await expect(alpha.locator('.preadout')).toHaveText('Success');await expect(beta.locator('.preadout')).toHaveText('Success');
+  const sheets={};
+  for(const [name,viewer] of [['alpha',alpha],['beta',beta]]){
+    const help=viewer.locator('button:visible').filter({hasText:/^\s*\?\s*$/});
+    await expect(help).toHaveCount(1);expect(await help.evaluate(b=>b.textContent.trim())).toBe('?');
+    await expect(help).toHaveAccessibleName('Keyboard shortcuts');
+    const id=await help.getAttribute('aria-controls');expect(id).toBeTruthy();
+    const sheet=viewer.locator('dialog#'+id);await expect(sheet).toHaveCount(1);await expect(sheet).not.toHaveAttribute('open','');
+    sheets[name]={help,sheet};
+  }
+  const story=alpha.getByRole('tab',{name:'Story',exact:true});
+  await story.click();await expect(story).toBeFocused();
+  await page.keyboard.press('?');
+  await expect(sheets.alpha.sheet).toHaveAttribute('open','');await expect(sheets.alpha.sheet).toBeVisible();
+  await expect(sheets.alpha.sheet).toHaveAccessibleName('Keyboard shortcuts');
+  await expect(sheets.beta.sheet).not.toHaveAttribute('open','');
+  const rows=await sheets.alpha.sheet.locator('dl').evaluateAll(lists=>lists.flatMap(list=>[...list.querySelectorAll(':scope > dt')].map(dt=>[dt.textContent.replace(/\s+/g,' ').trim(),dt.nextElementSibling.textContent.replace(/\s+/g,' ').trim()])));
+  expect(rows).toEqual(NATIVE_KEYS);
+  await page.keyboard.press('Escape');
+  await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');await expect(story).toBeFocused();
+  await page.keyboard.press('ArrowRight');await expect(alpha.getByRole('tab',{name:'Notes',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.keyboard.press('Home');await expect(story).toHaveAttribute('aria-selected','true');
+  await sheets.beta.help.click();
+  await expect(sheets.beta.sheet).toHaveAttribute('open','');await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');
+  await page.keyboard.press('Escape');
+  await expect(sheets.beta.sheet).not.toHaveAttribute('open','');await expect(sheets.beta.help).toBeFocused();
+  const search=page.locator('#host-search');await search.click();await page.keyboard.type('?');
+  await expect(search).toHaveValue('?');
+  await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');await expect(sheets.beta.sheet).not.toHaveAttribute('open','');
+  expect(new URL(page.url()).hash).toBe('#host-route');expect(await page.evaluate(()=>window.history.length)).toBe(history);
+  await page.evaluate(()=>{__host.left(false);__host.right(false);});
+  await expect(alpha.locator('.docview')).toHaveCount(0);await expect(beta.locator('.docview')).toHaveCount(0);
+  await expect.poll(()=>resources(page)).toEqual(baseline);
+});

@@ -453,6 +453,44 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (descriptor && descriptor.validateDeclaration)
       panelContexts[p.id] = descriptor.validateDeclaration(p, PP, warnings, errors, d);
   });
+  /* Per-step declaration overrides fold along each path, exactly as the
+     engine folds them (foldPanelDeclarations). The step loop below reports an
+     override's own findings where it is authored and checks the rest of the
+     patch against every distinct effective declaration of that step. Panels
+     with no `declare` anywhere keep the single-declaration checks. */
+  var panelDeclares = Object.create(null);
+  (d.steps || []).forEach(function(st){
+    var patch = stepPanelPatch(st);
+    if (patch) Object.keys(patch).forEach(function(pid){
+      if (panelDeclById[pid] && panelPatchHasDeclare(patch[pid])) panelDeclares[pid] = true;
+    });
+  });
+  Object.keys(panelDeclares).forEach(function(pid){
+    var panel = panelDeclById[pid], descriptor = PanelRegistry.get(panel.type), perStep = Object.create(null);
+    function entry(index){ return perStep[index] || (perStep[index] = {messages: [], decls: []}); }
+    function contextFor(decl){
+      if (decl === panel) return panelContexts[pid];
+      return descriptor && descriptor.validateDeclaration ? descriptor.validateDeclaration(decl, 'declare', [], [], d) : undefined;
+    }
+    function fold(indices){
+      var decls = foldPanelDeclarations(panel, indices.map(function(i){ return d.steps[i]; }), {
+        descriptor: descriptor, diagram: d,
+        report: function(position, text){
+          var e = entry(indices[position]);
+          if (e.messages.indexOf(text) < 0) e.messages.push(text);
+        }
+      });
+      decls.forEach(function(decl, position){
+        var e = entry(indices[position]), json = decl === panel ? null : JSON.stringify(decl);
+        if (!e.decls.some(function(item){ return item.decl === decl || (json !== null && item.json === json); }))
+          e.decls.push({decl: decl, json: json, context: contextFor(decl)});
+      });
+    }
+    diagramPathList(d).forEach(function(path){ fold(path.indices); });
+    /* A step outside every path is unreachable, but its patch is still checked. */
+    (d.steps || []).forEach(function(st, ti){ if (!perStep[ti]) fold([ti]); });
+    panelDeclares[pid] = perStep;
+  });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
     deltaWarnings(st, DP + '.steps[' + ti + ']', warnings);
@@ -532,8 +570,21 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           '; the engine ignores this patch');
       } else {
         var panel = panelDeclById[pid], descriptor = PanelRegistry.get(panel.type);
-        if (descriptor && descriptor.validatePatch)
-          descriptor.validatePatch(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panel, warnings, panelContexts[pid]);
+        var PATCH_PATH = DP + '.steps[' + ti + '].panels.' + pid;
+        if (panelDeclares[pid]){
+          var declared = panelDeclares[pid][ti];
+          declared.messages.forEach(function(text){ warnings.push(PATCH_PATH + '.' + text); });
+          var cleanPatch = (stepPanelPatch(stepWithoutPanelDeclare(st, pid)) || {})[pid];
+          if (descriptor && descriptor.validatePatch){
+            var seen = [];
+            declared.decls.forEach(function(item){
+              var local = [];
+              descriptor.validatePatch(cleanPatch, PATCH_PATH, item.decl, local, item.context);
+              local.forEach(function(text){ if (seen.indexOf(text) < 0){ seen.push(text); warnings.push(text); } });
+            });
+          }
+        } else if (descriptor && descriptor.validatePatch)
+          descriptor.validatePatch(patch[pid], PATCH_PATH, panel, warnings, panelContexts[pid]);
       }
     });
     if (st && st.lane && !lanes[st.lane])

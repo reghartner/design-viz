@@ -232,6 +232,7 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
  blank titles | '  ' vs '  ' | state.text === file text | treating whitespace-only titles as an identity
  title on one side | 'Orders' vs none, and the converse | state.text === file text | treating a missing title as a wildcard
+ identity decoy | current page mentions the imported title/ID only in description and tags | state.text === file text | matching identity by searching the whole page
  both untitled | no title, no ID | state.text === file text | treating two untitled documents as the same */
 function importPair(before,after){
  const raw=pinFixture(),text=JSON.stringify(raw,null,2),lockRaw=JSON.parse(C.planSetNodeLocked(text,raw,0,'b',true).text);
@@ -270,6 +271,7 @@ for(const [label,before,after] of [
  ['whitespace-only titles',{title:'  '},{title:'  '}],
  ['title on the current document only',{title:'Orders'},{}],
  ['title on the imported file only',{},{title:'Orders'}],
+ ['the imported identity appears only in other fields',{title:'Orders',description:'Payments',tags:['payments']},{title:'Payments',documentLinks:{id:'payments'}}],
  ['both untitled',{},{}]
 ])test('#628 file import of a different document ('+label+') is imported exactly as written',()=>{
  const {lock,file}=importPair(before,after),state=textSession(lock);

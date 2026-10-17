@@ -201,6 +201,17 @@ using older indexes have expired; do not delete them during rolling publication.
 Only static assets reach nginx; Chromium and npm dependencies remain in the build
 stage. CI's downloadable site artifact includes this thumbnail directory.
 
+Forks whose build image cannot use the Chromium Playwright downloads (Alpine or
+a corporate base image) can set `FLOWVIEW_CHROMIUM_PATH` to the path of a system
+Chromium executable (on Alpine, from `apk add chromium font-dejavu`) and skip
+`npx playwright install`; `npm ci --prefix tools/browser-tests` is still needed. Capture then
+launches that browser with `--no-sandbox`, because build containers run as
+root. Unset, the pinned Playwright Chromium runs as before. A system Chromium
+can render slightly different pixels from the pinned build, so thumbnails may
+differ in small details. The capture rules above do not depend on the Chromium
+build. Install a font with arrow glyphs: on Alpine, without `font-dejavu`, "→"
+renders as a missing-glyph box in thumbnails.
+
 `preview.version: 1` contains `url`, matching authored `revision`, `width: 960`,
 and `height: 600`. Browse accepts only the publisher's relative content-addressed
 PNG paths, loads images lazily, and never fetches specs for cards or filters.

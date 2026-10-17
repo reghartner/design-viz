@@ -8,6 +8,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {loadRepositoryCatalog,localReader,githubReader,parseDocuments} from '../repositories.mjs';
 import {syncCatalog} from '../../canon/catalog-sync.mjs';
+import {assertPinnedActions} from './workflow-pins.mjs';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const fixture=path.join(root,'examples/canon/catalog-sources');
 const config=JSON.parse(await readFile(path.join(fixture,'sources.json'),'utf8'));
@@ -101,14 +102,50 @@ test('sync workflow runs trusted code and proposes only the bundled catalog on a
   const pr=steps.find(s=>s.uses?.startsWith('peter-evans/create-pull-request@'));
   assert.equal(pr.with['add-paths'],'workbench/catalog.json');assert.equal(pr.with.branch,'flowview/catalog-sync');
   assert.match(pr.uses,/@[a-f0-9]{40}$/);assert.equal(pr.with['delete-branch'],true);
-  // Held back for self-hosted runners older than 2.327.1 (see the workflow's header comment).
-  assert.deepEqual(steps.filter(s=>s.uses).map(s=>s.uses),[
-    'actions/checkout@v4','actions/setup-node@v4',
-    'actions/create-github-app-token@v3','actions/create-github-app-token@v3',
-    'peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676',
-  ]);
+  assertPinnedActions(steps.filter(s=>s.uses).map(s=>s.uses));
   const exported=steps.find(s=>s.name==='Export and validate catalog');
   assert.match(exported.run,/--sources/);assert.match(exported.run,/--backstage/);assert.match(exported.env.FLOWVIEW_BACKSTAGE_TOKEN,/secrets\.FLOWVIEW_BACKSTAGE_TOKEN/);
+});
+
+/* #637 forks on newer runners may bump catalog-sync actions without editing this test.
+ * Every row is applied to every roster position (checkout, setup-node, both app-token steps, create-pull-request).
+ * row | fixture | assertion (scoped) | rejects
+ * bumped | non-PR actions @v5/@v9, PR at another 40-hex SHA | accepts | an exact-version list
+ * SHA | each non-PR action alone at a 40-hex SHA | accepts | allowing only @vN for non-PR actions
+ * major | each non-PR action alone @v10 | accepts | a single-digit @vN pattern
+ * order | every pair of distinct-named positions swapped | rejects | comparing only the set of names, or one ordering relationship
+ * missing | each action dropped in turn | rejects | checking only that listed actions are pinned
+ * extra | a third-party action inserted | rejects | prefix-matching the expected names
+ * renamed | each action replaced by a same-ref lookalike name | rejects | checking refs but not names
+ * branch | each action @main | rejects | accepting any ref
+ * unpinned | each action with no @ref | rejects | splitting on @ without requiring a ref
+ * empty ref | each action ending in @ | rejects | accepting an empty ref
+ * semver | each action @v4.2.2 | rejects | anything looser than @vN or a full SHA
+ * short SHA | each action @ + 12 hex | rejects | accepting abbreviated SHAs
+ * long/upper SHA | each action @ + 41 hex, or 40 upper-case hex | rejects | an unanchored or case-folded SHA match
+ * PR tag | peter-evans/create-pull-request@v7 | rejects | letting the PR action use @vN like the others
+ */
+test('catalog-sync action pinning allows forks to bump versions but never to unpin',()=>{
+  const sha='0123456789abcdef0123456789abcdef01234567';
+  const names=['actions/checkout','actions/setup-node','actions/create-github-app-token','actions/create-github-app-token','peter-evans/create-pull-request'];
+  const bumped=['v5','v5','v9','v9',sha].map((ref,i)=>names[i]+'@'+ref);
+  const at=(i,use)=>bumped.map((u,j)=>j===i?use:u);
+  assertPinnedActions(bumped);
+  for(let i=0;i<4;i++){assertPinnedActions(at(i,names[i]+'@'+sha));assertPinnedActions(at(i,names[i]+'@v10'));}
+  const bad={extra:[...bumped.slice(0,4),'someone/else@v1',bumped[4]],prTag:at(4,names[4]+'@v7')};
+  names.forEach((_,i)=>names.forEach((__,j)=>{if(i<j && names[i]!==names[j]){const swapped=[...bumped];[swapped[i],swapped[j]]=[swapped[j],swapped[i]];bad['order'+i+j]=swapped;}}));
+  names.forEach((name,i)=>Object.assign(bad,{
+    ['missing'+i]:bumped.filter((_,j)=>j!==i),
+    ['renamed'+i]:at(i,name+'-fork@'+bumped[i].split('@')[1]),
+    ['branch'+i]:at(i,name+'@main'),
+    ['unpinned'+i]:at(i,name),
+    ['emptyRef'+i]:at(i,name+'@'),
+    ['semver'+i]:at(i,name+'@v4.2.2'),
+    ['shortSha'+i]:at(i,name+'@'+sha.slice(0,12)),
+    ['longSha'+i]:at(i,name+'@'+sha+'8'),
+    ['upperSha'+i]:at(i,name+'@'+sha.toUpperCase()),
+  }));
+  for(const [row,uses] of Object.entries(bad))assert.throws(()=>assertPinnedActions(uses),assert.AssertionError,row);
 });
 
 test('CLI rebuilds the catalog from the fake repository with no credentials or network',async t=>{

@@ -1,4 +1,6 @@
 import {test,expect} from '../helpers/test.mjs';
+import {chromium} from '@playwright/test';
+import * as thumbnails from '../../canon/thumbnails.mjs';
 import {createThumbnailCapture,thumbnailAsset} from '../../canon/thumbnails.mjs';
 import {publishLibrary} from '../../canon/library.mjs';
 import {mkdir,readFile,writeFile,rm,symlink,readdir,stat,chmod} from 'node:fs/promises';
@@ -91,4 +93,38 @@ test('production capture renders embedded app screens and device apps, and bound
     const large=await capture.capture({id:'large',filename:f.file,spec:raw});expect(large.observed.nodes).toHaveLength(45);expect(large.observed.clippedNodes).toBe(0);expect(large.png.readUInt32BE(16)).toBe(960);expect(large.png.readUInt32BE(20)).toBe(600);expect(large.png.length).toBeLessThan(750*1024);
     raw.page.sections[0].diagram.nodes=Object.fromEntries(Array.from({length:1001},(_,i)=>['n'+i,{title:'Service'}]));await expect(capture.capture({id:'too-large',filename:f.file,spec:raw})).rejects.toThrow(/bounded thumbnail workload/);
   }finally{await capture.close();}
+});
+
+/* #637 FLOWVIEW_CHROMIUM_PATH contract (forks on Alpine / corporate images supply their own Chromium).
+ * row | fixture | assertion (scoped) | rejects
+ * unset | env {} | chromiumLaunchOptions(env) deep-equals {headless:true} | an implementation that always adds --no-sandbox or an executablePath
+ * empty | env {FLOWVIEW_CHROMIUM_PATH:''} | same as unset | treating an empty variable as a path
+ * set | env {FLOWVIEW_CHROMIUM_PATH:'/opt/chromium/chrome'} | deep-equals {headless:true,executablePath:that path,args:['--no-sandbox']} | ignoring the variable, or omitting --no-sandbox (containers run as root)
+ * wired | process.env points at a wrapper that records its argv and execs the bundled Chromium | wrapper ran, its argv contains --no-sandbox, and a capture still renders | an exported helper that chromium.launch never uses, or a launch that checks the path but starts the bundled browser
+ */
+test('FLOWVIEW_CHROMIUM_PATH selects a custom Chromium without changing the default launch',async()=>{
+  const options=thumbnails.chromiumLaunchOptions;
+  expect(typeof options).toBe('function');
+  expect(options({})).toEqual({headless:true});
+  expect(options({FLOWVIEW_CHROMIUM_PATH:''})).toEqual({headless:true});
+  expect(options({FLOWVIEW_CHROMIUM_PATH:'/opt/chromium/chrome'})).toEqual({headless:true,executablePath:'/opt/chromium/chrome',args:['--no-sandbox']});
+});
+
+test('createThumbnailCapture launches the Chromium named by FLOWVIEW_CHROMIUM_PATH',async({server})=>{
+  const f=await setup(server),wrapper=path.join(f.root,'custom-chromium'),argv=path.join(f.root,'custom-chromium.argv'),previous=process.env.FLOWVIEW_CHROMIUM_PATH;
+  const quote=value=>"'"+value.replaceAll("'","'\\''")+"'";
+  await writeFile(wrapper,'#!/bin/sh\nprintf "%s\\n" "$@" > '+quote(argv)+'\nexec '+quote(chromium.executablePath())+' "$@"\n');await chmod(wrapper,0o755);
+  const raw={page:{title:'Custom browser',sections:[{diagram:graph('Custom Chromium service')}]}};await writeFile(f.file,JSON.stringify(raw));
+  process.env.FLOWVIEW_CHROMIUM_PATH=wrapper;
+  try{
+    const capture=await createThumbnailCapture(f.root);
+    try{
+      const shot=await capture.capture({id:'custom',filename:f.file,spec:raw});
+      expect(shot.observed.nodes.join(' ')).toContain('Custom Chromium service');
+    }finally{await capture.close();}
+  }finally{
+    if(previous===undefined)delete process.env.FLOWVIEW_CHROMIUM_PATH;else process.env.FLOWVIEW_CHROMIUM_PATH=previous;
+  }
+  const args=(await readFile(argv,'utf8').catch(()=>'')).split('\n');
+  expect(args).toContain('--no-sandbox');
 });

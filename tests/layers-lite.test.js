@@ -166,10 +166,16 @@ const pinCases=[
  ['lanes: delete edge',{lanes:true,sameRowEdge:true},(t,r)=>C.planDeleteEdge(t,r,0,5)],
  ['lanes: change edge endpoint',{lanes:true},(t,r)=>C.planSetEdgeEndpoint(t,r,0,3,'to','h')]
 ];
-/* Everything but placement and lock flags: the locked edit must make the same
- content change as the unlocked one, so a plan that refuses or drops the edit
- when a lock exists cannot pass. */
-function contentOnly(text){const raw=JSON.parse(text),d=diagram(raw);delete d.rows;delete d.floats;Object.values(d.nodes).forEach(n=>delete n.locked);return raw;}
+/* Everything except b's own lock flag and placement entry: the locked edit
+ must make the same content AND placement change for every other node as the
+ unlocked one, so a plan that refuses, drops or misplaces the edit near a
+ lock cannot pass. b leaves its slot the way a pin lift does (a one-node
+ stack collapses, an emptied row stays). */
+function contentOnly(text){
+ const raw=JSON.parse(text),d=diagram(raw);delete d.nodes.b.locked;
+ d.rows=(d.rows||[]).map(row=>row.flatMap(slot=>{if(!Array.isArray(slot))return slot==='b'?[]:[slot];const kept=slot.filter(id=>id!=='b');return kept.length===1?[kept[0]]:kept.length?[kept]:[];}));
+ d.floats=(d.floats||[]).filter(f=>f.id!=='b');return raw;
+}
 for(const [label,options,edit] of pinCases)test('#617 lock pins b through: '+label,()=>{
  const raw=pinFixture(options),text=JSON.stringify(raw,null,2),before=allCenters(text).b;
  const unlocked=edit(text,JSON.parse(text));assert.equal(unlocked.error,undefined);assert.notDeepEqual(allCenters(unlocked.text).b,before,'precondition: the edit re-spaces b when unlocked');

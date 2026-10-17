@@ -27,7 +27,7 @@ test('editor shares the Contents, Views and Page shell without covering its auth
  await expect(nav(page).locator('.embedcopy')).toHaveCount(1);
  const contentsToggle=nav(page).locator('.reader-top>button');await contentsToggle.click();await expect(nav(page).locator('.reader-contents')).toBeHidden();
  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Edited Product journey');await title.press('Enter');
- await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await expect(page.locator('.workspace-rail')).toHaveCSS('left','12px');
+ await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await expect(page.locator('.workspace-rail')).toHaveCSS('left','56px');
  await page.locator('#undo-builder').click();await expect(page.locator('#workbench-editor-title')).toHaveText(fixture().page.title);await expect(nav(page).locator('.reader-contents')).toBeHidden();await page.locator('#redo-builder').click();await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await page.locator('#undo-builder').click();await closeTools(page);await contentsToggle.click();await expect(nav(page).locator('.reader-contents')).toBeVisible();
  // Workbench authoring is desktop-only; exercise wide and compact desktop shells.
  for(const width of [1440,1024]){

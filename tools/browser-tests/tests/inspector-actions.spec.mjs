@@ -334,6 +334,8 @@ test('every node style preset stays readable, bordered and distinct in the edito
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="plain"] .t1'));
   const live=(await page.locator('#guide select[aria-label="Node style"] option').evaluateAll(options=>options.map(o=>o.value))).filter(Boolean);
   expect(live).toEqual(STYLE_TOKENS);await closeTools(page);
+  // The audit reads unselected cards: Escape clears the selection ring left by inspecting the default node.
+  await page.locator('#section-overview [data-dv-node="plain"]').focus();await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
   await page.locator('#workspace-appearance>summary').click();
   const editorSkins=await page.locator('#workspace-appearance-body button[id^="sk-"]').evaluateAll(buttons=>buttons.map(b=>b.id.slice(3)));
   expect(editorSkins.sort()).toEqual(['aurora','blueprint','lavender','lilac','pastel','rose','terminal']);

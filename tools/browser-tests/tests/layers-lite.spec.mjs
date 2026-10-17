@@ -77,11 +77,16 @@ test('importing the same document keeps a locked node in place; a different docu
  await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');const start=await graphCenter(node(page,'b'));
 
  const same=file('Browser contract');await importFile(same);
- const expected=JSON.parse(same),ed=expected.page.blocks[0].diagram;ed.rows[0]=['z','a','c'];ed.floats=[{id:'b',side:'below',x:start.x,y:start.y,noSpread:true}];
- expect(JSON.parse(await source(page))).toEqual(expected);
- await expect.poll(()=>graphCenter(node(page,'b'))).toEqual(start);await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');
+ // Rendered SVG boxes carry float noise, so centers compare within half a graph unit.
+ const imported=JSON.parse(await source(page)),pins=imported.page.blocks[0].diagram.floats;
+ expect(pins).toHaveLength(1);expect(pins[0]).toMatchObject({id:'b',side:'below',noSpread:true});
+ expect(Math.abs(pins[0].x-start.x)).toBeLessThan(0.5);expect(Math.abs(pins[0].y-start.y)).toBeLessThan(0.5);
+ const expected=JSON.parse(same);expected.page.blocks[0].diagram.rows[0]=['z','a','c'];delete imported.page.blocks[0].diagram.floats;
+ expect(imported).toEqual(expected);
+ await expect.poll(async()=>{const now=await graphCenter(node(page,'b'));return Math.abs(now.x-start.x)<0.5 && Math.abs(now.y-start.y)<0.5;}).toBe(true);
+ await expect(node(page,'b')).toHaveAttribute('data-dv-position-locked','true');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(node(page,'z')).toHaveCount(0);
 
  const other=file('Other story');await importFile(other);
- await expect(page.locator('#src')).toHaveValue(other);expect(await graphCenter(node(page,'b'))).not.toEqual(start);
+ await expect(page.locator('#src')).toHaveValue(other);const moved=await graphCenter(node(page,'b'));expect(Math.abs(moved.x-start.x)+Math.abs(moved.y-start.y)).toBeGreaterThan(50);
 });

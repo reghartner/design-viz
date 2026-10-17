@@ -226,6 +226,7 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  same ID, renamed | page.documentLinks.id both sides, titles differ | b re-pinned | a title-only identity that drops renamed files
  same canon ID | page.canon.id both sides | b re-pinned | ignoring canon.id
  canon ID wins | same canon.id, different documentLinks.id | b re-pinned | documentLinks.id taking precedence over canon.id
+ same ID, different fields | canon.id 'orders' vs documentLinks.id 'orders', both directions | b re-pinned | comparing IDs per field instead of the derived diagram ID
  different title | both untitled-ID, titles differ, b locked in both | state.text === file text | a guard matching nodes by id across documents
  different ID, same title | documentLinks.id differs | state.text === file text | a title match overriding IDs
  ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
@@ -246,7 +247,9 @@ for(const [label,before,after] of [
  ['same title after trimming',{title:' Orders '},{title:'Orders'}],
  ['same documentLinks.id, renamed',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders v2',documentLinks:{id:'orders'}}],
  ['same canon ID',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
- ['same canon ID, different documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'old'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'new'}}]
+ ['same canon ID, different documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'old'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'},documentLinks:{id:'new'}}],
+ ['canon.id matches the imported documentLinks.id',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',documentLinks:{id:'orders'}}],
+ ['documentLinks.id matches the imported canon.id',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}]
 ])test('#628 file import of the same document ('+label+') keeps a locked node in place in one undo step',()=>{
  const {lock,file}=importPair(before,after),state=textSession(lock),start=allCenters(lock).b;
  assert.equal(state.session.accept({text:file},{lockGuard:'same-document'}),true);

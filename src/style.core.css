@@ -3325,7 +3325,10 @@ body.sk-editorial .errbox{
    over them. The card paint and the preset values live at the end of this
    sheet. */
 .docview .node.node-styled .t1{fill:var(--ns-ink);}
-.docview .node.node-styled .t2{fill:var(--ns-sub);}
+/* Tones repaint the card and the title but leave the subtitle to the skin;
+   a toned styled card therefore drops its preset subtitle color and reads
+   like a plain card (Ink's subtitle would otherwise sit on the tone fill). */
+.docview .node.node-styled:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .t2{fill:var(--ns-sub);}
 .node.tone-pulse .card{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out;}
 @keyframes dvnodepulse{
   0%{transform:scale(1);}

@@ -1,0 +1,21 @@
+{
+  "pages": [
+    {
+      "file": "panel-declarations.html",
+      "spec": "panel-declarations.spec.json",
+      "title": "Panel declarations and per-step changes",
+      "family": "panel-declarations",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "battery",
+        "checks",
+        "funnel",
+        "gauge",
+        "log",
+        "radar",
+        "table"
+      ]
+    }
+  ]
+}

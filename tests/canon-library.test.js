@@ -331,10 +331,11 @@ test('optional Backstage metadata is sanitized and older indexes never guess bin
   const good={entityRef:'component:default/api',label:'API',edgeCount:3};
   entry.boundServices=[null,{},'API',{...good,entityRef:'bad'},{...good,edgeCount:-1},{...good,edgeCount:1.2},good,{...good,label:'Duplicate',edgeCount:99},{entityRef:'component:other/api',label:42,edgeCount:0}];
   assert.deepEqual(plain(context.parseCanonLibrary(raw)[0].boundServices),[good,{entityRef:'component:other/api',label:'component:other/api',edgeCount:0}]);
-  for(const version of [2,3])for(const value of [undefined,null,'API',{}]){
+  for(const version of [2,3])for(const value of [undefined,null,'API',{},[null,{entityRef:'invalid',edgeCount:1}]]){
     raw.version=version;entry.boundServices=value;const parsed=context.parseCanonLibrary(raw)[0];
     assert.equal(parsed.boundServices,undefined);assert.deepEqual(plain(parsed.services),entry.services);assert.equal(parsed.spec,undefined);
   }
+  entry.boundServices=[];assert.deepEqual(plain(context.parseCanonLibrary(raw)[0].boundServices),[]);
   const embedded=manifest();assert.deepEqual(plain(context.parseCanonLibrary(embedded)[0].boundServices),C.serviceSummaries(embedded.diagrams[0].spec));
 });
 

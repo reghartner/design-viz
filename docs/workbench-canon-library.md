@@ -128,7 +128,8 @@ sections. Browse uses only these compact summaries and never fetches a diagram
 or provider to populate the row or filter. Older v2/v3 indexes without summaries
 keep title search/filtering and show no service row; embedded v1 specs can derive
 the summaries locally. Invalid optional records are ignored without preventing
-browsing.
+browsing. A nonempty summary with no valid records falls back to legacy title
+filters; an explicit empty array means there are no bound services.
 
 `diagrams.json` is generated and gitignored, not another hand-maintained
 membership file. Its version 3 entries contain `id`, `title`, the optional

@@ -39,6 +39,8 @@ function libraryBoundServices(value){
     seen.add(service.entityRef);
     out.push({entityRef:service.entityRef,label:typeof service.label==='string' && service.label.trim()?service.label.trim():service.entityRef,edgeCount:service.edgeCount});
   });
+  // An authored empty summary is meaningful; a wholly malformed list is not.
+  if(Array.isArray(value) && value.length && !out.length)return undefined;
   return FlowCanon.sortServiceSummaries(out);
 }
 /* Only publisher-owned PNG paths with the matching authored revision are

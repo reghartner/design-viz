@@ -935,3 +935,21 @@ test('older service title filters and malformed optional summaries remain usable
   await expect(first).toBeHidden();await expect(second).toBeVisible();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:entity:component:default/api');
   await expect(page).toHaveURL(fixture.url);expect(requests).toEqual([]);
 });
+
+test('all-invalid service summaries retain legacy facets while valid empty summaries only allow keyword search',async({page,server})=>{
+  const fixture=await publish(server),requests=[];
+  fixture.index.diagrams[0].services=['Legacy service'];
+  fixture.index.diagrams[0].boundServices=[null,{entityRef:'invalid',edgeCount:1}];
+  fixture.index.diagrams[1].services=['Legacy service','Empty-only title'];
+  fixture.index.diagrams[1].boundServices=[];
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(fixture.index));
+  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const first=mainLibrary(page).locator('[data-id="first"]'),second=mainLibrary(page).locator('[data-id="second"]');
+  await expect(mainLibrary(page).locator('.canon-library-services')).toHaveCount(0);
+  await expect(page.getByLabel('Service',{exact:true}).locator('option')).toHaveText(['All services','Legacy service']);
+  await page.getByLabel('Service',{exact:true}).selectOption('Legacy service');await expect(first).toBeVisible();await expect(second).toBeHidden();
+  await page.locator('#welcome-library-clear').click();await page.getByRole('searchbox',{name:'Search diagrams'}).fill('Empty-only title');
+  await expect(first).toBeHidden();await expect(second).toBeVisible();
+  await expect(page).toHaveURL(fixture.url);expect(requests).toEqual([]);
+});

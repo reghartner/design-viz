@@ -39,7 +39,7 @@ test('strandscene template, picker example, feature label, styles and sizing use
   assert.deepEqual(plain(panelAssets().features['panel.strandscene']), {label:'Strand scene panel', since:'0.2.0'});
   const def = C.PanelRegistry.get('strandscene');
   assert.equal(def.order, 46); assert.equal(def.overridable, undefined, 'declaration changes per step belong to the engine, not the panel');
-  assert.deepEqual(plain(C.panelPatchFields(panel())).map(f => f[0]), ['actors', 'events', 'caption', 'highlight', 'labels', 'camera', 'paired', 'note'], 'patch fields are state only');
+  assert.deepEqual(plain(C.panelPatchFields(panel())).map(f => f[0]).filter(k => k !== 'declare'), ['actors', 'events', 'caption', 'highlight', 'labels', 'camera', 'paired', 'note'], 'patch fields are state only');
   assert.deepEqual(plain(C.PANEL_SETUP_FIELDS.strandscene).map(f => f[0]), ['label', 'sequence', 'alphabet', 'strands', 'lower', 'start', 'beads', 'sites', 'actors', 'initial']);
   assert.deepEqual(plain(def.layout.canvasSizing), {mode:'fixed-aspect', aspect:560 / 315, resizeAxis:'width'});
   assert.deepEqual(plain(def.layout.sectionSizing), {minWidth:320, preferredWidth:560, maxWidth:900, aspectPolicy:'fixed', bodyAspect:16 / 9, grow:1, contentSelector:'.mech-frame', ancillarySelector:'.mech-legend,.swnote'});

@@ -231,6 +231,7 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  different ID, same title | derived IDs differ: documentLinks/documentLinks, canon/canon, and both cross-field directions | state.text === file text | a title match overriding IDs, or a per-field ID check
  ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
  blank titles | '  ' vs '  ' | state.text === file text | treating whitespace-only titles as an identity
+ title on one side | 'Orders' vs none, and the converse | state.text === file text | treating a missing title as a wildcard
  both untitled | no title, no ID | state.text === file text | treating two untitled documents as the same */
 function importPair(before,after){
  const raw=pinFixture(),text=JSON.stringify(raw,null,2),lockRaw=JSON.parse(C.planSetNodeLocked(text,raw,0,'b',true).text);
@@ -267,6 +268,8 @@ for(const [label,before,after] of [
  ['ID on the current document only',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders'}],
  ['ID on the imported file only',{title:'Orders'},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
  ['whitespace-only titles',{title:'  '},{title:'  '}],
+ ['title on the current document only',{title:'Orders'},{}],
+ ['title on the imported file only',{},{title:'Orders'}],
  ['both untitled',{},{}]
 ])test('#628 file import of a different document ('+label+') is imported exactly as written',()=>{
  const {lock,file}=importPair(before,after),state=textSession(lock);

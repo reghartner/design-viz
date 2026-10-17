@@ -1,0 +1,98 @@
+{
+  "page": {
+    "title": "Pump telemetry — panels that change what they measure",
+    "description": "A flow gauge switches to hourly volume, a readings table gains a column on the offline path and a latency budget adds a span, all through per-step declaration overrides.",
+    "tags": ["authoring", "declare", "alternates", "telemetry"],
+    "sections": [
+      {
+        "heading": "Hourly reporting from a pump station",
+        "intro": "Every panel keeps one declaration, but a step may override parts of it with `declare`. The override carries along the selected path, `null` restores the authored value, and `enterOnce.declare` applies to a single beat.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "sensor": {"title": "Flow sensor", "sub": "Inline meter"},
+            "controller": {"title": "Pump controller", "sub": "Edge unit"},
+            "cloud": {"title": "Fleet cloud", "sub": "Telemetry API"}
+          },
+          "rows": [["sensor", "controller", "cloud"]],
+          "edges": [
+            {"from": "sensor", "to": "controller"},
+            {"from": "controller", "to": "cloud"}
+          ],
+          "panels": [
+            {"id": "flow", "type": "gauge", "title": "Flow", "unit": "L/min", "max": 120, "initial": {"value": 35}},
+            {
+              "id": "readings", "type": "table", "title": "Readings",
+              "columns": [{"id": "metric", "label": "Metric"}, {"id": "value", "label": "Value"}],
+              "initial": {"rows": [{"id": "flow", "cells": {"metric": "Flow", "value": "35 L/min"}}]}
+            },
+            {
+              "id": "budget", "type": "waterfall", "title": "Report latency",
+              "spans": [
+                {"id": "sample", "label": "Sample", "ms": 40},
+                {"id": "encode", "label": "Encode", "ms": 20},
+                {"id": "send", "label": "Send", "ms": 140}
+              ],
+              "initial": {"reveal": 0}
+            }
+          ],
+          "steps": [
+            {
+              "id": "sample", "edge": "sensor->controller",
+              "text": "The inline meter samples the flow and sends it to the controller.",
+              "panels": {"flow": {"value": 42}, "budget": {"reveal": 1},
+                "readings": {"rows": [{"id": "flow", "cells": {"metric": "Flow", "value": "42 L/min"}, "status": "changed"}]}}
+            },
+            {
+              "id": "encode", "nodes": ["controller"],
+              "text": "The controller encodes a report.",
+              "panels": {"budget": {"reveal": 2}}
+            },
+            {
+              "id": "hourly", "nodes": ["controller"],
+              "text": "From here on the controller reports hourly volume, so the gauge changes its unit and range, and the budget gains a compression span.",
+              "panels": {
+                "flow": {"value": 2.1, "declare": {"max": 5, "unit": "m³/h", "title": "Volume per hour"}},
+                "budget": {"reveal": 3, "declare": {"spans": [
+                  {"id": "sample", "label": "Sample", "ms": 40},
+                  {"id": "encode", "label": "Encode", "ms": 20},
+                  {"id": "compress", "label": "Compress", "ms": 35},
+                  {"id": "send", "label": "Send", "ms": 90}
+                ]}},
+                "readings": {"rows": [{"id": "flow", "cells": {"metric": "Volume", "value": "2.1 m³/h"}, "status": "changed"}]}
+              }
+            },
+            {
+              "id": "upload", "edge": "controller->cloud",
+              "text": "The hourly report reaches the fleet cloud.",
+              "panels": {"flow": {"value": 2.4}, "budget": {"reveal": 4},
+                "readings": {"rows": [{"id": "flow", "cells": {"metric": "Volume", "value": "2.4 m³/h"}}]}}
+            },
+            {
+              "id": "offline", "nodes": ["controller"],
+              "text": "The uplink is down. The controller stores readings locally, so the table gains a column for how many are waiting.",
+              "panels": {
+                "flow": {"value": 44},
+                "readings": {
+                  "declare": {"columns": [{"id": "metric", "label": "Metric"}, {"id": "value", "label": "Value"}, {"id": "stored", "label": "Stored locally"}]},
+                  "rows": [{"id": "flow", "cells": {"metric": "Flow", "value": "44 L/min", "stored": 1}, "status": "added"}]
+                }
+              }
+            },
+            {
+              "id": "flush", "edge": "controller->cloud",
+              "text": "The link returns and the backlog flushes.",
+              "panels": {"flow": {"value": 43}, "budget": {"reveal": 3},
+                "readings": {"rows": [{"id": "flow", "cells": {"metric": "Flow", "value": "43 L/min", "stored": 0}, "status": "changed"}]}}
+            }
+          ],
+          "paths": [
+            {"id": "online", "label": "Hourly reporting", "steps": ["sample", "encode", "hourly", "upload"]},
+            {"id": "offline", "label": "Link down", "steps": ["sample", "encode", "offline", "flush"]}
+          ]
+        }
+      }
+    ]
+  }
+}

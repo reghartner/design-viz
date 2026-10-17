@@ -13,6 +13,27 @@
   reads, one insertion, its origin on the map, a quality filter, and an
   in-frame versus frameshift ending. Recipe: `cookbook/sequence-panels.md`.
 
+## Per-step panel declaration overrides (2026-10-17)
+
+- A step's panel patch may carry the reserved key `declare`: an object of
+  declaration fields (`max`, `unit`, `title`, `columns`, `spans`, …) that
+  overrides the panel's declaration from that step on along the selected path.
+  It is sparse and carries forward; `null` restores the authored value;
+  `enterOnce.declare` applies to one beat; `id`, `type`, `initial` and
+  `visible` are reserved. Works for every panel type through one engine
+  mechanism (`foldPanelDeclarations`); specs without `declare` fold, validate
+  and render exactly as before.
+- The validator checks the effective declaration with the panel's own rules
+  where the override is authored (`steps[i].panels.<id>.declare.<key>`),
+  ignores an override the panel rejects, and validates the rest of the patch
+  against the effective declaration. Viewers update the panel heading when
+  the effective `title` changes. Compatibility stamps `steps.panel-declare`.
+- Workbench: every typed step form has **Declaration overrides** under
+  **Advanced** with Inherit, Carry forward and This step only; the
+  effective-state inspector shows the overridden keys as `declare`.
+- New example `examples/panel-declare/` and recipe
+  `cookbook/declaration-overrides.md`.
+
 ## Company identity from configuration (2026-10-13)
 
 - `company/company.json` sets a fork's `companyName`, `repository`,
@@ -394,7 +415,6 @@
   models consistently across HLD prose, wire contracts, plan tables,
   specs, and rendered pages.
 
-
 ## IoT visualization atlas (2026-09-05)
 
 - **Five new inspector widgets** (each Codex-reviewed across a 4-cycle loop
@@ -429,7 +449,6 @@
   per-link signal fields warn (caught three `rssi` slips), radar patches
   fully checked, degenerate sectors rejected, message texts aligned to
   exact model behavior.
-
 
 ## Panels stop restarting animations on every step (2026-09-05)
 

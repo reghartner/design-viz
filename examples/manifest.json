@@ -333,6 +333,24 @@
       ]
     },
     {
+      "file": "panel-declare/panel-declare.html",
+      "spec": "panel-declare/panel-declare.spec.json",
+      "title": "Pump telemetry \u2014 panels that change what they measure",
+      "family": "panel-declare",
+      "description": "A flow gauge switches to hourly volume, a readings table gains a column on the offline path and a latency budget adds a span, all through per-step declaration overrides.",
+      "tags": [
+        "authoring",
+        "declare",
+        "alternates",
+        "telemetry"
+      ],
+      "widgets": [
+        "gauge",
+        "table",
+        "waterfall"
+      ]
+    },
+    {
       "file": "panel-visibility/panel-visibility.html",
       "spec": "panel-visibility/panel-visibility.spec.json",
       "title": "Show the right panel at the right moment",

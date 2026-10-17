@@ -35,6 +35,17 @@ available. A layout’s hidden elements remain hidden. Ambient shows all panels
 included in the view. Use Outline to select a hidden panel. Try the
 [panel visibility example](../examples/panel-visibility/panel-visibility.spec.json).
 
+Every panel's step form ends with **Declaration overrides** under
+**Advanced**: a JSON object of declaration fields (for example
+`{"max": 200, "unit": "W"}`) that overrides the panel's declaration from this
+step on along the selected path. **Inherit** removes this step's override,
+**Carry forward** keeps it for later steps, and **This step only** writes it
+under `enterOnce`. A key set to `null` restores the declared value. The
+starting-state form never has it; the effective-state inspector lists the
+overridden keys as `declare` with the steps that authored them. Try the
+[declaration overrides example](../examples/panel-declare/panel-declare.spec.json)
+and [recipe](../cookbook/declaration-overrides.md).
+
 For an **App screens** panel, every step inspector includes an **App screen**
 selector under **Panel changes**, even before the step has a panel patch. Choose
 a named uploaded screen, inherit the previous screen, or explicitly clear it.

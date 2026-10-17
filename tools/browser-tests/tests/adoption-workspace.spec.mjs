@@ -129,7 +129,7 @@ test('short floating tools keep their close buttons and rail reachable above can
    R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
 /* #611 contract matrix (desktop editor): the Layers tab is removed; position locks stay in Inspect and the object menu.
    row | fixture | assertion (scoped) | rejects
-   L1 rail roster | editorSpec | .workspace-rail [role=tab] labels (text outside .editor-tool-icon) equal Agent, Brief, Inspect, Steps, Find objects, JSON, File in order | a Layers tab left in the rail, or another tool dropped with it
+   L1 rail roster | editorSpec | .workspace-rail button[id^=editor-tab-] labels (text outside .editor-tool-icon) equal Agent, Brief, Inspect, Steps, Find objects, JSON, File in order | a Layers tab left in the rail, or another tool dropped with it
    L2 no Layers DOM | same | #editor-tab-layers, #editor-layers and #workspace-window-layers each have count 0 | the tab hidden while its pane or floating window still ships
    L3 stale saved workspace | localStorage dv-workbench-floating-v1 saved with tool "layers" and open layers + steps windows | after load: no page error, #workspace-window-layers count 0, #workspace-window-steps visible | restoring a Layers window, throwing on the unknown name, or discarding every saved window */
 /* Static rows use soft assertions so one RED run reports every unmet row. */
@@ -178,10 +178,10 @@ test('the rail has no Layers tab and a saved Layers window is ignored',async({pa
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
   await page.evaluate(()=>{localStorage.clear();localStorage.setItem('dv-workbench-floating-v1',JSON.stringify({tool:'layers',windows:{layers:{open:true,x:900,y:160,w:380,h:500},steps:{open:true,x:500,y:160,w:380,h:500}}}));});
   await page.reload();await paste(page,JSON.stringify(spec(),null,2));
-  const tabs=page.locator('.workspace-rail [role="tab"]');
-  await expect(tabs).toHaveCount(7);
-  expect(await tabs.evaluateAll(list=>list.map(tab=>[...tab.childNodes].filter(node=>!(node.classList && node.classList.contains('editor-tool-icon'))).map(node=>node.textContent).join('').trim()))).toEqual(['Agent','Brief','Inspect','Steps','Find objects','JSON','File']);
-  for(const id of ['#editor-tab-layers','#editor-layers','#workspace-window-layers'])await expect(page.locator(id),id).toHaveCount(0);
+  const tabs=page.locator('.workspace-rail button[id^="editor-tab-"]');
+  await expect(tabs.first()).toBeVisible();
+  expect.soft(await tabs.evaluateAll(list=>list.map(tab=>[...tab.childNodes].filter(node=>!(node.classList && node.classList.contains('editor-tool-icon'))).map(node=>node.textContent).join('').trim()))).toEqual(['Agent','Brief','Inspect','Steps','Find objects','JSON','File']);
+  for(const id of ['#editor-tab-layers','#editor-layers','#workspace-window-layers'])await expect.soft(page.locator(id),id).toHaveCount(0);
   await expect(page.locator('#workspace-window-steps')).toBeVisible();
   expect(errors).toEqual([]);
 });

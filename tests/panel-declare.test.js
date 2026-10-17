@@ -193,7 +193,7 @@ test('hostile declare values never throw, never mutate the spec and never pollut
     null, 7, 'text', true,
   ];
   /* Specs are parsed JSON, so every hostile value is JSON-representable. */
-  let escaped = 0;
+  const escaped = {happy: 0, alt: 0};
   for (const value of hostile) {
     const d = fixture();
     d.steps[1].panels.g.declare = value;
@@ -202,6 +202,7 @@ test('hostile declare values never throw, never mutate the spec and never pollut
     /* The alternate path (s1, s5) must exercise hostile values too. */
     d.steps[4].panels.g = {declare: value, enterOnce: {declare: value}};
     d.steps[4].panels.t.declare = value;
+    d.steps[4].panels.t.enterOnce = {declare: value};
     const before = JSON.stringify(d), frozen = freeze(d);
     assert.doesNotThrow(() => validate(frozen));
     for (const route of ['happy', 'alt']) {
@@ -215,8 +216,8 @@ test('hostile declare values never throw, never mutate the spec and never pollut
           assert.doesNotThrow(() => C.renderPanelBody(host, decls[panel.id][i] || panel, state, 'aurora', states, i, false));
           if (host.innerHTML) assert.doesNotMatch(host.innerHTML, /<img src=x/, route + ' ' + panel.id + ' step ' + i);
           const decl = decls[panel.id][i];
-          if (decl && typeof decl.unit === 'string' && decl.unit.includes('<img') && panel.id === 'g') { escaped++; assert.match(host.innerHTML, /&lt;img src=x/); }
-          if (decl && Array.isArray(decl.columns) && decl.columns.some(c => c && String(c.label).includes('<img')) && panel.id === 't') { escaped++; assert.match(host.innerHTML, /&lt;img src=x/); }
+          if (decl && typeof decl.unit === 'string' && decl.unit.includes('<img') && panel.id === 'g') { escaped[route]++; assert.match(host.innerHTML, /&lt;img src=x/); }
+          if (decl && Array.isArray(decl.columns) && decl.columns.some(c => c && String(c.label).includes('<img')) && panel.id === 't') { escaped[route]++; assert.match(host.innerHTML, /&lt;img src=x/); }
         });
       });
     }
@@ -225,7 +226,7 @@ test('hostile declare values never throw, never mutate the spec and never pollut
     assert.equal(C.Object ? C.Object.prototype.polluted : undefined, undefined);
     assert.equal(vm.runInContext('({}).polluted', C), undefined, 'context Object.prototype not polluted');
   }
-  assert.ok(escaped >= 4, 'rendered markup payloads were checked on both paths (' + escaped + ')');
+  for (const route of ['happy', 'alt']) assert.ok(escaped[route] >= 2, route + ' path checked escaped gauge unit and table column markup (' + escaped[route] + ')');
 });
 
 test('the rest of a patch is validated against the effective declaration on its own path', () => {

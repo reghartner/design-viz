@@ -307,3 +307,46 @@ test('thumbnail metadata is revision-bound and confined to publisher-owned image
   assert.equal(context.parseCanonLibrary(manifest())[0].preview,undefined);
   assert.equal(context.libraryTeamName('group:default/payments-platform'),'Payments Platform');assert.equal(context.libraryTeamName('group:europe/payments-platform'),'Payments Platform · europe');
 });
+
+test('Backstage summaries rank distinct incident edges, deduplicate identities and break ties deterministically',()=>{
+  const bound=(ref,title,label)=>({title,binding:{entityRef:'component:default/'+ref,...(label?{label}:{})}});
+  const raw={page:{sections:[{diagram:{nodes:{b:bound('shared','Other title'),a:bound('shared','Title','Friendly'),c:bound('peer','Peer'),d:bound('zero','Zero'),e:{title:'Unbound'}},edges:[{from:'a',to:'b'},{from:'a',to:'a'},{from:'a',to:'c'},{from:'c',to:'e'}]}},{diagram:{nodes:{x:bound('shared','Changed'),y:bound('alpha','Alpha'),z:bound('beta','Alpha')},edges:[{from:'x',to:'y'}]}}]}};
+  assert.deepEqual(C.serviceSummaries(raw),[
+    {entityRef:'component:default/shared',label:'Friendly',edgeCount:4},
+    {entityRef:'component:default/peer',label:'Peer',edgeCount:2},
+    {entityRef:'component:default/alpha',label:'Alpha',edgeCount:1},
+    {entityRef:'component:default/beta',label:'Alpha',edgeCount:0},
+    {entityRef:'component:default/zero',label:'Zero',edgeCount:0},
+  ]);
+  const fallbacks=C.serviceSummaries({page:{sections:[{diagram:{nodes:{a:bound('a','Node title','  '),b:bound('b',null)},edges:[]}}]}});
+  assert.equal(fallbacks.find(service=>service.entityRef==='component:default/a').label,'Node title');
+  assert.equal(fallbacks.find(service=>service.entityRef==='component:default/b').label,'component:default/b');
+  const ties={page:{sections:[{diagram:{nodes:{z:bound('z','Same'),a:bound('a','Same')},edges:[]}}]}};
+  assert.deepEqual(C.serviceSummaries(ties).map(s=>s.entityRef),['component:default/a','component:default/z']);
+});
+
+test('optional Backstage metadata is sanitized and older indexes never guess bindings from node titles',async()=>{
+  const {buildLibrary}=await import('../tools/canon/library.mjs');
+  const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json')),entry=raw.diagrams[0];
+  const good={entityRef:'component:default/api',label:'API',edgeCount:3};
+  entry.boundServices=[null,{},'API',{...good,entityRef:'bad'},{...good,edgeCount:-1},{...good,edgeCount:1.2},good,{...good,label:'Duplicate',edgeCount:99},{entityRef:'component:other/api',label:42,edgeCount:0}];
+  assert.deepEqual(plain(context.parseCanonLibrary(raw)[0].boundServices),[good,{entityRef:'component:other/api',label:'component:other/api',edgeCount:0}]);
+  for(const version of [2,3])for(const value of [undefined,null,'API',{},[null,{entityRef:'invalid',edgeCount:1}]]){
+    raw.version=version;entry.boundServices=value;const parsed=context.parseCanonLibrary(raw)[0];
+    assert.equal(parsed.boundServices,undefined);assert.deepEqual(plain(parsed.services),entry.services);assert.equal(parsed.spec,undefined);
+  }
+  entry.boundServices=[];assert.deepEqual(plain(context.parseCanonLibrary(raw)[0].boundServices),[]);
+  const embedded=manifest();assert.deepEqual(plain(context.parseCanonLibrary(embedded)[0].boundServices),C.serviceSummaries(embedded.diagrams[0].spec));
+});
+
+test('publisher summarizes resolved imported bindings while preserving legacy unbound-title search metadata',async t=>{
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs'),f=discoveryFixture(t);
+  function story(id,diagram){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/team'},sections:[{diagram}]}};}
+  const provider=story('provider',{nodes:{a:{title:'Source title',binding:{entityRef:'component:default/api',label:'API'}},b:{title:'Unbound store'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],topologyExports:{core:{nodes:['a','b'],edges:['a->b']}}});
+  const consumer=story('consumer',{nodes:{local:{title:'Local',binding:{entityRef:'component:other/api',label:'API'}}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'imported'}],edges:[{from:'local',to:'imported::a'}]});
+  f.write('provider.json',provider);f.write('consumer.json',consumer);
+  const library=await buildLibraryFromDirectory(f.directory),entry=library.diagrams.find(entry=>entry.id==='consumer');
+  assert.deepEqual(entry.boundServices,[{entityRef:'component:default/api',label:'API',edgeCount:2},{entityRef:'component:other/api',label:'API',edgeCount:1}]);
+  assert.ok(entry.services.includes('Unbound store'));assert.ok(entry.services.includes('Source title'));
+  assert.equal(entry.spec,undefined);assert.deepEqual(plain(context.parseCanonLibrary(library).find(entry=>entry.id==='consumer').boundServices),entry.boundServices);
+});

@@ -30,6 +30,19 @@ function diagramSearchText(values,spec){
    malformed values, still load as if the metadata were absent. */
 function libraryDescription(value){return typeof value==='string'?value:'';}
 function libraryTags(value){return Array.isArray(value)?value.filter(function(tag){return typeof tag==='string' && tag;}):[];}
+/* Optional published bindings are never inferred from display names or fetched.
+   Ignore malformed records and duplicate identities without trusting their counts. */
+function libraryBoundServices(value){
+  var seen=new Set(),out=[];
+  if(Array.isArray(value))value.forEach(function(service){
+    if(!service || !FlowCanon.entityRef(service.entityRef) || seen.has(service.entityRef) || !Number.isSafeInteger(service.edgeCount) || service.edgeCount<0)return;
+    seen.add(service.entityRef);
+    out.push({entityRef:service.entityRef,label:typeof service.label==='string' && service.label.trim()?service.label.trim():service.entityRef,edgeCount:service.edgeCount});
+  });
+  // An authored empty summary is meaningful; a wholly malformed list is not.
+  if(Array.isArray(value) && value.length && !out.length)return undefined;
+  return FlowCanon.sortServiceSummaries(out);
+}
 /* Only publisher-owned PNG paths with the matching authored revision are
    accepted. No raw markup, remote URLs, traversal, queries or fragments. */
 function libraryPreviewData(value,revision){
@@ -58,7 +71,7 @@ function parseCanonLibrary(raw){
     var title=typeof entry.title==='string' && entry.title.trim()?entry.title:entry.id;
     if(raw.version===1){
       var spec=canonLibrarySpec(entry.spec,{id:entry.id});
-      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
+      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),boundServices:FlowCanon.serviceSummaries(spec),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
     }
     if(!entry.canon || entry.canon.id!==entry.id || FlowCanon.validate({page:{canon:entry.canon}}).length)throw new Error('Invalid diagram membership: '+entry.id);
     canonLibrarySpecURL(entry.specUrl,'https://library.invalid/workbench/diagrams.json');
@@ -66,7 +79,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -296,6 +309,7 @@ function initWorkbenchLibrary(opts){
     if(ctl)ctl.destroy();ctl=null;
   }
   function stop(){
+    retireServiceRows();
     sequence++;active=null;current=null;edit.disabled=true;copy.disabled=true;removeManualCopyField(copy);
     retireViewer();reader.replaceChildren();
   }
@@ -397,16 +411,66 @@ function initWorkbenchLibrary(opts){
     if(entry.services)return entry.services;
     var names=[];if(entry.spec)FlowCanon.sections(entry.spec).forEach(function(section){Object.values(section.diagram.nodes || {}).forEach(function(node){if(typeof node.title==='string')names.push(node.title);});});return names;
   }
+  var serviceLabels=new Map(),serviceValues=new Map(),serviceRefs=new Map(),serviceRows=[],serviceObserver=null;
+  function retireServiceRows(){
+    if(serviceObserver)serviceObserver.disconnect();serviceObserver=null;
+    serviceRows.forEach(function(row){row.close();});serviceRows=[];
+  }
+  function serviceLabel(ref){return serviceLabels.get(ref) || ref;}
+  function serviceRow(entry){
+    if(!entry.boundServices || !entry.boundServices.length)return null;
+    var row=document.createElement('div');row.className='canon-library-services';
+    var label=document.createElement('button');label.type='button';label.className='canon-library-services-label';label.textContent='Services:';
+    label.setAttribute('aria-label','Show all services for '+entry.title);label.setAttribute('aria-expanded','false');
+    var strip=document.createElement('div');strip.className='canon-library-services-strip';
+    var popup=document.createElement('div');popup.className='canon-library-services-popup';popup.setAttribute('popover','manual');popup.setAttribute('role','group');popup.setAttribute('aria-label','All services for '+entry.title);
+    popup.id='canon-library-services-'+entry.id;label.setAttribute('aria-controls',popup.id);
+    var heading=document.createElement('strong');heading.textContent='Services';popup.append(heading);
+    var timer=null,suppressed=false;
+    function close(){clearTimeout(timer);timer=null;if(popup.matches(':popover-open'))popup.hidePopover();label.setAttribute('aria-expanded','false');}
+    function position(){
+      var rect=row.getBoundingClientRect();popup.style.width=Math.min(400,window.innerWidth-24)+'px';
+      popup.style.left=Math.max(12,Math.min(rect.left,window.innerWidth-popup.offsetWidth-12))+'px';
+      popup.style.top=Math.max(12,rect.bottom+popup.offsetHeight>window.innerHeight-12?rect.top-popup.offsetHeight:rect.bottom)+'px';
+    }
+    function show(){clearTimeout(timer);if(suppressed || row.getBoundingClientRect().width===0)return;serviceRows.forEach(function(other){if(other.element!==row)other.close();});if(!popup.matches(':popover-open'))popup.showPopover();label.setAttribute('aria-expanded','true');position();}
+    function leave(){clearTimeout(timer);timer=setTimeout(function(){timer=null;if(!row.matches(':hover') && !popup.matches(':hover') && !row.contains(document.activeElement))close();},120);}
+    function chip(service){
+      var button=document.createElement('button');button.type='button';button.className='canon-library-service';button.dataset.service=service.entityRef;button.textContent=serviceLabel(service.entityRef);button.title=service.entityRef;button.setAttribute('aria-label','Filter by service: '+serviceLabel(service.entityRef));
+      button.addEventListener('click',function(){facets.service.value=serviceValues.get(service.entityRef);suppressed=true;label.focus({preventScroll:true});filterCards();});return button;
+    }
+    entry.boundServices.forEach(function(service){strip.append(chip(service));popup.append(chip(service));});
+    row.append(label,strip,popup);
+    function measure(){
+      if(!row.getBoundingClientRect().width)return;
+      var overflow=strip.scrollWidth>strip.clientWidth+1;row.classList.toggle('has-overflow',overflow);
+      var end=strip.getBoundingClientRect().right-(overflow?16:0);
+      Array.from(strip.children).forEach(function(button){var visible=button.getBoundingClientRect().right<=end+1;button.style.visibility=visible?'':'hidden';button.tabIndex=visible?0:-1;button.setAttribute('aria-hidden',String(!visible));});
+      if(popup.matches(':popover-open'))position();
+    }
+    row.addEventListener('mouseenter',function(){suppressed=false;show();});row.addEventListener('mouseleave',leave);
+    popup.addEventListener('mouseenter',function(){clearTimeout(timer);});popup.addEventListener('mouseleave',leave);
+    row.addEventListener('focusin',show);row.addEventListener('focusout',function(event){if(!row.contains(event.relatedTarget)){suppressed=false;close();}});
+    label.addEventListener('click',function(){suppressed=false;show();});
+    row.addEventListener('keydown',function(event){if(event.key==='Escape'){event.preventDefault();event.stopPropagation();suppressed=true;label.focus({preventScroll:true});close();}});
+    var owner={element:row,close:close,measure:measure};serviceRows.push(owner);return row;
+  }
+  function updateServiceRows(){serviceRows.forEach(function(row){row.measure();});}
   function matches(entry){
     return (!search.value.trim() || entry.searchText.includes(search.value.trim().toLowerCase())) &&
       (!facets.team.value || entry.canon.owner===facets.team.value) &&
-      (!facets.service.value || entry.serviceNames.includes(facets.service.value)) &&
+      (!facets.service.value || (serviceRefs.has(facets.service.value)?(entry.boundServices || []).some(function(service){return service.entityRef===serviceRefs.get(facets.service.value);}):!entry.boundServices && entry.serviceNames.includes(facets.service.value))) &&
       (!facets.topic.value || (entry.tags || []).includes(facets.topic.value));
   }
   function cards(){
-    grid.replaceChildren();
+    retireServiceRows();grid.replaceChildren();serviceLabels=new Map();serviceValues=new Map();serviceRefs=new Map();
+    var legacyServiceNames=new Set(entries.filter(function(entry){return !entry.boundServices;}).flatMap(services));
+    entries.forEach(function(entry){(entry.boundServices || []).forEach(function(service){if(!serviceLabels.has(service.entityRef))serviceLabels.set(service.entityRef,service.label);});});
+    serviceLabels.forEach(function(label,ref){var value='entity:'+ref;while(legacyServiceNames.has(value) || serviceRefs.has(value))value='entity:'+value;serviceValues.set(ref,value);serviceRefs.set(value,ref);});
+    var labels=Array.from(serviceLabels.entries());
+    labels.forEach(function(pair){if(labels.some(function(other){return other[0]!==pair[0] && other[1]===pair[1];}))serviceLabels.set(pair[0],pair[1]+' · '+pair[0]);});
     entries.forEach(function(entry){
-      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description].concat(entry.tags || [],entry.serviceNames));
+      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description].concat(entry.tags || [],entry.serviceNames,(entry.boundServices || []).flatMap(function(service){return [service.label,service.entityRef];})));
       var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
       var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
       var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);
@@ -416,15 +480,17 @@ function initWorkbenchLibrary(opts){
       var detail=document.createElement('span');detail.className='canon-library-counts';detail.textContent=entry.spec?starterCountLine(entry.spec):['nodes','steps','panels'].map(function(key){return entry.counts[key]+' '+(entry.counts[key]===1?key.slice(0,-1):key);}).join(' · ');
       var tags=document.createElement('div');tags.className='canon-library-tags';
       (entry.tags || []).forEach(function(tag){var chip=document.createElement('button');chip.type='button';chip.className='canon-library-tag';chip.textContent=tag;chip.setAttribute('aria-label','Filter by topic: '+tag);chip.setAttribute('aria-pressed',String(facets.topic.value===tag));chip.addEventListener('click',function(){facets.topic.value=facets.topic.value===tag?'':tag;filterCards();});tags.append(chip);});
-      metadata.append(owner,tags,detail);card.append(open,metadata);grid.append(card);
+      metadata.append(owner,tags);var row=serviceRow(entry);if(row)metadata.append(row);metadata.append(detail);card.append(open,metadata);grid.append(card);
     });
     Object.keys(facets).forEach(function(key){
-      var select=facets[key],current=select.value,values=Array.from(new Set(entries.flatMap(function(entry){return key==='team'?[entry.canon.owner]:key==='service'?entry.serviceNames:entry.tags || [];}))).filter(Boolean);
+      var select=facets[key],current=select.value,values=Array.from(new Set(entries.flatMap(function(entry){return key==='team'?[entry.canon.owner]:key==='service'?(entry.boundServices?entry.boundServices.map(function(service){return serviceValues.get(service.entityRef);}):entry.serviceNames):entry.tags || [];}))).filter(Boolean);
       values.sort(function(a,b){return a.toLowerCase()<b.toLowerCase()?-1:a.toLowerCase()>b.toLowerCase()?1:0;});
       select.replaceChildren();var all=document.createElement('option');all.value='';all.textContent='All '+({team:'teams',service:'services',topic:'topics'}[key]);select.append(all);
-      values.forEach(function(value){var option=document.createElement('option');option.value=value;option.textContent=key==='team'?libraryTeamName(value):value;if(key==='team' && values.some(function(other){return other!==value && libraryTeamName(other)===option.textContent;}))option.textContent+=' ('+value+')';option.title=value;select.append(option);});
+      values.forEach(function(value){var option=document.createElement('option');option.value=value;option.textContent=key==='team'?libraryTeamName(value):key==='service' && serviceRefs.has(value)?serviceLabel(serviceRefs.get(value)):value+(key==='service' && Array.from(serviceLabels.values()).includes(value)?' (node title)':'');if(key==='team' && values.some(function(other){return other!==value && libraryTeamName(other)===option.textContent;}))option.textContent+=' ('+value+')';option.title=value;select.append(option);});
       select.value=values.includes(current)?current:'';
     });
+    serviceObserver=new ResizeObserver(updateServiceRows);serviceRows.forEach(function(row){serviceObserver.observe(row.element);});
+    document.fonts.ready.then(function(){if(serviceObserver)updateServiceRows();});
     if(published)readRecent();filterCards();
   }
   function renderRecent(){
@@ -441,16 +507,20 @@ function initWorkbenchLibrary(opts){
     empty.textContent=empty.hidden?'':'No diagrams match'+(query?' “'+query+'”':' these filters')+'. Try another keyword or clear your filters.';
     filterChips.replaceChildren();
     var filters=[{label:'Search',value:query,clear:function(){search.value='';}}];
-    Object.keys(facets).forEach(function(key){filters.push({label:key[0].toUpperCase()+key.slice(1),value:key==='team' && facets[key].value?libraryTeamName(facets[key].value):facets[key].value,clear:function(){facets[key].value='';}});});
+    Object.keys(facets).forEach(function(key){filters.push({label:key[0].toUpperCase()+key.slice(1),value:key==='team' && facets[key].value?libraryTeamName(facets[key].value):key==='service' && serviceRefs.has(facets[key].value)?serviceLabel(serviceRefs.get(facets[key].value)):facets[key].value,clear:function(){facets[key].value='';}});});
     filters.filter(function(filter){return filter.value;}).forEach(function(filter){var chip=document.createElement('button');chip.type='button';chip.textContent=filter.label+': '+filter.value+' ×';chip.setAttribute('aria-label','Remove '+filter.label.toLowerCase()+' filter: '+filter.value);chip.addEventListener('click',function(){filter.clear();filterCards();search.focus();});filterChips.append(chip);});
     activeFilters.hidden=!filterChips.children.length;
     grid.querySelectorAll('.canon-library-tag').forEach(function(chip){chip.setAttribute('aria-pressed',String(chip.textContent===facets.topic.value));});
+    serviceRows.forEach(function(row){row.close();});updateServiceRows();
+    grid.querySelectorAll('.canon-library-service').forEach(function(chip){chip.setAttribute('aria-pressed',String(serviceValues.get(chip.dataset.service)===facets.service.value));});
     renderRecent();
   }
+  window.addEventListener('resize',updateServiceRows);
+  window.addEventListener('scroll',function(event){if(event.target===document)serviceRows.forEach(function(row){row.close();});},true);
   search.addEventListener('input',filterCards);Object.values(facets).forEach(function(select){select.addEventListener('change',filterCards);});
   document.getElementById('welcome-library-clear').addEventListener('click',function(){search.value='';Object.values(facets).forEach(function(select){select.value='';});filterCards();search.focus();});
   document.getElementById('welcome-library-clear-recent').addEventListener('click',function(){recent=[];saveRecent();renderRecent();search.focus();});
-  ['grid','list'].forEach(function(mode){document.getElementById('welcome-library-'+mode+'-view').addEventListener('click',function(){grid.classList.toggle('canon-library-list',mode==='list');['grid','list'].forEach(function(name){document.getElementById('welcome-library-'+name+'-view').setAttribute('aria-pressed',String(name===mode));});});});
+  ['grid','list'].forEach(function(mode){document.getElementById('welcome-library-'+mode+'-view').addEventListener('click',function(){grid.classList.toggle('canon-library-list',mode==='list');serviceRows.forEach(function(row){row.close();});updateServiceRows();['grid','list'].forEach(function(name){document.getElementById('welcome-library-'+name+'-view').setAttribute('aria-pressed',String(name===mode));});});});
   async function show(screen,id){
     stop();active=screen;var token=sequence;
     pending=null;specRequests.clear();
@@ -535,7 +605,7 @@ function initWorkbenchLibrary(opts){
     }
     catch(ex){error.textContent=ex.message;error.hidden=false;}
   });
-  window.addEventListener('pagehide',function(){sequence++;retireViewer();});
+  window.addEventListener('pagehide',function(){sequence++;retireServiceRows();retireViewer();});
   window.addEventListener('pageshow',function(event){if(event.persisted && active)show(active,opts.selected());});
   return {show:show,hide:stop};
 }

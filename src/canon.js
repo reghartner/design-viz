@@ -21,6 +21,29 @@ var FlowCanon = (function(){
     walk(p.blocks || p.sections);
     return out;
   }
+  /* One service per catalog identity. Count each incident edge once in each
+     section, including self-loops and edges between two nodes of that service. */
+  function serviceSummaries(raw){
+    var found=new Map();
+    sections(raw).forEach(function(section){
+      var nodes=section.diagram.nodes || {},refs=new Map();
+      Object.keys(nodes).sort().forEach(function(id){
+        var node=nodes[id],binding=node && node.binding;
+        if(!binding || !entityRef(binding.entityRef))return;
+        var ref=binding.entityRef,label=[binding.label,node.title,ref].find(function(value){return typeof value==='string' && value.trim();}).trim();
+        refs.set(id,ref);
+        if(!found.has(ref))found.set(ref,{entityRef:ref,label:label,edgeCount:0});
+      });
+      (section.diagram.edges || []).forEach(function(edge){
+        new Set([refs.get(edge.from),refs.get(edge.to)]).forEach(function(ref){if(ref)found.get(ref).edgeCount++;});
+      });
+    });
+    return sortServiceSummaries(Array.from(found.values()));
+  }
+  function sortServiceSummaries(services){
+    function compare(a,b){return a<b?-1:a>b?1:0;}
+    return services.sort(function(a,b){return b.edgeCount-a.edgeCount || compare(a.label.toLowerCase(),b.label.toLowerCase()) || compare(a.entityRef,b.entityRef);});
+  }
   function catalog(input){
     if (!input || input.version !== 1 || !Array.isArray(input.services)) throw new Error('Catalog: expected version 1 and services.');
     var seen=new Set();
@@ -177,6 +200,6 @@ var FlowCanon = (function(){
     (value && Array.isArray(value.codeRefs) ? value.codeRefs : []).forEach(function(ref){add('Code · '+(ref.label || ref.id),codeUrl(ref));});
     return out;
   }
-  return {version:1,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,catalog:catalog,binding:binding,
+  return {version:1,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

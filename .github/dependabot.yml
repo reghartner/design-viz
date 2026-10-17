@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    # catalog-sync.yml may run on a self-hosted runner (vars.FLOWVIEW_CATALOG_RUNNER)
+    # older than 2.327.1, which the v5+ actions need; its versions are held back by hand.
+    exclude-paths:
+      - .github/workflows/catalog-sync.yml
+    groups:
+      actions: {patterns: ["*"]}
+  - package-ecosystem: npm
+    directories:
+      - /tools/browser-tests
+      - /tools/catalog-sync
+      - /apps/backstage
+      - /apps/confluence
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /deploy/workbench
+    schedule: {interval: weekly}

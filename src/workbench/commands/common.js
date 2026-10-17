@@ -92,24 +92,6 @@ function builderRewrite(text, raw, path, mutate){
   return r;
 }
 
-/* Non-placement edits (delete, groups, paste, lane edges, ...) can re-space a
-   row or its band. Re-pin locked row nodes the edit moved at their prior
-   positions so a lock still acts as a pin. Layout helpers are only reached
-   when a locked row node exists. */
-function builderKeepLockedPins(text,raw,sectionIdx,plan){
-  if(!plan || plan.error || plan.noop || typeof plan.text!=='string')return plan;
-  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return plan;
-  var nodes=got.d.nodes || {},ids=builderFlatRowIds(got.d.rows).filter(function(id){return nodes[id] && nodes[id].locked===true;});
-  if(!ids.length)return plan;
-  var nextRaw;try{nextRaw=JSON.parse(plan.text);}catch(ex){return plan;}
-  var next=builderDiagram(plan.text,nextRaw,sectionIdx);if(next.error)return plan;
-  var before=layout(got.d).pos,after=layout(next.d).pos;
-  if(!ids.some(function(id){var p=after[id];return p && !p.float && builderNodePositionLocked(next.d,id) && (p.cx!==before[id].cx || p.cy!==before[id].cy);}))return plan;
-  var copy=builderClone(next.d);builderFreezeLockedPositions(copy,before,ids);
-  var pinned=builderPlacementPlan(plan.text,nextRaw,next.path,next.d,copy);
-  return pinned.error || pinned.noop?plan:Object.assign({},plan,{text:pinned.text});
-}
-
 function planSetField(text, raw, targetPath, key, valueTextOrNull){
   /* Surgical single-field edit on the object at targetPath. */
   if (!jsonLocate(text, targetPath))

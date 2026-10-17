@@ -200,8 +200,9 @@ result for its exact source path. Selecting a result keeps the list open;
 multiple selected nodes expose explicit **Lock selected positions** and **Unlock
 selected positions** commands. Each writes `locked: true` as one undoable edit and
 pins the node's center where it is: a row node keeps its slot, so no other node
-moves, and an edit that would re-space the row first lifts the locked node into
-explicit free placement at that center. Unlocking retains the pinned position and
+moves, and any later edit that would shift a locked node lifts it into explicit
+free placement at that center in the same Undo step (JSON-tab typing, file import
+and accepted Agent proposals stay exactly as written). Unlocking retains the pinned position and
 moves nothing. Mixed Shift/Ctrl/Cmd selections and
 box selections keep locked members selected while drag, arrow movement,
 alignment, and distribution move only unlocked members. Auto arrange preserves

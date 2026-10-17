@@ -548,10 +548,11 @@ with no `title` shows its id:
   Renders a small clickable ↗ on the card corner (new tab).
 - `locked` — optional boolean. `true` pins this ordinary graph node's center at
   its current graph coordinates. A newly locked row node keeps its row slot, so
-  locking or unlocking moves no other node. An edit that would re-space that
-  row or its band (moving, deleting or adding row members, group changes, lane
-  edges) first lifts the locked node into explicit free placement at its
-  current center in the same undoable edit. Mixed selections keep the
+  locking or unlocking moves no other node. Any Workbench edit that would move
+  a locked node (re-spacing its row, the group band, lane gaps or spread
+  floats) instead lifts it into explicit free placement at its prior center in
+  the same undoable edit. Hand-typed JSON, file import and accepted Agent
+  proposals are published exactly as written. Mixed selections keep the
   locked node selected while moving only unlocked members, and Auto arrange
   routes unlocked nodes around pins. It does not lock the node's size/content,
   links, edges, story state, copy, playback, or deletion. The lock border and

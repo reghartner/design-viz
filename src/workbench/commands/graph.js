@@ -28,8 +28,9 @@ function planSetNodesLocked(text,raw,sectionIdx,nodeIds,locked){
   var changed=ids.filter(function(id){return (got.d.nodes[id].locked===true)!==locked;});
   if(!changed.length)return {noop:true};
   var positions=layout(got.d).pos;
-  /* The flag alone pins the node where it is: a row node stays in rows, so
-     no neighbour re-spaces. Edits that would move it lift it to a float. */
+  /* The flag alone pins the node where it is: a row node keeps its slot, so
+     no neighbour re-spaces. The session lock guard lifts it to a float when a
+     later edit would move it (builderPinMovedLocks). */
   return builderRewrite(text,raw,got.path,function(d){
     changed.forEach(function(id){if(locked)d.nodes[id].locked=true;else delete d.nodes[id].locked;});
     if(locked){
@@ -117,7 +118,7 @@ function planAddImageNode(text,raw,sectionIdx,asset,placement){
   placed=rowEdit.text;
   var inserted=jsonInsertMember(placed,got.path.concat(['nodes']),id,JSON.stringify(node));
   if(!inserted)return {error:'Could not add the image node to this diagram.'};
-  return builderKeepLockedPins(text,raw,sectionIdx,{text:inserted.text,start:inserted.start,end:inserted.end,kind:'node',id:id});
+  return {text:inserted.text,start:inserted.start,end:inserted.end,kind:'node',id:id};
 }
 function planAddEdge(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
@@ -150,8 +151,8 @@ function planAddEdge(text, raw, sectionIdx){
              ', "kind": "int", "label": "describe the hop"}';
   var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
   if (!r) return {error: 'could not edit edges in the editor text'};
-  return builderKeepLockedPins(text, raw, sectionIdx, {text: r.text, start: r.start, end: r.end, kind: 'edge',
-          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0});
+  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
+          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
 
 function planAddPanel(text, raw, sectionIdx, type, destination){
@@ -272,13 +273,12 @@ function planSetNodeGroup(text, raw, sectionIdx, nodeId, keyOrNull){
   var key = keyOrNull == null ? null : keyOrNull.trim() || null;
   var plan = planSetField(text, raw, got.path.concat(['nodes', nodeId]), 'group',
                           key == null ? null : JSON.stringify(key));
-  if (plan.error) return plan;
-  if (key == null) return builderKeepLockedPins(text, raw, sectionIdx, plan);
+  if (plan.error || key == null) return plan;
   var groups = got.d.groups;
-  if (groups && Object.prototype.hasOwnProperty.call(groups, key)) return builderKeepLockedPins(text, raw, sectionIdx, plan);
+  if (groups && Object.prototype.hasOwnProperty.call(groups, key)) return plan;
   var r = groups ? jsonSetField(plan.text, got.path.concat(['groups']), key, '{}')
                  : jsonSetField(plan.text, got.path, 'groups', '{' + JSON.stringify(key) + ': {}}');
-  return r ? builderKeepLockedPins(text, raw, sectionIdx, r) : {error: 'could not declare group'};
+  return r || {error: 'could not declare group'};
 }
 
 function planBulkSetGroup(text, raw, targets, keyOrNull){
@@ -334,14 +334,14 @@ function planSetGroupParent(text, raw, sectionIdx, key, parentOrNull){
   var shape = builderGroupsShapeError(got.d);
   if (shape) return shape;
   if (parentOrNull != null && typeof parentOrNull !== 'string') return {error: 'parent must be text'};
-  return builderKeepLockedPins(text, raw, sectionIdx, builderRewrite(text, raw, got.path, function(d){
+  return builderRewrite(text, raw, got.path, function(d){
     var groups = Object.assign(Object.create(null), d.groups || {});
     var meta = Object.assign(Object.create(null), groups[key] || {});
     if (parentOrNull == null || parentOrNull.trim() === '') delete meta.parent;
     else meta.parent = parentOrNull.trim();
     groups[key] = meta;
     d.groups = groups;
-  }));
+  });
 }
 
 function builderGroupParentOptions(groups, key){
@@ -391,7 +391,7 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   if (got.error) return got;
   var shape = builderGroupsShapeError(got.d);
   if (shape) return shape;
-  return builderKeepLockedPins(text, raw, sectionIdx, builderRewrite(text, raw, got.path, function(d){
+  return builderRewrite(text, raw, got.path, function(d){
     /* promote through the SANITIZED links: a dangling, self, or cyclic
        parent on the deleted group must not be handed down to children */
     var promoted = sanitizedGroupParents(d.groups)[key];
@@ -406,7 +406,7 @@ function planDeleteGroup(text, raw, sectionIdx, key){
     Object.keys(d.nodes || {}).forEach(function(id){
       if (d.nodes[id] && d.nodes[id].group === key) delete d.nodes[id].group;
     });
-  }));
+  });
 }
 
 function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
@@ -460,10 +460,10 @@ function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId, reso
   var hasContract=!!(e.contract || duplicate && duplicate.contract) || (got.d.steps || []).some(function(step){return step && step.contracts && (Object.prototype.hasOwnProperty.call(step.contracts,oldKey) || Object.prototype.hasOwnProperty.call(step.contracts,nextKey));});
   if(nextKey!==oldKey && duplicate && hasContract)return {error:'Connections with JSON contracts need distinct endpoints.'};
   if(nextKey!==oldKey && (got.d.steps || []).some(function(step){return step && step.contracts && Object.prototype.hasOwnProperty.call(step.contracts,nextKey);}))return {error:'A contract already references the new edge key. Resolve it before changing endpoints.'};
-  return builderKeepLockedPins(text, raw, sectionIdx, builderRewrite(text, raw, got.path, function(d){
+  return builderRewrite(text, raw, got.path, function(d){
     d.edges[edgeIdx][field] = nodeId;
     builderRetargetStepKeys(d.steps, oldKey, builderEdgeKey(d.edges[edgeIdx]));
-  }));
+  });
 }
 
 function planRenameNode(text, raw, sectionIdx, oldId, newId){
@@ -602,13 +602,13 @@ function planDeleteNode(text, raw, sectionIdx, id){
       }
     });
   });
-  return builderKeepLockedPins(text,raw,sectionIdx,builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
+  return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
     if(target!==sectionIdx || !detail.ports)return;
     Object.keys(detail.ports).forEach(function(port){
       if(detail.ports[port]===id){delete detail.ports[port];if(detail.mode==='expand')detail.mode='focus';}
     });
     if(!Object.keys(detail.ports).length)delete detail.ports;
-  }));
+  });
 }
 
 function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
@@ -617,11 +617,11 @@ function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
   var e = (got.d.edges || [])[edgeIdx];
   if (!e) return {error: 'edge not found — reselect and try again'};
   var key = builderEdgeKey(e);
-  return builderKeepLockedPins(text, raw, sectionIdx, builderRewrite(text, raw, got.path, function(d){
+  return builderRewrite(text, raw, got.path, function(d){
     d.edges.splice(edgeIdx, 1);
     var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
     if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
-  }));
+  });
 }
 
 function planDeletePanel(text, raw, sectionIdx, panelIdx){
@@ -698,8 +698,8 @@ function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId, resolved){
              ', "kind": "int", "label": "describe the hop"}';
   var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
   if (!r) return {error: 'could not edit edges in the editor text'};
-  return builderKeepLockedPins(text, raw, sectionIdx, {text: r.text, start: r.start, end: r.end, kind: 'edge',
-          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0});
+  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
+          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
 
 function planDuplicateNode(text, raw, sectionIdx, id){
@@ -742,5 +742,5 @@ function planDuplicateNode(text, raw, sectionIdx, id){
   var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
     JSON.stringify(builderClone(d.nodes[id])));
   if (!def) return {error: 'could not edit nodes in the editor text'};
-  return builderKeepLockedPins(text, raw, sectionIdx, {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId});
+  return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
 }

@@ -1,7 +1,7 @@
 # For packaged rehearsals with prebuilt HTML; company forks use Dockerfile.
 # Build from the company fork root. Root canon.json selects diagram folders.
 # No credentials are image inputs.
-FROM node:24-alpine AS library
+FROM node:25-alpine AS library
 WORKDIR /build
 COPY tools/canon/ tools/canon/
 COPY canon.json canon.json

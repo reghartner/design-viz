@@ -1,6 +1,6 @@
 # Build from the company fork root. HTML is generated from source in this stage.
 # Explicit inputs keep local credentials and development dependencies out.
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 RUN apk add --no-cache python3
 WORKDIR /build
 COPY LICENSE LICENSE

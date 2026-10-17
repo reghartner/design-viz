@@ -83,15 +83,18 @@ function fixture(){
 const forPath = (d, id) => C.diagramForPath(d, id);
 
 test('specs without declare fold exactly as before and report the authored declaration at every step', () => {
-  let diagrams = 0, paths = 0;
+  let diagrams = 0, paths = 0, declared = 0;
   for (const rel of specFiles()){
     let raw;
     try { raw = JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8')); } catch (ex) { continue; }
     for (const d of diagramsOf(raw)){
       diagrams++;
       for (const route of C.diagramPathList(d)){
-        paths++;
         const sub = forPath(d, route.id);
+        const uses = (sub.panels || []).some(panel => panel && panel.id &&
+          (sub.steps || []).some(step => C.panelPatchHasDeclare((C.stepPanelPatch(step) || {})[panel.id])));
+        if (uses){ declared++; continue; }
+        paths++;
         assert.deepEqual(plain(C.foldPanelStates(sub)), plain(referenceFold(sub)), rel + ' ' + route.id);
         const decls = C.foldDiagramPanelDeclarations(sub);
         (sub.panels || []).forEach(panel => {
@@ -103,6 +106,7 @@ test('specs without declare fold exactly as before and report the authored decla
     }
   }
   assert.ok(diagrams > 40 && paths > 50, 'swept ' + diagrams + ' diagrams and ' + paths + ' paths');
+  assert.ok(declared >= 1, 'the shipped example exercises declare and is excluded from the identity sweep');
 });
 
 test('declare carries along a path, null restores the authored value, enterOnce applies to one step and paths stay independent', () => {
@@ -212,3 +216,176 @@ test('compatibility stamps the feature only when a step patch carries declare', 
   onceOnly.steps.forEach(step => Object.values(step.panels).forEach(patch => { delete patch.declare; }));
   assert.ok(C.FlowviewCompatibility.detect(onceOnly).includes('steps.panel-declare'));
 });
+
+/* ---- player: effective declaration per step and the panel title ---- */
+class FakeElement {
+  constructor(tag){
+    this.tagName = String(tag || 'div').toUpperCase(); this.children = []; this.parentNode = null; this.attributes = Object.create(null);
+    this.style = {}; this.dataset = {}; this.textContent = ''; this._html = ''; this.inert = false; this.firstChild = null;
+    const classes = new Set(), self = this;
+    this.classList = {
+      add(...names){ names.forEach(n => classes.add(n)); self._syncClass(); },
+      remove(...names){ names.forEach(n => classes.delete(n)); self._syncClass(); },
+      toggle(name, force){ const on = force === undefined ? !classes.has(name) : !!force; on ? classes.add(name) : classes.delete(name); self._syncClass(); return on; },
+      contains(name){ return classes.has(name); }
+    };
+    this._classes = classes;
+  }
+  _syncClass(){ this._className = Array.from(this._classes).join(' '); }
+  get className(){ return this._className || ''; }
+  set className(value){ this._classes.clear(); String(value).split(/\s+/).filter(Boolean).forEach(n => this._classes.add(n)); this._syncClass(); }
+  get innerHTML(){ return this._html; }
+  set innerHTML(value){ this._html = String(value); this.children = []; }
+  appendChild(child){ child.parentNode = this; this.children.push(child); return child; }
+  insertBefore(child, before){ child.parentNode = this; const at = this.children.indexOf(before); at < 0 ? this.children.push(child) : this.children.splice(at, 0, child); return child; }
+  removeChild(child){ const at = this.children.indexOf(child); if (at < 0) throw new Error('not a child'); this.children.splice(at, 1); child.parentNode = null; return child; }
+  setAttribute(name, value){ this.attributes[name] = String(value); }
+  getAttribute(name){ return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }
+  hasAttribute(name){ return Object.prototype.hasOwnProperty.call(this.attributes, name); }
+  removeAttribute(name){ delete this.attributes[name]; }
+  querySelector(){ return null; }
+  querySelectorAll(){ return []; }
+  closest(){ return null; }
+  contains(){ return false; }
+  matches(){ return false; }
+  addEventListener(){} removeEventListener(){} focus(){} blur(){}
+  getBoundingClientRect(){ return {left:0, top:0, width:300, height:200, right:300, bottom:200}; }
+}
+function playerContext(){
+  const P = {URL, TextEncoder, console, setTimeout, clearTimeout, requestAnimationFrame: () => 0, cancelAnimationFrame(){}, Map, Set};
+  P.document = {createElement: tag => new FakeElement(tag), createElementNS: (ns, tag) => new FakeElement(tag), body: new FakeElement('body')};
+  P.window = P;
+  vm.createContext(P);
+  for (const file of ['compatibility.js','canon.js','validator.js','engine.js','builder.workbench.js','panel-picker.workbench.js','clipboard.workbench.js'])
+    vm.runInContext(readSource(file), P, {filename:file});
+  return P;
+}
+const titleOf = card => { const t = card.children.find(c => c.classList.contains('ptitle')); return t ? t.textContent : null; };
+
+test('the player renders each step with its effective declaration and keeps the heading in sync', () => {
+  const P = playerContext();
+  const d = fixture();
+  d.panels.push({id:'untitled', type:'gauge', max:10, initial:{value:1}});
+  d.steps[1].panels.untitled = {declare:{title:'Now titled'}};
+  d.steps[3].panels.untitled = {declare:{title:null}};
+  const aside = new FakeElement('aside');
+  const happy = P.diagramForPath(d, 'happy');
+  const ctl = P.buildPanels(aside, happy, 'pastel', null, null);
+  const card = id => aside.children.find(c => c.getAttribute('data-dv-panel') === String(d.panels.findIndex(p => p.id === id)));
+  assert.equal(titleOf(card('g')), 'Draw');
+  assert.equal(titleOf(card('untitled')), null);
+  assert.match(card('g').children.find(c => c.classList.contains('pbody')).innerHTML, /gaugeunit">mA</);
+  ctl.setStep(1, true);
+  assert.equal(titleOf(card('g')), 'Draw (watts)');
+  assert.equal(titleOf(card('untitled')), 'Now titled');
+  assert.equal(card('untitled').children[0].classList.contains('ptitle'), true, 'a created heading precedes the body');
+  assert.match(card('g').children.find(c => c.classList.contains('pbody')).innerHTML, /gaugeunit">W</);
+  assert.match(card('t').children.find(c => c.classList.contains('pbody')).innerHTML, /<th scope="col">Value<\/th>/);
+  ctl.setStep(2, false);
+  assert.match(card('t').children.find(c => c.classList.contains('pbody')).innerHTML, /<th scope="col">Zed<\/th>/);
+  ctl.setStep(3, true);
+  assert.equal(titleOf(card('untitled')), null, 'null restores the missing heading');
+  assert.equal(titleOf(card('g')), 'Draw (watts)');
+  ctl.setStep(0, false, true);
+  assert.equal(titleOf(card('g')), 'Draw', 'ambient uses step zero');
+  ctl.setDiagram(P.diagramForPath(d, 'alt'));
+  ctl.setStep(1, false);
+  assert.equal(titleOf(card('g')), 'Draw');
+  assert.match(card('t').children.find(c => c.classList.contains('pbody')).innerHTML, /<th scope="col">Value<\/th>/);
+  ctl.destroy();
+  /* Without any override the DOM is built exactly as before: title first, body second, no extra nodes. */
+  const plainAside = new FakeElement('aside');
+  const clean = fixture(); clean.steps.forEach(step => Object.values(step.panels).forEach(patch => { delete patch.declare; if (patch.enterOnce) delete patch.enterOnce.declare; }));
+  P.buildPanels(plainAside, P.diagramForPath(clean, 'happy'), 'pastel', null, null);
+  plainAside.children.forEach(cardEl => assert.deepEqual(cardEl.children.map(c => c.className), ['ptitle','pbody']));
+});
+
+/* One type-specific declaration field per registered panel type, taken from
+   the picker template. Every step of both paths renders headlessly with and
+   without presentation animation; the heading must follow the override. */
+const SWEEP = {
+  state: t => ({states: ['idle','busy','done']}),
+  leds: t => ({leds: t.leds.concat([{id:'extra', label:'Extra'}])}),
+  gauge: t => ({max: 999, unit: 'W'}),
+  log: t => ({tags: Object.assign({}, t.tags, {SEC: '#F87171'})}),
+  screen: t => ({scene: 'raccoon-at-night'}),
+  image: t => ({caption: 'Changed caption'}),
+  waterfall: t => ({spans: t.spans.concat([{id:'extra', label:'Extra', ms: 15}])}),
+  orbit: t => ({states: t.states.slice().reverse()}),
+  zoneframe: t => ({zones: t.zones.map(z => Object.assign({}, z, {id: z.id + '-2'}))}),
+  xray: t => ({layers: t.layers.concat([{id:'extra', label:'Extra', holder:'nobody'}])}),
+  queue: t => ({}),
+  thermo: t => ({max: 150, crit: 120}),
+  battery: t => ({low: 50}),
+  buffer: t => ({segments: 24}),
+  radar: t => ({range: 12}),
+  homemap: t => ({outline: {w: 160, h: 90}}),
+  signal: t => ({links: t.links.concat([{id:'extra', label:'Extra', transport:'wifi'}])}),
+  tiles: t => ({tiles: t.tiles.concat([{id:'extra', label:'Extra'}])}),
+  inflight: t => ({lanes: t.lanes.concat([{id:'extra', label:'Extra'}])}),
+  phone: t => ({brand: {app: 'Changed app'}}),
+  deviceapp: t => ({subtitle: 'Changed subtitle'}),
+  appscreens: t => ({frame: 'phone'}),
+  timeline: t => ({span: '12h'}),
+  table: t => ({columns: t.columns.concat([{id:'extra', label:'Extra'}])}),
+  'data-contract': t => ({fieldWidth: 220}),
+  checks: t => ({checks: t.checks.concat([{id:'extra', label:'Extra'}])}),
+  budget: t => ({metrics: t.metrics.map(m => Object.assign({}, m, {max: m.max * 2}))}),
+  cost: t => ({currency: 'EUR'}),
+  trace: t => ({spans: t.spans.map(s => Object.assign({}, s, {ms: s.ms + 1}))}),
+  replicas: t => ({unit: 'rows'}),
+  chime: t => ({}),
+  dispatch: t => ({agency: 'County response'}),
+  security: t => ({site: 'Elm House'}),
+  sequence: t => ({wrap: 40}),
+  frames: t => ({start: 101}),
+  reads: t => ({maxReads: 6}),
+  locus: t => ({unit: 'bp'}),
+  funnel: t => ({unit: 'fragments'}),
+  grid: t => ({decimals: 1})
+};
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';
+
+test('every registered panel type renders every step of both paths under a declaration override without throwing', () => {
+  const P = playerContext();
+  const types = Array.from(P.PanelRegistry.types());
+  assert.deepEqual(types.filter(type => !SWEEP[type]), [], 'add a sweep entry for new panel types');
+  for (const type of types){
+    const sample = P.panelPickerExample(type, {referenceImage: PNG});
+    const panel = plain(sample.panel);
+    const override = Object.assign({title: 'Changed ' + type}, SWEEP[type](panel));
+    const alternate = Object.assign({title: 'Alternate ' + type}, SWEEP[type](panel));
+    const d = {nodes:{a:{title:'A'}, b:{title:'B'}}, rows:[['a','b']], edges:[{from:'a',to:'b'}], panels:[panel],
+      steps:[
+        {id:'s1', text:'Start', edge:'a->b'},
+        {id:'s2', text:'Override', nodes:['a'], panels:{[panel.id]:{declare: override}}},
+        {id:'s3', text:'Once', nodes:['b'], panels:{[panel.id]:{enterOnce:{declare:{title: 'Once ' + type}}}}},
+        {id:'s4', text:'Shared end', edge:'a->b'},
+        {id:'s5', text:'Alternate', nodes:['a'], panels:{[panel.id]:{declare: alternate}}}
+      ],
+      paths:[{id:'happy', steps:['s1','s2','s3','s4']},{id:'alt', steps:['s1','s5','s4']}]};
+    const v = plain(P.validate(P.normalize(page(d))));
+    assert.deepEqual(v.errors, [], type);
+    assert.deepEqual(v.warnings.filter(w => w.includes('.declare')), [], type + ': the override must be accepted');
+    for (const route of ['happy','alt']){
+      const sub = P.diagramForPath(d, route);
+      const decls = P.foldDiagramPanelDeclarations(sub)[panel.id];
+      assert.notEqual(decls[1], sub.panels[0], type + ' ' + route + ' overrides at step 2');
+      const aside = new FakeElement('aside');
+      let ctl;
+      assert.doesNotThrow(() => { ctl = P.buildPanels(aside, sub, 'aurora', null, null); }, type + ' ' + route + ' build');
+      const card = aside.children[0];
+      assert.equal(titleOf(card), panel.title, type + ' ' + route + ' starts with the authored title');
+      for (const animate of [false, true]) sub.steps.forEach((step, index) => {
+        assert.doesNotThrow(() => ctl.setStep(index, animate), type + ' ' + route + ' step ' + (index + 1) + (animate ? ' animated' : ''));
+        const expected = route === 'happy' ? [panel.title, 'Changed ' + type, 'Once ' + type, 'Changed ' + type][index] : [panel.title, 'Alternate ' + type, 'Alternate ' + type][index];
+        assert.equal(titleOf(card), expected, type + ' ' + route + ' title at step ' + (index + 1));
+        const body = card.children.find(c => c.classList.contains('pbody'));
+        assert.doesNotMatch(body.innerHTML, /\bNaN\b|\bundefined\b|Infinity/, type + ' ' + route + ' step ' + (index + 1));
+      });
+      assert.doesNotThrow(() => ctl.setStep(0, false, true), type + ' ambient');
+      ctl.destroy();
+    }
+  }
+});
+

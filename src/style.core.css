@@ -3937,7 +3937,8 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 
 /* Reader utilities and the "?" shortcut sheet (viewer/shortcuts.js). Core, not
    tour styles: the native and Forge viewers load only page and core (#602).
-   Reader utilities follow the fixed navigation's spacer in Standard. */
+   Reader utilities follow the fixed navigation's spacer in Standard. Explore
+   keeps the same controls together at the bottom, clear of the top navigation. */
 .reader-shortcuts{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:20px 22px 22px;border:1px solid #d5d8e3;border-radius:12px;background:#fff;color:#1f2433;font:14px/1.45 'IBM Plex Sans',sans-serif;box-shadow:0 18px 50px rgba(20,24,40,.28);}
 .reader-shortcuts::backdrop{background:rgba(15,18,30,.4);}
 .reader-shortcuts header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 4px;}
@@ -3949,3 +3950,4 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .reader-shortcuts-close{min-height:32px;padding:5px 12px;border:1px solid #d5d8e3;border-radius:7px;background:#fff;color:#1f2433;font:500 13px/20px 'IBM Plex Sans',sans-serif;cursor:pointer;}.reader-shortcuts-close:hover{background:#f1f2f7;}
 .reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
 .reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}

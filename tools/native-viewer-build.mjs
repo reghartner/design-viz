@@ -28,7 +28,9 @@ export async function nativeViewerSource(){
     'flowview-root .has-reader-contents:not(.explore-full-window)>:not(.explore-navigation):not(.document-navigation-space){margin-left:calc(var(--reader-inset,0px) + 12px);}' +
     '.native-canvas .has-reader-contents .viewer-diagram-canvas{left:var(--reader-inset,0px);}.native-canvas .navigation-contained>.reader-navigation{padding-left:0;margin-left:0;}.native-canvas .reader-navigation>.reader-top{padding-left:calc(var(--flowview-host-actions-inline-offset,0px) + 12px);min-height:max(56px,var(--flowview-host-actions-block-offset,0px));}@media(max-width:1024px){.native-canvas .reader-navigation>.reader-top{padding-left:12px;min-height:56px;}}' +
     '.native-canvas-story{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;font:12px sans-serif;}'+
-    '.native-canvas-story select{font:inherit;max-width:200px;}';
+    '.native-canvas-story select{font:inherit;max-width:200px;}'+
+    // Explore reader utilities stay inside their own mount, not fixed to the host viewport.
+    'flowview-root.viewer-exploring .reader-page-actions{position:absolute;}';
   const assets={css,fonts,icons:shared.icons};
   const sources=sourceLoader.entrypoint('native').source;
   return '// Generated trusted native renderer; inert specs are passed to mountNativeViewer.\n'+await read('src/native/environment.js')+

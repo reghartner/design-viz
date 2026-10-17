@@ -75,6 +75,3 @@
 .dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
 @media print{.dv-tour-discovery{display:none!important;}}
 
-/* Explore keeps the reader utilities together at the bottom, clear of the top
-   navigation (standalone and Workbench pages; embedded readers keep them in flow). */
-@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}

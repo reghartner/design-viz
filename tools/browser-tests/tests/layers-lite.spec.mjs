@@ -78,7 +78,7 @@ test('importing the same document keeps a locked node in place; a different docu
 
  const same=file('Browser contract');await importFile(same);
  // Rendered SVG boxes carry float noise, so centers compare within half a graph unit.
- const imported=JSON.parse(await source(page)),pins=imported.page.blocks[0].diagram.floats;
+ const imported=JSON.parse(await source(page)),pins=imported.page.blocks[0].diagram.floats||[];
  expect(pins).toHaveLength(1);expect(pins[0]).toMatchObject({id:'b',side:'below',noSpread:true});
  expect(Math.abs(pins[0].x-start.x)).toBeLessThan(0.5);expect(Math.abs(pins[0].y-start.y)).toBeLessThan(0.5);
  const expected=JSON.parse(same);expected.page.blocks[0].diagram.rows[0]=['z','a','c'];delete imported.page.blocks[0].diagram.floats;

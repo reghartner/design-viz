@@ -37,11 +37,11 @@ test('alignment pins an automatic clicked anchor only when another object change
  for(const direction of ['horizontal','vertical']){
   const raw=fixture(),d=raw.page.sections[0].diagram;d.nodes.r={};d.nodes.c={};d.rows=[['r']];d.floats=[{id:'a',side:'below',noSpread:true},{id:'b',side:'below',noSpread:true},{id:'c',side:'below',noSpread:true}];
   const text=JSON.stringify(raw),nodeTargets=[{kind:'node',section:0,id:'a'},{kind:'node',section:0,id:'b'}];
-  const nodeRects=direction==='horizontal'?[{x:1265,y:42,w:150,h:44},{x:1265,y:126,w:150,h:44}]:[{x:1125,y:42,w:150,h:44},{x:1265,y:126,w:150,h:44}];
+  const nodeRects=direction==='horizontal'?[{x:1265,y:39,w:150,h:50},{x:1265,y:123,w:150,h:50}]:[{x:1125,y:39,w:150,h:50},{x:1265,y:123,w:150,h:50}];
   const plan=B.planAlignSpatial(text,raw,nodeTargets,'explore',direction,nodeRects,1);assert.ok(!plan.error,plan.error);const next=JSON.parse(plan.text),floats=next.page.sections[0].diagram.floats;
-  assert.deepEqual(floats,direction==='horizontal'?[{id:'a',side:'below',noSpread:true,x:1340,y:148},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true,x:1340,y:232}]:[{id:'a',side:'below',noSpread:true,x:1340,y:64},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true}]);
+  assert.deepEqual(floats,direction==='horizontal'?[{id:'a',side:'below',noSpread:true,x:1340,y:148},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true,x:1340,y:247}]:[{id:'a',side:'below',noSpread:true,x:1340,y:64},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true}]);
   const laid=B.layout(next.page.sections[0].diagram);assert.equal(laid.pos.b.cx,1340);assert.equal(laid.pos.b.cy,148);assert.equal(laid.pos.a[direction==='horizontal'?'cy':'cx'],direction==='horizontal'?148:1340);
-  assert.equal(laid.pos.c.cx,1340);assert.equal(laid.pos.c.cy,232);
+  assert.equal(laid.pos.c.cx,1340);assert.equal(laid.pos.c.cy,247);
   const repeat=B.planAlignSpatial(plan.text,next,nodeTargets,'explore',direction,nodeRects.map((r,i)=>i?{...r}:{...r,[direction==='horizontal'?'y':'x']:direction==='horizontal'?126:1265}),1);assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
  }
  const raw=fixture(),d=raw.page.sections[0].diagram;d.rows=[[]];d.floats=[{id:'a',x:100,y:80},{id:'b',side:'below',noSpread:true}];const text=JSON.stringify(raw);
@@ -59,7 +59,7 @@ test('mixed alignment accepts a nonfirst visual anchor without rewriting its aut
 });
 test('mixed duplicate remaps IDs and placements and mixed delete resolves panel ID atomically',()=>{
  const raw=fixture(),text=JSON.stringify(raw),plan=B.planDuplicateSpatial(text,raw,targets,'explore',rects);assert.ok(!plan.error,plan.error);const d=JSON.parse(plan.text).page.sections[0].diagram;
- assert.ok(d.nodes.a1);assert.equal(d.panels[1].id,'p1');assert.deepEqual(d.floats[1],{id:'a1',x:124,y:104});assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[1],{panel:'p1',x:324,y:224,w:240,h:80});assert.equal(d.layouts[0].sectionLayout.default[1].panel,'p1');assert.equal(d.layouts[0].exploreLayout.panelPlacements[0].placement,'canvas');
+ assert.ok(d.nodes.a1);assert.equal(d.panels[1].id,'p1');assert.deepEqual(d.floats[1],{id:'a1',x:132,y:112});assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[1],{panel:'p1',x:324,y:224,w:240,h:80});assert.equal(d.layouts[0].sectionLayout.default[1].panel,'p1');assert.equal(d.layouts[0].exploreLayout.panelPlacements[0].placement,'canvas');
  const del=B.planBulkDelete(plan.text,[targets[0],{kind:'panel',section:0,index:99,id:'p'}]);assert.ok(!del.error,del.error);const next=JSON.parse(del.text).page.sections[0].diagram;assert.equal(next.nodes.a,undefined);assert.deepEqual(next.panels.map(p=>p.id),['p1']);assert.equal(next.layouts[0].exploreLayout.canvas.panels.length,1);
  assert.match(B.planBulkDelete(text,[targets[0],{kind:'panel',section:0,id:'missing'}]).error,/no longer exists/);assert.ok(raw.page.sections[0].diagram.nodes.a);
 });

@@ -96,7 +96,7 @@ test('anonymous export exactly matches production bounds and routes for classic,
     path:expected.paths[index]
   })));
   assert.deepEqual(diagram,before,'pure export leaves the source object untouched');
-  assert.deepEqual(actual.nodes.map(node=>[node.width,node.height]),[[150,54],[170,54],[170,54],[150,54],[150,44],[150,44]]);
+  assert.deepEqual(actual.nodes.map(node=>[node.width,node.height]),[[150,54],[170,54],[170,54],[150,54],[150,50],[150,50]]);
   assert.ok(actual.nodes.some(node=>node.x<0 || node.y<0),'awkward negative placement is preserved');
 });
 

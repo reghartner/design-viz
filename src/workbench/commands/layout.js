@@ -1071,7 +1071,8 @@ function planDuplicateSpatial(text,raw,targets,layoutId,rects){
       if(t.kind==='node'){
         var id=builderUniqueKey(used,t.id);used[id]=true;nodeMap[t.id]=id;d.nodes[id]=builderClone(d.nodes[t.id]);
         var f=(d.floats || []).find(function(f){return f.id===t.id;});
-        if(f){var copy=builderClone(f);copy.id=id;if(rects && rects[i]){copy.x=rects[i].x+rects[i].w/2+24;copy.y=rects[i].y+rects[i].h/2+24;delete copy.dx;delete copy.dy;}d.floats.push(copy);}
+        /* Offset past half a card's height so the original's centre stays clickable. */
+        if(f){var copy=builderClone(f);copy.id=id;if(rects && rects[i]){copy.x=rects[i].x+rects[i].w/2+32;copy.y=rects[i].y+rects[i].h/2+32;delete copy.dx;delete copy.dy;}d.floats.push(copy);}
         else (d.rows || []).forEach(function(row){for(var j=0;j<row.length;j++){if(row[j]===t.id){row.splice(j+1,0,id);j++;}else if(Array.isArray(row[j])){var k=row[j].indexOf(t.id);if(k>=0)row[j].splice(k+1,0,id);}}});
       }else{
         var original=d.panels.find(function(p){return p.id===t.id;}),copy=builderClone(original),id=builderUniqueKey(usedPanels,t.id);usedPanels[id]=true;panelMap[t.id]=id;copy.id=id;d.panels.push(copy);

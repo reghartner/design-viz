@@ -784,31 +784,62 @@ function layoutCoinGroup(group){
   });
   return pts;
 }
-/* Lane cards reserve two title lines without changing row heights. Measure the
+/* Cards reserve two title lines without changing row heights. Measure the
    active skin's font, including the space occupied by links and drill-down. */
 function refreshLaneTitles(svg){
   if (!svg._fitLaneTitles) return;
   svg._fitLaneTitles();
   /* Font loading and host skin changes can alter widths after the first
      render. A replaced/destroyed board must not receive delayed updates. */
-  if (svg.ownerDocument.fonts) svg.ownerDocument.fonts.ready.then(function(){
+  var fonts = svg.ownerDocument && svg.ownerDocument.fonts;
+  if (fonts && fonts.ready) fonts.ready.then(function(){
     if (svg.isConnected && svg.parentNode && svg.parentNode.firstChild === svg) svg._fitLaneTitles();
   });
 }
-function fitLaneNodeTitle(node, title, width){
-  var text = node.querySelector('.t1'), sub = node.querySelector('.t2');
-  if (!text) return; /* handoff cards own their presentation */
-  var right = width - 12, firstRight = right, secondRight = right;
-  node.querySelectorAll('.nlink circle,.nbackref circle').forEach(function(circle){
-    firstRight = Math.min(firstRight, Number(circle.getAttribute('cx')) - Number(circle.getAttribute('r')) - 4);
+/* Boards in hidden Tabs or views render at display:none, where text measures
+   zero wide. Fit those again when the board is shown, not on every resize. */
+function watchLaneTitles(svg){
+  if (typeof ResizeObserver !== 'function') return;
+  var shown = false;
+  var observer = new ResizeObserver(function(entries){
+    if (!svg.isConnected){ observer.disconnect(); return; }
+    var wasShown = shown;
+    shown = entries[entries.length - 1].contentRect.width > 0;
+    if (shown && !wasShown && svg._titlesPending) svg._fitLaneTitles();
   });
-  var hasSub = sub && sub.textContent;
+  observer.observe(svg);
+  svg._titleObserver = observer;
+}
+function fitLaneNodeTitle(node, title, width, subtitle){
+  var text = node.querySelector('.t1'), sub = node.querySelector('.t2'), card = node.querySelector('.card');
+  if (!text || !card) return true; /* handoff cards own their presentation */
+  var x = Number(text.getAttribute('x')), right = width - 12, firstRight = right, secondRight = right;
+  /* Keep the rendered baselines; refits start from them, not from tspans. */
+  if (!text.hasAttribute('data-dv-y')) text.setAttribute('data-dv-y', text.getAttribute('y'));
+  if (sub && !sub.hasAttribute('data-dv-y')) sub.setAttribute('data-dv-y', sub.getAttribute('y'));
+  var titleY = Number(text.getAttribute('data-dv-y')), subY = sub ? Number(sub.getAttribute('data-dv-y')) : 0;
+  /* Controls left of the title (above the icon) need no room beside it. */
+  node.querySelectorAll('.nlink circle,.nbackref circle').forEach(function(circle){
+    var cx = Number(circle.getAttribute('cx'));
+    if (cx > x) firstRight = Math.min(firstRight, cx - Number(circle.getAttribute('r')) - 4);
+  });
+  var hasSub = sub && subtitle;
   if (hasSub) secondRight = Math.min(secondRight, firstRight);
-  var detail = node.querySelector('.detail-trigger rect');
-  if (detail) secondRight = Math.min(secondRight, Number(detail.getAttribute('x')) - 4);
+  var subRight = right, detail = node.querySelector('.detail-trigger rect');
+  if (detail){
+    /* The drill-down button's top reaches the first title line's box. */
+    firstRight = Math.min(firstRight, Number(detail.getAttribute('x')) - 4);
+    secondRight = Math.min(secondRight, Number(detail.getAttribute('x')) - 4);
+    subRight = Math.min(subRight, Number(detail.getAttribute('x')) - 4);
+  }
+  /* Short (float) cards have no room for two title lines above a subtitle,
+     and their single title line box needs the full card to clear it. */
+  var twoLines = !(hasSub && Number(card.getAttribute('height')) < 54);
+  if (!twoLines){ titleY = 27; subY = 43; }
+  var target = text;
   function fits(value, available){
-    text.textContent = value;
-    return text.getComputedTextLength() <= available;
+    target.textContent = value;
+    return target.getComputedTextLength() <= available;
   }
   function take(value, available, ellipsis, suffix){
     var chars = Array.from(value), low = 0, high = chars.length;
@@ -820,29 +851,67 @@ function fitLaneNodeTitle(node, title, width){
     return chars.slice(0,low).join('');
   }
   text.setAttribute('aria-label', title);
-  text.setAttribute('y','25');
-  if (sub) sub.setAttribute('y','41');
+  text.setAttribute('y', titleY);
+  var fitTitle = node.querySelector('title[data-dv-fit-title]');
+  if (fitTitle) fitTitle.remove();
+  if (sub){
+    sub.setAttribute('y', subY);
+    sub.removeAttribute('aria-label');
+    sub.textContent = subtitle || '';
+  }
   /* Non-layout DOMs such as Forge's jsdom harness lack SVG measurement.
      Preserve the authored name when there is no geometry to fit against. */
-  if (typeof text.getComputedTextLength !== 'function'){
-    text.textContent = title;
-    return;
+  text.textContent = title;
+  if (typeof text.getComputedTextLength !== 'function') return true;
+  /* Hidden boards (display:none) have no boxes and measure zero: keep the
+     authored text until the board is shown. Checking boxes first also lays
+     the text out before it is measured. */
+  if (!text.getClientRects().length) return false;
+  if (hasSub){
+    target = sub;
+    if (!fits(subtitle, subRight - x)){
+      var shortSub = take(subtitle, subRight - x, true).trimEnd() + '…';
+      sub.textContent = shortSub;
+      sub.setAttribute('aria-label', subtitle);
+      var tip = document.createElementNS(SVGNS,'title');
+      tip.textContent = subtitle;
+      sub.appendChild(tip);
+    }
+    target = text;
   }
-  if (fits(title, firstRight - 46)) return;
-  var first = take(title, firstRight - 46, false), split = first.lastIndexOf(' ');
+  if (fits(title, firstRight - x)) return true;
+  /* A title cut with … shows its full text on hover; lane and image cards
+     already render one. */
+  function exposeTitle(){
+    if (Array.prototype.some.call(node.children, function(child){ return child.tagName.toLowerCase() === 'title'; })) return;
+    var full = document.createElementNS(SVGNS,'title');
+    full.setAttribute('data-dv-fit-title','');
+    full.textContent = title;
+    node.insertBefore(full, node.firstChild);
+  }
+  if (!twoLines){
+    text.textContent = take(title, firstRight - x, true).trimEnd() + '…';
+    exposeTitle();
+    return true;
+  }
+  var first = take(title, firstRight - x, false), split = first.lastIndexOf(' ');
   if (split > 0) first = first.slice(0,split);
   var rest = title.slice(first.length).trimStart();
   /* Keep the separator in textContent, but on the second line: a trailing
      SVG space expands the first tspan's bounds without painting a glyph. */
   var second = (title.charAt(first.length) === ' ' ? ' ' : '') + rest;
-  if (!fits(second, secondRight - 46)) second = take(second, secondRight - 46, true).trimEnd() + '…';
-  var y = hasSub ? 17 : 25;
+  if (!fits(second, secondRight - x)){
+    second = take(second, secondRight - x, true).trimEnd() + '…';
+    exposeTitle();
+  }
+  var y = hasSub ? titleY - 8 : titleY;
   text.textContent = '';
   [first, second].forEach(function(line, index){
     var span = document.createElementNS(SVGNS,'tspan');
-    span.setAttribute('x','46');span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
+    span.setAttribute('x',x);span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
   });
-  if (hasSub) sub.setAttribute('y','48');
+  if (hasSub) sub.setAttribute('y', subY + 7);
+  return true;
 }
 /* Measure complete graph ink in SVG coordinates, including transformed node
    groups, paths, labels and coins. Hidden story fragments retain their bounds.
@@ -946,33 +1015,50 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
-    var hasReferences=nodeReferenceLinks(d,id,options).length>0,referenceX=p.w-(hasNodeLink?38:15);
-    var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
+    var hasReferences=nodeReferenceLinks(d,id,options).length>0;
+    /* Card controls sit in a row above the icon so the title keeps the full
+       width beside it; handoff cards keep them at the top-right corner. */
+    var controlCount=(hasNodeLink?1:0)+(hasReferences?1:0)+(siblingPages.length?1:0),slot=0;
+    /* Cards: an 18-wide hit area per control from the top edge down to the
+       icon, which keeps one position on every card of a size. */
+    /* Short cards: 12-high control row, then the icon with equal room above
+       and below it (50 - 12 - 26 = 2 × 6). */
+    var iconY=small?18:14,hitH=small?12:14,controlY=n.handoff?14:hitH/2;
+    function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
+    var linkX=hasNodeLink?controlX(p.w-15):0;
+    var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
+    var backlinkX=siblingPages.length?controlX(p.w-15-(hasNodeLink?23:0)-(hasReferences?23:0)):0;
+    var textX=Math.max(nodeImage?52:46,controlCount?9+18*controlCount+1:0);
+    var imageY=controlCount?hitH+1:7;
+    function controlHit(cx,cornerR){
+      return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
+        '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
+    }
     s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          (nodeImage ?
-           '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="7" width="38" height="' + (p.h-14) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
-           '<text class="t1" x="52" y="' + (small?19:23) + '">' + esc(nodeTitle) + '</text>' +
-           '<text class="t2" x="52" y="' + (small?34:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
-           '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
-           '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
-           '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
-           '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>')) +
+           '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="' + imageY + '" width="38" height="' + (p.h-imageY-7) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
+           '<text class="t1" x="' + textX + '" y="' + (small?25:23) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="' + textX + '" y="' + (small?41:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
+           '<rect class="icbg" x="12" y="' + iconY + '" width="26" height="26" rx="8"/>' +
+           '<use href="#i-' + icon + '" x="17" y="' + (iconY+5) + '" width="16" height="16"/>' +
+           '<text class="t1" x="' + textX + '" y="' + (small?28:25) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="' + textX + '" y="' + (small?43:41) + '">' + esc(n.sub || '') + '</text>')) +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
-           '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +
-           '<text x="' + (p.w - 15) + '" y="18" text-anchor="middle">&#8599;</text></a>' : '') +
+           controlHit(linkX,9) +
+           '<text x="' + linkX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8599;</text></a>' : '') +
          (hasReferences ?
            '<g class="nlink nrefs-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Links for ' + esc(nodeTitle) + '">' +
-           '<title>Links · right-click this node or open here</title><circle cx="' + referenceX + '" cy="14" r="10" fill="transparent"/>' +
-           '<text x="' + referenceX + '" y="18" text-anchor="middle">&#8943;</text></g>' : '') +
+           '<title>Links · right-click this node or open here</title>' + controlHit(referenceX,10) +
+           '<text x="' + referenceX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8943;</text></g>' : '') +
          (siblingPages.length ?
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
-           '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
-           '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
+           controlHit(backlinkX,9) +
+           '<text x="' + backlinkX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8599;</text></g>' : '') +
          (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
          '</g>';
   });
@@ -981,23 +1067,36 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   // this renderer's graph; clearing the host discards those live objects.
   el.insertAdjacentHTML('afterbegin', s);
   var svg = el.firstChild;
-  if (el._boardSVG) el._boardSVG.remove();
+  if (el._boardSVG){
+    if (el._boardSVG._titleObserver) el._boardSVG._titleObserver.disconnect();
+    el._boardSVG.remove();
+  }
   el._boardSVG = svg;
   var nodeEls = {};
   Object.keys(d.nodes).forEach(function(id){
     var node = document.getElementById(prefix + '-n-' + id);
     if (node){
       nodeEls[id] = node;
-      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
+      /* Cards with controls above the icon carry the marker at the other corner. */
+      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, !d.nodes[id].handoff && node.querySelector && node.querySelector('.nlink,.nbackref') ? L.pos[id].w - 4 : 4, -6);
     }
   });
-  if (L.routing === 'lanes'){
-    function fitTitles(){
-      Object.keys(nodeEls).forEach(function(id){fitLaneNodeTitle(nodeEls[id], d.nodes[id].title || id, L.pos[id].w);});
-    }
-    svg._fitLaneTitles = fitTitles;
-    refreshLaneTitles(svg);
-  }
+  /* Fit this board's own cards: another board may reuse the same prefix. */
+  var fitEls = {};
+  Array.prototype.forEach.call(svg.children || [], function(child){
+    var id = child.getAttribute && child.getAttribute('data-dv-node');
+    if (id != null && Object.prototype.hasOwnProperty.call(nodeEls, id)) fitEls[id] = child;
+  });
+  svg._fitLaneTitles = function(){
+    svg._titlesPending = false;
+    Object.keys(fitEls).forEach(function(id){
+      var n = d.nodes[id];
+      if (n.handoff || isTextBoxNode(n)) return;
+      if (!fitLaneNodeTitle(fitEls[id], n.title || id, L.pos[id].w, n.sub || (embeddedImageKind(n.image) ? 'Embedded image' : ''))) svg._titlesPending = true;
+    });
+  };
+  refreshLaneTitles(svg);
+  watchLaneTitles(svg);
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix,options);
 

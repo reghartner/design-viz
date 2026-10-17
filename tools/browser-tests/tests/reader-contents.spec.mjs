@@ -70,6 +70,7 @@ test('desktop Contents expands every View by default and preserves independent d
    M2 View toggles by hand | real Enter/click on a Reference View disclosure | that View's sections 0 and aria-expanded false, the sibling View keeps 2; click restores | disclosure state shared across Views or reset by the default
    N1 moving keeps groups | Next section, then a real click on a Reference View row | after each move the other group stays aria-expanded=true with its View rows | collapsing every group except the new owner on navigation
    D1 deep link lands | fresh load of #t=reference&d=glossary&v=ref-explore | tab label Reference, glossary row in ref-explore aria-current=page, #section-glossary is the Explore section; both Tabs expanded | a deep-link landing that expands only the linked Tab
+   D3 cross-document link | a second standalone document whose node handoff {spec,section:'glossary',view:'ref-explore',siteBaseUrl} points at contents-expanded.html; real click on its .handoff-link | the opened tab is contents-expanded.html?diagram=…#d=glossary&v=ref-explore, lands with tab label Reference, glossary row current, every Tab/View expanded | a cross-document landing that expands only the linked Tab or loses the section
    D2 hash change | real same-document navigation to #d=review&v=explore | Product journey owns, review row current, Reference still expanded | hashchange routing that recollapses groups
    R1 restore() wins | Workbench re-render (workbench-navigation.spec.mjs) | a Tab the reader collapsed stays collapsed after the preview re-renders | the landing default overriding saved state
    E1 Backstage native | twoTabs() mounted through apps/backstage nativeViewer.js (shadow root) | same L1/L2 assertions inside the host | fixing only the standalone viewer
@@ -116,6 +117,12 @@ test('#607 desktop Contents lands with every Tab and View expanded and keeps rea
   await expectAllExpanded(root);
   await page.goto(server.origin+'/contents-expanded.html#d=review&v=explore');
   await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(sections('explore').filter({hasText:'Decide what becomes the accepted diagram'})).toHaveAttribute('aria-current','page');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
+  const linking={page:{title:'Linking document',sections:[{id:'source',heading:'Source',diagram:{nodes:{a:{title:'Glossary link',handoff:{spec:'contents-expanded',section:'glossary',view:'ref-explore',siteBaseUrl:server.origin+'/contents-expanded.html'}}},rows:[['a']]}}]}};
+  await openRaw(page,server,linking,'contents-linking');const opened=page.context().waitForEvent('page');await page.locator('[data-dv-node="a"] .handoff-link').click();const linked=await opened;
+  expect(linked.url()).toContain('/contents-expanded.html?diagram=contents-expanded#');const target=linked.locator('#docview');
+  await expect(target.locator('.reader-tab-label')).toHaveText('Reference');await expect(target.locator('.reader-tree-sections[data-reader-view="ref-explore"] .reader-tree-section').filter({hasText:'Glossary terms'})).toHaveAttribute('aria-current','page');await expect(target.locator('.explore-active-section')).toHaveAttribute('id','section-glossary');
+  await linked.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expectAllExpanded(target);await linked.close();
 });
 
 test('#607 Backstage native reader lands with every Tab and View expanded',async({page,server})=>{

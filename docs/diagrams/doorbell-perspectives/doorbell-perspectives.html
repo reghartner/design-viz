@@ -913,21 +913,6 @@ html.dv-commenting .docview>:not(.explore-navigation),html.dv-commenting .docvie
 .dv-tour-discovery[hidden]{display:none;}
 .dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
 @media print{.dv-tour-discovery{display:none!important;}}
-
-/* Reader utilities follow the fixed navigation's spacer in Standard. Explore
-   keeps the same controls together at the bottom, clear of the top navigation. */
-.reader-shortcuts{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:20px 22px 22px;border:1px solid #d5d8e3;border-radius:12px;background:#fff;color:#1f2433;font:14px/1.45 'IBM Plex Sans',sans-serif;box-shadow:0 18px 50px rgba(20,24,40,.28);}
-.reader-shortcuts::backdrop{background:rgba(15,18,30,.4);}
-.reader-shortcuts header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 4px;}
-.reader-shortcuts h2{margin:0;font:600 18px/1.3 'Sora','IBM Plex Sans',sans-serif;}
-.reader-shortcuts h3{margin:16px 0 8px;color:#5f6578;font:600 11px/1.4 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;}
-.reader-shortcuts dl{display:grid;grid-template-columns:7.5rem 1fr;align-items:baseline;gap:7px 18px;margin:0;}
-.reader-shortcuts dt{white-space:nowrap;color:#5f6578;}.reader-shortcuts dd{margin:0;}
-.reader-shortcuts kbd{display:inline-block;min-width:1.5em;box-sizing:border-box;padding:1px 6px;border:1px solid #c9ccd8;border-bottom-width:2px;border-radius:5px;background:#f6f7fb;color:#1f2433;font:600 12px/18px 'IBM Plex Mono',monospace;text-align:center;}
-.reader-shortcuts-close{min-height:32px;padding:5px 12px;border:1px solid #d5d8e3;border-radius:7px;background:#fff;color:#1f2433;font:500 13px/20px 'IBM Plex Sans',sans-serif;cursor:pointer;}.reader-shortcuts-close:hover{background:#f1f2f7;}
-.reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
-.reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
-@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -7598,6 +7583,23 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .wire-contract-preview [role=status]:not(:empty){margin-top:8px;}
 .wire-contract-copy{flex:none;cursor:pointer;padding:5px 10px;border:1px solid currentColor;border-radius:6px;color:inherit;background:transparent;font:inherit;}
 .wire-contract-json{font:12px/1.6 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;margin:8px 0;padding:10px;background:#80808012;border-radius:6px;}
+
+/* Reader utilities and the "?" shortcut sheet (viewer/shortcuts.js). Core, not
+   tour styles: the native and Forge viewers load only page and core (#602).
+   Reader utilities follow the fixed navigation's spacer in Standard. Explore
+   keeps the same controls together at the bottom, clear of the top navigation. */
+.reader-shortcuts{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:20px 22px 22px;border:1px solid #d5d8e3;border-radius:12px;background:#fff;color:#1f2433;font:14px/1.45 'IBM Plex Sans',sans-serif;box-shadow:0 18px 50px rgba(20,24,40,.28);}
+.reader-shortcuts::backdrop{background:rgba(15,18,30,.4);}
+.reader-shortcuts header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 4px;}
+.reader-shortcuts h2{margin:0;font:600 18px/1.3 'Sora','IBM Plex Sans',sans-serif;}
+.reader-shortcuts h3{margin:16px 0 8px;color:#5f6578;font:600 11px/1.4 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;}
+.reader-shortcuts dl{display:grid;grid-template-columns:7.5rem 1fr;align-items:baseline;gap:7px 18px;margin:0;}
+.reader-shortcuts dt{white-space:nowrap;color:#5f6578;}.reader-shortcuts dd{margin:0;}
+.reader-shortcuts kbd{display:inline-block;min-width:1.5em;box-sizing:border-box;padding:1px 6px;border:1px solid #c9ccd8;border-bottom-width:2px;border-radius:5px;background:#f6f7fb;color:#1f2433;font:600 12px/18px 'IBM Plex Mono',monospace;text-align:center;}
+.reader-shortcuts-close{min-height:32px;padding:5px 12px;border:1px solid #d5d8e3;border-radius:7px;background:#fff;color:#1f2433;font:500 13px/20px 'IBM Plex Sans',sans-serif;cursor:pointer;}.reader-shortcuts-close:hover{background:#f1f2f7;}
+.reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}
 
 /* Section-local viewing chrome; floating defaults belong to each named view. */
 .section-viewport{position:relative;min-width:0;isolation:isolate;}
@@ -37180,27 +37182,31 @@ function wireExternalHandoffs(ctl,options){
 /* ---- src/viewer/shortcuts.js ---- */
 /* Reader keyboard shortcuts. "?" opens this sheet on every reader surface
    (#562); the rows list only keys the reader handles: presenter and focused
-   step keys (engine.js), tab-bar keys, and Esc for menus and popovers. */
+   step keys (engine.js), tab-bar keys, and Esc for menus and popovers.
+   Embedded readers (Backstage native, Forge) have no presenter, so they pass
+   {presenter:false} and omit the rows marked 'presenter' (#602). Lookups stay
+   under doc.body: the native viewer's bounded document has no querySelector. */
 var READER_SHORTCUT_GROUPS=[
   ['Anywhere',[['?','Open this shortcut sheet'],['Esc','Close this sheet, an open menu or a popover']]],
-  ['Diagram focused, or in Present',[['← / →','Previous or next step'],['Space','Play or pause the steps']]],
-  ['In Present',[['1–9','Switch to that tab'],['Esc','Exit Present']]],
+  ['Diagram focused, or in Present',[['← / →','Previous or next step'],['Space','Play or pause the steps']],'presenter'],
+  ['In Present',[['1–9','Switch to that tab'],['Esc','Exit Present']],'presenter'],
   ['Tab bar focused',[['← / →','Previous or next tab'],['Home / End','First or last tab']]]
 ];
 function readerShortcutTextTarget(target){
   return !!(target && target.closest && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'));
 }
-function wireReaderShortcuts(ctl,view,win){
-  var doc=win.document,opener=null,destroyed=false;
+function wireReaderShortcuts(ctl,view,win,options){
+  var doc=win.document,opener=null,destroyed=false,presenter=!(options && options.presenter===false);
   function el(tag,cls,text){var node=doc.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
   var dialog=el('dialog','reader-shortcuts');dialog.id='reader-shortcuts';dialog.setAttribute('aria-labelledby','reader-shortcuts-title');
   var header=el('header'),title=el('h2',null,'Keyboard shortcuts'),close=el('button','reader-shortcuts-close','Close');
   title.id='reader-shortcuts-title';close.type='button';header.append(title,close);dialog.appendChild(header);
   READER_SHORTCUT_GROUPS.forEach(function(group){
+    if(group[2]==='presenter' && !presenter)return;
     var section=el('section'),list=el('dl');section.appendChild(el('h3',null,group[0]));
     group[1].forEach(function(row){
       var dt=el('dt');
-      row[0].split(/( \/ |–)/).forEach(function(part,i){dt.appendChild(i%2?doc.createTextNode(part):el('kbd',null,part));});
+      row[0].split(/( \/ |–)/).forEach(function(part,i){dt.append(i%2?part:el('kbd',null,part));});
       list.append(dt,el('dd',null,row[1]));
     });
     section.appendChild(list);dialog.appendChild(section);
@@ -37211,13 +37217,13 @@ function wireReaderShortcuts(ctl,view,win){
   button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',dialog.id);button.setAttribute('aria-keyshortcuts','?');
   var pageActions=readerPageActions(view,ctl);pageActions.appendChild(button);
   function show(){
-    if(destroyed || dialog.open || doc.querySelector('dialog[open]'))return false;
+    if(destroyed || dialog.open || doc.body.querySelector('dialog[open]'))return false;
     opener=doc.activeElement;dialog.showModal();close.focus({preventScroll:true});return true;
   }
   function keydown(ev){
     if(ev.key!=='?' || ev.defaultPrevented || ev.isComposing || ev.altKey || ev.ctrlKey || ev.metaKey)return;
     if(!view.isConnected || !view.getClientRects().length || readerShortcutTextTarget(ev.target))return;
-    var tour=doc.querySelector('.dv-tour');if(tour && !tour.hidden)return;
+    var tour=doc.body.querySelector('.dv-tour');if(tour && !tour.hidden)return;
     if(show())ev.preventDefault();
   }
   function closed(){var target=opener;opener=null;if(target && target.isConnected && target.focus)target.focus({preventScroll:true});}

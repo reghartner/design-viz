@@ -320,6 +320,10 @@ test('published previews select the authored opening View and visible diagram wi
   d.steps[0].panelVisibility.summary=true;d.panels[0].visible=false;assert.equal(C.libraryPreview(raw).kind,'panels');
   d.steps[0].panelVisibility={};assert.equal(C.libraryPreview(raw),null);
   d.view='ambient';assert.equal(C.libraryPreview(raw).kind,'panels');
+  const legacy={page:{sections:[{heading:'Intro',text:'Welcome'},{heading:'Primary panel',diagram:{...graph('Not the opening view'),primaryPanel:'home',panels:[{id:'home',type:'homemap',title:'Home',outline:{w:280,h:160},rooms:[],devices:[],subjects:[]}],sectionLayout:{default:[{x:0,y:0,w:12,h:8}]}}}]}};
+  assert.equal(C.libraryPreview(legacy).kind,'panels');
+  legacy.page.sections[1].diagram.layouts=[{id:'overview',name:'Overview',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]}}];
+  assert.equal(C.libraryPreview(legacy).kind,'graph');
   const tabs={page:{blocks:[{tabs:[{label:'Opening',sections:[{id:'prose',heading:'Start',text:'Read this'}]},{label:'Private',sections:[{diagram:graph('Inactive service')}]}]}]}};
   assert.equal(C.libraryPreview(tabs),null);
   tabs.page.blocks[0].tabs[0].sections.push({diagram:graph('Visible service')});assert.equal(C.libraryPreview(tabs).nodes[0].label,'Visible service');

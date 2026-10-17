@@ -23,7 +23,11 @@ function libraryPreview(raw){
   var opening=diagramForPath(d,openingPath.id),firstStep=(opening.steps || []).findIndex(function(step){return !filter.steps || filter.steps.includes(step.id);});
   var visibility=foldPanelVisibility(opening);
   var panels=(d.panels || []).filter(function(p){return visible('panel:'+p.id) && (d.view!=='step' || !(d.steps || []).length || visibility[p.id][Math.max(0,firstStep)]!==false);});
-  var focus=diagramFocusPanel(d),panelFirst=chosen.member.layout==='home' || (!items && focus && d.primaryPanel===focus.id);
+  var focus=diagramFocusPanel(d),named=definition && !definition.legacy;
+  // Named composition overrides the legacy Home/Data flow mode. Without it,
+  // an unspecified member layout keeps the primary panel's default Home mode,
+  // even when a legacy sectionLayout exists for the alternate Data flow mode.
+  var panelFirst=focus && !named && (chosen.member.layout==='home' || (!chosen.member.layout && d.primaryPanel===focus.id));
   var ids=Object.keys(d.nodes || {});
   if(!visible('diagram') || panelFirst || !ids.length){
     if(!panels.length)return null;

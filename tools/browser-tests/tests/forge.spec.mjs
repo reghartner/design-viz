@@ -70,7 +70,7 @@ test('Forge Explore height converges when the host resizes its iframe to content
 // 2 key opens that sheet | real click on the "Software request" tab (sheet closed first) then keyboard.press('?') | that dialog is the single open dialog, accessible name "Keyboard shortcuts" | key unwired; key opens a different sheet
 // 3 roster lists only keys this reader handles | same open sheet | ordered [dt, dd] pairs of its dl rows equal FORGE_KEYS (Anywhere + Tab bar; no step or Present rows: the Forge viewer has no presenter) | the standalone roster listing Present/step keys that do nothing here; an empty sheet
 // 4 Esc closes, focus returns | same | keyboard.press('Escape'): dialog not open; the tab is focused | a sheet that traps the reader or drops focus
-// 5 listed tab keys work | tab bar focused | ArrowRight selects "IoT reconciliation" (aria-selected), Home selects "Software request" | a roster row for keys that are not handled
+// 5 listed tab keys work | tab bar focused | each listed key on the two-tab bar: ArrowRight selects+focuses "IoT reconciliation", ArrowLeft "Software request", End "IoT reconciliation", Home "Software request" | a roster row for keys that are not handled
 // 6 button opens the sheet | real click on the "?" button | dialog open; Esc closes it and focuses the "?" button | button unwired
 // 7 bridge untouched | same | the simulated bridge saw only getContext (no navigate/submit/close) while the sheet opened and closed | a "?" handler that routes through the Confluence bridge
 // 8 text input | configuring macro: JSON pasted, Preview rendered (its "?" control visible = contrasting precondition); real click in #spec-input, Ctrl/Meta+End, type "?" | #spec-input value is the pasted JSON + "?"; no dialog open | a "?" that is stolen from the import textarea
@@ -110,8 +110,11 @@ test('Forge viewer: "?" opens the reader shortcut sheet listing only its keys, n
   expect(rows).toEqual(FORGE_KEYS);
   await page.keyboard.press('Escape');
   await expect(sheet).not.toHaveAttribute('open','');await expect(first).toBeFocused();
-  await page.keyboard.press('ArrowRight');await expect(reader.getByRole('tab',{name:'IoT reconciliation',exact:true})).toHaveAttribute('aria-selected','true');
-  await page.keyboard.press('Home');await expect(first).toHaveAttribute('aria-selected','true');
+  const second=reader.getByRole('tab',{name:'IoT reconciliation',exact:true});
+  await page.keyboard.press('ArrowRight');await expect(second).toHaveAttribute('aria-selected','true');await expect(second).toBeFocused();
+  await page.keyboard.press('ArrowLeft');await expect(first).toHaveAttribute('aria-selected','true');await expect(first).toBeFocused();
+  await page.keyboard.press('End');await expect(second).toHaveAttribute('aria-selected','true');await expect(second).toBeFocused();
+  await page.keyboard.press('Home');await expect(first).toHaveAttribute('aria-selected','true');await expect(first).toBeFocused();
   await help.click();await expect(sheet).toHaveAttribute('open','');
   await page.keyboard.press('Escape');await expect(sheet).not.toHaveAttribute('open','');await expect(help).toBeFocused();
   expect(await page.evaluate(()=>__calls.map(c=>c.method))).toEqual(['getContext']);

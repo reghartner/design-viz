@@ -116,7 +116,7 @@ test('actual React native viewers isolate styles/navigation and retire stale rev
 // 2 key opens that viewer's own sheet | real click on alpha's "Story" tab (both sheets closed first) then keyboard.press('?') | alpha's dialog open, accessible name "Keyboard shortcuts"; beta's dialog not open | key unwired; one key press opening every mounted viewer's sheet
 // 3 roster lists only keys this reader handles | same open alpha sheet | ordered [dt, dd] pairs of its dl rows equal NATIVE_KEYS (Anywhere + Tab bar; no step or Present rows: the native mount has no presenter) | the standalone roster listing Present/step keys that do nothing here; an empty sheet
 // 4 Esc closes, focus returns | same | keyboard.press('Escape'): alpha dialog not open; alpha "Story" tab focused | a sheet that traps the reader or drops focus
-// 5 listed tab keys work | alpha tab bar focused | ArrowRight selects "Notes" (aria-selected), Home selects "Story" | a roster row for keys that are not handled
+// 5 listed tab keys work | alpha tab bar focused | each listed key on the two-tab bar: ArrowRight selects+focuses "Notes", ArrowLeft "Story", End "Notes", Home "Story" | a roster row for keys that are not handled
 // 6 button opens the sheet | real click on beta's "?" button | beta dialog open, alpha dialog not open; beta's own [dt, dd] rows equal NATIVE_KEYS (each mount checked, not alpha standing for both); Esc closes it and focuses beta's "?" button | button unwired / opens the other viewer's sheet / a second mount with the standalone roster
 // 7 text input in the host page | real click in host #host-search, type "?" | the input value is "?"; no dialog open in either viewer | a handler on the host document that steals "?" from portal search fields
 // 8 linking and cleanup untouched | same | page hash stays "#host-route", history.length unchanged; after unmounting both, tracked resources equal the pre-mount baseline | a "?" handler that writes the URL, or leaks listeners/dialogs after destroy
@@ -152,8 +152,11 @@ test('native viewers: "?" opens each viewer\'s own reader shortcut sheet listing
   expect(await rows(sheets.alpha.sheet)).toEqual(NATIVE_KEYS);
   await page.keyboard.press('Escape');
   await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');await expect(story).toBeFocused();
-  await page.keyboard.press('ArrowRight');await expect(alpha.getByRole('tab',{name:'Notes',exact:true})).toHaveAttribute('aria-selected','true');
-  await page.keyboard.press('Home');await expect(story).toHaveAttribute('aria-selected','true');
+  const second=alpha.getByRole('tab',{name:'Notes',exact:true});
+  await page.keyboard.press('ArrowRight');await expect(second).toHaveAttribute('aria-selected','true');await expect(second).toBeFocused();
+  await page.keyboard.press('ArrowLeft');await expect(story).toHaveAttribute('aria-selected','true');await expect(story).toBeFocused();
+  await page.keyboard.press('End');await expect(second).toHaveAttribute('aria-selected','true');await expect(second).toBeFocused();
+  await page.keyboard.press('Home');await expect(story).toHaveAttribute('aria-selected','true');await expect(story).toBeFocused();
   await sheets.beta.help.click();
   await expect(sheets.beta.sheet).toHaveAttribute('open','');await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');
   await expect(sheets.beta.sheet).toHaveAccessibleName('Keyboard shortcuts');expect(await rows(sheets.beta.sheet)).toEqual(NATIVE_KEYS);

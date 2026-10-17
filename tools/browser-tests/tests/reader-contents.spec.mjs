@@ -350,12 +350,13 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    R4 content not covered | same | #section-overview left >= rail right | a rail drawn over the page content
    H1 no pass-through open | real mouse sweep content → marker 3 → content | no overlay shown at any time (MutationObserver log on .reader-contents hidden) | opening on pointerenter without a delay
    H2 no edge trigger | real hover at the top bar's left edge and in the content just right of the rail, 600ms each | overlay never shown | a screen-edge hot zone
-   H3 hover-intent overlay | real hover on marker 2 | .reader-contents visible with .reader-contents-overlay, opened 120–1500ms after the rail's pointerenter; its left edge = rail right; #section-overview box unchanged; toggle still aria-expanded=false | a 0ms open; the pinned push sidebar; an overlay that moves the page
+   H3 hover-intent overlay | real hover on marker 2 | .reader-contents visible with .reader-contents-overlay, opened 150–700ms after the rail's pointerenter; its left edge = rail right; #section-overview box unchanged; toggle still aria-expanded=false | a 0ms open; the pinned push sidebar; an overlay that moves the page
    H4 numbered entries match | overlay open | each .reader-tree-tab .reader-part-number = the rail marker text in order and its name = the marker's name | unnumbered Contents; numbers that drift from the rail
    H5 only current part expanded | overlay open on part 2 | .reader-tree-tab aria-expanded = [false,true,false×4] | the pinned all-expanded tree in the overlay
    H6 mouse leave closes | real mouse move to the page centre | overlay hidden, toggle aria-expanded=false | an overlay that stays until clicked
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
    K1 click pins | real click on marker 4 while the overlay is open | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; tab label "Smart motion"; pager "Section 4 of 6"; every Contents Tab aria-expanded=true (#607) | a click that only navigates; a pinned panel that keeps the overlay tree
+   K2 keyboard | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=true, pager "Section 5 of 6", focus on the current Contents row inside "Day-one setup" | mouse-only markers; a marker that pins without navigating
    G1 pager unit | Contents closed on part 4 | pager group "Document sections"; Previous → "Section 3 of 6" with tab label "Answer and talk", marker 3 current, count "3/6" (not "Section 1 of 2"); Previous ×2 → "Section 1 of 6", Previous disabled; Next ×5 → "Section 6 of 6", Next disabled | today's per-View pager
    X1 Explore accepts the rail | Answer map (Explore) with Contents closed | .viewer-diagram-canvas left = rail right | a canvas under the rail
    X2 canvas drag | real mouse down on the canvas, drag onto marker 2, hold 600ms, release | overlay never shown | opening from drags that pass over the rail
@@ -365,6 +366,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    B1 Backstage native | atlas() through nativeViewer.js in a 1200x800 shadow host | rail visible inside the host with the six named markers; hover opens the overlay beside the rail without moving the page; Escape closes; the overlay's "Pin Contents open" pins (toggle expanded, rail hidden); Next → "Section 3 of 6" | fixing only the standalone viewer
    W1 Workbench reader | atlas() pasted into workbench.html | after closing Contents: rail with six named markers left of the Workbench tool rail; hover opens the overlay; pager "Section 1 of 6", Next → "Section 2 of 6" with marker 2 current | fixing only the viewer bundle
    N1 phone hides the rail | atlas() at 390x844 (read-only mobile) | .reader-rail hidden; #section-overview left < 44; Next → "Section 3 of 6"; widening to 1440 shows the rail with its single current marker = the pager's part | a rail covering phone content
+   M1 many parts scroll | 30 one-section prose Tabs at 1440x900, Tab link #t=part-28, Contents closed | rail bottom = 900; .reader-rail-list scrollHeight > clientHeight; marker 28 is current and its box lies inside the list's box; .reader-rail-count "28/30" inside the rail | a rail that overflows the window or hides the current marker off-list
    C1 current marker contrast | every theme in the picker at 1440, Contents closed | current marker text vs its own filled background >= 4.5:1 | accent-on-accent or dark-on-dark text in the dark skins */
 function atlas(skin='pastel'){
   const base=story(skin).page.sections[0].tabs[0].sections[0],section=(id,heading)=>({...structuredClone(base),id,heading});
@@ -393,7 +395,7 @@ async function expectHoverOverlay(page,root,index){
   const nav=root.locator('.reader-navigation'),side=root.locator('.reader-contents'),rail=await railOf(root).boundingBox(),before=await root.locator('#section-overview').boundingBox();
   await takeLog(nav);await marksOf(root).nth(index).hover();await expect(side).toBeVisible();await expect(side).toHaveClass(/reader-contents-overlay/);
   const log=await takeLog(nav),shown=log.find(entry=>entry.type==='shown'),enter=log.filter(entry=>entry.type==='enter' && entry.t<=shown.t).pop();
-  expect(enter,'pointerenter before the overlay').toBeTruthy();expect(shown.t-enter.t).toBeGreaterThanOrEqual(120);expect(shown.t-enter.t).toBeLessThanOrEqual(1500);
+  expect(enter,'pointerenter before the overlay').toBeTruthy();expect(shown.t-enter.t).toBeGreaterThanOrEqual(150);expect(shown.t-enter.t).toBeLessThanOrEqual(700);
   const box=await side.boundingBox();expect(Math.abs(box.x-(rail.x+rail.width))).toBeLessThanOrEqual(1);
   expect(await root.locator('#section-overview').boundingBox()).toEqual(before);await expect(root.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
 }
@@ -426,6 +428,12 @@ test('#622 closed Contents shows a numbered rail, a hover overlay that pins on c
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(Array(6).fill('true'));
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,3);
+  await root.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
+  for(let i=0;i<4;i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(4)).toBeFocused();await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(label).toHaveText('Section 5 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
+  await expect(root.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab',{hasText:'Day-one setup'})}).locator('[aria-current="page"]:focus')).toHaveCount(1);
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(label).toHaveText('Section 6 of 6');await root.getByRole('button',{name:'Previous section',exact:true}).click();await root.getByRole('button',{name:'Previous section',exact:true}).click();await expect(label).toHaveText('Section 4 of 6');
+  await closeContents(root);await expectCurrentPart(root,3);
   const previous=pager.getByRole('button',{name:'Previous section',exact:true}),next=pager.getByRole('button',{name:'Next section',exact:true});
   await previous.click();await expect(label).toHaveText('Section 3 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Answer and talk');await expect(root.locator('#section-answer')).toBeVisible();await expectCurrentPart(root,2);
   await previous.click();await expect(label).toHaveText('Section 2 of 6');await previous.click();await expect(label).toHaveText('Section 1 of 6');await expect(previous).toBeDisabled();await expectCurrentPart(root,0);
@@ -441,6 +449,19 @@ test('#622 closed Contents shows a numbered rail, a hover overlay that pins on c
   const linking={page:{title:'Rail linking document',documentLinks:{id:'rail-linking',siteBaseUrl:server.origin+'/rail-linking.html'},sections:[{id:'source',heading:'Source',diagram:{nodes:{a:{title:'Setup link',handoff:{spec:'contents-rail',section:'setup',siteBaseUrl:server.origin+'/contents-rail.html'}}},rows:[['a']]}}]}};
   await openRaw(page,server,linking,'rail-linking');const opened=page.context().waitForEvent('page');await page.getByRole('link',{name:'Open Setup link diagram (new tab)',exact:true}).click();const linked=await opened;
   const target=linked.locator('#docview');await expect(target.locator('.reader-tab-label')).toHaveText('Day-one setup');await expect(target.locator('.reader-page-label')).toHaveText('Section 5 of 6');await linked.close();
+});
+
+test('#622 a long document scrolls its rail and keeps the current marker in view',async({page,server})=>{
+  // Prose-only parts: thirty stepped diagrams make the page too slow to load.
+  await page.setViewportSize({width:1440,height:900});
+  const raw={page:{title:'Thirty parts',sections:[{tabs:Array.from({length:30},(_,i)=>({label:'Part '+(i+1),sections:[{id:'part-'+(i+1),heading:'Part '+(i+1)+' section',text:'Part '+(i+1)+' prose.'}]}))}]}};
+  const root=await openRaw(page,server,raw,'contents-rail-long');await page.goto(server.origin+'/contents-rail-long.html#t=part-28');await page.reload();
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 28 of 30');await closeContents(root);
+  const rail=await railOf(root).boundingBox();expect(rail.y+rail.height).toBe(900);await expect(marksOf(root)).toHaveCount(30);
+  const list=root.locator('.reader-rail-list');expect(await list.evaluate(el=>el.scrollHeight>el.clientHeight)).toBe(true);
+  await expect(marksOf(root).nth(27)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-rail-count')).toHaveText('28/30');
+  const box=await list.boundingBox(),mark=await marksOf(root).nth(27).boundingBox(),count=await root.locator('.reader-rail-count').boundingBox();
+  expect(mark.y).toBeGreaterThanOrEqual(box.y);expect(mark.y+mark.height).toBeLessThanOrEqual(box.y+box.height);expect(count.y+count.height).toBeLessThanOrEqual(rail.y+rail.height);
 });
 
 test('#622 Backstage native reader shows the rail, hover overlay, pin and part pager',async({page,server})=>{

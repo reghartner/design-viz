@@ -1449,7 +1449,7 @@ function initWorkbenchBuilder(opts){
         return {raw:raw,topologyContext:nextContext};
       },
       publish:function(text,prepared){
-        return session.accept({text:text},{topologyContext:prepared.topologyContext,exactSource:true,
+        return session.accept({text:text},{topologyContext:prepared.topologyContext,lockGuard:'same-document',
           beforePublish:function(){beforeImported('file');},afterRender:function(){afterImported(prepared.raw);}});
       }
     },current);

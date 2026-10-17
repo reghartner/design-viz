@@ -233,8 +233,11 @@ right-click menu locks or unlocks its position; selected-node menus name the bul
 actions explicitly. Locked members stay selected and fixed during a mixed drag,
 with a local lock cue instead of an Inspector error. Locking moves no other node,
 and a later edit that would shift a locked node pins it where it was instead,
-except text you type in the JSON tab, an imported file, or an accepted Agent
-proposal, which are kept exactly as written.
+except text you type in the JSON tab or an accepted Agent proposal, which are
+kept exactly as written. Importing a file pins locked nodes too when the file is
+the same document: the same diagram ID, or the same title when neither has an
+ID. Undo removes the import and the pins together. A different document is
+imported exactly as written.
 
 In Explore, **Panels → Placement for Section notes** chooses **Floating** or
 **On canvas** independently of other panels and step controls. Notes retain a

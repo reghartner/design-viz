@@ -113,7 +113,7 @@ test('sync workflow runs trusted code and proposes only the bundled catalog on a
  * bumped | non-PR actions @v5/@v9, PR at another 40-hex SHA | accepts | an exact-version list
  * SHA | each non-PR action alone at a 40-hex SHA | accepts | allowing only @vN for non-PR actions
  * major | each non-PR action alone @v10 | accepts | a single-digit @vN pattern
- * order | two adjacent actions swapped | rejects | comparing only the set of names
+ * order | every pair of distinct-named positions swapped | rejects | comparing only the set of names, or one ordering relationship
  * missing | each action dropped in turn | rejects | checking only that listed actions are pinned
  * extra | a third-party action inserted | rejects | prefix-matching the expected names
  * renamed | each action replaced by a same-ref lookalike name | rejects | checking refs but not names
@@ -132,7 +132,8 @@ test('catalog-sync action pinning allows forks to bump versions but never to unp
   const at=(i,use)=>bumped.map((u,j)=>j===i?use:u);
   assertPinnedActions(bumped);
   for(let i=0;i<4;i++){assertPinnedActions(at(i,names[i]+'@'+sha));assertPinnedActions(at(i,names[i]+'@v10'));}
-  const bad={order:[bumped[1],bumped[0],...bumped.slice(2)],extra:[...bumped.slice(0,4),'someone/else@v1',bumped[4]],prTag:at(4,names[4]+'@v7')};
+  const bad={extra:[...bumped.slice(0,4),'someone/else@v1',bumped[4]],prTag:at(4,names[4]+'@v7')};
+  names.forEach((_,i)=>names.forEach((__,j)=>{if(i<j && names[i]!==names[j]){const swapped=[...bumped];[swapped[i],swapped[j]]=[swapped[j],swapped[i]];bad['order'+i+j]=swapped;}}));
   names.forEach((name,i)=>Object.assign(bad,{
     ['missing'+i]:bumped.filter((_,j)=>j!==i),
     ['renamed'+i]:at(i,name+'-fork@'+bumped[i].split('@')[1]),

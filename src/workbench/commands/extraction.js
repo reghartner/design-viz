@@ -244,7 +244,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     var findings=builderValidateSource(JSON.parse(result.text),validateSource),childFindings=builderValidateSource(childSpec);
     if(findings.errors.length || childFindings.errors.length)return {error:'Extraction could not preserve valid references: '+findings.errors.concat(childFindings.errors).join('\n')};
     var range=jsonLocate(result.text,got.path.concat(['nodes',domainId]));
-    return {text:result.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,
-      detailSection:mode==='local'?records.length:undefined,sectionId:sectionId,childSpec:childSpec,report:report};
+    return builderKeepLockedPins(text,raw,sectionIdx,{text:result.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,
+      detailSection:mode==='local'?records.length:undefined,sectionId:sectionId,childSpec:childSpec,report:report});
   }catch(error){return {error:'Could not extract this selection: '+error.message};}
 }

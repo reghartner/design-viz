@@ -175,6 +175,6 @@ function planPasteBuilderClipboard(text,raw,data,destination,validateSource){
     }
     var errors = builderValidateSource(next,validateSource).errors;
     if(errors.length)throw new Error('Paste was not applied: '+errors[0]);
-    return {text:JSON.stringify(next,null,2),target:target};
+    return builderKeepLockedPins(text,raw,destination.section,{text:JSON.stringify(next,null,2),target:target});
   } catch(ex){return {error:ex.message};}
 }

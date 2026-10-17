@@ -6,8 +6,9 @@ function builderLockedNodeIds(d,ids){
   return Object.keys(nodes).filter(function(id){return (!wanted || wanted.has(id)) && nodes[id] && nodes[id].locked===true;});
 }
 function builderNodePositionLocked(d,id){return !!(d && d.nodes && d.nodes[id] && d.nodes[id].locked===true);}
-/* A pin is an absolute float. Lifting raw-authored locked row nodes here makes
-   old/manual JSON obey the same invariant as the Inspect and object-menu controls. */
+/* A lock keeps a row node in its slot, so locking moves no neighbour. A plan
+   that would move a locked row node first lifts it here into an absolute
+   noSpread float at its current position; old locks already are floats. */
 function builderFreezeLockedPositions(d,positions,onlyIds){
   var locked=builderLockedNodeIds(d,onlyIds),wanted=new Set(locked);if(!locked.length)return false;
   var before=JSON.stringify([d.rows,d.floats]);

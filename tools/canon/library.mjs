@@ -43,7 +43,7 @@ async function libraryFromEntries(entries,output){
     const {description,tags}=entry.spec.page;
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
       ...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
-      canon:entry.spec.page.canon,counts,services,exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
+      canon:entry.spec.page.canon,counts,services,boundServices:C.serviceSummaries(rendered),exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
   }))};
 }
 export async function buildLibrary(registryPath,output='workbench/diagrams.json'){return libraryFromEntries((await registry(registryPath)).entries,await physicalPath(output));}

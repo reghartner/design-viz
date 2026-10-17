@@ -1709,3 +1709,16 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 
 /* Let the document title yield before desktop project actions overflow. */
 @media(min-width:1181px){.workspace-canvas .workspace-tools{min-width:max-content;}}
+
+/* Backstage services stay on one line; the full list uses the browser top layer. */
+.canon-library-services{display:flex;align-items:center;gap:6px;min-width:0;position:relative;font:11px/1.4 'IBM Plex Sans',sans-serif}
+.canon-library-services-label{flex:none;border:0;background:none;color:#77708d;padding:5px 0;font:inherit;cursor:pointer}
+.canon-library-services-strip{display:flex;gap:5px;overflow:hidden;min-width:0;flex:1;padding:2px 0}
+.canon-library-services.has-overflow::after{content:'';position:absolute;right:0;top:0;bottom:0;width:28px;background:linear-gradient(90deg,#ffffff00,#eae5f4);pointer-events:none}
+.canon-library-service{flex:none;white-space:nowrap;font:11px/1.4 'IBM Plex Sans',sans-serif;border:1px solid #dfd9ec;border-radius:5px;background:#f6f3fa;color:#6b598b;padding:3px 7px;cursor:pointer}
+.canon-library-service:hover,.canon-library-service[aria-pressed=true]{background:#e9e1f4;border-color:#b8a5d2;color:#523b76}
+.canon-library-services-popup{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height: min(360px,calc(100vh - 24px));overflow:auto;padding:14px;background:#fff;border:1px solid #dcd5e8;border-radius:8px;box-shadow:0 10px 30px #35244b30;color:#675b7d}
+.canon-library-services-popup:popover-open{display:flex;flex-wrap:wrap;gap:7px}
+.canon-library-services-popup>strong{flex-basis:100%;font:600 12px/1.4 'IBM Plex Sans',sans-serif;margin-bottom:3px}
+.canon-library-services-popup .canon-library-service{white-space:normal;overflow-wrap:anywhere;max-width:100%;text-align:left}
+.canon-library-list .canon-library-metadata{width:280px}

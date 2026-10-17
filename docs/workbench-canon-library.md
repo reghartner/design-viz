@@ -11,6 +11,18 @@ a reader restores its selected diagram from the published index and its selected
 Returning from a reader keeps the search, filters, and Grid/List choice for the
 current page session.
 
+Cards with Backstage-tagged nodes show **Services:** and one row of service
+chips in both Grid and List. Services are ranked by connected-edge count, highest
+first; ties use the label, then the full catalog reference. A right fade appears
+only when the complete list does not fit. Hover over the row or focus its
+**Services:** button to reveal every service; Escape dismisses the list. Clicking
+any chip sets the Service filter to that exact Backstage identity, preserving the
+other filters. Equal service labels include their catalog references to distinguish
+them. Nodes without a `binding.entityRef` never appear in this row; their titles
+remain keyword-searchable. The Service menu uses exact catalog identities when
+service summaries are available; older indexes retain node-title filters. A
+legacy title option that duplicates a catalog label is marked **(node title)**.
+
 **Recently viewed** keeps the last six successful published reads in this browser,
 scoped to the site's library URL. It deduplicates visits, removes diagrams no
 longer published, and follows the same active filters as the collection. Failed
@@ -106,12 +118,25 @@ flattened source files are written. The final image needs no Node process,
 API, browser GitHub token or live Backstage connection. The read-only library,
 direct links, Back/Forward and explicit **Edit in Workbench** behavior are unchanged.
 
+Service summaries are calculated from the resolved diagrams, including imported
+topology. They deduplicate by `binding.entityRef`; the label uses `binding.label`,
+then node title, then the reference. When repeated nodes use different labels,
+the first section and lexically first node ID supply the label. Each edge counts
+once for each service incident to it within its section: a self-loop or an edge
+between two nodes bound to the same service counts once. Counts add across
+sections. Browse uses only these compact summaries and never fetches a diagram
+or provider to populate the row or filter. Older v2/v3 indexes without summaries
+keep title search/filtering and show no service row; embedded v1 specs can derive
+the summaries locally. Invalid optional records are ignored without preventing
+browsing.
+
 `diagrams.json` is generated and gitignored, not another hand-maintained
 membership file. Its version 3 entries contain `id`, `title`, the optional
 author-owned `description` and `tags` (copied from the spec's `page.description`
 and `page.tags` when present), `canon` membership,
 `counts` (resolved nodes, steps, panels), `services` (the distinct resolved node
-titles, used by **Search diagrams**), a relative authored `specUrl`, and a
+titles, used by **Search diagrams**), optional `boundServices` records
+(`entityRef`, `label`, `edgeCount`), a relative authored `specUrl`, and a
 `revision` SHA256 of the membership-adjusted authored JSON. They contain no authored diagram
 rows, steps, panel state, or embedded specs. An optional `preview` contains only
 a same-origin PNG path, source revision and fixed image dimensions. For example:

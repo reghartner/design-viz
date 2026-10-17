@@ -771,7 +771,10 @@ async function explorationFixture(server){
     const folder=path.join(fixture.root,'diagrams',id);await mkdir(folder,{recursive:true});await writeFile(path.join(folder,id+'.spec.json'),JSON.stringify(spec));await writeFile(path.join(folder,id+'.html'),'<!doctype html>');fixture.specs[id]=spec;
   }
   await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:definitions.map(([id,,,,owner])=>({folder:'diagrams/'+id,owner}))}));
-  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json'),thumbnails:true});return fixture;
+  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json'),thumbnails:true});
+  // This fixture preserves compatibility with indexes published before service summaries.
+  fixture.index.diagrams.forEach(entry=>delete entry.boundServices);
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(fixture.index));return fixture;
 }
 const mainLibrary=page=>page.locator('#welcome-library-grid');
 const recentIDs=page=>page.locator('#welcome-library-recent-items a').evaluateAll(links=>links.map(link=>new URL(link.href).searchParams.get('diagram')));
@@ -842,4 +845,93 @@ test('Browse handles malformed previews and corrupt or unavailable history stora
   await page.addInitScript(()=>{const get=Storage.prototype.getItem,set=Storage.prototype.setItem,remove=Storage.prototype.removeItem;Storage.prototype.getItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return get.call(this,key);};Storage.prototype.setItem=function(key,value){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return set.call(this,key,value);};Storage.prototype.removeItem=function(key){if(key.startsWith('flowview-library-recent'))throw Error('blocked');return remove.call(this,key);};});
   await page.reload();await expect(mainLibrary(page).locator('article')).toHaveCount(8);await mainLibrary(page).locator('article[data-id="first"] a').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();expect(await recentIDs(page)).toEqual(['first']);
   await page.getByRole('button',{name:'Clear history',exact:true}).click();await expect(page.locator('#welcome-library-recent')).toBeHidden();
+});
+
+async function serviceRowsFixture(server){
+  const fixture=await publish(server),first=fixture.specs.first,second=fixture.specs.second;
+  first.page.title='Order to doorstep';first.page.description='Checkout coordinates payment, inventory, fulfillment and delivery.';first.page.tags=['commerce'];
+  const d=first.page.blocks[0].diagram;d.nodes.a.title='Checkout';d.nodes.a.binding={entityRef:'component:default/checkout',label:'Checkout'};
+  d.nodes.b.title='Payment API';d.nodes.b.binding={entityRef:'component:default/payment',label:'Payment API'};
+  d.nodes.c.title='Unbound warehouse';
+  for(const [id,label] of [['inventory','Inventory'],['fulfillment','Fulfillment'],['shipping','Shipping'],['notifications','Notifications'],['analytics','Analytics'],['fraud','Fraud review']])d.nodes[id]={title:label,binding:{entityRef:'component:default/'+id,label}};
+  d.rows=[['a'],['b','c','inventory','fulfillment'],['shipping','notifications','analytics','fraud']];
+  d.edges=Object.keys(d.nodes).filter(id=>id!=='a').map(to=>({from:'a',to,kind:'https'}));
+  second.page.title='Regional payments';second.page.tags=['commerce'];second.page.blocks[0].diagram.nodes.a.binding={entityRef:'component:europe/payment',label:'Payment API'};
+  const third=structuredClone(fixture.specs.second);third.page.title='An untagged diagram';delete third.page.blocks[0].diagram.nodes.a.binding;fixture.specs.third=third;
+  for(const [id,spec] of Object.entries(fixture.specs)){const folder=path.join(fixture.root,'diagrams',id);await mkdir(folder,{recursive:true});await writeFile(path.join(folder,id+'.spec.json'),JSON.stringify(spec));}
+  await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:Object.keys(fixture.specs).map(id=>({folder:'diagrams/'+id,owner:'group:default/commerce'}))}));
+  fixture.index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json'),thumbnails:true});return fixture;
+}
+
+test('Backstage service rows rank and clip one line, reveal all on hover/focus and filter exact identities without source reads',async({page,server},testInfo)=>{
+  test.setTimeout(90000);
+  const fixture=await serviceRowsFixture(server),requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.setViewportSize({width:1440,height:1000});await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const first=mainLibrary(page).locator('[data-id="first"]'),second=mainLibrary(page).locator('[data-id="second"]'),third=mainLibrary(page).locator('[data-id="third"]');
+  const row=first.locator('.canon-library-services'),strip=row.locator('.canon-library-services-strip'),popup=row.locator('.canon-library-services-popup'),trigger=row.locator('.canon-library-services-label');
+  await expect(third.locator('.canon-library-services')).toHaveCount(0);await expect(row).toHaveClass(/has-overflow/);
+  await expect(strip.locator('button').first()).toHaveText('Checkout');
+  await expect(page.getByLabel('Service',{exact:true}).locator('option').filter({hasText:/^Checkout$/})).toHaveCount(1);
+  await expect(page.getByLabel('Service',{exact:true}).locator('option[value="Checkout"],option[value="Unbound warehouse"]')).toHaveCount(0);
+  const geometry=await strip.locator('button').evaluateAll(buttons=>buttons.map(button=>({top:button.offsetTop,tabIndex:button.tabIndex,hidden:button.getAttribute('aria-hidden'),visible:getComputedStyle(button).visibility})));
+  expect(new Set(geometry.map(button=>button.top)).size).toBe(1);expect(geometry.some(button=>button.hidden==='true' && button.tabIndex===-1 && button.visible==='hidden')).toBe(true);
+  await expect(popup).toBeHidden();
+  if(process.env.FLOWVIEW_SERVICE_EVIDENCE){await mkdir(process.env.FLOWVIEW_SERVICE_EVIDENCE,{recursive:true});await page.screenshot({path:path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'services-collapsed-1440.png')});await writeFile(path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'launch-url.txt'),fixture.url+'\n');await cp(fixture.root,path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'company'),{recursive:true});}
+  await trigger.hover();await expect(popup).toBeVisible();await expect(popup.locator('button')).toHaveCount(8);
+  const hidden=popup.locator('[data-service="component:default/shipping"]');await hidden.hover();await expect(popup).toBeVisible();
+  if(process.env.FLOWVIEW_SERVICE_EVIDENCE)await page.screenshot({path:path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'services-expanded-1440.png')});
+  await hidden.click();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/shipping');await expect(first).toBeVisible();await expect(second).toBeHidden();await expect(page).toHaveURL(fixture.url);
+  // Selecting the already selected chip keeps the filter set.
+  await trigger.click();await expect(popup).toBeVisible();await hidden.click();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/shipping');
+  await page.locator('#welcome-library-clear').click();await page.getByLabel('Topic',{exact:true}).selectOption('commerce');
+  await trigger.focus();await expect(popup).toBeVisible();await page.keyboard.press('Escape');await expect(popup).toBeHidden();await expect(trigger).toBeFocused();
+  await page.keyboard.press('Tab');await expect(popup).toBeHidden(); // Escape does not immediately reopen through focus.
+  await page.getByLabel('Service',{exact:true}).focus();await trigger.focus();await expect(popup).toBeVisible();
+  const precise=popup.locator('[data-service="component:default/payment"]');
+  for(let i=0;i<20 && !await precise.evaluate(el=>el===document.activeElement);i++)await page.keyboard.press('Tab');
+  await expect(precise).toBeFocused();await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/payment');await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');await expect(first).toBeVisible();await expect(second).toBeHidden();
+  await page.locator('#welcome-library-clear').click();await page.setViewportSize({width:1140,height:900});
+  await expect.poll(()=>strip.locator('button[tabindex="0"]').count()).toBeLessThan(geometry.filter(button=>button.tabIndex===0).length);
+  await page.setViewportSize({width:1280,height:900});
+  if(process.env.FLOWVIEW_SERVICE_EVIDENCE){await page.mouse.move(0,0);await page.screenshot({path:path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'services-collapsed-1280.png')});}
+  await page.getByRole('button',{name:'List',exact:true}).click();
+  await expect(mainLibrary(page)).toHaveClass(/canon-library-list/);await expect(row).toHaveClass(/has-overflow/);
+  await expect(row).toHaveClass(/has-overflow/);await trigger.hover();await expect(popup).toBeVisible();
+  if(process.env.FLOWVIEW_SERVICE_EVIDENCE)await page.screenshot({path:path.join(process.env.FLOWVIEW_SERVICE_EVIDENCE,'services-expanded-list-1280.png')});
+  await hidden.click();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/shipping');await expect(second).toBeHidden();
+  await page.locator('#welcome-library-clear').click();await page.getByRole('button',{name:'Grid',exact:true}).click();
+  // Filter from hidden back to visible, then resize the desktop grid again.
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('regional');await expect(first).toBeHidden();await page.getByRole('searchbox',{name:'Search diagrams'}).fill('');await expect(row).toHaveClass(/has-overflow/);
+  await page.setViewportSize({width:1800,height:1000});
+  await expect(second.locator('.canon-library-services')).not.toHaveClass(/has-overflow/);await expect(second.locator('.canon-library-services-strip button')).toHaveAttribute('tabindex','0');
+  await second.locator('.canon-library-services-strip button').click();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:europe/payment');await expect(first).toBeHidden();await expect(second).toBeVisible();
+  await page.locator('#welcome-library-clear').click();await page.getByRole('searchbox',{name:'Search diagrams'}).fill('unbound warehouse');await expect(first).toBeVisible();
+  expect(requests).toEqual([]);await expect(mainLibrary(page).locator('a button,button a')).toHaveCount(0);
+  await testInfo.attach('services-final',{body:await page.screenshot(),contentType:'image/png'});
+  await page.locator('#welcome-library-clear').click();await trigger.hover();await expect(popup).toBeVisible();
+  await first.locator('.canon-library-preview').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(popup).toBeHidden();
+  await page.goBack();await expect(first).toBeVisible();await expect(popup).toBeHidden();await trigger.hover();await expect(popup).toBeVisible();
+  await popup.locator('[data-service="component:default/shipping"]').click();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/shipping');
+  expect(requests).toEqual([fixture.specURL('first')]);
+
+});
+
+test('older service title filters and malformed optional summaries remain usable without loading specs',async({page,server})=>{
+  const fixture=await publish(server),requests=[];
+  delete fixture.index.diagrams[0].boundServices;
+  fixture.index.diagrams[0].services=['Legacy service','Real API','entity:component:default/api'];
+  fixture.index.diagrams[1].boundServices=[null,{entityRef:'invalid',label:'Invalid',edgeCount:4},{entityRef:'component:default/api',label:'Real API',edgeCount:1}];
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(fixture.index));
+  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const first=mainLibrary(page).locator('[data-id="first"]'),second=mainLibrary(page).locator('[data-id="second"]');
+  await expect(first.locator('.canon-library-services')).toHaveCount(0);await expect(second.locator('.canon-library-services-strip button')).toHaveText(['Real API']);
+  await expect(page.getByLabel('Service',{exact:true}).locator('option[value="Real API"]')).toHaveText('Real API (node title)');
+  await expect(page.getByLabel('Service',{exact:true}).locator('option').filter({hasText:/^Real API$/})).toHaveCount(1);
+  await page.getByLabel('Service',{exact:true}).selectOption('Legacy service');await expect(first).toBeVisible();await expect(second).toBeHidden();
+  await page.getByLabel('Service',{exact:true}).selectOption('entity:component:default/api');await expect(first).toBeVisible();await expect(second).toBeHidden();
+  await page.locator('#welcome-library-clear').click();await second.locator('.canon-library-services-strip button').click();
+  await expect(first).toBeHidden();await expect(second).toBeVisible();await expect(page.getByLabel('Service',{exact:true})).toHaveValue('entity:entity:component:default/api');
+  await expect(page).toHaveURL(fixture.url);expect(requests).toEqual([]);
 });

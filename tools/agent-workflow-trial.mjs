@@ -34,18 +34,22 @@ class Claude {
     this.events=[];this.results=[];this.buffer='';this.exited=false;this.session=session;this.pending=Promise.resolve();
     const folder=session.sessionPath, relative='./'+path.basename(folder);
     const allowed=['Read(./**)','Glob(./**)','Grep(./**)','Monitor'];
-    for(const name of ['candidate.spec.json','candidate.ledger.md','answer.txt','progress.txt','baseline.json']) {
+    // Registered requests seed per-request copies: candidate-<request id>.spec.json and .ledger.md.
+    for(const name of ['candidate*.spec.json','candidate*.ledger.md','candidate*.visibility.json','answer.txt','progress.txt','baseline.json']) {
       allowed.push('Write('+relative+'/'+name+')','Edit('+relative+'/'+name+')');
     }
     for(const location of [folder,relative,relative.slice(2)])for(const quote of ['', '"', "'"])allowed.push(
       'Bash(python3 '+quote+location+'/folder-agent.py'+quote+' *)',
       'Bash(node '+quote+location+'/authoring/tools/validate.js'+quote+' *)',
-      'Bash(python3 '+quote+location+'/authoring/.claude/skills/hld-to-page/scripts/spec_walk.py'+quote+' *)');
+      'Bash(python3 '+quote+location+'/authoring/.claude/skills/hld-to-page/scripts/spec_walk.py'+quote+' *)',
+      'Bash(python3 '+quote+location+'/authoring/.claude/skills/hld-to-page/scripts/pilot_capture.py'+quote+' *)',
+      'Bash(python3 '+quote+location+'/authoring/tools/authoring-packet.py'+quote+' *)',
+      'Bash(node '+quote+location+'/authoring/tools/visibility-check.cjs'+quote+' *)');
     allowed.push('Bash(python3 --version)','Bash(node --version)');
     this.process=spawn('claude',['--model',model,'--safe-mode','--restricted','--no-chrome',
       '--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--tools','Read,Write,Edit,Glob,Grep,Bash,Monitor',
       '--allowedTools',...allowed,'--permission-mode','dontAsk','--permission-prompts','none',
-      '--append-system-prompt','Keep trial responses concise. Use Read/Write/Edit for files. The permitted Bash commands are the local folder-agent.py helper, bundled validate.js, bundled spec_walk.py, and Python/Node version checks. Run these commands individually with literal paths, without shell variables or compound commands. Other Bash commands are not pre-approved. Do not work around a permission denial.',
+      '--append-system-prompt','Keep trial responses concise. Use Read/Write/Edit for files. The permitted Bash commands are the local folder-agent.py helper, bundled validate.js, spec_walk.py, pilot_capture.py, authoring-packet.py and visibility-check.cjs, and Python/Node version checks. Write authoring packets inside the working directory (--out ./packet.md) so you can read them. Run these commands individually with literal paths, without shell variables or compound commands. Other Bash commands are not pre-approved. Do not work around a permission denial.',
       '--no-session-persistence','--print','--verbose','--input-format','stream-json','--output-format','stream-json'],
       {cwd:session.projectPath,stdio:['pipe','pipe','pipe']});
     this.stderr='';this.process.stderr.on('data',data=>this.stderr+=data);
@@ -127,10 +131,10 @@ async function connect(name,workflow) {
   const agent=new Claude(session);agents.push(agent);session.agent=agent;
   return session;
 }
-async function openAgent(page,mode='external') {
+// The Agent window has no workflow tabs; a connected window shows only its method's controls.
+async function openAgent(page) {
   if (!await page.locator('#editor-agent').isVisible()) await page.locator('#editor-tab-agent').click();
   if (await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-close-guide').click();
-  await page.locator('#folder-agent-mode-'+mode).click();
 }
 async function closeAgent(page) {
   if (await page.locator('#editor-agent').isVisible()) await page.locator('#workspace-window-agent .workspace-window-close').click();
@@ -225,7 +229,12 @@ try {
   const first=await preview(external);
   await page.locator('#agent-update-close').click();
   for(let index=0;index<40;index++)human=await edit(external,doc=>doc.page.title='Live trial '+index);
+  // The browser re-merges the proposal on a later 250 ms poll than the state.json publication;
+  // a merge landing while the preview is open asks for a fresh review, so reopen it once.
+  await delay(2000);
   await page.locator('#agent-update-open').click();
+  await delay(1000);
+  if(await page.locator('#agent-update-review-refresh').isVisible()){await page.locator('#agent-update-close').click();await page.locator('#agent-update-open').click();}
   await expect(page.locator('#agent-update-note')).toContainText('separate changes');
   await expect(page.locator('#agent-update-view')).toContainText('Front door camera');
   await expect(page.locator('#agent-update-view')).toContainText('Delivery API');
@@ -284,12 +293,13 @@ try {
   assert.equal(await page.locator('#src').inputValue(),beforeCancel);
   await passed('real native begin timeout withdraws a late disk publication and retry succeeds');
 
-  await openAgent(page,'embedded');
-  await expect(page.locator('#folder-agent-send')).toBeDisabled();
+  await openAgent(page);
+  await expect(page.locator('#folder-agent-reestablish')).toBeVisible();
+  await expect(page.locator('#folder-agent-send')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();
   assert.equal((await external.read('session.json')).workflow,'external');
   assert(!agent.events.some(event=>event.message?.content?.some(block=>block.type==='tool_use' && block.name==='Monitor')));
   await closeAgent(page);
-  await passed('choosing In workbench does not change the external connection or start Monitor');
+  await passed('the copy & paste connection shows no In workbench composer and never starts Monitor');
 
   const embedded=await connect('monitor','embedded'),monitor=embedded.agent,mp=embedded.page;
   await monitor.turn(embedded.instructions+'\n\nConnect and keep Monitor active. No diagram request yet. All work stays inside this temporary trial project.');

@@ -31,12 +31,12 @@
           },
           "step": {
            "title": "Step patch",
-           "sub": "steps[i].panels",
+           "sub": "panels.<id>",
            "icon": "terminal"
           },
           "vis": {
            "title": "Visibility",
-           "sub": "step-level map",
+           "sub": "step map",
            "icon": "gear"
           },
           "clock": {
@@ -46,12 +46,12 @@
           },
           "path": {
            "title": "Path",
-           "sub": "this path only",
+           "sub": "one path",
            "icon": "router"
           },
           "fold": {
            "title": "Fold",
-           "sub": "per panel type",
+           "sub": "per type",
            "icon": "chip",
            "tint": "data"
           },
@@ -62,7 +62,7 @@
           },
           "render": {
            "title": "Renderer",
-           "sub": "fixed declaration",
+           "sub": "fixed input",
            "icon": "monitor",
            "tint": "data"
           }
@@ -546,13 +546,35 @@
            }
           },
           {
+           "id": "t-merge-back",
+           "edges": [
+            "fold->player"
+           ],
+           "time": "+1h",
+           "text": "**No funnel patch: the carried counts return.** `kept` shows 870 again; the one-step 500 is gone.",
+           "panels": {
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.funnel",
+                "value": "(no patch)",
+                "rule": "kept back to 870"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
            "id": "t-delete",
            "edges": [
             "step->path",
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Per-key delete.** In a merge map, `null` for one key forgets that key; `counts: null` would forget every key.",
+           "text": "**Per-key delete.** In a merge map, `null` for one key forgets that key; `raw` and `clean` stay.",
            "panels": {
             "funnel": {
              "counts": {
@@ -567,6 +589,32 @@
                 "key": "panels.funnel",
                 "value": "{\"counts\": {\"kept\": null}}",
                 "rule": "kept forgotten; raw and clean stay"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "t-clear",
+           "edges": [
+            "step->path",
+            "path->fold"
+           ],
+           "time": "+1h",
+           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (A table's `rows: []` clears by replacement; a device-app field `null` restores its declared value: Special fold rules tab.)",
+           "panels": {
+            "funnel": {
+             "counts": null
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.funnel",
+                "value": "{\"counts\": null}",
+                "rule": "every key forgotten"
                }
               }
              ]
@@ -607,10 +655,12 @@
            "panelVisibility": {
             "funnel": false
            },
-           "text": "**Visibility is a step-level map.** `panelVisibility` hides the funnel. Its content keeps folding while hidden: this step also sets `kept` to 860.",
+           "text": "**Visibility is a step-level map.** `panelVisibility` hides the funnel. Its content keeps folding while hidden: this step also writes all three counts.",
            "panels": {
             "funnel": {
              "counts": {
+              "raw": 1000,
+              "clean": 920,
               "kept": 860
              }
             },
@@ -628,7 +678,7 @@
                "id": "b",
                "cells": {
                 "key": "panels.funnel",
-                "value": "{\"counts\": {\"kept\": 860}}",
+                "value": "{\"counts\": {\"raw\": 1000, \"clean\": 920, \"kept\": 860}}",
                 "rule": "folds while hidden"
                }
               }
@@ -649,7 +699,7 @@
            "panelVisibility": {
             "funnel": true
            },
-           "text": "**A few types let a step override a declared value.** The radar declares `threshold: 80`; this step writes 50 and the arc moves. The funnel reappears showing 860. The full list of such keys is on the Panel types tab; each is built into its own type.",
+           "text": "**A few types let a step override a declared value.** The radar declares `threshold: 80`; this step writes 50 and the arc moves. The funnel reappears showing the counts written while it was hidden. The full list of such keys is on the Panel types tab; each is built into its own type.",
            "panels": {
             "radar": {
              "threshold": 50
@@ -747,7 +797,9 @@
             "t-null",
             "t-merge",
             "t-merge-once",
+            "t-merge-back",
             "t-delete",
+            "t-clear",
             "t-time",
             "t-hide",
             "t-shaped",
@@ -774,7 +826,7 @@
          "graphFrame": {
           "x": 18,
           "y": 15,
-          "w": 733,
+          "w": 745,
           "h": 379
          },
          "sectionLayout": {
@@ -846,7 +898,7 @@
       "sections": [
        {
         "id": "special",
-        "heading": "Special fold rules in custom panel types",
+        "heading": "Special panel fold rules",
         "accent": "green",
         "text": [
          "Operations that only some types accept. Each is shown with a real panel. Times and rates are illustrative."
@@ -866,7 +918,7 @@
           },
           "fold": {
            "title": "Custom fold",
-           "sub": "type's own rules",
+           "sub": "own rules",
            "icon": "chip",
            "tint": "data"
           },
@@ -986,6 +1038,21 @@
              "status": "ready"
             }
            }
+          },
+          {
+           "id": "ops",
+           "type": "inflight",
+           "title": "Inflight: start, mark, end; history kept",
+           "lanes": [
+            {
+             "id": "up",
+             "label": "clip upload"
+            },
+            {
+             "id": "push",
+             "label": "push"
+            }
+           ]
           },
           {
            "id": "cell",
@@ -1123,6 +1190,103 @@
                 "key": "panels.buffer",
                 "value": "{\"cells\": [\"protected\", \"protected\"]}",
                 "rule": "replaces; paints cleared"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-start",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Inflight operations.** `start` opens a bar in each lane at this step.",
+           "panels": {
+            "ops": {
+             "start": [
+              {
+               "lane": "up",
+               "label": "clip 1"
+              },
+              {
+               "lane": "push",
+               "label": "notify"
+              }
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"start\": [{\"lane\": \"up\", …}, {\"lane\": \"push\", …}]}",
+                "rule": "two bars open"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-mark",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**`end` closes a bar; `mark` recolours an open one.** Operations in one patch apply in the order start, end, mark.",
+           "panels": {
+            "ops": {
+             "end": [
+              "push"
+             ],
+             "mark": [
+              {
+               "lane": "up",
+               "state": "retry"
+              }
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"end\": [\"push\"], \"mark\": [{\"lane\": \"up\", \"state\": \"retry\"}]}",
+                "rule": "push closed; upload marked retry"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-end",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**History is kept.** The upload bar closes; both finished bars stay on the axis.",
+           "panels": {
+            "ops": {
+             "end": [
+              "up"
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"end\": [\"up\"]}",
+                "rule": "closed; history retained"
                }
               }
              ]
@@ -1352,6 +1516,52 @@
            }
           },
           {
+           "id": "s-once-limits",
+           "edges": [
+            "patch->fold"
+           ],
+           "time": "+0m",
+           "text": "**`enterOnce` support is type-specific.** Common-fold types accept any non-appended field. Funnel merges one-step counts (Today tab). Phone accepts only `enterOnce.audio`. Device app has no `enterOnce`; the validator warns and ignores it.",
+           "panels": {
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "common fold",
+                "value": "any field except appended ones",
+                "rule": "one step"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "funnel / grid",
+                "value": "merged over carried map",
+                "rule": "one step"
+               }
+              },
+              {
+               "id": "c",
+               "cells": {
+                "key": "phone",
+                "value": "audio only",
+                "rule": "validator warns on others"
+               }
+              },
+              {
+               "id": "d",
+               "cells": {
+                "key": "deviceapp",
+                "value": "not supported",
+                "rule": "validator warns; ignored"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
            "id": "s-bind",
            "edges": [
             "patch->fold",
@@ -1447,6 +1657,9 @@
             "s-paint",
             "s-paint2",
             "s-cells",
+            "s-start",
+            "s-mark",
+            "s-end",
             "s-notify",
             "s-clear",
             "s-report",
@@ -1455,6 +1668,7 @@
             "s-drain",
             "s-icon",
             "s-icon-null",
+            "s-once-limits",
             "s-bind",
             "s-cut",
             "s-after"
@@ -1471,7 +1685,7 @@
          "graphFrame": {
           "x": 18,
           "y": 15,
-          "w": 551,
+          "w": 577,
           "h": 374
          },
          "sectionLayout": {
@@ -1481,49 +1695,56 @@
             "x": 0,
             "y": 0,
             "w": 10,
-            "h": 9
+            "h": 10
            },
            {
             "panel": "sjson",
             "x": 10,
             "y": 0,
             "w": 14,
-            "h": 9
+            "h": 10
            },
            {
             "controls": "steps",
             "x": 0,
-            "y": 9,
+            "y": 10,
             "w": 24,
-            "h": 5
+            "h": 6
            },
            {
             "panel": "buffer",
             "x": 0,
-            "y": 14,
+            "y": 16,
             "w": 8,
             "h": 5
            },
            {
+            "panel": "ops",
+            "x": 0,
+            "y": 21,
+            "w": 8,
+            "h": 6
+           },
+           {
             "panel": "cell",
             "x": 0,
-            "y": 19,
+            "y": 27,
             "w": 8,
-            "h": 8
+            "h": 7
            },
            {
             "panel": "strand",
             "x": 8,
-            "y": 14,
+            "y": 16,
             "w": 9,
             "h": 13
            },
            {
             "panel": "app",
             "x": 17,
-            "y": 14,
+            "y": 16,
             "w": 7,
-            "h": 13
+            "h": 18
            }
           ]
          }
@@ -1564,7 +1785,10 @@
           "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`."
          },
          {
-          "text": "**Per-item state keyed by declared ids** (does not replace the declaration): xray `layers`, zoneframe `zones`, replicas `replicas`, strandscene `actors`, cellscene `items`."
+          "text": "**Whole-array state keyed by declared ids** (common fold; each patch replaces the whole array, and items it does not list fall back to their declared default): xray `layers`, zoneframe `zones`, replicas `replicas`."
+         },
+         {
+          "text": "**Per-item carried state keyed by declared ids** (custom fold; each item carries independently): strandscene `actors`, cellscene `items`."
          },
          {
           "text": "**Not changeable per step**: every other declaration field, for example gauge `max` and `unit`, funnel `stages`, table `columns`, and every panel's card `title`."
@@ -1594,13 +1818,13 @@
           },
           "merge": {
            "title": "Effective",
-           "sub": "per step, per path",
+           "sub": "per path",
            "icon": "chip",
            "tint": "data"
           },
           "valid": {
            "title": "Validator",
-           "sub": "type's checks",
+           "sub": "own checks",
            "icon": "shield"
           },
           "fold": {
@@ -1892,7 +2116,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**Effective declaration** = the authored declaration shallow-merged with every `panelDeclare` earlier on this path, then this step's `panelDeclareOnce`. `null` for a key restores the declared value. `id`, `type`, `initial` and `visible` are reserved and warn.",
+           "text": "**Order:** authored declaration, then every accepted `panelDeclare` on this path up to and including this step, then this step's `panelDeclareOnce`. `null` in `panelDeclare` restores the declared value from then on; `null` in `panelDeclareOnce` does so for one step. `id`, `type`, `initial`, `visible` are reserved.",
            "panels": {
             "effective": {
              "rows": [
@@ -1978,12 +2202,120 @@
            }
           },
           {
+           "id": "p-once",
+           "edges": [
+            "author->merge"
+           ],
+           "text": "**A one-step override.** This step writes `panelDeclareOnce: {\"gauge\": {\"max\": 50}}`: the gauge uses 50 here and 200 again next step.",
+           "panels": {
+            "effective": {
+             "rows": [
+              {
+               "id": "max",
+               "cells": {
+                "field": "max",
+                "value": "50",
+                "from": "panelDeclareOnce here"
+               },
+               "status": "changed"
+              },
+              {
+               "id": "unit",
+               "cells": {
+                "field": "unit",
+                "value": "W",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "title",
+               "cells": {
+                "field": "title",
+                "value": "Draw (watts)",
+                "from": "panelDeclare (carried)"
+               }
+              }
+             ]
+            },
+            "pjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "steps[i].panelDeclareOnce.gauge",
+                "value": "{\"max\": 50}",
+                "rule": "this step only"
+               }
+              }
+             ]
+            },
+            "guarantees": {
+             "results": {
+              "noop": {
+               "status": "pass",
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
+              },
+              "collide": {
+               "status": "pass",
+               "detail": "step-level key outside panel state"
+              },
+              "forks": {
+               "status": "pending"
+              },
+              "agree": {
+               "status": "pending"
+              },
+              "derived": {
+               "status": "pending"
+              },
+              "shaped": {
+               "status": "pending"
+              },
+              "viewers": {
+               "status": "pending"
+              },
+              "history": {
+               "status": "pending"
+              }
+             }
+            }
+           }
+          },
+          {
            "id": "p-valid",
            "edges": [
             "merge->valid"
            ],
-           "text": "**Validated where written.** The type's `validateDeclaration` runs on the effective declaration; warnings name `steps[i].panelDeclare.<id>.<field>`; an override with errors is ignored. The rest of the step's patch is checked against the effective declaration. Contexts are cached by declaration content.",
+           "text": "**Validated where written**, with warnings at `steps[i].panelDeclare.<id>.<field>`; an override with errors is ignored. The rest of the patch is checked against what the renderer will use: for types with their own override keys (data-contract `fields`), state overrides win over the effective declaration in both validation and rendering.",
            "panels": {
+            "effective": {
+             "rows": [
+              {
+               "id": "max",
+               "cells": {
+                "field": "max",
+                "value": "200",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "unit",
+               "cells": {
+                "field": "unit",
+                "value": "W",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "title",
+               "cells": {
+                "field": "title",
+                "value": "Draw (watts)",
+                "from": "panelDeclare (carried)"
+               }
+              }
+             ]
+            },
             "pjson": {
              "rows": [
               {
@@ -1996,6 +2328,14 @@
               },
               {
                "id": "b",
+               "cells": {
+                "key": "data-contract",
+                "value": "state fields > effective declaration",
+                "rule": "same order to validate and render"
+               }
+              },
+              {
+               "id": "c",
                "cells": {
                 "key": "cache",
                 "value": "one context per distinct declaration",
@@ -2043,7 +2383,7 @@
             "merge->fold",
             "fold->player"
            ],
-           "text": "**Folding: a decision is needed.** Option A, segment fold: each declaration change starts a new segment seeded from the previous snapshot, so earlier steps are never reinterpreted; phone, deviceapp, homemap and inflight need a seed rule first. Option B, whole-path refold (PR #643): simpler, but a later declaration can make an earlier ignored patch take effect (for example a grid key declared later).",
+           "text": "**Folding: a decision is needed.** Option A, segment fold: each declaration change starts a new segment seeded from the carried state (without `enterOnce` overlays or one-step operations such as `drain`), so earlier steps are never reinterpreted; every fold needs a defined resume point, and phone, deviceapp, homemap and inflight need one written first. Option B, whole-path refold (PR #643): simpler, but a later declaration can make an earlier ignored patch take effect (for example a grid key declared later).",
            "panels": {
             "pjson": {
              "rows": [
@@ -2051,8 +2391,8 @@
                "id": "a",
                "cells": {
                 "key": "Option A",
-                "value": "segments seeded at each change",
-                "rule": "no reinterpretation; 4 folds need a seed rule"
+                "value": "segments seeded from carried state",
+                "rule": "no reinterpretation; folds need a resume point"
                }
               },
               {
@@ -2093,7 +2433,7 @@
               },
               "history": {
                "status": "warn",
-               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
               }
              }
             }
@@ -2147,7 +2487,7 @@
               },
               "history": {
                "status": "warn",
-               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
               }
              }
             }
@@ -2217,7 +2557,7 @@
               },
               "history": {
                "status": "warn",
-               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
               }
              }
             }
@@ -2288,7 +2628,7 @@
               },
               "history": {
                "status": "warn",
-               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
               }
              }
             }
@@ -2362,7 +2702,7 @@
               },
               "history": {
                "status": "warn",
-               "detail": "decision needed: segment fold (needs a seed rule in 4 folds) or whole-path refold"
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
               }
              }
             }
@@ -2436,6 +2776,7 @@
            "steps": [
             "p-shape",
             "p-merge",
+            "p-once",
             "p-valid",
             "p-fold",
             "p-render",
@@ -2488,12 +2829,12 @@
             "x": 0,
             "y": 13,
             "w": 24,
-            "h": 6
+            "h": 7
            },
            {
             "panel": "guarantees",
             "x": 0,
-            "y": 19,
+            "y": 20,
             "w": 24,
             "h": 14
            }

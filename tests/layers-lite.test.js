@@ -222,11 +222,13 @@ test('#617 guard: exactSource accepts publish reviewed text unchanged',()=>{
  exactSource (row above).
  row | fixture | assertion (scoped) | rejects
  same title, no IDs | lock b, file adds z before a (b moves) | b's center == pre-import; only b's placement differs from the file; one undo restores | an import that skips the guard (today's exactSource)
+ same title after trim | ' Orders ' vs 'Orders' | b re-pinned | raw (untrimmed) title equality
  same ID, renamed | page.documentLinks.id both sides, titles differ | b re-pinned | a title-only identity that drops renamed files
  same canon ID | page.canon.id both sides | b re-pinned | ignoring canon.id
  different title | both untitled-ID, titles differ, b locked in both | state.text === file text | a guard matching nodes by id across documents
  different ID, same title | documentLinks.id differs | state.text === file text | a title match overriding IDs
- ID on one side | before has id, file does not | state.text === file text | treating a missing ID as a wildcard
+ ID on one side | before has id, file does not; and the converse | state.text === file text | treating a missing ID as a wildcard on either side
+ blank titles | '  ' vs '  ' | state.text === file text | treating whitespace-only titles as an identity
  both untitled | no title, no ID | state.text === file text | treating two untitled documents as the same */
 function importPair(before,after){
  const raw=pinFixture(),text=JSON.stringify(raw,null,2),lockRaw=JSON.parse(C.planSetNodeLocked(text,raw,0,'b',true).text);
@@ -240,6 +242,7 @@ function importPair(before,after){
 }
 for(const [label,before,after] of [
  ['same title, no IDs',{title:'Orders'},{title:'Orders'}],
+ ['same title after trimming',{title:' Orders '},{title:'Orders'}],
  ['same documentLinks.id, renamed',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders v2',documentLinks:{id:'orders'}}],
  ['same canon ID',{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}]
 ])test('#628 file import of the same document ('+label+') keeps a locked node in place in one undo step',()=>{
@@ -253,7 +256,9 @@ for(const [label,before,after] of [
 for(const [label,before,after] of [
  ['different title',{title:'Orders'},{title:'Payments'}],
  ['different documentLinks.id, same title',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders',documentLinks:{id:'payments'}}],
- ['ID on one side only',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders'}],
+ ['ID on the current document only',{title:'Orders',documentLinks:{id:'orders'}},{title:'Orders'}],
+ ['ID on the imported file only',{title:'Orders'},{title:'Orders',canon:{version:1,id:'orders',kind:'design',owner:'group:default/local'}}],
+ ['whitespace-only titles',{title:'  '},{title:'  '}],
  ['both untitled',{},{}]
 ])test('#628 file import of a different document ('+label+') is imported exactly as written',()=>{
  const {lock,file}=importPair(before,after),state=textSession(lock);

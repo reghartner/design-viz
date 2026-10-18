@@ -14,8 +14,13 @@ tier repriced**).
 The quickest map is a venue from the library. One field draws a whole arena:
 
 ```json
-{"id": "map", "type": "seatmap", "title": "UBS Arena, Elmont, NY",
- "venue": "ubs-arena", "currency": "USD", "initial": {"sold": {"101": 120}}}
+{"page": {"title": "Opening night", "blocks": [{"heading": "Presale",
+  "text": ["Capacities are an illustrative even split, not venue data."],
+  "diagram": {"nodes": {"box": {"title": "Box office"}}, "rows": [["box"]],
+    "panels": [{"id": "map", "type": "seatmap", "title": "UBS Arena, Elmont, NY",
+      "venue": "ubs-arena", "currency": "USD", "initial": {"sold": {"101": 120}}}],
+    "steps": [{"id": "presale", "nodes": ["box"], "text": "Presale opens.",
+      "panels": {"map": {"sold": {"102": 150}, "highlight": "102"}}}]}}]}}
 ```
 
 The library starts with one venue, **UBS Arena (Elmont, NY)**, id `ubs-arena`:

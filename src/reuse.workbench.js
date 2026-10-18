@@ -57,7 +57,7 @@ function initWorkbenchStepReuse(opts){
     panel.innerHTML = '';
     (model.diagram.panels || []).forEach(function(p){ option(panel, p.id, p.title || p.id); });
     var preferred = (model.diagram.panels || []).find(function(p){ return p.id === priorPanel; }) ||
-      (model.diagram.panels || []).find(function(p){ return p.id === model.diagram.primaryPanel; }) || (model.diagram.panels || [])[0];
+      (model.diagram.panels || [])[0];
     panel.value = preferred ? preferred.id : ''; panel.disabled = !preferred;
     el('result').textContent = snapshot.label + ' · ' + model.diagram.steps.length + ' steps after this change';
     apply.textContent = (mode.value === 'copy' ? 'Copy ' : 'Share ') + selected.size + (selected.size === 1 ? ' step' : ' steps');

@@ -6,8 +6,7 @@
       "heading": "At the threshold",
       "text": ["A fictional doorbell story, with the porch outside on the left and the entry inside on the right. Follow the visitor through the door, or choose Leave outside to keep the door closed and leave a parcel on the porch."],
       "diagram": {
-        "view": "step", "primaryPanel": "home",
-        "nodes": {
+        "view": "step", "nodes": {
           "doorbell": {"title": "Doorbell", "sub": "porch camera", "icon": "doorbell", "tint": "dev"},
           "hub": {"title": "Home hub", "sub": "local events", "icon": "house"},
           "phone": {"title": "Resident", "sub": "visitor notification", "icon": "phone"},
@@ -51,8 +50,98 @@
         "paths": [
           {"id": "welcome", "label": "Welcome in", "color": "#278A52", "steps": ["quiet", "approach", "notify", "open", "cross", "close"]},
           {"id": "leave-outside", "label": "Leave outside", "color": "#B7791F", "steps": ["quiet", "approach", "notify", "wait", "leave"]}
+        ],
+        "layouts": [
+          {
+            "id": "home",
+            "name": "Home",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 18,
+                  "panel": "home"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "panel:home",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 6
+                },
+                {
+                  "x": 0,
+                  "y": 18,
+                  "w": 24,
+                  "h": 12,
+                  "hidden": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "flow",
+            "name": "Data flow",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 18
+                },
+                {
+                  "x": 0,
+                  "y": 18,
+                  "w": 24,
+                  "h": 12,
+                  "panel": "home"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "diagram",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 6
+                }
+              ]
+            }
+          }
+        ],
+        "defaultLayout": "home"
+      },
+      "id": "section-1"
+    }],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }

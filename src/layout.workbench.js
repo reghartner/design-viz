@@ -381,7 +381,6 @@ function initSectionLayoutEditor(opts){
   life.listen(view,'click',function(ev){
     if(ev.target.closest('[data-dv-detail-preview]'))return;
     if(ev.target.closest('[data-view-layout],.tabbtn')){cancel();endEditing();refresh();}
-    else if(ev.target.closest('[data-view-focus]')){cancel();endEditing();refresh();}
   });
   life.listen(view,'tab-view-change',function(){cancel();endEditing();refresh();});
   life.listen(view,'diagram-view-change',function(ev){

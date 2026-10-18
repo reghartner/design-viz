@@ -1844,24 +1844,14 @@ perspectives" of one timeline). Types:
   no automatic migration or geometry-inferred alarm. Replace declared `path`
   artwork with the track generated from subject history.
 - `homemap` — a 320×180 top-down home with independently patched devices.
-  Set `diagram.primaryPanel` to this panel's id (for example `"home"`) to
-  make it the centerpiece: a large map, playback directly underneath, other
-  panels alongside or below, and a collapsed **Data flow** disclosure below.
-  This optional presentation works with any declared panel; missing/unknown
-  ids retain the normal layout. Renaming or deleting a panel in the workbench
-  updates the reference. No schema-version opt-in is required.
-  Published pages and the workbench offer **Home / Data flow** to switch the
-  main view live while retaining the selected path, step, widget state, and
-  playback. This control also appears for a sidebar homemap without
-  `primaryPanel`; it uses the first homemap. An explicit centerpiece takes
-  precedence (other widget types use their title instead of Home). The spec
-  sets the opening layout; switching does not mutate it. The timeline follows
-  the main view, and secondary panels stack below it on narrow screens.
-  With a saved `diagram.sectionLayout`, the custom arrangement replaces the
-  Home choice. Set `diagram.layoutName` to a nonempty string of up to 40
-  characters to name that view (default **Layout**); **Data flow** remains the
-  second choice. Hide/Show data flow is a temporary reader control within the
-  arrangement and keeps panels and step controls visible. For several named
+  Panels never add Views or choose an opening presentation. To give a map or
+  another panel the main space, author `diagram.layouts` geometry and reference
+  it from explicit `page.views` or Tab Views. Use tile visibility and control
+  attachment to choose what each arrangement shows. Home and Data flow can be
+  deliberately authored Views sharing one story; no collapsible graph or
+  Sidebar/Centerpiece setting is generated. Older focus diagrams require the
+  [offline migration](../docs/panel-view-migration.md).
+  For several named
   arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
   `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
   its host profiles; tile `hidden:true` hides a panel or diagram in that view.

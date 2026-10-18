@@ -136,10 +136,10 @@ test('default geometry never adds or renames Views, including after Arrange and 
   assert.deepEqual(plain(ctx.validate(ctx.normalize(saved)).errors),[]);
  }
 });
-test('default placement retains existing Home/Data flow choices and compatibility member references',()=>{
+test('default placement stays Standard with panels and supports geometry member references',()=>{
  const raw={sections:[{id:'story',diagram:{nodes:{a:{}},rows:[['a']],primaryPanel:'home',panels:[{id:'home',type:'homemap',title:'Home'}]}}]};
  const choices=()=>{const o=ctx.tabViewOwners(ctx.normalize(raw))[0],v=ctx.tabViewDefinitions(o);return plain([v.map(v=>[v.id,v.name]),ctx.tabViewDefault(o,v).id]);};
- const before=choices();raw.sections[0].diagram.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};assert.deepEqual(choices(),before);
+ const before=choices();assert.deepEqual(before,[[['standard','Standard']],'standard']);raw.sections[0].diagram.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};assert.deepEqual(choices(),before);
  for(const layout of ['layout','default']){
   raw.views=[{id:'reading',name:'Standard',presentation:'standard',sections:[{section:'story',layout}]}];
   assert.deepEqual(plain(ctx.validate(ctx.normalize(raw)).errors),[]);

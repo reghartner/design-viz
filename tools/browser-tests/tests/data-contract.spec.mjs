@@ -88,6 +88,7 @@ test('editing inherited highlights preserves the other colors and can apply to o
   const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
   await guide.getByRole('button',{name:'ADD TO STEP',exact:true}).click();
+  await closeTools(page);
   await root.locator('.pt-data-contract .ptitle').click();await page.keyboard.press('Escape');
   await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.steps[2].panels?.contract).toEqual({});
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();

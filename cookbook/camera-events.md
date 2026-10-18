@@ -10,30 +10,186 @@ or real video asset is needed.
   "page": {
     "title": "Record first, capture the event later",
     "skin": "pastel",
-    "sections": [{
-      "heading": "Doorbell event",
-      "text": ["An illustrative doorbell clip. These SVG animations are not real footage or measured event timing."],
-      "diagram": {
-        "view": "step", "primaryPanel": "clip",
-        "nodes": {
-          "camera": {"title": "Doorbell", "icon": "doorbell"},
-          "store": {"title": "Clip store", "icon": "cloud"}
+    "sections": [
+      {
+        "heading": "Doorbell event",
+        "text": [
+          "An illustrative doorbell clip. These SVG animations are not real footage or measured event timing."
+        ],
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Doorbell",
+              "icon": "doorbell"
+            },
+            "store": {
+              "title": "Clip store",
+              "icon": "cloud"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "store"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "store",
+              "kind": "https",
+              "label": "save clip"
+            }
+          ],
+          "panels": [
+            {
+              "id": "clip",
+              "type": "screen",
+              "title": "Front door camera",
+              "scene": "doorbell-runners",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "The camera is in standby."
+            },
+            {
+              "id": "record",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Recording begins on an empty porch.",
+              "panels": {
+                "clip": {
+                  "mode": "rec"
+                }
+              }
+            },
+            {
+              "id": "run",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Two people run away while recording continues.",
+              "panels": {
+                "clip": {
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "edge": "camera->store",
+              "text": "Store the captured event clip.",
+              "panels": {
+                "clip": {
+                  "mode": "save",
+                  "banner": "CLIP SAVED"
+                }
+              }
+            }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Front door camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "clip"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "clip"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
         },
-        "rows": [["camera", "store"]],
-        "edges": [{"from": "camera", "to": "store", "kind": "https", "label": "save clip"}],
-        "panels": [{
-          "id": "clip", "type": "screen", "title": "Front door camera",
-          "scene": "doorbell-runners",
-          "initial": {"mode": "off", "scenePlayback": "waiting"}
-        }],
-        "steps": [
-          {"id": "standby", "nodes": ["camera"], "text": "The camera is in standby."},
-          {"id": "record", "nodes": ["camera"], "text": "Recording begins on an empty porch.", "panels": {"clip": {"mode": "rec"}}},
-          {"id": "run", "nodes": ["camera"], "text": "Two people run away while recording continues.", "panels": {"clip": {"scenePlayback": "playing"}}},
-          {"id": "save", "edge": "camera->store", "text": "Store the captured event clip.", "panels": {"clip": {"mode": "save", "banner": "CLIP SAVED"}}}
+        "id": "section-1"
+      }
+    ],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Front door camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }
 ```

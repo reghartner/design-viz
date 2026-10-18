@@ -360,10 +360,10 @@ function initWorkbenchCanvas(options){
   surface.addEventListener('workbench-canvas-view',function(){var rec=current();if(rec)fitRequests.add(fitIdentity(rec));});
   view.addEventListener('diagram-view-change',selectedByEvent);
   view.addEventListener('explore-overlay-scale',paintZoom);
-  view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus],[data-view-layout],.section-view-settings'))selectedByEvent(ev);},true);
+  view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-layout],.section-view-settings'))selectedByEvent(ev);},true);
   view.addEventListener('change',function(ev){if(ev.target.closest('.section-view-settings'))selectedByEvent(ev);},true);
-  // Automatic Home/Data views predate viewport change events.
-  view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus],[data-view-layout]'))selectedByEvent(ev);});
+  // Named arrangement clicks also select their section.
+  view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-layout]'))selectedByEvent(ev);});
   document.getElementById('workspace-pan').addEventListener('click',function(){hand=!hand;paintHand();});
   document.getElementById('workspace-zoom-in').addEventListener('click',function(){setZoom(viewport().canvasZoom()*1.2);});
   document.getElementById('workspace-zoom-out').addEventListener('click',function(){setZoom(viewport().canvasZoom()/1.2);});

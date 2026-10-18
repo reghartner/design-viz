@@ -196,7 +196,7 @@ function initPanelPicker(opts){
       if(!items.length){var note=document.createElement('p');note.textContent=empty;details.appendChild(note);return;}
       var ul=document.createElement('ul');items.forEach(function(value){var li=document.createElement('li');li.textContent=value;ul.appendChild(li);});details.appendChild(ul);
     }
-    list('Kept',['Panel ID, title, starting visibility, layout positions, and centerpiece setting.','Step visibility and path membership.' ].concat(summary.kept.indexOf('brand')>=0?['Company branding.']:[]),'');
+    list('Kept',['Panel ID, title, starting visibility, and layout positions.','Step visibility and path membership.' ].concat(summary.kept.indexOf('brand')>=0?['Company branding.']:[]),'');
     list('Setup replaced or removed',summary.removedFields,'No old type-specific setup.');
     list('Step overrides removed',summary.steps.map(function(step){return 'Step '+(step.index+1)+(step.id?' · '+step.id:'')+(step.text?' · '+step.text:'')+' — '+step.fields.join('; ')+' — '+(step.paths.length?step.paths.join(', '):'not on a path');}),'No step overrides for this panel.');
     list('Playback controls detached',summary.detached,'All control attachments stay as they are.');

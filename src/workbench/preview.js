@@ -35,9 +35,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
     if(options && options.reader && rec.viewport)prior.reader=rec.viewport.snapshotReaderState();
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.boardSize && rec.boardSize.snapshot) prior.boardNavigation = rec.boardSize.snapshot();
-    if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
     if (rec.presentation){
-      prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId;
       if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
     }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
@@ -81,13 +79,10 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       if(prior.viewId!=null && rec.presentation.setView)rec.presentation.setView(prior.viewId);
       else {
         if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
-        if(prior.focusPanel===rec.presentation.panelId && prior.primaryPanel===section.diagram.primaryPanel)rec.presentation.setMode(prior.focusMode);
       }
     }
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
-    if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
-      rec.flowDisclosure.open = prior.flowOpen;
     if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;

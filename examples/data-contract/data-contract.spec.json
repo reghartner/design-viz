@@ -6,8 +6,7 @@
       "heading": "OrderCreated",
       "text": "The contract stays in place while each step calls attention to the fields a consumer needs.",
       "diagram": {
-        "view": "step", "autoplay": false, "primaryPanel": "contract",
-        "nodes": {"orders": {"title": "Orders service"}},
+        "view": "step", "autoplay": false, "nodes": {"orders": {"title": "Orders service"}},
         "rows": [["orders"]],
         "panels": [{
           "id": "contract", "type": "data-contract", "title": "OrderCreated · v1",
@@ -34,8 +33,98 @@
           {"id": "resume", "text": "Return to the amount validation fields.", "nodes": ["orders"]},
           {"id": "pending", "text": "Inspect the pending-order payload for this step only.", "panels": {"contract": {"enterOnce": {"fields": [{"id": "order-id", "label": "order_id", "cells": {"type": "string", "required": "Yes", "example": "ord_2048", "notes": "Stable identifier used for idempotency."}}, {"id": "status", "label": "status", "cells": {"type": "enum", "required": "Yes", "example": "pending", "notes": "Waiting for confirmation from the payment service."}}, {"id": "total", "label": "total_minor", "cells": {"type": "integer", "required": "Yes", "example": 2499, "notes": "Total in the currency's minor unit."}}, {"id": "currency", "label": "currency", "cells": {"type": "string", "required": "Yes", "example": "USD", "notes": "Currency code for total_minor."}}, {"id": "customer-id", "label": "customer_id", "cells": {"type": "string", "required": "No", "example": "cus_1024", "notes": "Omitted for guest checkout."}}], "fieldWidth": 190, "highlights": {"status": {"color": "amber", "label": "Pending confirmation"}}}}}},
           {"id": "complete", "text": "The complete contract remains available.", "panels": {"contract": {"highlights": {}, "note": "All consumers share this contract."}}}
+        ],
+        "layouts": [
+          {
+            "id": "home",
+            "name": "Contract",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 16,
+                  "panel": "contract"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "panel:contract",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 4
+                },
+                {
+                  "x": 0,
+                  "y": 16,
+                  "w": 24,
+                  "h": 12,
+                  "hidden": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "flow",
+            "name": "Data flow",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 16
+                },
+                {
+                  "x": 0,
+                  "y": 16,
+                  "w": 24,
+                  "h": 12,
+                  "panel": "contract"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "diagram",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 4
+                }
+              ]
+            }
+          }
+        ],
+        "defaultLayout": "home"
+      },
+      "id": "section-1"
+    }],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Contract",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }

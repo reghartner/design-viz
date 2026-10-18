@@ -80,7 +80,7 @@ test('outdoor starters validate and the threshold paths keep door and occupancy 
   for(const name of ['whole-home-outdoors','front-door-threshold']){
     const spec=outdoorFixture(name),result=C.validate(C.normalize(spec));
     assert.deepEqual(plain(result.errors),[],name);assert.deepEqual(plain(result.warnings),[],name);
-    const d=diagram(spec);assert.equal(d.primaryPanel,'home');
+    const d=diagram(spec);assert.equal(d.defaultLayout,'home');
     assert.ok(d.panels[0].rooms.some(r=>r.kind==='outdoor'));
     assert.ok(d.panels[0].devices.some(d=>d.display==='door'));
   }
@@ -219,7 +219,7 @@ function edit(spec, step, key, value, pid = 'home'){
 test('home story validates, focuses its map, and keeps the outage local', () => {
   const spec = fixture(), d = diagram(spec), result = C.validate(C.normalize(spec));
   assert.deepEqual(plain(result.errors), []); assert.deepEqual(plain(result.warnings), []);
-  assert.equal(d.primaryPanel, 'home');
+  assert.equal(d.defaultLayout, 'home');
   const healthy = C.builderHomemapStep(d, 4, 'home', 'happy');
   const outage = C.builderHomemapStep(d, 6, 'home', 'offline');
   assert.equal(healthy.model.subjects[0].hidden, false);
@@ -286,18 +286,7 @@ test('legacy patch aliases and special IDs remain ordinary own keys', () => {
   spec = edit(spec, 0, 'constructor', undefined, '__proto__');
   assert.deepEqual(diagram(spec).steps[0].patch, {other:{value:7}});
 });
-test('centerpiece references rename and delete with their panel; unknown IDs warn and fall back', () => {
-  let spec = fixture();
-  let result = C.planRenamePanel(JSON.stringify(spec), spec, 0, 0, 'house');
-  spec = JSON.parse(result.text); assert.equal(diagram(spec).primaryPanel, 'house');
-  result = C.planDeletePanel(JSON.stringify(spec), spec, 0, 0);
-  assert.equal(diagram(JSON.parse(result.text)).primaryPanel, undefined);
-  assert.ok(C.planPrimaryPanel(JSON.stringify(spec), spec, 0, 'missing').error);
-  diagram(spec).primaryPanel = 'missing';
-  assert.ok(C.validate(C.normalize(spec)).warnings.some(w=>w.includes('.primaryPanel:')));
-  result = C.planPrimaryPanel(JSON.stringify(spec), spec, 0, null);
-  assert.equal(diagram(JSON.parse(result.text)).primaryPanel, undefined);
-});
+
 test('state titles and visual cues survive without chips when paused, in reduced motion, and in ambient', () => {
   const d = diagram(fixture()), panel = d.panels[0];
   const snapshot = C.builderHomemapStep(d, 1, 'home', 'happy');

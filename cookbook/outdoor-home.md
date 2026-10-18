@@ -25,33 +25,220 @@ design rather than treating them as product behavior.
   "page": {
     "title": "A visitor crosses the threshold",
     "skin": "pastel",
-    "sections": [{
-      "heading": "Outside to inside",
-      "text": ["Fictional example: the resident opens a door for a visitor."],
-      "diagram": {
-        "view": "step",
-        "primaryPanel": "home",
-        "nodes": {"door": {"title": "Front door", "icon": "lock"}},
-        "rows": [["door"]],
-        "panels": [{
-          "id": "home", "type": "homemap", "title": "At the door",
-          "outline": {"x": 164, "y": 10, "w": 150, "h": 160},
-          "rooms": [
-            {"label": "OUTSIDE · PORCH", "kind": "outdoor", "x": 6, "y": 10, "w": 151, "h": 160},
-            {"label": "INSIDE · ENTRY", "x": 167, "y": 13, "w": 144, "h": 154}
+    "sections": [
+      {
+        "heading": "Outside to inside",
+        "text": [
+          "Fictional example: the resident opens a door for a visitor."
+        ],
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "door": {
+              "title": "Front door",
+              "icon": "lock"
+            }
+          },
+          "rows": [
+            [
+              "door"
+            ]
           ],
-          "devices": [{"id": "door", "kind": "entry", "display": "door", "label": "Front door", "x": 164, "y": 108, "facing": 270, "doorWidth": 30, "doorSwing": 90}],
-          "subjects": [{"id": "visitor", "label": "Visitor", "x": 110, "y": 92}],
-          "initial": {"door": "closed"}
-        }],
-        "steps": [
-          {"id": "wait", "nodes": ["door"], "text": "The visitor waits outside the closed door."},
-          {"id": "open", "nodes": ["door"], "text": "The door opens inward.", "panels": {"home": {"door": "open"}}},
-          {"id": "enter", "nodes": ["door"], "text": "The visitor crosses into the entry while the door stays open.", "panels": {"home": {"visitor": {"x": 230, "y": 92}}}},
-          {"id": "close", "nodes": ["door"], "text": "The door closes behind the visitor.", "panels": {"home": {"door": "closed"}}}
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "At the door",
+              "outline": {
+                "x": 164,
+                "y": 10,
+                "w": 150,
+                "h": 160
+              },
+              "rooms": [
+                {
+                  "label": "OUTSIDE · PORCH",
+                  "kind": "outdoor",
+                  "x": 6,
+                  "y": 10,
+                  "w": 151,
+                  "h": 160
+                },
+                {
+                  "label": "INSIDE · ENTRY",
+                  "x": 167,
+                  "y": 13,
+                  "w": 144,
+                  "h": 154
+                }
+              ],
+              "devices": [
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "display": "door",
+                  "label": "Front door",
+                  "x": 164,
+                  "y": 108,
+                  "facing": 270,
+                  "doorWidth": 30,
+                  "doorSwing": 90
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 110,
+                  "y": 92
+                }
+              ],
+              "initial": {
+                "door": "closed"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "wait",
+              "nodes": [
+                "door"
+              ],
+              "text": "The visitor waits outside the closed door."
+            },
+            {
+              "id": "open",
+              "nodes": [
+                "door"
+              ],
+              "text": "The door opens inward.",
+              "panels": {
+                "home": {
+                  "door": "open"
+                }
+              }
+            },
+            {
+              "id": "enter",
+              "nodes": [
+                "door"
+              ],
+              "text": "The visitor crosses into the entry while the door stays open.",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 230,
+                    "y": 92
+                  }
+                }
+              }
+            },
+            {
+              "id": "close",
+              "nodes": [
+                "door"
+              ],
+              "text": "The door closes behind the visitor.",
+              "panels": {
+                "home": {
+                  "door": "closed"
+                }
+              }
+            }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Home",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 16,
+                    "panel": "home"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "panel:home",
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 16
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-1"
+      }
+    ],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }
 ```

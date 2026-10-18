@@ -20,7 +20,7 @@
       };
     },
     presentation: {growing:true, ambientInitial:true},
-    layout: {focusByDefault:true, focusLabel:'Meter', large:true, height:9, supporting:false, attachControls:true},
+    layout: {large:true, height:9, supporting:false, attachControls:true},
     references: {nodes:['sources.*.node']},
     validateDeclaration: function (panel, path, warnings, errors) {
       if (!validValue(panel.max) || panel.max === 0)

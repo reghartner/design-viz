@@ -29,7 +29,7 @@ current destination.
 
 Choose **Software & data → Data contract** for one field per row with custom
 columns. Inspect provides **Add field**, **Add column**, names, ordering and
-widths; use **Centerpiece** for a wide contract. **Starting state → Field
+widths; use **Arrange selected section…** to give a contract more width. **Starting state → Field
 highlights** sets the opening colors. To emphasize fields at another step,
 select that step, use **ADD TO STEP**, click the contract panel and finish
 adding. Its **Field highlights** controls offer preset or custom colors,

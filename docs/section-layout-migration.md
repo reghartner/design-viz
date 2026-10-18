@@ -96,3 +96,6 @@ where used. Report each affected diagram, classification, change or reason no
 change was needed, link behavior, and verification result. Keep code integration
 and all required diagram fixes in that one reviewable company rollout. Document
 editing and Arrange acceptance remain desktop-only.
+
+For retired panel-driven Home/Data flow choices, run the bounded
+[panel View migration](panel-view-migration.md) on inventoried files.

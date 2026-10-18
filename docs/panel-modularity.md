@@ -38,12 +38,13 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `visibilityEvidence(panel, state, field)` | Optional pure evidence facet; return supported/visible/reason plus trusted DOM address metadata for an internal field. Unsupported fields must say so; whole-panel content is generic. See [visibility evidence](visibility-evidence.md). |
 | `presentation` | Shared traits: `growing`, `ambientInitial`, `historyRequiresSteps` |
 | `authoring` | Template, setup/step fields, picker description/example, provenance and custom editor hooks |
-| `layout` | Default focus, focus label, control attachment, large sizing and preferred height |
+| `layout` | Control attachment, large sizing and preferred height |
 | `references` | Paths such as `{nodes: ['sources.*.node']}` for rename, deletion and cross-spec paste |
 | `styles`, `editorStyles` | Panel-only CSS; shared themes and reusable primitives remain shared |
 
-`layout` supports `focusByDefault`, `focusLabel`, `attachControls`, `large`,
-`height`, `supporting`, `fallbackHeight` and `canvasSizing`. A preferred size
+`layout` supports `attachControls`, `large`,
+`height`, `supporting`, `fallbackHeight` and `canvasSizing`. Panels never create Views or choose the opening View. Retired `focusByDefault`
+and `focusLabel` flags have no runtime effect. A preferred size
 never overrides a saved size or hidden choice. `fallbackHeight` is used when
 appending a panel to an existing layout. `canvasSizing` is an opt-in Explore
 canvas policy. `mode: 'fixed-aspect'` fits the rendered content and uses the

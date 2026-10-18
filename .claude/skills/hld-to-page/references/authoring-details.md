@@ -136,13 +136,12 @@ entry markers remain unchanged. These are presentation geometry, so explicitly
 author subject movement and sensor states. The outdoor recipe includes both
 starter layouts; do not invent a separate doors array or schema version.
 
-**Choose the main view.** A `homemap` or other panel can be the centerpiece
-with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live
-Home / Data flow switching while retaining the selected step and path.
-Home view maximizes the map up to its height limit (70vh; 560px in Confluence)
-and derives its width from the aspect ratio. Supporting panels fill surplus
-horizontal space in responsive columns, or sit below on narrow pages.
-No additional spec setting is required.
+**Choose the main view.** Author named `diagram.layouts` arrangements and
+reference them from explicit Views. Use panel tile geometry, diagram visibility
+and step-control attachment to give a panel the main space. Panels never create
+Views or change the opening choice. See `docs/panel-view-migration.md` for older
+`primaryPanel` diagrams. Home and Data flow can remain deliberately authored
+Views sharing the same nodes, panels, paths and steps.
 Home device states use animation instead of state chips; subject labels
 are hidden unless `showSubjectLabels:true` is declared on the panel. Map
 device/room coordinates are shared layout; subject positions are sparse
@@ -427,7 +426,7 @@ item's remove and reorder controls kept local.
 
 Panel inspectors use **Change panel type…** to open the visual library and an
 explicit replacement review. Replacement seeds the registered template and
-instantiate hook, preserves ID/title/visibility, diagram layouts and centerpiece,
+instantiate hook, preserves ID/title/visibility, diagram layouts,
 and keeps branding only for compatible types. Old type-specific setup, including
 unknown imported keys, is listed and discarded. All state overrides for that
 panel are removed from registry steps and legacy `patch` aliases on every path;

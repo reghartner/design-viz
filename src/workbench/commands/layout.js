@@ -615,16 +615,6 @@ function planStackNodes(text, raw, sectionIdx, nodeIds){
   return plan;
 }
 
-function planPrimaryPanel(text, raw, sectionIdx, panelId){
-  var got = builderDiagram(text, raw, sectionIdx);
-  if (got.error) return got;
-  if (panelId != null && !(got.d.panels || []).some(function(p){ return p && p.id === panelId; }))
-    return {error:'Choose an existing panel for the centerpiece.'};
-  return builderRewrite(text, raw, got.path, function(d){
-    if (panelId == null) delete d.primaryPanel; else d.primaryPanel = panelId;
-  });
-}
-
 /* Authored section layouts are spec data; host preview dimensions are workspace
    state. Pointer previews never write source until one successful release. */
 /* Upgrade all sibling profiles together because columns belongs to the whole
@@ -753,33 +743,13 @@ function planSectionExploreLayout(text,raw,section,layoutId,value,allowPresentat
   if(index<0 || got.d.layouts[index].presentation!=='explore' && !allowPresentationOverride)return {error:'Select an Explore view before arranging it.'};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
 }
-/* Match the viewer's legacy Home/Layout and Data choices when a header action
-   first authors them. Only geometry is new: the story and its default survive. */
+/* Explicit authoring materializes only the selected ordinary arrangement. */
 function builderPromoteSectionViews(d,layoutId){
-  var source=sectionLayoutDefinition(d),panels=Array.isArray(d.panels)?d.panels:[];
-  var focus=panels.find(function(p){return p && typeof p.id==='string' && p.id && p.id===d.primaryPanel;}) ||
-    panels.find(function(p){return p && typeof p.id==='string' && p.id && panelCapability(p.type,'focusByDefault',false);});
-  var first=focus?'home':null,defaultId=focus && d.primaryPanel===focus.id?'home':'flow';
-  var selected=layoutId==null || layoutId==='default'?defaultId:source && layoutId==='layout'?'flow':layoutId;
-  if(selected!=='flow' && selected!==first)return {error:'Reselect the view before editing it.'};
-  var views=[],targets=['default'];
-  if(focus){
-    var homeDiagram=Object.assign({},d,{primaryPanel:focus.id}),preset=sectionLayoutPreset(homeDiagram,'default');
-    var hidden=Object.assign({},preset.find(function(it){return sectionLayoutKey(it)==='diagram';}),{hidden:true});
-    var controls=preset.find(function(it){return it.controls==='steps';}),items;
-    if(controls){
-      if(panelCapability(focus.type,'attachControls',false))controls.attachTo='panel:'+focus.id;
-      items=sectionLayoutOptimize(homeDiagram,'default',[hidden,controls]);
-    }else items=sectionLayoutPreset(homeDiagram,'default',['diagram']).concat([hidden]);
-    var label=panelCapability(focus.type,'focusLabel',focus.title || 'Home');
-    views.push({id:'home',name:String(label).trim().slice(0,40) || 'Home',sectionLayout:{columns:24,default:items}});
-  }
-  var flowDiagram=Object.assign({},d,{primaryPanel:undefined}),profiles={columns:24};
-  targets.forEach(function(target){profiles[target]=sectionLayoutOptimize(flowDiagram,target,null);});
-  if(source)profiles=builderSectionLayout24(source.sectionLayout);
-  views.push({id:'flow',name:focus?'Data flow':'Standard',sectionLayout:profiles});
-  d.layouts=views;d.defaultLayout=defaultId;delete d.sectionLayout;delete d.layoutName;
-  return {layoutId:selected};
+  if(layoutId!=null && ['default','layout','flow'].indexOf(layoutId)<0)return {error:'Reselect the arrangement before editing it.'};
+  var source=sectionLayoutDefinition(d);
+  d.layouts=[{id:'flow',name:source?source.name:'Standard',sectionLayout:source?builderSectionLayout24(source.sectionLayout):{columns:24,default:sectionLayoutOptimize(d,'default',null)}}];
+  d.defaultLayout='flow';delete d.sectionLayout;delete d.layoutName;
+  return {layoutId:'flow'};
 }
 function planSectionViewSteps(text,raw,section,layoutId,indices){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
@@ -872,11 +842,10 @@ function sectionLayoutSwap(items,from,to){
 function sectionLayoutOptimize(d,target,items){
   var hidden=(items || []).filter(function(it){return it.hidden===true && it.controls==null;});
   var previous=(items || []).find(function(it){return it.controls==='steps';});
-  var attachment=previous?previous.attachTo:items?'diagram':d.primaryPanel && (d.panels || []).some(function(p){return p.id===d.primaryPanel && panelCapability(p.type,'attachControls',false);})?'panel:'+d.primaryPanel:'diagram';
+  var attachment=previous?previous.attachTo:'diagram';
   var excluded=hidden.map(sectionLayoutKey),dock=attachment && excluded.indexOf(attachment)<0 && sectionLayoutTiles(d).some(function(t){return t.key==='steps';});
   if(dock)excluded.push('steps');
-  var presetDiagram=attachment?Object.assign({},d,{primaryPanel:attachment==='diagram'?undefined:attachment.slice(6)}):d;
-  var next=sectionLayoutPreset(presetDiagram,target,excluded);
+  var next=sectionLayoutPreset(d,target,excluded);
   if(dock){
     var host=next.find(function(it){return sectionLayoutKey(it)===attachment;});
     if(host){

@@ -23,7 +23,6 @@
           "id": "doorbell-perspectives",
           "view": "step",
           "autoplay": false,
-          "primaryPanel": "home",
           "nodes": {
             "camera": {
               "title": "Camera",

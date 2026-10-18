@@ -536,7 +536,6 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
     return {error: 'id "' + newId + '" is already taken'};
   return builderRewrite(text, raw, got.path, function(d){
     d.panels[panelIdx].id = newId;
-    if (d.primaryPanel === oldId) d.primaryPanel = newId;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
       if(v && v.exploreLayout && Array.isArray(v.exploreLayout.panelPlacements))v.exploreLayout.panelPlacements.forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
       if(v && v.exploreLayout)[v.exploreLayout,v.exploreLayout.canvas].forEach(function(layout){if(layout && Array.isArray(layout.panels))layout.panels.forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});});
@@ -631,7 +630,6 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   if (!p) return {error: 'panel not found — reselect and try again'};
   var id = p.id;
   return builderRewrite(text, raw, got.path, function(d){
-    if (d.primaryPanel === id) delete d.primaryPanel;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
       if(v && v.exploreLayout && Array.isArray(v.exploreLayout.panelPlacements))v.exploreLayout.panelPlacements=v.exploreLayout.panelPlacements.filter(function(it){return !it || it.panel!==id;});
       if(v && v.exploreLayout)[v.exploreLayout,v.exploreLayout.canvas].forEach(function(layout){if(layout && Array.isArray(layout.panels))layout.panels=layout.panels.filter(function(it){return !it || it.panel!==id;});});

@@ -55,6 +55,30 @@ function seatmapViewBox(panel) {
   var ok = function (v) { return isFiniteNum(v) && v >= 100 && v <= 4000; };
   return { width: ok(box.width) ? box.width : SPM_VIEW, height: ok(box.height) ? box.height : SPM_VIEW };
 }
+/* Optional rink outline for paths geometry, in viewBox units:
+   {shape:"rink", x, y, width, height}, drawn under the sections with the
+   bowl's field style. Corners follow 200 × 85 ft proportions (28 ft radius). */
+var SEATMAP_FIELD_SHAPES = ['rink'];
+function seatmapFieldRect(panel) {
+  var f = panel.field, view = seatmapViewBox(panel);
+  if (seatmapGeometry(panel) !== 'paths' || !panelObject(f) || SEATMAP_FIELD_SHAPES.indexOf(f.shape) < 0) return null;
+  if (![f.x, f.y, f.width, f.height].every(isFiniteNum) || f.x < 0 || f.y < 0 || f.width < 10 || f.height < 10 ||
+    f.x + f.width > view.width || f.y + f.height > view.height) return null;
+  return { x: f.x, y: f.y, width: f.width, height: f.height };
+}
+function seatmapFieldShape(rect) {
+  var r = spmRound(Math.min(rect.height * 28 / 85, rect.width / 2, rect.height / 2));
+  var x0 = spmRound(rect.x), y0 = spmRound(rect.y), x1 = spmRound(rect.x + rect.width), y1 = spmRound(rect.y + rect.height);
+  var d = 'M' + spmRound(x0 + r) + ',' + y0 + 'L' + spmRound(x1 - r) + ',' + y0 + 'A' + r + ',' + r + ' 0 0 1 ' + x1 + ',' + spmRound(y0 + r) +
+    'L' + x1 + ',' + spmRound(y1 - r) + 'A' + r + ',' + r + ' 0 0 1 ' + spmRound(x1 - r) + ',' + y1 + 'L' + spmRound(x0 + r) + ',' + y1 +
+    'A' + r + ',' + r + ' 0 0 1 ' + x0 + ',' + spmRound(y1 - r) + 'L' + x0 + ',' + spmRound(y0 + r) + 'A' + r + ',' + r + ' 0 0 1 ' + spmRound(x0 + r) + ',' + y0 + 'Z';
+  /* Centre line and the two blue lines, 25 ft either side of centre. */
+  var lines = [0.375, 0.5, 0.625].map(function (f) {
+    var x = spmRound(rect.x + rect.width * f);
+    return 'M' + x + ',' + y0 + 'L' + x + ',' + y1;
+  }).join('');
+  return { field: d, fieldLines: lines };
+}
 function seatmapPathOk(d) {
   return !spmParsePath(d, { range: [0, SPM_VIEW] }).error;
 }
@@ -138,7 +162,21 @@ function seatmapLandmarks(panel) {
       isFiniteNum(mark.x) && isFiniteNum(mark.y) && mark.x >= 0 && mark.x <= view.width && mark.y >= 0 && mark.y <= view.height;
   }).map(function (mark) { return { id: mark.id, label: mark.label, x: mark.x, y: mark.y }; });
 }
-function seatmapDeclarationWarnings(panel, path, warnings) {
+/* `venue` names a SeatmapVenues entry (src/panels/venue-library.js); its
+   fields fill every venue field the panel does not write. An unknown id
+   warns with the available ids and the panel draws its own fields. */
+function seatmapResolve(panel) {
+  return SeatmapVenues.resolve(panel);
+}
+function seatmapVenueWarnings(panel, path, warnings) {
+  if (!panelOwn(panel, 'venue') || SeatmapVenues.get(panel.venue)) return;
+  var ids = SeatmapVenues.ids();
+  warnings.push(path + '.venue: ' + (typeof panel.venue === 'string' ? 'unknown venue "' + panel.venue + '"' : 'expected a venue id') +
+    ' — available: ' + (ids.length ? ids.join(', ') : 'none') + '; drawing the panel’s own sections');
+}
+function seatmapDeclarationWarnings(raw, path, warnings) {
+  seatmapVenueWarnings(raw, path, warnings);
+  var panel = seatmapResolve(raw);
   var geometry = seatmapGeometry(panel), slots = seatmapRingSlots(panel);
   if (panel.geometry !== undefined && panel.geometry !== 'bowl' && panel.geometry !== 'paths')
     warnings.push(path + '.geometry: expected bowl or paths — using bowl');
@@ -159,6 +197,11 @@ function seatmapDeclarationWarnings(panel, path, warnings) {
     else if (!panelObject(panel.viewBox) || !isFiniteNum(panel.viewBox.width) || !isFiniteNum(panel.viewBox.height) ||
       panel.viewBox.width < 100 || panel.viewBox.width > 4000 || panel.viewBox.height < 100 || panel.viewBox.height > 4000)
       warnings.push(path + '.viewBox: expected {width,height} numbers 100–4000 — using 1000×1000');
+  }
+  if (panel.field !== undefined) {
+    if (geometry !== 'paths') warnings.push(path + '.field: only used by geometry "paths" — ignored');
+    else if (!seatmapFieldRect(panel))
+      warnings.push(path + '.field: expected {"shape":"rink","x","y","width","height"} with width and height ≥ 10 inside the viewBox — no field drawn');
   }
   var ringIds = Object.create(null);
   if (!Array.isArray(panel.rings) || !panel.rings.length || panel.rings.length > SEATMAP_MAX_RINGS)
@@ -257,6 +300,7 @@ function seatmapHighlightOk(value, capacities) {
   return Array.isArray(value) && value.length <= SEATMAP_MAX_HIGHLIGHT && value.every(function (id) { return typeof id === 'string' && id in capacities; });
 }
 function seatmapPatchWarnings(state, path, panel, warnings) {
+  panel = seatmapResolve(panel);
   softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, panel, warnings) {
     var capacities = seatmapCapacities(panel), tiers = seatmapTiers(panel);
     Object.keys(state).forEach(function (key) {
@@ -359,11 +403,14 @@ function seatmapLabelFont(label, geom) {
    highlight set. Prices and revenue are "where price known": a section without
    a price contributes nothing and is listed as unpriced. */
 function seatmapModel(panel, state) {
+  panel = seatmapResolve(panel);
   state = panelObject(state) ? state : {};
   var geometry = seatmapGeometry(panel), rings = seatmapRings(panel), tiers = seatmapTiers(panel), decl = seatmapSections(panel);
   var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
   var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null;
   var view = bowl ? { width: bowl.width, height: bowl.height } : seatmapViewBox(panel);
+  var fieldRect = bowl ? null : seatmapFieldRect(panel), fieldShape = fieldRect ? seatmapFieldShape(fieldRect) : null;
+  var field = bowl ? bowl.field : fieldShape ? fieldShape.field : null, fieldLines = bowl ? bowl.fieldLines : fieldShape ? fieldShape.fieldLines : '';
   var mode = SEATMAP_MODES.indexOf(state.mode) >= 0 ? state.mode : 'sold';
   var sold = panelObject(state.sold) ? state.sold : {}, held = panelObject(state.held) ? state.held : {};
   var price = panelObject(state.price) ? state.price : {}, tierOf = panelObject(state.tierOf) ? state.tierOf : {};
@@ -440,7 +487,7 @@ function seatmapModel(panel, state) {
   });
   var prices = sections.filter(function (s) { return s.price !== null; }).map(function (s) { return s.price; });
   return {
-    geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: bowl ? bowl.field : null, fieldLines: bowl ? bowl.fieldLines : '', mode: mode, currency: currency,
+    geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: field, fieldLines: fieldLines, mode: mode, currency: currency,
     sections: sections, rings: ringTotals, tiers: tierCounts, zones: zoneOrder.map(function (z) { return { zone: z, sections: zones[z] }; }),
     landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2]),
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
@@ -450,7 +497,7 @@ function seatmapModel(panel, state) {
        data, label text and lines, landmarks and tier definitions. */
     geometryKey: spmHash(geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) {
       return s.id + '@' + s.x + ',' + s.y + '|' + s.d + '|' + s.lines.join('/') + '|' + s.font;
-    }).join(',') + ';' + JSON.stringify(seatmapLandmarks(panel)) + ';' + JSON.stringify(tiers) + ';' + (bowl ? bowl.field : '')),
+    }).join(',') + ';' + JSON.stringify(seatmapLandmarks(panel)) + ';' + JSON.stringify(tiers) + ';' + (field || '') + (fieldLines && !bowl ? '|' + fieldLines : '')),
   };
 }
 function seatmapTierPalette(i) {
@@ -524,6 +571,7 @@ function seatmapTotals(model) {
     '<div class="seatmap-stat"><b>' + esc(seatmapRevenueText(model)) + '</b><span>revenue' + (t.revenueKnown && !t.allPriced ? ' · where price known' : '') + '</span></div></div>';
 }
 function seatmapHTML(panel, state, model, hid, pulse) {
+  panel = seatmapResolve(panel);
   model = model || seatmapModel(panel, state);
   hid = hid || 'spm-static';
   var h = '<div class="seatmap seatmap-mode-' + model.mode + (pulse ? ' seatmap-pulse' : '') + '">';
@@ -600,10 +648,205 @@ function seatmapTemplateSections() {
   zones.forEach(function (zone, i) { out.push({ id: '20' + (i + 1), ring: 'upper', capacity: 640, zone: zone }); });
   return out;
 }
+/* ---- Workbench (desktop authoring only) ----
+   Venue picker and seating-chart import for the panel inspector. Each
+   gesture is one context.transact, so one Undo restores the declaration.
+   - Picking a venue writes `venue` and REMOVES the panel's own venue fields
+     (geometry, bowl, rings, sections, landmarks, …): written fields override
+     the venue, so keeping them would hide the pick.
+   - None keeps a copy of the venue's seating in the panel and drops `venue`.
+   - Import seating chart… parses CSV/SVG with the shared importer
+     (src/panels/seatmap-import.js, the code behind tools/seatmap-import.mjs),
+     drops `venue` and writes the imported fields inline, clearing any other
+     venue field so nothing from the previous venue lingers.
+   Planners are pure text edits (tests call them directly). */
+var SEATMAP_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+function seatmapPlanPickVenue(text, raw, path, panel, venueId) {
+  var pairs = [];
+  if (venueId) {
+    if (!SeatmapVenues.get(venueId)) return { error: 'Unknown venue "' + venueId + '".' };
+    pairs.push(['venue', JSON.stringify(venueId)]);
+    SEATMAP_VENUE_FIELDS.forEach(function (key) { if (panelOwn(panel, key)) pairs.push([key, null]); });
+  } else {
+    var resolved = seatmapResolve(panel);
+    SEATMAP_VENUE_FIELDS.forEach(function (key) {
+      if (!panelOwn(panel, key) && panelOwn(resolved, key)) pairs.push([key, JSON.stringify(resolved[key])]);
+    });
+    pairs.push(['venue', null]);
+  }
+  return planSetFields(text, raw, path, pairs);
+}
+function seatmapPlanImport(text, raw, path, panel, fragment) {
+  var pairs = [['venue', null]];
+  SEATMAP_VENUE_FIELDS.forEach(function (key) {
+    pairs.push([key, panelOwn(fragment, key) ? JSON.stringify(fragment[key]) : null]);
+  });
+  return planSetFields(text, raw, path, pairs);
+}
+function seatmapPlanCopyVenueField(text, raw, path, panel, key) {
+  var resolved = seatmapResolve(panel);
+  if (panelOwn(panel, key) || !panelOwn(resolved, key)) return { error: 'Nothing to copy: the panel already writes ' + key + '.' };
+  return planSetField(text, raw, path, key, JSON.stringify(resolved[key]));
+}
+function seatmapVenueOptionLabel(v) {
+  return v.name + (v.location ? ' — ' + v.location : '') + ' · ' + v.sections + ' sections';
+}
+function seatmapDescribe(value) {
+  if (Array.isArray(value)) return value.length + (value.length === 1 ? ' item' : ' items');
+  if (panelObject(value)) return JSON.stringify(value);
+  return String(value);
+}
+function seatmapEditor(context) {
+  var doc = context.document, lastReport = null;
+  function el(tag, cls, text) {
+    var node = doc.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function edit(planFor, message) {
+    if (context.editingBlocked()) { context.error('Finish ADD TO STEP before changing the venue.'); return false; }
+    return context.transact(function (raw) {
+      var target = context.target(), path = target && builderTargetPath(raw, target), panel = path && specValueAt(raw, path);
+      if (!panel || panel.type !== 'seatmap') return { error: 'Select the Venue map panel again.' };
+      return planFor(raw, panel, path);
+    }, { after: function () { lastReport = message ? { source: context.source(), text: message } : null; context.refresh(); } });
+  }
+  function importControls(box) {
+    var retired = false;
+    context.onFormRetire(function () { retired = true; });
+    var file = el('input'), capacity = el('input', 'fctl'), levels = el('input', 'fctl');
+    file.type = 'file';
+    file.accept = '.csv,.svg,text/csv,image/svg+xml';
+    file.setAttribute('aria-label', 'Import seating chart');
+    capacity.type = 'number';
+    capacity.min = '1';
+    capacity.placeholder = 'e.g. 17250';
+    capacity.setAttribute('aria-label', 'Total capacity for blank rows');
+    levels.placeholder = '1:100 level,2:200 level';
+    levels.setAttribute('aria-label', 'Level map');
+    var group = el('div', 'seatmap-import');
+    group.appendChild(el('p', 'fnote', 'Import seating chart… — a CSV (id,level,zone,capacity[,label]) or an SVG chart, the same formats as tools/seatmap-import.mjs. The imported rings and sections are written into this panel and replace the venue.'));
+    [['Total capacity (optional)', capacity], ['Level map (SVG, optional)', levels], ['Chart file', file]].forEach(function (pair) {
+      var label = el('label', 'obj-field', pair[0]);
+      label.appendChild(pair[1]);
+      group.appendChild(label);
+    });
+    context.listen(file, 'change', function () {
+      var chosen = file.files && file.files[0];
+      if (!chosen) return;
+      file.value = '';
+      if (chosen.size > SEATMAP_IMPORT_MAX_BYTES) { context.error('The chart is larger than 2 MiB. The panel is unchanged.'); return; }
+      var total = String(capacity.value || '').trim(), capacityTotal = null;
+      if (total) {
+        capacityTotal = Number(total);
+        if (!Number.isSafeInteger(capacityTotal) || capacityTotal < 1) { context.error('Total capacity must be a whole number of at least 1.'); return; }
+      }
+      var original = context.source(), selection = JSON.stringify(context.target());
+      function current() { return !retired && context.source() === original && JSON.stringify(context.target()) === selection; }
+      Promise.resolve().then(function () { return chosen.text(); }).then(function (text) {
+        if (!current()) return;
+        var result;
+        try {
+          result = SeatmapImport.importText(text, chosen.name, { capacityTotal: capacityTotal, levelMap: String(levels.value || '').trim() || null });
+        } catch (error) {
+          context.error('Import failed: ' + error.message + '. The panel is unchanged.');
+          return;
+        }
+        var message = SeatmapImport.formatReport(result.report, chosen.name);
+        if (result.fragment.capacityNote) message += '\nCapacities: ' + result.fragment.capacityNote + '. Say so on the page.';
+        edit(function (raw, panel, path) { return seatmapPlanImport(context.source(), raw, path, panel, result.fragment); }, message);
+      }, function () { if (current()) context.error('Could not read the chart file. The panel is unchanged.'); });
+    });
+    box.appendChild(group);
+  }
+  function venueControl(panel) {
+    var box = el('div', 'seatmap-venue'), select = el('select', 'fctl');
+    select.setAttribute('aria-label', 'Venue');
+    var none = el('option', '', 'None — this panel’s own sections');
+    none.value = '';
+    select.appendChild(none);
+    SeatmapVenues.list().forEach(function (v) {
+      var option = el('option', '', seatmapVenueOptionLabel(v));
+      option.value = v.id;
+      select.appendChild(option);
+    });
+    var currentId = panelOwn(panel, 'venue') && typeof panel.venue === 'string' ? panel.venue : '';
+    var venue = SeatmapVenues.get(currentId);
+    if (currentId && !venue) {
+      var unknown = el('option', '', currentId + ' (unknown)');
+      unknown.value = currentId;
+      select.appendChild(unknown);
+    }
+    select.value = currentId;
+    context.listen(select, 'change', function () {
+      var id = select.value;
+      if (id === currentId) return;
+      var replaced = SEATMAP_VENUE_FIELDS.filter(function (key) { return panelOwn(panel, key); }), message;
+      if (id) message = 'Using ' + SeatmapVenues.get(id).name + (replaced.length ? '. Replaced this panel’s own ' + replaced.join(', ') + '; Undo restores them.' : '.');
+      else message = venue ? 'Copied ' + venue.name + '’s seating into this panel; edit it freely.' : 'Removed the venue reference.';
+      if (!edit(function (raw, live, path) { return seatmapPlanPickVenue(context.source(), raw, path, live, id); }, message)) select.value = currentId;
+    });
+    box.appendChild(select);
+    if (venue) {
+      box.appendChild(el('p', 'fnote', venue.note || ''));
+      var own = SEATMAP_VENUE_FIELDS.filter(function (key) { return panelOwn(panel, key); });
+      if (own.length) box.appendChild(el('p', 'fnote', 'This panel overrides the venue’s ' + own.join(', ') + '.'));
+    } else if (currentId) box.appendChild(el('p', 'fnote', 'No venue "' + currentId + '" in the library; the panel draws its own sections.'));
+    if (lastReport && lastReport.source === context.source()) box.appendChild(el('pre', 'fnote seatmap-import-report', lastReport.text));
+    importControls(box);
+    return context.controls.block('Venue', box);
+  }
+  function inheritedControl(key, panel) {
+    var venue = SeatmapVenues.get(panel.venue), meta = SEATMAP_FIELD_META[key] || {};
+    var box = el('div', 'seatmap-inherited');
+    box.appendChild(el('p', 'fnote', 'From ' + venue.name + ': ' + seatmapDescribe(venue.seatmap[key]) + '. Writing this field on the panel overrides the venue’s value.'));
+    box.appendChild(context.controls.action('Edit a copy here', function () {
+      edit(function (raw, live, path) { return seatmapPlanCopyVenueField(context.source(), raw, path, live, key); },
+        'Copied ' + venue.name + '’s ' + key + ' into this panel; it now overrides the venue.');
+    }));
+    return context.controls.block(meta.label || key, box);
+  }
+  return {
+    setupField: function (field, panel) {
+      var key = field[0];
+      if (key === 'venue') return venueControl(panel);
+      if (SEATMAP_VENUE_FIELDS.indexOf(key) >= 0 && !panelOwn(panel, key)) {
+        var venue = SeatmapVenues.get(panel.venue);
+        if (venue && panelOwn(venue.seatmap, key)) return inheritedControl(key, panel);
+      }
+      return null;
+    },
+  };
+}
+var SEATMAP_FIELD_META = {
+  venue: { label: 'Venue', help: 'A venue from the library supplies geometry, rings, sections and landmarks. Any of those fields written on the panel overrides the venue’s value. Picking a venue replaces the panel’s own copies; Undo restores them.' },
+  geometry: { label: 'Geometry', help: 'bowl draws generic rings from bowl, rings and each section’s zone. paths uses each section’s own SVG path (imported with tools/seatmap-import.mjs).' },
+  bowl: { label: 'Bowl shape', help: 'rink (default: two straight sidelines joined by rounded ends), oval, rectangle or pitch. Generic shapes only; a library venue with traced sections uses paths geometry instead.' },
+  direction: { label: 'Numbering direction', help: 'clockwise (default) or counterclockwise: the order sections walk around the bowl from the left end.' },
+  startAt: { label: 'Walk starts at', help: 'end (default): the first sections sit on the left end; sideline: the walk starts on the top sideline.' },
+  ringSlots: { label: 'Slots per ring', help: 'Only for rings whose sections carry an explicit slot: 8–32 equal arc-length slots, default 16. Rings without slots are placed by zone.' },
+  currency: { label: 'Currency', help: 'Three-letter ISO code used for prices and revenue; default USD. No conversion.' },
+  showTotals: { label: 'Show totals strip', help: 'Sold / capacity, sell-through, held seats and revenue where price is known. Default on.' },
+  rings: { label: 'Rings', help: '1–4 rings from the inside out, e.g. 100 level, 200 level, 300 level. Ring ids group sections in the legend.' },
+  sections: { label: 'Sections', help: '4–160 sections in numbering order. ring is a ring id; zone (sideline, corner, end or club) decides where the wedge sits; optional slot/span place a ring by slots instead; path is the SVG path for paths geometry; capacity is seats; tier is a tier id.' },
+  tiers: { label: 'Price tiers', help: 'Up to 8 tiers with optional #RRGGBB colours, shown in tier mode.' },
+  landmarks: { label: 'Landmarks', help: 'Up to 8 text labels inside the viewBox, e.g. home bench or stage.' },
+  viewBox: { label: 'viewBox (paths)', help: '{"width","height"} for paths geometry; default 1000×1000. Aspect is preserved.' },
+  sold: { label: 'Sold by section', help: 'Object keyed by section id → seats sold (0 to capacity). Keys merge into the carried map; a key set to null forgets that section; null clears every section.', nullLabel: 'Clear every sold count' },
+  held: { label: 'Holds by section', help: 'Object keyed by section id → {"count", "label", "until"} or null. Held seats draw a hatch. Merges like sold.', nullLabel: 'Clear every hold' },
+  price: { label: 'Price by section', help: 'Object keyed by section id → price in the panel currency. Revenue = sold × price where price is known. Merges like sold.', nullLabel: 'Clear every price' },
+  tierOf: { label: 'Tier by section', help: 'Object keyed by section id → tier id, overriding the declared tier. Merges like sold.', nullLabel: 'Clear every tier override' },
+  mode: { label: 'Colour mode', help: 'sold (default), held, price, tier or revenue chooses what the fill intensity means.' },
+  highlight: { label: 'Highlight', help: 'One section id, an array of up to 8 ids, or null. Highlighted sections get a bold outline and pulse once when the set changes.', nullLabel: 'No highlight' },
+  note: { label: 'Explanation' },
+  field: { label: 'Rink outline (paths)', help: '{"shape":"rink","x","y","width","height"} in viewBox units for paths geometry: a rink drawn under the sections with centre and blue lines. The importer reads it from <rect id="rink-outline">.' },
+};
 PanelRegistry.define('seatmap', {
   label: 'Venue map', since: '0.2.0', order: 50,
   validateDeclaration: seatmapDeclarationWarnings, validatePatch: seatmapPatchWarnings, fold: seatmapFold,
   render: function (host, panel, state, skin, states, stepIdx, animate) {
+    panel = seatmapResolve(panel);
     var model = seatmapModel(panel, state);
     /* Pattern id and highlight history are per host: presentation only. */
     var hid = host._spmId || (host._spmId = 'spmh' + ++ZF_SEQ);
@@ -667,38 +910,19 @@ PanelRegistry.define('seatmap', {
       initial: { sold: { 101: 380, 102: 300, 103: 410, 104: 405, 105: 290, 106: 240, 107: 400, 108: 395, 201: 320, 202: 180, 203: 420, 204: 390, 205: 150, 206: 120, 207: 260, 208: 200 } },
     },
     setupFields: [
-      ['geometry', 'text'], ['bowl', 'text'], ['direction', 'text'], ['startAt', 'text'], ['ringSlots', 'num'], ['currency', 'text'], ['showTotals', 'jsonAny'],
+      ['venue', 'text'], ['geometry', 'text'], ['bowl', 'text'], ['direction', 'text'], ['startAt', 'text'], ['ringSlots', 'num'], ['currency', 'text'], ['showTotals', 'jsonAny'],
       ['rings', 'rows', { max: SEATMAP_MAX_RINGS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['sections', 'rows', { wide: true, max: SEATMAP_MAX_SECTIONS, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'ring', req: true }, { k: 'slot', kind: 'num' }, { k: 'span', kind: 'num' }, { k: 'capacity', kind: 'num', req: true }, { k: 'zone' }, { k: 'tier' }, { k: 'path' }] }],
       ['tiers', 'rows', { max: SEATMAP_MAX_TIERS, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'color' }] }],
       ['landmarks', 'rows', { max: SEATMAP_MAX_LANDMARKS, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'x', kind: 'num' }, { k: 'y', kind: 'num' }] }],
-      ['viewBox', 'json'], ['initial', 'json'],
+      ['viewBox', 'json'], ['field', 'json'], ['initial', 'json'],
     ],
     patchFields: [
       ['sold', 'json', { nullable: true }], ['held', 'json', { nullable: true }], ['price', 'json', { nullable: true }], ['tierOf', 'json', { nullable: true }],
       ['mode', 'enum', SEATMAP_MODES], ['highlight', 'jsonAny', { nullable: true }], ['note', 'text'],
     ],
-    fieldMeta: {
-      geometry: { label: 'Geometry', help: 'bowl draws generic rings from bowl, rings and each section’s zone. paths uses each section’s own SVG path (imported with tools/seatmap-import.mjs).' },
-      bowl: { label: 'Bowl shape', help: 'rink (default: two straight sidelines joined by rounded ends), oval, rectangle or pitch. Generic shapes only; no real venue is drawn.' },
-      direction: { label: 'Numbering direction', help: 'clockwise (default) or counterclockwise: the order sections walk around the bowl from the left end.' },
-      startAt: { label: 'Walk starts at', help: 'end (default): the first sections sit on the left end; sideline: the walk starts on the top sideline.' },
-      ringSlots: { label: 'Slots per ring', help: 'Only for rings whose sections carry an explicit slot: 8–32 equal arc-length slots, default 16. Rings without slots are placed by zone.' },
-      currency: { label: 'Currency', help: 'Three-letter ISO code used for prices and revenue; default USD. No conversion.' },
-      showTotals: { label: 'Show totals strip', help: 'Sold / capacity, sell-through, held seats and revenue where price is known. Default on.' },
-      rings: { label: 'Rings', help: '1–4 rings from the inside out, e.g. 100 level, 200 level, 300 level. Ring ids group sections in the legend.' },
-      sections: { label: 'Sections', help: '4–160 sections in numbering order. ring is a ring id; zone (sideline, corner, end or club) decides where the wedge sits; optional slot/span place a ring by slots instead; path is the SVG path for paths geometry; capacity is seats; tier is a tier id.' },
-      tiers: { label: 'Price tiers', help: 'Up to 8 tiers with optional #RRGGBB colours, shown in tier mode.' },
-      landmarks: { label: 'Landmarks', help: 'Up to 8 text labels inside the viewBox, e.g. home bench or stage.' },
-      viewBox: { label: 'viewBox (paths)', help: '{"width","height"} for paths geometry; default 1000×1000. Aspect is preserved.' },
-      sold: { label: 'Sold by section', help: 'Object keyed by section id → seats sold (0 to capacity). Keys merge into the carried map; a key set to null forgets that section; null clears every section.', nullLabel: 'Clear every sold count' },
-      held: { label: 'Holds by section', help: 'Object keyed by section id → {"count", "label", "until"} or null. Held seats draw a hatch. Merges like sold.', nullLabel: 'Clear every hold' },
-      price: { label: 'Price by section', help: 'Object keyed by section id → price in the panel currency. Revenue = sold × price where price is known. Merges like sold.', nullLabel: 'Clear every price' },
-      tierOf: { label: 'Tier by section', help: 'Object keyed by section id → tier id, overriding the declared tier. Merges like sold.', nullLabel: 'Clear every tier override' },
-      mode: { label: 'Colour mode', help: 'sold (default), held, price, tier or revenue chooses what the fill intensity means.' },
-      highlight: { label: 'Highlight', help: 'One section id, an array of up to 8 ids, or null. Highlighted sections get a bold outline and pulse once when the set changes.', nullLabel: 'No highlight' },
-      note: { label: 'Explanation' },
-    },
+    fieldMeta: SEATMAP_FIELD_META,
+    editor: seatmapEditor,
     picker: {
       order: 50, name: 'Venue map', category: 'Sports & events marketing', tagline: 'Where the seats sold',
       description: 'A bowl of sections coloured by sell-through, holds, price, tier or revenue, so readers watch presales, group holds and promotions fill the building step by step.',

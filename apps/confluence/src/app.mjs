@@ -3,7 +3,7 @@
 export async function startConfluenceApp(document, bridge, core){
   const el = id => document.getElementById(id);
   const host = el('docview'), input = el('spec-input'), file = el('spec-file');
-  const section = el('section'), focus = el('focus'), skin = el('skin');
+  const section = el('section'), skin = el('skin');
   const save = el('save'), status = el('import-status'), appStatus = el('app-status');
   let controller = null, shortcuts = null, context = null, revision = 0, busy = false, reading = false;
   const destroy = () => {
@@ -12,7 +12,7 @@ export async function startConfluenceApp(document, bridge, core){
   };
   function message(text, error = false){ status.textContent = text; status.classList.toggle('error',error); }
   function fail(text){ appStatus.hidden = false; appStatus.textContent = text; appStatus.classList.add('error'); }
-  function selections(){ return {section:section.value,focus:focus.value,skin:skin.value}; }
+  function selections(){ return {section:section.value,focus:'spec',skin:skin.value}; }
   function optionsFor(page, selected){
     section.replaceChildren(new document.defaultView.Option('Entire spec','all'));
     core.confluenceSections(page).forEach(s=>section.add(new document.defaultView.Option(s.label,s.id)));
@@ -81,7 +81,6 @@ export async function startConfluenceApp(document, bridge, core){
   el('configuration').hidden = false;
   core.SELECTABLE_SKINS.concat(core.SKIN_NAMES.includes(config.skin) && !core.SELECTABLE_SKINS.includes(config.skin)?[config.skin]:[]).forEach(name=>skin.add(new document.defaultView.Option(core.skinLabel(name),name)));
   input.value = typeof config.specJson === 'string' ? config.specJson : '';
-  focus.value = ['spec','home','data'].includes(config.focus) ? config.focus : 'spec';
   skin.value = core.SKIN_NAMES.includes(config.skin) ? config.skin : 'spec';
   if (input.value){
     const existing = core.buildConfluenceExport(input.value);
@@ -89,7 +88,7 @@ export async function startConfluenceApp(document, bridge, core){
     preview();
   }
   input.addEventListener('input',changed);
-  [section,focus,skin].forEach(field=>field.addEventListener('change',preview));
+  [section,skin].forEach(field=>field.addEventListener('change',preview));
   file.addEventListener('change',async()=>{
     const selected = file.files?.[0]; file.value = '';
     if (!selected || busy) return;

@@ -1101,7 +1101,7 @@ function initWorkbenchBuilder(opts){
     if(diagramImport)diagramImport.refresh();
   });
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
-    view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
+    view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'arrangement-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
     editView:function(section,id,action,value){var nextId,ok=commitCascade(function(raw){var plan=planTabViewEdit(session.text(),raw,section,id,action,value,session.validate);nextId=plan.viewId;return plan;});return ok?nextId:null;},
     commit:function(section,target,items,id){
@@ -1660,6 +1660,7 @@ function initWorkbenchBuilder(opts){
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),
     supportsWorkingFile:function(){return !!workingBrowser.pickFile;},chooseWorkingFile:chooseWorkingFile,
     loadText:loadText,beginFileOpen:beginFileOpen, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
+    arrangementSection:function(request,next,previous){return sectionLayoutEditor?sectionLayoutEditor.arrangementSection(request,next,previous):null;},
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
     isProjectOpen:session.isProjectOpen,
     draft:session.draft,

@@ -380,7 +380,6 @@ and each `patch:` line is one sparse patch.
         "diagram": {
           "view": "step",
           "storyTime": {"start": "2026-10-02T18:04", "end": "2026-10-03T07:30", "clock": "12h", "date": "short"},
-          "primaryPanel": "home",
           "nodes": {
             "sensor": {"title": "Tilt sensor", "sub": "on garage door", "icon": "sensor", "tint": "dev"},
             "hub": {"title": "Home hub", "sub": "opener relay", "icon": "router", "tint": "dev"},

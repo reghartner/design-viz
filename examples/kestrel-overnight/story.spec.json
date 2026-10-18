@@ -44,7 +44,6 @@
         ],
         "diagram": {
           "view": "step",
-          "primaryPanel": "home",
           "storyTime": {
             "start": "2026-10-01T22:30",
             "end": "2026-10-02T08:30",
@@ -1411,7 +1410,113 @@
                 "b-late-alert"
               ]
             }
-          ]
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Home",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 18,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "batt"
+                  },
+                  {
+                    "x": 0,
+                    "y": 18,
+                    "w": 16,
+                    "h": 23,
+                    "panel": "app"
+                  },
+                  {
+                    "x": 16,
+                    "y": 6,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "pkgclip"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "panel:home",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 6
+                  },
+                  {
+                    "x": 0,
+                    "y": 18,
+                    "w": 16,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 18
+                  },
+                  {
+                    "x": 0,
+                    "y": 18,
+                    "w": 16,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "batt"
+                  },
+                  {
+                    "x": 0,
+                    "y": 30,
+                    "w": 16,
+                    "h": 23,
+                    "panel": "app"
+                  },
+                  {
+                    "x": 16,
+                    "y": 6,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "pkgclip"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 6
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
         }
       }
     ],
@@ -1422,10 +1527,13 @@
         "content.deviceapp",
         "content.deviceapp-freshness",
         "content.deviceapp-navigation",
+        "document.tab-views",
         "flow.alternates",
         "flow.drilldown",
         "flow.failures",
         "flow.story-time",
+        "layout.grid-24",
+        "layout.named",
         "media.scene-raccoon-at-night",
         "media.screen-playing",
         "media.screen-scene-override",
@@ -1435,6 +1543,31 @@
         "panel.homemap",
         "panel.screen"
       ]
-    }
+    },
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "kestrel-overnight",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "kestrel-overnight",
+            "layout": "flow"
+          }
+        ]
+      }
+    ],
+    "defaultView": "section-1-home"
   }
 }

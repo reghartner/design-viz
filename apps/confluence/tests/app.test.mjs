@@ -10,6 +10,7 @@ const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
 const home=await readFile(new URL('src/starters/homemap-story.json',root),'utf8');
 const trace=await readFile(new URL('src/starters/complex-trace.json',root),'utf8');
 const entry=sourceLoader.entrypoint('forge'),source=entry.source;
+function arrangementStory(){const raw=JSON.parse(home);delete raw.page.views;delete raw.page.defaultView;delete raw.page.sections[0].diagram.layouts;delete raw.page.sections[0].diagram.defaultLayout;return raw;}
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){
   const dom=new JSDOM(html,{url:'https://forge.example/viewer/',runScripts:'outside-only',pretendToBeVisual:true});
@@ -136,10 +137,10 @@ test('file import cannot preview or save the previous JSON while the replacement
 });
 test('display overrides persist separately from the imported JSON',async t=>{
   const s=await setup(t);s.paste(home);
-  s.el('section').value='1';s.el('focus').value='data';s.el('skin').value='lilac';
-  s.el('focus').dispatchEvent(new s.win.Event('change'));
+  s.el('section').value='1';s.el('skin').value='lilac';
+  s.el('section').dispatchEvent(new s.win.Event('change'));
   s.el('save').click();await settle();const config=s.calls.submits[0].config;
-  assert.equal(config.section,'1');assert.equal(config.focus,'data');assert.equal(config.skin,'lilac');
+  assert.equal(config.section,'1');assert.equal(config.focus,'spec');assert.equal(config.skin,'lilac');
   assert.equal(s.el('skin').querySelector('[value=lilac]').textContent,'Opus Lilac');
   assert.deepEqual(JSON.parse(config.specJson),JSON.parse(home));
 });
@@ -154,7 +155,7 @@ for(const skin of ['daylight','editorial'])test('saved legacy '+skin+' stays sel
 });
 
 test('Forge selects the Confluence composition and preserves alternate state through live view switches',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'resident',name:'Resident',sectionLayout:{default:[{x:0,y:0,w:8,h:12}],confluence:[{panel:'home',x:0,y:0,w:12,h:12},{x:0,y:12,w:12,h:12}]}},
     {id:'flow',name:'Data flow',sectionLayout:{confluence:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='resident';
   const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
@@ -176,7 +177,7 @@ test('Forge selects the Confluence composition and preserves alternate state thr
 });
 
 test('default Confluence geometry keeps its live board and controls without adding reader choices',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   delete d.panels;delete d.primaryPanel;delete d.paths;d.steps=[{id:'start',nodes:['camera'],text:'Start'}];
   d.sectionLayout={default:[{x:0,y:0,w:8,h:12}],confluence:[{x:0,y:0,w:12,h:16},{controls:'steps',x:0,y:16,w:12,h:6}]};
   const source=JSON.stringify(raw),s=await setup(t,{config:{specJson:source}}),view=s.el('docview');
@@ -196,7 +197,7 @@ test('default Confluence geometry keeps its live board and controls without addi
 
 test('detached step controls retain one live transport across layout focus, alternates, and ambient mode',async t=>{
   for(const panels of [true,false])for(const controlsFirst of [true,false]){
-    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    const raw=arrangementStory(),d=raw.page.sections[0].diagram;
     if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
     d.layouts=[{id:'detached',name:'Detached controls',sectionLayout:{confluence:[
       {x:0,y:controlsFirst?6:0,w:12,h:12},
@@ -224,7 +225,7 @@ test('detached step controls retain one live transport across layout focus, alte
 
 
 test('node reference menus support right-click, keyboard focus, Forge navigation, and disposal',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   d.nodes.cloud.binding={entityRef:'component:default/events',catalogUrl:'https://backstage.example/catalog/default/component/events',label:'Events <safe>',api:{entityRef:'api:default/events',definitionUrl:'https://api.example/openapi',title:'Events'}};
   d.nodes.cloud.codeRefs=[{id:'events.handle',repository:'https://github.example/team/events',revision:'a'.repeat(40),path:'src/handler.js',anchor:{start:'start',end:'end'},startLine:10,endLine:15}];
   const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview'),node=view.querySelector('[data-dv-node="cloud"]'),trigger=node.querySelector('.nrefs-trigger');
@@ -247,7 +248,7 @@ test('node reference menus support right-click, keyboard focus, Forge navigation
 });
 
 test('nodes without references retain native context menus and path replacement removes open menus',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   d.nodes.cloud.binding={entityRef:'component:default/events',catalogUrl:'https://backstage.example/events'};
   const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
   const camera=view.querySelector('[data-dv-node="camera"]'),ev=new s.win.MouseEvent('contextmenu',{bubbles:true,cancelable:true});camera.dispatchEvent(ev);assert.equal(ev.defaultPrevented,false);assert.equal(camera.querySelector('.nrefs-trigger'),null);
@@ -261,7 +262,7 @@ test('nodes without references retain native context menus and path replacement 
 
 test('authored chapter visibility hides only the diagram, retains playback, and restores exact positions',async t=>{
   for(const detached of [true,false])for(const panels of [true,false]){
-    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    const raw=arrangementStory(),d=raw.page.sections[0].diagram;
     if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
     const tiles=[{x:0,y:0,w:12,h:12},...(detached?[{controls:'steps',x:0,y:12,w:12,h:6}]:[])];
     d.layouts=[{id:'shown',name:'Data flow',sectionLayout:{confluence:tiles}},
@@ -289,7 +290,7 @@ test('authored chapter visibility hides only the diagram, retains playback, and 
 });
 
 test('multiple layouts replace Home with the diagram while retaining the same live alternate, controls and supporting widgets',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   const map={panel:'home',x:0,y:0,w:8,h:12},board={x:0,y:18,w:8,h:12,hidden:true},steps={controls:'steps',x:0,y:12,w:8,h:6};
   const supporting=d.panels.filter(p=>p.id!=='home').map((p,i)=>({panel:p.id,x:8,y:i*10,w:4,h:10}));
   d.layouts=[{id:'resident',name:'Resident <safe>',sectionLayout:{default:[map,board,steps,...supporting]}},{id:'engineer',name:'Engineering',sectionLayout:{default:[{...board,y:0,hidden:false},{...map,y:18,hidden:true},steps,...supporting],confluence:[{...board,y:0,h:10,hidden:false},{...map,y:18,hidden:true},{...steps,y:10},...supporting]}}];
@@ -310,7 +311,7 @@ test('multiple layouts replace Home with the diagram while retaining the same li
 });
 
 test('views dock one live transport to Home or diagram and filter stops without losing skipped state',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   d.panels.push({id:'proof',type:'state',title:'Carry-forward proof',states:['Initial','Skipped update'],initial:{state:'Initial'}});
   d.steps[1].panels.proof={state:'Skipped update'};
   const common=[{panel:'home',x:0,y:0,w:8,h:18},{x:0,y:18,w:8,h:18,hidden:true},{controls:'steps',attachTo:'panel:home',x:0,y:18,w:8,h:6}];
@@ -335,7 +336,7 @@ test('views dock one live transport to Home or diagram and filter stops without 
 });
 
 test('attached transport heights follow the active host profile and hiding the drawing ignores caption scroll height',async t=>{
-  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const raw=arrangementStory(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'map',name:'Map',sectionLayout:{default:[{panel:'home',x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'panel:home',x:0,y:20,w:8,h:7}]}},
     {id:'flow',name:'Flow',sectionLayout:{default:[{x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:12,h:8}]}},
     {id:'hidden-flow',name:'Hidden flow',sectionLayout:{default:[{x:0,y:0,w:8,h:20,hidden:true},{controls:'steps',attachTo:'diagram',x:0,y:20,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:20,hidden:true},{controls:'steps',attachTo:'diagram',x:0,y:20,w:12,h:8}]}},
@@ -357,7 +358,7 @@ test('attached transport heights follow the active host profile and hiding the d
 
 test('all row routing modes expose sizing without changing the drawing or requiring steps',async t=>{
   for(const routing of [undefined,'curves','lanes'])for(const withSteps of [false,true]){
-    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    const raw=arrangementStory(),d=raw.page.sections[0].diagram;
     delete d.routing;if(routing)d.routing=routing;
     if(!withSteps){delete d.steps;delete d.paths;}
     const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');

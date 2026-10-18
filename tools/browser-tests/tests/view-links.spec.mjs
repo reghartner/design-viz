@@ -1,6 +1,8 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import {createRequire} from 'node:module';
+const {migrate}=createRequire(import.meta.url)('../../migrate-panel-views.cjs');
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
@@ -49,21 +51,26 @@ test('hash navigation restores named views without history-dependent filters or 
  await page.evaluate(()=>{location.hash='d=front-door';});await expect(selected(page)).toHaveAttribute('data-layout-id','home-story');
 });
 
-test('legacy Home and Data flow preserve saved geometry, while named IDs take precedence',async({page,server})=>{
- const spec=structuredClone(named),d=spec.page.sections[0].diagram;delete d.layouts;delete d.defaultLayout;
- const url=await build(server,spec,'legacy-views');
- await page.goto(url+'#d=front-door&v=flow&m=step&s=notify');await expect(page.locator('#section-front-door')).toHaveAttribute('data-view-id','flow');
- await expect(page.locator('[data-view-focus="flow"]')).toHaveAttribute('aria-pressed','true');
- await page.getByRole('button',{name:'Home',exact:true}).click();await expect.poll(()=>viewOf(page)).toBe('home');
- await page.reload();await expect(page.locator('[data-view-focus="panel"]')).toHaveAttribute('aria-pressed','true');
- d.sectionLayout=named.page.sections[0].diagram.layouts[0].sectionLayout;
- const layoutURL=await build(server,spec,'legacy-layout');await page.goto(layoutURL+'#d=front-door&v=home');
- await expect(page.locator('#section-front-door')).toHaveAttribute('data-view-id','home');expect(viewOf(page)).toBe('home');
- await page.getByRole('button',{name:'Data flow',exact:true}).click();await expect.poll(()=>viewOf(page)).toBe('flow');await page.reload();
- await expect(page.locator('.section-layout-grid')).toBeVisible();await expect(page.locator('.board')).toBeHidden();await expect(page.locator('[data-view-layout]')).toHaveCount(0);
+test('migrated View links preserve geometry and history; retired shortcuts never recreate Views',async({page,server})=>{
+ const old=structuredClone(named),d=old.page.sections[0].diagram;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
+ d.sectionLayout=structuredClone(named.page.sections[0].diagram.layouts[0].sectionLayout);
+ const {spec,report}=migrate(old),flow=report.links.find(l=>l.kind==='fragment-view' && l.from==='flow').to,home=report.links.find(l=>l.kind==='fragment-view' && l.from==='home').to;
+ const geometry=spec.page.sections[0].diagram.layouts.find(v=>v.id==='flow').sectionLayout;
+ for(const profile of ['default','confluence'])expect(geometry[profile].map(t=>({...t,x:t.x/2,w:t.w/2}))).toEqual(d.sectionLayout[profile]);
+ const url=await build(server,spec,'migrated-links'),sec=page.locator('#section-front-door');
+ await page.goto(url+'#d=front-door&v='+flow+'&m=step&s=notify');await expect(sec).toHaveAttribute('data-view-id','flow');expect(viewOf(page)).toBe(flow);
+ await expect(sec.locator('.section-layout-grid')).toBeVisible();await expect(sec.locator('.board')).toBeHidden();await expect(sec.locator('.stepline')).toContainText('resident is notified');
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Home',exact:true}).click();await expect.poll(()=>viewOf(page)).toBe(home);
+ await page.reload();await expect(sec).toHaveAttribute('data-view-id','home');
+ await page.evaluate(id=>{location.hash='d=front-door&v='+id+'&m=step&s=notify';},flow);await expect(sec).toHaveAttribute('data-view-id','flow');
+ await page.goBack();await expect(sec).toHaveAttribute('data-view-id','home');await page.goForward();await expect(sec).toHaveAttribute('data-view-id','flow');
+ for(const retired of ['home','flow']){
+  await page.goto(url+'#d=front-door&v='+retired);await expect(sec).toHaveAttribute('data-view-id','home');await expect.poll(()=>viewOf(page)).toBe(home);
+  await expect(page.locator('[data-view-focus],.secondary-flow')).toHaveCount(0);await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(2);
+ }
  const collision=structuredClone(named),cd=collision.page.sections[0].diagram;cd.layouts[1].id='home';
  const collisionURL=await build(server,collision,'named-home');await page.goto(collisionURL+'#d=front-door&v=home');
- await expect(selected(page)).toHaveText('Service flow');await expect(page.locator('.board')).toBeVisible();
+ await expect(selected(page)).toHaveText('Service flow');await expect(sec.locator('.board')).toBeVisible();
 });
 
 test('view-only embeds target their section even without steps or when other sections come first',async({page,server})=>{

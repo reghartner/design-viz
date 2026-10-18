@@ -333,9 +333,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   sectionLayoutWarnings(d, DP, warnings);
   if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
     warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
-  if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
-      !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
-    warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
+  if (d.primaryPanel !== undefined) warnings.push(DP + '.primaryPanel: retired; use tools/migrate-panel-views.cjs to preserve the old presentations as explicit arrangements');
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (Object.prototype.hasOwnProperty.call(d, 'autoplay') && typeof d.autoplay !== 'boolean')

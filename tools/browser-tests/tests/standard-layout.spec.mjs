@@ -139,8 +139,8 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   expect(await page.locator('.layout-preview-stage').evaluate(el=>el.style.minHeight)).toBe('');
 });
 
-// Desktop authoring only. These tests run in CI; no local browser execution is
-// required to develop the source-preserving Arrange transition.
+// Desktop authoring only. Existing geometry stays unchanged; new sections
+// borrow an editable grid until the first authored arrangement edit.
 import arrangeViews from '../../../tests/fixtures/arrange-views.cjs';
 import {chooseNavigation} from '../helpers/test.mjs';
 for(const kind of ['named','legacy-named','legacy-grid','automatic'])test(`Arrange preserves the current geometry and both Views for ${kind} JSON`,async({page,server})=>{
@@ -162,15 +162,16 @@ for(const kind of ['named','legacy-named','legacy-grid','automatic'])test(`Arran
   const before=await geometry();expect(before.length).toBeGreaterThan(0);
   await arrangeChapter(page);await settle(page);
   await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
-  await expect(selected()).toHaveAttribute('aria-selected','true');expect(await geometry()).toEqual(before);
+  await expect(selected()).toHaveAttribute('aria-selected','true');if(kind!=='automatic')expect(await geometry()).toEqual(before);
   await expect(nav.getByRole('tab',{name:'Explore',exact:true,includeHidden:true})).toHaveCount(1);
   if(kind==='automatic'){
-    await expect(page.locator('.section-arrange-fields')).toContainText('Choose Optimize layout to create an editable grid');
-    await expect(page.locator('.section-layout-grid')).toHaveCount(0);
-  }else{
+    await expect(page.getByRole('spinbutton',{name:'Height',exact:true})).toBeVisible();await expect(page.locator('.section-layout-grid')).toBeVisible();
+    await page.getByRole('button',{name:'Done arranging',exact:true}).click();await settle(page);expect(await geometry()).toEqual(before);await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();await arrangeChapter(page);
+  }
+  {
     // Existing grids remain directly editable without an initialization write.
     const handle=page.locator('[data-layout-key="panel:home"] .section-tile-move');
-    await handle.focus();await page.keyboard.press('ArrowUp');
+    await handle.focus();await page.keyboard.press(kind==='automatic'?'ArrowDown':'ArrowUp');
     await expect(page.locator('#src')).not.toHaveValue(source);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -183,6 +184,7 @@ for(const kind of ['named','legacy-named','legacy-grid','automatic'])test(`Arran
   expect(next.defaultLayout).toBe(original.defaultLayout);
   if(original.layouts)expect(next.layouts[1]).toEqual(original.layouts[1]);
   else expect(next.layouts).toBeUndefined();
+  if(kind==='automatic')expect(next.sectionLayout.default.find(it=>it.controls==='steps').attachTo).toBe('diagram');
   await expect(page.locator('.section-layout-grid')).toBeVisible();
   await expect(selected()).toHaveAttribute('aria-selected','true');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);

@@ -8,8 +8,8 @@ source-preserving legacy migration and navigation.
 
 `diagram.sectionLayout` saves panel, diagram and step-control placement only.
 Adding or editing it never creates or renames reader Views in either the page
-header or the section. A plain diagram remains Standard; existing Home/Data flow
-choices remain available, with saved geometry used for Data flow. `layoutName`
+header or the section. A diagram without authored Views or named arrangements remains Standard,
+regardless of its panels. `layoutName`
 does not create a choice. Use canonical `page.views`/`tab.views` for perspectives,
 or deliberately named `diagram.layouts` for independently selectable arrangements.
 Do not remove placement to suppress an accidental Layout/Data flow toggle.
@@ -29,7 +29,7 @@ pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-Opening **Arrange selected section…** preserves the current View, every saved arrangement, and the visible positions; it does not optimize or write JSON. Saved grids can be dragged immediately. A legacy Home/Data flow presentation without an active grid stays visible; choose **Optimize layout** to create an editable grid explicitly.
+Opening **Arrange selected section…** preserves the current View, every saved arrangement, and the visible positions; it does not optimize or write JSON. Saved grids can be dragged immediately. A section without an active grid stays visible; choose **Optimize layout** to create an editable grid explicitly.
 
 To arrange a Standard view, choose **View → Arrange selected section…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
@@ -77,10 +77,9 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
   Responsive and Backstage use a 16-column main tile with supporting
   panels in eight columns; without supporting panels, main tiles fill the row.
   Confluence gives the diagram and Home a full row,
-  with smaller panels paired below. A declared centerpiece comes first.
+  with smaller panels paired below. The diagram comes first.
 - **Reset layout** removes only the selected host arrangement. The default
-  arrangement applies if one exists; otherwise the existing Home/Data flow
-  presentation returns. This differs from the workspace's editor-split reset.
+  arrangement applies if one exists; otherwise the ordinary default placement returns. This differs from the workspace's editor-split reset.
 
 Layouts are saved in the spec and survive JSON, HTML and Confluence export.
 The selected arrangement profile, preview host and preview width are temporary workspace state. Profile selection writes no source; each arrangement edit is one Undo operation. Explore floating geometry, camera, and notes defaults remain shared across profiles; its tile visibility follows the selected profile.
@@ -277,7 +276,8 @@ the view button return to its saved selection. This does not change the spec.
 Views are the complete set of buttons; there is no additional automatic
 Data flow mode. Name any View **Data flow** and choose the diagram, panels and
 attachment it should show. **Make opening view** chooses the View that opens first.
-Older specs without named layouts keep their automatic Home/Data flow behavior.
+Older panel-focus specs need the [offline migration](panel-view-migration.md)
+to preserve Home/Data flow as explicit choices.
 
 ## Section arrangement contract
 

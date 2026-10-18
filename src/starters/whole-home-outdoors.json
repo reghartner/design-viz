@@ -7,7 +7,6 @@
       "text": ["A fictional home sits inside its grounds. Outdoor cameras and perimeter sensors watch the approach; indoor smoke, leak, and motion sensors keep their own state. Follow a visitor from the driveway to the front door."],
       "diagram": {
         "view": "step",
-        "primaryPanel": "home",
         "nodes": {
           "sensors": {"title": "Sensor array", "sub": "perimeter + indoors", "icon": "antenna", "tint": "dev"},
           "cameras": {"title": "Outdoor cameras", "sub": "drive · garden · porch", "icon": "camera", "tint": "dev"},
@@ -56,8 +55,98 @@
           {"id": "notify", "edge": "cloud->phone", "text": "The resident receives the visitor alert. The front door is still closed.", "panels": {"home": {"hub": "idle"}}},
           {"id": "welcome", "nodes": ["hub"], "text": "The resident opens the front door and welcomes the visitor inside. The entry door swings inward; the back door stays closed.", "panels": {"home": {"front-door": "open", "visitor": {"x": 130, "y": 116}}}},
           {"id": "closed", "nodes": ["sensors"], "text": "The front door closes behind the visitor. Outdoor monitoring continues independently of the people inside.", "panels": {"home": {"front-door": "closed", "porch-cam": "scan"}}}
+        ],
+        "layouts": [
+          {
+            "id": "home",
+            "name": "Home",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 16,
+                  "panel": "home"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "panel:home",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 4
+                },
+                {
+                  "x": 0,
+                  "y": 16,
+                  "w": 24,
+                  "h": 12,
+                  "hidden": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "flow",
+            "name": "Data flow",
+            "sectionLayout": {
+              "columns": 24,
+              "default": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "w": 24,
+                  "h": 16
+                },
+                {
+                  "x": 0,
+                  "y": 16,
+                  "w": 24,
+                  "h": 12,
+                  "panel": "home"
+                },
+                {
+                  "controls": "steps",
+                  "attachTo": "diagram",
+                  "x": 0,
+                  "y": 12,
+                  "w": 24,
+                  "h": 4
+                }
+              ]
+            }
+          }
+        ],
+        "defaultLayout": "home"
+      },
+      "id": "section-1"
+    }],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }

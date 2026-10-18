@@ -36,7 +36,7 @@ After the company installs the Forge app:
 
 1. Insert **Flowview** with Confluence's `/` macro menu.
 2. Choose the exported file, or paste the copied JSON.
-3. Preview. Optionally select one section, a starting Home/Data flow view, or a skin.
+3. Preview. Optionally select one section or a skin; the authored opening View is retained.
 4. Save the snapshot, then publish the Confluence page.
 
 Readers can use playback, alternate paths, Home/Data switching, board sizing and

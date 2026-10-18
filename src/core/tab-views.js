@@ -25,7 +25,6 @@ function tabViewDefinitions(owner){
   var views=[],standard=[],diagramCount=eligible.filter(function(rec){return !!rec.section.diagram;}).length;
   eligible.forEach(function(rec){var d=rec.section.diagram,definitions=d?diagramLayoutViews(d):[],initial=d && sectionLayoutDefinition(d);
     if(!initial || initial.presentation!=='explore')standard.push({record:rec,layout:initial && !initial.legacy?initial.id:undefined});
-    if(d && !Array.isArray(d.layouts)){var focus=diagramFocusPanel(d);if(focus && !definitions.length)definitions.push({id:'home',name:panelCapability(focus.type,'focusLabel',focus.title || 'Panel'),presentation:'standard'});if(focus || definitions.length)definitions.push({id:'flow',name:'Data flow',presentation:'standard'});}
     definitions.forEach(function(def){views.push({id:'section-'+rec.number+'-'+def.id,name:(diagramCount>1?(rec.section.heading || rec.reference)+' · ':'')+def.name,presentation:def.presentation,legacy:true,legacyLayout:def.legacy?'layout':def.id,members:[{record:rec,layout:def.legacy?'layout':def.id}]});});
   });
   if(standard.length && (eligible.length>1 || !views.length)){
@@ -41,8 +40,7 @@ function tabViewDefault(owner,views){
   var eligible=owner.records.filter(function(rec){return !rec.domainOnly;});
   var first=eligible.find(function(rec){return !!rec.section.diagram;}) || eligible[0],def=first && first.section.diagram && sectionLayoutDefinition(first.section.diagram);
   var single=eligible.length===1;
-  var diagram=first && first.section.diagram,focus=diagram && diagramFocusPanel(diagram);
-  var id=def && !def.legacy ? def.id : focus && diagram.primaryPanel===focus.id ? 'home' : 'flow';
+  var id=def && !def.legacy ? def.id : 'flow';
   return def && def.presentation==='explore' || single ? views.find(function(view){return view.members.length===1 && view.members[0].record===first && view.legacyLayout===id;}) || views[0]:views[0];
 }
 function validateTabViews(page,errors){
@@ -60,7 +58,7 @@ function validateTabViews(page,errors){
       var members=new Set();view.sections.forEach(function(member,j){var loc=where+'.sections['+j+']',ref=tabViewMemberReference(member),record=owner.records.find(function(rec){return rec.section.id===ref;});
         if((typeof member!=='string' && !specObject(member)) || typeof ref!=='string' || !record || members.has(ref)){errors.push(loc+': use a unique section ID belonging to this Tab');return;}members.add(ref);
         if(record.domainOnly)errors.push(loc+': detail domains are available through drilldown only');
-        if(specObject(member) && member.layout!==undefined){var d=record.section.diagram,layouts=d && diagramLayoutViews(d);if(typeof member.layout!=='string' || !layouts || !(!layouts.length && ['layout','default'].indexOf(member.layout)>=0 && sectionLayoutDefinition(d)) && !layouts.some(function(layout){return layout.id===member.layout || layout.legacy && member.layout==='layout';}) && !(['flow','home'].indexOf(member.layout)>=0 && (member.layout==='flow' || diagramFocusPanel(d))))errors.push(loc+'.layout: name an arrangement belonging to this section');}
+        if(specObject(member) && member.layout!==undefined){var d=record.section.diagram,layouts=d && diagramLayoutViews(d);if(typeof member.layout!=='string' || !layouts || !(!layouts.length && ['layout','default'].indexOf(member.layout)>=0 && sectionLayoutDefinition(d)) && !layouts.some(function(layout){return layout.id===member.layout || layout.legacy && member.layout==='layout';}))errors.push(loc+'.layout: name an arrangement belonging to this section');}
       });
     });
   });

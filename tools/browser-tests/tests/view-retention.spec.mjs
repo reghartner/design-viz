@@ -1,3 +1,5 @@
+import {createRequire} from 'node:module';
+const {migrate}=createRequire(import.meta.url)('../../migrate-panel-views.cjs');
 import {test,expect,paste,prepareEditorSurface,openInspectorGroup} from '../helpers/test.mjs';
 
 function fixture(kind){
@@ -10,7 +12,7 @@ function fixture(kind){
     diagram.defaultLayout='home-story';
   }
   if(kind==='single layout')diagram.sectionLayout={default:[{panel:'home',x:0,y:0,w:8,h:8},{x:8,y:0,w:4,h:8},{controls:'steps',attachTo:'panel:home',x:0,y:8,w:12,h:4}]};
-  return {page:{title:'View retention',blocks:[{heading:'Doorbell story',diagram}]}};
+  return migrate({page:{title:'View retention',blocks:[{heading:'Doorbell story',diagram}]}}).spec;
 }
 const section=page=>page.locator('#docview .doc-sec').first();
 const guide=page=>page.locator('#guide');
@@ -38,7 +40,7 @@ for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view 
   await renderJSON(page,raw=>{raw.page.title='Renamed page';});await expect(section(page)).toHaveAttribute('data-view-id',flow);
   await renderJSON(page,raw=>{const d=raw.page.blocks[0].diagram;d.nodes.store={title:'Storage'};d.rows[0].push('store');});await expect(section(page)).toHaveAttribute('data-view-id',flow);
   if(kind==='Home/Data flow'){
-    await renderJSON(page,raw=>{const d=raw.page.blocks[0].diagram;d.panels[0].id='front-yard';d.primaryPanel='front-yard';});
+    await renderJSON(page,raw=>{const d=raw.page.blocks[0].diagram;d.panels[0].id='front-yard';d.layouts.forEach(v=>Object.values(v.sectionLayout).filter(Array.isArray).forEach(items=>items.forEach(t=>{if(t.panel==='home')t.panel='front-yard';if(t.attachTo==='panel:home')t.attachTo='panel:front-yard';})));});
     await expect(section(page)).toHaveAttribute('data-view-id',flow);
   }
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');await expect(section(page)).toHaveAttribute('data-view-id',flow);

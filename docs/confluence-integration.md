@@ -33,7 +33,7 @@ await view.submit({
   config: {
     specJson: "<compact original spec JSON>",
     section: "all", // or a 1-based section ordinal string in rendering order
-    focus: "spec",  // spec | home | data
+    focus: "spec",  // retired setting; old home/data values are ignored
     skin: "spec"    // spec | aurora | pastel | blueprint | terminal | rose | lavender | lilac (legacy daylight/editorial accepted)
   }
 });
@@ -134,3 +134,8 @@ for in-page expansion). Their height is independent of the iframe viewport,
 so automatic host resizing cannot repeatedly enlarge the content. Browser
 fullscreen still fills the available screen. Standalone and workbench Explore
 views use the viewport height.
+
+The macro opens the authored View. The former Home/Data flow starting-view
+selector is retired; stored focus values are ignored. Convert legacy focus
+diagrams with [the offline migration](panel-view-migration.md) before replacing
+the snapshot.

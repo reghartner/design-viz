@@ -202,3 +202,48 @@ test('legacy View promotion requires the matched section and ignores reordered g
   assert.equal(reference([definition('section-1-flow',other)]),'flow','another section cannot claim the generated identity');
   assert.equal(reference([definition('section-1-flow',other,true),definition('section-2-flow',rec,true)]),'flow','reordered legacy Views resolve by layout within the matched section');
 });
+
+test('Arrange preview borrows geometry without changing accepted source or any authored arrangement',()=>{
+  const h=harness(),raw=JSON.parse(SOURCE),page=h.c.normalize(raw),original=plain(page);
+  const display=h.c.workbenchArrangementPreviewPage(page,0);
+  assert.notEqual(display,page);assert.deepEqual(plain(page),original);
+  assert.deepEqual(plain(display.sections[0].diagram.sectionLayout).columns,24);
+  for(const profile of ['default','backstage','confluence'])assert.ok(display.sections[0].diagram.sectionLayout[profile].length);
+  assert.equal(display.views,undefined);assert.equal(display.sections[0].diagram.layouts,undefined);
+  assert.equal(h.c.workbenchArrangementPreviewPage(page,null),page);
+  assert.equal(h.c.workbenchArrangementPreviewPage(page,5),page);
+  for(const saved of [{sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:12}],confluence:[{x:0,y:0,w:20,h:9}]}},{layouts:[{id:'reading',sectionLayout:{default:[{x:0,y:0,w:24,h:12}]}}]}]){
+    Object.assign(page.sections[0].diagram,saved);
+    assert.equal(h.c.workbenchArrangementPreviewPage(page,0),page);
+  }
+  h.preview.render(SOURCE,{origin:'arrangement-preview'});
+  assert.equal(h.preview.renderedText(),SOURCE);assert.deepEqual(plain(h.preview.page()),original);
+});
+
+test('Arrange fills missing responsive geometry without overwriting a saved host profile',()=>{
+  const h=harness(),page=h.c.normalize(JSON.parse(SOURCE)),d=page.sections[0].diagram;
+  d.sectionLayout={columns:12,confluence:[{x:0,y:2,w:10,h:9}]};const original=plain(page);
+  const display=h.c.workbenchArrangementPreviewPage(page,0);
+  assert.deepEqual(plain(page),original);assert.equal(display.sections[0].diagram.sectionLayout.columns,24);
+  assert.deepEqual(plain(display.sections[0].diagram.sectionLayout.confluence),[{x:0,y:2,w:20,h:9}]);
+  assert.ok(display.sections[0].diagram.sectionLayout.default.length);
+});
+
+test('temporary Arrange render never replaces the accepted page or rendered source',()=>{
+  const c={lintPage:()=>[]};vm.createContext(c);for(const name of ['validator','workbench/preview'])vm.runInContext(readSource(name+'.js'),c);
+  let display;c.renderPage=(view,page)=>{display=page;return {destroy(){}};};c.restoreActiveTabs=()=>{};
+  const preview=c.createWorkbenchPreviewController({view:{},skin:()=> 'pastel',findings(){},present(){},arrangementSection:()=>0});
+  const result=preview.render(SOURCE,{origin:'arrangement-preview'});assert.equal(result.ok,true);
+  assert.ok(display.sections[0].diagram.sectionLayout);assert.equal(preview.page().sections[0].diagram.sectionLayout,undefined);
+  assert.equal(preview.renderedText(),SOURCE);assert.deepEqual(plain(preview.page()),plain(c.normalize(JSON.parse(SOURCE))));
+});
+
+test('Arrange follows a surviving section across insertion and ends when it is removed or ambiguous',()=>{
+  const h=harness(),page=h.c.normalize({page:{sections:[{id:'first',heading:'First',diagram:{nodes:{a:{}},rows:[['a']]}},{id:'second',heading:'Second',diagram:{nodes:{b:{}},rows:[['b']]}}]}});
+  const inserted=plain(page);inserted.sections.unshift({id:'new',diagram:{nodes:{c:{}},rows:[['c']]}});
+  assert.equal(h.c.workbenchArrangementSection(page,inserted,1),2);
+  const removed=plain(page);removed.sections.pop();assert.equal(h.c.workbenchArrangementSection(page,removed,1),null);
+  assert.equal(h.c.workbenchArrangementSection(page,removed,0),0);
+  const anonymous=h.c.normalize(JSON.parse(SOURCE)),duplicate=plain(anonymous);duplicate.sections.push(plain(anonymous.sections[0]));
+  assert.equal(h.c.workbenchArrangementSection(anonymous,duplicate,0),null);
+});

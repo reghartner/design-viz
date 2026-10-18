@@ -562,6 +562,46 @@ test('the real metadata index fetches only the opened spec and imports the same 
   expect(JSON.parse(await readFile(path.join(fixture.root,'diagrams/first/first.spec.json'),'utf8'))).toEqual(fixture.specs.first);
 });
 
+test('the selected site skin owns Canon, navigation and editor rerenders without changing authored defaults',async({page,server})=>{
+  const fixture=await publish(server);
+  fixture.specs.first.page.skin='daylight';fixture.specs.second.page.skin='aurora';
+  for(const id of ['first','second'])await writeFile(path.join(fixture.root,'diagrams',id,id+'.spec.json'),JSON.stringify(fixture.specs[id]));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+
+  await page.goto(fixture.url+'?diagram=first');
+  const body=page.locator('body'),reader=page.locator('#canon-reader');
+  await expect(body).toHaveClass(/\bsk-pastel\b/);await expect(reader).toHaveClass(/\bsk-pastel\b/);
+  const pastelSection=await reader.locator('.doc-sec').first().evaluate(el=>getComputedStyle(el).backgroundColor);
+  await page.context().addCookies([{name:'dv_skin',value:'blueprint',url:server.origin}]);await page.reload();
+  await expect(page.locator('#canon-reader-title')).toHaveText('First story');
+  await expect(body).toHaveClass(/\bsk-blueprint\b/);await expect(reader).toHaveClass(/\bsk-blueprint\b/);
+  const firstSection=await reader.locator('.doc-sec').first().elementHandle();
+
+  await reader.locator('.reader-theme-menu>summary').click();await reader.locator('[data-reader-skin="terminal"]').click();
+  await expect(body).toHaveClass(/\bsk-terminal\b/);await expect(reader).toHaveClass(/\bsk-terminal\b/);
+  expect(await firstSection.evaluate(el=>el.isConnected)).toBe(true);
+  const terminalSection=await reader.locator('.doc-sec').first().evaluate(el=>getComputedStyle(el).backgroundColor);
+  expect(terminalSection).not.toBe(pastelSection);
+
+  await page.locator('[data-welcome-back]:visible').click();
+  if(await page.locator('#welcome-home').isVisible())await page.locator('#welcome-library').click();
+  await page.locator('#welcome-library-grid').getByRole('link',{name:'Second story',exact:true}).click();
+  await expect(page.locator('#canon-reader-title')).toHaveText('Second story');
+  await expect(body).toHaveClass(/\bsk-terminal\b/);await expect(reader).toHaveClass(/\bsk-terminal\b/);
+  expect(await reader.locator('.doc-sec').first().evaluate(el=>getComputedStyle(el).backgroundColor)).toBe(terminalSection);
+
+  const secondSection=await reader.locator('.doc-sec').first().elementHandle();
+  await page.evaluate(()=>window.postMessage({type:'dv_skin',skin:'rose'},'*'));
+  await expect(body).toHaveClass(/\bsk-rose\b/);await expect(reader).toHaveClass(/\bsk-rose\b/);
+  expect(await secondSection.evaluate(el=>el.isConnected)).toBe(true);
+  await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
+  const source=await page.locator('#src').inputValue();expect(JSON.parse(source).page.skin).toBe('aurora');
+  await expect(page.locator('#docview')).toHaveClass(/\bsk-rose\b/);
+  await page.locator('#go').evaluate(button=>button.click());await expect(page.locator('#src')).toHaveValue(source);
+  await expect(page.locator('#docview')).toHaveClass(/\bsk-rose\b/);
+  expect(JSON.parse(await readFile(path.join(fixture.root,'diagrams/second/second.spec.json'),'utf8')).page.skin).toBe('aurora');
+});
+
 test('a direct link beneath a deployment prefix loads one spec, reloads and preserves the saved draft',async({page,server})=>{
   const fixture=await publish(server),requests=[],draft=JSON.stringify({text:'unfinished draft {',at:1});
   await page.addInitScript(value=>localStorage.setItem('dv-workbench-draft',value),draft);

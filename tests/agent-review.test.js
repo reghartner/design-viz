@@ -70,10 +70,12 @@ function uiHarness(options={}){
   }
   const elements={};ids.forEach(id=>elements['agent-update-'+id]=element(id));
   const observers=[];class Observer{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(){this.observed=true;}disconnect(){this.disconnected=true;}}
-  const doc={createElement:element,defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
-  const pages=[],accepted=[],rejected=[];
-  const c={workbenchReaderPreviewSnapshot:()=>({}),restoreWorkbenchReaderPreviewSnapshot:()=>({matches:new Map()}),restoreWorkbenchReaderCameras:()=>{},document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {sections:[],destroy(){destroyed++;}};},
+  const doc={body:element('body'),createElement:element,defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
+  const pages=[],skins=[],appliedSkins=[],accepted=[],rejected=[];
+  const c={workbenchReaderPreviewSnapshot:()=>({}),restoreWorkbenchReaderPreviewSnapshot:()=>({matches:new Map()}),restoreWorkbenchReaderCameras:()=>{},document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),
+    applySkinClasses(body,view,skin){appliedSkins.push({body,view,skin});return true;},
     initViewerExploreCanvas(ctl,view,opts){canvasOptions=opts;return {destroy(){canvasDestroyed++;}};}};
+  c.renderPage=function(root,page,skin){rendered++;pages.push(plain(page));skins.push(skin);return {sections:[],destroy(){destroyed++;}};};
   vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('core/tab-views.js'),c);vm.runInContext(readSource('core/details.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
   let session;
   if(options.topology){
@@ -86,9 +88,16 @@ function uiHarness(options={}){
   snapshot={current,source,currentLedger:'old',ledger:'new',review:{version:1,id:'p',requestId:'r',ok:true,summary:'Changed A',conflicts:[]}};
   if(options.current)snapshot.current=options.current;if(options.source)snapshot.source=options.source;
   if(options.ok===false)snapshot.review.ok=false;
-  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async(message,version)=>rejected.push({message,version})});
-  return {c,ui,elements,observers,pages,accepted,rejected,get snapshot(){return snapshot;},replaceSnapshot(next){snapshot=next;},session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
+  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,skin:options.skin,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async(message,version)=>rejected.push({message,version})});
+  return {c,ui,elements,observers,pages,skins,appliedSkins,accepted,rejected,get snapshot(){return snapshot;},replaceSnapshot(next){snapshot=next;},session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
 }
+test('review preview uses the selected site skin and updates it live without rebuilding',()=>{
+  const h=uiHarness({skin:()=> 'terminal'});h.ui.update(h.review);h.ui.open();
+  assert.deepEqual(h.skins,['terminal']);assert.equal(h.counts().rendered,1);
+  assert.equal(h.ui.setSkin('rose'),true);assert.equal(h.counts().rendered,1);
+  assert.equal(h.appliedSkins.length,1);assert.equal(h.appliedSkins[0].body.id,'body');assert.equal(h.appliedSkins[0].view.id,'view');assert.equal(h.appliedSkins[0].skin,'rose');
+  h.ui.destroy();
+});
 test('review UI opens full-window with supporting details optional and retires redraws',()=>{
   const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
   assert.equal(h.counts().rendered,1);assert.equal(h.canvasOptions().initialContentsOpen,false);assert.deepEqual(plain(h.canvasOptions().presentation),{panelsHiddenWhenGraphVisible:true,overlayScale:.5});assert.equal(h.canvasOptions().forceFit,true);assert.equal(h.canvasOptions().refitOnResize,true);assert.deepEqual(plain(h.canvasOptions().fitInsets),{left:24,right:24,top:20,bottom:24});assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true');assert.equal(e['agent-update-commit'].disabled,false);

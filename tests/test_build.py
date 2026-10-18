@@ -263,7 +263,8 @@ class TestNoLibraryFlag(unittest.TestCase):
 
     def test_cli_default_shows_and_flag_hides_the_button(self):
         output = ROOT / 'workbench/flowspec.html'
-        others = [ROOT / 'template/flowview.html', ROOT / 'workbench/diagrams.json']
+        others = [ROOT / 'template/flowview.html', ROOT / 'workbench/diagrams.json',
+                  ROOT / 'tools/canon/generated-runtime.cjs']
         original = {p: p.read_bytes() if p.exists() else None for p in [output, *others]}
         def restore():
             for path, data in original.items():

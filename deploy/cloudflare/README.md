@@ -74,8 +74,9 @@ must answer `302` to a `cloudflareaccess.com` URL.
 ## Redeploy
 
 Run `sh deploy/cloudflare/deploy.sh` again. Wrangler uploads only changed files.
-The script leaves this checkout's `workbench/flowspec.html` built without the
-Browse button; run `python3 tools/build.py` to restore it for local use.
+When the script exits, it rebuilds this checkout's `workbench/` and `template/`
+outputs with a default build, so local use and `Dockerfile.prebuilt` keep the
+Browse button.
 
 ## Agent editing
 

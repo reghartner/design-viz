@@ -252,7 +252,7 @@ function initWorkbenchAgentReview(opts){
       // providers that are not published into the session until acceptance.
       var raw=JSON.parse(source),resolved=opts.resolve?(shown.topologyContext?opts.resolve(raw,shown.topologyContext):opts.resolve(raw)):raw;
       var page=normalize(resolved),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
-      ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});renderedPage=page;
+      ctl=renderPage(el('view'),page,typeof opts.skin==='function'?opts.skin(page):page.skin,null,{autoplay:false});renderedPage=page;
       var restored=saved?restoreWorkbenchReaderPreviewSnapshot(page,ctl,saved):null;
       // Review opens on the changed diagram rather than spending its limited
       // comparison space on the optional document outline.
@@ -321,6 +321,7 @@ function initWorkbenchAgentReview(opts){
     if(restored && restored.fallback)navigationStatus(restored.fallback+' · '+side);
     if(selected>=0 && !entries[selected][side])navigationStatus('This '+entries[selected].status+' item has no counterpart in '+side+'. Use '+(side==='current'?'Proposed':'Current')+' to inspect it.');
   }
+  function setSkin(name){if(rendered)return applySkinClasses(doc.body,el('view'),name);return false;}
   function refresh(){
     var next=opts.snapshot();if(!next){close();return;}
     var first=!shown,changed=shown && shown.review.version!==next.review.version;shown=next;
@@ -374,5 +375,5 @@ function initWorkbenchAgentReview(opts){
     catch(ex){el('feedback').focus();el('feedback').select();el('note').hidden=false;el('review-refresh').hidden=true;el('note-text').textContent='Press ⌘C / Ctrl+C to copy the feedback. Use Return for revision to release this proposal when you are ready.';}
   });
   life.listen(el('return'),'click',async function(){if(!shown)return;var version=shown.review.version,text=el('feedback').value;close();await opts.reject(text,version);});
-  life.own(close);return {update:update,open:open,destroy:life.destroy};
+  life.own(close);return {update:update,open:open,setSkin:setSkin,destroy:life.destroy};
 }

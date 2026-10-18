@@ -59,13 +59,13 @@
         </section>
       </div>
       <div class="welcome-actions" aria-label="Choose how to begin">
-        <button type="button" class="welcome-action" id="welcome-catalog"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">⌘</span><span class="welcome-action-copy"><strong>From service catalog</strong><span>Choose services. Map their connections.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
+        <button type="button" class="welcome-action" id="welcome-catalog"{{WORKBENCH_CATALOG_HIDDEN}}><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">⌘</span><span class="welcome-action-copy"><strong>From service catalog</strong><span>Choose services. Map their connections.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action" id="welcome-paste"><span class="welcome-action-icon welcome-icon-lilac" aria-hidden="true">{ }</span><span class="welcome-action-copy"><strong>Paste JSON</strong><span>Pick up where your agent left off.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action" id="welcome-open"><span class="welcome-action-icon welcome-icon-mint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 3h9l-2 10H3V7Zm0 0V4h7l2 3h7v3"/></svg></span><span class="welcome-action-copy"><strong>Open file</strong><span>Bring a Flowview JSON file.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action welcome-action-primary" id="welcome-new"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">+</span><span class="welcome-action-copy"><strong>Start new project</strong><span>A useful example or a blank canvas.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
       </div>
       <button type="button" class="welcome-resume" id="welcome-resume" hidden><span class="welcome-resume-icon" aria-hidden="true">↶</span><span><strong id="welcome-resume-title">Resume your draft</strong><span id="welcome-resume-detail"></span></span><span aria-hidden="true">Continue →</span></button>
-      <button type="button" class="welcome-library-entry" id="welcome-library"><span><b>Browse diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
+      <button type="button" class="welcome-library-entry" id="welcome-library"{{WORKBENCH_LIBRARY_HIDDEN}}><span><b>Browse diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
       <a id="welcome-gallery" class="welcome-text-button welcome-gallery-link" data-examples-gallery target="_blank" rel="noopener" hidden>Browse the examples gallery <span aria-hidden="true">↗</span></a>
       <details id="welcome-earlier-drafts" hidden><summary>Two most recent earlier drafts saved in this browser</summary><div id="welcome-earlier-list"></div></details>
       <div class="welcome-bottom">
@@ -120,7 +120,7 @@
       <div class="welcome-screen-heading"><div><p class="welcome-kicker">Make it your own</p><h1 tabindex="-1">Every story starts somewhere.</h1><p class="welcome-description">Start simple, explore a complete example, or make space for something new.</p></div><button type="button" id="welcome-new-agent" class="welcome-button">Build with my agent <span aria-hidden="true">↗</span></button></div>
       <div class="welcome-search"><label for="welcome-template-search">Search templates</label><input id="welcome-template-search" type="search" placeholder="Name, description, tag or service" autocomplete="off" spellcheck="false"></div>
       <div id="welcome-template-filters" class="welcome-filters" role="group" aria-label="Filter templates"></div>
-      <button type="button" id="welcome-new-catalog" class="welcome-button">Start from your service catalog →</button>
+      <button type="button" id="welcome-new-catalog" class="welcome-button"{{WORKBENCH_CATALOG_HIDDEN}}>Start from your service catalog →</button>
       <button type="button" id="welcome-new-prompt" class="welcome-text-button">Create a standalone brief →</button>
       <a id="welcome-new-gallery" class="welcome-text-button welcome-gallery-link" data-examples-gallery target="_blank" rel="noopener" hidden>Browse the examples gallery <span aria-hidden="true">↗</span></a>
       <p class="welcome-note" id="welcome-template-status" role="status"></p>

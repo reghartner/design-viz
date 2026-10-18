@@ -272,8 +272,7 @@ if(!workbenchPractice)installWorkbenchTourKeyGuard(window);
 var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
-var activeSkin = null; /* null = follow the host/spec default */
-var previewDocumentSkin = false; /* explicit document-default preview bypasses the host cookie */
+var activeSkin = null; /* explicit picker/host choice for this Workbench session */
 var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
   resolve:function(raw){return workbenchBuilder?workbenchBuilder.resolve(raw):raw;},
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
@@ -294,7 +293,7 @@ var skinBtns = {};
     b.setAttribute('aria-pressed', name === DEFAULT_SKIN ? 'true' : 'false');
     b.textContent = skinLabel(name);
     b.addEventListener('click', function(){
-      previewDocumentSkin = false; activeSkin = name; setSkinButtons(name);
+      activeSkin = name; setSkinButtons(name);
       workbenchPreview.repaint(name);
     });
     holder.appendChild(b);
@@ -303,8 +302,10 @@ var skinBtns = {};
 })();
 
 document.getElementById('preview-skin-default').addEventListener('click',function(){
-  previewDocumentSkin=true;activeSkin=null;
-  var skin=currentSkin(workbenchPreview.page());setSkinButtons(skin);workbenchPreview.repaint(skin);
+  /* This is a deliberate one-time choice of the current document's saved
+     default, not a mode that lets each later document replace the site skin. */
+  var skin=resolveSkin('',workbenchPreview.page() && workbenchPreview.page().skin);
+  activeSkin=skin;setSkinButtons(skin);workbenchPreview.repaint(skin);
 });
 document.getElementById('preview-skin-settings').addEventListener('click',function(){
   document.getElementById('workspace-appearance').open=false;
@@ -326,12 +327,11 @@ function readCookieText(){
   catch (ex) { return ''; } /* sandboxed pages may deny cookie reads */
 }
 function currentSkin(page){
-  if (previewDocumentSkin) return resolveSkin('', page && page.skin);
   if (activeSkin) return activeSkin;
-  /* same precedence as the viewer (boot.flowview.js): a valid dv_skin
-     cookie set by the hosting site beats the spec default, until a skin
-     button (or the host channel below) picks one explicitly */
-  return resolveSkin(readCookieText(), page && page.skin);
+  /* The Workbench is a site shell: its selected/default skin owns every
+     document surface. Authored page.skin remains saved source metadata and
+     is only chosen by the explicit "Use document default" action above. */
+  return resolveSkin(readCookieText());
 }
 function setSkinButtons(skin){
   var page=workbenchPreview && workbenchPreview.page(),saved=resolveSkin('',page && page.skin);
@@ -353,8 +353,10 @@ function setSkinButtons(skin){
 window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
-  previewDocumentSkin = false; activeSkin = name;
+  activeSkin = name;
   setSkinButtons(name);
+  if(welcome && welcome.setSkin)welcome.setSkin(name);
+  if(workbenchBuilder && workbenchBuilder.setSkin)workbenchBuilder.setSkin(name);
   if(workbenchReaderPreview && workbenchReaderPreview.active())workbenchReaderPreview.setSkin(name);
   return applySkinClasses(document.body, view, name);
 };
@@ -419,7 +421,7 @@ if(workbenchPractice){
   initWorkbenchPractice({builder:workbenchBuilder,workspace:workspace,controller:workbenchPreview.controller,agent:workbenchPracticeAgent});
 }else{
 welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
-  workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
+  workspace:workspace,skin:currentSkin,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw,topologyContext){
   loadingCanon=true;
   try{var result=workbenchBuilder.loadSpec(raw,null,topologyContext);if(result)welcome.canonicalLoaded();return result;}

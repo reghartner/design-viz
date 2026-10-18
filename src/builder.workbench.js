@@ -1503,7 +1503,7 @@ function initWorkbenchBuilder(opts){
     if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen Canon to load a later deployment; this session never refreshes automatically.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
-  var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,
+  var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
     releaseWorking:function(){return workingFile.clear();},
     workingDestination:function(binding){workingFile.attach(binding);},
     workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},
@@ -1640,6 +1640,7 @@ function initWorkbenchBuilder(opts){
   return {
     resolve:session.resolve,
     loadSpec:function(raw,origin,topologyContext){var ok=life.alive() && loadText(JSON.stringify(raw,null,2),topologyContext);if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
+    setSkin:function(name){if(agentChat && agentChat.setSkin)agentChat.setSkin(name);},
     startAgent:function(mode,options){if(agentChat)agentChat.openSetup(mode || 'external',options);},
     practice:opts.practice?{select:function(target,extend){
       target=Object.assign({},target,{el:findTargetEl(target)});

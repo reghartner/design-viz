@@ -843,6 +843,12 @@ default, and expose the six valid tokens as `window.dvSkins`. The consuming
 site owns the picker and persistence; the engine never writes cookies or uses
 `localStorage`. A same-origin host dropdown can be wired without hardcoding:
 
+In Workbench, the site selection applies to the editor, published-library
+reader, and page previews from their first render and remains selected while
+navigating between documents. A document's saved `page.skin` remains the
+standalone fallback and does not change the site selection or its source when a
+site skin is chosen.
+
 ```js
 const select = document.querySelector('#design-theme');
 for (const skin of window.dvSkins) select.add(new Option(skin, skin));

@@ -910,6 +910,14 @@ also take `title`):
 | `table` | `columns` (rows are checked against the columns in effect) |
 | `checks` | `checks` |
 | `budget` | `metrics` |
+| `sequence` | `label`, `sequence`, `alphabet`, `start`, `strand`, `wrap` |
+| `frames` | `label`, `sequence`, `alphabet`, `start` |
+| `reads` | `reference`, `alphabet`, `start`, `label`, `maxReads`, `showMatches` |
+| `locus` | `length`, `unit`, `label`, `features` |
+
+For these types a setup field in a patch is not an unknown state field, and
+state such as `marks` or `reads` is checked against the setup in effect at
+that step.
 
 On other types, setup fields in a patch do not change the panel.
 Compatibility metadata advertises `flow.panel-setup-steps`.

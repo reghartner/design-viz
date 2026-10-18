@@ -172,8 +172,10 @@ Check these before flagging a type:
 - The type has no existing override that ignores invalid values and falls
   back to the declaration (`data-contract`, `radar`).
 
-Flagged types: `gauge`, `state`, `log`, `orbit`, `queue`, `table`, `checks` and
-`budget`. Left unflagged after checking:
+Flagged types: `gauge`, `state`, `log`, `orbit`, `queue`, `table`, `checks`,
+`budget`, and the custom-fold types `sequence`, `frames`, `reads` and `locus`.
+These four keep their own folds, which use the common fold with acceptance
+rules for state fields only, so setup names already carry. Left unflagged after checking:
 `thermo` (its history sparkline reads the current limits for every step),
 `waterfall` (its reveal animation remembers bars by position, not span),
 `image` (its contract promises that steps never change the shared image),

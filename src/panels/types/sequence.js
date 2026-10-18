@@ -276,7 +276,7 @@ function sequenceHTML(panel, state, dx) {
 
 PanelRegistry.define('sequence', {
   label: 'Sequence track',
-  since: '0.2.0',
+  since: '0.2.0', unified: true,
   order: 40,
   validateDeclaration: sequenceDeclarationWarnings,
   validatePatch: sequencePatchWarnings,

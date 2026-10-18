@@ -145,7 +145,7 @@ PanelRegistry.define('wavefield', {
   authoring: {
     initialFields: true, transientFields: ['sources', 'probe', 'wavelength', 'note'],
     template: {title: 'Wave interference', wavelength: 1, separation: 4, screenDistance: 10, screenHeight: 12, unit: 'cm', initial: {sources: 'two', probe: 0}},
-    setupFields: [['wavelength', 'num'], ['separation', 'num'], ['screenDistance', 'num'], ['screenHeight', 'num'], ['unit', 'text']],
+    setupFields: [['wavelength', 'num'], ['separation', 'num'], ['screenDistance', 'num'], ['screenHeight', 'num'], ['unit', 'text'], ['initial', 'json']],
     patchFields: [['sources', 'enum', ['one', 'two']], ['probe', 'num'], ['wavelength', 'num'], ['note', 'text']],
     fieldMeta: {wavelength: {label: 'Wavelength λ', help: 'Use the same distance unit for all geometry. A step value starts a new wavelength trial; all paths and intensities are recalculated.'}, separation: {label: 'Source separation d'}, screenDistance: {label: 'Screen distance L'}, screenHeight: {label: 'Screen height', help: 'Defaults to max(2 × separation, screenDistance).'}, unit: {label: 'Distance unit'}, sources: {label: 'Active sources', help: 'Two equal, in-phase sources, or S1 alone.'}, probe: {label: 'Probe y', help: 'Signed screen coordinate; zero is the centre, positive is upward. Must lie within half the screen height.'}, note: {label: 'Teaching note'}},
     picker: {order: 51, name: 'Wave interference', category: 'Science & sequencing', tagline: 'From path difference to bright and dark fringes', description: 'Two coherent point sources, exact paths and a probe on a shared intensity graph. Assumes equal amplitudes; omits diffraction envelope and geometric spreading. Deterministic authored snapshots.'},

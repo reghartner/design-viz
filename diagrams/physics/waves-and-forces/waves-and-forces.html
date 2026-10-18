@@ -19175,7 +19175,7 @@ PanelRegistry.define('cellscene', {
       ],
       initial: { caption: 'A cell at rest.' },
     },
-    setupFields: [['label', 'text'], ['legendMode', 'enum', ['all', 'visible']], ['labelMode', 'enum', ['standard', 'readable']], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['label', 'text'], ['legendMode', 'text'], ['labelMode', 'text'], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
     patchFields: [['items', 'json'], ['events', 'jsonArr'], ['zoom', 'text'], ['highlight', 'text'], ['labels', 'jsonArr'], ['caption', 'text'], ['note', 'text']],
     expandPatchFields: function (panel) {
       var ids = cellsceneCompartments(panel.compartments, 'panel').map(function (c) { return c.id; });
@@ -19183,8 +19183,8 @@ PanelRegistry.define('cellscene', {
     },
     fieldMeta: {
       label: { label: 'Scene title', help: 'Short title inside the frame, e.g. "a plant cell".' },
-      legendMode: { label: 'Scene legend', help: 'all (default) lists every item. visible omits hidden items and items with count 0; cell and nucleus context stays in the legend.', unsetLabel: 'All items (default)' },
-      labelMode: { label: 'Scene labels', help: 'readable enlarges SVG labels and places the caption below the scene; standard preserves the compact layout.', unsetLabel: 'Standard (default)' },
+      legendMode: { label: 'Scene legend (all or visible)', help: 'all (default) lists every item. visible omits hidden items and items with count 0; cell and nucleus context stays in the legend.', unsetLabel: 'All items (default)' },
+      labelMode: { label: 'Scene labels (standard or readable)', help: 'readable enlarges SVG labels and places the caption below the scene; standard preserves the compact layout.', unsetLabel: 'Standard (default)' },
       compartments: { label: 'Compartments', help: 'Up to 8 {id, kind, label?, parent?, x?, y?, rx?, ry?}; kinds outside, cell, nucleus, vesicle, organelle, region. One cell, one nucleus.' },
       items: { label: 'Items', help: 'Setup: 1–8 {id, role, shape?, label?, size?, start:{in, x?, y?, count?, state?}}. Step: an object keyed by item id that patches in, x, y, count (0–50), state (free|bound|active|released|hidden), label and daughter; an id set to null returns that item to its start.' },
       events: { label: 'Events this step', help: 'Up to 4: {kind:"enter", item, to, via?}, {kind:"bud", vesicle, from, items?}, {kind:"fuse", vesicle, with, to}, {kind:"divide", daughters?}, {kind:"signal", at, rings?}. Events run on this step only; their lasting effects carry.' },

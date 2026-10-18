@@ -199,7 +199,7 @@ test('model resolves anchors, clusters, division geometry, zoom, highlight and c
   const rings = C.cellsceneModel(p, {events:[{kind:'signal',at:'nuc',rings:3}]});
   same(plain(rings.transients.map(t => [t.kind, t.x, t.y, t.delay])), [['signal',352,158,0],['signal',352,158,250],['signal',352,158,500]]);
 });
-test('legend mode preserves all items by default and validates its setup enum without mutating the declaration', () => {
+test('legend mode preserves all items by default and validates setup values without mutating the declaration', () => {
   const p = panel(), expected = C.cellsceneModel(p, {}).legend;
   same(expected.map(chip => chip.id), ['p', 'c', 'nucleus', 'cell']);
   same(C.cellsceneModel({...p, legendMode:'all'}, {}).legend, expected);
@@ -214,7 +214,7 @@ test('legend mode preserves all items by default and validates its setup enum wi
   for (const legendMode of ['all', 'visible'])
     same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, legendMode}]}), {errors:[], warnings:[]});
   const authoring = C.panelAuthoring('cellscene');
-  same(authoring.setupFields.find(field => field[0] === 'legendMode'), ['legendMode', 'enum', ['all', 'visible']]);
+  same(authoring.setupFields.find(field => field[0] === 'legendMode'), ['legendMode', 'text']);
   assert.match(authoring.fieldMeta.legendMode.help, /default.*hidden.*count 0.*cell and nucleus/);
   assert.ok(!C.panelPatchFields(p).some(field => field[0] === 'legendMode'), 'legend mode is declaration setup');
 });
@@ -266,7 +266,7 @@ test('readable label mode enlarges scene labels and moves the caption into the f
   same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'readable'}]}), {errors:[], warnings:[]});
   same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'large'}]}).warnings,
     ['sections[0].diagram.panels[0].labelMode: expected standard|readable — using standard']);
-  same(C.panelAuthoring('cellscene').setupFields.find(field => field[0] === 'labelMode'), ['labelMode','enum',['standard','readable']]);
+  same(C.panelAuthoring('cellscene').setupFields.find(field => field[0] === 'labelMode'), ['labelMode','text']);
   const host = fakeHost(), states = folded(diagram([{id:'caption', panels:{cell:state}}]));
   C.renderPanelBody(host, {...p, labelMode:'readable'}, states[0], 'aurora', states, 0, false);
   assert.match(host.html, /cellscene-caption/);

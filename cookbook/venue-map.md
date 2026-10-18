@@ -165,7 +165,8 @@ field it cannot accept.
 - A `<rect id="rink-outline">` (or any `<rect data-field="rink">`) becomes the
   panel's `field`: `{"shape":"rink","x","y","width","height"}` in viewBox
   units, drawn under the sections with rounded corners, a centre line and two
-  blue lines. Only translate/scale transforms are accepted for it, and an
+  blue lines. Its transforms may translate and scale (also as a `matrix`) but
+  not rotate or skew, and an
   outline outside the sections' bounding box is reported and omitted.
 - `<style>` and `<script>` are ignored, external references are never
   followed, no script runs, and the output is refused above 512 KiB.

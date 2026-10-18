@@ -898,8 +898,20 @@ The value carries forward along the path, `enterOnce` applies it to that step
 only, and `null` restores the declared value. `title` can change the same way;
 an empty string hides the heading. `id`, `type`, `initial`, `visible` and
 `brand` never change per step. A value the declaration would warn about warns
-at the patch path instead. Types that support this: `gauge` (`unit`, `max`,
-`title`). On other types, setup fields in a patch do not change the panel.
+at the patch path instead. Types that support this, with their fields (all
+also take `title`):
+
+| Type | Setup fields a step can change |
+| --- | --- |
+| `gauge` | `unit`, `max` |
+| `state`, `orbit` | `states`, `colors` |
+| `log` | `tags` (recolors every shown line, earlier ones included) |
+| `queue` | `title` only |
+| `table` | `columns` (rows are checked against the columns in effect) |
+| `checks` | `checks` |
+| `budget` | `metrics` |
+
+On other types, setup fields in a patch do not change the panel.
 Compatibility metadata advertises `flow.panel-setup-steps`.
 
 ### panels — synchronized inspector widgets

@@ -89,6 +89,7 @@ PanelRegistry.extend('orbit', {
   order: 7,
   label: 'Orbit',
   since: '0.1.0',
+  unified: true,
   layout: {
     canvasSizing: { mode: 'fixed-aspect', aspect: 220 / 156, resizeAxis: 'width' },
   },

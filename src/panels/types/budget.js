@@ -141,6 +141,7 @@ PanelRegistry.extend('budget', {
   order: 25,
   label: 'Budget',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('budget', {

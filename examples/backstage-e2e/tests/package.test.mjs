@@ -174,7 +174,22 @@ test(
     const spec = JSON.parse(
       await readFile(path.join(designer, 'specs/doorbell.json'))
     );
-    assert.deepEqual(C.validateSpec(spec).errors, []);
+    assert.deepEqual(C.validateSpec(spec), {errors: [], warnings: []});
+    const section = spec.page.sections[0], diagram = section.diagram;
+    assert.equal(diagram.primaryPanel, undefined);
+    assert.equal(spec.page.views.length, 2);
+    const presentation = name => {
+      const view = spec.page.views.find(view => view.name === name);
+      assert.equal(view.sections.length, 1);
+      assert.equal(view.sections[0].section, section.id, 'Views share one story section');
+      return {view, tiles: diagram.layouts.find(layout => layout.id === view.sections[0].layout).sectionLayout.default};
+    };
+    const home = presentation('Home'), flow = presentation('Data flow');
+    assert.equal(spec.page.defaultView, home.view.id);
+    assert.equal(home.tiles.find(tile => !tile.panel && !tile.controls).hidden, true);
+    assert.equal(home.tiles.find(tile => tile.controls === 'steps').attachTo, 'panel:home');
+    assert.notEqual(flow.tiles.find(tile => !tile.panel && !tile.controls).hidden, true);
+    assert.equal(flow.tiles.find(tile => tile.controls === 'steps').attachTo, 'diagram');
     assert.deepEqual(C.compatibility.check(spec).messages, []);
     const references = C.references(spec).map((r) => r.reference);
     assert.equal(references.length, 3);

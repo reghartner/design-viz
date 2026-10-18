@@ -1,9 +1,8 @@
 # Recipe — a home map as the centerpiece
 
-Use `diagram.primaryPanel` to make the place and people the main view. The
-live **Home / Data flow** switch lets the reader follow the same path and
-step from either perspective. A centerpiece is a presentation choice, not
-a different diagram or schema version.
+Author explicit **Home** and **Data flow** Views to follow the same path and
+step from either perspective. Each View references an arrangement over one
+shared story. Adding a panel never creates Views or changes the opening choice.
 
 This fictional home story places a visitor, shows a detection, then opens
 the door. Geometry is illustration in a 320×180 frame, not physical units.
@@ -15,47 +14,255 @@ in 320×180 and let the editor convert drag/tap placement back into that frame.
   "page": {
     "title": "A visitor comes inside",
     "skin": "pastel",
-    "sections": [{
-      "heading": "At the front door",
-      "diagram": {
-        "view": "step", "primaryPanel": "home",
-        "nodes": {
-          "doorbell": {"title": "Doorbell", "icon": "doorbell"},
-          "hub": {"title": "Home hub", "icon": "house"}
+    "sections": [
+      {
+        "heading": "At the front door",
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "doorbell"
+            },
+            "hub": {
+              "title": "Home hub",
+              "icon": "house"
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "hub"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "hub",
+              "kind": "mqtt",
+              "label": "detection"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "The home",
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "x": 10,
+                  "y": 10,
+                  "w": 80,
+                  "h": 160
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 90,
+                  "y": 10,
+                  "w": 100,
+                  "h": 160
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 190,
+                  "y": 10,
+                  "w": 120,
+                  "h": 160
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Porch cam",
+                  "x": 45,
+                  "y": 42,
+                  "facing": 80,
+                  "spread": 60,
+                  "range": 70
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 100,
+                  "y": 80
+                },
+                {
+                  "id": "hub",
+                  "kind": "hub",
+                  "label": "Home hub",
+                  "x": 240,
+                  "y": 60
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 40,
+                  "y": 130
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "hub": "idle",
+                "visitor": null
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "nodes": [
+                "doorbell"
+              ],
+              "text": "The porch is quiet. The camera scans."
+            },
+            {
+              "id": "approach",
+              "edge": "doorbell->hub",
+              "text": "A visitor approaches; the camera reports detection.",
+              "panels": {
+                "home": {
+                  "cam": "detect",
+                  "hub": "rx",
+                  "visitor": {
+                    "x": 65,
+                    "y": 110
+                  },
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "hub"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "inside",
+              "nodes": [
+                "hub"
+              ],
+              "text": "The door opens and the visitor enters while the camera records.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "door": "open",
+                  "visitor": {
+                    "x": 130,
+                    "y": 105
+                  }
+                }
+              }
+            }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Home",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 16,
+                    "panel": "home"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "panel:home",
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 16
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
         },
-        "rows": [["doorbell", "hub"]],
-        "edges": [{"from": "doorbell", "to": "hub", "kind": "mqtt", "label": "detection"}],
-        "panels": [{
-          "id": "home", "type": "homemap", "title": "The home",
-          "rooms": [
-            {"label": "PORCH", "x": 10, "y": 10, "w": 80, "h": 160},
-            {"label": "ENTRY", "x": 90, "y": 10, "w": 100, "h": 160},
-            {"label": "LIVING ROOM", "x": 190, "y": 10, "w": 120, "h": 160}
-          ],
-          "devices": [
-            {"id": "cam", "kind": "camera", "label": "Porch cam", "x": 45, "y": 42, "facing": 80, "spread": 60, "range": 70},
-            {"id": "door", "kind": "entry", "label": "Front door", "x": 100, "y": 80},
-            {"id": "hub", "kind": "hub", "label": "Home hub", "x": 240, "y": 60}
-          ],
-          "subjects": [{"id": "visitor", "label": "Visitor", "x": 40, "y": 130}],
-          "initial": {"cam": "scan", "door": "closed", "hub": "idle", "visitor": null}
-        }],
-        "steps": [
-          {"id": "quiet", "nodes": ["doorbell"], "text": "The porch is quiet. The camera scans."},
-          {"id": "approach", "edge": "doorbell->hub", "text": "A visitor approaches; the camera reports detection.", "panels": {"home": {"cam": "detect", "hub": "rx", "visitor": {"x": 65, "y": 110}, "signals": [{"from": "cam", "to": "hub"}]}}},
-          {"id": "inside", "nodes": ["hub"], "text": "The door opens and the visitor enters while the camera records.", "panels": {"home": {"cam": "rec", "door": "open", "visitor": {"x": 130, "y": 105}}}}
+        "id": "section-1"
+      }
+    ],
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
         ]
       }
-    }]
+    ],
+    "defaultView": "section-1-home"
   }
 }
 ```
 
 ## Editing and inheritance
 
-In the panel inspector, **Presentation → Centerpiece** sets `primaryPanel`;
-**Sidebar** defaults to the data view. Existing homemaps already get the
-live view switch. A reader's switch is temporary and does not edit the spec.
+Use **Arrange selected section…** to edit panel geometry, diagram visibility
+and step-control attachment. View settings choose the opening View. A reader's
+View switch is temporary and does not edit the spec. Convert older focus files
+with [the offline migration](../docs/panel-view-migration.md).
 
 Select a step or a device/person to open the step placement map:
 

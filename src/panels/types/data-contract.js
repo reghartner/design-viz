@@ -241,7 +241,7 @@
   PanelRegistry.define('data-contract', {
     label:'Data contract', since:'0.1.0', order:23.5,
     itemCollection:{key:'fields',max:MAX_FIELDS},
-    layout:{focusByDefault:true,focusLabel:'Contract',large:true,height:12,supporting:false,attachControls:true},
+    layout:{large:true,height:12,supporting:false,attachControls:true},
     validateDeclaration:function (panel, path, warnings, errors, diagram) {
       if (panel.fieldWidth != null && width(panel.fieldWidth, null) === null) warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using 180');
       if (Array.isArray(panel.columns) && !panel.columns.length) { /* A field-only contract is valid. */ }

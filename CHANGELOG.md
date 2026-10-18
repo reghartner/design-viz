@@ -1,5 +1,23 @@
 # Changelog
 
+## Venue library for the Venue map panel (2026-10-17)
+
+- `seatmap` panels can reference a venue: `"venue": "ubs-arena"` supplies
+  geometry, rings, sections, landmarks and the rink outline; any of those
+  written on the panel overrides the venue's value. Unknown ids warn with the
+  available ids. The library ships one venue, UBS Arena (Elmont, NY), traced
+  as original polygons from section positions on a public seating chart
+  (`examples/sports/ubs-arena/`), with capacities as an illustrative even
+  split. Forks add venues in `company/panels/venues/`.
+- Paths geometry accepts an optional rink outline, `field`, and the importer
+  reads it from `<rect id="rink-outline">`.
+- `tools/seatmap-import.mjs --venue` writes a venue file; the parser now lives
+  in `src/panels/seatmap-import.js` and is shared with the workbench.
+- Workbench (desktop): the Venue map inspector has a **Venue** picker and
+  **Import seating chart…** (CSV or SVG), each one Undo step.
+- Data: the left-end 200-ring section of the arena CSV is now `329` (was
+  `229`), matching the public chart.
+
 ## Sequence-teaching panels (2026-10-17)
 
 - Six generic science panels for step-driven teaching pages: `sequence`,

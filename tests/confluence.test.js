@@ -41,19 +41,19 @@ test('snapshot limits count compact UTF-8 bytes, preserve literal text and never
 });
 test('display settings preserve the original snapshot and isolate sections inside tabs',()=>{
   const original=home(), first=original.page.sections[0], second=JSON.parse(JSON.stringify(first));
-  second.heading='Second';const raw={page:{title:'Both',skin:'pastel',blocks:[{tabs:[{label:'One',sections:[first]},{label:'Two',sections:[second]}]}]}};
+  second.heading='Second';second.id='second';const raw={page:{title:'Both',skin:'pastel',blocks:[{tabs:[{label:'One',sections:[first]},{label:'Two',sections:[second]}]}]}};
   const text=JSON.stringify(raw), b=C.buildConfluenceConfig(text,{section:'2',focus:'data',skin:'daylight'});
   assert.ok(!b.error,b.error);
   const display=C.confluenceDisplayPage(b.exported.page,b.config);
   assert.equal(display.blocks.length,1);assert.equal(display.blocks[0].heading,'Second');
   assert.equal(display.blocks[0].diagram.primaryPanel,undefined);assert.equal(display.skin,'daylight');
   assert.equal(b.config.specJson,text);assert.equal(JSON.stringify(raw),text);
-  assert.equal(b.exported.page.blocks[0].tabs[1].sections[0].diagram.primaryPanel,'home');
-  assert.equal(C.confluenceDisplayPage(display,{section:'all',focus:'home',skin:'spec'}).blocks[0].diagram.primaryPanel,'home');
+  assert.equal(b.exported.page.blocks[0].tabs[1].sections[0].diagram.defaultLayout,'home');
+  assert.deepEqual(C.confluenceDisplayPage(display,{section:'all',focus:'home',skin:'spec'}).blocks[0].diagram,display.blocks[0].diagram);
   for(const values of [{section:'99'},{section:1},{focus:'unknown'},{skin:'nope'}]) assert.ok(C.buildConfluenceConfig(text,values).error);
   const homePage=home().page, d=homePage.sections[0].diagram;
   d.panels.unshift({...d.panels[0],id:'other-home'});
-  assert.equal(C.confluenceDisplayPage(homePage,{section:'all',focus:'home',skin:'spec'}).sections[0].diagram.primaryPanel,'home');
+  assert.equal(JSON.stringify(C.confluenceDisplayPage(homePage,{section:'all',focus:'home',skin:'spec'}).sections[0].diagram),JSON.stringify(d));
 });
 test('source links only allow explicit web URLs or Confluence wiki-relative paths',()=>{
   const base='https://team.atlassian.net';

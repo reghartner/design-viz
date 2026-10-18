@@ -43,13 +43,12 @@ function sectionLayoutControlsRows(d,items){
 function sectionLayoutPreset(d, target, excludedKeys){
   var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
   var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
-  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
-  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
+  var ordered=tiles;
   var controls=tiles.find(function(t){return t.key==='steps';});
   if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
+  var supporting=tiles.some(function(t){return t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
   ordered.forEach(function(t){
-    var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge||t===main;
+    var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge;
     var w=large?(narrow||!supporting?24:16):(narrow?12:8);
     var h=t.key==='steps'?((d.paths || []).length>1?6:4):panelLarge?panelCapability(t.type,'height',12):large?12:panelCapability(t.type,'height',6);
     var xs=large?[0]:narrow?[0,12]:[16], candidates=xs.map(function(x){
@@ -245,11 +244,6 @@ function sectionLayoutItems(d, target, id){
   return sectionLayoutPack(items);
 }
 
-function diagramFocusPanel(d){
-  var panels = Array.isArray(d.panels) ? d.panels : [];
-  return panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.id === d.primaryPanel;}) ||
-    panels.find(function(p){return p && typeof p.id === 'string' && p.id && panelCapability(p.type,'focusByDefault',false);}) || null;
-}
 /* Reader filters normalize once for playback and authoring audits. Hidden stops
    still participate in state folding; this describes reachability only. */
 function sectionViewFilter(d,pathIds,stepIds){

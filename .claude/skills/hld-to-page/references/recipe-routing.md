@@ -41,7 +41,8 @@ topology, notification or outcome without evidence.
 
 - Target desktop and the intended Backstage/Confluence content widths. Test
   phone widths only when asked.
-- `diagram.primaryPanel` makes a panel (often the `homemap`) the centerpiece.
+- Author explicit Views and named arrangements to give a panel the main space.
+  Adding panels never creates Views; see `docs/panel-view-migration.md` for old specs.
 - Use panel `visible: false` plus step `panelVisibility` to show a panel only
   when it matters; this is different from device-app card `visible`.
 - Let the pure Node `tools/compose-page-layout.cjs` command arrange new graph

@@ -14,28 +14,28 @@ function diagram(panels){
   return {nodes:{node:{}},rows:[['node']],panels,steps:[{nodes:['node']}]};
 }
 
-test('panel capabilities preserve primary sizing priority and legacy missing-tile heights', () => {
+test('panel capabilities preserve intrinsic sizing and legacy missing-tile heights', () => {
   const c = core();
   const d = diagram(['homemap','deviceapp','phone','screen','state'].map(type => ({id:type,type})));
   for (const target of ['default','backstage','confluence']){
     for (const primaryPanel of [undefined,'phone','screen','deviceapp']){
       const sizes = Object.fromEntries(c.sectionLayoutPreset({...d,primaryPanel},target).filter(t => t.panel).map(t => [t.panel,t.h]));
-      assert.deepEqual(sizes,{homemap:12,deviceapp:23,phone:primaryPanel==='phone'?12:10,screen:primaryPanel==='screen'?12:8,state:6});
+      assert.deepEqual(sizes,{homemap:12,deviceapp:23,phone:10,screen:8,state:6});
     }
     const legacy = c.sectionLayoutItems({...d,sectionLayout:{default:[]}},target);
     assert.deepEqual(plain(legacy.map(tile => tile.h)),[12,12,6,6,6,6]);
   }
 });
 
-test('a registered layout capability opts into focus, controls and saved-layout fallback', () => {
+test('a registered layout capability opts into sizing, controls and saved-layout fallback', () => {
   const c = core();
   c.PanelRegistry.extend('layout-contract-probe', {layout:{focusByDefault:true,focusLabel:'Topology',attachControls:true,large:true,height:17,fallbackHeight:9,supporting:false}});
   const panel = {id:'probe',type:'layout-contract-probe',title:'Authored title'};
   const d = diagram([{id:'state',type:'state'},panel]);
-  assert.equal(c.diagramFocusPanel(d),panel);
-  assert.equal(c.diagramFocusPanel({...d,primaryPanel:'state'}).id,'state');
+  const owner=c.tabViewOwners(c.normalize(d))[0],views=c.tabViewDefinitions(owner);
+  assert.equal(views.length,1);assert.equal(views[0].name,'Standard');
   const optimized = c.sectionLayoutOptimize({...d,primaryPanel:'probe'},'default',null);
-  assert.equal(optimized.find(t => t.controls).attachTo,'panel:probe');
+  assert.equal(optimized.find(t => t.controls).attachTo,'diagram');
   const saved = {default:[{panel:'probe',x:0,y:0,w:12,h:17},{controls:'steps',x:0,y:17,w:12,h:4,attachTo:'panel:probe'}]};
   const warnings = [];
   c.sectionLayoutProfileWarnings(d,saved,'diagram',warnings);
@@ -46,19 +46,16 @@ test('a registered layout capability opts into focus, controls and saved-layout 
   assert.equal(hidden.find(t => t.panel==='probe').hidden,true);
   assert.notEqual(c.sectionLayoutDock(hidden),'panel:probe');
 
-  const buttons = [], group = {setAttribute(){},appendChild(button){buttons.push(button);}};
-  c.document = {createElement(){return {setAttribute(){},addEventListener(){}};}};
-  c.createDiagramFocusControl({viewChoicesHost:group},panel,null,null,null);
-  assert.deepEqual(buttons.map(button => button.textContent),['Topology','Data flow']);
+
 });
 
-test('Confluence preferred focus and clipboard references use a new panel definition', () => {
+test('Confluence ignores retired focus flags and clipboard references use a new panel definition', () => {
   const c = core();
   c.PanelRegistry.extend('reference-contract-probe', {layout:{focusByDefault:true},references:{nodes:['links.*.source']}});
   const panel = {id:'probe',type:'reference-contract-probe',links:[{source:'node'},{source:'missing'}]};
   const raw = {page:{sections:[{diagram:diagram([panel])}]}},before = JSON.stringify(raw);
   const focused = c.confluenceDisplayPage(raw.page,{section:'all',focus:'home',skin:'spec'});
-  assert.equal(focused.sections[0].diagram.primaryPanel,'probe');
+  assert.equal(focused.sections[0].diagram.primaryPanel,undefined);
   const copied = c.builderClipboardCopy(raw,[{kind:'panel',section:0,index:0}]);
   assert.equal(copied.error,undefined);
   const pasted = c.planPasteBuilderClipboard(before,raw,copied.data,{section:0});

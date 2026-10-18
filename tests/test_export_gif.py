@@ -34,6 +34,53 @@ class ExportGifPureTests(unittest.TestCase):
         self.assertEqual(len(default.fragments), 7)
         self.assertTrue(all("&v=" not in f and "&p=" not in f for f in default.fragments))
 
+    def test_canonical_views_use_owner_ids_and_member_filters_in_pages_and_tabs(self):
+        for tabbed in (False, True):
+            spec = self.named_spec()
+            section = spec["page"]["sections"][0]
+            section["id"] = "story"
+            owner = {"sections": [section], "views": [
+                {"id": "scene", "name": "Scene", "presentation": "standard", "sections": [{"section": "story", "layout": "home-story"}]},
+                {"id": "systems", "name": "Systems", "presentation": "standard", "sections": [{"section": "story", "layout": "service-flow"}]},
+                {"id": "opening", "name": "Opening", "presentation": "standard", "sections": ["story"]},
+            ]}
+            page = {"blocks": [{"tabs": [dict(owner, label="Tab")]}]} if tabbed else owner
+            target = export_gif.choose_target(page, view="scene")
+            self.assertTrue(all("&v=scene&" in f for f in target.fragments))
+            self.assertEqual(target.view.canonical_id, "home-story")
+            self.assertEqual(target.step_refs, ("quiet", "notify", "inside"))
+            self.assertEqual(export_gif.choose_target(page, view="systems").view.layout_id, "service-flow")
+            self.assertEqual(export_gif.choose_target(page, view="opening").view.layout_id, "home-story")
+            with self.assertRaisesRegex(ValueError, "available: scene, systems, opening"):
+                export_gif.choose_target(page, view="home-story")
+            owner["views"].append(owner["views"][0])
+            with self.assertRaisesRegex(ValueError, "not a unique View"):
+                export_gif.choose_target(page, view="scene")
+
+    def test_canonical_geometry_only_views_preserve_url_and_rendered_identity(self):
+        for alias in ("layout", "default", None):
+            member = {"section": "story"}
+            if alias is not None:
+                member["layout"] = alias
+            spec = {"sections": [{"id": "story", "diagram": {
+                "nodes": {"a": {"title": "A"}}, "rows": [["a"]], "steps": [{"id": "one", "nodes": ["a"]}],
+                "sectionLayout": {"columns": 24, "default": [{"x": 0, "y": 0, "w": 24, "h": 12}]},
+            }}], "views": [{"id": "reading", "name": "Reading", "presentation": "standard", "sections": [member]}]}
+            target = export_gif.choose_target(spec, view="reading")
+            self.assertEqual(target.view.canonical_id, "flow")
+            self.assertEqual(target.view.layout_id, "default")
+            self.assertIn("&v=reading&", target.fragments[0])
+
+    def test_migrated_panel_views_capture_the_explicit_data_flow_id(self):
+        spec = json.loads((ROOT / "src/starters/homemap-story.json").read_text())
+        owner = spec["page"]
+        flow = next(v for v in owner["views"] if v["sections"][0].get("layout") == "flow")
+        target = export_gif.choose_target(spec, view=flow["id"])
+        self.assertEqual(target.view.layout_id, "flow")
+        self.assertTrue(all("&v=" + flow["id"] + "&" in f for f in target.fragments))
+        with self.assertRaisesRegex(ValueError, "available:"):
+            export_gif.choose_target(spec, view="flow")
+
     def test_view_filter_excludes_empty_paths_and_preserves_full_path_positions(self):
         spec = self.named_spec()
         d = spec["page"]["sections"][0]["diagram"]
@@ -74,14 +121,15 @@ class ExportGifPureTests(unittest.TestCase):
         spec = self.named_spec()
         d = spec["page"]["sections"][0]["diagram"]
         d.pop("layouts")
-        self.assertEqual(export_gif.choose_target(spec, view="home").view.canonical_id, "home")
+        with self.assertRaisesRegex(ValueError, "available: flow"):
+            export_gif.choose_target(spec, view="home")
         self.assertEqual(export_gif.choose_target(spec, view="flow").view.canonical_id, "flow")
-        with self.assertRaisesRegex(ValueError, "available: home, flow"):
+        with self.assertRaisesRegex(ValueError, "available: flow"):
             export_gif.choose_target(spec, view="layout")
         d["sectionLayout"] = {"default": []}
-        for reference in ("home", "layout"):
+        for reference in ("default", "layout"):
             target = export_gif.choose_target(spec, view=reference)
-            self.assertEqual(target.view.canonical_id, "layout")
+            self.assertEqual(target.view.canonical_id, "flow")
             self.assertEqual(target.view.layout_id, "default")
         d.pop("sectionLayout")
         d.pop("panels")
@@ -371,6 +419,45 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertIn("view home-story", result.stdout)
             self.assertIn("d=front-door", result.stdout)
             self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 3)
+
+    def test_geometry_only_owner_views_capture_aliases_and_omitted_layout(self):
+        for alias in ("layout", "default", None):
+            with self.subTest(alias=alias), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+                member = {"section": "story"}
+                if alias is not None:
+                    member["layout"] = alias
+                spec = {"sections": [{"id": "story", "diagram": {
+                    "nodes": {"a": {"title": "A"}}, "rows": [["a"]], "steps": [{"id": "one", "nodes": ["a"]}], "autoplay": False,
+                    "sectionLayout": {"columns": 24, "default": [{"x": 0, "y": 0, "w": 24, "h": 12}]},
+                }}], "views": [{"id": "reading", "name": "Reading", "presentation": "standard", "sections": [member]}]}
+                target = export_gif.choose_target(spec, view="reading")
+                temp_path = pathlib.Path(temp)
+                source, page = temp_path / "geometry.json", temp_path / "geometry.html"
+                source.write_text(json.dumps(spec))
+                subprocess.run([sys.executable, str(ROOT / "tools/inject.py"), str(source),
+                                str(ROOT / "template/flowview.html"), str(page)], check=True, capture_output=True)
+                frames = export_gif.capture_frames(
+                    page, target.fragments, CHROME, 1280, temp_path,
+                    section_reference=target.section_reference, view=target.view,
+                    source_indices=target.source_indices)
+                self.assertEqual(len(frames), 1)
+
+    def test_migrated_owner_view_captures_data_flow_instead_of_opening_home(self):
+        spec = json.loads((ROOT / "src/starters/homemap-story.json").read_text())
+        spec["page"]["sections"][0]["diagram"]["autoplay"] = False
+        target = export_gif.choose_target(spec, view="section-1-flow")
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            temp_path = pathlib.Path(temp)
+            source, page = temp_path / "migrated.json", temp_path / "migrated.html"
+            source.write_text(json.dumps(spec))
+            subprocess.run([sys.executable, str(ROOT / "tools/inject.py"), str(source),
+                            str(ROOT / "template/flowview.html"), str(page)], check=True, capture_output=True)
+            frames = export_gif.capture_frames(
+                page, target.fragments[:1], CHROME, 1280, temp_path,
+                section_reference=target.section_reference, view=target.view,
+                source_indices=target.source_indices[:1])
+            self.assertEqual(len(frames), 1)
+            self.assertTrue(frames[0].read_bytes().startswith(export_gif.PNG_SIGNATURE))
 
     def test_view_capture_rejects_old_html_even_when_its_default_matches(self):
         # A page built before view-aware links never stamps data-view-id.

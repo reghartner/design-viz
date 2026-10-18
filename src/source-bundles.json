@@ -28,7 +28,10 @@
     "panels/bio.js",
     "panels/sports.js",
     "panels/mech.js",
+    "panels/venue-library.js",
     "@company/panels/*.js",
+    "panels/venues/*.js",
+    "@company/panels/venues/*.js",
     "panels/types/*.js",
     "@company/panels/types/*.js"
   ],
@@ -71,6 +74,7 @@
     "workbench/session.js",
     "workbench/field-values.js",
     "workbench/panel-collections.js",
+    "panels/seatmap-import.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/image-nodes.js",

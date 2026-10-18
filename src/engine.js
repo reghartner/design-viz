@@ -2081,81 +2081,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
 }
 
 /* ---------------- section + page renderers ---------------- */
-function createBoardGrid(sectionEl, hasPanels, primaryPanel){
-  var toolbar, choices, modes;
-  if (hasPanels && primaryPanel){
-    toolbar = document.createElement('div'); toolbar.className = 'diagram-views';
-    choices = document.createElement('div'); choices.className = 'diagram-view-choice';
-    toolbar.appendChild(choices);
-    modes = document.createElement('div'); modes.className = 'primary-modes';
-    toolbar.appendChild(modes); sectionEl.appendChild(toolbar);
-  }
-  var grid = document.createElement('div');
-  grid.className = 'boardgrid' + (hasPanels ? ' haspanels' : '');
-  sectionEl.appendChild(grid);
-  if (!hasPanels) return {grid:grid, diagramHost:grid, controlsHost:sectionEl, diagramCol:null};
-
-  if (primaryPanel){
-    grid.className += ' panel-first';
-    var primary = document.createElement('div'); primary.className = 'primary-panel';
-    grid.appendChild(primary);
-    var flow = document.createElement('details'); flow.className = 'secondary-flow';
-    var summary = document.createElement('summary'); summary.textContent = 'Data flow';
-    flow.appendChild(summary);
-    /* Keep the secondary board outside the widget grid and in DOM order
-       after the map and its playback controls, including on phones. */
-    sectionEl.appendChild(flow);
-    var flowCol = document.createElement('div'); flowCol.className = 'diagramcol';
-    flow.appendChild(flowCol);
-    return {grid:grid, diagramHost:flowCol, controlsHost:primary, diagramCol:flowCol,
-      primaryHost:primary, modesHost:modes, flowDisclosure:flow, viewChoicesHost:choices};
-  }
-
-  var diagramCol = document.createElement('div');
-  diagramCol.className = 'diagramcol';
-  grid.appendChild(diagramCol);
-  return {grid:grid, diagramHost:diagramCol, controlsHost:diagramCol, diagramCol:diagramCol};
-}
-
-/* Reader-only layout: move existing elements, preserving widget state, the
-   selected path/step, running playback, and board sizing. Never re-render. */
-function createDiagramFocusControl(layout, panel, aside, bar, initial, changed, modeRail, changing){
-  var group = layout.viewChoicesHost, buttons = {}, mode = null, destroyed = false;
-  group.setAttribute('role','group'); group.setAttribute('aria-label','View focus');
-  function setMode(value){
-    if (destroyed || ['panel','flow'].indexOf(value) < 0 || value === mode) return;
-    if (changing) changing();
-    mode = value;
-    var home = value === 'panel';
-    if (home){
-      layout.flowDisclosure.appendChild(layout.diagramCol);
-      layout.grid.appendChild(aside);
-      if (bar){if(modeRail)layout.primaryHost.appendChild(modeRail);layout.primaryHost.appendChild(bar);}
-    } else {
-      layout.grid.insertBefore(layout.diagramCol, layout.primaryHost);
-      if (bar){if(modeRail)layout.diagramCol.appendChild(modeRail);layout.diagramCol.appendChild(bar);}
-      layout.primaryHost.appendChild(aside);
-    }
-    layout.grid.classList.toggle('panel-first',home);
-    layout.grid.classList.toggle('flow-first',!home);
-    layout.flowDisclosure.hidden = !home;
-    buttons.panel.setAttribute('aria-pressed',String(home));
-    buttons.flow.setAttribute('aria-pressed',String(!home));
-    if (changed) changed(home ? layout.primaryHost : layout.diagramCol);
-  }
-  [['panel',panelCapability(panel.type,'focusLabel',panel.title || 'Panel')],['flow','Data flow']].forEach(function(choice){
-    var button = document.createElement('button'); button.type = 'button'; button.className = 'mbtn';
-    button.textContent = choice[1]; button.setAttribute('data-view-focus',choice[0]);
-    button.title = 'Make ' + choice[1] + ' the main view';
-    button.addEventListener('click',function(){setMode(choice[0]);});
-    buttons[choice[0]] = button; group.appendChild(button);
-  });
-  setMode(initial);
-  return {panelId:panel.id, mode:function(){return mode;}, setMode:setMode,
-    viewId:function(){return mode==='panel'?'home':'flow';},
-    defaultView:function(){return initial==='panel'?'home':'flow';},
-    setView:function(id){if(id!=='home' && id!=='flow')return false;setMode(id==='home'?'panel':'flow');return true;},
-    destroy:function(){destroyed = true;}};
+function createBoardGrid(sectionEl, hasPanels){
+  var grid=document.createElement('div');grid.className='boardgrid'+(hasPanels?' haspanels':'');sectionEl.appendChild(grid);
+  if(!hasPanels)return {grid:grid,diagramHost:grid,controlsHost:sectionEl,diagramCol:null};
+  var diagramCol=document.createElement('div');diagramCol.className='diagramcol';grid.appendChild(diagramCol);
+  return {grid:grid,diagramHost:diagramCol,controlsHost:diagramCol,diagramCol:diagramCol};
 }
 
 /* Saved section composition moves the existing live widgets, never their state.
@@ -2379,13 +2309,13 @@ function createExploreNavigation(ctl,options){
   ctl.view.addEventListener('tab-view-change',viewChanged);
   return {element:nav,mount:mount,restore:restore,contents:contents,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
-function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
+function createSectionComposition(box, layout, d, board, bar, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
   if(!items)return null;
   var dock=sectionLayoutDock(items),separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
   var named=definition && !definition.legacy;
-  var defaultView=named?layoutId:base?base.defaultView():'flow';
+  var defaultView=named?layoutId:'flow';
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -2400,10 +2330,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     setExploreIndicator(button,v.presentation==='explore','Explore viewing mode: opens a canvas you can pan and zoom.');
     button.addEventListener('click',function(){setLayout(v.id);});buttons[v.id]=button;group.appendChild(button);
   });
-  /* Keep authored choices before the standard Data flow button. */
+  /* Keep authored arrangements in their declared order. */
   Object.keys(buttons).reverse().forEach(function(id){group.insertBefore(buttons[id],group.firstChild);});
-  var homeChoice=group.querySelector('[data-view-focus="panel"]');if(named && homeChoice)homeChoice.remove();
-  if(named)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.remove();});
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
@@ -2423,7 +2351,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     grid.style.setProperty('--section-layout-width',width<1000?'1000px':'auto');
   }):null;
   if(layoutSizeObserver)layoutSizeObserver.observe(grid.parentNode);
-  var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden;
+  var active=false, saved=[], oldHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden;
   function paintFlow(){
     viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
@@ -2449,16 +2377,14 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     viewport.suspend();
     saved.forEach(function(rec){rec.node.classList.remove('layout-docked-card');if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
-    if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
     if(!quiet)viewport.setView({id:'flow',presentation:'standard'},[],layout.grid);
-    if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
-    if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
+    if(changed && !quiet)changed(layout.diagramCol || board);
   }
   function activate(){
     if(active)return;
-    oldHidden=layout.grid.hidden;flowHidden=layout.flowDisclosure && layout.flowDisclosure.hidden;
+    oldHidden=layout.grid.hidden;
     var cards=Array.prototype.slice.call(box.querySelectorAll('.pwidget[data-dv-panel]'));
     items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
       if(dock && it.controls==='steps')return;
@@ -2487,19 +2413,17 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
         move(board,col);if(!separateSteps && bar)move(bar,col);
       }
     });
-    /* A board without a primary panel owns the Ambient/Step buttons. Keep
-       them reachable when the board is hidden, then restore on Data flow. */
+    /* Keep Ambient/Step reachable while the diagram tile is hidden. */
     var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
-    layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
+    layout.grid.hidden=true;
     grid.hidden=false;active=true;grid.setAttribute('data-layout-id',layoutId);
     if(stepper){var activeDefinition=sectionLayoutDefinition(d,layoutId);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed',String(id===layoutId));});
     paintFlow();
     viewport.setView(sectionLayoutDefinition(d,layoutId),items);
     if(changed)changed(viewport.scrollTarget());
-    group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(!named && b.getAttribute('data-view-focus')==='flow'));});
   }
-  function setMode(value){if(named || value==='layout' || value==='flow' || !base)activate();else{restore();if(stepper)stepper.setViewFilter(null,null);base.setMode(value);}}
+  function setMode(){activate();}
   function setLayout(id){
     if(!views.some(function(v){return v.id===id;}))return;
     if(id!==layoutId){
@@ -2510,10 +2434,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     activate();
   }
-  group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]')){restore();if(stepper)stepper.setViewFilter(null,null);}},true);
-  group.addEventListener('click',function(ev){var choice=ev.target.closest('[data-view-focus]');if(!named && choice && choice.getAttribute('data-view-focus')==='flow')activate();});
-  if(named || defaultView==='flow')activate();
-  return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
+  activate();
+  return {mode:function(){return 'layout';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
     setLayoutTarget:function(value){
       value=value || 'default';if(value===(target || 'default'))return;
@@ -2525,18 +2447,17 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
     snapshotReaderState:function(){return {viewport:viewport.snapshotReaderState()};},
     restoreReaderState:function(saved){if(saved)viewport.restoreReaderState(saved.viewport);},
-    viewId:function(){return active?(named?layoutId:'flow'):base?base.viewId():'flow';},
+    viewId:function(){return named?layoutId:'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
       if(named){if(!views.some(function(v){return v.id===id;}))return false;setLayout(id);return true;}
       if(id==='layout' || id==='default'){setMode('layout');return true;}
-      if(id==='home' && base){setMode('panel');return true;}
       if(id==='flow'){setMode('flow');return true;}
       return false;
     },
     diagramVisible:function(){return active?showDiagram:true;},viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
-    destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
+    destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();}};
 }
 
 function sectionHasProse(sec){
@@ -2955,9 +2876,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
 
-  var primaryPanel = diagramFocusPanel(d);
-  var boardLayout = createBoardGrid(box, hasPanels, primaryPanel);
-  result.flowDisclosure = boardLayout.flowDisclosure;
+  var boardLayout = createBoardGrid(box, hasPanels);
   var grid = boardLayout.grid;
 
   var boardDiv = document.createElement('div');
@@ -2975,8 +2894,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, activeDiagram, skin, boardLayout.primaryHost, primaryPanel && primaryPanel.id);
-    if (primaryPanel && d.panels.length === 1) aside.hidden = true;
+    panelCtl = buildPanels(aside, activeDiagram, skin);
   }
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
@@ -2987,7 +2905,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var hasSteps = (d.steps || []).length > 0;
   var hasDelta = diagramHasDelta(d);
   var btnDelta = null, bar = null;
-  function addFocusControl(){
+  function addComposition(){
     var ready=false;
     function presentationChanged(host){
       if(result.stepper)result.stepper.scrollTargetEl=host;
@@ -2996,19 +2914,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       box.setAttribute('data-view-id',result.presentation.viewId());
       if(onChange)onChange();
     }
-    if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
-      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged,result.modeRail,function(){
-        // Explore must restore its live controls before Home/Data flow moves
-        // them. The changed callback then mounts the selected view's canvas.
-        if(standardViewport)standardViewport.suspend();
-      });
-    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
     if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
       /* Expansion also belongs to ordinary diagrams without authored views. */
       var surface=document.createElement('div');surface.className='standard-view-surface';
       box.insertBefore(surface,boardLayout.grid);surface.appendChild(boardLayout.grid);
-      if(boardLayout.flowDisclosure)surface.appendChild(boardLayout.flowDisclosure);
       if(bar && bar.parentNode===box)surface.appendChild(bar);
       var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
@@ -3035,7 +2946,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       var deltaTog = document.createElement('span'); deltaTog.className = 'mtoggle';
       deltaTog.appendChild(btnDelta); (boardLayout.modesHost || lg).appendChild(deltaTog);
     }
-    addFocusControl();
+    addComposition();
     staticWireContracts=wireStepContracts(box,board,edgeJsonContracts(activeDiagram),prefix,0);
     return result;
   }
@@ -3132,7 +3043,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var modeRail=document.createElement('div');modeRail.className='playback-mode-rail';modeRail.appendChild(tog);
   bar.parentNode.insertBefore(modeRail,bar);
   result.modeRail=modeRail;
-  addFocusControl();
+  addComposition();
   return result;
 }
 
@@ -3235,7 +3146,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, detailOnly:!!sec.detailOnly, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               flowDisclosure:built.flowDisclosure, presentation:built.presentation, viewport:built.viewport,
+               presentation:built.presentation, viewport:built.viewport,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

@@ -3609,55 +3609,24 @@ body.sk-blueprint .termbar.has-paths .schips{--path-label-bg:#04264F;}
 @media(prefers-reduced-motion:reduce){.comm-packet{display:none !important}}
 @media print{.comm-failure{display:none !important}}
 @media print{.stepmode .comm-hidden{opacity:1 !important}}
-/* Readers can give the same scene or flow the main space. */
+/* Authored arrangement navigation. */
 .diagram-views{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin:8px 0 12px;}
 .diagram-view-choice{display:flex;flex-wrap:wrap;gap:4px;max-width:100%;padding:3px;border:1px solid var(--dfaint);border-radius:10px;}
 .diagram-view-choice .mbtn{min-width:0;min-height:34px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.diagram-views .primary-modes{margin:0 0 0 auto;}
 @media(max-width:640px){.diagram-view-choice .mbtn{min-height:40px;}}
-body .docview .boardgrid.haspanels.panel-first{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
-body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-template-columns:minmax(0,1fr);}
-.primary-panel{min-width:0;}
 .canon-evidence{margin:10px 0;color:var(--dtext);font:12px/1.6 'IBM Plex Sans',sans-serif;}
 .canon-evidence summary{cursor:pointer;font-weight:600;}
 .canon-evidence a,.canon-step-links a{display:inline-block;color:var(--dink);margin:4px 12px 4px 0;overflow-wrap:anywhere;}
 .canon-step-links{display:block;flex-basis:100%;}
 .canon-step-links[hidden]{display:none;}
-/* Keep the home at its existing maximum height, then give surplus horizontal
-   space to supporting widgets. Match the 320:216 SVG and each skin's card
-   padding/borders so the map reaches that height without empty side space. */
-body{--home-card-inset:30px;}
-body.sk-editorial{--home-card-inset:34px;}
-body.sk-terminal{--home-card-inset:26px;}
-body.sk-pastel{--home-card-inset:32px;}
-body.sk-blueprint{--home-card-inset:24px;}
-.boardgrid{--home-max-width:calc(var(--home-max-height,70vh) * 1.4814814815 + var(--home-card-inset));}
 /* @panel-style-order:2341 */
-.primary-modes{display:flex;justify-content:flex-end;margin:8px 0;}
-.primary-modes:empty{display:none;}
-.primary-panel>.pwidget{margin-top:0;}
 /* @panel-style-order:2345 */
-.primary-panel>.termbar{margin-top:0;}
-.flow-first>.primary-panel>.panelcol{margin-top:12px;}
-.flow-first>.primary-panel>.panelcol[hidden],.secondary-flow[hidden]{display:none !important;}
-.secondary-flow{margin-top:16px;border-top:1px solid var(--dfaint);padding-top:8px;}
-.secondary-flow>summary{cursor:pointer;color:var(--dtext);font:600 12px 'IBM Plex Mono',monospace;padding:10px 0;}
-.secondary-flow>summary:focus-visible{outline:2px solid var(--acc);outline-offset:3px;}
 /* @panel-style-order:2384 */
-@media(max-width:980px){body .docview .boardgrid.haspanels.panel-first{grid-template-columns:minmax(0,1fr);}}
-@media print{
-  body .docview .boardgrid.haspanels.panel-first{display:block;}
-}
-@media print{
-  .primary-panel>.pwidget{display:block !important;break-inside:avoid;}
-}
-@media print{
-  .diagram-views,.primary-modes,.secondary-flow>summary{display:none !important;}
-}
+@media print{.diagram-views{display:none !important;}}
 /* @panel-style-order:2389 */
 /* Layout wins over skin-specific fixed sidebars. At 1000px, even the widest
    skin would leave only ~660px for the diagram. Stack first, preserving all
-   available width for the active diagram or primary home panel. Named queries
+   available width for the active diagram and panels. Named queries
    cannot accidentally measure a nested diagram or widget container instead. */
 @media screen{
   @container diagram-section (max-width:1000px){

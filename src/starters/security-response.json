@@ -12,7 +12,6 @@
         "diagram": {
           "view": "step",
           "autoplay": false,
-          "primaryPanel": "home",
           "defaultLayout": "response-room",
           "nodes": {
             "sensor": {

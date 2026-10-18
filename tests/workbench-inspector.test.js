@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','panels/seatmap-import','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -793,4 +793,93 @@ test('bulk node editing offers the Node style control and icon color beside the 
   select.value='amber';select.fire('change');
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.style),['amber','amber',undefined]);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+/* Venue map inspector (desktop authoring): venue picker, None, Edit a copy
+   and Import seating chart…, each one Undo step. */
+const seatmapSpec=extra=>({nodes:{},rows:[[]],panels:[Object.assign({id:'map',type:'seatmap',title:'Map'},extra)],steps:[]});
+const seatmapInline=()=>({bowl:'rink',rings:[{id:'lower',label:'Lower'}],sections:['1','2','3','4'].map(id=>({id,ring:'lower',capacity:10,zone:'end'})),landmarks:[{id:'b',label:'bench',x:400,y:300}],currency:'USD'});
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+const allText=el=>el.textContent+el.children.map(allText).join("");
+
+test('the Venue picker lists the library (UBS Arena only) and picking it replaces inline seating in one undo step',()=>{
+  const e=environment(),h=e.mount(seatmapSpec(seatmapInline()));h.inspector.render();
+  const select=aria(h.guide,'Venue');assert.ok(select);
+  assert.deepEqual(select.options.map(o=>o.value),['',...e.C.SeatmapVenues.ids()]);assert.equal(select.options[1].value,'ubs-arena');
+  assert.match(select.options[1].textContent,/^UBS Arena — Elmont, NY · 80 sections$/);
+  assert.equal(select.value,'');
+  const before=h.text;select.value='ubs-arena';select.fire('change');h.flush();
+  const panel=JSON.parse(h.text).panels[0];
+  assert.deepEqual(panel,{id:'map',type:'seatmap',title:'Map',currency:'USD',venue:'ubs-arena'},'inline venue fields are removed; other fields stay');
+  assert.match(h.guide.querySelector('.seatmap-import-report').textContent,/Using UBS Arena\. Replaced this panel’s own bowl, rings, sections, landmarks; Undo restores them\./);
+  assert.equal(aria(h.guide,'Venue').value,'ubs-arena');
+  assert.match(allText(h.guide.querySelector('.seatmap-venue')),/public seating guides/);
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('venue fields show where they come from; Edit a copy writes one field inline and None keeps a copy of the seating',()=>{
+  const e=environment(),h=e.mount(seatmapSpec({venue:'ubs-arena',landmarks:[]}));h.inspector.render();
+  const inherited=h.guide.querySelectorAll('.seatmap-inherited').map(allText);
+  assert.ok(inherited.some(text=>/From UBS Arena: 80 items/.test(text)),inherited.join('|'));
+  assert.match(allText(h.guide.querySelector('.seatmap-venue')),/This panel overrides the venue’s landmarks\./);
+  const venue=e.C.SeatmapVenues.get('ubs-arena').seatmap,before=h.text;
+  const copy=h.guide.querySelectorAll('button').filter(button=>button.textContent==='Edit a copy here');
+  assert.equal(copy.length,inherited.length,'one button per inherited field');
+  const sectionsButton=copy[inherited.findIndex(text=>/80 items/.test(text))];
+  sectionsButton.fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].sections,JSON.parse(JSON.stringify(venue.sections)));
+  assert.equal(JSON.parse(h.text).panels[0].venue,'ubs-arena');
+  h.session.undo();assert.equal(h.text,before);
+  h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  const select=aria(h.guide,'Venue');select.value='';select.fire('change');h.flush();
+  const detached=JSON.parse(h.text).panels[0];
+  assert.equal(detached.venue,undefined);
+  assert.deepEqual(detached.landmarks,[],'the panel’s own override is kept');
+  for(const key of ['geometry','viewBox','field','rings','sections'])assert.deepEqual(detached[key],JSON.parse(JSON.stringify(venue[key])),key);
+  assert.deepEqual(Array.from(e.C.validate(e.C.normalize(JSON.parse(h.text))).warnings),[]);
+  h.session.undo();assert.equal(h.text,before);
+});
+
+test('Import seating chart… parses a CSV with the shared importer, writes it inline in place of the venue, and Undo restores the venue',async()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const csv=fs.readFileSync(path.join(__dirname,'../examples/sports/arena-sections.csv'),'utf8');
+  const e=environment(),h=e.mount(seatmapSpec({venue:'ubs-arena',currency:'USD'}));h.inspector.render();
+  aria(h.guide,'Total capacity for blank rows').value='17250';
+  const input=aria(h.guide,'Import seating chart'),before=h.text;
+  assert.equal(input.type,'file');assert.match(input.accept,/\.csv/);assert.match(input.accept,/\.svg/);
+  input.files=[{name:'arena.csv',size:csv.length,text:async()=>csv}];input.fire('change');
+  await settle();h.flush();
+  const panel=JSON.parse(h.text).panels[0];
+  const expected=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/sports/arena-sections.sections.json'),'utf8'));
+  assert.equal(panel.venue,undefined);
+  for(const key of ['geometry','bowl','rings','sections'])assert.deepEqual(panel[key],expected[key],key);
+  for(const key of ['viewBox','field','landmarks'])assert.equal(panel[key],undefined,key);
+  assert.equal(panel.currency,'USD');
+  const report=h.guide.querySelector('.seatmap-import-report').textContent;
+  assert.match(report,/rings: 3 \(100 level: 21, 200 level: 33, 300 level: 26\)/);
+  assert.match(report,/Capacities: illustrative even split\. Say so on the page\./);
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('an SVG chart imports paths with its rink outline; a broken chart reports an error and changes nothing',async()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const svg=fs.readFileSync(path.join(__dirname,'../examples/sports/ubs-arena/arena.svg'),'utf8');
+  const e=environment(),h=e.mount(seatmapSpec(seatmapInline()));h.inspector.render();
+  aria(h.guide,'Level map').value='100-level:100 level,200-level:200 level,300-level:300 level';
+  aria(h.guide,'Import seating chart').files=[{name:'arena.svg',size:svg.length,text:async()=>svg}];
+  aria(h.guide,'Import seating chart').fire('change');await settle();h.flush();
+  const panel=JSON.parse(h.text).panels[0],venue=e.C.SeatmapVenues.get('ubs-arena').seatmap;
+  assert.equal(panel.geometry,'paths');assert.equal(panel.bowl,undefined);assert.equal(panel.landmarks,undefined);
+  assert.deepEqual(panel.field,JSON.parse(JSON.stringify(venue.field)));
+  assert.deepEqual(panel.sections.map(s=>s.path),JSON.parse(JSON.stringify(venue.sections.map(s=>s.path))));
+  const before=h.text;
+  aria(h.guide,'Import seating chart').files=[{name:'bad.csv',size:10,text:async()=>'id,level\n1,a\n'}];
+  aria(h.guide,'Import seating chart').fire('change');await settle();h.flush();
+  assert.equal(h.text,before);
+  assert.match(allText(h.guide),/Import failed: CSV header needs id,level,zone,capacity/);
+  aria(h.guide,'Total capacity for blank rows').value='-3';
+  aria(h.guide,'Import seating chart').files=[{name:'x.csv',size:10,text:async()=>''}];
+  aria(h.guide,'Import seating chart').fire('change');await settle();
+  assert.equal(h.text,before);
+  assert.match(allText(h.guide),/Total capacity must be a whole number/);
 });

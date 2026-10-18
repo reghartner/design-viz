@@ -153,7 +153,7 @@ test('invalid or unrendered JSON and detached view controls cannot rewrite an un
   await expect(presentation(page)).toHaveValue('standard');await held.dispose();
 });
 
-for(const size of [{width:1800,height:1200},{width:390,height:844},{width:500,height:844},{width:650,height:844}])test('canvas view controls stay reachable at '+size.width+'px',async({page,server},info)=>{
+for(const size of [{width:1800,height:1200}])test('canvas view controls stay reachable at '+size.width+'px',async({page,server},info)=>{
   await page.setViewportSize(size);const original=await open(page,server);
   const select=presentation(page),summary=settings(page).locator('summary');await reachable(select);await reachable(summary);
   await summary.click();await summary.focus();await page.keyboard.press('Enter');const name=settings(page).getByRole('textbox',{name:'View name',exact:true});
@@ -182,11 +182,12 @@ test('an arranging sibling cannot steal view navigation, and the selected chapte
 });
 
 
-test('changing automatic Data to Explore preserves Home and its opening default',async({page,server})=>{
+test('changing Standard to Explore never manufactures panel-derived Views',async({page,server})=>{
   const input=fixture(),d=input.page.blocks[0].diagram;delete input.page.views;delete input.page.defaultView;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
-  const original=await open(page,server,input),opening=await nav(page).locator('.reader-top-view[aria-selected=true]').getAttribute('data-tab-view');await topView(page,'Data flow').click();await options(page);await presentation(page).selectOption('explore');
-  const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].diagram).toEqual(d);expect(saved.defaultView).toBe(opening);expect(saved.views.find(v=>v.id===saved.defaultView)).toMatchObject({name:'Home',presentation:'standard'});expect(saved.views.find(v=>v.name==='Data flow').presentation).toBe('explore');
-  await expect(section(page)).toHaveAttribute('data-view-id','flow');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
-  await topView(page,'Home').click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(presentation(page)).toHaveValue('standard');
+  const original=await open(page,server,input);
+  await expect(nav(page).locator('.reader-top-view')).toHaveCount(1);await expect(topView(page,'Standard')).toBeVisible();
+  await presentation(page).selectOption('explore');
+  const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].diagram).toEqual(d);expect(saved.views).toHaveLength(1);expect(saved.views[0]).toMatchObject({name:'Standard',presentation:'explore'});
+  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

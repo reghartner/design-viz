@@ -9,7 +9,6 @@
           "A wide-angle view looking out from the front door. Step 3 records the empty porch; step 4 starts the run. Return to 3, then 4, to replay."
         ],
         "diagram": {
-          "primaryPanel": "camera-view",
           "view": "step",
           "nodes": {
             "camera": {
@@ -121,8 +120,72 @@
                 }
               }
             }
-          ]
-        }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Front door camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-1"
       },
       {
         "heading": "Two people running away",
@@ -130,7 +193,6 @@
           "A wide-angle view looking out from the front door. Step 3 records the empty porch; step 4 starts the run. Return to 3, then 4, to replay."
         ],
         "diagram": {
-          "primaryPanel": "camera-view",
           "view": "step",
           "nodes": {
             "camera": {
@@ -242,8 +304,72 @@
                 }
               }
             }
-          ]
-        }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Front door camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-2"
       },
       {
         "heading": "Someone comes home",
@@ -251,7 +377,6 @@
           "Step 2 shows the quiet scene. Step 3 begins recording; step 4 triggers the event while REC stays on. Return to step 3, then 4, to replay the event."
         ],
         "diagram": {
-          "primaryPanel": "camera-view",
           "view": "step",
           "nodes": {
             "camera": {
@@ -363,8 +488,72 @@
                 }
               }
             }
-          ]
-        }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Entry camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-3"
       },
       {
         "heading": "A fire in the kitchen",
@@ -372,7 +561,6 @@
           "Step 2 shows the quiet scene. Step 3 begins recording; step 4 triggers the event while REC stays on. Return to step 3, then 4, to replay the event."
         ],
         "diagram": {
-          "primaryPanel": "camera-view",
           "view": "step",
           "nodes": {
             "camera": {
@@ -484,8 +672,72 @@
                 }
               }
             }
-          ]
-        }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Kitchen camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-4"
       },
       {
         "heading": "A raccoon at night, recorded then played back",
@@ -493,7 +745,6 @@
           "An illustrative animated clip, not real footage. Step 2 records the empty night porch; step 3 starts the raccoon while REC continues. After standby, step 6 uses mode playing: the saved clip is played back with a PLAYING label. Scene event (Before event / Play event) is a separate control that only starts or holds the action."
         ],
         "diagram": {
-          "primaryPanel": "camera-view",
           "view": "step",
           "nodes": {
             "camera": {
@@ -617,9 +868,208 @@
                 }
               }
             }
-          ]
-        }
+          ],
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Porch camera",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 24,
+                    "h": 12,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "x": 0,
+                    "y": 12,
+                    "w": 24,
+                    "h": 4,
+                    "controls": "steps"
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 24,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 8,
+                    "panel": "camera-view"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
+        },
+        "id": "section-5"
       }
-    ]
+    ],
+    "views": [
+      {
+        "id": "standard",
+        "name": "Standard",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1"
+          },
+          {
+            "section": "section-2"
+          },
+          {
+            "section": "section-3"
+          },
+          {
+            "section": "section-4"
+          },
+          {
+            "section": "section-5"
+          }
+        ]
+      },
+      {
+        "id": "section-1-home",
+        "name": "Running from the doorbell · Front door camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Running from the doorbell · Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-1",
+            "layout": "flow"
+          }
+        ]
+      },
+      {
+        "id": "section-2-home",
+        "name": "Two people running away · Front door camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-2",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-2-flow",
+        "name": "Two people running away · Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-2",
+            "layout": "flow"
+          }
+        ]
+      },
+      {
+        "id": "section-3-home",
+        "name": "Someone comes home · Entry camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-3",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-3-flow",
+        "name": "Someone comes home · Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-3",
+            "layout": "flow"
+          }
+        ]
+      },
+      {
+        "id": "section-4-home",
+        "name": "A fire in the kitchen · Kitchen camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-4",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-4-flow",
+        "name": "A fire in the kitchen · Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-4",
+            "layout": "flow"
+          }
+        ]
+      },
+      {
+        "id": "section-5-home",
+        "name": "A raccoon at night, recorded then played back · Porch camera",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-5",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-5-flow",
+        "name": "A raccoon at night, recorded then played back · Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "section-5",
+            "layout": "flow"
+          }
+        ]
+      }
+    ],
+    "defaultView": "standard"
   }
 }

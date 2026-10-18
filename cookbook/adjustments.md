@@ -32,7 +32,7 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "editing the alternate also changed the happy path" | **Make independent here**, or copy the step under a fresh ID and replace only that path's reference | shared IDs deliberately share one body; aligned columns do not imply shared content |
 | "copy these happy-path steps into the alternate" | **Steps → Reuse steps…** | copy by default; share only intentionally; inspect the resulting destination panel state |
 | "show a communication that doesn't happen" | `steps[i].failures` with `"from->to"` keys | `dropped` = attempted but lost; `blocked` = never sent; declared edge required; a timeout alone proves neither |
-| "make the home map the main view" | `diagram.primaryPanel:"home"` (use the panel's ID) | **Presentation → Centerpiece**; reader can switch Home / Data flow live |
+| "make the home map the main view" | Explicit `diagram.layouts` panel tiles and View member references | **Arrange selected section…**; author Home and Data flow as deliberate Views |
 | "move a home device / room / person" | device/room declaration x/y; subject's per-step `{x,y}` patch | 320×180 frame; device/room drags change all steps; subject moves follow the selected step |
 | "remove the subject names" | omit `homemap.showSubjectLabels` or set it to false | names are hidden by default; `true` opts in; state chips are already omitted |
 | "start recording before the person moves / fire starts" | screen patch `mode:"rec",scenePlayback:"waiting"`, then later `scenePlayback:"playing"` | mode and scene phase inherit separately; see `camera-events.md` |

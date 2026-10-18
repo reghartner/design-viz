@@ -48,7 +48,7 @@ for(const width of [1280,1800])test('chapter diagram visibility saves and restor
     await reader.locator('.explore-navigation .reader-contents-tab:has(.reader-tree-view[aria-current="page"])').getByRole('button',{name:'Home story',exact:true}).click();await expect(sec.locator('.board')).toBeHidden();await reader.close();
   }
 });
-for(const savedLayout of [false,true])test('legacy '+(savedLayout?'saved':'automatic')+' chapters gain undoable visibility without a reader reveal override',async({page,server})=>{
+for(const savedLayout of [false,true])test('ordinary '+(savedLayout?'saved':'automatic')+' sections gain undoable visibility without extra Views or a reader reveal override',async({page,server,context})=>{
   const d=structuredClone(seed.page.sections[0].diagram);delete d.layouts;delete d.defaultLayout;
   if(savedLayout){
     d.sectionLayout=structuredClone(seed.page.sections[0].diagram.layouts[0].sectionLayout);
@@ -56,11 +56,16 @@ for(const savedLayout of [false,true])test('legacy '+(savedLayout?'saved':'autom
   }
   d.autoplay=false;const raw={page:{sections:[{heading:'Legacy story',diagram:d}]}};
   await open(page,server,raw);const initial=await source(page);
-  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true}).click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
-  expect(saved.layouts.map(v=>v.id)).toEqual(['home','flow']);expect(saved.layouts[1].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
-  await expect(section(page).locator('.board')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(1);
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Standard',exact:true}).click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
+  expect(saved.layouts.map(v=>v.id)).toEqual(['flow']);expect(saved.layouts[0].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
+  await expect(section(page).locator('.board')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(1);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(section(page).locator('.board')).toBeVisible();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);await expect(section(page).locator('.board')).toBeHidden();
+  const reader=await exportReader(context,server,hidden,'ordinary-hidden-'+savedLayout);
+  await expect(reader.locator('.board')).toBeHidden();await expect(reader.locator('[data-layout-flow]')).toHaveCount(0);
+  await expect(reader.locator('.reader-top-view')).toHaveCount(1);await expect(reader.getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');await reader.close();
   await change(page,true);await expect(section(page).locator('.board')).toBeVisible();
 });
 

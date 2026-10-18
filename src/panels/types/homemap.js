@@ -1134,9 +1134,7 @@ PanelRegistry.extend('homemap', {
   since: '0.1.0',
   layout: {
     sectionSizing: { minWidth: 230, preferredWidth: 350, maxWidth: 520, bodyAspect: 320 / 216, aspectPolicy: 'fixed', grow: 0, ancillarySelector: '.hmaudio-captions', contentSelector: '.hmframe' },
-    focusByDefault: true,
     fallbackHeight: 12,
-    focusLabel: 'Home',
     attachControls: true,
     large: true,
     supporting: false,
@@ -1264,28 +1262,6 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 }`,
     },
     {
-      order: 2338,
-      css: String.raw`@media screen{
-  .panel-first>.primary-panel:has(>.pt-homemap){width:100%;max-width:var(--home-max-width);justify-self:center;}
-}
-@media screen{
-  body .docview .boardgrid.panel-first:has(>.primary-panel>.pt-homemap)>.panelcol:not([hidden]){
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));align-items:start;margin-top:0;
-  }
-}
-@media screen and (min-width:981px){
-  @container diagram-section (min-width:1001px){
-    body .docview .boardgrid.haspanels.panel-first:has(>.primary-panel>.pt-homemap):has(>.panelcol:not([hidden])){
-      grid-template-columns:minmax(0,var(--home-max-width)) minmax(280px,1fr);
-    }
-  }
-}`,
-    },
-    {
-      order: 2344,
-      css: String.raw`.primary-panel .hmframe{max-height:var(--home-max-height,70vh);}`,
-    },
-    {
       order: 2351,
       css: String.raw`.hmspace{--hm-room-color:var(--hm-line);}
 .hm-room-occupied{--hm-room-color:var(--hm-accent);}
@@ -1329,12 +1305,6 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 }
 @media print{
   .hmtrail,.hmsig{display:none !important;}
-}`,
-    },
-    {
-      order: 2388,
-      css: String.raw`@media print{
-  .primary-panel .hmframe{max-height:none;}
 }`,
     },
     {

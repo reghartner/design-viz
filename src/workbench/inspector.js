@@ -1821,10 +1821,6 @@ function panelForm(val, ctx){
       frow('Panel type',Object.assign(document.createElement('span'),{textContent:val.type})),
       frow('Title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
-    rows.push(frow('Presentation', selectControl(['Sidebar', 'Centerpiece'], ctx.diagram.primaryPanel === val.id ? 'Centerpiece' : 'Sidebar', function(v){
-      return commitCascade(function(raw){ return planPrimaryPanel(session.text(), raw, t.section, v === 'Centerpiece' ? val.id : null); },
-        {after:function(){ renderInspector(); }});
-    })));
     var editor=panelEditor(val.type);
     var visibility=selectControl(['show','hide'],val.visible===false?'hide':'show',function(value){
       return commitSimple('visible',value==='hide'?'false':null);

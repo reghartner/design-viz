@@ -52,7 +52,13 @@ test('the overlay panel and its helper are bundled into every built output and t
   const overlaid=execFileSync(process.execPath,['tools/validate.js',spec],{cwd:checkout,encoding:'utf8'});
   assert.match(overlaid,/0 errors, 0 warnings/);
   // Without the overlay the type is unknown, so the overlay made the difference.
-  assert.match(plainValidation.stdout+plainValidation.stderr,/unknown panel type "ticket-board"/);
+  assert.match(plainValidation.stdout+plainValidation.stderr,/unknown panel type "ticket-board"/);  // A fork venue (company/panels/venues) joins the seatmap venue library.
+  const venue=viewer.indexOf('/* ---- company/panels/venues/fixture-hall.js ---- */');
+  assert.ok(venue>viewer.indexOf('/* ---- src/panels/venues/ubs-arena.js ---- */')&&venue<upstream,'upstream venues, then fork venues, before the panel types');
+  const venueSpec=path.join(checkout,'company/venue-check.spec.json');
+  fs.writeFileSync(venueSpec,JSON.stringify({nodes:{n:{}},rows:[['n']],panels:[{id:'map',type:'seatmap',venue:'fixture-hall'}]}));
+  try{assert.match(execFileSync(process.execPath,['tools/validate.js',venueSpec],{cwd:checkout,encoding:'utf8'}),/0 errors, 0 warnings/);}
+  finally{fs.rmSync(venueSpec,{force:true});}
 });
 
 test('the folder-agent kit carries the company example and the contract with its fragment appended',()=>{

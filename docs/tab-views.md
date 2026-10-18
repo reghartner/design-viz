@@ -140,8 +140,8 @@ original diagram source in a section.
 Legacy `diagram.layouts[].presentation`, `defaultLayout`, host profiles,
 geometry and filters remain intact. Runtime compatibility Views preserve those
 arrangements independently: an Explore arrangement includes only its own section.
-A default Standard compatibility View stacks eligible Standard sections. Automatic
-Home/Data flow choices remain available. The first View-authoring action adds
+A default Standard compatibility View stacks eligible Standard sections. Panels never generate choices. For older automatic Home/Data flow
+presentations, use the [offline conversion](panel-view-migration.md). The first View-authoring action adds
 stable section IDs and canonical Views using source splices, retaining every
 existing section and arrangement. It creates one Undo entry. The experimental
 `tab.presentation` field is not authoritative and does not override legacy

@@ -34,8 +34,9 @@ function buildConfluenceConfig(text, values){
     return {error:'The selected section is missing. Choose a section from the imported spec.'};
   if (['spec','home','data'].indexOf(focus) < 0) return {error:'Choose a supported starting view.'};
   if (skin !== 'spec' && SKIN_NAMES.indexOf(skin) < 0) return {error:'Choose a supported skin.'};
-  return {config:{specJson:exported.text, section:section, focus:focus, skin:skin}, exported:exported};
+  return {config:{specJson:exported.text, section:section, focus:'spec', skin:skin}, exported:exported};
 }
+/* Stored legacy focus values are ignored; only authored Views choose presentation. */
 function confluenceDisplayPage(page, config){
   var display = JSON.parse(JSON.stringify(page));
   if (config.section !== 'all'){
@@ -46,16 +47,6 @@ function confluenceDisplayPage(page, config){
     // selected entry section is initially visible in this macro.
     display.blocks = hasDetails ? sectionRecords(display).map(function(r){return Object.assign({},r.section,{detailOnly:r.section!==selected.section});}) : [selected.section]; delete display.sections;
   }
-  confluenceSections(display).forEach(function(s){
-    var d = s.section.diagram;
-    if (!d) return;
-    if (config.focus === 'data') delete d.primaryPanel;
-    if (config.focus === 'home'){
-      var preferred = (d.panels || []).filter(function(p){return panelCapability(p.type,'focusByDefault',false);});
-      var primary = preferred.find(function(p){return p.id === d.primaryPanel;}) || preferred[0];
-      if (primary) d.primaryPanel = primary.id;
-    }
-  });
   if (config.skin !== 'spec') display.skin = config.skin;
   return display;
 }

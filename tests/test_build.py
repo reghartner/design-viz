@@ -16,6 +16,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD = ROOT / "tools" / "build.py"
+sys.path.insert(0, str(ROOT / "tools"))
+import build  # noqa: E402  (tools/build.py, for its marker helpers)
 PAGES = [ROOT / "template" / "flowview.html", ROOT / "workbench" / "flowspec.html"]
 OUTPUTS = PAGES + [ROOT / "tools" / "canon" / "generated-runtime.cjs",
                    ROOT / "workbench" / "diagrams.json"]
@@ -244,6 +246,59 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         for p in OUTPUTS:
             self.assertEqual(before[p], p.read_text(), f"{p} changed on rebuild")
+
+
+class TestWelcomeEntryFlags(unittest.TestCase):
+    """--no-library / --no-catalog hide optional Welcome entries at build time; default builds keep them."""
+
+    BUTTONS = {
+        'library': re.compile(rb'<button type="button" class="welcome-library-entry" id="welcome-library"( hidden)?>'),
+        'catalog': re.compile(rb'<button type="button" class="welcome-action" id="welcome-catalog"( hidden)?>'),
+        'new-catalog': re.compile(rb'<button type="button" id="welcome-new-catalog" class="welcome-button"( hidden)?>'),
+    }
+
+    def test_marker_values_and_wiring(self):
+        self.assertEqual(build.welcome_hidden(False), '')
+        self.assertEqual(build.welcome_hidden(True), ' hidden')
+        skeleton = build.read('workbench.skel.html')
+        self.assertEqual(skeleton.count('id="welcome-library"{{WORKBENCH_LIBRARY_HIDDEN}}>'), 1)
+        self.assertEqual(skeleton.count('{{WORKBENCH_CATALOG_HIDDEN}}'), 2)
+        css = build.read('style.workbench.css')
+        self.assertIn('.welcome-library-entry[hidden]{display:none}', css)
+        self.assertIn('.welcome-action[hidden],#welcome-new-catalog[hidden]{display:none}', css)
+        self.assertIn('.welcome-actions:has(> #welcome-catalog[hidden]){grid-template-columns:repeat(3,minmax(0,1fr))}', css)
+        # Each catalog marker sits on one of the two Welcome catalog buttons, so the
+        # editor Add menu's catalog entry is not touched by --no-catalog.
+        tags = re.findall(r'<button [^>]*\{\{WORKBENCH_CATALOG_HIDDEN\}\}>', skeleton)
+        self.assertEqual(tags, ['<button type="button" class="welcome-action" id="welcome-catalog"{{WORKBENCH_CATALOG_HIDDEN}}>',
+                                '<button type="button" id="welcome-new-catalog" class="welcome-button"{{WORKBENCH_CATALOG_HIDDEN}}>'])
+
+    def test_cli_flags_hide_only_their_entries(self):
+        output = ROOT / 'workbench/flowspec.html'
+        others = [ROOT / 'template/flowview.html', ROOT / 'workbench/diagrams.json',
+                  ROOT / 'tools/canon/generated-runtime.cjs']
+        original = {p: p.read_bytes() if p.exists() else None for p in [output, *others]}
+        def restore():
+            for path, data in original.items():
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(data)
+        self.addCleanup(restore)
+        def buttons(*args):
+            r = subprocess.run([sys.executable, str(BUILD), '--no-config', *args], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            html = output.read_bytes()
+            found = {}
+            for name, pattern in self.BUTTONS.items():
+                matches = pattern.findall(html)
+                self.assertEqual(len(matches), 1, name)
+                found[name] = matches[0] == b' hidden'
+            return found
+        self.assertEqual(buttons(), {'library': False, 'catalog': False, 'new-catalog': False})
+        self.assertEqual(buttons('--no-library'), {'library': True, 'catalog': False, 'new-catalog': False})
+        self.assertEqual(buttons('--no-catalog'), {'library': False, 'catalog': True, 'new-catalog': True})
+        self.assertEqual(buttons('--no-library', '--no-catalog'), {'library': True, 'catalog': True, 'new-catalog': True})
 
 
 if __name__ == "__main__":

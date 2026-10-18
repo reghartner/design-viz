@@ -38,7 +38,18 @@ if [ "$NAME_OK" = no ]; then
 fi
 
 cd "$ROOT"
-python3 tools/build.py
+# --no-library and --no-catalog hide the Welcome "Browse diagrams" and "From
+# service catalog" entries: this host publishes no library and no catalog (the
+# editor's Add menu keeps its catalog entry). That build writes the checkout's shared outputs (workbench/, template/),
+# which Dockerfile.prebuilt and local use copy as-is, so a default build always
+# replaces them when this script exits, whether it succeeded or failed.
+restore_default_build() {
+  if ! (cd "$ROOT" && python3 tools/build.py >/dev/null); then
+    echo "deploy.sh: could not restore the default build; run python3 tools/build.py" >&2
+  fi
+}
+trap restore_default_build EXIT
+python3 tools/build.py --no-library --no-catalog
 
 rm -rf "$SITE"
 mkdir -p "$SITE/workbench" "$SITE/template"

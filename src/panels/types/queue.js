@@ -111,6 +111,7 @@ PanelRegistry.extend('queue', {
   order: 10,
   label: 'Queue',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('queue', {

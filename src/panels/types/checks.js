@@ -81,6 +81,7 @@ PanelRegistry.extend('checks', {
   order: 24,
   label: 'Checks',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('checks', {

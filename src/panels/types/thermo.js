@@ -349,6 +349,7 @@ PanelRegistry.extend('thermo', {
   order: 12,
   label: 'Temperature',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('thermo', {

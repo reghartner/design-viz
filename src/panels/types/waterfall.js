@@ -125,6 +125,7 @@ PanelRegistry.extend('waterfall', {
   order: 6,
   label: 'Waterfall',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('waterfall', {

@@ -139,6 +139,7 @@ PanelRegistry.extend('table', {
   order: 23,
   label: 'Table',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('table', {

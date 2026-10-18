@@ -279,9 +279,12 @@ function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, error
   if (once) rest.enterOnce = once;
   var effective = panelEffectiveDeclaration(decl, step), descriptor = PanelRegistry.get(decl.type);
   if (effective === decl || !descriptor.validateDeclaration) return {patch:rest, panel:effective, context:unified.context};
+  /* `initial` was checked once with the declaration; leave it out here. */
   var before = [], beforeErrors = [], after = [], afterErrors = [];
-  descriptor.validateDeclaration(decl, path, before, beforeErrors, d);
-  var context = descriptor.validateDeclaration(effective, path, after, afterErrors, d);
+  var setup = Object.assign({}, decl), next = Object.assign({}, effective);
+  delete setup.initial; delete next.initial;
+  descriptor.validateDeclaration(setup, path, before, beforeErrors, d);
+  var context = descriptor.validateDeclaration(next, path, after, afterErrors, d);
   if (touched){
     after.forEach(function(w){ if (before.indexOf(w) < 0) warnings.push(w); });
     afterErrors.forEach(function(e){ if (beforeErrors.indexOf(e) < 0) errors.push(e); });

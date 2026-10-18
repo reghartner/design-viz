@@ -6,12 +6,94 @@ appears and later converts, a promo lifts the upper deck, a tier is repriced.
 Every number is authored per step; the panel folds sparse patches into complete
 state and never forecasts. The complete teaching page is
 [`examples/sports/venue-map.spec.json`](../examples/sports/venue-map.spec.json)
-(two paths: **Sells out** and **Soft demand → upper tier repriced**).
+(UBS Arena, Elmont, NY; two paths: **Sells out** and **Soft demand → upper
+tier repriced**).
 
-## Two ways to get a map
+## Pick a venue from the library
+
+The quickest map is a venue from the library. One field draws a whole arena:
+
+```json
+{"id": "map", "type": "seatmap", "title": "UBS Arena, Elmont, NY",
+ "venue": "ubs-arena", "currency": "USD", "initial": {"sold": {"101": 120}}}
+```
+
+The library starts with one venue, **UBS Arena (Elmont, NY)**, id `ubs-arena`:
+80 sections in three rings, each section an original polygon drawn from its
+position on a public seating chart, with a rink outline and bench and ice
+landmarks. Section numbering comes from public seating guides (the left-end
+200-ring section is `329`, as the public chart labels it); capacities are an
+illustrative even split of 17,250 seats, not venue data, so say so on the page.
+
+**In the workbench** (desktop), select the Venue map panel: the **Venue**
+picker at the top of the inspector lists the library. Choosing a venue writes
+`"venue"` and removes the panel's own copies of the venue fields (geometry,
+bowl, rings, sections, landmarks, …), because a field written on the panel
+overrides the venue; one Undo restores them. Fields the venue supplies show
+**From UBS Arena: …** with **Edit a copy here**, which writes that one field
+into the panel as an override. Choosing **None** keeps a copy of the venue's
+seating in the panel and drops the reference.
+
+### Precedence
+
+`venue` supplies `geometry`, `bowl`, `direction`, `startAt`, `ringSlots`,
+`viewBox`, `field`, `rings`, `sections` and `landmarks`. Each of those written
+on the panel replaces the venue's value for that field wholesale; arrays are
+never merged, so `"landmarks": []` removes the venue's landmarks and a
+`sections` array replaces all 80. Everything else (`title`, `currency`,
+`tiers`, `showTotals`, `initial`, step patches) belongs to the panel. An
+unknown id warns with the available ids and the panel draws its own fields (or
+an empty map); it never fails the page.
+
+### Importing a different arena
+
+**In the workbench:** under the Venue picker, **Import seating chart…** takes
+the same CSV or SVG the command-line importer reads (optionally a total
+capacity for blank rows and an SVG level map). It runs the same parser, writes
+the imported `geometry`, `bowl` or `viewBox`/`field`, `rings` and `sections`
+into the panel, drops `venue` and clears the venue's other fields so nothing
+from the previous arena lingers, and shows the import report. One Undo
+restores the panel as it was.
+
+**As a library venue** (so every page can reference it by id), run the
+importer with `--venue`:
+
+```sh
+node tools/seatmap-import.mjs chart.svg --level-map "100-level:100 level,200-level:200 level" \
+  --capacity-total 18000 --venue my-arena --venue-name "My Arena" --venue-location "City, ST" \
+  --venue-note "Section numbering from public seating guides; capacities are an illustrative even split." \
+  --landmark "home-bench:home bench:430:300" --out company/panels/venues/my-arena.js
+```
+
+The output is one `SeatmapVenues.define({...})` call with a JSON literal. A
+fork keeps venue files in `company/panels/venues/`; upstream venues live in
+`src/panels/venues/`. Both directories are discovered by the build, so adding
+a venue edits no upstream file. Venue ids are unique across both; a malformed
+or duplicate file fails the build and the tests. Regenerate a venue file from
+its source rather than editing it. UBS Arena's was produced by
+
+```sh
+python3 examples/sports/ubs-arena/trace.py
+node tools/seatmap-import.mjs examples/sports/ubs-arena/arena.svg \
+  --level-map "100-level:100 level,200-level:200 level,300-level:300 level" --capacity-total 17250 \
+  --venue ubs-arena --venue-name "UBS Arena" --venue-location "Elmont, NY" \
+  --venue-note "Section numbering and positions from public seating guides, drawn as original polygons by examples/sports/ubs-arena/trace.py. Capacities are an illustrative even split of 17,250 seats, not venue data." \
+  --landmark "home-bench:home bench:428:302" --landmark "away-bench:visitors:556:302" --landmark "ice:ice:489:404" \
+  --out src/panels/venues/ubs-arena.js
+```
+
+`trace.py` reads section positions (`positions.json`, boxes read off a public
+seating chart; only each section's centre angle and ring are used) and the
+order, ring and zone of every section from `examples/sports/arena-sections.csv`,
+and draws each ring as a band between two rounded rectangles split between
+neighbouring sections. `tests/seatmap-venue.test.js` checks that both commands
+reproduce the committed files byte for byte.
+
+## Ways to get a map
 
 | You have… | Do this | Result |
 |---|---|---|
+| a venue in the library | `"venue": "<id>"`, or the inspector's **Venue** picker | that venue's sections, rings and landmarks |
 | a list of sections (spreadsheet, seating guide) | write a CSV `id,level,zone,capacity[,label]` and run the importer | `geometry:"bowl"` — a generic rink with one ring per level, sections placed by zone |
 | the venue's own SVG seating chart | run the importer on the SVG | `geometry:"paths"` — every section keeps its real outline |
 | nothing yet | start from the picker template (two rings × eight zoned sections) | a small bowl to edit by hand |
@@ -71,6 +153,11 @@ field it cannot accept.
   inference is wrong.
 - Capacities come from `data-capacity` where present; others follow the CSV
   rule (`--capacity-total` split or 1). `data-zone` and `data-label` are kept.
+- A `<rect id="rink-outline">` (or any `<rect data-field="rink">`) becomes the
+  panel's `field`: `{"shape":"rink","x","y","width","height"}` in viewBox
+  units, drawn under the sections with rounded corners, a centre line and two
+  blue lines. Only translate/scale transforms are accepted for it, and an
+  outline outside the sections' bounding box is reported and omitted.
 - `<style>` and `<script>` are ignored, external references are never
   followed, no script runs, and the output is refused above 512 KiB.
 - Every emitted path passes the panel's strict tokenizer (absolute

@@ -16,6 +16,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD = ROOT / "tools" / "build.py"
+sys.path.insert(0, str(ROOT / "tools"))
+import build  # noqa: E402  (tools/build.py, for its marker helpers)
 PAGES = [ROOT / "template" / "flowview.html", ROOT / "workbench" / "flowspec.html"]
 OUTPUTS = PAGES + [ROOT / "tools" / "canon" / "generated-runtime.cjs",
                    ROOT / "workbench" / "diagrams.json"]
@@ -244,6 +246,40 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         for p in OUTPUTS:
             self.assertEqual(before[p], p.read_text(), f"{p} changed on rebuild")
+
+
+class TestNoLibraryFlag(unittest.TestCase):
+    """--no-library hides the Welcome Browse diagrams button at build time; default builds keep it."""
+
+    BUTTON = re.compile(rb'<button type="button" class="welcome-library-entry" id="welcome-library"( hidden)?>')
+
+    def test_marker_values(self):
+        self.assertEqual(build.welcome_library_hidden(False), '')
+        self.assertEqual(build.welcome_library_hidden(True), ' hidden')
+        skeleton = build.read('workbench.skel.html')
+        self.assertEqual(skeleton.count('id="welcome-library"{{WORKBENCH_LIBRARY_HIDDEN}}>'), 1)
+        css = build.read('style.workbench.css')
+        self.assertIn('.welcome-library-entry[hidden]{display:none}', css)
+
+    def test_cli_default_shows_and_flag_hides_the_button(self):
+        output = ROOT / 'workbench/flowspec.html'
+        others = [ROOT / 'template/flowview.html', ROOT / 'workbench/diagrams.json']
+        original = {p: p.read_bytes() if p.exists() else None for p in [output, *others]}
+        def restore():
+            for path, data in original.items():
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(data)
+        self.addCleanup(restore)
+        def button(*args):
+            r = subprocess.run([sys.executable, str(BUILD), '--no-config', *args], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            found = self.BUTTON.findall(output.read_bytes())
+            self.assertEqual(len(found), 1)
+            return found[0]
+        self.assertEqual(button('--no-library'), b' hidden')
+        self.assertEqual(button(), b'')
 
 
 if __name__ == "__main__":

@@ -14,13 +14,14 @@ on that plan. Check Cloudflare's pricing pages before relying on either figure.
 
 ## What gets uploaded
 
-`deploy.sh` runs `python3 tools/build.py`, assembles `deploy/cloudflare/site/`,
+`deploy.sh` runs `python3 tools/build.py --no-library`, which hides the Welcome
+**Browse diagrams** button because this host publishes no library. It assembles `deploy/cloudflare/site/`,
 generates `deploy/cloudflare/.generated/wrangler.jsonc`, and uploads with Wrangler:
 
 | Published path | Source | Purpose |
 | --- | --- | --- |
 | `/workbench/flowspec.html` | `workbench/flowspec.html` | the editor |
-| `/workbench/diagrams.json` | generated, always empty | library index; its presence makes Browse show nothing rather than the bundled fictional example. `canon.json` is ignored |
+| `/workbench/diagrams.json` | generated, always empty | library index. The Browse button is hidden, but a direct `?diagram=` link still reads this file; its presence keeps the library empty instead of showing the bundled fictional example. `canon.json` is ignored |
 | `/workbench/starters.json` | `workbench/starters.example.json` | welcome-page starter projects |
 | `/template/flowview.html` | `template/flowview.html` | fetched by Export project |
 | `/_redirects` | generated | `/` redirects to the editor |
@@ -73,6 +74,8 @@ must answer `302` to a `cloudflareaccess.com` URL.
 ## Redeploy
 
 Run `sh deploy/cloudflare/deploy.sh` again. Wrangler uploads only changed files.
+The script leaves this checkout's `workbench/flowspec.html` built without the
+Browse button; run `python3 tools/build.py` to restore it for local use.
 
 ## Agent editing
 

@@ -38,7 +38,10 @@ if [ "$NAME_OK" = no ]; then
 fi
 
 cd "$ROOT"
-python3 tools/build.py
+# --no-library hides the Welcome "Browse diagrams" button: this host publishes no
+# library. It rewrites workbench/flowspec.html in this checkout; run a plain
+# `python3 tools/build.py` afterwards to restore the button for local use.
+python3 tools/build.py --no-library
 
 rm -rf "$SITE"
 mkdir -p "$SITE/workbench" "$SITE/template"

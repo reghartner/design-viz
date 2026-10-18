@@ -1257,6 +1257,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 
 /* Published diagrams use the same viewer without any editor bindings. */
 .welcome-library-entry{display:flex;justify-content:space-between;align-items:center;gap:24px;width:100%;margin:20px 0 0;padding:19px 25px;border:1px solid #d6d1e5;border-radius:14px;background:linear-gradient(110deg,#f1edfa,#f3f8f5);text-align:left;color:#343c55;cursor:pointer;font:inherit}
+.welcome-library-entry[hidden]{display:none}
 .welcome-library-entry>span:first-child{display:flex;align-items:baseline;gap:20px}.welcome-library-entry b{font-size:16px}.welcome-library-entry span span{font-size:13px;color:#667084}
 .welcome:has(#welcome-library-screen:not([hidden])){max-width:1280px;padding-top:22px}
 #welcome-library-screen .welcome-back{margin-bottom:12px}

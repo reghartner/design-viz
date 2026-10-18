@@ -16,10 +16,11 @@
       "sections": [
        {
         "id": "today",
-        "heading": "How panels change at each step today",
+        "heading": "How panel state changes per step today: the common rules",
         "accent": "blue",
         "text": [
-         "Click through the steps. Each panel beside the diagram is a real Flowview panel demonstrating the rule its title names; the table shows exactly what that step wrote. Counts and rates are illustrative. The Special fold rules tab covers the remaining operations."
+         "Not every rule here applies to every panel. Most of this tab is the common fold used by 22 of the 42 types; the other 20 types have custom folds with their own rules (Special fold rules tab). The last row of the table at every step says exactly which types the rule covers.",
+         "Each panel beside the diagram is a real Flowview panel demonstrating the rule its title names; the table shows exactly what that step wrote. Counts and rates are illustrative."
         ],
         "diagram": {
          "view": "step",
@@ -316,6 +317,15 @@
                 "value": "400",
                 "rule": "declaration: fixed"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "all 42 types",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -344,6 +354,15 @@
                 "value": "{\"value\": 40}",
                 "rule": "shallow merge; carried"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "22 common-fold types; custom folds carry by their own rules",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -384,6 +403,15 @@
                 "value": "(no patch)",
                 "rule": "keeps 40"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "log on the 22 common-fold types",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -429,6 +457,15 @@
                 "value": "{\"log\": [{\"tag\": \"STEP\", \"text\": \"second line\"}]}",
                 "rule": "appends"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "22 common-fold types; custom folds differ (Special tab)",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -470,6 +507,15 @@
                 "value": "{\"counts\": {\"raw\": 1000}}",
                 "rule": "first count"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "storing null: common fold; its meaning: each renderer",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -510,6 +556,15 @@
                 "value": "{\"value\": 40}",
                 "rule": "back to 40"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "funnel, grid, seatmap only",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -540,6 +595,15 @@
                 "value": "{\"enterOnce\": {\"counts\": {\"kept\": 500}}}",
                 "rule": "merged for this step only"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "funnel and grid one-step entries only",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -562,6 +626,15 @@
                 "value": "(no patch)",
                 "rule": "kept back to 870"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "funnel, grid, seatmap only",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -590,6 +663,15 @@
                 "value": "{\"counts\": {\"kept\": null}}",
                 "rule": "kept forgotten; raw and clean stay"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "funnel, grid, seatmap only",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -602,7 +684,7 @@
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (Elsewhere: a table's `rows: []` clears by replacement; a device-app card property such as `{\"icon\": null}` restores its declared value, while `null` for a whole card clears that card. The property case is shown on the Special fold rules tab.)",
+           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (Elsewhere: a table's `rows: []` clears by replacement; a device-app card property such as `{\"icon\": null}` restores its declared value, while `null` for a whole card clears that card. The property case is on the Special fold rules tab.)",
            "panels": {
             "funnel": {
              "counts": null
@@ -616,6 +698,15 @@
                 "value": "{\"counts\": null}",
                 "rule": "every key forgotten"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "funnel, grid, seatmap only",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -639,6 +730,15 @@
                 "value": "\"+5h\"",
                 "rule": "battery drains 20 %"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "battery, phone, deviceapp, appscreens, with storyTime declared",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -681,6 +781,15 @@
                 "value": "{\"counts\": {\"raw\": 1000, \"clean\": 920, \"kept\": 860}}",
                 "rule": "folds while hidden"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "all 42 types",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -721,6 +830,15 @@
                 "value": "{\"funnel\": true}",
                 "rule": "shown again"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "only the types listed on the Panel types tab",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -752,6 +870,15 @@
                 "value": "\"mA\"",
                 "rule": "no step can change it"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "all 42 types, for every field without a per-type override",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -778,6 +905,15 @@
                 "value": "{\"value\": 5}",
                 "rule": "this path only"
                }
+              },
+              {
+               "id": "z",
+               "cells": {
+                "key": "applies to",
+                "value": "all 42 types",
+                "rule": ""
+               },
+               "status": "changed"
               }
              ]
             }
@@ -897,91 +1033,41 @@
       "label": "Special fold rules",
       "sections": [
        {
-        "id": "special",
-        "heading": "Special panel fold rules",
+        "id": "sp-paint",
+        "heading": "Buffer: range paint accumulates",
         "accent": "green",
         "text": [
-         "Operations that only some types accept. Each is shown with a real panel. Times and rates are illustrative. The Home / Data flow switch above the diagram appears because a home map panel is present; it is normal Flowview behaviour, not part of this explanation."
+         "Operations that only some panel types accept, one section per case. Each section has its own steps, its one panel and the JSON each step wrote. Times and rates are illustrative.",
+         "Buffer `mark` paints add up across steps; `enterOnce.mark` replaces them for one step; `cells` replaces everything."
         ],
         "diagram": {
          "view": "step",
          "nodes": {
-          "patch": {
-           "title": "Step patch",
-           "sub": "operations",
-           "icon": "terminal"
-          },
-          "clock": {
-           "title": "Story time",
-           "sub": "step.time",
-           "icon": "gear"
-          },
           "fold": {
-           "title": "Custom fold",
+           "title": "Fold",
            "sub": "own rules",
-           "icon": "chip",
-           "tint": "data"
-          },
-          "view": {
-           "title": "Snapshot",
-           "sub": "per step",
-           "icon": "monitor"
+           "icon": "chip"
           }
          },
          "rows": [
-          []
+          [
+           "fold"
+          ]
          ],
-         "floats": [
-          {
-           "id": "clock",
-           "side": "below",
-           "x": 123,
-           "y": 202
-          },
-          {
-           "id": "fold",
-           "side": "below",
-           "x": 349,
-           "y": 202
-          },
-          {
-           "id": "patch",
-           "side": "below",
-           "x": 349,
-           "y": 70
-          },
-          {
-           "id": "view",
-           "side": "below",
-           "x": 349,
-           "y": 334
-          }
-         ],
-         "edges": [
-          {
-           "from": "patch",
-           "to": "fold",
-           "kind": "int",
-           "label": "operations"
-          },
-          {
-           "from": "clock",
-           "to": "fold",
-           "kind": "int",
-           "label": "elapsed time"
-          },
-          {
-           "from": "fold",
-           "to": "view",
-           "kind": "int",
-           "label": "result"
-          }
-         ],
+         "edges": [],
          "panels": [
           {
-           "id": "sjson",
+           "id": "buffer",
+           "type": "buffer",
+           "title": "Buffer: range paint accumulates",
+           "segments": 12,
+           "capacity": "6 s",
+           "initial": {}
+          },
+          {
+           "id": "json",
            "type": "table",
-           "title": "What this step wrote (this table's rows are replaced every step)",
+           "title": "What this step wrote",
            "columns": [
             {
              "id": "key",
@@ -999,46 +1085,363 @@
            "initial": {
             "rows": []
            }
-          },
+          }
+         ],
+         "steps": [
           {
-           "id": "buffer",
-           "type": "buffer",
-           "title": "Buffer: range paint accumulates",
-           "segments": 12,
-           "capacity": "6 s",
-           "initial": {}
-          },
-          {
-           "id": "app",
-           "type": "deviceapp",
-           "title": "Device app: notifications, report times, card overrides",
-           "appName": "Homestead",
-           "device": "Front door camera",
-           "fields": [
-            {
-             "id": "battery",
-             "label": "Battery",
-             "kind": "battery",
-             "badgeMode": "none"
+           "id": "s-paint",
+           "text": "**Range paint accumulates.** Buffer `mark` ranges are added to every earlier paint, like `log` lines.",
+           "panels": {
+            "buffer": {
+             "mark": [
+              [
+               0,
+               3,
+               "buffered"
+              ]
+             ]
             },
-            {
-             "id": "model",
-             "label": "Camera model",
-             "icon": "camera",
-             "badgeMode": "none"
-            }
-           ],
-           "initial": {
-            "battery": {
-             "value": 68,
-             "status": "ready"
-            },
-            "model": {
-             "value": "Doorbell camera",
-             "status": "ready"
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"mark\": [[0, 3, \"buffered\"]]}",
+                "rule": "paint added"
+               }
+              }
+             ]
             }
            }
           },
+          {
+           "id": "s-paint2",
+           "text": "**A second paint lands on top** of the first: cells 2–5 become uploading, 0–1 stay buffered.",
+           "panels": {
+            "buffer": {
+             "mark": [
+              [
+               2,
+               5,
+               "uploading"
+              ]
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"mark\": [[2, 5, \"uploading\"]]}",
+                "rule": "applied over earlier paint"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-paint-once",
+           "text": "**Exception: `enterOnce.mark` replaces the paint list for one step.** Only cells 6–8 show as dropped here; the next step shows the accumulated paint again.",
+           "panels": {
+            "buffer": {
+             "enterOnce": {
+              "mark": [
+               [
+                6,
+                8,
+                "dropped"
+               ]
+              ]
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"enterOnce\": {\"mark\": [[6, 8, \"dropped\"]]}}",
+                "rule": "replaces paints for one step"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-paint-back",
+           "text": "**Back to the accumulated paint.** No patch: cells 0–5 show the two earlier paints again.",
+           "panels": {
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "(no patch)",
+                "rule": "accumulated paints return"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-cells",
+           "text": "**`cells` replaces everything and clears earlier paint.**",
+           "panels": {
+            "buffer": {
+             "cells": [
+              "protected",
+              "protected"
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"cells\": [\"protected\", \"protected\"]}",
+                "rule": "replaces; paints cleared"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 8
+           },
+           {
+            "panel": "buffer",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 8
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 8
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-signals",
+        "heading": "Home map: transient signals",
+        "accent": "green",
+        "text": [
+         "Home-map `signals` draw at their step only; device states carry."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
+          {
+           "id": "home",
+           "type": "homemap",
+           "title": "Home map: one-step signals",
+           "outline": {
+            "w": 300,
+            "h": 164
+           },
+           "devices": [
+            {
+             "id": "cam1",
+             "kind": "camera",
+             "label": "Porch cam",
+             "x": 46,
+             "y": 40,
+             "facing": 35,
+             "spread": 80,
+             "range": 70
+            },
+            {
+             "id": "door",
+             "kind": "entry",
+             "label": "Front door",
+             "x": 160,
+             "y": 158
+            },
+            {
+             "id": "hub",
+             "kind": "hub",
+             "label": "Hub",
+             "x": 160,
+             "y": 92
+            }
+           ],
+           "initial": {
+            "cam1": "scan",
+            "door": "closed",
+            "hub": "idle"
+           }
+          },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-signal",
+           "text": "**A purely transient patch.** Home-map `signals` draw a message from the porch camera to the hub at this step only and leave nothing in carried state; the camera's `detect` state does carry.",
+           "panels": {
+            "home": {
+             "cam1": "detect",
+             "signals": [
+              {
+               "from": "cam1",
+               "to": "hub"
+              }
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.home",
+                "value": "{\"cam1\": \"detect\", \"signals\": [{\"from\": \"cam1\", \"to\": \"hub\"}]}",
+                "rule": "signal this step only; detect carried"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-signal-after",
+           "text": "**Next step, no patch:** no signal is drawn; the camera stays in `detect`. Compare the Strand scene section, where a cut's result is carried.",
+           "panels": {
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.home",
+                "value": "(no patch)",
+                "rule": "nothing from the signal remains"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 9
+           },
+           {
+            "panel": "home",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 9
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 9
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-zones",
+        "heading": "Zoneframe: whole-array state by id",
+        "accent": "green",
+        "text": [
+         "A `zones` patch replaces the whole carried array; zones it does not list show their declared state."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
           {
            "id": "yard",
            "type": "zoneframe",
@@ -1094,45 +1497,141 @@
            "initial": {}
           },
           {
-           "id": "home",
-           "type": "homemap",
-           "title": "Home map: one-step signals",
-           "outline": {
-            "w": 300,
-            "h": 164
-           },
-           "devices": [
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
             {
-             "id": "cam1",
-             "kind": "camera",
-             "label": "Porch cam",
-             "x": 46,
-             "y": 40,
-             "facing": 35,
-             "spread": 80,
-             "range": 70
+             "id": "key",
+             "label": "Where"
             },
             {
-             "id": "door",
-             "kind": "entry",
-             "label": "Front door",
-             "x": 160,
-             "y": 158
+             "id": "value",
+             "label": "JSON"
             },
             {
-             "id": "hub",
-             "kind": "hub",
-             "label": "Hub",
-             "x": 160,
-             "y": 92
+             "id": "rule",
+             "label": "How it folds"
             }
            ],
            "initial": {
-            "cam1": "scan",
-            "door": "closed",
-            "hub": "idle"
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-zones",
+           "text": "**Whole-array state by id.** The patch lists only the walkway (masked). The fold carries this array as given; the renderer shows the door at its declared state.",
+           "panels": {
+            "yard": {
+             "zones": [
+              {
+               "id": "walk",
+               "state": "masked"
+              }
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.yard",
+                "value": "{\"zones\": [{\"id\": \"walk\", \"state\": \"masked\"}]}",
+                "rule": "array replaced; door from declaration"
+               }
+              }
+             ]
+            }
            }
           },
+          {
+           "id": "s-zones2",
+           "text": "**A second patch replaces the array, it does not merge.** It lists only the door (ignored), so the walkway returns to its declared armed state. Compare the Strand scene section, where each actor carries independently.",
+           "panels": {
+            "yard": {
+             "zones": [
+              {
+               "id": "door",
+               "state": "ignored"
+              }
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.yard",
+                "value": "{\"zones\": [{\"id\": \"door\", \"state\": \"ignored\"}]}",
+                "rule": "walkway back to declared armed"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 8
+           },
+           {
+            "panel": "yard",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 8
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 8
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-inflight",
+        "heading": "Inflight: start, mark, end",
+        "accent": "green",
+        "text": [
+         "Operations apply in the order start, end, mark; finished bars stay on the axis."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
           {
            "id": "ops",
            "type": "inflight",
@@ -1149,6 +1648,512 @@
            ]
           },
           {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-start",
+           "text": "**Inflight operations.** `start` opens a bar in each lane at this step.",
+           "panels": {
+            "ops": {
+             "start": [
+              {
+               "lane": "up",
+               "label": "clip 1"
+              },
+              {
+               "lane": "push",
+               "label": "notify"
+              }
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"start\": [{\"lane\": \"up\", …}, {\"lane\": \"push\", …}]}",
+                "rule": "two bars open"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-mark",
+           "text": "**`end` closes a bar; `mark` recolours an open one.** Operations in one patch apply in the order start, end, mark.",
+           "panels": {
+            "ops": {
+             "end": [
+              "push"
+             ],
+             "mark": [
+              {
+               "lane": "up",
+               "state": "retry"
+              }
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"end\": [\"push\"], \"mark\": [{\"lane\": \"up\", \"state\": \"retry\"}]}",
+                "rule": "push closed; upload marked retry"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-end",
+           "text": "**History is kept.** The upload bar closes; both finished bars stay on the axis.",
+           "panels": {
+            "ops": {
+             "end": [
+              "up"
+             ]
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.ops",
+                "value": "{\"end\": [\"up\"]}",
+                "rule": "closed; history retained"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 8
+           },
+           {
+            "panel": "ops",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 8
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 8
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-notify",
+        "heading": "Device app: notifications",
+        "accent": "green",
+        "text": [
+         "`notify` adds cards; `clear` removes the stack first."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
+          {
+           "id": "app",
+           "type": "deviceapp",
+           "title": "Device app: notifications, report times, card overrides",
+           "appName": "Homestead",
+           "device": "Front door camera",
+           "fields": [
+            {
+             "id": "battery",
+             "label": "Battery",
+             "kind": "battery",
+             "badgeMode": "none"
+            },
+            {
+             "id": "model",
+             "label": "Camera model",
+             "icon": "camera",
+             "badgeMode": "none"
+            }
+           ],
+           "initial": {
+            "battery": {
+             "value": 68,
+             "status": "ready"
+            },
+            "model": {
+             "value": "Doorbell camera",
+             "status": "ready"
+            }
+           }
+          },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-notify",
+           "time": "+10m",
+           "text": "**Notifications accumulate**, newest first.",
+           "panels": {
+            "app": {
+             "notify": {
+              "app": "Homestead",
+              "title": "Motion",
+              "text": "Someone is at the door."
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.notify",
+                "value": "{\"app\": \"Homestead\", \"title\": \"Motion\", …}",
+                "rule": "added to the stack"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-clear",
+           "time": "+10m",
+           "text": "**`clear` then `notify` in one patch:** the stack is cleared first, then the new card is added.",
+           "panels": {
+            "app": {
+             "clear": true,
+             "notify": {
+              "app": "Homestead",
+              "title": "Clip saved",
+              "text": "A 12 s clip is ready."
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app",
+                "value": "{\"clear\": true, \"notify\": {…\"Clip saved\"…}}",
+                "rule": "clear first, then add"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "storyTime": {
+          "start": "2026-10-17T18:00",
+          "span": "6h",
+          "clock": "24h",
+          "date": "none"
+         },
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "app",
+            "x": 7,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "json",
+            "x": 14,
+            "y": 0,
+            "w": 10,
+            "h": 15
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-fresh",
+        "heading": "Device app: report freshness",
+        "accent": "green",
+        "text": [
+         "`reportedAt` stamps a card; later steps age it from story time."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
+          {
+           "id": "app",
+           "type": "deviceapp",
+           "title": "Device app: notifications, report times, card overrides",
+           "appName": "Homestead",
+           "device": "Front door camera",
+           "fields": [
+            {
+             "id": "battery",
+             "label": "Battery",
+             "kind": "battery",
+             "badgeMode": "none"
+            },
+            {
+             "id": "model",
+             "label": "Camera model",
+             "icon": "camera",
+             "badgeMode": "none"
+            }
+           ],
+           "initial": {
+            "battery": {
+             "value": 68,
+             "status": "ready"
+            },
+            "model": {
+             "value": "Doorbell camera",
+             "status": "ready"
+            }
+           }
+          },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-report",
+           "time": "+10m",
+           "text": "**A report time.** `reportedAt: \"now\"` stamps the battery card with this step's story time.",
+           "panels": {
+            "app": {
+             "battery": {
+              "value": 61,
+              "status": "ready",
+              "reportedAt": "now"
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.battery",
+                "value": "{\"value\": 61, \"reportedAt\": \"now\"}",
+                "rule": "carried; freshness from story time"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-fresh",
+           "time": "+2h",
+           "text": "**Freshness and drain come from elapsed time.** Two hours later the card reads \"Updated 2 h ago\" and the battery has drained 4 % (2 % per hour, illustrative), with no patch to either.",
+           "panels": {
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "step.time",
+                "value": "\"+2h\"",
+                "rule": "card ages; battery drains"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "storyTime": {
+          "start": "2026-10-17T18:00",
+          "span": "6h",
+          "clock": "24h",
+          "date": "none"
+         },
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "app",
+            "x": 7,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "json",
+            "x": 14,
+            "y": 0,
+            "w": 10,
+            "h": 15
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-charge",
+        "heading": "Battery: anchor and one-step drain",
+        "accent": "green",
+        "text": [
+         "`charge` sets the value exactly; `drain` subtracts once."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
+          {
            "id": "cell",
            "type": "battery",
            "title": "Battery: anchors and one-step drain",
@@ -1158,6 +2163,301 @@
             "trend": "idle"
            }
           },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-anchor",
+           "time": "+0m",
+           "text": "**`charge` is an anchor.** The battery shows exactly 90; drift continues from it. A `drain` in the same patch would be ignored.",
+           "panels": {
+            "cell": {
+             "charge": 90
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.cell",
+                "value": "{\"charge\": 90}",
+                "rule": "shown exactly; drift continues"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-drain",
+           "time": "+0m",
+           "text": "**`drain` is a one-step operation.** 5 % is subtracted at this step (85 %); it is not repeated at later steps.",
+           "panels": {
+            "cell": {
+             "drain": 5
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.cell",
+                "value": "{\"drain\": 5}",
+                "rule": "−5 once; not carried"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "storyTime": {
+          "start": "2026-10-17T18:00",
+          "span": "6h",
+          "clock": "24h",
+          "date": "none"
+         },
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 8
+           },
+           {
+            "panel": "cell",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 8
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 8
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-cards",
+        "heading": "Device app: overriding a declared card value",
+        "accent": "green",
+        "text": [
+         "A card property overrides its declared value; `null` restores it."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
+          {
+           "id": "app",
+           "type": "deviceapp",
+           "title": "Device app: notifications, report times, card overrides",
+           "appName": "Homestead",
+           "device": "Front door camera",
+           "fields": [
+            {
+             "id": "battery",
+             "label": "Battery",
+             "kind": "battery",
+             "badgeMode": "none"
+            },
+            {
+             "id": "model",
+             "label": "Camera model",
+             "icon": "camera",
+             "badgeMode": "none"
+            }
+           ],
+           "initial": {
+            "battery": {
+             "value": 68,
+             "status": "ready"
+            },
+            "model": {
+             "value": "Doorbell camera",
+             "status": "ready"
+            }
+           }
+          },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
+          }
+         ],
+         "steps": [
+          {
+           "id": "s-icon",
+           "text": "**A card field can override a declared value.** The model card's declared icon is `camera`; this step sets `chip`.",
+           "panels": {
+            "app": {
+             "model": {
+              "icon": "chip"
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.model",
+                "value": "{\"icon\": \"chip\"}",
+                "rule": "overrides the declared icon"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-icon-null",
+           "text": "**`null` restores the declared value** for that card field.",
+           "panels": {
+            "app": {
+             "model": {
+              "icon": null
+             }
+            },
+            "json": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.app.model",
+                "value": "{\"icon\": null}",
+                "rule": "declared camera icon again"
+               }
+              }
+             ]
+            }
+           }
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "app",
+            "x": 7,
+            "y": 0,
+            "w": 7,
+            "h": 15
+           },
+           {
+            "panel": "json",
+            "x": 14,
+            "y": 0,
+            "w": 10,
+            "h": 15
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-events",
+        "heading": "Strand scene: one-step and carried events",
+        "accent": "green",
+        "text": [
+         "Per-actor state carries; `enterOnce.events` lasts one step; ordinary `events` leave a carried result."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
           {
            "id": "strand",
            "type": "strandscene",
@@ -1194,35 +2494,52 @@
            "initial": {
             "caption": "The enzyme is free."
            }
+          },
+          {
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
+            },
+            {
+             "id": "value",
+             "label": "JSON"
+            },
+            {
+             "id": "rule",
+             "label": "How it folds"
+            }
+           ],
+           "initial": {
+            "rows": []
+           }
           }
          ],
          "steps": [
           {
-           "id": "s-paint",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Range paint accumulates.** Buffer `mark` ranges are added to every earlier paint, like `log` lines.",
+           "id": "s-bind",
+           "text": "**Per-item state keyed by declared ids.** The enzyme moves to position 11 and binds. `actors` sets state for the declared actor; it does not replace the declaration.",
            "panels": {
-            "buffer": {
-             "mark": [
-              [
-               0,
-               3,
-               "buffered"
-              ]
-             ]
+            "strand": {
+             "actors": {
+              "enz": {
+               "at": 11,
+               "state": "bound"
+              }
+             },
+             "caption": "The enzyme binds."
             },
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.buffer",
-                "value": "{\"mark\": [[0, 3, \"buffered\"]]}",
-                "rule": "paint added"
+                "key": "panels.strand.actors",
+                "value": "{\"enz\": {\"at\": 11, \"state\": \"bound\"}}",
+                "rule": "state for a declared actor"
                }
               }
              ]
@@ -1230,65 +2547,28 @@
            }
           },
           {
-           "id": "s-paint2",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A second paint lands on top** of the first: cells 2–5 become uploading, 0–1 stay buffered.",
+           "id": "s-cut-once",
+           "text": "**A one-step event.** `enterOnce.events` cuts the strand for this step only; its result is shown here and discarded afterwards.",
            "panels": {
-            "buffer": {
-             "mark": [
-              [
-               2,
-               5,
-               "uploading"
-              ]
-             ]
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.buffer",
-                "value": "{\"mark\": [[2, 5, \"uploading\"]]}",
-                "rule": "applied over earlier paint"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-paint-once",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Exception: `enterOnce.mark` replaces the paint list for one step.** Only cells 6–8 show as dropped here; the next step shows the accumulated paint again.",
-           "panels": {
-            "buffer": {
+            "strand": {
              "enterOnce": {
-              "mark": [
-               [
-                6,
-                8,
-                "dropped"
-               ]
+              "events": [
+               {
+                "kind": "cut",
+                "site": "s1"
+               }
               ]
-             }
+             },
+             "caption": "Cut for this step only."
             },
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.buffer",
-                "value": "{\"enterOnce\": {\"mark\": [[6, 8, \"dropped\"]]}}",
-                "rule": "replaces paints for one step"
+                "key": "panels.strand",
+                "value": "{\"enterOnce\": {\"events\": [{\"kind\": \"cut\", \"site\": \"s1\"}]}}",
+                "rule": "cut shown; not carried"
                }
               }
              ]
@@ -1296,50 +2576,20 @@
            }
           },
           {
-           "id": "s-paint-back",
-           "edges": [
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Back to the accumulated paint.** No patch: cells 0–5 show the two earlier paints again.",
+           "id": "s-cut-once-after",
+           "text": "**Next step: the strand is whole again.** The displayed snapshot at the previous step is not the carried state, which is why a resume point must come from carried state.",
            "panels": {
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.buffer",
-                "value": "(no patch)",
-                "rule": "accumulated paints return"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-cells",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**`cells` replaces everything and clears earlier paint.**",
-           "panels": {
-            "buffer": {
-             "cells": [
-              "protected",
-              "protected"
-             ]
+            "strand": {
+             "caption": "Whole again."
             },
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.buffer",
-                "value": "{\"cells\": [\"protected\", \"protected\"]}",
-                "rule": "replaces; paints cleared"
+                "key": "panels.strand",
+                "value": "{\"caption\": \"Whole again.\"}",
+                "rule": "carried state had no cut"
                }
               }
              ]
@@ -1347,130 +2597,26 @@
            }
           },
           {
-           "id": "s-zones",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Whole-array state by id.** The patch lists only the walkway (masked). The fold carries this array as given; the renderer shows the door at its declared state.",
+           "id": "s-cut",
+           "text": "**A step-local event with a carried result.** The `cut` event plays at this step only; the cut strand is carried to later steps.",
            "panels": {
-            "yard": {
-             "zones": [
+            "strand": {
+             "events": [
               {
-               "id": "walk",
-               "state": "masked"
+               "kind": "cut",
+               "site": "s1"
               }
-             ]
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.yard",
-                "value": "{\"zones\": [{\"id\": \"walk\", \"state\": \"masked\"}]}",
-                "rule": "array replaced; door from declaration"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-zones2",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A second patch replaces the array, it does not merge.** It lists only the door (ignored), so the walkway returns to its declared armed state. Compare the strand scene below, where each actor carries independently.",
-           "panels": {
-            "yard": {
-             "zones": [
-              {
-               "id": "door",
-               "state": "ignored"
-              }
-             ]
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.yard",
-                "value": "{\"zones\": [{\"id\": \"door\", \"state\": \"ignored\"}]}",
-                "rule": "walkway back to declared armed"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-start",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Inflight operations.** `start` opens a bar in each lane at this step.",
-           "panels": {
-            "ops": {
-             "start": [
-              {
-               "lane": "up",
-               "label": "clip 1"
-              },
-              {
-               "lane": "push",
-               "label": "notify"
-              }
-             ]
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.ops",
-                "value": "{\"start\": [{\"lane\": \"up\", …}, {\"lane\": \"push\", …}]}",
-                "rule": "two bars open"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-mark",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**`end` closes a bar; `mark` recolours an open one.** Operations in one patch apply in the order start, end, mark.",
-           "panels": {
-            "ops": {
-             "end": [
-              "push"
              ],
-             "mark": [
-              {
-               "lane": "up",
-               "state": "retry"
-              }
-             ]
+             "caption": "The strand is cut."
             },
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.ops",
-                "value": "{\"end\": [\"push\"], \"mark\": [{\"lane\": \"up\", \"state\": \"retry\"}]}",
-                "rule": "push closed; upload marked retry"
+                "key": "panels.strand.events",
+                "value": "[{\"kind\": \"cut\", \"site\": \"s1\"}]",
+                "rule": "event this step; cut carried"
                }
               }
              ]
@@ -1478,318 +2624,112 @@
            }
           },
           {
-           "id": "s-end",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**History is kept.** The upload bar closes; both finished bars stay on the axis.",
+           "id": "s-after",
+           "text": "**Next step, no patch:** the strand stays cut. No event replays.",
            "panels": {
-            "ops": {
-             "end": [
-              "up"
-             ]
-            },
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
                "cells": {
-                "key": "panels.ops",
-                "value": "{\"end\": [\"up\"]}",
-                "rule": "closed; history retained"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-signal",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A purely transient patch.** Home-map `signals` draw a message from the porch camera to the hub at this step only and leave nothing in carried state; the camera's `detect` state does carry.",
-           "panels": {
-            "home": {
-             "cam1": "detect",
-             "signals": [
-              {
-               "from": "cam1",
-               "to": "hub"
-              }
-             ]
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.home",
-                "value": "{\"cam1\": \"detect\", \"signals\": [{\"from\": \"cam1\", \"to\": \"hub\"}]}",
-                "rule": "signal this step only; detect carried"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-signal-after",
-           "edges": [
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Next step, no patch:** no signal is drawn; the camera stays in `detect`. Compare the strand-scene cut, whose result is carried.",
-           "panels": {
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.home",
+                "key": "panels.strand",
                 "value": "(no patch)",
-                "rule": "nothing from the signal remains"
+                "rule": "cut result carried"
                }
               }
              ]
             }
            }
-          },
+          }
+         ],
+         "autoplay": false,
+         "sectionLayout": {
+          "columns": 24,
+          "default": [
+           {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 4,
+            "hidden": true
+           },
+           {
+            "controls": "steps",
+            "x": 0,
+            "y": 0,
+            "w": 7,
+            "h": 10
+           },
+           {
+            "panel": "strand",
+            "x": 7,
+            "y": 0,
+            "w": 8,
+            "h": 10
+           },
+           {
+            "panel": "json",
+            "x": 15,
+            "y": 0,
+            "w": 9,
+            "h": 10
+           }
+          ]
+         }
+        }
+       },
+       {
+        "id": "sp-once",
+        "heading": "enterOnce support by type",
+        "accent": "green",
+        "text": [
+         "What a one-step override does in each kind of panel."
+        ],
+        "diagram": {
+         "view": "step",
+         "nodes": {
+          "fold": {
+           "title": "Fold",
+           "sub": "own rules",
+           "icon": "chip"
+          }
+         },
+         "rows": [
+          [
+           "fold"
+          ]
+         ],
+         "edges": [],
+         "panels": [
           {
-           "id": "s-notify",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+10m",
-           "text": "**Notifications accumulate**, newest first.",
-           "panels": {
-            "app": {
-             "notify": {
-              "app": "Homestead",
-              "title": "Motion",
-              "text": "Someone is at the door."
-             }
+           "id": "json",
+           "type": "table",
+           "title": "What this step wrote",
+           "columns": [
+            {
+             "id": "key",
+             "label": "Where"
             },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.app.notify",
-                "value": "{\"app\": \"Homestead\", \"title\": \"Motion\", …}",
-                "rule": "added to the stack"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-clear",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+10m",
-           "text": "**`clear` then `notify` in one patch:** the stack is cleared first, then the new card is added.",
-           "panels": {
-            "app": {
-             "clear": true,
-             "notify": {
-              "app": "Homestead",
-              "title": "Clip saved",
-              "text": "A 12 s clip is ready."
-             }
+            {
+             "id": "value",
+             "label": "JSON"
             },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.app",
-                "value": "{\"clear\": true, \"notify\": {…\"Clip saved\"…}}",
-                "rule": "clear first, then add"
-               }
-              }
-             ]
+            {
+             "id": "rule",
+             "label": "How it folds"
             }
-           }
-          },
-          {
-           "id": "s-report",
-           "edges": [
-            "patch->fold",
-            "fold->view"
            ],
-           "time": "+10m",
-           "text": "**A report time.** `reportedAt: \"now\"` stamps the battery card with this step's story time.",
-           "panels": {
-            "app": {
-             "battery": {
-              "value": 61,
-              "status": "ready",
-              "reportedAt": "now"
-             }
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.app.battery",
-                "value": "{\"value\": 61, \"reportedAt\": \"now\"}",
-                "rule": "carried; freshness from story time"
-               }
-              }
-             ]
-            }
+           "initial": {
+            "rows": []
            }
-          },
-          {
-           "id": "s-fresh",
-           "edges": [
-            "clock->fold",
-            "fold->view"
-           ],
-           "time": "+2h",
-           "text": "**Freshness and drain come from elapsed time.** Two hours later the card reads \"Updated 2 h ago\" and the battery has drained 4 % (2 % per hour, illustrative), with no patch to either.",
-           "panels": {
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "step.time",
-                "value": "\"+2h\"",
-                "rule": "card ages; battery drains"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-anchor",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**`charge` is an anchor.** The battery shows exactly 90; drift continues from it. A `drain` in the same patch would be ignored.",
-           "panels": {
-            "cell": {
-             "charge": 90
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.cell",
-                "value": "{\"charge\": 90}",
-                "rule": "shown exactly; drift continues"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-drain",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**`drain` is a one-step operation.** 5 % is subtracted at this step (85 %); it is not repeated at later steps.",
-           "panels": {
-            "cell": {
-             "drain": 5
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.cell",
-                "value": "{\"drain\": 5}",
-                "rule": "−5 once; not carried"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-icon",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A card field can override a declared value.** The model card's declared icon is `camera`; this step sets `chip`.",
-           "panels": {
-            "app": {
-             "model": {
-              "icon": "chip"
-             }
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.app.model",
-                "value": "{\"icon\": \"chip\"}",
-                "rule": "overrides the declared icon"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-icon-null",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**`null` restores the declared value** for that card field.",
-           "panels": {
-            "app": {
-             "model": {
-              "icon": null
-             }
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.app.model",
-                "value": "{\"icon\": null}",
-                "rule": "declared camera icon again"
-               }
-              }
-             ]
-            }
-           }
-          },
+          }
+         ],
+         "steps": [
           {
            "id": "s-once-limits",
-           "edges": [
-            "patch->fold"
-           ],
-           "time": "+0m",
-           "text": "**`enterOnce` support is type-specific.** Common fold: any field for one step; `log` cannot be set through it, and buffer `mark` replaces the paint list (shown above). Funnel and grid merge one-step entries. Phone accepts only `enterOnce.audio`. Device app has none. Other custom folds define their own rules.",
+           "text": "**`enterOnce` support is type-specific.** Common fold: any field for one step; `log` cannot be set through it, and buffer `mark` replaces the paint list (Buffer section). Funnel and grid merge one-step entries. Phone accepts only `enterOnce.audio`. Device app has none. Other custom folds define their own rules.",
            "panels": {
-            "sjson": {
+            "json": {
              "rows": [
               {
                "id": "a",
@@ -1842,272 +2782,32 @@
              ]
             }
            }
-          },
-          {
-           "id": "s-bind",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Per-item state keyed by declared ids.** The enzyme moves to position 11 and binds. `actors` sets state for the declared actor; it does not replace the declaration.",
-           "panels": {
-            "strand": {
-             "actors": {
-              "enz": {
-               "at": 11,
-               "state": "bound"
-              }
-             },
-             "caption": "The enzyme binds."
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.strand.actors",
-                "value": "{\"enz\": {\"at\": 11, \"state\": \"bound\"}}",
-                "rule": "state for a declared actor"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-cut-once",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A one-step event.** `enterOnce.events` cuts the strand for this step only; its result is shown here and discarded afterwards.",
-           "panels": {
-            "strand": {
-             "enterOnce": {
-              "events": [
-               {
-                "kind": "cut",
-                "site": "s1"
-               }
-              ]
-             },
-             "caption": "Cut for this step only."
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.strand",
-                "value": "{\"enterOnce\": {\"events\": [{\"kind\": \"cut\", \"site\": \"s1\"}]}}",
-                "rule": "cut shown; not carried"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-cut-once-after",
-           "edges": [
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Next step: the strand is whole again.** The displayed snapshot at the previous step is not the carried state, which is why a resume point must come from carried state.",
-           "panels": {
-            "strand": {
-             "caption": "Whole again."
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.strand",
-                "value": "{\"caption\": \"Whole again.\"}",
-                "rule": "carried state had no cut"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-cut",
-           "edges": [
-            "patch->fold",
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**A step-local event with a carried result.** The `cut` event plays at this step only; the cut strand is carried to later steps.",
-           "panels": {
-            "strand": {
-             "events": [
-              {
-               "kind": "cut",
-               "site": "s1"
-              }
-             ],
-             "caption": "The strand is cut."
-            },
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.strand.events",
-                "value": "[{\"kind\": \"cut\", \"site\": \"s1\"}]",
-                "rule": "event this step; cut carried"
-               }
-              }
-             ]
-            }
-           }
-          },
-          {
-           "id": "s-after",
-           "edges": [
-            "fold->view"
-           ],
-           "time": "+0m",
-           "text": "**Next step, no patch:** the strand stays cut. No event replays.",
-           "panels": {
-            "sjson": {
-             "rows": [
-              {
-               "id": "a",
-               "cells": {
-                "key": "panels.strand",
-                "value": "(no patch)",
-                "rule": "cut result carried"
-               }
-              }
-             ]
-            }
-           }
           }
          ],
-         "paths": [
-          {
-           "id": "special",
-           "label": "Special fold rules",
-           "color": "#34d399",
-           "steps": [
-            "s-paint",
-            "s-paint2",
-            "s-paint-once",
-            "s-paint-back",
-            "s-cells",
-            "s-zones",
-            "s-zones2",
-            "s-start",
-            "s-mark",
-            "s-end",
-            "s-signal",
-            "s-signal-after",
-            "s-notify",
-            "s-clear",
-            "s-report",
-            "s-fresh",
-            "s-anchor",
-            "s-drain",
-            "s-icon",
-            "s-icon-null",
-            "s-once-limits",
-            "s-bind",
-            "s-cut-once",
-            "s-cut-once-after",
-            "s-cut",
-            "s-after"
-           ]
-          }
-         ],
-         "storyTime": {
-          "start": "2026-10-17T18:00",
-          "span": "6h",
-          "clock": "24h",
-          "date": "none"
-         },
          "autoplay": false,
-         "graphFrame": {
-          "x": 18,
-          "y": 15,
-          "w": 577,
-          "h": 374
-         },
          "sectionLayout": {
           "columns": 24,
           "default": [
            {
             "x": 0,
             "y": 0,
-            "w": 10,
-            "h": 10
-           },
-           {
-            "panel": "sjson",
-            "x": 10,
-            "y": 0,
-            "w": 14,
-            "h": 10
+            "w": 24,
+            "h": 4,
+            "hidden": true
            },
            {
             "controls": "steps",
             "x": 0,
-            "y": 10,
-            "w": 24,
-            "h": 5
-           },
-           {
-            "panel": "buffer",
-            "x": 0,
-            "y": 15,
-            "w": 8,
-            "h": 5
-           },
-           {
-            "panel": "home",
-            "x": 0,
-            "y": 20,
-            "w": 8,
-            "h": 9
-           },
-           {
-            "panel": "ops",
-            "x": 0,
-            "y": 29,
-            "w": 8,
-            "h": 6
-           },
-           {
-            "panel": "strand",
-            "x": 8,
-            "y": 15,
-            "w": 9,
-            "h": 10
-           },
-           {
-            "panel": "yard",
-            "x": 8,
-            "y": 25,
-            "w": 9,
+            "y": 0,
+            "w": 7,
             "h": 8
            },
            {
-            "panel": "cell",
-            "x": 8,
-            "y": 33,
-            "w": 9,
-            "h": 7
-           },
-           {
-            "panel": "app",
-            "x": 17,
-            "y": 15,
-            "w": 7,
-            "h": 18
+            "panel": "json",
+            "x": 7,
+            "y": 0,
+            "w": 17,
+            "h": 8
            }
           ]
          }
@@ -2172,7 +2872,7 @@
         "heading": "Proposed change: a step-level panelDeclare map",
         "accent": "violet",
         "text": [
-         "A design proposal, not shipped behaviour. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the gpt-6-astra review of that PR. One decision is open: how folding treats earlier steps (step 5)."
+         "A design proposal, not shipped behaviour. One entry shape covers both lasting and timed overrides: `{\"set\": {…}, \"steps\": N}`. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the gpt-6-astra review of that PR. One decision is open: how folding treats earlier steps (step 5)."
         ],
         "diagram": {
          "view": "step",
@@ -2424,7 +3124,7 @@
            "nodes": [
             "author"
            ],
-           "text": "**A step-level map keyed by panel id**, beside `panelVisibility`, so it never shares a name with a panel's own state keys and works with both `panels` and legacy `patch` spellings: `\"panelDeclare\": {\"gauge\": {\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}}`.",
+           "text": "**One entry shape, keyed by panel id**, beside `panelVisibility`, so it never shares a name with a panel's own state keys and works with both `panels` and legacy `patch` spellings: `\"panelDeclare\": {\"gauge\": {\"set\": {\"max\": 200}, \"steps\": 3}}`. `set` holds declaration fields; `steps` is how many steps the entry lasts on this path, counting its own step (default: until the path ends). Keeping fields inside `set` means `steps` never collides with a declaration field of the same name.",
            "panels": {
             "pjson": {
              "rows": [
@@ -2432,16 +3132,16 @@
                "id": "a",
                "cells": {
                 "key": "steps[i].panelDeclare.gauge",
-                "value": "{\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}",
-                "rule": "shape only; applied in step 2"
+                "value": "{\"set\": {\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}}",
+                "rule": "no steps: lasts to the end of the path (step 2)"
                }
               },
               {
                "id": "b",
                "cells": {
-                "key": "steps[i].panelDeclareOnce.gauge",
-                "value": "{\"max\": 50}",
-                "rule": "shape only; applied in step 3"
+                "key": "steps[i].panelDeclare.gauge",
+                "value": "{\"set\": {\"max\": 50}, \"steps\": 1}",
+                "rule": "lasts one step (step 3)"
                }
               }
              ]
@@ -2482,7 +3182,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**Order:** authored declaration, then every accepted `panelDeclare` on this path up to and including this step, then this step's `panelDeclareOnce`. `null` in `panelDeclare` restores the declared value from then on; `null` in `panelDeclareOnce` does so for one step. `id`, `type`, `initial`, `visible` are reserved. Merge depth: each top-level declaration field is replaced whole, including arrays and objects such as `fields` or `stages`; nothing is merged inside them.",
+           "text": "**Effective declaration** = the authored declaration with every entry active at this step applied in step order (later entries win). An entry is active from its own step for `steps` steps on this path. When it expires, its keys return to what they would be without it. `null` inside `set` restores the declared value while the entry is active. `id`, `type`, `initial`, `visible` are reserved inside `set`. Merge depth: each top-level declaration field is replaced whole, including arrays and objects such as `fields` or `stages`; nothing is merged inside them.",
            "panels": {
             "effective": {
              "rows": [
@@ -2491,7 +3191,7 @@
                "cells": {
                 "field": "max",
                 "value": "200",
-                "from": "panelDeclare here"
+                "from": "entry from this step"
                },
                "status": "changed"
               },
@@ -2500,7 +3200,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare here"
+                "from": "entry from this step"
                },
                "status": "changed"
               },
@@ -2509,7 +3209,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare here"
+                "from": "entry from this step"
                },
                "status": "changed"
               }
@@ -2529,7 +3229,7 @@
                "id": "b",
                "cells": {
                 "key": "null",
-                "value": "{\"max\": null}",
+                "value": "{\"set\": {\"max\": null}}",
                 "rule": "restores the declared 400 (step 7)"
                }
               },
@@ -2580,7 +3280,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**A one-step override.** This step writes `panelDeclareOnce: {\"gauge\": {\"max\": 50}}`: the gauge uses 50 here and 200 again next step.",
+           "text": "**A timed entry.** This step writes `{\"set\": {\"max\": 50}, \"steps\": 1}`: the gauge uses 50 here. Next step the entry has expired and max is 200 again, from the earlier entry that is still active. `steps: 3` would hold 50 for this step and the next two.",
            "panels": {
             "effective": {
              "rows": [
@@ -2589,7 +3289,7 @@
                "cells": {
                 "field": "max",
                 "value": "50",
-                "from": "panelDeclareOnce here"
+                "from": "entry from this step (steps: 1)"
                },
                "status": "changed"
               },
@@ -2598,7 +3298,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -2606,7 +3306,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               }
              ]
@@ -2616,9 +3316,17 @@
               {
                "id": "a",
                "cells": {
-                "key": "steps[i].panelDeclareOnce.gauge",
-                "value": "{\"max\": 50}",
-                "rule": "this step only"
+                "key": "steps[i].panelDeclare.gauge",
+                "value": "{\"set\": {\"max\": 50}, \"steps\": 1}",
+                "rule": "active this step only"
+               }
+              },
+              {
+               "id": "b",
+               "cells": {
+                "key": "steps: 3",
+                "value": "{\"set\": {\"max\": 50}, \"steps\": 3}",
+                "rule": "active for 3 steps on this path"
                }
               }
              ]
@@ -2669,7 +3377,7 @@
                "cells": {
                 "field": "max",
                 "value": "200",
-                "from": "panelDeclare (carried; one-step 50 ended)"
+                "from": "entry from step 2 (step-3 entry expired)"
                },
                "status": "changed"
               },
@@ -2678,7 +3386,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -2686,7 +3394,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               }
              ]
@@ -2775,7 +3483,7 @@
                "cells": {
                 "field": "max",
                 "value": "200",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -2783,7 +3491,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -2791,7 +3499,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               }
              ]
@@ -2942,7 +3650,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -2950,7 +3658,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               }
              ]
@@ -3031,7 +3739,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**`null` restores the declared value.** This step writes `panelDeclare: {\"gauge\": {\"max\": null}}`: max returns to the declared 400 from here on; unit and title keep their overrides.",
+           "text": "**`null` restores the declared value.** This step writes `{\"set\": {\"max\": null}}` with no `steps`: max returns to the declared 400 until the path ends; unit and title keep their overrides.",
            "panels": {
             "effective": {
              "rows": [
@@ -3049,7 +3757,7 @@
                "cells": {
                 "field": "unit",
                 "value": "W",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               },
               {
@@ -3057,7 +3765,7 @@
                "cells": {
                 "field": "title",
                 "value": "Draw (watts)",
-                "from": "panelDeclare (carried)"
+                "from": "entry from step 2"
                }
               }
              ]
@@ -3068,8 +3776,8 @@
                "id": "a",
                "cells": {
                 "key": "steps[i].panelDeclare.gauge",
-                "value": "{\"max\": null}",
-                "rule": "override removed from here on"
+                "value": "{\"set\": {\"max\": null}}",
+                "rule": "declared value from here on"
                }
               }
              ]
@@ -3325,7 +4033,7 @@
          "paths": [
           {
            "id": "proposal",
-           "label": "Proposed: panelDeclare",
+           "label": "Proposed: panelDeclare {set, steps}",
            "color": "#a78bfa",
            "steps": [
             "p-shape",

@@ -172,10 +172,16 @@ function cellsceneDecl(panel, path, warnings) {
   panel = panelObject(panel) ? panel : {};
   var compartments = cellsceneCompartments(panel.compartments, path || 'panel', warnings);
   var items = cellsceneItems(panel.items, compartments, path || 'panel', warnings);
+  var legendMode = panel.legendMode === 'visible' ? 'visible' : 'all';
+  if (panel.legendMode !== undefined && panel.legendMode !== 'all' && panel.legendMode !== 'visible')
+    cellsceneWarn(warnings, (path || 'panel') + '.legendMode', 'expected all|visible — using all');
+  var labelMode = panel.labelMode === 'readable' ? 'readable' : 'standard';
+  if (panel.labelMode !== undefined && panel.labelMode !== 'standard' && panel.labelMode !== 'readable')
+    cellsceneWarn(warnings, (path || 'panel') + '.labelMode', 'expected standard|readable — using standard');
   var byId = Object.create(null), itemById = Object.create(null);
   compartments.forEach(function (c) { byId[c.id] = c; });
   items.forEach(function (item) { itemById[item.id] = item; });
-  return { compartments: compartments, items: items, label: mechText(panel.label, 40), byId: byId, itemById: itemById };
+  return { compartments: compartments, items: items, legendMode: legendMode, labelMode: labelMode, label: mechText(panel.label, 40), byId: byId, itemById: itemById };
 }
 
 /* ---- state cleaning (shared by validation and the fold) ---- */
@@ -604,7 +610,7 @@ function cellsceneModel(panel, state) {
       transients.push({ kind: 'cross', x: f.x, y: f.y, delay: 250 });
     } else if (ev.kind === 'divide' && divided) { hasDivide = true; transients.push({ kind: 'divide', x: cell.x, y: cell.y }); }
   });
-  var legend = items.map(function (it) {
+  var legend = items.filter(function (it) { return decl.legendMode !== 'visible' || it.visible; }).map(function (it) {
     var text = !it.visible ? (it.state === 'hidden' ? 'hidden' : 'none') :
       (it.count >= 2 ? '×' + it.count + ' · ' : '') + it.inLabel + (it.state !== 'free' ? ' · ' + it.state : '');
     return { id: it.id, role: it.role, name: it.label || it.id, state: text, hot: it.visible && (it.state === 'bound' || it.state === 'active') };
@@ -617,14 +623,14 @@ function cellsceneModel(panel, state) {
   }).join('; ') + (cell ? '; ' + (divided ? 'two daughter cells' + (nucleus ? ', each with a nucleus' : '') : 'one cell') : '');
   return {
     scene: MECH_SCENE, title: decl.label || 'cell scene', caption: mechText(state.caption, 90), compartments: comps, geom: geom, cell: cell, nucleus: nucleus,
-    divided: divided, daughters: daughters, items: items, vesicles: vesicleList, zoom: zoom, highlight: highlight, labels: labels,
+    divided: divided, daughters: daughters, items: items, vesicles: vesicleList, zoom: zoom, highlight: highlight, labels: labels, readableLabels: decl.labelMode === 'readable',
     transients: transients, legend: legend, aria: aria, hasDivide: hasDivide,
   };
 }
 
 /* ---- markup ---- */
 /* Labels sit in a `.cellscene-fit` group that counter-scales under zoom, so
-   text keeps its 10 px size while the scene is enlarged. */
+   text keeps its authored size while the scene is enlarged. */
 function cellsceneFit(x, y, inner) {
   return '<g transform="translate(' + mechNum(x) + ' ' + mechNum(y) + ')"><g class="cellscene-fit">' + inner + '</g></g>';
 }
@@ -711,7 +717,7 @@ function cellsceneParts(model, prev, motion) {
   });
   m.labels.forEach(function (l) { overlay += cellsceneFit(l.x, l.y, mechTagMarkup(0, 0, l.text, 'cellscene-callout')); });
   var hud = cellsceneLabelText(14, 20, m.title + ' · zoom: ' + (m.zoom ? m.zoom.label : 'whole scene'), 'start');
-  if (m.caption) hud += '<text class="cellscene-t-cap" x="14" y="37">' + esc(m.caption) + '</text>';
+  if (m.caption && !m.readableLabels) hud += '<text class="cellscene-t-cap" x="14" y="37">' + esc(m.caption) + '</text>';
   var outside = m.compartments.filter(function (c) { return c.kind === 'outside'; })[0];
   if (outside) hud += cellsceneLabelText(546, 300, outside.label, 'end');
   var zs = m.zoom ? m.zoom.scale : 1;
@@ -729,8 +735,11 @@ function cellsceneAssemble(parts, model, state) {
   var svg = '<svg class="mech-frame cellscene-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '">' +
     grid + '<g class="cellscene-view" style="' + parts.viewStyle + '"><g class="cellscene-scene">' + parts.scene + '</g><g class="cellscene-overlay">' + parts.overlay + '</g></g>' +
     '<g class="cellscene-hud">' + parts.hud + '</g></svg>';
-  var foot = parts.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
-  return '<div class="swpanel cellscene">' + svg + '<div class="cellscene-foot">' + foot + '</div></div>';
+  return '<div class="swpanel cellscene' + (model.readableLabels ? ' cellscene-readable' : '') + '">' + svg + '<div class="cellscene-foot">' + cellsceneFoot(parts, model, state) + '</div></div>';
+}
+function cellsceneFoot(parts, model, state) {
+  return (model.readableLabels && model.caption ? '<p class="cellscene-caption">' + esc(model.caption) + '</p>' : '') +
+    parts.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
 }
 function cellsceneHTML(panel, state, model) {
   state = panelObject(state) ? state : {};
@@ -786,7 +795,7 @@ function cellsceneRender(host, panel, state, skin, states, stepIdx, animate) {
           }
           overlay.innerHTML = still.overlay;
           hud.innerHTML = still.hud;
-          foot.innerHTML = still.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
+          foot.innerHTML = cellsceneFoot(still, model, state);
         }
       }
       host._csScene = still.scene;
@@ -829,6 +838,8 @@ PanelRegistry.define('cellscene', {
 .cellscene-st-bound .cellscene-body,.cellscene-st-active .cellscene-body{filter:drop-shadow(0 0 9px var(--mf))}
 .cellscene-st-released .cellscene-body{opacity:.72}
 .cellscene-t-cap{font:500 11.5px 'IBM Plex Sans',sans-serif;fill:var(--dtext)}
+.cellscene-readable .cellscene-fit > text{font-size:18px;letter-spacing:0}
+.cellscene-caption{margin:8px 0 4px;font-size:13px;line-height:1.4;color:var(--dtext)}
 .cellscene-foot{min-width:0}
 .cellscene-crossing{animation:cellsceneCross 1.25s cubic-bezier(.4,0,.2,1) both}
 @keyframes cellsceneCross{0%{transform:translate(var(--cs-x0),var(--cs-y0)) scale(1)}40%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(1)}50%,60%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(.65)}100%{transform:translate(0,0) scale(1)}}
@@ -854,7 +865,7 @@ PanelRegistry.define('cellscene', {
       ],
       initial: { caption: 'A cell at rest.' },
     },
-    setupFields: [['label', 'text'], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['label', 'text'], ['legendMode', 'enum', ['all', 'visible']], ['labelMode', 'enum', ['standard', 'readable']], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
     patchFields: [['items', 'json'], ['events', 'jsonArr'], ['zoom', 'text'], ['highlight', 'text'], ['labels', 'jsonArr'], ['caption', 'text'], ['note', 'text']],
     expandPatchFields: function (panel) {
       var ids = cellsceneCompartments(panel.compartments, 'panel').map(function (c) { return c.id; });
@@ -862,13 +873,15 @@ PanelRegistry.define('cellscene', {
     },
     fieldMeta: {
       label: { label: 'Scene title', help: 'Short title inside the frame, e.g. "a plant cell".' },
+      legendMode: { label: 'Scene legend', help: 'all (default) lists every item. visible omits hidden items and items with count 0; cell and nucleus context stays in the legend.', unsetLabel: 'All items (default)' },
+      labelMode: { label: 'Scene labels', help: 'readable enlarges SVG labels and places the caption below the scene; standard preserves the compact layout.', unsetLabel: 'Standard (default)' },
       compartments: { label: 'Compartments', help: 'Up to 8 {id, kind, label?, parent?, x?, y?, rx?, ry?}; kinds outside, cell, nucleus, vesicle, organelle, region. One cell, one nucleus.' },
       items: { label: 'Items', help: 'Setup: 1–8 {id, role, shape?, label?, size?, start:{in, x?, y?, count?, state?}}. Step: an object keyed by item id that patches in, x, y, count (0–50), state (free|bound|active|released|hidden), label and daughter; an id set to null returns that item to its start.' },
       events: { label: 'Events this step', help: 'Up to 4: {kind:"enter", item, to, via?}, {kind:"bud", vesicle, from, items?}, {kind:"fuse", vesicle, with, to}, {kind:"divide", daughters?}, {kind:"signal", at, rings?}. Events run on this step only; their lasting effects carry.' },
       zoom: { label: 'Zoom to compartment', help: 'Frames one compartment with a 12% margin; clear for the whole scene.', nullLabel: 'Whole scene' },
       highlight: { label: 'Highlighted compartment', nullLabel: 'No highlight' },
       labels: { label: 'Callouts', help: 'Up to 4 {at: {x,y} | item or compartment id, text}. A full list each time; clear removes them.', nullLabel: 'No callouts' },
-      caption: { label: 'Caption', help: 'One line under the title inside the scene.', nullLabel: 'No caption' },
+      caption: { label: 'Caption', help: 'One line under the title, or below the scene in readable label mode.', nullLabel: 'No caption' },
       note: { label: 'Explanation' },
     },
     picker: {

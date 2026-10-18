@@ -9,8 +9,7 @@
         "heading": "01 / Follow the genome",
         "accent": "cyan",
         "text": [
-          "An incoming genome can be read to make proteins and copied to supply new genomes. Follow the shared path until one new copy is available, then compare further synthesis with a hypothetical interruption.",
-          "Select either path and advance its seven beats. The cell and close-up retain the same camera and scale. Symbols describe causal order; counts, extents and distances are not biological measurements."
+          "Choose a path and follow its seven beats. Both reach one completed +RNA copy before the fork. Compare continued synthesis with a hypothetical interruption; counts and extents are symbolic, with no timescale."
         ],
         "diagram": {
           "view": "step",
@@ -136,7 +135,7 @@
             {
               "id": "cellview",
               "type": "cellscene",
-              "title": "THE CELL · a fixed view",
+              "title": "CELL CONTEXT · a fixed view",
               "label": "Illustrative eukaryotic cell",
               "compartments": [
                 {
@@ -185,7 +184,7 @@
                   "id": "genome",
                   "role": "cargo",
                   "shape": "pill",
-                  "label": "Incoming RNA",
+                  "label": "+RNA",
                   "size": "m",
                   "start": {
                     "x": 200,
@@ -284,20 +283,22 @@
                 "zoom": null,
                 "caption": "An arriving particle carries RNA. The modeled copying pathway is cytoplasmic.",
                 "note": "Pill: incoming RNA · wedge: new RNA pool · spiky: assembly pool or outside particle."
-              }
+              },
+              "legendMode": "visible",
+              "labelMode": "readable"
             },
             {
               "id": "copyview",
               "type": "rnacopy",
-              "title": "THE COPY GATE · a conceptual close-up",
-              "label": "RNA synthesis · input to emerging strand",
+              "title": "RNA COPYING · the close-up",
+              "label": "Incoming +RNA → complementary intermediate → new +RNA",
               "initial": {
                 "status": "ready",
                 "position": 0.2,
                 "progress": 0,
                 "copies": 0,
-                "caption": "The close-up becomes active when viral copying machinery is available.",
-                "note": "The ribbon summarizes synthesis. Complementary intermediates, cofactors and membrane organization are omitted."
+                "caption": "The polymerase site is ready; no complementary intermediate or completed copy is shown yet.",
+                "note": "The site, copy tray and pathway bridge are separate teaching views. Sequence, cofactors and membrane organization are omitted."
               }
             }
           ],
@@ -389,7 +390,7 @@
                   "labels": [
                     {
                       "at": {
-                        "x": 252,
+                        "x": 140,
                         "y": 73
                       },
                       "text": "Translation supplies machinery"
@@ -405,7 +406,7 @@
               "nodes": [
                 "gate"
               ],
-              "text": "Copying has supplied one symbolic completed new positive-sense RNA genome, and further synthesis is underway. Both paths share this pre-fork copy; the hypothetical interruption will affect only further synthesis.",
+              "text": "Copying through a complementary RNA intermediate has supplied one symbolic new +RNA genome. A further intermediate is now underway. Both paths share the completed pre-fork copy; the hypothetical interruption affects further synthesis.",
               "panels": {
                 "cellview": {
                   "highlight": "cyt",
@@ -445,8 +446,8 @@
                   "position": 0.4,
                   "progress": 0.3,
                   "copies": 1,
-                  "caption": "The numeric count records one completed symbolic new genome. The partial ribbon represents the next synthesis in progress.",
-                  "note": "Incoming +RNA → complementary RNA intermediate → new +RNA. The inset compresses these rounds; the count and current ribbon show different stages."
+                  "caption": "One completed +RNA token sits in the tray. The dashed strand at the polymerase site is a separate complementary intermediate in progress.",
+                  "note": "The bridge shows the two copying rounds. Intermediate extent and completed-copy count are independent authored states, not a rate or yield."
                 }
               },
               "edge": "translation->gate"
@@ -473,7 +474,7 @@
                   "labels": [
                     {
                       "at": {
-                        "x": 297,
+                        "x": 140,
                         "y": 74
                       },
                       "text": "New genomes become available"
@@ -486,8 +487,8 @@
                   "position": 0.8,
                   "progress": 1,
                   "copies": 4,
-                  "caption": "The numeric count rises from one to four completed symbolic copies. One ribbon depicts synthesis, not four separate RNA marks.",
-                  "note": "Authored counts describe this cartoon, not measured yield. Packaging and release are illustrative assumptions; real coupling varies."
+                  "caption": "Four separate +RNA tokens show the authored completed-copy count. The site shows a complementary intermediate at its authored full extent.",
+                  "note": "The site and tray summarize different copying rounds. Neither the token count nor strand extent predicts kinetics, yield or efficacy."
                 }
               },
               "edge": "gate->new"
@@ -527,8 +528,8 @@
                   "caption": "The model assigns new RNA to assembly; one symbolic copy remains."
                 },
                 "copyview": {
-                  "caption": "Four is the cumulative completed-copy count. The cell assigns three symbolic copies to its assembly pool and shows one still free.",
-                  "note": "This allocation and later release are illustrative assumptions. Real coupling varies; the numbers are not yield or efficacy estimates."
+                  "caption": "The tray retains four cumulative completed-copy tokens. The cell assigns three symbolic copies to its assembly pool and leaves one free.",
+                  "note": "The intermediate remains a separate authored state. Packaging and later release are illustrative assumptions; real coupling varies."
                 }
               },
               "edge": "new->assembly"
@@ -587,7 +588,7 @@
               "nodes": [
                 "interrupt"
               ],
-              "text": "Suppose further RNA synthesis is interrupted at the shared gate. The next strand remains incomplete, while the one completed new genome made before the fork remains available.",
+              "text": "Suppose further synthesis is interrupted at the shared gate. The dashed complementary intermediate stays incomplete, while the completed pre-fork +RNA copy remains available in the tray.",
               "panels": {
                 "cellview": {
                   "highlight": "cyt",
@@ -599,7 +600,7 @@
                   "labels": [
                     {
                       "at": {
-                        "x": 257,
+                        "x": 140,
                         "y": 74
                       },
                       "text": "Further synthesis interrupted"
@@ -612,8 +613,8 @@
                   "position": 0.4,
                   "progress": 0.3,
                   "copies": 1,
-                  "caption": "The count stays at one completed copy; the next strand remains partial. The cross identifies the hypothetical stop in further synthesis.",
-                  "note": "The completed pre-fork copy is retained. The later packaging/release outcome is an illustrative assumption, not a yield or efficacy estimate."
+                  "caption": "The stop square marks interrupted synthesis. The dashed intermediate remains incomplete; the separate tray retains the completed pre-fork +RNA token.",
+                  "note": "An interruption preserves both authored states. Later packaging and release are illustrative assumptions, with no efficacy estimate."
                 }
               },
               "edge": "gate->interrupt",
@@ -656,8 +657,8 @@
                   "caption": "Assumed packaging uses the completed pre-fork copy."
                 },
                 "copyview": {
-                  "caption": "One is the cumulative completed-copy count. The cell now assigns that pre-fork copy to an assumed particle, so its free RNA wedge disappears.",
-                  "note": "The incoming genome remains in place. Packaging and later release of the new copy are illustrative assumptions, not established outcomes."
+                  "caption": "The tray retains one cumulative completed-copy token. In the cell, that pre-fork copy is assigned to a particle; the incomplete intermediate persists at the stopped site.",
+                  "note": "The incoming genome remains in place. Packaging and release are illustrative assumptions; real coupling varies."
                 }
               },
               "edge": "interrupt->limited",
@@ -695,6 +696,10 @@
                     }
                   ],
                   "caption": "Assumed release of a particle derived from the pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "One cumulative completed-copy token remains in the tray; the incomplete intermediate remains at the stopped site. The cell shows the assumed release of one particle.",
+                  "note": "These are independent authored symbols, not measured output, efficacy or a guarantee about real viruses."
                 }
               },
               "edge": "limited->residual",
@@ -737,29 +742,29 @@
             "columns": 24,
             "default": [
               {
-                "panel": "cellview",
+                "controls": "steps",
                 "x": 0,
                 "y": 0,
-                "w": 14,
-                "h": 14
+                "w": 24,
+                "h": 7
               },
               {
-                "panel": "copyview",
-                "x": 14,
-                "y": 0,
+                "panel": "cellview",
+                "x": 0,
+                "y": 7,
                 "w": 10,
                 "h": 14
               },
               {
-                "controls": "steps",
-                "x": 0,
-                "y": 14,
-                "w": 24,
-                "h": 6
+                "panel": "copyview",
+                "x": 10,
+                "y": 7,
+                "w": 14,
+                "h": 16
               },
               {
                 "x": 0,
-                "y": 20,
+                "y": 23,
                 "w": 24,
                 "h": 18
               }
@@ -773,10 +778,10 @@
         "accent": "violet",
         "text": [
           "The important dependency is genome supply → assembly → release. Translation separately makes proteins from RNA. The copying schematic is incoming +RNA → complementary RNA intermediate → new +RNA; each arrow compresses machinery and intermediate steps.",
-          "At the shared gate, the numeric count is one completed new genome while the partial ribbon represents further synthesis in progress. The interruption stops that further synthesis. The cell wedge is a labeled pool symbol, not one mark per genome."
+          "At the shared gate, one separate tray token is a completed new +RNA genome. The dashed strand at the active site is a further complementary intermediate. Interruption preserves the completed token and leaves that intermediate incomplete. The cell wedge is a labeled pool symbol."
         ],
         "bullets": [
-          "Incoming RNA: a pink pill labeled Incoming RNA. Completed new RNA: a cyan wedge labeled with its symbolic pool count. A spiky assembly mark represents its labeled pool; outside spiky marks are individual symbolic particles. The close-up uses a solid input ribbon and dashed emerging strand.",
+          "Incoming RNA: a pill labeled +RNA in the cell and a solid input strand in the close-up. Complementary intermediate: a dashed strand at the polymerase site. Completed new +RNA: separate tray tokens and a labeled wedge pool in the cell. Labeled spiky marks distinguish assembly from outside particles; a stop square identifies interrupted synthesis.",
           "This illustrative copying pathway takes place in the cytoplasm of a eukaryotic cell. Other organelles are omitted to focus the dependency; cell dimensions and membrane positions carry no anatomical scale.",
           "The alternate path assumes the completed pre-fork copy can be packaged and released with existing proteins. Real replication–assembly coupling varies. Three versus one outside particles are drawing choices, not measured yield, efficacy or a claim about every virus.",
           "Checkpoint: explain why protein production can continue without guaranteeing a supply of new complete genomes. Then identify which downstream stages the hypothetical interruption can constrain."
@@ -818,7 +823,7 @@
             {
               "k": "Abstraction",
               "v": "One cell · symbolic genome supply · one branch point",
-              "g": "The drawing omits complementary intermediates, compartment organization, competing processes, host responses and real timescales. Entry, packaging and release routes differ across viruses."
+              "g": "The pathway bridge names the complementary intermediate but compresses its copying rounds. The drawing omits molecular detail, compartment organization, competing processes, host responses and real timescales. Entry, packaging and release routes differ across viruses."
             }
           ]
         },

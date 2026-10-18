@@ -55,7 +55,7 @@ After the packet, load only relevant starting-material or handoff details:
 | Existing engineering flow | [Existing engineering flow](references/use-case-existing-flow.md) |
 | HLD | [HLD](references/use-case-hld.md) |
 | Honeycomb trace or export | [Honeycomb trace](references/use-case-honeycomb.md) |
-| Science lesson | [Physics](../../../cookbook/physics-panels.md) (`wavefield`, `forcebody`); [conceptual copying](../../../cookbook/viral-copy-gate.md) (`rnacopy`; sequence-free, no efficacy prediction) |
+| Science lesson | [Physics](../../../cookbook/physics-panels.md) (`wavefield`, `forcebody`); [conceptual copying](../../../cookbook/viral-copy-gate.md) (`rnacopy`, `cellscene`; opt-in visible scene legend and readable labels, sequence-free, no efficacy prediction) |
 
 ## Session and environment routes
 

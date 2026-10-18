@@ -84,13 +84,14 @@ test('validation rejects malformed values at exact paths and the fold preserves 
 });
 
 test('model is deterministic, bounded and independent of status, count and elapsed time', () => {
-  for (const position of [0,0.3,1]) for (const progress of [0,0.6,1]) {
+  for (const position of [0,0.3,1]) for (const progress of [0,0.01,0.6,1]) {
     const state = freeze({position, progress, copies:2, status:'copying'});
     const m = C.rnacopyModel(panel(), state);
     assert.deepEqual(plain(m), plain(C.rnacopyModel(panel(), state)));
-    assert.ok(m.x >= 112 && m.x <= 448);
-    assert.ok(m.copyEnd.x > 24 && m.copyEnd.y <= 222);
+    assert.ok(m.x >= 124 && m.x <= 320);
+    assert.ok(m.copyEnd.x > 44 && m.copyEnd.y <= 263);
     assert.equal(!!m.copyPath, progress > 0);
+    if (progress > 0) assert.ok(Math.hypot(m.copyEnd.x - m.x, m.copyEnd.y - m.y) > 48, 'nonzero intermediate must emerge beyond the polymerase halo');
     for (const status of ['ready','paused','interrupted','complete']) {
       const held = C.rnacopyModel(panel(), {...state,status,copies:12,time:100000});
       assert.equal(held.copyPath, m.copyPath);
@@ -106,7 +107,7 @@ test('model is deterministic, bounded and independent of status, count and elaps
   assert.equal(C.rnacopyModel(panel({label:'Changed'}),{}).label,'Changed');
 });
 
-test('render uses an unlabeled sequence-free input, shared polymerase artwork and accessible state symbols', () => {
+test('render labels a sequence-free intermediate, shared polymerase artwork and accessible state symbols', () => {
   const p = panel(), s = {position:0.5,progress:0.7,copies:4,status:'paused'};
   const paused = html(p,s), interrupted = html(p,{...s,status:'interrupted'});
   assert.match(paused, /role="img" aria-label="RNA copying\. Polymerase paused;/);
@@ -116,7 +117,7 @@ test('render uses an unlabeled sequence-free input, shared polymerase artwork an
   assert.match(paused, /4 copies · authored/);
   assert.match(paused, /70% extent/);
   assert.match(paused, /aria-label="Ribbon legend"/);
-  assert.match(paused, /Symbolic state · no sequence or timescale/);
+  assert.match(paused, /authored independently\. No sequence or timescale/);
   assert.doesNotMatch(paused, /mech-nt|mech-t-nt|rnacopy-ruler|data-sequence/);
   assert.equal(paused.match(/class="rnacopy-copy" d="([^"]+)"/)[1], interrupted.match(/class="rnacopy-copy" d="([^"]+)"/)[1]);
   assert.equal(paused.match(/class="rnacopy-input" d="([^"]+)"/)[1], interrupted.match(/class="rnacopy-input" d="([^"]+)"/)[1]);
@@ -124,6 +125,25 @@ test('render uses an unlabeled sequence-free input, shared polymerase artwork an
   const render = C.PanelViews.get('rnacopy'), host = {};
   assert.equal(render(host,p,s,'aurora',[],0,true).html, render(host,p,s,'daylight',[],0,false).html);
   assert.deepEqual(Object.keys(host), [], 'no retained state, DOM dependence or clocks');
+});
+
+test('completed copies are separate tokens and never inferred from the active intermediate', () => {
+  for (const copies of [0,1,4,12]) for (const status of ['ready','copying','paused','interrupted','complete']) {
+    const out = html(panel(), {copies,status,progress:0.45,position:0.8});
+    assert.equal((out.match(/class="rnacopy-completed-copy"/g) || []).length, copies);
+    assert.equal((out.match(/class="rnacopy-polymerase"/g) || []).length, 1);
+    assert.match(out, /class="rnacopy-tray"/);
+    assert.match(out, /Separate symbolic count/);
+    assert.match(out, /Incoming \+RNA is copied through a complementary intermediate before new \+RNA/);
+    const site = out.slice(out.indexOf('class="rnacopy-site-bg"'), out.indexOf('class="rnacopy-tray"'));
+    assert.match(site, /Complementary intermediate/);
+    assert.doesNotMatch(site, /New \+RNA|rnacopy-completed-copy/);
+    assert.match(out, /45% extent/);
+  }
+  assert.match(html(panel(), {copies:0}), /No copies shown/);
+  assert.match(html(panel(), {status:'interrupted',progress:0.5}), /Stopped · intermediate retained/);
+  assert.match(html(panel(), {status:'interrupted',progress:0}), /Stopped · no intermediate drawn/);
+  assert.doesNotMatch(html(panel(), {status:'interrupted',progress:0}), /stopped intermediate remains visible/);
 });
 
 test('all authored text is escaped and hostile keys cannot become markup or folded properties', () => {

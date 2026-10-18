@@ -199,6 +199,78 @@ test('model resolves anchors, clusters, division geometry, zoom, highlight and c
   const rings = C.cellsceneModel(p, {events:[{kind:'signal',at:'nuc',rings:3}]});
   same(plain(rings.transients.map(t => [t.kind, t.x, t.y, t.delay])), [['signal',352,158,0],['signal',352,158,250],['signal',352,158,500]]);
 });
+test('legend mode preserves all items by default and validates its setup enum without mutating the declaration', () => {
+  const p = panel(), expected = C.cellsceneModel(p, {}).legend;
+  same(expected.map(chip => chip.id), ['p', 'c', 'nucleus', 'cell']);
+  same(C.cellsceneModel({...p, legendMode:'all'}, {}).legend, expected);
+  for (const invalid of ['VISIBLE', '', null, 0, {}, []]) {
+    const authored = {...p, legendMode:invalid}, before = JSON.stringify(authored);
+    const warnings = validate({nodes:{n:{}}, rows:[['n']], panels:[authored]}).warnings;
+    same(warnings, ['sections[0].diagram.panels[0].legendMode: expected all|visible — using all']);
+    same(C.cellsceneModel(authored, {}).legend, expected);
+    assert.equal(C.cellsceneDecl(authored).legendMode, 'all');
+    assert.equal(JSON.stringify(authored), before);
+  }
+  for (const legendMode of ['all', 'visible'])
+    same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, legendMode}]}), {errors:[], warnings:[]});
+  const authoring = C.panelAuthoring('cellscene');
+  same(authoring.setupFields.find(field => field[0] === 'legendMode'), ['legendMode', 'enum', ['all', 'visible']]);
+  assert.match(authoring.fieldMeta.legendMode.help, /default.*hidden.*count 0.*cell and nucleus/);
+  assert.ok(!C.panelPatchFields(p).some(field => field[0] === 'legendMode'), 'legend mode is declaration setup');
+});
+test('visible legend follows drawn items through hide, zero count, reveal and reset, keeping cell context and aria', () => {
+  const p = {...panel(), legendMode:'visible'};
+  const steps = [
+    {id:'hidden', panels:{cell:{items:{p:{state:'hidden',count:3}, c:{state:'free',count:0}}}}},
+    {id:'reveal', panels:{cell:{items:{p:{state:'free'}, c:{state:'active',count:6}}}}},
+    {id:'zero', panels:{cell:{items:{p:{count:0}, c:{count:0}}}}},
+    {id:'reset', panels:{cell:{items:{p:null, c:null}}}},
+  ];
+  const states = folded({...diagram(steps), panels:[p]});
+  const expectedIds = [['nucleus','cell'], ['p','c','nucleus','cell'], ['nucleus','cell'], ['p','nucleus','cell']];
+  states.forEach((state, index) => {
+    const m = C.cellsceneModel(p, state), html = C.cellsceneHTML(p, state);
+    same(m.legend.map(chip => chip.id), expectedIds[index]);
+    same(m.legend.filter(chip => !['nucleus','cell'].includes(chip.id)).map(chip => chip.id), m.items.filter(item => item.visible).map(item => item.id));
+    same(m.aria, C.cellsceneModel(panel(), state).aria, 'legend filtering does not alter the visible scene description');
+    const legend = /<ul class="mech-legend"[^>]*>([\s\S]*?)<\/ul>/.exec(html)[1];
+    same([...legend.matchAll(/data-id="([^"]+)"/g)].map(match => match[1]), expectedIds[index]);
+    for (const item of m.items) {
+      assert.equal(html.includes('cellscene-item cellscene-role-' + item.role), item.visible);
+      assert.equal(m.aria.includes(item.label), item.visible);
+    }
+  });
+  const divided = C.cellsceneModel(p, {...states[0], divided:true});
+  same(divided.legend.map(chip => [chip.id, chip.state]), [['nucleus','×2'], ['cell','2']]);
+});
+test('changing legend mode patches the legend while retaining scene geometry', () => {
+  const p = panel(), host = fakeHost(), state = folded(diagram([]))[0];
+  C.renderPanelBody(host, p, state, 'aurora', [state], 0, false);
+  const visible = {...p, legendMode:'visible'};
+  C.renderPanelBody(host, visible, state, 'aurora', [state], 0, false);
+  assert.equal(host.writes, 1, 'legend setup changes patch the footer in place');
+  assert.doesNotMatch(host.parts['.cellscene-foot'].innerHTML, /data-id="c"/);
+  assert.match(host.parts['.cellscene-foot'].innerHTML, /data-id="p"/);
+  C.renderPanelBody(host, p, state, 'aurora', [state], 0, false);
+  assert.equal(host.writes, 1);
+  assert.match(host.parts['.cellscene-foot'].innerHTML, /data-id="c"/);
+});
+test('readable label mode enlarges scene labels and moves the caption into the footer', () => {
+  const p = panel(), state = {caption:'A long explanation that needs room to wrap.'};
+  const standard = C.cellsceneHTML(p, state), readable = C.cellsceneHTML({...p, labelMode:'readable'}, state);
+  assert.match(standard, /class="cellscene-t-cap"/);
+  assert.doesNotMatch(standard, /cellscene-readable|cellscene-caption/);
+  assert.match(readable, /class="swpanel cellscene cellscene-readable"/);
+  assert.match(readable, /<p class="cellscene-caption">A long explanation that needs room to wrap\.<\/p>/);
+  assert.doesNotMatch(readable, /class="cellscene-t-cap"/);
+  same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'readable'}]}), {errors:[], warnings:[]});
+  same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'large'}]}).warnings,
+    ['sections[0].diagram.panels[0].labelMode: expected standard|readable — using standard']);
+  same(C.panelAuthoring('cellscene').setupFields.find(field => field[0] === 'labelMode'), ['labelMode','enum',['standard','readable']]);
+  const host = fakeHost(), states = folded(diagram([{id:'caption', panels:{cell:state}}]));
+  C.renderPanelBody(host, {...p, labelMode:'readable'}, states[0], 'aurora', states, 0, false);
+  assert.match(host.html, /cellscene-caption/);
+});
 test('render emits settled markup with glide styles, one crossing transient per enter, and nothing when not animating', () => {
   const p = panel(), states = folded(diagram(story())), host = {};
   const first = render()(host, p, states[0], null, states, 0, true);

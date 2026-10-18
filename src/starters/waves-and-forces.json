@@ -388,30 +388,29 @@
             "columns": 24,
             "default": [
               {
+                "controls": "steps",
                 "x": 0,
                 "y": 0,
                 "w": 24,
-                "h": 12
+                "h": 6
               },
               {
-                "controls": "steps",
                 "x": 0,
-                "y": 12,
-                "w": 24,
-                "h": 6,
-                "attachTo": "diagram"
+          "y": 34,
+          "w": 24,
+          "h": 6
               },
               {
                 "panel": "wave",
                 "x": 0,
-                "y": 12,
+          "y": 6,
                 "w": 24,
-                "h": 20
+                "h": 28
               },
               {
                 "panel": "wave-ledger",
                 "x": 0,
-                "y": 32,
+                "y": 40,
                 "w": 24,
                 "h": 7
               }
@@ -832,19 +831,19 @@
                 "x": 0,
                 "y": 9,
                 "w": 12,
-                "h": 16
+                "h": 21
               },
               {
                 "panel": "trial-b",
                 "x": 12,
                 "y": 9,
                 "w": 12,
-                "h": 16
+                "h": 21
               },
               {
                 "panel": "force-ledger",
                 "x": 0,
-                "y": 25,
+                "y": 30,
                 "w": 24,
                 "h": 7
               }

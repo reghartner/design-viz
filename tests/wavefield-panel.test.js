@@ -94,5 +94,57 @@ test('dark-fringe display suppresses only numerical residuals without rounding t
   const html = C.wavefieldHTML(p, state);
   assert.match(html, /I\/I₀ = 0, Dark minimum/);
   assert.match(html, /I\/I₀ <b>0<\/b>/);
+  assert.match(html, /Resultant amplitude <b>≈0<\/b>/);
+  assert.doesNotMatch(html, /Resultant amplitude [^<]*5\.66e-8/);
   assert.equal(C.wavefieldModel(p, state).probe.intensity, exact.probe.intensity);
+});
+
+test('screen cells cover the screen and share exact model intensities, including the probe', () => {
+  for (const state of [{sources:'one', probe:2.3}, {probe:coordinate(0.5)}, {probe:coordinate(1)}, {probe:-1.1, wavelength:2}]) {
+    const m = C.wavefieldModel(panel(), state), cells = plain(C.wavefieldScreenSamples(m));
+    near(cells[0].low, -6); near(cells.at(-1).high, 6);
+    cells.forEach((cell, i) => {
+      assert.ok(cell.high > cell.low);
+      if (i) near(cells[i-1].high, cell.low);
+      near(cell.intensity, C.wavefieldSample(m.config, m.sources, cell.y).intensity);
+      near(cell.normalized, cell.intensity / 4);
+    });
+    const probe = cells.find(cell => cell.y === m.probe.y);
+    assert.ok(probe, 'screen explicitly includes the selected probe');
+    near(probe.intensity, m.probe.intensity);
+    const html = C.wavefieldHTML(panel(), state);
+    const rendered = [...html.matchAll(/class="wavefield-screen-sample" data-y="([^"]+)" data-intensity="([^"]+)"[^>]+fill="rgb\(([^)]+)\)"/g)];
+    assert.equal(rendered.length, cells.length);
+    rendered.forEach((match, i) => { near(Number(match[1]), cells[i].y); near(Number(match[2]), cells[i].intensity); });
+    if (state.sources === 'one') {
+      assert.ok(cells.every(cell => cell.intensity === 1));
+      assert.equal(new Set(rendered.map(match => match[3])).size, 1, 'single-source strip is uniformly illuminated');
+    } else {
+      assert.ok(cells.some(cell => cell.intensity < 1e-12));
+      assert.ok(cells.some(cell => cell.intensity > 3.999999));
+    }
+  }
+});
+
+test('static phase comparison sums signed source waves and agrees with probe intensity', () => {
+  for (const state of [{probe:0}, {probe:coordinate(0.5)}, {probe:-coordinate(0.5)}, {probe:coordinate(1)}, {probe:1.3, wavelength:2}, {sources:'one', probe:3}]) {
+    const m = C.wavefieldModel(panel(), state), phase = plain(C.wavefieldPhase(m));
+    near(phase.amplitude ** 2, m.probe.intensity);
+    near(phase.degrees, m.sources === 'one' ? 0 : 360 * m.probe.delta / m.config.wavelength);
+    phase.points.forEach(point => near(point.sum, point.a + point.b));
+    // Mean squared displacement across a complete cycle gives half the squared
+    // amplitude. This checks the rendered phase curves against the intensity.
+    near(phase.points.slice(0, -1).reduce((sum, point) => sum + point.sum ** 2, 0) / 96 * 2, m.probe.intensity);
+    const html = C.wavefieldHTML(panel(), state);
+    assert.match(html, /static comparison/); assert.match(html, /Solid S1 \+ dashed S2 = sum/);
+    assert.match(html, /data-component="sum"/);
+    if (m.classification === 'Dark minimum') {
+      assert.ok(phase.points.every(point => Math.abs(point.sum) < 1e-12));
+      assert.match(html, /Opposite phase → cancellation/);
+      const sum = html.match(/data-component="sum" points="([^"]+)"/)[1];
+      assert.ok(sum.split(' ').every(pair => Number(pair.split(',')[1]) === 112), 'dark probe has a visibly flat sum');
+    }
+    if (m.classification === 'Bright maximum') assert.match(html, /Aligned phase → reinforcement/);
+    if (m.sources === 'one') assert.doesNotMatch(html, /data-component="b"/);
+  }
 });

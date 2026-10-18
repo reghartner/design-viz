@@ -8583,6 +8583,8 @@ p.reads-empty{margin:4px 0;font-size:11px}
 .cellscene-st-bound .cellscene-body,.cellscene-st-active .cellscene-body{filter:drop-shadow(0 0 9px var(--mf))}
 .cellscene-st-released .cellscene-body{opacity:.72}
 .cellscene-t-cap{font:500 11.5px 'IBM Plex Sans',sans-serif;fill:var(--dtext)}
+.cellscene-readable .cellscene-fit > text{font-size:18px;letter-spacing:0}
+.cellscene-caption{margin:8px 0 4px;font-size:13px;line-height:1.4;color:var(--dtext)}
 .cellscene-foot{min-width:0}
 .cellscene-crossing{animation:cellsceneCross 1.25s cubic-bezier(.4,0,.2,1) both}
 @keyframes cellsceneCross{0%{transform:translate(var(--cs-x0),var(--cs-y0)) scale(1)}40%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(1)}50%,60%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(.65)}100%{transform:translate(0,0) scale(1)}}
@@ -8594,59 +8596,70 @@ p.reads-empty{margin:4px 0;font-size:11px}
 @media print{.cellscene-parent{display:none}.cellscene-cell,.cellscene-nuc,.cellscene-ves,.cellscene-org{print-color-adjust:exact}}
 
 
-.forcebody{--fb-bg:#f5f7fa;--fb-force:#286aaf;--fb-net:#b34827;--fb-motion:#6851aa;color:var(--dtext,#263449);font:13px 'IBM Plex Sans',sans-serif;min-width:0}
+.forcebody{--fb-bg:#f5f7fa;--fb-force:#286aaf;--fb-net:#ae4727;--fb-motion:#6851aa;--fb-rule:color-mix(in srgb,currentColor 15%,transparent);color:var(--dtext,#263449);font:14px/1.45 'IBM Plex Sans',sans-serif;min-width:0}
 .sk-aurora .forcebody,.sk-terminal .forcebody,.sk-blueprint .forcebody{--fb-bg:#162136;--fb-force:#83bcff;--fb-net:#ffc381;--fb-motion:#c6b6ff}
-.forcebody-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;letter-spacing:.09em;text-transform:uppercase}.forcebody-heading strong{font:600 16px 'IBM Plex Mono',monospace;letter-spacing:0}
-.forcebody-caption{font-weight:600;font-size:17px;margin:10px 0 14px;overflow-wrap:anywhere}.forcebody-scene{display:block;width:100%;height:auto;overflow:visible}
-.forcebody-surface{fill:color-mix(in srgb,var(--dtext,#263449) 3%,transparent);stroke:color-mix(in srgb,var(--dtext,#263449) 14%,transparent)}
-.forcebody-grid{fill:none;stroke:currentColor;opacity:.06;stroke-width:1}.forcebody-divider{stroke:currentColor;opacity:.18;fill:none}
-.forcebody-kicker{font:600 11px 'IBM Plex Sans',sans-serif;letter-spacing:1.5px;fill:currentColor}.forcebody-axis{font:11px 'IBM Plex Sans',sans-serif;fill:currentColor;opacity:.78}
-.forcebody-puck-shadow{fill:currentColor;opacity:.1}.forcebody-puck{fill:color-mix(in srgb,var(--fb-force) 18%,var(--fb-bg));stroke:var(--fb-force);stroke-width:2}.forcebody-puck-ring{fill:none;stroke:var(--fb-force);opacity:.3}.forcebody-puck-text{font:italic 600 18px Georgia,serif;fill:var(--fb-force)}
-.forcebody-trail{fill:none;stroke:var(--fb-motion);stroke-width:2;stroke-dasharray:4 4}.forcebody-force{fill:var(--fb-force);stroke:var(--fb-force);stroke-width:2.5}.forcebody-force text{stroke:none;font:700 12px 'IBM Plex Sans',sans-serif;paint-order:stroke;stroke:var(--fb-bg);stroke-width:3px;stroke-linejoin:round}
-.forcebody-net{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:4}.forcebody-net-label{fill:var(--fb-net);font:600 14px 'IBM Plex Mono',monospace}.forcebody-origin{fill:var(--fb-net)}.forcebody-zero{fill:none;stroke:var(--fb-net);stroke-width:2;stroke-dasharray:3 4}
-.forcebody-velocity{stroke:var(--fb-motion);fill:var(--fb-motion);stroke-width:2;stroke-dasharray:5 4}.forcebody-velocity polygon{stroke-dasharray:none}.forcebody-velocity-text{fill:var(--fb-motion);font:600 13px 'IBM Plex Mono',monospace}
-.forcebody-forces{margin:10px 0}.forcebody-forces>div{display:flex;align-items:baseline;gap:10px;padding:6px 2px;border-bottom:1px solid color-mix(in srgb,currentColor 10%,transparent)}.forcebody-forces b{font-size:11px}.forcebody-forces span{flex:1;overflow-wrap:anywhere}.forcebody-forces code{font-size:11px;text-align:right}
-.forcebody-equation{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;background:color-mix(in srgb,var(--fb-net) 9%,transparent);border-left:3px solid var(--fb-net);padding:13px 15px;border-radius:0 8px 8px 0}.forcebody-equation span{grid-row:span 2;font:italic 18px Georgia,serif;align-self:center}.forcebody-equation strong{font:600 13px 'IBM Plex Mono',monospace}.forcebody-equation small{font-size:11px}
-.forcebody-relation{margin-top:12px;font-weight:600}.forcebody-key{font-size:11px;line-height:1.5;opacity:.78;margin-top:5px}.forcebody-note{margin-top:12px;line-height:1.5;overflow-wrap:anywhere}
+.forcebody-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}.forcebody-heading>span{display:flex;align-items:center;gap:9px;overflow-wrap:anywhere}.forcebody-heading i{width:7px;height:7px;flex-shrink:0;border-radius:50%;background:var(--fb-force)}.forcebody-heading strong{padding:3px 9px;border:1px solid var(--fb-rule);border-radius:6px;font:600 20px 'IBM Plex Mono',monospace;letter-spacing:-.04em;white-space:nowrap}.forcebody-heading small{font-size:13px;font-weight:400}
+.forcebody-caption{font-weight:600;font-size:22px;letter-spacing:-.035em;line-height:1.2;margin:8px 0 10px;overflow-wrap:anywhere}.forcebody-scene{display:block;width:100%;height:auto;overflow:visible}
+.forcebody-surface{fill:color-mix(in srgb,var(--fb-force) 4%,transparent);stroke:var(--fb-rule)}.forcebody-grid{fill:none;stroke:currentColor;opacity:.055;stroke-width:1}.forcebody-divider{stroke:currentColor;opacity:.16;fill:none}
+.forcebody-kicker{font:600 14px 'IBM Plex Sans',sans-serif;letter-spacing:1px;fill:currentColor}.forcebody-axis{font:13px 'IBM Plex Sans',sans-serif;fill:currentColor;opacity:.75}.forcebody-body-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:currentColor}
+.forcebody-puck-halo{fill:none;stroke:var(--fb-force);stroke-width:1;opacity:.18}.forcebody-puck{fill:color-mix(in srgb,var(--fb-force) 15%,var(--fb-bg));stroke:var(--fb-force);stroke-width:2}.forcebody-puck-ring{fill:none;stroke:var(--fb-force);opacity:.3}.forcebody-puck-text{font:italic 600 26px Georgia,serif;fill:var(--fb-force)}
+.forcebody-force{fill:var(--fb-force);stroke:var(--fb-force);stroke-width:3.5}.forcebody-force text{font:700 15px 'IBM Plex Sans',sans-serif;paint-order:stroke;stroke:var(--fb-bg);stroke-width:4px;stroke-linejoin:round}.forcebody-net{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:5}.forcebody-net-label{fill:var(--fb-net);font:600 19px 'IBM Plex Mono',monospace}.forcebody-origin{fill:var(--fb-net)}.forcebody-zero{fill:none;stroke:var(--fb-net);stroke-width:2;stroke-dasharray:4 5}.forcebody-balanced{font:600 15px 'IBM Plex Sans',sans-serif;fill:var(--fb-net)}
+.forcebody-forces{margin:5px 0 10px}.forcebody-forces>div{display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid var(--fb-rule)}.forcebody-forces b{color:var(--fb-force);font:600 12px 'IBM Plex Mono',monospace}.forcebody-forces span{flex:1;overflow-wrap:anywhere}.forcebody-forces code{font:12px 'IBM Plex Mono',monospace;text-align:right}
+.forcebody-equation{background:color-mix(in srgb,var(--fb-net) 6%,transparent);border:1px solid color-mix(in srgb,var(--fb-net) 23%,transparent);padding:8px 13px;border-radius:10px}.forcebody-equation-title{display:flex;justify-content:space-between;align-items:center;gap:12px}.forcebody-equation-title>span{font-size:11px;letter-spacing:.1em;font-weight:600}.forcebody-equation-title>b{font:italic 20px Georgia,serif;color:var(--fb-net)}.forcebody-calculation{display:grid;grid-template-columns:1fr auto .8fr auto 1.3fr;align-items:center;gap:10px;margin:8px 0}.forcebody-calculation>div{min-width:0}.forcebody-calculation strong{display:block;font:600 23px 'IBM Plex Mono',monospace;letter-spacing:-.04em;overflow-wrap:anywhere}.forcebody-calculation small{font-size:12px;font-weight:400;letter-spacing:0}.forcebody-calculation span{font-size:11px;opacity:.8}.forcebody-calculation i{font:22px Georgia,serif;opacity:.5}.forcebody-answer strong{color:var(--fb-net)}
+.forcebody-meter{margin-top:6px}.forcebody-meter-track{height:8px;position:relative;border-radius:2px;background:color-mix(in srgb,var(--fb-net) 12%,transparent);background-image:linear-gradient(to right,transparent calc(100% - 1px),var(--fb-rule) 1px);background-size:25% 100%;overflow:hidden}.forcebody-meter-track>span{display:block;height:100%;background:var(--fb-net);border-radius:2px}.forcebody-meter-labels{display:grid;grid-template-columns:repeat(4,1fr);position:relative;font:10px 'IBM Plex Mono',monospace;margin-top:5px}.forcebody-meter-labels>span:not(:first-child){transform:translateX(-50%);width:max-content}.forcebody-meter-labels>span:last-child{position:absolute;right:0;transform:none}.forcebody-scale-note{font-size:11px;margin-top:7px;opacity:.78}
+.forcebody-motion{margin-top:9px;border-top:2px solid var(--fb-rule)}.forcebody-motion-heading{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 2px;gap:10px}.forcebody-motion-heading>b{font-size:16px;letter-spacing:-.02em}.forcebody-motion-heading>span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.7}.forcebody-motion-row{display:grid;grid-template-columns:minmax(95px,1fr) minmax(0,1.65fr) 76px;align-items:center;gap:10px;min-height:58px;border-bottom:1px solid var(--fb-rule)}.forcebody-motion-name b{display:block;font-size:14px}.forcebody-motion-name small{display:block;font-size:10px;opacity:.75;margin-top:3px}.forcebody-motion-value strong{display:block;font:600 14px 'IBM Plex Mono',monospace;overflow-wrap:anywhere;letter-spacing:-.03em}.forcebody-motion-value span{display:block;font-size:12px;margin-top:4px}.forcebody-velocity-row .forcebody-motion-value{color:var(--fb-motion)}.forcebody-acceleration-row .forcebody-motion-value{color:var(--fb-net)}.forcebody-direction{width:68px;height:56px}.forcebody-direction-axis{stroke:currentColor;opacity:.16;stroke-width:1;fill:none}.forcebody-direction-origin{fill:currentColor;opacity:.4}.forcebody-direction-zero{fill:none;stroke:currentColor;stroke-width:2}.forcebody-velocity{stroke:var(--fb-motion);fill:var(--fb-motion);stroke-width:4;stroke-dasharray:6 4}.forcebody-velocity polygon{stroke-dasharray:none}.forcebody-acceleration{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:4}
+.forcebody-direction-unknown{fill:currentColor;opacity:.55;font:600 25px 'IBM Plex Mono',monospace}
+.forcebody-relation{font-size:16px;font-weight:600;letter-spacing:-.015em;margin-top:9px}.forcebody-key{font-size:10px;line-height:1.5;opacity:.75;margin-top:5px}.forcebody-note{margin-top:8px;padding:6px 11px;border-left:2px solid var(--fb-force);background:color-mix(in srgb,var(--fb-force) 5%,transparent);font-size:13px;line-height:1.45;overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.forcebody *{animation:none!important;transition:none!important}}
-@media print{.forcebody{--fb-force:#174d84;--fb-net:#893617;--fb-motion:#514080;color:#18232e;break-inside:avoid}.forcebody-scene{print-color-adjust:exact}.forcebody-surface{fill:#fff;stroke:#bcc4cc}.forcebody-puck{fill:#e2eaf3}.forcebody-force text{stroke:#fff}}
+@media print{.forcebody{--fb-bg:#fff;--fb-force:#174d84;--fb-net:#893617;--fb-motion:#514080;color:#18232e;break-inside:avoid;print-color-adjust:exact}.forcebody-surface{fill:#fff;stroke:#bcc4cc}.forcebody-puck{fill:#e2eaf3}.forcebody-force text{stroke:#fff}}
 
 
-.rnacopy{min-width:0;--rc-input:#8FADC9;--rc-copy:#67DFC5;--rc-status:#BCA6FF}
-.rnacopy-frame{overflow:hidden}
-.rnacopy-kicker{font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.12em;fill:var(--mk-mute)}
-.rnacopy-heading{font:600 19px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-status-bg{fill:color-mix(in srgb,var(--rc-status) 12%,var(--mk-tagbg));stroke:var(--rc-status);stroke-width:1}
+.rnacopy{min-width:0;--rc-input:#9EBFDF;--rc-copy:#F4C67A;--rc-output:#72DCC2;--rc-status:#C4ACFF}
+.rnacopy-frame{overflow:hidden;border:1px solid var(--mk-rung);box-sizing:border-box}
+.rnacopy-kicker,.rnacopy-section{font:600 12px 'IBM Plex Mono',monospace;letter-spacing:.06em;fill:var(--mk-mute)}
+.rnacopy-heading{font:600 29px 'IBM Plex Sans',sans-serif;letter-spacing:-.02em;fill:var(--mk-ink)}
+.rnacopy-status-bg{fill:color-mix(in srgb,var(--rc-status) 12%,var(--mk-tagbg));stroke:var(--rc-status);stroke-width:1.5}
 .rnacopy-status-icon{fill:none;stroke:var(--rc-status);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.rnacopy-status-text{font:600 13px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-st-paused{--rc-status:#F4CB79}.rnacopy-st-interrupted{--rc-status:#FF9696}.rnacopy-st-complete{--rc-status:#67DFC5}
-.rnacopy-guide{fill:none;stroke:var(--mk-rung);stroke-width:1}
-.rnacopy-input,.rnacopy-input-shadow,.rnacopy-copy,.rnacopy-copy-shadow{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.rnacopy-input-shadow{stroke:color-mix(in srgb,var(--rc-input) 15%,transparent);stroke-width:17}
+.rnacopy-status-text{font:600 19px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-st-paused{--rc-status:#F4CB79}.rnacopy-st-interrupted{--rc-status:#FF9696}.rnacopy-st-complete{--rc-status:#72DCC2}
+.rnacopy-site-bg,.rnacopy-tray-bg{fill:var(--mk-tagbg);stroke:var(--mk-rung);stroke-width:1}
+.rnacopy-tray-bg{fill:color-mix(in srgb,var(--rc-output) 4%,var(--mk-tagbg))}
+.rnacopy-input,.rnacopy-input-shadow,.rnacopy-copy,.rnacopy-copy-shadow,.rnacopy-output{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rnacopy-input-shadow{stroke:color-mix(in srgb,var(--rc-input) 12%,transparent);stroke-width:19}
 .rnacopy-input{stroke:var(--rc-input);stroke-width:6}
-.rnacopy-copy-shadow{stroke:color-mix(in srgb,var(--rc-copy) 15%,transparent);stroke-width:16}
-.rnacopy-copy{stroke:var(--rc-copy);stroke-width:5;stroke-dasharray:9 4}
+.rnacopy-copy-shadow{stroke:color-mix(in srgb,var(--rc-copy) 12%,transparent);stroke-width:16}
+.rnacopy-copy{stroke:var(--rc-copy);stroke-width:5;stroke-dasharray:9 5}
 .rnacopy-copy-tip{fill:var(--rc-copy)}
-.rnacopy-halo{fill:color-mix(in srgb,#B99CFF 9%,var(--mk-tagbg));stroke:color-mix(in srgb,#B99CFF 35%,transparent);stroke-width:1}
-.rnacopy-st-interrupted .rnacopy-halo,.rnacopy-st-paused .rnacopy-halo{stroke:var(--rc-status);stroke-dasharray:4 4}
-.rnacopy-leader{fill:none;stroke:var(--mk-mute);stroke-width:1}
-.rnacopy-enzyme-label{font:500 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-metric{font:600 13px 'IBM Plex Mono',monospace;fill:var(--mk-ink)}
-.rnacopy-small{font:10px 'IBM Plex Sans',sans-serif;fill:var(--mk-mute)}
-.rnacopy-details{color:var(--dtext);font:12px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere}
-.rnacopy-label{font-weight:600;margin-top:8px}
+.rnacopy-halo{fill:color-mix(in srgb,var(--rc-status) 9%,var(--mk-tagbg));stroke:color-mix(in srgb,var(--rc-status) 45%,transparent);stroke-width:1.5}
+.rnacopy-st-interrupted .rnacopy-halo,.rnacopy-st-paused .rnacopy-halo{stroke:var(--rc-status);stroke-dasharray:5 5}
+.rnacopy-site-core{fill:var(--mk-tagbg)}
+.rnacopy-polymerase .mech-actor path{fill:color-mix(in srgb,var(--rc-status) 22%,var(--mk-tagbg));stroke:var(--rc-status);filter:none}
+.rnacopy-leader{fill:none;stroke:var(--rc-input);stroke-width:1.5}
+.rnacopy-ribbon-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:var(--rc-input)}
+.rnacopy-intermediate-label{fill:var(--rc-copy)}
+.rnacopy-state-note{font:500 14px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-count{font:600 42px 'IBM Plex Sans',sans-serif;fill:var(--rc-output)}
+.rnacopy-tray-label{font:500 17px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-output{stroke:var(--rc-output);stroke-width:3}
+.rnacopy-token-bg{fill:color-mix(in srgb,var(--rc-output) 6%,var(--mk-tagbg));stroke:color-mix(in srgb,var(--rc-output) 30%,var(--mk-rung));stroke-width:1}
+.rnacopy-empty,.rnacopy-small{font:14px 'IBM Plex Sans',sans-serif;fill:var(--mk-mute)}
+.rnacopy-path-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-flow-arrow{fill:none;stroke:var(--mk-mute);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rnacopy-details{color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere}
+.rnacopy-label{font-weight:600;margin-top:9px}
 .rnacopy-legend{display:flex;flex-wrap:wrap;gap:4px 18px;list-style:none;margin:5px 0 0;padding:0}
 .rnacopy-legend li{display:inline-flex;gap:7px;align-items:center}
 .rnacopy-legend i{display:inline-block;width:20px;height:0;border-top:3px solid var(--rc-input)}
 .rnacopy-legend .rnacopy-copy-key{border-top:3px dashed var(--rc-copy)}
-.rnacopy-caption,.rnacopy-note{margin:6px 0 0}.rnacopy-note{color:var(--dfaint)}
-.sk-daylight .rnacopy,body.sk-editorial .rnacopy,body.sk-pastel .rnacopy{--rc-input:#486581;--rc-copy:#137763;--rc-status:#6D48B3}
+.rnacopy-legend .rnacopy-output-key{border-top:3px solid var(--rc-output)}
+.rnacopy-caption,.rnacopy-note,.rnacopy-authored{margin:6px 0 0}.rnacopy-note,.rnacopy-authored{color:var(--dfaint)}
+.sk-daylight .rnacopy,body.sk-editorial .rnacopy,body.sk-pastel .rnacopy{--rc-input:#365F89;--rc-copy:#95600B;--rc-output:#137763;--rc-status:#6D48B3}
 .sk-daylight .rnacopy-st-paused,body.sk-editorial .rnacopy-st-paused,body.sk-pastel .rnacopy-st-paused{--rc-status:#8B5A0D}
 .sk-daylight .rnacopy-st-interrupted,body.sk-editorial .rnacopy-st-interrupted,body.sk-pastel .rnacopy-st-interrupted{--rc-status:#AF3838}
 .sk-daylight .rnacopy-st-complete,body.sk-editorial .rnacopy-st-complete,body.sk-pastel .rnacopy-st-complete{--rc-status:#137763}
 body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6B82;--mk-rung:#B8C2D4;--mk-tagbg:#FFFFFF}
 @media (prefers-reduced-motion:reduce){.rnacopy *{animation:none;transition:none}}
-@media print{.rnacopy{break-inside:avoid;--rc-input:#486581;--rc-copy:#137763;--rc-status:#49346F}.rnacopy-frame{background:#fff;--mk-ink:#111;--mk-mute:#444;--mk-rung:#ccc;--mk-tagbg:#fff;print-color-adjust:exact}.rnacopy .mech-actor path{filter:none}.rnacopy-details,.rnacopy-note{color:#111}.rnacopy *{animation:none;transition:none}}
+@media print{.rnacopy{break-inside:avoid;--rc-input:#365F89;--rc-copy:#95600B;--rc-output:#137763;--rc-status:#49346F}.rnacopy-frame{background:#fff;--mk-ink:#111;--mk-mute:#444;--mk-rung:#ccc;--mk-tagbg:#fff;print-color-adjust:exact}.rnacopy .mech-actor path{filter:none}.rnacopy-details,.rnacopy-note,.rnacopy-authored{color:#111}.rnacopy *{animation:none;transition:none}}
 
 
 .seatmap{font-size:11px;color:var(--dtext);min-width:0;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A}
@@ -8685,26 +8698,31 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
 @media print{.seatmap-fill,.seatmap-lbl{transition:none}.seatmap-pulse .seatmap-outline{animation:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 
-.wavefield-panel{color:var(--dtext);font:12px/1.45 'IBM Plex Sans',sans-serif;--wf-a:#36bfd0;--wf-b:#e7a55b;min-width:0}
-.sk-daylight .wavefield-panel,.sk-editorial .wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d}
-.wavefield-head{display:flex;justify-content:space-between;gap:12px;color:var(--dink);font-size:14px}
-.wavefield-head span{font-size:11px;border:1px solid currentColor;border-radius:20px;padding:2px 9px}
-.wavefield-parameters,.wavefield-assumptions{color:var(--dfaint);font-size:11px;margin:7px 0}
-.wavefield-svg{width:100%;height:auto;display:block;overflow:visible}
-.wavefield-bg{fill:color-mix(in srgb,var(--dtext) 5%,transparent)}
-.wavefield-s1{stroke:var(--wf-a)}.wavefield-s2{stroke:var(--wf-b);stroke-dasharray:5 4}
-.wavefield-wave{fill:none;stroke-width:1;opacity:.24}
-.wavefield-path{stroke-width:2;fill:none}.wavefield-source{fill:var(--dink);stroke-width:2}
-.wavefield-off{fill:none;opacity:.45}.wavefield-probe{fill:var(--dink);stroke:var(--dtext);stroke-width:1}
-.wavefield-axis,.wavefield-grid{stroke:var(--dtext);opacity:.15;stroke-width:1}
-.wavefield-screen{stroke:var(--dink);stroke-width:3}.wavefield-guide{stroke:var(--dtext);stroke-width:1;stroke-dasharray:2 4;opacity:.6}
-.wavefield-label{fill:var(--dink);font:600 12px 'IBM Plex Sans',sans-serif}.wavefield-tick{fill:var(--dtext);font:10px 'IBM Plex Mono',monospace}
-.wavefield-curve{fill:none;stroke:var(--dink);stroke-width:1.8;stroke-linejoin:round}
-.wavefield-readouts{display:flex;flex-wrap:wrap;gap:8px 24px;border-top:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);padding-top:10px}
-.wavefield-readouts span{display:flex;flex-direction:column;font-size:10px}.wavefield-readouts b{color:var(--dink);font:600 14px 'IBM Plex Mono',monospace}
-.wavefield-equation{font:11px 'IBM Plex Mono',monospace;color:var(--dink)}.wavefield-note{border-left:3px solid var(--wf-a);padding-left:10px}
+.wavefield-panel{color:var(--dtext);font:12px/1.45 'IBM Plex Sans',sans-serif;--wf-a:#48cbd7;--wf-b:#edb376;--wf-result:#dfc68a;min-width:0}
+.sk-daylight .wavefield-panel,.sk-editorial .wavefield-panel{--wf-a:#087783;--wf-b:#a85c24;--wf-result:#815e16}
+.wavefield-head{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--dink)}
+.wavefield-head strong{display:block;font-size:17px;line-height:1.3;font-weight:600}.wavefield-head small,.wavefield-phase-caption small{display:block;font-size:10px;letter-spacing:.15em;color:var(--dfaint);margin-bottom:5px}
+.wavefield-head>span{font-size:11px;border:1px solid color-mix(in srgb,var(--wf-result) 60%,transparent);background:color-mix(in srgb,var(--wf-result) 10%,transparent);border-radius:4px;padding:5px 9px;white-space:nowrap}
+.wavefield-parameters{font:11px 'IBM Plex Mono',monospace;color:var(--dfaint);margin:12px 0 14px}.wavefield-assumptions{color:var(--dfaint);font-size:11px;margin:7px 0}
+.wavefield-svg,.wavefield-phase-svg{width:100%;height:auto;display:block;overflow:visible}
+.wavefield-bg{fill:color-mix(in srgb,var(--dtext) 4%,transparent);stroke:color-mix(in srgb,var(--dtext) 14%,transparent)}
+.wavefield-s1{stroke:var(--wf-a)}.wavefield-s2{stroke:var(--wf-b);stroke-dasharray:6 4}
+.wavefield-wave{fill:none;stroke-width:1;opacity:.19}
+.wavefield-path{stroke-width:2.4;fill:none}.wavefield-source{fill:var(--dink);stroke-width:3}
+.wavefield-off{fill:none;opacity:.45}.wavefield-probe{fill:var(--dink);stroke:var(--wf-result);stroke-width:2.5}
+.wavefield-axis,.wavefield-grid{stroke:var(--dtext);opacity:.2;stroke-width:1}
+.wavefield-screen-frame{fill:#121b27;stroke:var(--dtext);stroke-width:1}.wavefield-screen-sample{shape-rendering:crispEdges}
+.wavefield-screen{stroke:var(--dink);stroke-width:1}.wavefield-guide{stroke:var(--wf-result);stroke-width:1.5;stroke-dasharray:4 4}.wavefield-crosshair{stroke:var(--wf-result);stroke-width:1.5}
+.wavefield-label{fill:var(--dink);font:600 13px 'IBM Plex Sans',sans-serif}.wavefield-tick{fill:var(--dtext);font:11px 'IBM Plex Mono',monospace}
+.wavefield-curve{fill:none;stroke:var(--wf-result);stroke-width:2.5;stroke-linejoin:round}.wavefield-curve-area{fill:var(--wf-result);opacity:.13}
+.wavefield-phase{display:grid;grid-template-columns:1fr 1.1fr;gap:20px;align-items:center;background:color-mix(in srgb,var(--dtext) 4%,transparent);border:1px solid color-mix(in srgb,var(--dtext) 15%,transparent);border-radius:8px;padding:14px 16px;margin:8px 0 15px}
+.wavefield-phase-caption strong{display:block;color:var(--dink);font-size:14px;margin:4px 0 8px}.wavefield-phase-caption span{display:block;font-size:11px;margin:4px 0}.wavefield-phase-caption .wavefield-phase-key{color:var(--dfaint);font-size:10px}
+.wavefield-phase-curve{fill:none;stroke-width:2;stroke-linejoin:round}.wavefield-sum{stroke:var(--wf-result);stroke-width:3}
+.wavefield-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);padding-bottom:12px}
+.wavefield-readouts span{display:flex;flex-direction:column;font-size:10px}.wavefield-readouts b{color:var(--dink);font:600 15px 'IBM Plex Mono',monospace;margin-top:3px}
+.wavefield-equation{font:11px 'IBM Plex Mono',monospace;color:var(--dink)}.wavefield-note{border-left:3px solid var(--wf-a);padding:5px 0 5px 12px}
 @media (prefers-reduced-motion:reduce){.wavefield-panel *{animation:none!important;transition:none!important}}
-@media print{.wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d;color:#222;--dtext:#333;--dink:#111;--dfaint:#444;break-inside:avoid}.wavefield-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}.wavefield-wave{opacity:.4}}
+@media print{.wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d;--wf-result:#815e16;color:#222;--dtext:#333;--dink:#111;--dfaint:#444;break-inside:avoid}.wavefield-svg,.wavefield-phase-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}.wavefield-wave{opacity:.3}}
 
 
 .chime-panel{display:flex;align-items:center;gap:16px;min-width:0;padding:8px 0;color:var(--dtext);overflow-wrap:anywhere}
@@ -8850,8 +8868,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
         "heading": "01 / Follow the genome",
         "accent": "cyan",
         "text": [
-          "An incoming genome can be read to make proteins and copied to supply new genomes. Follow the shared path until one new copy is available, then compare further synthesis with a hypothetical interruption.",
-          "Select either path and advance its seven beats. The cell and close-up retain the same camera and scale. Symbols describe causal order; counts, extents and distances are not biological measurements."
+          "Choose a path and follow its seven beats. Both reach one completed +RNA copy before the fork. Compare continued synthesis with a hypothetical interruption; counts and extents are symbolic, with no timescale."
         ],
         "diagram": {
           "view": "step",
@@ -8977,7 +8994,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
             {
               "id": "cellview",
               "type": "cellscene",
-              "title": "THE CELL · a fixed view",
+              "title": "CELL CONTEXT · a fixed view",
               "label": "Illustrative eukaryotic cell",
               "compartments": [
                 {
@@ -9026,7 +9043,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "id": "genome",
                   "role": "cargo",
                   "shape": "pill",
-                  "label": "Incoming RNA",
+                  "label": "+RNA",
                   "size": "m",
                   "start": {
                     "x": 200,
@@ -9125,20 +9142,22 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                 "zoom": null,
                 "caption": "An arriving particle carries RNA. The modeled copying pathway is cytoplasmic.",
                 "note": "Pill: incoming RNA · wedge: new RNA pool · spiky: assembly pool or outside particle."
-              }
+              },
+              "legendMode": "visible",
+              "labelMode": "readable"
             },
             {
               "id": "copyview",
               "type": "rnacopy",
-              "title": "THE COPY GATE · a conceptual close-up",
-              "label": "RNA synthesis · input to emerging strand",
+              "title": "RNA COPYING · the close-up",
+              "label": "Incoming +RNA → complementary intermediate → new +RNA",
               "initial": {
                 "status": "ready",
                 "position": 0.2,
                 "progress": 0,
                 "copies": 0,
-                "caption": "The close-up becomes active when viral copying machinery is available.",
-                "note": "The ribbon summarizes synthesis. Complementary intermediates, cofactors and membrane organization are omitted."
+                "caption": "The polymerase site is ready; no complementary intermediate or completed copy is shown yet.",
+                "note": "The site, copy tray and pathway bridge are separate teaching views. Sequence, cofactors and membrane organization are omitted."
               }
             }
           ],
@@ -9230,7 +9249,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "labels": [
                     {
                       "at": {
-                        "x": 252,
+                        "x": 140,
                         "y": 73
                       },
                       "text": "Translation supplies machinery"
@@ -9246,7 +9265,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
               "nodes": [
                 "gate"
               ],
-              "text": "Copying has supplied one symbolic completed new positive-sense RNA genome, and further synthesis is underway. Both paths share this pre-fork copy; the hypothetical interruption will affect only further synthesis.",
+              "text": "Copying through a complementary RNA intermediate has supplied one symbolic new +RNA genome. A further intermediate is now underway. Both paths share the completed pre-fork copy; the hypothetical interruption affects further synthesis.",
               "panels": {
                 "cellview": {
                   "highlight": "cyt",
@@ -9286,8 +9305,8 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "position": 0.4,
                   "progress": 0.3,
                   "copies": 1,
-                  "caption": "The numeric count records one completed symbolic new genome. The partial ribbon represents the next synthesis in progress.",
-                  "note": "Incoming +RNA → complementary RNA intermediate → new +RNA. The inset compresses these rounds; the count and current ribbon show different stages."
+                  "caption": "One completed +RNA token sits in the tray. The dashed strand at the polymerase site is a separate complementary intermediate in progress.",
+                  "note": "The bridge shows the two copying rounds. Intermediate extent and completed-copy count are independent authored states, not a rate or yield."
                 }
               },
               "edge": "translation->gate"
@@ -9314,7 +9333,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "labels": [
                     {
                       "at": {
-                        "x": 297,
+                        "x": 140,
                         "y": 74
                       },
                       "text": "New genomes become available"
@@ -9327,8 +9346,8 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "position": 0.8,
                   "progress": 1,
                   "copies": 4,
-                  "caption": "The numeric count rises from one to four completed symbolic copies. One ribbon depicts synthesis, not four separate RNA marks.",
-                  "note": "Authored counts describe this cartoon, not measured yield. Packaging and release are illustrative assumptions; real coupling varies."
+                  "caption": "Four separate +RNA tokens show the authored completed-copy count. The site shows a complementary intermediate at its authored full extent.",
+                  "note": "The site and tray summarize different copying rounds. Neither the token count nor strand extent predicts kinetics, yield or efficacy."
                 }
               },
               "edge": "gate->new"
@@ -9368,8 +9387,8 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "caption": "The model assigns new RNA to assembly; one symbolic copy remains."
                 },
                 "copyview": {
-                  "caption": "Four is the cumulative completed-copy count. The cell assigns three symbolic copies to its assembly pool and shows one still free.",
-                  "note": "This allocation and later release are illustrative assumptions. Real coupling varies; the numbers are not yield or efficacy estimates."
+                  "caption": "The tray retains four cumulative completed-copy tokens. The cell assigns three symbolic copies to its assembly pool and leaves one free.",
+                  "note": "The intermediate remains a separate authored state. Packaging and later release are illustrative assumptions; real coupling varies."
                 }
               },
               "edge": "new->assembly"
@@ -9428,7 +9447,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
               "nodes": [
                 "interrupt"
               ],
-              "text": "Suppose further RNA synthesis is interrupted at the shared gate. The next strand remains incomplete, while the one completed new genome made before the fork remains available.",
+              "text": "Suppose further synthesis is interrupted at the shared gate. The dashed complementary intermediate stays incomplete, while the completed pre-fork +RNA copy remains available in the tray.",
               "panels": {
                 "cellview": {
                   "highlight": "cyt",
@@ -9440,7 +9459,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "labels": [
                     {
                       "at": {
-                        "x": 257,
+                        "x": 140,
                         "y": 74
                       },
                       "text": "Further synthesis interrupted"
@@ -9453,8 +9472,8 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "position": 0.4,
                   "progress": 0.3,
                   "copies": 1,
-                  "caption": "The count stays at one completed copy; the next strand remains partial. The cross identifies the hypothetical stop in further synthesis.",
-                  "note": "The completed pre-fork copy is retained. The later packaging/release outcome is an illustrative assumption, not a yield or efficacy estimate."
+                  "caption": "The stop square marks interrupted synthesis. The dashed intermediate remains incomplete; the separate tray retains the completed pre-fork +RNA token.",
+                  "note": "An interruption preserves both authored states. Later packaging and release are illustrative assumptions, with no efficacy estimate."
                 }
               },
               "edge": "gate->interrupt",
@@ -9497,8 +9516,8 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                   "caption": "Assumed packaging uses the completed pre-fork copy."
                 },
                 "copyview": {
-                  "caption": "One is the cumulative completed-copy count. The cell now assigns that pre-fork copy to an assumed particle, so its free RNA wedge disappears.",
-                  "note": "The incoming genome remains in place. Packaging and later release of the new copy are illustrative assumptions, not established outcomes."
+                  "caption": "The tray retains one cumulative completed-copy token. In the cell, that pre-fork copy is assigned to a particle; the incomplete intermediate persists at the stopped site.",
+                  "note": "The incoming genome remains in place. Packaging and release are illustrative assumptions; real coupling varies."
                 }
               },
               "edge": "interrupt->limited",
@@ -9536,6 +9555,10 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
                     }
                   ],
                   "caption": "Assumed release of a particle derived from the pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "One cumulative completed-copy token remains in the tray; the incomplete intermediate remains at the stopped site. The cell shows the assumed release of one particle.",
+                  "note": "These are independent authored symbols, not measured output, efficacy or a guarantee about real viruses."
                 }
               },
               "edge": "limited->residual",
@@ -9578,29 +9601,29 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
             "columns": 24,
             "default": [
               {
-                "panel": "cellview",
+                "controls": "steps",
                 "x": 0,
                 "y": 0,
-                "w": 14,
-                "h": 14
+                "w": 24,
+                "h": 7
               },
               {
-                "panel": "copyview",
-                "x": 14,
-                "y": 0,
+                "panel": "cellview",
+                "x": 0,
+                "y": 7,
                 "w": 10,
                 "h": 14
               },
               {
-                "controls": "steps",
-                "x": 0,
-                "y": 14,
-                "w": 24,
-                "h": 6
+                "panel": "copyview",
+                "x": 10,
+                "y": 7,
+                "w": 14,
+                "h": 16
               },
               {
                 "x": 0,
-                "y": 20,
+                "y": 23,
                 "w": 24,
                 "h": 18
               }
@@ -9614,10 +9637,10 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
         "accent": "violet",
         "text": [
           "The important dependency is genome supply → assembly → release. Translation separately makes proteins from RNA. The copying schematic is incoming +RNA → complementary RNA intermediate → new +RNA; each arrow compresses machinery and intermediate steps.",
-          "At the shared gate, the numeric count is one completed new genome while the partial ribbon represents further synthesis in progress. The interruption stops that further synthesis. The cell wedge is a labeled pool symbol, not one mark per genome."
+          "At the shared gate, one separate tray token is a completed new +RNA genome. The dashed strand at the active site is a further complementary intermediate. Interruption preserves the completed token and leaves that intermediate incomplete. The cell wedge is a labeled pool symbol."
         ],
         "bullets": [
-          "Incoming RNA: a pink pill labeled Incoming RNA. Completed new RNA: a cyan wedge labeled with its symbolic pool count. A spiky assembly mark represents its labeled pool; outside spiky marks are individual symbolic particles. The close-up uses a solid input ribbon and dashed emerging strand.",
+          "Incoming RNA: a pill labeled +RNA in the cell and a solid input strand in the close-up. Complementary intermediate: a dashed strand at the polymerase site. Completed new +RNA: separate tray tokens and a labeled wedge pool in the cell. Labeled spiky marks distinguish assembly from outside particles; a stop square identifies interrupted synthesis.",
           "This illustrative copying pathway takes place in the cytoplasm of a eukaryotic cell. Other organelles are omitted to focus the dependency; cell dimensions and membrane positions carry no anatomical scale.",
           "The alternate path assumes the completed pre-fork copy can be packaged and released with existing proteins. Real replication–assembly coupling varies. Three versus one outside particles are drawing choices, not measured yield, efficacy or a claim about every virus.",
           "Checkpoint: explain why protein production can continue without guaranteeing a supply of new complete genomes. Then identify which downstream stages the hypothetical interruption can constrain."
@@ -9659,7 +9682,7 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
             {
               "k": "Abstraction",
               "v": "One cell · symbolic genome supply · one branch point",
-              "g": "The drawing omits complementary intermediates, compartment organization, competing processes, host responses and real timescales. Entry, packaging and release routes differ across viruses."
+              "g": "The pathway bridge names the complementary intermediate but compresses its copying rounds. The drawing omits molecular detail, compartment organization, competing processes, host responses and real timescales. Entry, packaging and release routes differ across viruses."
             }
           ]
         },
@@ -18440,10 +18463,16 @@ function cellsceneDecl(panel, path, warnings) {
   panel = panelObject(panel) ? panel : {};
   var compartments = cellsceneCompartments(panel.compartments, path || 'panel', warnings);
   var items = cellsceneItems(panel.items, compartments, path || 'panel', warnings);
+  var legendMode = panel.legendMode === 'visible' ? 'visible' : 'all';
+  if (panel.legendMode !== undefined && panel.legendMode !== 'all' && panel.legendMode !== 'visible')
+    cellsceneWarn(warnings, (path || 'panel') + '.legendMode', 'expected all|visible — using all');
+  var labelMode = panel.labelMode === 'readable' ? 'readable' : 'standard';
+  if (panel.labelMode !== undefined && panel.labelMode !== 'standard' && panel.labelMode !== 'readable')
+    cellsceneWarn(warnings, (path || 'panel') + '.labelMode', 'expected standard|readable — using standard');
   var byId = Object.create(null), itemById = Object.create(null);
   compartments.forEach(function (c) { byId[c.id] = c; });
   items.forEach(function (item) { itemById[item.id] = item; });
-  return { compartments: compartments, items: items, label: mechText(panel.label, 40), byId: byId, itemById: itemById };
+  return { compartments: compartments, items: items, legendMode: legendMode, labelMode: labelMode, label: mechText(panel.label, 40), byId: byId, itemById: itemById };
 }
 
 /* ---- state cleaning (shared by validation and the fold) ---- */
@@ -18872,7 +18901,7 @@ function cellsceneModel(panel, state) {
       transients.push({ kind: 'cross', x: f.x, y: f.y, delay: 250 });
     } else if (ev.kind === 'divide' && divided) { hasDivide = true; transients.push({ kind: 'divide', x: cell.x, y: cell.y }); }
   });
-  var legend = items.map(function (it) {
+  var legend = items.filter(function (it) { return decl.legendMode !== 'visible' || it.visible; }).map(function (it) {
     var text = !it.visible ? (it.state === 'hidden' ? 'hidden' : 'none') :
       (it.count >= 2 ? '×' + it.count + ' · ' : '') + it.inLabel + (it.state !== 'free' ? ' · ' + it.state : '');
     return { id: it.id, role: it.role, name: it.label || it.id, state: text, hot: it.visible && (it.state === 'bound' || it.state === 'active') };
@@ -18885,14 +18914,14 @@ function cellsceneModel(panel, state) {
   }).join('; ') + (cell ? '; ' + (divided ? 'two daughter cells' + (nucleus ? ', each with a nucleus' : '') : 'one cell') : '');
   return {
     scene: MECH_SCENE, title: decl.label || 'cell scene', caption: mechText(state.caption, 90), compartments: comps, geom: geom, cell: cell, nucleus: nucleus,
-    divided: divided, daughters: daughters, items: items, vesicles: vesicleList, zoom: zoom, highlight: highlight, labels: labels,
+    divided: divided, daughters: daughters, items: items, vesicles: vesicleList, zoom: zoom, highlight: highlight, labels: labels, readableLabels: decl.labelMode === 'readable',
     transients: transients, legend: legend, aria: aria, hasDivide: hasDivide,
   };
 }
 
 /* ---- markup ---- */
 /* Labels sit in a `.cellscene-fit` group that counter-scales under zoom, so
-   text keeps its 10 px size while the scene is enlarged. */
+   text keeps its authored size while the scene is enlarged. */
 function cellsceneFit(x, y, inner) {
   return '<g transform="translate(' + mechNum(x) + ' ' + mechNum(y) + ')"><g class="cellscene-fit">' + inner + '</g></g>';
 }
@@ -18979,7 +19008,7 @@ function cellsceneParts(model, prev, motion) {
   });
   m.labels.forEach(function (l) { overlay += cellsceneFit(l.x, l.y, mechTagMarkup(0, 0, l.text, 'cellscene-callout')); });
   var hud = cellsceneLabelText(14, 20, m.title + ' · zoom: ' + (m.zoom ? m.zoom.label : 'whole scene'), 'start');
-  if (m.caption) hud += '<text class="cellscene-t-cap" x="14" y="37">' + esc(m.caption) + '</text>';
+  if (m.caption && !m.readableLabels) hud += '<text class="cellscene-t-cap" x="14" y="37">' + esc(m.caption) + '</text>';
   var outside = m.compartments.filter(function (c) { return c.kind === 'outside'; })[0];
   if (outside) hud += cellsceneLabelText(546, 300, outside.label, 'end');
   var zs = m.zoom ? m.zoom.scale : 1;
@@ -18997,8 +19026,11 @@ function cellsceneAssemble(parts, model, state) {
   var svg = '<svg class="mech-frame cellscene-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '">' +
     grid + '<g class="cellscene-view" style="' + parts.viewStyle + '"><g class="cellscene-scene">' + parts.scene + '</g><g class="cellscene-overlay">' + parts.overlay + '</g></g>' +
     '<g class="cellscene-hud">' + parts.hud + '</g></svg>';
-  var foot = parts.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
-  return '<div class="swpanel cellscene">' + svg + '<div class="cellscene-foot">' + foot + '</div></div>';
+  return '<div class="swpanel cellscene' + (model.readableLabels ? ' cellscene-readable' : '') + '">' + svg + '<div class="cellscene-foot">' + cellsceneFoot(parts, model, state) + '</div></div>';
+}
+function cellsceneFoot(parts, model, state) {
+  return (model.readableLabels && model.caption ? '<p class="cellscene-caption">' + esc(model.caption) + '</p>' : '') +
+    parts.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
 }
 function cellsceneHTML(panel, state, model) {
   state = panelObject(state) ? state : {};
@@ -19054,7 +19086,7 @@ function cellsceneRender(host, panel, state, skin, states, stepIdx, animate) {
           }
           overlay.innerHTML = still.overlay;
           hud.innerHTML = still.hud;
-          foot.innerHTML = still.legend + (state.note ? '<div class="swnote">' + esc(String(state.note)) + '</div>' : '');
+          foot.innerHTML = cellsceneFoot(still, model, state);
         }
       }
       host._csScene = still.scene;
@@ -19097,6 +19129,8 @@ PanelRegistry.define('cellscene', {
 .cellscene-st-bound .cellscene-body,.cellscene-st-active .cellscene-body{filter:drop-shadow(0 0 9px var(--mf))}
 .cellscene-st-released .cellscene-body{opacity:.72}
 .cellscene-t-cap{font:500 11.5px 'IBM Plex Sans',sans-serif;fill:var(--dtext)}
+.cellscene-readable .cellscene-fit > text{font-size:18px;letter-spacing:0}
+.cellscene-caption{margin:8px 0 4px;font-size:13px;line-height:1.4;color:var(--dtext)}
 .cellscene-foot{min-width:0}
 .cellscene-crossing{animation:cellsceneCross 1.25s cubic-bezier(.4,0,.2,1) both}
 @keyframes cellsceneCross{0%{transform:translate(var(--cs-x0),var(--cs-y0)) scale(1)}40%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(1)}50%,60%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(.65)}100%{transform:translate(0,0) scale(1)}}
@@ -19122,7 +19156,7 @@ PanelRegistry.define('cellscene', {
       ],
       initial: { caption: 'A cell at rest.' },
     },
-    setupFields: [['label', 'text'], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['label', 'text'], ['legendMode', 'enum', ['all', 'visible']], ['labelMode', 'enum', ['standard', 'readable']], ['compartments', 'jsonArr'], ['items', 'jsonArr'], ['initial', 'json']],
     patchFields: [['items', 'json'], ['events', 'jsonArr'], ['zoom', 'text'], ['highlight', 'text'], ['labels', 'jsonArr'], ['caption', 'text'], ['note', 'text']],
     expandPatchFields: function (panel) {
       var ids = cellsceneCompartments(panel.compartments, 'panel').map(function (c) { return c.id; });
@@ -19130,13 +19164,15 @@ PanelRegistry.define('cellscene', {
     },
     fieldMeta: {
       label: { label: 'Scene title', help: 'Short title inside the frame, e.g. "a plant cell".' },
+      legendMode: { label: 'Scene legend', help: 'all (default) lists every item. visible omits hidden items and items with count 0; cell and nucleus context stays in the legend.', unsetLabel: 'All items (default)' },
+      labelMode: { label: 'Scene labels', help: 'readable enlarges SVG labels and places the caption below the scene; standard preserves the compact layout.', unsetLabel: 'Standard (default)' },
       compartments: { label: 'Compartments', help: 'Up to 8 {id, kind, label?, parent?, x?, y?, rx?, ry?}; kinds outside, cell, nucleus, vesicle, organelle, region. One cell, one nucleus.' },
       items: { label: 'Items', help: 'Setup: 1–8 {id, role, shape?, label?, size?, start:{in, x?, y?, count?, state?}}. Step: an object keyed by item id that patches in, x, y, count (0–50), state (free|bound|active|released|hidden), label and daughter; an id set to null returns that item to its start.' },
       events: { label: 'Events this step', help: 'Up to 4: {kind:"enter", item, to, via?}, {kind:"bud", vesicle, from, items?}, {kind:"fuse", vesicle, with, to}, {kind:"divide", daughters?}, {kind:"signal", at, rings?}. Events run on this step only; their lasting effects carry.' },
       zoom: { label: 'Zoom to compartment', help: 'Frames one compartment with a 12% margin; clear for the whole scene.', nullLabel: 'Whole scene' },
       highlight: { label: 'Highlighted compartment', nullLabel: 'No highlight' },
       labels: { label: 'Callouts', help: 'Up to 4 {at: {x,y} | item or compartment id, text}. A full list each time; clear removes them.', nullLabel: 'No callouts' },
-      caption: { label: 'Caption', help: 'One line under the title inside the scene.', nullLabel: 'No caption' },
+      caption: { label: 'Caption', help: 'One line under the title, or below the scene in readable label mode.', nullLabel: 'No caption' },
       note: { label: 'Explanation' },
     },
     picker: {
@@ -21363,37 +21399,57 @@ function forcebodyArrow(x, y, dx, dy, cls, label, offset) {
   var ex = x + dx, ey = y + dy, head = Math.min(9, length * 0.5);
   var points = ex + ',' + ey + ' ' + (ex - ux * head - uy * head * .5) + ',' + (ey - uy * head + ux * head * .5) + ' ' + (ex - ux * head + uy * head * .5) + ',' + (ey - uy * head - ux * head * .5);
   return '<g class="' + cls + '"><line x1="' + x + '" y1="' + y + '" x2="' + ex + '" y2="' + ey + '"/><polygon points="' + points + '"/>' +
-    (label ? '<text x="' + (ex + ux * 15) + '" y="' + (ey + uy * 15 + 4) + '" text-anchor="middle">' + esc(label) + '</text>' : '') + '</g>';
+    (label ? '<text x="' + (ex + (Math.abs(ux) > .7 ? ux * 16 : 16)) + '" y="' + (ey + 4) + '" text-anchor="middle">' + esc(label) + '</text>' : '') + '</g>';
+}
+function forcebodySigned(n) { return (n > 0 ? '+' : '') + forcebodyFormat(n); }
+function forcebodyDirection(v) {
+  if (!v) return 'Not specified';
+  if (!v.x && !v.y) return 'Zero vector';
+  return [v.x > 0 ? 'Right' : v.x < 0 ? 'Left' : '', v.y > 0 ? 'up' : v.y < 0 ? 'down' : ''].filter(Boolean).join(' + ');
+}
+function forcebodyMotionRow(kind, name, v, unit, provenance) {
+  var magnitude = v ? Math.hypot(v.x, v.y) : 0;
+  var value = v ? '(' + forcebodySigned(v.x) + ', ' + forcebodySigned(v.y) + ') ' + unit : 'Not specified';
+  return '<div class="forcebody-motion-row forcebody-' + kind + '-row"><div class="forcebody-motion-name"><b>' + name + '</b><small>' + provenance + '</small></div>' +
+    '<div class="forcebody-motion-value"><strong>' + esc(value) + '</strong><span>' + forcebodyDirection(v) + '</span></div>' +
+    '<svg class="forcebody-direction" viewBox="0 0 120 100" aria-hidden="true"><path class="forcebody-direction-axis" d="M8 50H112M60 8V92"/><circle class="forcebody-direction-origin" cx="60" cy="50" r="3"/>' +
+    (!v ? '<text class="forcebody-direction-unknown" x="60" y="57" text-anchor="middle">—</text>' :
+      magnitude ? forcebodyArrow(60, 50, v.x / magnitude * 40, -v.y / magnitude * 40, 'forcebody-' + kind, '', 0) :
+        '<circle class="forcebody-direction-zero" cx="60" cy="50" r="10"/>') + '</svg></div>';
 }
 function forcebodyHTML(panel, state) {
   var m = forcebodyModel(panel, state), fmt = forcebodyFormat;
+  // The minimum force domain is fixed across ordinary classroom trials. Larger
+  // values expand it explicitly; velocity direction never implies integration.
+  var forceScale = Math.max(5, m.scale), forceUnit = 76 / forceScale;
   var description = m.label + '. ' + m.relation + '. Net force ' + forcebodyPair(m.net, 'N') + '. ' +
     (m.acceleration ? 'Acceleration ' + forcebodyPair(m.acceleration, 'm/s²') + '.' : 'Declare a valid mass to calculate acceleration.') +
     (m.velocity ? ' Authored velocity ' + forcebodyPair(m.velocity, 'm/s') + '.' : '');
-  var h = '<div class="forcebody"><div class="forcebody-heading"><span>' + esc(m.trial) + '</span><strong>' + (m.mass === null ? 'Mass required' : fmt(m.mass) + ' kg') + '</strong></div>' +
-    '<div class="forcebody-caption">' + esc(m.caption || m.label) + '</div><svg class="forcebody-scene" viewBox="0 0 640 340" role="img" aria-label="' + esc(description) + '">' +
-    '<title>' + esc(description) + '</title><rect class="forcebody-surface" x="1" y="1" width="638" height="338" rx="18"/>' +
-    '<path class="forcebody-grid" d="M40 70H600M40 120H600M40 170H600M40 220H600M40 270H600M90 50V290M140 50V290M190 50V290M240 50V290M290 50V290M340 50V290M390 50V290M440 50V290M490 50V290M540 50V290"/>' +
-    '<text class="forcebody-kicker" x="26" y="30">APPLIED FORCES · N</text><text class="forcebody-kicker" x="444" y="30">RESULTANT</text>' +
-    '<path class="forcebody-divider" d="M406 52V244"/><text class="forcebody-axis" x="26" y="55">+x → · +y ↑</text>';
-  if (m.speed > 0) {
-    var vx = m.velocity.x / m.speed, vy = -m.velocity.y / m.speed;
-    [1, 2, 3].forEach(function (i) { h += '<circle class="forcebody-trail" cx="' + (240 - vx * (32 + i * 22)) + '" cy="' + (160 - vy * (32 + i * 22)) + '" r="' + (23 - i * 4) + '" opacity="' + (.38 - i * .08) + '"/>'; });
-  }
-  h += '<circle class="forcebody-puck-shadow" cx="240" cy="168" r="31"/><circle class="forcebody-puck" cx="240" cy="160" r="30"/><circle class="forcebody-puck-ring" cx="240" cy="160" r="22"/><text class="forcebody-puck-text" x="240" y="165" text-anchor="middle">m</text>';
-  m.forces.forEach(function (f, i) { h += forcebodyArrow(240, 160, f.x / m.scale * 105, -f.y / m.scale * 105, 'forcebody-force forcebody-f' + i, 'F' + (i + 1), (i - (m.forces.length - 1) / 2) * 10); });
-  h += '<circle class="forcebody-origin" cx="514" cy="160" r="4"/>' + forcebodyArrow(514, 160, m.net.x / m.scale * 105, -m.net.y / m.scale * 105, 'forcebody-net', '', 0) +
-    '<text class="forcebody-net-label" x="514" y="240" text-anchor="middle">ΣF = ' + fmt(m.net.magnitude) + ' N</text><text class="forcebody-axis" x="514" y="258" text-anchor="middle">' + esc(forcebodyPair(m.net, 'N')) + '</text>';
-  if (m.net.magnitude === 0) h += '<circle class="forcebody-zero" cx="514" cy="160" r="23"/><text class="forcebody-axis" x="514" y="202" text-anchor="middle">Balanced</text>';
-  h += '<path class="forcebody-divider" d="M26 270H614"/>';
-  if (m.speed > 0) h += forcebodyArrow(60, 305, m.velocity.x / m.speed * 28, -m.velocity.y / m.speed * 28, 'forcebody-velocity', '', 0);
-  h += '<text class="forcebody-velocity-text" x="106" y="301">v · ' + esc(m.velocity ? forcebodyPair(m.velocity, 'm/s') : 'not specified') + '</text><text class="forcebody-axis" x="106" y="322">Authored velocity · dashed arrow / trail</text></svg>';
+  var h = '<div class="forcebody"><div class="forcebody-heading"><span><i></i>' + esc(m.trial) + '</span><strong>' + (m.mass === null ? 'Mass required' : fmt(m.mass) + ' <small>kg</small>') + '</strong></div>' +
+    '<div class="forcebody-caption">' + esc(m.caption || m.label) + '</div><svg class="forcebody-scene" viewBox="0 0 640 260" role="img" aria-label="' + esc(description) + '">' +
+    '<title>' + esc(description) + '</title><rect class="forcebody-surface" x="1" y="1" width="638" height="258" rx="16"/>' +
+    '<path class="forcebody-grid" d="M30 82H610M30 136H610M30 190H610M77 66V210M131 66V210M185 66V210M239 66V210M293 66V210M377 66V210M431 66V210M485 66V210M539 66V210M593 66V210"/>' +
+    '<text class="forcebody-kicker" x="24" y="32">01 / APPLIED FORCES</text><text class="forcebody-kicker" x="365" y="32">02 / NET FORCE</text>' +
+    '<path class="forcebody-divider" d="M336 58V218"/><text class="forcebody-axis" x="24" y="55">+x →  ·  +y ↑</text>' +
+    '<circle class="forcebody-puck-halo" cx="185" cy="136" r="58"/><circle class="forcebody-puck" cx="185" cy="136" r="39"/><circle class="forcebody-puck-ring" cx="185" cy="136" r="30"/><text class="forcebody-puck-text" x="185" y="144" text-anchor="middle">m</text>';
+  m.forces.forEach(function (f, i) { h += forcebodyArrow(185, 136, f.x * forceUnit, -f.y * forceUnit, 'forcebody-force forcebody-f' + i, 'F' + (i + 1), (i - (m.forces.length - 1) / 2) * 12); });
+  h += '<circle class="forcebody-origin" cx="485" cy="136" r="5"/>' + forcebodyArrow(485, 136, m.net.x * forceUnit, -m.net.y * forceUnit, 'forcebody-net', '', 0);
+  if (m.net.magnitude === 0) h += '<circle class="forcebody-zero" cx="485" cy="136" r="29"/><text class="forcebody-balanced" x="485" y="188" text-anchor="middle">Balanced</text>';
+  h += '<text class="forcebody-body-label" x="185" y="234" text-anchor="middle">' + esc(m.label.length > 26 ? m.label.slice(0, 25) + '…' : m.label) + '</text>' +
+    '<text class="forcebody-net-label" x="485" y="234" text-anchor="middle">ΣF = ' + fmt(m.net.magnitude) + ' N</text>' +
+    '<text class="forcebody-axis" x="485" y="252" text-anchor="middle">' + esc(forcebodyPair(m.net, 'N')) + '</text></svg>';
   h += '<div class="forcebody-forces">';
   m.forces.forEach(function (f, i) { h += '<div><b>F' + (i + 1) + '</b><span>' + esc(f.label) + '</span><code>' + esc(forcebodyPair(f, 'N')) + '</code></div>'; });
   if (!m.forces.length) h += '<div><span>No applied forces · ΣF = 0 N</span></div>';
-  h += '</div><div class="forcebody-equation"><span>a = ΣF / m</span><strong>' + (m.acceleration ? esc(forcebodyPair(m.acceleration, 'm/s²')) : 'Declare mass in kg') + '</strong><small>' +
-    (m.acceleration ? '|a| = ' + fmt(m.acceleration.magnitude) + ' m/s²' : 'Use a positive finite mass') + '</small></div><div class="forcebody-relation">' + esc(m.relation) + '</div>' +
-    '<div class="forcebody-key">Force arrows share one scale. Velocity is schematic. Authored snapshots; no trajectory prediction.</div>';
+  h += '</div><div class="forcebody-equation"><div class="forcebody-equation-title"><span>03 / ACCELERATION</span><b>a = ΣF / m</b></div><div class="forcebody-calculation"><div><strong>' + fmt(m.net.magnitude) + '<small> N</small></strong><span>net force · magnitude</span></div><i>÷</i><div><strong>' + (m.mass === null ? '—' : fmt(m.mass)) + '<small> kg</small></strong><span>fixed mass</span></div><i>=</i><div class="forcebody-answer"><strong>' + (m.acceleration ? fmt(m.acceleration.magnitude) : '—') + '<small> m/s²</small></strong><span>acceleration · magnitude</span></div></div>';
+  if (m.acceleration) {
+    var extent = Math.min(100, m.acceleration.magnitude / 4 * 100);
+    h += '<div class="forcebody-meter" role="img" aria-label="Acceleration magnitude ' + fmt(m.acceleration.magnitude) + ' m/s² on a fixed zero to four scale' + (m.acceleration.magnitude > 4 ? ', exceeds scale' : '') + '"><div class="forcebody-meter-track"><span style="width:' + extent + '%"></span></div><div class="forcebody-meter-labels"><span>0</span><span>1</span><span>2</span><span>3</span><span>4 m/s²</span></div></div><div class="forcebody-scale-note">Fixed comparison scale' + (m.acceleration.magnitude > 4 ? ' · value exceeds 4 m/s²; bar capped' : ' · same scale in every trial') + '</div>';
+  } else h += '<div class="forcebody-scale-note">Declare a positive finite mass to calculate acceleration.</div>';
+  h += '</div><div class="forcebody-motion"><div class="forcebody-motion-heading"><b>Motion at this instant</b><span>Direction arrows</span></div>' +
+    forcebodyMotionRow('velocity', 'Velocity v', m.velocity, 'm/s', 'Authored snapshot') +
+    forcebodyMotionRow('acceleration', 'Acceleration a', m.acceleration, 'm/s²', 'Calculated from forces') +
+    '<div class="forcebody-relation">' + esc(m.relation) + '</div></div><div class="forcebody-key">Components: (x, y). Force arrows share one scale (full length: ' + fmt(forceScale) + ' N). Motion arrows: direction only. No trajectory prediction.</div>';
   if (m.note) h += '<div class="forcebody-note">' + esc(m.note) + '</div>';
   return h + '</div>';
 }
@@ -21409,22 +21465,22 @@ PanelRegistry.define('forcebody', {
   render:function (host, panel, state) { return {html:forcebodyHTML(panel, state)}; },
   layout:{sectionSizing:{minWidth:360, preferredWidth:600, maxWidth:900, aspectPolicy:'content', grow:1}},
   styles:String.raw`
-.forcebody{--fb-bg:#f5f7fa;--fb-force:#286aaf;--fb-net:#b34827;--fb-motion:#6851aa;color:var(--dtext,#263449);font:13px 'IBM Plex Sans',sans-serif;min-width:0}
+.forcebody{--fb-bg:#f5f7fa;--fb-force:#286aaf;--fb-net:#ae4727;--fb-motion:#6851aa;--fb-rule:color-mix(in srgb,currentColor 15%,transparent);color:var(--dtext,#263449);font:14px/1.45 'IBM Plex Sans',sans-serif;min-width:0}
 .sk-aurora .forcebody,.sk-terminal .forcebody,.sk-blueprint .forcebody{--fb-bg:#162136;--fb-force:#83bcff;--fb-net:#ffc381;--fb-motion:#c6b6ff}
-.forcebody-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;letter-spacing:.09em;text-transform:uppercase}.forcebody-heading strong{font:600 16px 'IBM Plex Mono',monospace;letter-spacing:0}
-.forcebody-caption{font-weight:600;font-size:17px;margin:10px 0 14px;overflow-wrap:anywhere}.forcebody-scene{display:block;width:100%;height:auto;overflow:visible}
-.forcebody-surface{fill:color-mix(in srgb,var(--dtext,#263449) 3%,transparent);stroke:color-mix(in srgb,var(--dtext,#263449) 14%,transparent)}
-.forcebody-grid{fill:none;stroke:currentColor;opacity:.06;stroke-width:1}.forcebody-divider{stroke:currentColor;opacity:.18;fill:none}
-.forcebody-kicker{font:600 11px 'IBM Plex Sans',sans-serif;letter-spacing:1.5px;fill:currentColor}.forcebody-axis{font:11px 'IBM Plex Sans',sans-serif;fill:currentColor;opacity:.78}
-.forcebody-puck-shadow{fill:currentColor;opacity:.1}.forcebody-puck{fill:color-mix(in srgb,var(--fb-force) 18%,var(--fb-bg));stroke:var(--fb-force);stroke-width:2}.forcebody-puck-ring{fill:none;stroke:var(--fb-force);opacity:.3}.forcebody-puck-text{font:italic 600 18px Georgia,serif;fill:var(--fb-force)}
-.forcebody-trail{fill:none;stroke:var(--fb-motion);stroke-width:2;stroke-dasharray:4 4}.forcebody-force{fill:var(--fb-force);stroke:var(--fb-force);stroke-width:2.5}.forcebody-force text{stroke:none;font:700 12px 'IBM Plex Sans',sans-serif;paint-order:stroke;stroke:var(--fb-bg);stroke-width:3px;stroke-linejoin:round}
-.forcebody-net{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:4}.forcebody-net-label{fill:var(--fb-net);font:600 14px 'IBM Plex Mono',monospace}.forcebody-origin{fill:var(--fb-net)}.forcebody-zero{fill:none;stroke:var(--fb-net);stroke-width:2;stroke-dasharray:3 4}
-.forcebody-velocity{stroke:var(--fb-motion);fill:var(--fb-motion);stroke-width:2;stroke-dasharray:5 4}.forcebody-velocity polygon{stroke-dasharray:none}.forcebody-velocity-text{fill:var(--fb-motion);font:600 13px 'IBM Plex Mono',monospace}
-.forcebody-forces{margin:10px 0}.forcebody-forces>div{display:flex;align-items:baseline;gap:10px;padding:6px 2px;border-bottom:1px solid color-mix(in srgb,currentColor 10%,transparent)}.forcebody-forces b{font-size:11px}.forcebody-forces span{flex:1;overflow-wrap:anywhere}.forcebody-forces code{font-size:11px;text-align:right}
-.forcebody-equation{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;background:color-mix(in srgb,var(--fb-net) 9%,transparent);border-left:3px solid var(--fb-net);padding:13px 15px;border-radius:0 8px 8px 0}.forcebody-equation span{grid-row:span 2;font:italic 18px Georgia,serif;align-self:center}.forcebody-equation strong{font:600 13px 'IBM Plex Mono',monospace}.forcebody-equation small{font-size:11px}
-.forcebody-relation{margin-top:12px;font-weight:600}.forcebody-key{font-size:11px;line-height:1.5;opacity:.78;margin-top:5px}.forcebody-note{margin-top:12px;line-height:1.5;overflow-wrap:anywhere}
+.forcebody-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}.forcebody-heading>span{display:flex;align-items:center;gap:9px;overflow-wrap:anywhere}.forcebody-heading i{width:7px;height:7px;flex-shrink:0;border-radius:50%;background:var(--fb-force)}.forcebody-heading strong{padding:3px 9px;border:1px solid var(--fb-rule);border-radius:6px;font:600 20px 'IBM Plex Mono',monospace;letter-spacing:-.04em;white-space:nowrap}.forcebody-heading small{font-size:13px;font-weight:400}
+.forcebody-caption{font-weight:600;font-size:22px;letter-spacing:-.035em;line-height:1.2;margin:8px 0 10px;overflow-wrap:anywhere}.forcebody-scene{display:block;width:100%;height:auto;overflow:visible}
+.forcebody-surface{fill:color-mix(in srgb,var(--fb-force) 4%,transparent);stroke:var(--fb-rule)}.forcebody-grid{fill:none;stroke:currentColor;opacity:.055;stroke-width:1}.forcebody-divider{stroke:currentColor;opacity:.16;fill:none}
+.forcebody-kicker{font:600 14px 'IBM Plex Sans',sans-serif;letter-spacing:1px;fill:currentColor}.forcebody-axis{font:13px 'IBM Plex Sans',sans-serif;fill:currentColor;opacity:.75}.forcebody-body-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:currentColor}
+.forcebody-puck-halo{fill:none;stroke:var(--fb-force);stroke-width:1;opacity:.18}.forcebody-puck{fill:color-mix(in srgb,var(--fb-force) 15%,var(--fb-bg));stroke:var(--fb-force);stroke-width:2}.forcebody-puck-ring{fill:none;stroke:var(--fb-force);opacity:.3}.forcebody-puck-text{font:italic 600 26px Georgia,serif;fill:var(--fb-force)}
+.forcebody-force{fill:var(--fb-force);stroke:var(--fb-force);stroke-width:3.5}.forcebody-force text{font:700 15px 'IBM Plex Sans',sans-serif;paint-order:stroke;stroke:var(--fb-bg);stroke-width:4px;stroke-linejoin:round}.forcebody-net{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:5}.forcebody-net-label{fill:var(--fb-net);font:600 19px 'IBM Plex Mono',monospace}.forcebody-origin{fill:var(--fb-net)}.forcebody-zero{fill:none;stroke:var(--fb-net);stroke-width:2;stroke-dasharray:4 5}.forcebody-balanced{font:600 15px 'IBM Plex Sans',sans-serif;fill:var(--fb-net)}
+.forcebody-forces{margin:5px 0 10px}.forcebody-forces>div{display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid var(--fb-rule)}.forcebody-forces b{color:var(--fb-force);font:600 12px 'IBM Plex Mono',monospace}.forcebody-forces span{flex:1;overflow-wrap:anywhere}.forcebody-forces code{font:12px 'IBM Plex Mono',monospace;text-align:right}
+.forcebody-equation{background:color-mix(in srgb,var(--fb-net) 6%,transparent);border:1px solid color-mix(in srgb,var(--fb-net) 23%,transparent);padding:8px 13px;border-radius:10px}.forcebody-equation-title{display:flex;justify-content:space-between;align-items:center;gap:12px}.forcebody-equation-title>span{font-size:11px;letter-spacing:.1em;font-weight:600}.forcebody-equation-title>b{font:italic 20px Georgia,serif;color:var(--fb-net)}.forcebody-calculation{display:grid;grid-template-columns:1fr auto .8fr auto 1.3fr;align-items:center;gap:10px;margin:8px 0}.forcebody-calculation>div{min-width:0}.forcebody-calculation strong{display:block;font:600 23px 'IBM Plex Mono',monospace;letter-spacing:-.04em;overflow-wrap:anywhere}.forcebody-calculation small{font-size:12px;font-weight:400;letter-spacing:0}.forcebody-calculation span{font-size:11px;opacity:.8}.forcebody-calculation i{font:22px Georgia,serif;opacity:.5}.forcebody-answer strong{color:var(--fb-net)}
+.forcebody-meter{margin-top:6px}.forcebody-meter-track{height:8px;position:relative;border-radius:2px;background:color-mix(in srgb,var(--fb-net) 12%,transparent);background-image:linear-gradient(to right,transparent calc(100% - 1px),var(--fb-rule) 1px);background-size:25% 100%;overflow:hidden}.forcebody-meter-track>span{display:block;height:100%;background:var(--fb-net);border-radius:2px}.forcebody-meter-labels{display:grid;grid-template-columns:repeat(4,1fr);position:relative;font:10px 'IBM Plex Mono',monospace;margin-top:5px}.forcebody-meter-labels>span:not(:first-child){transform:translateX(-50%);width:max-content}.forcebody-meter-labels>span:last-child{position:absolute;right:0;transform:none}.forcebody-scale-note{font-size:11px;margin-top:7px;opacity:.78}
+.forcebody-motion{margin-top:9px;border-top:2px solid var(--fb-rule)}.forcebody-motion-heading{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 2px;gap:10px}.forcebody-motion-heading>b{font-size:16px;letter-spacing:-.02em}.forcebody-motion-heading>span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.7}.forcebody-motion-row{display:grid;grid-template-columns:minmax(95px,1fr) minmax(0,1.65fr) 76px;align-items:center;gap:10px;min-height:58px;border-bottom:1px solid var(--fb-rule)}.forcebody-motion-name b{display:block;font-size:14px}.forcebody-motion-name small{display:block;font-size:10px;opacity:.75;margin-top:3px}.forcebody-motion-value strong{display:block;font:600 14px 'IBM Plex Mono',monospace;overflow-wrap:anywhere;letter-spacing:-.03em}.forcebody-motion-value span{display:block;font-size:12px;margin-top:4px}.forcebody-velocity-row .forcebody-motion-value{color:var(--fb-motion)}.forcebody-acceleration-row .forcebody-motion-value{color:var(--fb-net)}.forcebody-direction{width:68px;height:56px}.forcebody-direction-axis{stroke:currentColor;opacity:.16;stroke-width:1;fill:none}.forcebody-direction-origin{fill:currentColor;opacity:.4}.forcebody-direction-zero{fill:none;stroke:currentColor;stroke-width:2}.forcebody-velocity{stroke:var(--fb-motion);fill:var(--fb-motion);stroke-width:4;stroke-dasharray:6 4}.forcebody-velocity polygon{stroke-dasharray:none}.forcebody-acceleration{stroke:var(--fb-net);fill:var(--fb-net);stroke-width:4}
+.forcebody-direction-unknown{fill:currentColor;opacity:.55;font:600 25px 'IBM Plex Mono',monospace}
+.forcebody-relation{font-size:16px;font-weight:600;letter-spacing:-.015em;margin-top:9px}.forcebody-key{font-size:10px;line-height:1.5;opacity:.75;margin-top:5px}.forcebody-note{margin-top:8px;padding:6px 11px;border-left:2px solid var(--fb-force);background:color-mix(in srgb,var(--fb-force) 5%,transparent);font-size:13px;line-height:1.45;overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.forcebody *{animation:none!important;transition:none!important}}
-@media print{.forcebody{--fb-force:#174d84;--fb-net:#893617;--fb-motion:#514080;color:#18232e;break-inside:avoid}.forcebody-scene{print-color-adjust:exact}.forcebody-surface{fill:#fff;stroke:#bcc4cc}.forcebody-puck{fill:#e2eaf3}.forcebody-force text{stroke:#fff}}
+@media print{.forcebody{--fb-bg:#fff;--fb-force:#174d84;--fb-net:#893617;--fb-motion:#514080;color:#18232e;break-inside:avoid;print-color-adjust:exact}.forcebody-surface{fill:#fff;stroke:#bcc4cc}.forcebody-puck{fill:#e2eaf3}.forcebody-force text{stroke:#fff}}
 `,
   authoring:{
     initialFields:true, transientFields:['forces','velocity','caption','note'],
@@ -21435,7 +21491,7 @@ PanelRegistry.define('forcebody', {
       mass:{label:'Mass (kg)',help:'Fixed for this body: 0.000001–1000000 kg. Use another panel with a separate trial label to compare a different mass.'},
       trial:{label:'Trial label'},label:{label:'Body label'},
       forces:{label:'Force vectors (N)',help:'Complete list of up to four {label, x, y}. +x is right; +y is up. The list replaces the previous forces.',nullLabel:'No forces'},
-      velocity:{label:'Authored velocity (m/s)',help:'{x,y}: +x right, +y up. Draws a schematic dashed direction arrow and trail. Never calculated from forces or time.',nullLabel:'Velocity unspecified'},
+      velocity:{label:'Authored velocity (m/s)',help:'{x,y}: +x right, +y up. Draws a schematic dashed direction arrow. Never calculated from forces or time.',nullLabel:'Velocity unspecified'},
       caption:{label:'Caption',nullLabel:'No caption'},note:{label:'Explanation',nullLabel:'No explanation'}
     },
     picker:{order:48,name:'Force body',category:'Science & sequencing',tagline:'Force changes velocity',description:'A puck with up to four force vectors, net force and a = ΣF/m. Authored velocity distinguishes ongoing motion from acceleration; compare mass in separate trials.'},
@@ -29713,50 +29769,82 @@ function rnacopyModel(panel, state) {
   var clean = rnacopyClean(state, 'state', null, false);
   var model = Object.assign({}, RNACOPY_DEFAULTS, clean);
   model.label = typeof panel.label === 'string' ? panel.label : 'RNA copying';
-  model.x = mechNum(112 + 336 * model.position);
-  model.y = 148;
-  /* A short branch peels off below the input. Extent controls only this path;
-     polymerase position, status and copy count never infer one another. */
-  var length = 28 + 0.78 * (model.x - 52) * model.progress;
-  model.copyEnd = {x:mechNum(model.x - length), y:mechNum(170 + 52 * model.progress)};
-  model.copyPath = model.progress > 0 ? 'M' + model.x + ',148 C' + mechNum(model.x - 15) + ',191 ' +
-    mechNum(model.x - length * 0.5) + ',' + mechNum(model.copyEnd.y + 23) + ' ' + model.copyEnd.x + ',' + model.copyEnd.y : '';
+  model.x = mechNum(124 + 196 * model.position);
+  model.y = 200;
+  /* This branch is the complementary intermediate, never new +RNA directly
+     copied from incoming +RNA. Extent, position, status and tray count remain
+     independent authored symbols. The lower lane explains the full pathway. */
+  var length = 44 + 0.65 * (model.x - 100) * model.progress;
+  model.copyEnd = {x:mechNum(model.x - length), y:mechNum(244 + 19 * model.progress)};
+  model.copyPath = model.progress > 0 ? 'M' + model.x + ',200 C' + mechNum(model.x - 6) + ',243 ' +
+    mechNum(model.x - length * 0.5) + ',' + mechNum(model.copyEnd.y + 16) + ' ' + model.copyEnd.x + ',' + model.copyEnd.y : '';
   model.aria = model.label + '. Polymerase ' + model.status + '; authored position ' +
-    Math.round(model.position * 100) + ' percent; authored copy extent ' + Math.round(model.progress * 100) +
-    ' percent; authored copies ' + model.copies + '. Sequence-free conceptual illustration.';
+    Math.round(model.position * 100) + ' percent; authored intermediate extent ' + Math.round(model.progress * 100) +
+    ' percent; ' + model.copies + ' completed +RNA copies in a separate symbolic tray. ' +
+    'Incoming +RNA is copied through a complementary intermediate before new +RNA. ' +
+    (model.status === 'interrupted' && model.progress > 0 ? 'The stopped intermediate remains visible. ' : '') +
+    'Sequence-free conceptual illustration; independent authored states, no timescale.';
   return model;
 }
 function rnacopyHTML(panel, state) {
   var m = rnacopyModel(panel, state), status = m.status.charAt(0).toUpperCase() + m.status.slice(1);
   var glyph = m.status === 'paused' ? '<path d="M-5,-7V7M5,-7V7"/>' :
-    m.status === 'interrupted' ? '<path d="M-6,-6L6,6M6,-6L-6,6"/>' :
+    m.status === 'interrupted' ? '<rect x="-6" y="-6" width="12" height="12" rx="1"/>' :
     m.status === 'complete' ? '<path d="M-7,0L-2,5L8,-6"/>' :
     m.status === 'copying' ? '<path d="M-7,0H7M2,-5L7,0L2,5"/>' : '<circle r="5"/>';
+  var held = m.status === 'interrupted' ? 'Stopped' : m.status === 'paused' ? 'Held' : m.status === 'complete' ? 'Complete' : m.status === 'copying' ? 'Emerging' : 'Ready';
+  var detail = m.progress === 0 ? 'no intermediate drawn' :
+    (m.status === 'interrupted' || m.status === 'paused') ? 'intermediate retained' : 'authored intermediate';
   var h = '<div class="rnacopy rnacopy-st-' + m.status + '">' +
-    '<svg class="mech-frame rnacopy-frame" viewBox="0 0 560 315" role="img" aria-label="' + esc(m.aria) + '">' +
+    '<svg class="mech-frame rnacopy-frame" viewBox="0 0 640 420" role="img" aria-label="' + esc(m.aria) + '">' +
     '<title>' + esc(m.aria) + '</title><g aria-hidden="true">' +
-    '<text class="rnacopy-kicker" x="24" y="29">CONCEPTUAL CLOSE-UP</text>' +
-    '<text class="rnacopy-heading" x="24" y="54">RNA copying</text>' +
-    '<rect class="rnacopy-status-bg" x="382" y="20" width="154" height="34" rx="17"/>' +
-    '<g class="rnacopy-status-icon" transform="translate(402,37)">' + glyph + '</g>' +
-    '<text class="rnacopy-status-text" x="420" y="42">' + status + '</text>' +
-    '<path class="rnacopy-guide" d="M24,254H536"/>' +
-    '<path class="rnacopy-input-shadow" d="M38,148 C70,124 88,148 112,148 H448 C478,148 490,172 522,148"/>' +
-    '<path class="rnacopy-input" d="M38,148 C70,124 88,148 112,148 H448 C478,148 490,172 522,148"/>';
+    '<text class="rnacopy-kicker" x="24" y="28">REPLICATION / CONCEPTUAL ATLAS</text>' +
+    '<text class="rnacopy-heading" x="24" y="62">RNA copying</text>' +
+    '<rect class="rnacopy-status-bg" x="438" y="29" width="178" height="40" rx="10"/>' +
+    '<g class="rnacopy-status-icon" transform="translate(458,49)">' + glyph + '</g>' +
+    '<text class="rnacopy-status-text" x="476" y="55">' + status + '</text>' +
+    '<rect class="rnacopy-site-bg" x="24" y="94" width="370" height="236" rx="14"/>' +
+    '<text class="rnacopy-section" x="44" y="119">01 / POLYMERASE SITE</text>' +
+    '<text class="rnacopy-ribbon-label" x="44" y="151">Incoming +RNA</text>' +
+    '<path class="rnacopy-leader" d="M52,161V182"/>' +
+    '<path class="rnacopy-input-shadow" d="M46,200 C64,181 83,200 104,200 H330 C349,200 356,219 374,200"/>' +
+    '<path class="rnacopy-input" d="M46,200 C64,181 83,200 104,200 H330 C349,200 356,219 374,200"/>';
   if (m.copyPath) h += '<path class="rnacopy-copy-shadow" d="' + m.copyPath + '"/>' +
-    '<path class="rnacopy-copy" d="' + m.copyPath + '"/><circle class="rnacopy-copy-tip" cx="' + m.copyEnd.x + '" cy="' + m.copyEnd.y + '" r="4"/>';
+    '<path class="rnacopy-copy" d="' + m.copyPath + '"/><circle class="rnacopy-copy-tip" cx="' + m.copyEnd.x + '" cy="' + m.copyEnd.y + '" r="5"/>';
   h += '<g class="rnacopy-polymerase" transform="translate(' + m.x + ',' + m.y + ')">' +
-    '<circle class="rnacopy-halo" r="37"/>' +
-    mechActorMarkup({role:'polymerase', shape:'clamp', size:'l', label:''}) +
-    '<path class="rnacopy-leader" d="M0,-30V-47"/>' +
-    '<text class="rnacopy-enzyme-label" y="-54" text-anchor="middle">Polymerase</text></g>' +
-    '<text class="rnacopy-metric" x="24" y="277">' + m.copies + (m.copies === 1 ? ' copy' : ' copies') + ' · authored</text>' +
-    '<text class="rnacopy-small" x="24" y="297">Symbolic state · no sequence or timescale</text>' +
-    '<text class="rnacopy-metric rnacopy-extent" x="536" y="277" text-anchor="end">' + Math.round(m.progress * 100) + '% extent</text>' +
-    '<text class="rnacopy-small" x="536" y="297" text-anchor="end">author-selected</text></g></svg>';
+    '<circle class="rnacopy-halo" r="43"/><g transform="scale(1.35)">' +
+    mechActorMarkup({role:'polymerase', shape:'clamp', size:'l', label:''}) + '</g>' +
+    '<circle class="rnacopy-site-core" r="13"/>' +
+    '<g class="rnacopy-status-icon rnacopy-site-icon">' + glyph + '</g></g>' +
+    '<text class="rnacopy-ribbon-label rnacopy-intermediate-label" x="44" y="290">Complementary intermediate</text>' +
+    '<text class="rnacopy-state-note" x="44" y="313">' + held + ' · ' + detail + '</text>' +
+    '<g class="rnacopy-tray"><rect class="rnacopy-tray-bg" x="414" y="94" width="202" height="236" rx="14"/>' +
+    '<text class="rnacopy-section" x="434" y="119">02 / COPY TRAY</text>' +
+    '<text class="rnacopy-count" x="434" y="172">' + m.copies + '</text>' +
+    '<text class="rnacopy-tray-label" x="492" y="151">completed</text>' +
+    '<text class="rnacopy-tray-label" x="492" y="173">+RNA</text>';
+  /* One physically separate ribbon per authored copy, including every count
+     through 12. These tokens never represent products of the current site. */
+  for (var i = 0; i < m.copies; i++) {
+    var tx = 435 + (i % 3) * 55, ty = 204 + Math.floor(i / 3) * 25;
+    h += '<g class="rnacopy-completed-copy" transform="translate(' + tx + ',' + ty + ')">' +
+      '<rect class="rnacopy-token-bg" x="-2" y="-10" width="48" height="21" rx="5"/>' +
+      '<path class="rnacopy-output" d="M4,1 C10,-9 14,10 21,0 S32,-6 38,1"/></g>';
+  }
+  if (m.copies === 0) h += '<text class="rnacopy-empty" x="434" y="223">No copies shown</text>';
+  h += '<text class="rnacopy-small" x="434" y="313">Separate symbolic count</text></g>' +
+    '<g class="rnacopy-pathway"><text class="rnacopy-section" x="24" y="356">CONCEPTUAL PATHWAY</text>' +
+    '<text class="rnacopy-path-label" x="24" y="387">Incoming +RNA</text>' +
+    '<path class="rnacopy-flow-arrow" d="M173,382H204M198,376L204,382L198,388"/>' +
+    '<text class="rnacopy-path-label" x="226" y="380">Complementary</text>' +
+    '<text class="rnacopy-path-label" x="226" y="400">intermediate</text>' +
+    '<path class="rnacopy-flow-arrow" d="M402,382H433M427,376L433,382L427,388"/>' +
+    '<text class="rnacopy-path-label" x="457" y="387">New +RNA</text></g></g></svg>';
   h += '<div class="rnacopy-details">' + (m.label ? '<div class="rnacopy-label">' + esc(m.label) + '</div>' : '') +
-    '<ul class="rnacopy-legend" aria-label="Ribbon legend"><li><i class="rnacopy-input-key" aria-hidden="true"></i>Input ribbon</li>' +
-    '<li><i class="rnacopy-copy-key" aria-hidden="true"></i>Emerging copy</li></ul>' +
+    '<ul class="rnacopy-legend" aria-label="Ribbon legend"><li><i class="rnacopy-input-key" aria-hidden="true"></i>Incoming RNA</li>' +
+    '<li><i class="rnacopy-copy-key" aria-hidden="true"></i>Complementary intermediate</li>' +
+    '<li><i class="rnacopy-output-key" aria-hidden="true"></i>Completed +RNA</li></ul>' +
+    '<p class="rnacopy-authored">' + Math.round(m.progress * 100) + '% extent · ' + m.copies + (m.copies === 1 ? ' copy' : ' copies') + ' · authored independently. No sequence or timescale.</p>' +
     (m.caption ? '<p class="rnacopy-caption">' + esc(m.caption) + '</p>' : '') +
     (m.note ? '<p class="rnacopy-note">' + esc(m.note) + '</p>' : '') + '</div></div>';
   return h;
@@ -29771,46 +29859,57 @@ PanelRegistry.define('rnacopy', {
   fold:rnacopyFold,
   render:function (host, panel, state) { return {html:rnacopyHTML(panel, state)}; },
   layout:{
-    canvasSizing:{mode:'fixed-aspect', aspect:560/315, resizeAxis:'width'},
-    sectionSizing:{minWidth:320, preferredWidth:560, maxWidth:900, aspectPolicy:'fixed', bodyAspect:16/9, grow:1, contentSelector:'.rnacopy-frame', ancillarySelector:'.rnacopy-details'},
+    canvasSizing:{mode:'fixed-aspect', aspect:640/420, resizeAxis:'width'},
+    sectionSizing:{minWidth:320, preferredWidth:640, maxWidth:900, aspectPolicy:'fixed', bodyAspect:640/420, grow:1, contentSelector:'.rnacopy-frame', ancillarySelector:'.rnacopy-details'},
     height:9, fallbackHeight:9,
   },
   styles:String.raw`
-.rnacopy{min-width:0;--rc-input:#8FADC9;--rc-copy:#67DFC5;--rc-status:#BCA6FF}
-.rnacopy-frame{overflow:hidden}
-.rnacopy-kicker{font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.12em;fill:var(--mk-mute)}
-.rnacopy-heading{font:600 19px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-status-bg{fill:color-mix(in srgb,var(--rc-status) 12%,var(--mk-tagbg));stroke:var(--rc-status);stroke-width:1}
+.rnacopy{min-width:0;--rc-input:#9EBFDF;--rc-copy:#F4C67A;--rc-output:#72DCC2;--rc-status:#C4ACFF}
+.rnacopy-frame{overflow:hidden;border:1px solid var(--mk-rung);box-sizing:border-box}
+.rnacopy-kicker,.rnacopy-section{font:600 12px 'IBM Plex Mono',monospace;letter-spacing:.06em;fill:var(--mk-mute)}
+.rnacopy-heading{font:600 29px 'IBM Plex Sans',sans-serif;letter-spacing:-.02em;fill:var(--mk-ink)}
+.rnacopy-status-bg{fill:color-mix(in srgb,var(--rc-status) 12%,var(--mk-tagbg));stroke:var(--rc-status);stroke-width:1.5}
 .rnacopy-status-icon{fill:none;stroke:var(--rc-status);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
-.rnacopy-status-text{font:600 13px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-st-paused{--rc-status:#F4CB79}.rnacopy-st-interrupted{--rc-status:#FF9696}.rnacopy-st-complete{--rc-status:#67DFC5}
-.rnacopy-guide{fill:none;stroke:var(--mk-rung);stroke-width:1}
-.rnacopy-input,.rnacopy-input-shadow,.rnacopy-copy,.rnacopy-copy-shadow{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.rnacopy-input-shadow{stroke:color-mix(in srgb,var(--rc-input) 15%,transparent);stroke-width:17}
+.rnacopy-status-text{font:600 19px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-st-paused{--rc-status:#F4CB79}.rnacopy-st-interrupted{--rc-status:#FF9696}.rnacopy-st-complete{--rc-status:#72DCC2}
+.rnacopy-site-bg,.rnacopy-tray-bg{fill:var(--mk-tagbg);stroke:var(--mk-rung);stroke-width:1}
+.rnacopy-tray-bg{fill:color-mix(in srgb,var(--rc-output) 4%,var(--mk-tagbg))}
+.rnacopy-input,.rnacopy-input-shadow,.rnacopy-copy,.rnacopy-copy-shadow,.rnacopy-output{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rnacopy-input-shadow{stroke:color-mix(in srgb,var(--rc-input) 12%,transparent);stroke-width:19}
 .rnacopy-input{stroke:var(--rc-input);stroke-width:6}
-.rnacopy-copy-shadow{stroke:color-mix(in srgb,var(--rc-copy) 15%,transparent);stroke-width:16}
-.rnacopy-copy{stroke:var(--rc-copy);stroke-width:5;stroke-dasharray:9 4}
+.rnacopy-copy-shadow{stroke:color-mix(in srgb,var(--rc-copy) 12%,transparent);stroke-width:16}
+.rnacopy-copy{stroke:var(--rc-copy);stroke-width:5;stroke-dasharray:9 5}
 .rnacopy-copy-tip{fill:var(--rc-copy)}
-.rnacopy-halo{fill:color-mix(in srgb,#B99CFF 9%,var(--mk-tagbg));stroke:color-mix(in srgb,#B99CFF 35%,transparent);stroke-width:1}
-.rnacopy-st-interrupted .rnacopy-halo,.rnacopy-st-paused .rnacopy-halo{stroke:var(--rc-status);stroke-dasharray:4 4}
-.rnacopy-leader{fill:none;stroke:var(--mk-mute);stroke-width:1}
-.rnacopy-enzyme-label{font:500 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
-.rnacopy-metric{font:600 13px 'IBM Plex Mono',monospace;fill:var(--mk-ink)}
-.rnacopy-small{font:10px 'IBM Plex Sans',sans-serif;fill:var(--mk-mute)}
-.rnacopy-details{color:var(--dtext);font:12px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere}
-.rnacopy-label{font-weight:600;margin-top:8px}
+.rnacopy-halo{fill:color-mix(in srgb,var(--rc-status) 9%,var(--mk-tagbg));stroke:color-mix(in srgb,var(--rc-status) 45%,transparent);stroke-width:1.5}
+.rnacopy-st-interrupted .rnacopy-halo,.rnacopy-st-paused .rnacopy-halo{stroke:var(--rc-status);stroke-dasharray:5 5}
+.rnacopy-site-core{fill:var(--mk-tagbg)}
+.rnacopy-polymerase .mech-actor path{fill:color-mix(in srgb,var(--rc-status) 22%,var(--mk-tagbg));stroke:var(--rc-status);filter:none}
+.rnacopy-leader{fill:none;stroke:var(--rc-input);stroke-width:1.5}
+.rnacopy-ribbon-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:var(--rc-input)}
+.rnacopy-intermediate-label{fill:var(--rc-copy)}
+.rnacopy-state-note{font:500 14px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-count{font:600 42px 'IBM Plex Sans',sans-serif;fill:var(--rc-output)}
+.rnacopy-tray-label{font:500 17px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-output{stroke:var(--rc-output);stroke-width:3}
+.rnacopy-token-bg{fill:color-mix(in srgb,var(--rc-output) 6%,var(--mk-tagbg));stroke:color-mix(in srgb,var(--rc-output) 30%,var(--mk-rung));stroke-width:1}
+.rnacopy-empty,.rnacopy-small{font:14px 'IBM Plex Sans',sans-serif;fill:var(--mk-mute)}
+.rnacopy-path-label{font:600 17px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
+.rnacopy-flow-arrow{fill:none;stroke:var(--mk-mute);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rnacopy-details{color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere}
+.rnacopy-label{font-weight:600;margin-top:9px}
 .rnacopy-legend{display:flex;flex-wrap:wrap;gap:4px 18px;list-style:none;margin:5px 0 0;padding:0}
 .rnacopy-legend li{display:inline-flex;gap:7px;align-items:center}
 .rnacopy-legend i{display:inline-block;width:20px;height:0;border-top:3px solid var(--rc-input)}
 .rnacopy-legend .rnacopy-copy-key{border-top:3px dashed var(--rc-copy)}
-.rnacopy-caption,.rnacopy-note{margin:6px 0 0}.rnacopy-note{color:var(--dfaint)}
-.sk-daylight .rnacopy,body.sk-editorial .rnacopy,body.sk-pastel .rnacopy{--rc-input:#486581;--rc-copy:#137763;--rc-status:#6D48B3}
+.rnacopy-legend .rnacopy-output-key{border-top:3px solid var(--rc-output)}
+.rnacopy-caption,.rnacopy-note,.rnacopy-authored{margin:6px 0 0}.rnacopy-note,.rnacopy-authored{color:var(--dfaint)}
+.sk-daylight .rnacopy,body.sk-editorial .rnacopy,body.sk-pastel .rnacopy{--rc-input:#365F89;--rc-copy:#95600B;--rc-output:#137763;--rc-status:#6D48B3}
 .sk-daylight .rnacopy-st-paused,body.sk-editorial .rnacopy-st-paused,body.sk-pastel .rnacopy-st-paused{--rc-status:#8B5A0D}
 .sk-daylight .rnacopy-st-interrupted,body.sk-editorial .rnacopy-st-interrupted,body.sk-pastel .rnacopy-st-interrupted{--rc-status:#AF3838}
 .sk-daylight .rnacopy-st-complete,body.sk-editorial .rnacopy-st-complete,body.sk-pastel .rnacopy-st-complete{--rc-status:#137763}
 body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6B82;--mk-rung:#B8C2D4;--mk-tagbg:#FFFFFF}
 @media (prefers-reduced-motion:reduce){.rnacopy *{animation:none;transition:none}}
-@media print{.rnacopy{break-inside:avoid;--rc-input:#486581;--rc-copy:#137763;--rc-status:#49346F}.rnacopy-frame{background:#fff;--mk-ink:#111;--mk-mute:#444;--mk-rung:#ccc;--mk-tagbg:#fff;print-color-adjust:exact}.rnacopy .mech-actor path{filter:none}.rnacopy-details,.rnacopy-note{color:#111}.rnacopy *{animation:none;transition:none}}
+@media print{.rnacopy{break-inside:avoid;--rc-input:#365F89;--rc-copy:#95600B;--rc-output:#137763;--rc-status:#49346F}.rnacopy-frame{background:#fff;--mk-ink:#111;--mk-mute:#444;--mk-rung:#ccc;--mk-tagbg:#fff;print-color-adjust:exact}.rnacopy .mech-actor path{filter:none}.rnacopy-details,.rnacopy-note,.rnacopy-authored{color:#111}.rnacopy *{animation:none;transition:none}}
 `,
   authoring:{
     initialFields:true, transientFields:RNACOPY_FIELDS.slice(),
@@ -29820,14 +29919,14 @@ body.sk-pastel .rnacopy-frame{background:#F4F6FA;--mk-ink:#0B1220;--mk-mute:#5E6
     fieldMeta:{
       label:{label:'Scene label'},
       status:{label:'Polymerase state', help:'An authored state; paused and interrupted retain the current composition.'},
-      position:{label:'Polymerase position', help:'Fraction 0–1 across the input ribbon. Independent of extent and state.'},
-      progress:{label:'Copy extent', help:'Authored fraction 0–1 controlling the emerging ribbon. A symbolic illustration, with no timescale.'},
-      copies:{label:'Authored copies', help:'Whole number 0–12. Does not increase automatically or predict output.'},
+      position:{label:'Polymerase position', help:'Fraction 0–1 across the incoming RNA ribbon. Independent of extent and state.'},
+      progress:{label:'Copy extent', help:'Authored fraction 0–1 controlling the complementary intermediate ribbon. A symbolic illustration, with no timescale.'},
+      copies:{label:'Authored copies', help:'Whole number 0–12 in a separate completed +RNA tray. Independent of the active intermediate; does not increase automatically or predict output.'},
       caption:{label:'Caption', nullLabel:'No caption'}, note:{label:'Explanation', nullLabel:'No explanation'},
     },
-    picker:{order:50, name:'RNA copying', category:'Science & sequencing', tagline:'A sequence-free copying close-up', description:'An input ribbon, polymerase and emerging copy. Author matched baseline, paused or hypothetical interruption states; all positions and counts are symbolic.'},
+    picker:{order:50, name:'RNA copying', category:'Science & sequencing', tagline:'A sequence-free copying close-up', description:'Incoming +RNA, polymerase, a complementary intermediate and a separate completed-copy tray. Author matched baseline, paused or hypothetical interruption states; all positions and counts are symbolic.'},
     example:function (sample) {
-      sample.state = {status:'copying', position:0.62, progress:0.65, copies:1, caption:'The emerging copy follows the authored extent.'};
+      sample.state = {status:'copying', position:0.62, progress:0.65, copies:1, caption:'The complementary intermediate follows the authored extent; completed +RNA is counted separately.'};
       sample.panel.initial = Object.assign({}, sample.state);
       return sample;
     },
@@ -36820,43 +36919,86 @@ function wavefieldFormat(value) {
 function wavefieldIntensityFormat(value) {
   return Math.abs(value) < 1e-12 ? '0' : wavefieldFormat(value);
 }
+function wavefieldAmplitudeFormat(value) {
+  return Math.abs(value) < 1e-6 ? '≈0' : wavefieldFormat(value);
+}
+/* Screen cells and phase curves are presentations of the same exact probe
+   model. Include the probe and extrema so every selected fringe is represented. */
+function wavefieldScreenSamples(model) {
+  var points = model.points.concat([model.probe]).sort(function (a, b) { return a.y - b.y; });
+  points = points.filter(function (point, index) { return index === 0 || point.y !== points[index - 1].y; });
+  return points.map(function (point, index) {
+    return {y: point.y, intensity: point.intensity, normalized: point.normalized,
+      low: index === 0 ? -model.config.screenHeight / 2 : (points[index - 1].y + point.y) / 2,
+      high: index === points.length - 1 ? model.config.screenHeight / 2 : (point.y + points[index + 1].y) / 2};
+  });
+}
+function wavefieldPhase(model) {
+  var cycles = model.probe.delta === null ? 0 : model.probe.delta / model.config.wavelength;
+  var phase = 2 * Math.PI * (cycles % 1), points = [];
+  for (var i = 0; i <= 96; i++) {
+    var theta = 2 * Math.PI * i / 96, a = Math.sin(theta), b = model.sources === 'one' ? 0 : Math.sin(theta - phase);
+    points.push({theta: theta, a: a, b: b, sum: a + b});
+  }
+  return {cycles: cycles, degrees: 360 * cycles, amplitude: Math.sqrt(model.probe.intensity), points: points};
+}
 function wavefieldHTML(panel, state) {
   var m = wavefieldModel(panel, state), c = m.config, p = m.probe, f = wavefieldFormat;
   var h = '<div class="wavefield-panel">';
   if (!m.valid) return h + '<p>Declare positive wavelength, separation and screenDistance (0.000001–1000000 in one unit).</p></div>';
-  var sx = 65, cy = 163, screen = sx + c.screenDistance * m.scale;
+  var sx = 70, cy = 174, screen = sx + c.screenDistance * m.scale;
   var y = function (v) { return cy - v * m.scale; }, num = function (v) { return v.toFixed(3); };
-  var top = y(c.screenHeight / 2), bottom = y(-c.screenHeight / 2), graphX = 490, graphW = 115;
+  var top = y(c.screenHeight / 2), bottom = y(-c.screenHeight / 2), graphX = 520, graphW = 178;
   var summary = (m.sources === 'two' ? 'Two in-phase sources' : 'One source, S2 off') + ', probe y = ' + f(p.y) + ' ' + c.unit + ', I/I₀ = ' + wavefieldIntensityFormat(p.intensity) + ', ' + m.classification;
-  h += '<div class="wavefield-head"><strong>' + esc(m.sources === 'two' ? 'Coherent sources' : 'Single source') + '</strong><span>' + esc(m.classification) + '</span></div>';
+  h += '<div class="wavefield-head"><div><small>OPTICAL BENCH</small><strong>' + esc(m.sources === 'two' ? 'Two paths. One interference pattern.' : 'One source. Uniform illumination.') + '</strong></div><span>' + esc(m.classification) + '</span></div>';
   h += '<div class="wavefield-parameters">' + esc((m.trial ? 'Wavelength trial · ' : '') + 'λ = ' + f(c.wavelength) + ' ' + c.unit + ' · d = ' + f(c.separation) + ' ' + c.unit + ' · L = ' + f(c.screenDistance) + ' ' + c.unit) + '</div>';
-  h += '<svg class="wavefield-svg" viewBox="0 0 650 325" role="img" aria-label="' + esc(summary) + '"><title>' + esc(summary) + '</title><desc>Solid circles and path identify source S1. Dashed circles and path identify source S2. The graph at right shares the screen coordinate and shows intensity relative to one source.</desc>';
-  h += '<rect class="wavefield-bg" x="8" y="30" width="445" height="266" rx="12"/>';
-  h += '<svg x="10" y="32" width="441" height="262" viewBox="10 32 441 262" overflow="hidden" aria-hidden="true">';
+  h += '<svg class="wavefield-svg" viewBox="0 0 760 346" role="img" aria-label="' + esc(summary) + '"><title>' + esc(summary) + '</title><desc>Solid circles and path identify source S1. Dashed circles and path identify source S2. The screen strip and enlarged intensity graph share the same vertical coordinate and exact intensity model. The crosshair joins the probe to its intensity.</desc>';
+  h += '<rect class="wavefield-bg" x="8" y="38" width="744" height="268" rx="12"/>';
+  h += '<text class="wavefield-label" x="20" y="23">01 / SOURCE PATHS</text><text class="wavefield-label" x="520" y="23">02 / INTENSITY I/I₀</text>';
+  h += '<svg x="10" y="40" width="464" height="264" viewBox="10 40 464 264" overflow="hidden" aria-hidden="true">';
   [1, 2].forEach(function (source) {
     if (source === 2 && m.sources === 'one') return;
     var sy = y((source === 1 ? 1 : -1) * c.separation / 2);
     m.rings.forEach(function (radius) { h += '<circle class="wavefield-wave wavefield-s' + source + '" cx="' + sx + '" cy="' + num(sy) + '" r="' + num(radius) + '"/>'; });
   });
   h += '</svg><line class="wavefield-axis" x1="' + sx + '" y1="' + cy + '" x2="' + num(screen) + '" y2="' + cy + '"/>';
+  h += '<rect class="wavefield-screen-frame" x="' + num(screen - 3) + '" y="' + num(top - 3) + '" width="28" height="' + num(bottom - top + 6) + '" rx="3"/>';
+  wavefieldScreenSamples(m).forEach(function (point) {
+    // A fixed luminance scale: black = 0, pale gold = 4 I0, including S1 alone.
+    var color = [18 + 228 * point.normalized, 27 + 188 * point.normalized, 39 + 115 * point.normalized].map(Math.round).join(',');
+    h += '<rect class="wavefield-screen-sample" data-y="' + point.y + '" data-intensity="' + point.intensity + '" x="' + num(screen) + '" y="' + num(y(point.high)) + '" width="22" height="' + num((point.high - point.low) * m.scale) + '" fill="rgb(' + color + ')"/>';
+  });
   h += '<line class="wavefield-screen" x1="' + num(screen) + '" y1="' + num(top) + '" x2="' + num(screen) + '" y2="' + num(bottom) + '"/>';
   [1, 2].forEach(function (source) {
     var sy = y((source === 1 ? 1 : -1) * c.separation / 2), off = source === 2 && m.sources === 'one';
     if (!off) h += '<line class="wavefield-path wavefield-s' + source + '" x1="' + sx + '" y1="' + num(sy) + '" x2="' + num(screen) + '" y2="' + num(y(p.y)) + '"/>';
-    h += '<circle class="wavefield-source wavefield-s' + source + (off ? ' wavefield-off' : '') + '" cx="' + sx + '" cy="' + num(sy) + '" r="6"/><text class="wavefield-label" x="18" y="' + num(sy - 10) + '">S' + source + (off ? ' off' : '') + '</text>';
+    h += '<circle class="wavefield-source wavefield-s' + source + (off ? ' wavefield-off' : '') + '" cx="' + sx + '" cy="' + num(sy) + '" r="7"/><text class="wavefield-label" x="20" y="' + num(sy - 12) + '">S' + source + (off ? ' off' : '') + '</text>';
   });
-  h += '<circle class="wavefield-probe" cx="' + num(screen) + '" cy="' + num(y(p.y)) + '" r="5"/><text class="wavefield-label" x="' + num(screen - 8) + '" y="' + num(y(p.y) - 10) + '" text-anchor="end">P</text>';
-  h += '<text class="wavefield-label" x="' + num(screen) + '" y="20" text-anchor="middle">Screen</text><text class="wavefield-label" x="548" y="20" text-anchor="middle">Intensity I/I₀</text>';
-  [0, 1, 2, 4].forEach(function (v) { var x = graphX + v / 4 * graphW; h += '<line class="wavefield-grid" x1="' + x + '" y1="' + num(top) + '" x2="' + x + '" y2="' + num(bottom) + '"/><text class="wavefield-tick" x="' + x + '" y="' + num(bottom + 18) + '" text-anchor="middle">' + v + '</text>'; });
+  h += '<text class="wavefield-label" x="' + num(screen + 11) + '" y="' + num(top - 14) + '" text-anchor="middle">Screen</text>';
+  [0, 1, 2, 4].forEach(function (v) { var x = graphX + v / 4 * graphW; h += '<line class="wavefield-grid" x1="' + x + '" y1="' + num(top) + '" x2="' + x + '" y2="' + num(bottom) + '"/><text class="wavefield-tick" x="' + x + '" y="' + num(bottom + 19) + '" text-anchor="middle">' + v + '</text>'; });
   var points = m.points.map(function (point) { return num(graphX + point.normalized * graphW) + ',' + num(y(point.y)); }).join(' ');
-  h += '<polyline class="wavefield-curve" points="' + points + '"/><line class="wavefield-guide" x1="' + num(screen + 8) + '" y1="' + num(y(p.y)) + '" x2="' + (graphX + graphW) + '" y2="' + num(y(p.y)) + '"/><circle class="wavefield-probe" cx="' + num(graphX + p.normalized * graphW) + '" cy="' + num(y(p.y)) + '" r="4"/>';
-  [c.screenHeight / 2, 0, -c.screenHeight / 2].forEach(function (v) { h += '<text class="wavefield-tick" x="642" y="' + num(y(v) + 4) + '" text-anchor="end">' + esc(f(v)) + '</text>'; });
-  h += '<text class="wavefield-tick" x="642" y="' + num(bottom + 34) + '" text-anchor="end">' + esc('y (' + c.unit + ')') + '</text></svg>';
+  h += '<polygon class="wavefield-curve-area" points="' + graphX + ',' + num(bottom) + ' ' + points + ' ' + graphX + ',' + num(top) + '"/><polyline class="wavefield-curve" points="' + points + '"/>';
+  h += '<line class="wavefield-guide" x1="' + num(screen - 15) + '" y1="' + num(y(p.y)) + '" x2="' + (graphX + graphW + 8) + '" y2="' + num(y(p.y)) + '"/><line class="wavefield-crosshair" x1="' + num(screen) + '" y1="' + num(y(p.y) - 12) + '" x2="' + num(screen) + '" y2="' + num(y(p.y) + 12) + '"/>';
+  h += '<circle class="wavefield-probe" cx="' + num(screen) + '" cy="' + num(y(p.y)) + '" r="5"/><text class="wavefield-label" x="' + num(screen - 12) + '" y="' + num(y(p.y) - 10) + '" text-anchor="end">P</text><circle class="wavefield-probe" cx="' + num(graphX + p.normalized * graphW) + '" cy="' + num(y(p.y)) + '" r="5"/>';
+  [c.screenHeight / 2, 0, -c.screenHeight / 2].forEach(function (v) { h += '<text class="wavefield-tick" x="744" y="' + num(y(v) + 4) + '" text-anchor="end">' + esc(f(v)) + '</text>'; });
+  h += '<text class="wavefield-tick" x="744" y="335" text-anchor="end">' + esc('y (' + c.unit + ')') + '</text><text class="wavefield-tick" x="20" y="332">Screen brightness: 0 = dark · 4 = bright</text></svg>';
+  var phase = wavefieldPhase(m);
+  var relation = m.sources === 'one' ? 'S1 alone → constant intensity' : m.classification === 'Dark minimum' ? 'Opposite phase → cancellation' : m.classification === 'Bright maximum' ? 'Aligned phase → reinforcement' : 'Shifted phase → intermediate intensity';
+  h += '<div class="wavefield-phase"><div class="wavefield-phase-caption"><small>03 / AT PROBE P</small><strong>' + relation + '</strong><span>' + esc(m.sources === 'one' ? 'S2 is off; only the solid wave contributes.' : 'Δr = ' + f(p.delta / c.wavelength) + ' λ · phase lag = ' + f(phase.degrees) + '°') + '</span><span>Resultant amplitude <b>' + wavefieldAmplitudeFormat(phase.amplitude) + '</b> × one source</span><span class="wavefield-phase-key">Solid S1 + dashed S2 = sum</span></div>';
+  h += '<svg class="wavefield-phase-svg" viewBox="0 0 340 160" role="img" aria-label="' + esc(relation + '. Static phase cycle comparison, not a time prediction. Resultant amplitude ' + wavefieldAmplitudeFormat(phase.amplitude)) + '"><title>' + esc(relation) + '</title><desc>The upper curves compare active source amplitudes at the probe across one phase cycle. The lower curve is their sum on the same amplitude scale. S1 is solid; S2 is dashed when active.</desc>';
+  [48, 112].forEach(function (v) { h += '<line class="wavefield-grid" x1="52" y1="' + v + '" x2="322" y2="' + v + '"/>'; });
+  h += '<text class="wavefield-tick" x="4" y="30">S1 + S2</text><text class="wavefield-tick" x="4" y="116">Sum</text>';
+  ['a', 'b', 'sum'].forEach(function (key) {
+    if (key === 'b' && m.sources === 'one') return;
+    var coords = phase.points.map(function (point) { return num(52 + point.theta / (2 * Math.PI) * 270) + ',' + num((key === 'sum' ? 112 : 48) - point[key] * 17); }).join(' ');
+    h += '<polyline class="wavefield-phase-curve ' + (key === 'sum' ? 'wavefield-sum' : key === 'a' ? 'wavefield-s1' : 'wavefield-s2') + '" data-component="' + key + '" points="' + coords + '"/>';
+  });
+  h += '<text class="wavefield-tick" x="187" y="157" text-anchor="middle">Phase cycle θ: 0 → 2π · static comparison</text></svg></div>';
   h += '<div class="wavefield-readouts"><span>r₁ <b>' + esc(f(p.r1) + ' ' + c.unit) + '</b></span><span>r₂ <b>' + (p.r2 === null ? 'off' : esc(f(p.r2) + ' ' + c.unit)) + '</b></span><span>Δr = r₂ − r₁ <b>' + (p.delta === null ? '—' : esc(f(p.delta / c.wavelength) + ' λ')) + '</b></span><span>I/I₀ <b>' + wavefieldIntensityFormat(p.intensity) + '</b></span></div>';
   h += '<p class="wavefield-equation">' + esc('Probe y = ' + f(p.y) + ' ' + c.unit + ' · ' + (m.sources === 'two' ? 'I/I₀ = 4 cos²(π Δr/λ)' : 'I/I₀ = 1 across the screen')) + '</p>';
   h += '<p class="wavefield-assumptions">Ideal in-phase point sources; equal amplitudes at the screen. Omits diffraction envelope and geometric spreading. I₀ is one-source intensity.</p>';
   if (m.ringStride > 1) h += '<p class="wavefield-assumptions">Wavefronts shown every ' + m.ringStride + ' wavelengths.</p>';
-  if (m.undersampled) h += '<p class="wavefield-assumptions">Dense fringes: graph is sampled; probe calculation remains exact. Increase wavelength to inspect individual fringes.</p>';
+  if (m.undersampled) h += '<p class="wavefield-assumptions">Dense fringes: screen and graph are sampled; probe calculation remains exact. Increase wavelength to inspect individual fringes.</p>';
   if (m.note) h += '<p class="wavefield-note">' + esc(m.note) + '</p>';
   return h + '</div>';
 }
@@ -36874,31 +37016,36 @@ PanelRegistry.define('wavefield', {
   presentation: {ambientInitial: true},
   layout: {sectionSizing: {minWidth: 480, preferredWidth: 700, maxWidth: 1100, aspectPolicy: 'content', grow: 1}},
   styles: String.raw`
-.wavefield-panel{color:var(--dtext);font:12px/1.45 'IBM Plex Sans',sans-serif;--wf-a:#36bfd0;--wf-b:#e7a55b;min-width:0}
-.sk-daylight .wavefield-panel,.sk-editorial .wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d}
-.wavefield-head{display:flex;justify-content:space-between;gap:12px;color:var(--dink);font-size:14px}
-.wavefield-head span{font-size:11px;border:1px solid currentColor;border-radius:20px;padding:2px 9px}
-.wavefield-parameters,.wavefield-assumptions{color:var(--dfaint);font-size:11px;margin:7px 0}
-.wavefield-svg{width:100%;height:auto;display:block;overflow:visible}
-.wavefield-bg{fill:color-mix(in srgb,var(--dtext) 5%,transparent)}
-.wavefield-s1{stroke:var(--wf-a)}.wavefield-s2{stroke:var(--wf-b);stroke-dasharray:5 4}
-.wavefield-wave{fill:none;stroke-width:1;opacity:.24}
-.wavefield-path{stroke-width:2;fill:none}.wavefield-source{fill:var(--dink);stroke-width:2}
-.wavefield-off{fill:none;opacity:.45}.wavefield-probe{fill:var(--dink);stroke:var(--dtext);stroke-width:1}
-.wavefield-axis,.wavefield-grid{stroke:var(--dtext);opacity:.15;stroke-width:1}
-.wavefield-screen{stroke:var(--dink);stroke-width:3}.wavefield-guide{stroke:var(--dtext);stroke-width:1;stroke-dasharray:2 4;opacity:.6}
-.wavefield-label{fill:var(--dink);font:600 12px 'IBM Plex Sans',sans-serif}.wavefield-tick{fill:var(--dtext);font:10px 'IBM Plex Mono',monospace}
-.wavefield-curve{fill:none;stroke:var(--dink);stroke-width:1.8;stroke-linejoin:round}
-.wavefield-readouts{display:flex;flex-wrap:wrap;gap:8px 24px;border-top:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);padding-top:10px}
-.wavefield-readouts span{display:flex;flex-direction:column;font-size:10px}.wavefield-readouts b{color:var(--dink);font:600 14px 'IBM Plex Mono',monospace}
-.wavefield-equation{font:11px 'IBM Plex Mono',monospace;color:var(--dink)}.wavefield-note{border-left:3px solid var(--wf-a);padding-left:10px}
+.wavefield-panel{color:var(--dtext);font:12px/1.45 'IBM Plex Sans',sans-serif;--wf-a:#48cbd7;--wf-b:#edb376;--wf-result:#dfc68a;min-width:0}
+.sk-daylight .wavefield-panel,.sk-editorial .wavefield-panel{--wf-a:#087783;--wf-b:#a85c24;--wf-result:#815e16}
+.wavefield-head{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--dink)}
+.wavefield-head strong{display:block;font-size:17px;line-height:1.3;font-weight:600}.wavefield-head small,.wavefield-phase-caption small{display:block;font-size:10px;letter-spacing:.15em;color:var(--dfaint);margin-bottom:5px}
+.wavefield-head>span{font-size:11px;border:1px solid color-mix(in srgb,var(--wf-result) 60%,transparent);background:color-mix(in srgb,var(--wf-result) 10%,transparent);border-radius:4px;padding:5px 9px;white-space:nowrap}
+.wavefield-parameters{font:11px 'IBM Plex Mono',monospace;color:var(--dfaint);margin:12px 0 14px}.wavefield-assumptions{color:var(--dfaint);font-size:11px;margin:7px 0}
+.wavefield-svg,.wavefield-phase-svg{width:100%;height:auto;display:block;overflow:visible}
+.wavefield-bg{fill:color-mix(in srgb,var(--dtext) 4%,transparent);stroke:color-mix(in srgb,var(--dtext) 14%,transparent)}
+.wavefield-s1{stroke:var(--wf-a)}.wavefield-s2{stroke:var(--wf-b);stroke-dasharray:6 4}
+.wavefield-wave{fill:none;stroke-width:1;opacity:.19}
+.wavefield-path{stroke-width:2.4;fill:none}.wavefield-source{fill:var(--dink);stroke-width:3}
+.wavefield-off{fill:none;opacity:.45}.wavefield-probe{fill:var(--dink);stroke:var(--wf-result);stroke-width:2.5}
+.wavefield-axis,.wavefield-grid{stroke:var(--dtext);opacity:.2;stroke-width:1}
+.wavefield-screen-frame{fill:#121b27;stroke:var(--dtext);stroke-width:1}.wavefield-screen-sample{shape-rendering:crispEdges}
+.wavefield-screen{stroke:var(--dink);stroke-width:1}.wavefield-guide{stroke:var(--wf-result);stroke-width:1.5;stroke-dasharray:4 4}.wavefield-crosshair{stroke:var(--wf-result);stroke-width:1.5}
+.wavefield-label{fill:var(--dink);font:600 13px 'IBM Plex Sans',sans-serif}.wavefield-tick{fill:var(--dtext);font:11px 'IBM Plex Mono',monospace}
+.wavefield-curve{fill:none;stroke:var(--wf-result);stroke-width:2.5;stroke-linejoin:round}.wavefield-curve-area{fill:var(--wf-result);opacity:.13}
+.wavefield-phase{display:grid;grid-template-columns:1fr 1.1fr;gap:20px;align-items:center;background:color-mix(in srgb,var(--dtext) 4%,transparent);border:1px solid color-mix(in srgb,var(--dtext) 15%,transparent);border-radius:8px;padding:14px 16px;margin:8px 0 15px}
+.wavefield-phase-caption strong{display:block;color:var(--dink);font-size:14px;margin:4px 0 8px}.wavefield-phase-caption span{display:block;font-size:11px;margin:4px 0}.wavefield-phase-caption .wavefield-phase-key{color:var(--dfaint);font-size:10px}
+.wavefield-phase-curve{fill:none;stroke-width:2;stroke-linejoin:round}.wavefield-sum{stroke:var(--wf-result);stroke-width:3}
+.wavefield-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);padding-bottom:12px}
+.wavefield-readouts span{display:flex;flex-direction:column;font-size:10px}.wavefield-readouts b{color:var(--dink);font:600 15px 'IBM Plex Mono',monospace;margin-top:3px}
+.wavefield-equation{font:11px 'IBM Plex Mono',monospace;color:var(--dink)}.wavefield-note{border-left:3px solid var(--wf-a);padding:5px 0 5px 12px}
 @media (prefers-reduced-motion:reduce){.wavefield-panel *{animation:none!important;transition:none!important}}
-@media print{.wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d;color:#222;--dtext:#333;--dink:#111;--dfaint:#444;break-inside:avoid}.wavefield-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}.wavefield-wave{opacity:.4}}
+@media print{.wavefield-panel{--wf-a:#086b7b;--wf-b:#9b541d;--wf-result:#815e16;color:#222;--dtext:#333;--dink:#111;--dfaint:#444;break-inside:avoid}.wavefield-svg,.wavefield-phase-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}.wavefield-wave{opacity:.3}}
 `,
   authoring: {
     initialFields: true, transientFields: ['sources', 'probe', 'wavelength', 'note'],
     template: {title: 'Wave interference', wavelength: 1, separation: 4, screenDistance: 10, screenHeight: 12, unit: 'cm', initial: {sources: 'two', probe: 0}},
-    setupFields: [['wavelength', 'num'], ['separation', 'num'], ['screenDistance', 'num'], ['screenHeight', 'num'], ['unit', 'text']],
+    setupFields: [['wavelength', 'num'], ['separation', 'num'], ['screenDistance', 'num'], ['screenHeight', 'num'], ['unit', 'text'], ['initial', 'json']],
     patchFields: [['sources', 'enum', ['one', 'two']], ['probe', 'num'], ['wavelength', 'num'], ['note', 'text']],
     fieldMeta: {wavelength: {label: 'Wavelength λ', help: 'Use the same distance unit for all geometry. A step value starts a new wavelength trial; all paths and intensities are recalculated.'}, separation: {label: 'Source separation d'}, screenDistance: {label: 'Screen distance L'}, screenHeight: {label: 'Screen height', help: 'Defaults to max(2 × separation, screenDistance).'}, unit: {label: 'Distance unit'}, sources: {label: 'Active sources', help: 'Two equal, in-phase sources, or S1 alone.'}, probe: {label: 'Probe y', help: 'Signed screen coordinate; zero is the centre, positive is upward. Must lie within half the screen height.'}, note: {label: 'Teaching note'}},
     picker: {order: 51, name: 'Wave interference', category: 'Science & sequencing', tagline: 'From path difference to bright and dark fringes', description: 'Two coherent point sources, exact paths and a probe on a shared intensity graph. Assumes equal amplitudes; omits diffraction envelope and geometric spreading. Deterministic authored snapshots.'},

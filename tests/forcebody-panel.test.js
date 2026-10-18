@@ -83,7 +83,7 @@ test('render safely escapes authored text and handles malformed snapshots', () =
   assert.doesNotMatch(html,/<img|onerror="bad|NaN|Infinity|undefined/);
   assert.match(html,/&lt;img/); assert.match(html,/role="img" aria-label=/);
   assert.match(html,/Moving · slowing now/); assert.match(html,/m\/s²/);
-  assert.match(html,/forcebody-trail/); assert.match(html,/forcebody-velocity/);
+  assert.doesNotMatch(html,/forcebody-trail/); assert.match(html,/forcebody-velocity/);
   assert.match(html,/F1/); assert.match(html,/Force arrows share one scale/);
   for (const state of [null,2,[],{forces:'bad'},{forces:[null]},{velocity:{x:NaN,y:0}},{forces:Array(5).fill({x:0,y:0})}]) {
     assert.doesNotThrow(() => C.forcebodyHTML(p,state));
@@ -111,4 +111,39 @@ test('registry discovers forcebody picker, metadata, styles and render without c
   assert.ok(!desc.authoring.patchFields.some(f => f[0] === 'mass'));
   assert.match(readStyles('style.core.css'),/\.forcebody\{/);
   assert.match(desc.styles,/prefers-reduced-motion/); assert.match(desc.styles,/@media print/);
+});
+
+
+test('direction rows distinguish authored velocity from computed acceleration without a motion history', () => {
+  const html = C.forcebodyHTML(panel(), {forces:[{x:-4,y:0}],velocity:{x:2,y:0}});
+  assert.match(html,/Velocity v<\/b><small>Authored snapshot/);
+  assert.match(html,/Acceleration a<\/b><small>Calculated from forces/);
+  assert.match(html,/\(\+2, 0\) m\/s<\/strong><span>Right/);
+  assert.match(html,/\(-2, 0\) m\/s²<\/strong><span>Left/);
+  assert.match(html,/class="forcebody-velocity"><line x1="60" y1="50" x2="100" y2="50"/);
+  assert.match(html,/class="forcebody-acceleration"><line x1="60" y1="50" x2="20" y2="50"/);
+  assert.doesNotMatch(html,/trail/);
+  const zero = C.forcebodyHTML(panel(),{velocity:{x:0,y:0}});
+  const unspecified = C.forcebodyHTML(panel(),{});
+  assert.match(zero,/Zero vector/);
+  assert.equal((zero.match(/class="forcebody-direction-zero"/g) || []).length,2);
+  assert.match(unspecified,/Not specified/);
+  assert.equal((unspecified.match(/class="forcebody-direction-unknown"/g) || []).length,1);
+  assert.equal((unspecified.match(/class="forcebody-direction-zero"/g) || []).length,1);
+  const unavailable = C.forcebodyHTML({...panel(),mass:null},{});
+  assert.equal((unavailable.match(/class="forcebody-direction-unknown"/g) || []).length,2);
+});
+
+test('fixed acceleration scale preserves the mass comparison and explicitly marks overflow', () => {
+  const state = {forces:[{x:4,y:0}],velocity:{x:2,y:0}};
+  const light = C.forcebodyHTML(panel(),state);
+  const heavy = C.forcebodyHTML({...panel(),mass:4},state);
+  assert.match(light,/Acceleration magnitude 2 m\/s² on a fixed zero to four scale/);
+  assert.match(heavy,/Acceleration magnitude 1 m\/s² on a fixed zero to four scale/);
+  assert.match(light,/forcebody-meter-track"><span style="width:50%"/);
+  assert.match(heavy,/forcebody-meter-track"><span style="width:25%"/);
+  const large = C.forcebodyHTML(panel(),{forces:[{x:100,y:0}]});
+  assert.match(large,/forcebody-meter-track"><span style="width:100%"/);
+  assert.match(large,/value exceeds 4 m\/s²; bar capped/);
+  assert.match(large,/full length: 100 N/);
 });

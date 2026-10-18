@@ -225,10 +225,13 @@ def font_css(profile: str = 'all') -> str:
     return loader('--font-css', profile)
 
 
-def welcome_library_hidden(no_library: bool) -> str:
-    """Attribute text for the Welcome Browse diagrams button. Default builds show it;
-    --no-library is for hosts that publish no diagram library (deploy/cloudflare/)."""
-    return ' hidden' if no_library else ''
+def welcome_hidden(hide: bool) -> str:
+    """Attribute text for an optional Welcome entry. Default builds show every entry;
+    --no-library and --no-catalog are explicit choices for hosts that publish no
+    diagram library or service catalog (deploy/cloudflare/). They are never inferred
+    from workbench/diagrams.json or workbench/catalog.json: packagers build this page
+    in another checkout and ship it beside a company's own library and catalog."""
+    return ' hidden' if hide else ''
 
 
 def fill(skel: str, mapping: dict) -> str:
@@ -251,6 +254,9 @@ def main() -> int:
     config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json and company/company.json')
     parser.add_argument('--no-library', action='store_true',
                         help='hide the Welcome "Browse diagrams" button, for hosts that publish no diagram library')
+    parser.add_argument('--no-catalog', action='store_true',
+                        help='hide the Welcome "From service catalog" actions, for hosts that publish no service catalog; '
+                             'the editor Add menu keeps its catalog entry')
     args = parser.parse_args()
     if args.no_config:
         # Every loader subprocess (and the kit's arrangement tool) inherits this.
@@ -288,7 +294,8 @@ def main() -> int:
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
             mapping['WORKBENCH_LANDING'] = landing
             mapping['WORKBENCH_EXAMPLES'] = examples
-            mapping['WORKBENCH_LIBRARY_HIDDEN'] = welcome_library_hidden(args.no_library)
+            mapping['WORKBENCH_LIBRARY_HIDDEN'] = welcome_hidden(args.no_library)
+            mapping['WORKBENCH_CATALOG_HIDDEN'] = welcome_hidden(args.no_catalog)
             mapping['HUMAN_GUIDE'] = human_guide()
             mapping.update(company_markers())
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)

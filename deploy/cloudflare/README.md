@@ -14,8 +14,10 @@ on that plan. Check Cloudflare's pricing pages before relying on either figure.
 
 ## What gets uploaded
 
-`deploy.sh` runs `python3 tools/build.py --no-library`, which hides the Welcome
-**Browse diagrams** button because this host publishes no library. It assembles `deploy/cloudflare/site/`,
+`deploy.sh` runs `python3 tools/build.py --no-library --no-catalog`, which hides
+the Welcome **Browse diagrams** button and both Welcome **From service catalog**
+actions, because this host publishes no library and no catalog. The editor's
+**Add to diagram → Services from catalog** stays. It assembles `deploy/cloudflare/site/`,
 generates `deploy/cloudflare/.generated/wrangler.jsonc`, and uploads with Wrangler:
 
 | Published path | Source | Purpose |
@@ -31,7 +33,8 @@ The generated config sets `html_handling: "none"` so `/workbench/flowspec.html` 
 served at its exact path; the editor fetches `starters.json`, `diagrams.json`
 and `../template/flowview.html` relative to that URL. The built-in starter
 projects are embedded in `flowspec.html`, so `src/starters/` is not uploaded. There is no
-`workbench/catalog.json`, so **From service catalog** reports no catalog.
+`workbench/catalog.json`, so **Add to diagram → Services from catalog** in the
+editor reports no catalog.
 
 ## Nothing account-specific is committed
 
@@ -76,7 +79,7 @@ must answer `302` to a `cloudflareaccess.com` URL.
 Run `sh deploy/cloudflare/deploy.sh` again. Wrangler uploads only changed files.
 When the script exits, it rebuilds this checkout's `workbench/` and `template/`
 outputs with a default build, so local use and `Dockerfile.prebuilt` keep the
-Browse button.
+Browse and catalog buttons.
 
 ## Agent editing
 

@@ -248,20 +248,32 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(before[p], p.read_text(), f"{p} changed on rebuild")
 
 
-class TestNoLibraryFlag(unittest.TestCase):
-    """--no-library hides the Welcome Browse diagrams button at build time; default builds keep it."""
+class TestWelcomeEntryFlags(unittest.TestCase):
+    """--no-library / --no-catalog hide optional Welcome entries at build time; default builds keep them."""
 
-    BUTTON = re.compile(rb'<button type="button" class="welcome-library-entry" id="welcome-library"( hidden)?>')
+    BUTTONS = {
+        'library': re.compile(rb'<button type="button" class="welcome-library-entry" id="welcome-library"( hidden)?>'),
+        'catalog': re.compile(rb'<button type="button" class="welcome-action" id="welcome-catalog"( hidden)?>'),
+        'new-catalog': re.compile(rb'<button type="button" id="welcome-new-catalog" class="welcome-button"( hidden)?>'),
+    }
 
-    def test_marker_values(self):
-        self.assertEqual(build.welcome_library_hidden(False), '')
-        self.assertEqual(build.welcome_library_hidden(True), ' hidden')
+    def test_marker_values_and_wiring(self):
+        self.assertEqual(build.welcome_hidden(False), '')
+        self.assertEqual(build.welcome_hidden(True), ' hidden')
         skeleton = build.read('workbench.skel.html')
         self.assertEqual(skeleton.count('id="welcome-library"{{WORKBENCH_LIBRARY_HIDDEN}}>'), 1)
+        self.assertEqual(skeleton.count('{{WORKBENCH_CATALOG_HIDDEN}}'), 2)
         css = build.read('style.workbench.css')
         self.assertIn('.welcome-library-entry[hidden]{display:none}', css)
+        self.assertIn('.welcome-action[hidden],#welcome-new-catalog[hidden]{display:none}', css)
+        self.assertIn('.welcome-actions:has(> #welcome-catalog[hidden]){grid-template-columns:repeat(3,minmax(0,1fr))}', css)
+        # Each catalog marker sits on one of the two Welcome catalog buttons, so the
+        # editor Add menu's catalog entry is not touched by --no-catalog.
+        tags = re.findall(r'<button [^>]*\{\{WORKBENCH_CATALOG_HIDDEN\}\}>', skeleton)
+        self.assertEqual(tags, ['<button type="button" class="welcome-action" id="welcome-catalog"{{WORKBENCH_CATALOG_HIDDEN}}>',
+                                '<button type="button" id="welcome-new-catalog" class="welcome-button"{{WORKBENCH_CATALOG_HIDDEN}}>'])
 
-    def test_cli_default_shows_and_flag_hides_the_button(self):
+    def test_cli_flags_hide_only_their_entries(self):
         output = ROOT / 'workbench/flowspec.html'
         others = [ROOT / 'template/flowview.html', ROOT / 'workbench/diagrams.json',
                   ROOT / 'tools/canon/generated-runtime.cjs']
@@ -273,14 +285,20 @@ class TestNoLibraryFlag(unittest.TestCase):
                 else:
                     path.write_bytes(data)
         self.addCleanup(restore)
-        def button(*args):
+        def buttons(*args):
             r = subprocess.run([sys.executable, str(BUILD), '--no-config', *args], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-            found = self.BUTTON.findall(output.read_bytes())
-            self.assertEqual(len(found), 1)
-            return found[0]
-        self.assertEqual(button('--no-library'), b' hidden')
-        self.assertEqual(button(), b'')
+            html = output.read_bytes()
+            found = {}
+            for name, pattern in self.BUTTONS.items():
+                matches = pattern.findall(html)
+                self.assertEqual(len(matches), 1, name)
+                found[name] = matches[0] == b' hidden'
+            return found
+        self.assertEqual(buttons(), {'library': False, 'catalog': False, 'new-catalog': False})
+        self.assertEqual(buttons('--no-library'), {'library': True, 'catalog': False, 'new-catalog': False})
+        self.assertEqual(buttons('--no-catalog'), {'library': False, 'catalog': True, 'new-catalog': True})
+        self.assertEqual(buttons('--no-library', '--no-catalog'), {'library': True, 'catalog': True, 'new-catalog': True})
 
 
 if __name__ == "__main__":

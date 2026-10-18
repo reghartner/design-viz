@@ -157,8 +157,13 @@ read site config. See [homepage configuration](homepage-example.md) for schema,
 input ownership and deployment. Reapply the configured build after running
 upstream tests, which build their default fixtures with `--no-config`.
 `--no-library` hides the Welcome **Browse diagrams** button in the built page,
-for hosts that publish no diagram library; default builds keep it. It combines
-with either config option.
+for hosts that publish no diagram library. `--no-catalog` hides the Welcome
+**From service catalog** actions (home page and Start new project), for hosts
+that publish no service catalog; the editor's Add menu keeps its catalog entry.
+Default builds keep every entry. Both are explicit choices, never inferred from
+`workbench/diagrams.json` or `workbench/catalog.json`: packagers such as the
+Backstage vendoring script build this page in another checkout and ship it
+beside a company's own library and catalog. Both combine with either config option.
 
 `build:viewer` emits native artifacts only; `build:runtime` emits native and backend
 artifacts. `check:viewer` now deletes the known generated outputs and compares two
@@ -213,7 +218,7 @@ ordinary Dockerfile by the packager; company source forks use the default
 source-building Dockerfile.
 
 `deploy/cloudflare/deploy.sh` is the smaller standalone option: it builds locally
-with `--no-library`, copies the editor, starters, export template and an empty library index into an
+with `--no-library --no-catalog`, copies the editor, starters, export template and an empty library index into an
 ignored `deploy/cloudflare/site/` directory, and uploads them to Cloudflare Workers
 as static assets. Gating the Worker with Cloudflare Access is a separate manual
 step. No catalog, Canon library or imported topology ships; the fork's company

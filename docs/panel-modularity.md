@@ -34,7 +34,7 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `validatePatch(patch, path, panel, warnings, context)` | Validate step patches using that instance's context |
 | `fold(panel, steps)` | Optional pure specialized folder returning absolute snapshots, including an initial snapshot for an empty story |
 | `storyTime(panel, states, steps, story, diagram)` | Optional pure post-fold step for time-derived fields; `story` is the path's resolved [story time](step-time.md) or null. Must return the states unchanged when it does not apply |
-| `render(host, panel, state, skin, states, stepIndex, animate)` | Describe presentation of an already-folded snapshot |
+| `render(host, panel, state, skin, states, stepIndex, animate, declared)` | Describe presentation of an already-folded snapshot. `panel` is the effective declaration for this state; `declared` is the authored one, for resolving setup at earlier steps (see [per-step setup changes](#per-step-setup-changes-unified)) |
 | `visibilityEvidence(panel, state, field)` | Optional pure evidence facet; return supported/visible/reason plus trusted DOM address metadata for an internal field. Unsupported fields must say so; whole-panel content is generic. See [visibility evidence](visibility-evidence.md). |
 | `presentation` | Shared traits: `growing`, `ambientInitial`, `historyRequiresSteps` |
 | `authoring` | Template, setup/step fields, picker description/example, provenance and custom editor hooks |
@@ -173,14 +173,16 @@ Check these before flagging a type:
 - The type has no existing override that ignores invalid values and falls
   back to the declaration (`data-contract`, `radar`).
 
-Flagged types: `gauge`, `state`, `orbit`, `queue`, `table`, `checks`,
+Flagged types: `gauge`, `state`, `log`, `orbit`, `queue`, `table`, `checks`,
 `budget`, and the custom-fold types `sequence`, `frames`, `reads` and `locus`.
 These four keep their own folds, which use the common fold with acceptance
 rules for state fields only, so setup names already carry.
 
-Left unflagged after checking:
-`log` (a later `tags` change would recolor lines already shown; its history
-rule comes first), `thermo` (its history sparkline reads the current limits
+A type whose renderer shows history decides what a setup change does to
+items already shown. Log keeps, for each line, the tags in effect at the step
+it was appended: it resolves them from `states` and `declared`.
+
+Left unflagged after checking: `thermo` (its history sparkline reads the current limits
 for every step), `waterfall` (its reveal animation remembers bars by position,
 not span), `image` (its contract promises that steps never change the shared
 image), `buffer` (its fold reads the declared `segments`), `trace` (its

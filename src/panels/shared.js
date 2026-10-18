@@ -303,7 +303,7 @@ function softwarePanelShell(content, state) {
 // Kept as a compatibility helper for callers of the software panel models.
 function softwarePanelHTML(panel, state) {
   var render = PanelViews.get(panel.type);
-  return render ? render({}, panelEffectiveDeclaration(panel, state), state || {}).html : softwarePanelShell('', state || {});
+  return render ? render({}, panelEffectiveDeclaration(panel, state), state || {}, undefined, undefined, undefined, undefined, panel).html : softwarePanelShell('', state || {});
 }
 function panelGlideElements(host, glide) {
   if (!glide) return [];
@@ -441,10 +441,12 @@ function tweenPanelBars(host, bars, animate) {
    history only; they never participate in state folding or alternate paths. */
 function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePresentation) {
   var render = PanelViews.get(panel.type),
-    animate = animatePresentation !== false && !RM;
+    animate = animatePresentation !== false && !RM,
+    declared = panel;
   panel = panelEffectiveDeclaration(panel, state);
+  /* The authored declaration lets a renderer resolve setup at earlier steps. */
   var result = render
-    ? render(host, panel, state || {}, skin, states, stepIdx, animate)
+    ? render(host, panel, state || {}, skin, states, stepIdx, animate, declared)
     : {
         html: '<div class="punknown">unknown panel type: ' + esc(String(panel.type)) + '</div>',
       };

@@ -1,15 +1,44 @@
 /* log panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+/* Up to 8 line ids, as one string or an array, like Seatmap's highlight. */
+function logHighlightIds(value) {
+  if (typeof value === 'string') return [value];
+  return Array.isArray(value) && value.length <= 8 && value.every(function (id) {
+    return typeof id === 'string';
+  }) ? value : [];
+}
+function logLineCount(state) {
+  return state && Array.isArray(state.log) ? state.log.length : 0;
+}
 PanelViews.register(
   'log',
-  function (host, panel, state, skin, states, stepIdx, animate) {
+  function (host, panel, state, skin, states, stepIdx, animate, declared) {
     var h = '';
     var tags = panel.tags || {};
+    declared = declared || panel;
+    /* With this path's history, lines appended at this step are new, and each
+       line keeps the tag colors in effect at the step it was appended. Lines
+       from `initial` use the starting tags, never step 0's patch. */
+    var history = Array.isArray(states) && typeof stepIdx === 'number' && stepIdx >= 0 && stepIdx < states.length;
+    var initial = declared.initial, start = panelObject(initial) && Array.isArray(initial.log) ? initial.log.length : 0;
+    var before = !history ? Infinity : stepIdx ? logLineCount(states[stepIdx - 1]) : start;
+    var appended = [];
+    if (history) for (var j = 0; j <= stepIdx; j++) appended.push(logLineCount(states[j]));
+    function tagsAt(i) {
+      if (!history) return tags;
+      if (i < start) return panelEffectiveDeclaration(declared, initial).tags || {};
+      for (var k = 0; k < appended.length; k++)
+        if (appended[k] > i) return panelEffectiveDeclaration(declared, states[k]).tags || {};
+      return tags;
+    }
+    var highlight = logHighlightIds(state.highlight), seen = Object.create(null);
     h += '<div class="plog panel-fill-scroll">';
-    (state.log || []).forEach(function (line) {
+    (state.log || []).forEach(function (line, i) {
       var tag = line && line.tag ? String(line.tag) : '';
-      var col2 = isHex(tags[tag]) ? tags[tag] : null;
+      var lineTags = tagsAt(i), col2 = isHex(lineTags[tag]) ? lineTags[tag] : null;
+      var id = panelObject(line) && typeof line.id === 'string' && line.id && !seen[line.id] ? line.id : null;
+      if (id) seen[id] = true;
       h +=
-        '<div class="plogline">' +
+        '<div class="plogline' + (i >= before ? ' plog-new' : '') + (id && highlight.indexOf(id) >= 0 ? ' plog-hl' : '') + '">' +
         (tag
           ? '<span class="plogtag"' +
             (col2 ? ' style="color:' + col2 + '"' : '') +
@@ -37,6 +66,48 @@ PanelRegistry.extend('log', {
   order: 3,
   label: 'Log',
   since: '0.1.0',
+  unified: true,
+});
+
+/* Line ids and highlight are the only things checked; other log content
+   keeps today's permissive behaviour. Ids come from the authored panel's
+   initial lines and every step's appended lines. */
+function logPatchWarnings(state, path, panel, warnings, context) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path) {
+    if (!panelOwn(state, 'highlight') || state.highlight === null) return;
+    var value = state.highlight;
+    if (typeof value !== 'string' && !(Array.isArray(value) && value.length <= 8 && value.every(function (id) { return typeof id === 'string'; }))) {
+      warnings.push(path + '.highlight: expected a line id, up to 8 line ids, or null — nothing highlighted');
+      return;
+    }
+    (typeof value === 'string' ? [value] : value).forEach(function (id) {
+      if (!context || !context.ids[id]) warnings.push(path + '.highlight: no log line has id "' + id + '" — ignored');
+    });
+  });
+}
+PanelRegistry.extend('log', {
+  validateDeclaration: function (panel, path, warnings, errors, d) {
+    var authored = ((d && d.panels) || []).filter(function (p) { return p && p.id === panel.id; })[0] || panel;
+    var ids = Object.create(null);
+    function scan(lines, where) {
+      (Array.isArray(lines) ? lines : [lines]).forEach(function (line, i) {
+        if (!panelOwn(line, 'id')) return;
+        var at = where + '[' + i + '].id';
+        if (typeof line.id !== 'string' || !line.id) warnings.push(path + ': ' + at + ' must be a non-empty string — line cannot be highlighted');
+        else if (ids[line.id]) warnings.push(path + ': ' + at + ' repeats line id "' + line.id + '" — only the first line with it can be highlighted');
+        else ids[line.id] = true;
+      });
+    }
+    if (panelObject(authored.initial) && Array.isArray(authored.initial.log)) scan(authored.initial.log, 'initial.log');
+    ((d && d.steps) || []).forEach(function (step, ti) {
+      var patch = stepPanelPatch(step), own = patch && panelObject(patch[panel.id]) ? patch[panel.id] : null;
+      if (own && own.log != null) scan(own.log, 'steps[' + ti + '].panels.' + panel.id + '.log');
+    });
+    var context = { ids: ids };
+    logPatchWarnings(authored.initial, path + '.initial', panel, warnings, context);
+    return context;
+  },
+  validatePatch: logPatchWarnings,
 });
 
 PanelRegistry.extend('log', {
@@ -47,7 +118,9 @@ PanelRegistry.extend('log', {
 .sk-aurora .plog{color:#93A7C9;}
 .sk-daylight .plog{color:#6B6F7A;}
 .plogline{display:flex; gap:7px;}
-.plogtag{font-weight:700; min-width:32px;}`,
+.plogtag{font-weight:700; min-width:32px;}
+.plogline.plog-new{box-shadow:inset 2px 0 0 currentColor; background:color-mix(in srgb,currentColor 8%,transparent);}
+.plogline.plog-hl{box-shadow:inset 3px 0 0 currentColor; background:color-mix(in srgb,currentColor 18%,transparent);}`,
     },
     {
       order: 1363,

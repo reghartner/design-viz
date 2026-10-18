@@ -55,3 +55,24 @@ test('sequence marks validate against the sequence in effect at that step', () =
   assert.match(warnings[0], /^steps\[1\]\.panels\.p\.marks\[0\]/);
   assert.deepEqual(stepWarnings(diagram('sequence', [{marks: [{id: 'm', from: 6, to: 8}]}])), [], 'the declared sequence is long enough');
 });
+
+test('setup fields in initial are checked as declared fields and apply in ambient', () => {
+  for (const type of TYPES) {
+    const [field, value] = SECOND[type];
+    const d = diagram(type, [null, {label: 5}]);
+    d.panels[0].initial = Object.assign({}, d.panels[0].initial, {[field]: value, label: 7});
+    const result = C.validate(C.normalize(d));
+    const panelWarnings = plain(result.warnings).filter(w => /\.(panels\[0\]|steps\[)/.test(w)).map(w => w.replace(/^.*?\.(panels\[0\]|steps)/, '$1'));
+    assert.deepEqual(panelWarnings, ['panels[0].label: expected text — ignored', 'steps[1].panels.p.label: expected text — ignored'], type);
+    /* Ambient presentation renders initial: the same as declaring the field. */
+    const authored = diagram(type, [null]);
+    authored.panels[0][field] = value;
+    authored.panels[0].label = 7;
+    assert.equal(C.softwarePanelHTML(d.panels[0], d.panels[0].initial), C.softwarePanelHTML(authored.panels[0], authored.panels[0].initial), type);
+  }
+  /* Initial state is checked against the setup in effect from the start. */
+  const d = diagram('sequence', [null]);
+  d.panels[0].initial = {sequence: 'ATGC', marks: [{id: 'm', from: 6, to: 8}]};
+  assert.ok(plain(C.validate(C.normalize(d)).warnings).some(w => /panels\[0\]\.initial\.marks\[0\]/.test(w)));
+  assert.ok(!plain(C.validate(C.normalize(d)).warnings).some(w => /initial\.sequence: unknown field/.test(w)));
+});

@@ -157,7 +157,8 @@ before calling `validatePatch`. It then runs `validateDeclaration` on the
 declaration in effect at that step and reports, at the patch path, the new
 warnings and any warning about a field the step sets; `initial` is not
 checked again. `validatePatch` receives that effective declaration and its
-context.
+context. Setup fields in `initial` are validated as declared fields, and the
+rest of `initial` as state.
 Compatibility reports `flow.panel-setup-steps` when a patch, `enterOnce` or
 `initial` sets one of these fields.
 

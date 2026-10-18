@@ -34,7 +34,8 @@ generated outputs are unchanged.
   --venue-name "…" --out company/panels/venues/<id>.js`. Fork venues load
   after the upstream ones in `src/panels/venues/`, before every panel type;
   panels use them with `"venue": "<id>"` and the workbench Venue picker lists
-  them. A venue id that repeats an upstream one fails the build. See
+  them. A venue id that repeats an upstream one fails the build, and the
+  upstream tests fail for a venue that does not validate clean. See
   [venue map](../cookbook/venue-map.md#importing-a-different-arena).
 
 `src/source-bundles.json` lists these directories as optional globs

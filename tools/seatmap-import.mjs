@@ -34,6 +34,8 @@
    path tokenizer and normaliser are the panel's own (src/panels/sports.js). */
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -60,6 +62,18 @@ export const fitPolyline = (...args) => lib().SeatmapImport.fitPolyline(...args)
 export const formatReport = (...args) => lib().SeatmapImport.formatReport(...args);
 export const venueEntry = (...args) => lib().SeatmapImport.venueEntry(...args);
 export const venueSource = (...args) => lib().SeatmapImport.venueSource(...args);
+
+/* Everything the panel validator says about a venue's seatmap fields, as a
+   panel would draw them: a venue file is written only when this is empty. */
+export function venueProblems(entry) {
+  const { readSource } = createRequire(import.meta.url)('./source-loader.cjs');
+  const context = { URL, TextEncoder };
+  vm.createContext(context);
+  vm.runInContext(readSource('validator.js'), context);
+  const panel = Object.assign({ id: 'map', type: 'seatmap' }, entry.seatmap);
+  const result = context.validate(context.normalize({ nodes: { n: {} }, rows: [['n']], panels: [panel] }));
+  return [...result.errors, ...result.warnings].map(text => String(text).replace(/^.*?panels\[0\]\.?/, 'seatmap.'));
+}
 
 /* "id:label:x:y"; the label may itself contain colons. */
 export function parseLandmark(text) {
@@ -112,6 +126,8 @@ export function run(argv, io = { stdout: process.stdout, stderr: process.stderr 
         id: options.venue, name: options.venueName, location: options.venueLocation, note: options.venueNote, landmarks: options.landmarks,
       });
       SeatmapVenues.define(entry); // the same checks the build applies to a venue file
+      const problems = venueProblems(entry);
+      if (problems.length) throw new Error('venue "' + entry.id + '" would not draw cleanly; nothing written:\n  - ' + problems.join('\n  - '));
       output = SeatmapImport.venueSource(entry, path.basename(options.input));
     } else output = JSON.stringify(result.fragment, null, 2) + '\n';
   } catch (error) {

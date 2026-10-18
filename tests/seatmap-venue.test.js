@@ -175,6 +175,11 @@ test('venue CLI options are checked: ids, names, landmarks and venue-only flags 
   assert.equal(run.status, 1); assert.match(run.stderr, /name must be/);
   run = cli([csv, '--venue', 'x', '--venue-name', 'X', '--landmark', 'nope']);
   assert.equal(run.status, 2); assert.match(run.stderr, /--landmark is id:label:x:y/);
+  // A venue is written only when the panel validator accepts it without a warning.
+  run = cli([csv, '--venue', 'x', '--venue-name', 'X', '--landmark', 'b:bench:5000:1', '--out', path.join(require('node:os').tmpdir(), 'never-' + process.pid + '.js')]);
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /venue "x" would not draw cleanly; nothing written:\n  - seatmap\.landmarks\[0\]: x and y must lie inside the 1000×770 viewBox/);
+  assert.equal(fs.existsSync(path.join(require('node:os').tmpdir(), 'never-' + process.pid + '.js')), false);
   run = cli([csv, '--capacity-total', '17250', '--venue', 'csv-hall', '--venue-name', 'CSV Hall', '--landmark', 'b:home: bench:400:322']);
   assert.equal(run.status, 0, run.stderr);
   // Nothing from the file name or the data can close the comment or an inline <script>.

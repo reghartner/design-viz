@@ -73,8 +73,12 @@ node tools/seatmap-import.mjs chart.svg --level-map "100-level:100 level,200-lev
 The output is one `SeatmapVenues.define({...})` call with a JSON literal. A
 fork keeps venue files in `company/panels/venues/`; upstream venues live in
 `src/panels/venues/`. Both directories are discovered by the build, so adding
-a venue edits no upstream file. Venue ids are unique across both; a malformed
-or duplicate file fails the build and the tests. Regenerate a venue file from
+a venue edits no upstream file. The importer writes a venue file only when
+the panel validator accepts its seatmap fields without a single warning (an
+out-of-view landmark or an unrecognised zone is refused, with the reasons).
+Venue ids are unique across both directories; a duplicate id or a file of the
+wrong shape fails the build, and `tests/seatmap-venue.test.js` fails for any
+library venue, upstream or fork, that does not validate clean. Regenerate a venue file from
 its source rather than editing it. UBS Arena's was produced by
 
 ```sh

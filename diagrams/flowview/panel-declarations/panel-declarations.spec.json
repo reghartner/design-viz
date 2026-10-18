@@ -699,7 +699,7 @@
            "panelVisibility": {
             "funnel": true
            },
-           "text": "**A few types let a step override a declared value.** The radar declares `threshold: 80`; this step writes 50 and the arc moves. The funnel reappears showing the counts written while it was hidden. The full list of such keys is on the Panel types tab; each is built into its own type.",
+           "text": "**A few types let a step override a declared value.** The radar declares `threshold: 80`; this step writes 50 and the arc moves. The funnel reappears with the counts written while hidden. Full list: Panel types tab.",
            "panels": {
             "radar": {
              "threshold": 50
@@ -1040,6 +1040,60 @@
            }
           },
           {
+           "id": "yard",
+           "type": "zoneframe",
+           "title": "Zoneframe: whole-array state by id",
+           "zones": [
+            {
+             "id": "walk",
+             "label": "walkway",
+             "state": "armed",
+             "points": [
+              [
+               128,
+               150
+              ],
+              [
+               148,
+               98
+              ],
+              [
+               176,
+               98
+              ],
+              [
+               198,
+               150
+              ]
+             ]
+            },
+            {
+             "id": "door",
+             "label": "door",
+             "state": "armed",
+             "points": [
+              [
+               220,
+               150
+              ],
+              [
+               230,
+               90
+              ],
+              [
+               270,
+               90
+              ],
+              [
+               280,
+               150
+              ]
+             ]
+            }
+           ],
+           "initial": {}
+          },
+          {
            "id": "ops",
            "type": "inflight",
            "title": "Inflight: start, mark, end; history kept",
@@ -1168,6 +1222,62 @@
            }
           },
           {
+           "id": "s-paint-once",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Exception: `enterOnce.mark` replaces the paint list for one step.** Only cells 6–8 show as dropped here; the next step shows the accumulated paint again.",
+           "panels": {
+            "buffer": {
+             "enterOnce": {
+              "mark": [
+               [
+                6,
+                8,
+                "dropped"
+               ]
+              ]
+             }
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "{\"enterOnce\": {\"mark\": [[6, 8, \"dropped\"]]}}",
+                "rule": "replaces paints for one step"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-paint-back",
+           "edges": [
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Back to the accumulated paint.** No patch: cells 0–5 show the two earlier paints again.",
+           "panels": {
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.buffer",
+                "value": "(no patch)",
+                "rule": "accumulated paints return"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
            "id": "s-cells",
            "edges": [
             "patch->fold",
@@ -1190,6 +1300,68 @@
                 "key": "panels.buffer",
                 "value": "{\"cells\": [\"protected\", \"protected\"]}",
                 "rule": "replaces; paints cleared"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-zones",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Whole-array state by id.** The patch lists only the walkway (masked). The fold carries this array as given; the renderer shows the door at its declared state.",
+           "panels": {
+            "yard": {
+             "zones": [
+              {
+               "id": "walk",
+               "state": "masked"
+              }
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.yard",
+                "value": "{\"zones\": [{\"id\": \"walk\", \"state\": \"masked\"}]}",
+                "rule": "array replaced; door from declaration"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-zones2",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A second patch replaces the array, it does not merge.** It lists only the door (ignored), so the walkway returns to its declared armed state. Compare the strand scene below, where each actor carries independently.",
+           "panels": {
+            "yard": {
+             "zones": [
+              {
+               "id": "door",
+               "state": "ignored"
+              }
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.yard",
+                "value": "{\"zones\": [{\"id\": \"door\", \"state\": \"ignored\"}]}",
+                "rule": "walkway back to declared armed"
                }
               }
              ]
@@ -1521,7 +1693,7 @@
             "patch->fold"
            ],
            "time": "+0m",
-           "text": "**`enterOnce` support is type-specific.** Common-fold types accept any non-appended field. Funnel merges one-step counts (Today tab). Phone accepts only `enterOnce.audio`. Device app has no `enterOnce`; the validator warns and ignores it.",
+           "text": "**`enterOnce` support is type-specific.** Common fold: any field for one step; `log` cannot be set through it, and buffer `mark` replaces the paint list (shown above). Funnel and grid merge one-step entries. Phone accepts only `enterOnce.audio`. Device app has none. Other custom folds define their own rules.",
            "panels": {
             "sjson": {
              "rows": [
@@ -1529,7 +1701,7 @@
                "id": "a",
                "cells": {
                 "key": "common fold",
-                "value": "any field except appended ones",
+                "value": "any field; log excluded; mark replaces",
                 "rule": "one step"
                }
               },
@@ -1555,6 +1727,14 @@
                 "key": "deviceapp",
                 "value": "not supported",
                 "rule": "validator warns; ignored"
+               }
+              },
+              {
+               "id": "e",
+               "cells": {
+                "key": "other custom folds",
+                "value": "each type's own rule",
+                "rule": "see its contract entry"
                }
               }
              ]
@@ -1656,7 +1836,11 @@
            "steps": [
             "s-paint",
             "s-paint2",
+            "s-paint-once",
+            "s-paint-back",
             "s-cells",
+            "s-zones",
+            "s-zones2",
             "s-start",
             "s-mark",
             "s-end",
@@ -1733,11 +1917,18 @@
             "h": 7
            },
            {
-            "panel": "strand",
+            "panel": "yard",
             "x": 8,
             "y": 16,
             "w": 9,
-            "h": 13
+            "h": 8
+           },
+           {
+            "panel": "strand",
+            "x": 8,
+            "y": 24,
+            "w": 9,
+            "h": 10
            },
            {
             "panel": "app",
@@ -1782,10 +1973,10 @@
           "text": "**Derived from story time**: battery drain and charge (with `charge` anchors and one-step `drain`); phone, deviceapp and appscreens clock and date; deviceapp card freshness from `reportedAt`."
          },
          {
-          "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`."
+          "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`; seatmap `tierOf` (overrides a section's declared `tier`; deleting the entry restores it)."
          },
          {
-          "text": "**Whole-array state keyed by declared ids** (common fold; each patch replaces the whole array, and items it does not list fall back to their declared default): xray `layers`, zoneframe `zones`, replicas `replicas`."
+          "text": "**Whole-value state keyed by declared ids** (common fold: each patch replaces the whole carried value; the renderer fills in ids the value does not list): zoneframe `zones` (unlisted zones show their declared state), xray `layers` (unlisted layers show sealed), replicas `replicas`, an object keyed by replica id (unlisted replicas show unknown)."
          },
          {
           "text": "**Per-item carried state keyed by declared ids** (custom fold; each item carries independently): strandscene `actors`, cellscene `items`."
@@ -1806,7 +1997,7 @@
         "heading": "Proposed change: a step-level panelDeclare map",
         "accent": "violet",
         "text": [
-         "A design proposal, not shipped behaviour. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the gpt-6-astra review of that PR. One decision is open: how folding treats earlier steps (step 4)."
+         "A design proposal, not shipped behaviour. The tables and checks on this tab are authored to explain the design; they do not run it. It replaces the reserved `declare` key inside panel patches from PR #643 and answers the gpt-6-astra review of that PR. One decision is open: how folding treats earlier steps (step 5)."
         ],
         "diagram": {
          "view": "step",
@@ -2067,7 +2258,7 @@
                "cells": {
                 "key": "steps[i].panelDeclare.gauge",
                 "value": "{\"max\": 200, \"unit\": \"W\", \"title\": \"Draw (watts)\"}",
-                "rule": "carried from this step"
+                "rule": "shape only; applied in step 2"
                }
               },
               {
@@ -2075,7 +2266,7 @@
                "cells": {
                 "key": "steps[i].panelDeclareOnce.gauge",
                 "value": "{\"max\": 50}",
-                "rule": "this step only, over the carried value"
+                "rule": "shape only; applied in step 3"
                }
               }
              ]
@@ -2116,7 +2307,7 @@
            "edges": [
             "author->merge"
            ],
-           "text": "**Order:** authored declaration, then every accepted `panelDeclare` on this path up to and including this step, then this step's `panelDeclareOnce`. `null` in `panelDeclare` restores the declared value from then on; `null` in `panelDeclareOnce` does so for one step. `id`, `type`, `initial`, `visible` are reserved.",
+           "text": "**Order:** authored declaration, then every accepted `panelDeclare` on this path up to and including this step, then this step's `panelDeclareOnce`. `null` in `panelDeclare` restores the declared value from then on; `null` in `panelDeclareOnce` does so for one step. `id`, `type`, `initial`, `visible` are reserved. Merge depth: each top-level declaration field is replaced whole, including arrays and objects such as `fields` or `stages`; nothing is merged inside them.",
            "panels": {
             "effective": {
              "rows": [
@@ -2164,7 +2355,15 @@
                "cells": {
                 "key": "null",
                 "value": "{\"max\": null}",
-                "rule": "restores the declared 400"
+                "rule": "restores the declared 400 (step 7)"
+               }
+              },
+              {
+               "id": "c",
+               "cells": {
+                "key": "merge depth",
+                "value": "{\"stages\": [ … ]}",
+                "rule": "replaces the whole stages array"
                }
               }
              ]
@@ -2329,17 +2528,25 @@
               {
                "id": "b",
                "cells": {
-                "key": "data-contract",
-                "value": "state fields > effective declaration",
-                "rule": "same order to validate and render"
+                "key": "worked example",
+                "value": "carried state fields [initial]; panelDeclare fields [declared]",
+                "rule": "renders [initial]: state wins"
                }
               },
               {
                "id": "c",
                "cells": {
-                "key": "cache",
-                "value": "one context per distinct declaration",
-                "rule": "not one per step"
+                "key": "same step",
+                "value": "highlight on field declared",
+                "rule": "warns: not a rendered field"
+               }
+              },
+              {
+               "id": "d",
+               "cells": {
+                "key": "enterOnce fields [temp]",
+                "value": "renders [temp] one step",
+                "rule": "then [initial] again"
                }
               }
              ]
@@ -2393,6 +2600,14 @@
                 "key": "Option A",
                 "value": "segments seeded from carried state",
                 "rule": "no reinterpretation; folds need a resume point"
+               }
+              },
+              {
+               "id": "c",
+               "cells": {
+                "key": "fold cache (A or B)",
+                "value": "keyed by declaration content",
+                "rule": "folds ≤ distinct declarations per path"
                }
               },
               {
@@ -2564,6 +2779,89 @@
            }
           },
           {
+           "id": "p-restore",
+           "edges": [
+            "author->merge"
+           ],
+           "text": "**`null` restores the declared value.** This step writes `panelDeclare: {\"gauge\": {\"max\": null}}`: max returns to the declared 400 from here on; unit and title keep their overrides.",
+           "panels": {
+            "effective": {
+             "rows": [
+              {
+               "id": "max",
+               "cells": {
+                "field": "max",
+                "value": "400",
+                "from": "declaration (override removed)"
+               },
+               "status": "changed"
+              },
+              {
+               "id": "unit",
+               "cells": {
+                "field": "unit",
+                "value": "W",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "title",
+               "cells": {
+                "field": "title",
+                "value": "Draw (watts)",
+                "from": "panelDeclare (carried)"
+               }
+              }
+             ]
+            },
+            "pjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "steps[i].panelDeclare.gauge",
+                "value": "{\"max\": null}",
+                "rule": "override removed from here on"
+               }
+              }
+             ]
+            },
+            "guarantees": {
+             "results": {
+              "noop": {
+               "status": "pass",
+               "detail": "no panelDeclare: the authored declaration object is used unchanged"
+              },
+              "collide": {
+               "status": "pass",
+               "detail": "step-level key outside panel state"
+              },
+              "forks": {
+               "status": "pending"
+              },
+              "agree": {
+               "status": "pass",
+               "detail": "one helper builds the effective declaration for both"
+              },
+              "derived": {
+               "status": "pass",
+               "detail": "facets, evidence and reference traversal receive the effective declaration"
+              },
+              "shaped": {
+               "status": "pending"
+              },
+              "viewers": {
+               "status": "pending"
+              },
+              "history": {
+               "status": "warn",
+               "detail": "decision needed: segment fold from carried state (every fold needs a resume point) or whole-path refold"
+              }
+             }
+            }
+           }
+          },
+          {
            "id": "p-compat",
            "edges": [
             "author->compat"
@@ -2663,9 +2961,17 @@
               {
                "id": "c",
                "cells": {
-                "key": "per-type override keys",
-                "value": "unchanged",
-                "rule": "unification is separate"
+                "key": "validateDeclaration",
+                "value": "pure; no side effects",
+                "rule": "may run once per distinct declaration per path"
+               }
+              },
+              {
+               "id": "d",
+               "cells": {
+                "key": "renderers",
+                "value": "recompute when the declaration changes",
+                "rule": "no declaration caches on the host"
                }
               }
              ]
@@ -2780,6 +3086,7 @@
             "p-valid",
             "p-fold",
             "p-render",
+            "p-restore",
             "p-derive",
             "p-compat",
             "p-forks"

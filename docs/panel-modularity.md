@@ -154,9 +154,10 @@ The overridable list is the names in `authoring.setupFields` plus `title`,
 or an explicit `unifiedFields: [...]`. `id`, `type`, `initial`, `visible` and
 `brand` are never overridden. The validator removes these names from a patch
 before calling `validatePatch`. It then runs `validateDeclaration` on the
-declaration in effect at that step and reports only the new warnings, at the
-patch path; `initial` is not checked again. `validatePatch` receives that
-effective declaration and its context.
+declaration in effect at that step and reports, at the patch path, the new
+warnings and any warning about a field the step sets; `initial` is not
+checked again. `validatePatch` receives that effective declaration and its
+context.
 Compatibility reports `flow.panel-setup-steps` when a patch, `enterOnce` or
 `initial` sets one of these fields.
 
@@ -171,8 +172,10 @@ Check these before flagging a type:
 - The type has no existing override that ignores invalid values and falls
   back to the declaration (`data-contract`, `radar`).
 
-Flagged types: `gauge`, `state`, `log`, `waterfall`, `orbit`, `queue`,
-`thermo`, `table`, `checks` and `budget`. Left unflagged after checking:
+Flagged types: `gauge`, `state`, `log`, `orbit`, `queue`, `table`, `checks` and
+`budget`. Left unflagged after checking:
+`thermo` (its history sparkline reads the current limits for every step),
+`waterfall` (its reveal animation remembers bars by position, not span),
 `image` (its contract promises that steps never change the shared image),
 `buffer` (its fold reads the declared `segments`), `trace` (its service picker
 reads the declared spans across every step) and `cost` (its items hold node

@@ -266,15 +266,15 @@ function specStructureErrors(page){
 
 /* A unified type's patch may carry setup fields. They are taken out before the
    type's own patch rules run, and the declaration in effect at this step is
-   checked with the type's declaration rules; only warnings the override adds
-   are reported, at the patch path. `carry` holds the setup values carried into
+   checked with the type's declaration rules. Warnings the override adds, or
+   that name a field this step sets, are reported at the patch path. `carry` holds the setup values carried into
    this step along one path. */
 function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, errors){
   var rest = Object.assign({}, patch), once = specObject(patch.enterOnce) ? Object.assign({}, patch.enterOnce) : null;
-  var step = Object.assign({}, carry), touched = false;
+  var step = Object.assign({}, carry), touched = [];
   unified.fields.forEach(function(key){
-    if (panelOwn(rest, key)){ step[key] = rest[key]; delete rest[key]; touched = true; }
-    if (once && panelOwn(once, key)){ step[key] = once[key]; delete once[key]; touched = true; }
+    if (panelOwn(rest, key)){ step[key] = rest[key]; delete rest[key]; touched.push(key); }
+    if (once && panelOwn(once, key)){ step[key] = once[key]; delete once[key]; touched.push(key); }
   });
   if (once) rest.enterOnce = once;
   var effective = panelEffectiveDeclaration(decl, step), descriptor = PanelRegistry.get(decl.type);
@@ -285,9 +285,14 @@ function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, error
   delete setup.initial; delete next.initial;
   descriptor.validateDeclaration(setup, path, before, beforeErrors, d);
   var context = descriptor.validateDeclaration(next, path, after, afterErrors, d);
-  if (touched){
-    after.forEach(function(w){ if (before.indexOf(w) < 0) warnings.push(w); });
-    afterErrors.forEach(function(e){ if (beforeErrors.indexOf(e) < 0) errors.push(e); });
+  /* Report what the override adds, and anything about a field this step sets
+     even when the declared value had the same problem. */
+  function own(message){
+    return touched.some(function(key){ return [':', '.', '['].indexOf(message.charAt((path + '.' + key).length)) >= 0 && message.indexOf(path + '.' + key) === 0; });
+  }
+  if (touched.length){
+    after.forEach(function(w){ if (before.indexOf(w) < 0 || own(w)) warnings.push(w); });
+    afterErrors.forEach(function(e){ if (beforeErrors.indexOf(e) < 0 || own(e)) errors.push(e); });
   }
   return {patch:rest, panel:effective, context:context};
 }

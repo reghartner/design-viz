@@ -160,6 +160,17 @@ test('a unified type with declaration rules has its overrides checked at the pat
     'steps[4].panels.p.label: unknown field',
     'steps[4].panels.p.value: above 10',
   ]);
+  /* Alternate paths carry independently: branch b never sees branch a's limit,
+     and the shared last step is checked once per distinct carry. */
+  const alt = {nodes: {a: {}}, rows: [['a']], panels: [{id: 'p', type: 'probe', limit: 10}],
+    steps: [{id: 'start', nodes: ['a']}, {id: 'a', nodes: ['a'], panels: {p: {limit: 50}}},
+      {id: 'b', nodes: ['a'], panels: {p: {value: 20}}}, {id: 'end', nodes: ['a'], panels: {p: {value: 20}}}],
+    paths: [{id: 'one', steps: ['start', 'a', 'end']}, {id: 'two', steps: ['start', 'b', 'end']}]};
+  const altWarnings = T.validate(T.normalize(alt)).warnings.filter(w => w.includes('.steps['));
+  assert.deepEqual(plain(altWarnings.map(w => w.replace(/^.*\.steps/, 'steps'))), [
+    'steps[2].panels.p.value: above 10',
+    'steps[3].panels.p.value: above 10',
+  ]);
 });
 
 test('compatibility reports per-step setup changes only for unified types that use them', () => {

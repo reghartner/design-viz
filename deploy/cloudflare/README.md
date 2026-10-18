@@ -14,13 +14,16 @@ on that plan. Check Cloudflare's pricing pages before relying on either figure.
 
 ## What gets uploaded
 
-`deploy.sh` runs `python3 tools/build.py`, assembles `deploy/cloudflare/site/`,
+`deploy.sh` runs `python3 tools/build.py --no-library --no-catalog`, which hides
+the Welcome **Browse diagrams** button and both Welcome **From service catalog**
+actions, because this host publishes no library and no catalog. The editor's
+**Add to diagram → Services from catalog** stays. It assembles `deploy/cloudflare/site/`,
 generates `deploy/cloudflare/.generated/wrangler.jsonc`, and uploads with Wrangler:
 
 | Published path | Source | Purpose |
 | --- | --- | --- |
 | `/workbench/flowspec.html` | `workbench/flowspec.html` | the editor |
-| `/workbench/diagrams.json` | generated, always empty | library index; its presence makes Browse show nothing rather than the bundled fictional example. `canon.json` is ignored |
+| `/workbench/diagrams.json` | generated, always empty | library index. The Browse button is hidden, but a direct `?diagram=` link still reads this file; its presence keeps the library empty instead of showing the bundled fictional example. `canon.json` is ignored |
 | `/workbench/starters.json` | `workbench/starters.example.json` | welcome-page starter projects |
 | `/template/flowview.html` | `template/flowview.html` | fetched by Export project |
 | `/_redirects` | generated | `/` redirects to the editor |
@@ -30,7 +33,8 @@ The generated config sets `html_handling: "none"` so `/workbench/flowspec.html` 
 served at its exact path; the editor fetches `starters.json`, `diagrams.json`
 and `../template/flowview.html` relative to that URL. The built-in starter
 projects are embedded in `flowspec.html`, so `src/starters/` is not uploaded. There is no
-`workbench/catalog.json`, so **From service catalog** reports no catalog.
+`workbench/catalog.json`, so **Add to diagram → Services from catalog** in the
+editor reports no catalog.
 
 ## Nothing account-specific is committed
 
@@ -73,6 +77,9 @@ must answer `302` to a `cloudflareaccess.com` URL.
 ## Redeploy
 
 Run `sh deploy/cloudflare/deploy.sh` again. Wrangler uploads only changed files.
+When the script exits, it rebuilds this checkout's `workbench/` and `template/`
+outputs with a default build, so local use and `Dockerfile.prebuilt` keep the
+Browse and catalog buttons.
 
 ## Agent editing
 

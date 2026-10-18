@@ -479,7 +479,7 @@ function initWorkbenchWelcome(opts){
   renderTemplates(); updatePrompt();
   var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,
+  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,skin:opts.skin,
     position:navigation.readerTarget,savePosition:navigation.readerTarget,
     open:function(id,published){navigation.go('reader',id,published);},
     unknown:function(value){navigation.replace('home',true);error('welcome-link-error','No published diagram matches “'+value+'”. Choose one from Browse diagrams.');},edit:function(spec,request,direct,topologyContext,target){
@@ -493,6 +493,7 @@ function initWorkbenchWelcome(opts){
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor, buildWithAgent:function(){buildWithAgent('external',true);},
+    setSkin:function(skin){if(library && library.setSkin)library.setSkin(skin);},
     localProjectOpened:navigation.localProject,
     canonicalLoaded:function(){if(navigation.screen()==='editor')displayEditor(false);else updateResume();}};
 }

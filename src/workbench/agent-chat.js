@@ -82,7 +82,7 @@ function initWorkbenchAgentChat(opts){
   // Review opens from the update banner; this card only records that an update waits.
   var reviewCard=element('section','folder-agent-receipt'),reviewSummary=element('p');
   reviewCard.id='folder-agent-review';reviewCard.hidden=true;reviewCard.append(reviewSummary,element('p','folder-agent-hint','Open Preview Agent Updates in the banner above to review it.'));history.insertBefore(reviewCard,activity);
-  var reviewer=initWorkbenchAgentReview({document:doc,resolve:opts.resolve,snapshot:function(){return client && client.reviewSnapshot();},
+  var reviewer=initWorkbenchAgentReview({document:doc,resolve:opts.resolve,skin:opts.previewSkin,snapshot:function(){return client && client.reviewSnapshot();},
     accept:async function(version){try{if(client)await client.acceptReview(version);}catch(ex){status('Could not accept changes: '+ex.message);}},
     reject:async function(message,version){try{if(client)await client.rejectReview(message,version);}catch(ex){status('Could not return the update: '+ex.message);}}});
   life.own(function(){reviewer.destroy();});
@@ -713,6 +713,7 @@ function initWorkbenchAgentChat(opts){
   recovery.handle().then(function(saved){if(life.alive())rememberedHandle=saved;});
   contextTick();stage('folder');setComposeMode('external');
   return {destroy:life.destroy,openSetup:openSetup,
+    setSkin:function(name){if(reviewer.setSkin)reviewer.setSkin(name);},
     practice:opts.practice?{connect:connect,propose:function(){if(client)client.propose();}}:null,
     releaseWorking:function(){return client?disconnect():Promise.resolve();},
     readLedger:function(){return client && state.connected?client.readLedger():Promise.resolve(null);},

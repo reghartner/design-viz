@@ -223,6 +223,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
       const assets=panelAssets(root);
       source = source.replace(marker, JSON.stringify(assets.features));
       source = source.replace('/* @icon-ids */ []',JSON.stringify(assets.iconIds || []));
+      source = source.replace('/* @panel-unified */ {}',JSON.stringify(assets.unified));
     }
     return {file, source};
   });
@@ -271,6 +272,7 @@ function panelAssets(root = sourceRoot) {
   // filesystem, process or network is exposed to module registration.
   vm.runInNewContext(formatSources(sourceRecords(['validator.js'], root, false)), context, { timeout: 5000 });
   const features = {},
+    unified = {},
     styles = [],
     editorStyles = [];
   for (const type of context.PanelRegistry.types()) {
@@ -292,10 +294,13 @@ function panelAssets(root = sourceRoot) {
         into.push({ css: item.css, order: item.order == null ? 100000 : item.order });
       }
     }
+    // Synthetic test roots may omit the shared panel helpers.
+    const fields = typeof context.panelUnifiedFields === 'function' && context.panelUnifiedFields(type);
+    if (fields) unified[type] = fields;
     collect(definition.styles, styles);
     collect(definition.editorStyles, editorStyles);
   }
-  return { features, styles, editorStyles, iconIds:context.FlowIcons ? Array.from(context.FlowIcons.ids).filter(id=>!context.FlowIcons.registry[id].legacy) : [] };
+  return { features, unified, styles, editorStyles, iconIds:context.FlowIcons ? Array.from(context.FlowIcons.ids).filter(id=>!context.FlowIcons.registry[id].legacy) : [] };
 }
 function readStyles(name, root = sourceRoot) {
   let source = fs.readFileSync(path.join(root, name), 'utf8');

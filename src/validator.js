@@ -264,6 +264,29 @@ function specStructureErrors(page){
   return errors;
 }
 
+/* A unified type's patch may carry setup fields. They are taken out before the
+   type's own patch rules run, and the declaration in effect at this step is
+   checked with the type's declaration rules; only warnings the override adds
+   are reported, at the patch path. */
+function unifiedPanelPatch(unified, patch, decl, d, path, warnings, errors){
+  var rest = Object.assign({}, patch), once = specObject(patch.enterOnce) ? Object.assign({}, patch.enterOnce) : null;
+  var step = Object.assign({}, unified.carry), touched = false;
+  unified.fields.forEach(function(key){
+    if (panelOwn(rest, key)){ unified.carry[key] = step[key] = rest[key]; delete rest[key]; touched = true; }
+    if (once && panelOwn(once, key)){ step[key] = once[key]; delete once[key]; touched = true; }
+  });
+  if (once) rest.enterOnce = once;
+  var effective = panelEffectiveDeclaration(decl, step), descriptor = PanelRegistry.get(decl.type);
+  if (effective === decl || !descriptor.validateDeclaration) return {patch:rest, panel:effective, context:unified.context};
+  var before = [], beforeErrors = [], after = [], afterErrors = [];
+  descriptor.validateDeclaration(decl, path, before, beforeErrors, d);
+  var context = descriptor.validateDeclaration(effective, path, after, afterErrors, d);
+  if (touched){
+    after.forEach(function(w){ if (before.indexOf(w) < 0) warnings.push(w); });
+    afterErrors.forEach(function(e){ if (beforeErrors.indexOf(e) < 0) errors.push(e); });
+  }
+  return {patch:rest, panel:effective, context:context};
+}
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
   var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
@@ -437,6 +460,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var panelIds = {};
   var panelDeclById = {};
   var panelContexts = Object.create(null);
+  var panelUnified = Object.create(null);
   (d.panels || []).forEach(function(p, pi){
     var PP = DP + '.panels[' + pi + ']';
     if (!p || typeof p !== 'object'){ errors.push(PP + ': must be an object {id, type, ...}'); return; }
@@ -452,6 +476,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
     if (descriptor && descriptor.validateDeclaration)
       panelContexts[p.id] = descriptor.validateDeclaration(p, PP, warnings, errors, d);
+    var unifiedFields = panelUnifiedFields(p.type);
+    if (unifiedFields){
+      var carry = Object.create(null);
+      unifiedFields.forEach(function(key){ if (panelOwn(p.initial, key)) carry[key] = p.initial[key]; });
+      panelUnified[p.id] = {fields:unifiedFields, carry:carry, context:panelContexts[p.id]};
+    }
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
@@ -532,8 +562,10 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           '; the engine ignores this patch');
       } else {
         var panel = panelDeclById[pid], descriptor = PanelRegistry.get(panel.type);
+        var PSP = DP + '.steps[' + ti + '].panels.' + pid, own = {patch:patch[pid], panel:panel, context:panelContexts[pid]};
+        if (panelUnified[pid]) own = unifiedPanelPatch(panelUnified[pid], patch[pid], panel, d, PSP, warnings, errors);
         if (descriptor && descriptor.validatePatch)
-          descriptor.validatePatch(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panel, warnings, panelContexts[pid]);
+          descriptor.validatePatch(own.patch, PSP, own.panel, warnings, own.context);
       }
     });
     if (st && st.lane && !lanes[st.lane])

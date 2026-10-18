@@ -5,6 +5,32 @@ function panelObject(v) {
 function panelOwn(obj, key) {
   return panelObject(obj) && Object.prototype.hasOwnProperty.call(obj, key);
 }
+/* A type that opts in with `unified: true` lets steps change its setup fields
+   exactly like state: the folded state carries them, `enterOnce` holds them for
+   one step, and null restores the declared value. Only these names are laid
+   over the declaration, so dynamic state IDs are never read as setup. */
+var PANEL_FRAME_FIELDS = ['id', 'type', 'initial', 'visible', 'brand'];
+function panelUnifiedFields(type) {
+  var definition = PanelRegistry.get(type);
+  if (!definition || !definition.unified) return null;
+  var names = definition.unifiedFields ||
+    ((definition.authoring && definition.authoring.setupFields) || []).map(function (field) {
+      return field[0];
+    }).concat('title');
+  return names.filter(function (name, i) {
+    return PANEL_FRAME_FIELDS.indexOf(name) < 0 && names.indexOf(name) === i;
+  });
+}
+/* Unflagged types, and states without overrides, return the declaration itself. */
+function panelEffectiveDeclaration(panel, state) {
+  var fields = panel && panelUnifiedFields(panel.type), out = panel;
+  (fields || []).forEach(function (key) {
+    if (!panelOwn(state, key) || state[key] === null) return;
+    if (out === panel) out = Object.assign({}, panel);
+    out[key] = state[key];
+  });
+  return out;
+}
 var BUFFER_STATES = ['empty', 'buffered', 'protected', 'uploading', 'uploaded', 'dropped'];
 function bufferSegCount(decl) {
   return decl && typeof decl.segments === 'number' && isFinite(decl.segments)
@@ -277,7 +303,7 @@ function softwarePanelShell(content, state) {
 // Kept as a compatibility helper for callers of the software panel models.
 function softwarePanelHTML(panel, state) {
   var render = PanelViews.get(panel.type);
-  return render ? render({}, panel, state || {}).html : softwarePanelShell('', state || {});
+  return render ? render({}, panelEffectiveDeclaration(panel, state), state || {}).html : softwarePanelShell('', state || {});
 }
 function panelGlideElements(host, glide) {
   if (!glide) return [];
@@ -416,6 +442,7 @@ function tweenPanelBars(host, bars, animate) {
 function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePresentation) {
   var render = PanelViews.get(panel.type),
     animate = animatePresentation !== false && !RM;
+  panel = panelEffectiveDeclaration(panel, state);
   var result = render
     ? render(host, panel, state || {}, skin, states, stepIdx, animate)
     : {
@@ -481,6 +508,23 @@ function panelOrder(panels) {
   return fixed.concat(growing);
 }
 
+/* The heading follows the step's effective declaration; it is created,
+   changed or removed only when that title differs from what is shown. */
+function panelTitle(card, title, el) {
+  if (!title) {
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    return null;
+  }
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'ptitle';
+    if (card.firstChild) card.insertBefore(el, card.firstChild);
+    else card.appendChild(el);
+  }
+  if (el.textContent !== String(title)) el.textContent = title;
+  return el;
+}
+
 function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
   var folded = foldPanelStates(d);
   var visibility = foldPanelVisibility(d);
@@ -492,12 +536,13 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     card.className = 'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown');
     /* spec index, not render order — log panels are reordered to the end */
     card.setAttribute('data-dv-panel', String((d.panels || []).indexOf(p)));
-    if (p.title) {
-      var t = document.createElement('div');
-      t.className = 'ptitle';
-      t.textContent = p.title;
-      card.appendChild(t);
-    }
+    /* Homemap ambient state precedes step zero; other widgets keep their
+       established first-folded-step preview. */
+    var view = PanelViews.get(p.type),
+      options = view ? view.options : {};
+    var home = options.ambientInitial;
+    var first = home ? p.initial : (folded[p.id] || [])[0];
+    var title = panelTitle(card, panelEffectiveDeclaration(p, first).title, null);
     var body = document.createElement('div');
     body.className = 'pbody';
     card.appendChild(body);
@@ -505,16 +550,11 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
       card
     );
     p = Object.assign({}, p, {brand: FlowBrand.effective(d.brand, p.brand)});
-    hosts[p.id] = { panel: p, body: body, card: card };
-    /* Homemap ambient state precedes step zero; other widgets keep their
-       established first-folded-step preview. */
-    var view = PanelViews.get(p.type),
-      options = view ? view.options : {};
-    var home = options.ambientInitial;
+    hosts[p.id] = { panel: p, body: body, card: card, title: title };
     renderPanelBody(
       body,
       p,
-      home ? p.initial : (folded[p.id] || [])[0],
+      first,
       skin,
       options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],
       home ? -1 : 0,
@@ -544,6 +584,9 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
         // remain hidden independently. Keep attached playback controls usable.
         var shown = ambient || (visibility[pid] || [])[i] !== false;
         var card = hosts[pid].card;
+        var state = homeAmbient ? panel.initial : states[si];
+        if (panelUnifiedFields(panel.type))
+          hosts[pid].title = panelTitle(card, panelEffectiveDeclaration(panel, state).title, hosts[pid].title);
         card.classList.toggle('panel-step-hidden', !shown);
         Array.prototype.forEach.call(card.children, function(child){
           if (!child.classList.contains('pbody') && !child.classList.contains('ptitle')) return;
@@ -554,7 +597,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
         renderPanelBody(
           hosts[pid].body,
           panel,
-          homeAmbient ? panel.initial : states[si],
+          state,
           skin,
           options.historyRequiresSteps && !traceNavigation ? [] : states,
           homeAmbient ? -1 : si,

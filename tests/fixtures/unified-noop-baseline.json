@@ -351,9 +351,9 @@
   }
  },
  "examples/data-contract/data-contract.spec.json": {
-  "spec": "ff303d4db532e48e",
+  "spec": "37a5442458b55044",
   "validate": "7cd4f8a0a4311207",
-  "compat": "fecd4eb08546a9d9",
+  "compat": "37934dfe78ee4055",
   "d0:happy": {
    "fold": "531b436d27d4b903",
    "render": {
@@ -858,9 +858,9 @@
   }
  },
  "examples/kestrel-overnight/story.spec.json": {
-  "spec": "223fb59dac4b03bc",
+  "spec": "1925f9580fd4e39e",
   "validate": "7cd4f8a0a4311207",
-  "compat": "3fa31e2d061037e4",
+  "compat": "77435fb262119029",
   "d0:normal": {
    "fold": "20fee394d356d1a1",
    "render": {
@@ -1122,19 +1122,19 @@
   }
  },
  "examples/sports/venue-map.spec.json": {
-  "spec": "00ae4ddedf8c0456",
+  "spec": "6e5d93285b1b6e49",
   "validate": "7cd4f8a0a4311207",
   "compat": "a62e84a78a673a90",
   "d0:sellout": {
-   "fold": "7d46a181d6bad6a5",
+   "fold": "fe69057535c39358",
    "render": {
-    "map": "5f252ea710ebf4bd"
+    "map": "841f4adc886acdaa"
    }
   },
   "d0:soft": {
-   "fold": "bb2cb75c9f1de73f",
+   "fold": "567a2f34095b1d57",
    "render": {
-    "map": "ee8d53a22d57361b"
+    "map": "e467f4b14ad1bcff"
    }
   }
  },
@@ -1281,7 +1281,7 @@
   }
  },
  "src/starters/audio-story.json": {
-  "spec": "0675c2734bea343c",
+  "spec": "d467d0be1563f0f2",
   "validate": "7cd4f8a0a4311207",
   "compat": "c307058fed119abf",
   "d0:conversation": {
@@ -1495,9 +1495,9 @@
   }
  },
  "src/starters/front-door-threshold.json": {
-  "spec": "33627957c0b8ee97",
+  "spec": "b0c9dfe6bab96a8a",
   "validate": "7cd4f8a0a4311207",
-  "compat": "62bee6bb2ecd2981",
+  "compat": "0d6fec3be966e4b6",
   "d0:welcome": {
    "fold": "20e3b7209db1ef83",
    "render": {
@@ -1512,9 +1512,9 @@
   }
  },
  "src/starters/homemap-story.json": {
-  "spec": "333ac6556fb433c0",
+  "spec": "1a3a922f25483116",
   "validate": "7cd4f8a0a4311207",
-  "compat": "799670b2bbaeb2d2",
+  "compat": "07ff3df9ebbff61a",
   "d0:happy": {
    "fold": "8a113c8db614cbe8",
    "render": {
@@ -1570,7 +1570,7 @@
   }
  },
  "src/starters/named-layouts.json": {
-  "spec": "bb7b1e8242d39d91",
+  "spec": "a63b1ae3248600db",
   "validate": "7cd4f8a0a4311207",
   "compat": "8af3c81aac302f2d",
   "d0:happy": {
@@ -1719,9 +1719,9 @@
   }
  },
  "src/starters/screen-clips.json": {
-  "spec": "710761259e7c7d03",
+  "spec": "e7ed5e5b2e8c2d54",
   "validate": "7cd4f8a0a4311207",
-  "compat": "f561b5d33c138657",
+  "compat": "6e4ef1c9df1feef7",
   "d0:happy": {
    "fold": "11b42bb61f7ddde1",
    "render": {
@@ -1754,7 +1754,7 @@
   }
  },
  "src/starters/security-response.json": {
-  "spec": "9297afc708db218b",
+  "spec": "bacfcb5db6ecb1ba",
   "validate": "7cd4f8a0a4311207",
   "compat": "fbef7b564be081f0",
   "d0:confirmed": {
@@ -1833,9 +1833,9 @@
   }
  },
  "src/starters/whole-home-outdoors.json": {
-  "spec": "84f5d786f04fd07e",
+  "spec": "aea766f4b0cd1991",
   "validate": "7cd4f8a0a4311207",
-  "compat": "d1b381efc99c1494",
+  "compat": "9f6910ce1cec382b",
   "d0:happy": {
    "fold": "cdde762088566b69",
    "render": {

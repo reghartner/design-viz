@@ -213,7 +213,7 @@ test('Home and Data flow retain live step controls across expanded-window switch
   const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   for(const name of ['Data flow','Home','Data flow']){
     await dialog.getByRole('button',{name,exact:true}).click();
-    await expect(dialog.locator((name==='Home'?'.primary-panel':'.diagramcol')+' > .termbar')).toBeVisible();
+    await expect(dialog.locator('.section-layout-tile[data-layout-key="'+(name==='Home'?'panel:home':'diagram')+'"] .termbar')).toBeVisible();
     await expect(dialog.locator('.playback-mode-rail')).toBeVisible();
     await expect(dialog.locator('.explore-stage')).toBeHidden();
     const navBeforeScroll=await dialog.locator('.explore-navigation').boundingBox();
@@ -229,19 +229,19 @@ test('Home and Data flow retain live step controls across expanded-window switch
   }
   await dialog.locator('.schips [data-step-source="3"]').click();
   await expect(dialog.locator('.stepid')).toHaveText('persist');
-  await info.attach('backstage-focus-controls',{body:await page.screenshot(),contentType:'image/png'});
+  await info.attach('backstage-authored-controls',{body:await page.screenshot(),contentType:'image/png'});
   await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();
-  await expect(alpha.locator('.diagramcol > .termbar')).toBeVisible();
+  await expect(alpha.locator('.section-layout-tile[data-layout-key=diagram] .termbar')).toBeVisible();
   await expect(alpha.locator('.stepid')).toHaveText('persist');
   await alpha.getByRole('button',{name:'Home',exact:true}).click();
-  await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
+  await expect(alpha.locator('.section-layout-tile[data-layout-key="panel:home"] .termbar')).toBeVisible();
   await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
-  await expect(dialog.locator('.primary-panel > .termbar')).toBeVisible();
+  await expect(dialog.locator('.section-layout-tile[data-layout-key="panel:home"] .termbar')).toBeVisible();
   await expect(dialog.locator('.stepid')).toHaveText('persist');
   await dialog.getByRole('button',{name:'Data flow',exact:true}).click();
   await dialog.getByRole('button',{name:'Home',exact:true}).click();
   await page.keyboard.press('Escape');
-  await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
+  await expect(alpha.locator('.section-layout-tile[data-layout-key="panel:home"] .termbar')).toBeVisible();
   await expect(alpha.locator('.stepid')).toHaveText('persist');
   await expect(beta.locator('.stepid')).toHaveText('done');
   await page.evaluate(()=>{__host.left(false);__host.right(false);});

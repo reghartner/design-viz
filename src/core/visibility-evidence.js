@@ -22,10 +22,7 @@ function visibilityEvidence(raw,document){
     var d=record.section.diagram,views=diagramLayoutViews(d),named=views.length && !views[0].legacy;
     if((Array.isArray(d.layouts)?d.layouts:[]).filter(function(v){return v && v.id===e.view;}).length>1)return stop('invalid','Ambiguous view ID');
     var view=views.find(function(v){return (v.legacy?'layout':v.id)===e.view;});
-    if(named && !view || !named && ['flow','home'].indexOf(e.view)<0 && !view ||
-      e.view==='home' && !views.length && !diagramFocusPanel(d))return stop('invalid','Unknown view');
-    // Legacy home is the saved layout alias; named views never fall back to flow.
-    if(!named && e.view==='home' && views.length)view=views[0];
+    if(named && !view || !named && e.view!=='flow' && !view)return stop('invalid','Unknown view');
     if(d.view==='ambient-only')return stop('invalid','Step is unreachable in ambient-only mode');
     var resolved=resolveSourceStep(d,e.path,e.step);
     if(!resolved || resolved.sourceIndex<0)return stop('invalid','Unknown path or step on this path');

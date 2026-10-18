@@ -69,7 +69,7 @@ travels with a whole-panel copy.
 | Selection | Paste behavior |
 |---|---|
 | One or more nodes from one diagram | Fresh node/group IDs; retains rows, stacks, floating placement, group ancestry, bindings and source links. Includes only edges between copied nodes. |
-| One or more panels from one diagram | Fresh panel IDs; includes definitions and initial state. Existing steps and the destination's centerpiece selection are unchanged. |
+| One or more panels from one diagram | Fresh panel IDs; includes definitions and initial state. Existing steps and the destination's authored View selection are unchanged. |
 | Home device, door, subject or room | Independent element in the selected Home panel, with a small offset. Existing device/subject count limits apply. |
 | Section | Complete independent section after the destination section, including nodes, panels, steps, alternates, failure paths and prose. Internal IDs remain scoped to the new diagram. |
 

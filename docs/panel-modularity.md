@@ -38,12 +38,13 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `visibilityEvidence(panel, state, field)` | Optional pure evidence facet; return supported/visible/reason plus trusted DOM address metadata for an internal field. Unsupported fields must say so; whole-panel content is generic. See [visibility evidence](visibility-evidence.md). |
 | `presentation` | Shared traits: `growing`, `ambientInitial`, `historyRequiresSteps` |
 | `authoring` | Template, setup/step fields, picker description/example, provenance and custom editor hooks |
-| `layout` | Default focus, focus label, control attachment, large sizing and preferred height |
+| `layout` | Control attachment, large sizing and preferred height |
 | `references` | Paths such as `{nodes: ['sources.*.node']}` for rename, deletion and cross-spec paste |
 | `styles`, `editorStyles` | Panel-only CSS; shared themes and reusable primitives remain shared |
 
-`layout` supports `focusByDefault`, `focusLabel`, `attachControls`, `large`,
-`height`, `supporting`, `fallbackHeight` and `canvasSizing`. A preferred size
+`layout` supports `attachControls`, `large`,
+`height`, `supporting`, `fallbackHeight` and `canvasSizing`. Panels never create Views or choose the opening View. Retired `focusByDefault`
+and `focusLabel` flags have no runtime effect. A preferred size
 never overrides a saved size or hidden choice. `fallbackHeight` is used when
 appending a panel to an existing layout. `canvasSizing` is an opt-in Explore
 canvas policy. `mode: 'fixed-aspect'` fits the rendered content and uses the
@@ -182,7 +183,9 @@ duplicate rules between modules.
 
 `src/source-bundles.json` discovers `panels/types/*.js` deterministically, then
 the optional company overlay globs `@company/panels/*.js` (before the types)
-and `@company/panels/types/*.js` (after them). The
+and `@company/panels/types/*.js` (after them). Seatmap venue data files
+(`panels/venues/*.js`, then `@company/panels/venues/*.js`) load after the
+helpers and before the types; see [venue map](../cookbook/venue-map.md). The
 validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Named entrypoints order these bundles
 and select shared assets and deliberate exports. `tools/source-loader.cjs` owns

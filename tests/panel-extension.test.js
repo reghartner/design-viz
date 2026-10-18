@@ -80,7 +80,7 @@ test('one added definition is discovered without editing an existing source or a
   assert.equal(C.PanelViews.get(TYPE),C.PanelRegistry.get(TYPE).render);
   assert.equal(C.PanelViews.get(TYPE).options.ambientInitial,true);
   assert.equal(C.panelCapability(TYPE,'height'),9);
-  assert.equal(C.diagramFocusPanel(fixture()).id,'meter');
+  assert.equal(C.tabViewDefinitions(C.tabViewOwners(C.normalize(fixture()))[0]).length,1);
   const ordered=C.panelOrder([{id:'meter',type:TYPE},{id:'gauge',type:'gauge'}]);
   assert.deepEqual(plain(ordered.map(panel=>panel.id)),['gauge','meter']);
   assert.equal('document' in C,false,'registration and discovery need no browser');

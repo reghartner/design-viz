@@ -35,9 +35,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
     if(options && options.reader && rec.viewport)prior.reader=rec.viewport.snapshotReaderState();
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.boardSize && rec.boardSize.snapshot) prior.boardNavigation = rec.boardSize.snapshot();
-    if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
     if (rec.presentation){
-      prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId;
       if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
     }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
@@ -81,13 +79,10 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       if(prior.viewId!=null && rec.presentation.setView)rec.presentation.setView(prior.viewId);
       else {
         if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
-        if(prior.focusPanel===rec.presentation.panelId && prior.primaryPanel===section.diagram.primaryPanel)rec.presentation.setMode(prior.focusMode);
       }
     }
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
-    if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
-      rec.flowDisclosure.open = prior.flowOpen;
     if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
@@ -110,12 +105,32 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
     else if(stepper.current().n!==indices[0])stepper.jump(indices[0]);
   });
 }
+/* Arrange borrows a grid only for this authoring render. The controller's
+   accepted page and source remain authored data, including for export/save. */
+function workbenchArrangementSection(previous,next,index){
+  if(index===null || !previous)return null;
+  var before=workbenchPreviewSections(previous),after=workbenchPreviewSections(next),selected=before[index];
+  if(!selected)return null;
+  var matches=matchWorkbenchPreviewSections(before,after),found=null;
+  matches.forEach(function(prior,position){if(prior===selected)found=position;});
+  return found;
+}
+function workbenchArrangementPreviewPage(page,index){
+  if(!Number.isInteger(index) || index<0)return page;
+  var record=sectionRecords(page)[index],d=record && record.section.diagram;
+  if(!d || sectionLayoutItems(d,'default'))return page;
+  var display=JSON.parse(JSON.stringify(page)),diagram=sectionRecords(display)[index].section.diagram;
+  diagram.sectionLayout={columns:SECTION_LAYOUT_COLUMNS};
+  ['default','backstage','confluence'].forEach(function(profile){diagram.sectionLayout[profile]=sectionLayoutItems(d,profile) || sectionLayoutPreset(d,profile);});
+  return display;
+}
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
   var tabs = previousPage ? activeTabReferences(previousCtl) : null;
   var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
-  var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
+  var display=workbenchArrangementPreviewPage(page,lifecycle && lifecycle.arrangementSection);
+  var ctl = renderPage(view, display, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
   /* An unpublished draft has no public document ID. Its controls deliberately
      use this Workbench document as a local/recovery base; Canon supplies its
      stable published route in library.workbench.js. */
@@ -231,6 +246,7 @@ function createWorkbenchPreviewController(opts){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
+        arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);
           replaced=true;page=null;ctl=null;renderedText=null;

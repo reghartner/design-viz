@@ -139,18 +139,15 @@ test('panel boards keep the step bar in the diagram cell before the top-aligned 
   });
 });
 
-test('a centerpiece keeps its map and timeline together before the optional flow on all viewport widths', () => {
+test('panels use the ordinary board grid without a focus toolbar or collapsed graph', () => {
   const local = loadCore({document:{createElement:layoutNode}});
-  const section = layoutNode('section'), layout = local.createBoardGrid(section, true, {id:'home'});
-  const map = layoutNode('div'), controls = layoutNode('div'), board = layoutNode('div');
-  layout.primaryHost.appendChild(map); layout.controlsHost.appendChild(controls); layout.diagramHost.appendChild(board);
-  assert.equal(layout.controlsHost, layout.primaryHost);
-  assert.deepEqual(section.children.map(c=>c.tag), ['div', 'div', 'details']);
-  assert.deepEqual(section.children[0].children, [layout.viewChoicesHost, layout.modesHost]);
-  assert.equal(section.children[2].children[0].textContent, 'Data flow');
-  assert.equal(section.children[2].open, undefined, 'flow starts collapsed');
-  assert.deepEqual(layout.primaryHost.children, [map, controls]);
-  assert.equal(layout.diagramHost.parentNode, section.children[2]);
+  const section=layoutNode('section'),layout=local.createBoardGrid(section,true,{id:'home'});
+  const board=layoutNode('div'),controls=layoutNode('div');
+  layout.diagramHost.appendChild(board);layout.controlsHost.appendChild(controls);
+  assert.equal(layout.controlsHost,layout.diagramCol);
+  assert.deepEqual(section.children,[layout.grid]);
+  assert.deepEqual(layout.diagramCol.children,[board,controls]);
+  assert.equal(layout.primaryHost,undefined);assert.equal(layout.flowDisclosure,undefined);assert.equal(layout.viewChoicesHost,undefined);
 });
 
 test('boards without panels retain the original grid and section-sibling step bar structure', () => {

@@ -10,41 +10,16 @@ with two alternate paths. For the grounds around a house, open
 For a porch and entry separated by a working door, open
 [`src/starters/front-door-threshold.json`](../src/starters/front-door-threshold.json).
 
-## Make the map the centerpiece
+## Choose a map arrangement
 
-Use **Home / Data flow** above a diagram to switch its focus live. Home gives
-the map the main space; Data flow gives that space to the service diagram and
-places the map beside it (below on narrow screens). The timeline follows the
-main view. Your selected path, step, device state, playback, and diagram sizing
-stay intact. In Home view, you can also expand **Data flow** below for a quick
-look at the supporting diagram.
+The maintained Home starters deliberately author **Home** and **Data flow**
+Views. Switch between them without changing the selected path, step or panel
+state. Home hides the graph; Data flow displays it as an ordinary View.
 
-If the section has a saved arrangement, its named layout replaces Home in the
-view switch. In the workbench, clear **Chapter → Show diagram in this chapter**
-to save a view with the map, other panels and timeline visible while hiding the
-diagram. Name it with **Chapter → Chapter name**; see
-[section layouts](section-layouts.md).
-
-Home view keeps the map as large as its height limit allows (70% of the
-viewport height; 560px in the content-sized Confluence iframe). Its width
-follows the map's aspect ratio, with room for the card padding and borders.
-Supporting panels fill the remaining horizontal space and arrange into columns
-when there is room. Narrow pages stack them below the centered map and shrink
-the map to fit. A home without supporting panels stays centered at the same
-height-based size. This is automatic; no spec setting or schema update is needed.
-
-To choose the default when a page opens, click **Edit layout** on the homemap
-in the workbench and choose **Presentation → Centerpiece**. This writes
-`diagram.primaryPanel: "home"` (using your panel's ID). **Sidebar** defaults
-to Data flow. Existing homemaps automatically get the live switch; they keep
-their authored opening layout. With multiple homemaps, the declared centerpiece
-is preferred, otherwise the first homemap is used. An explicitly featured panel
-of another type uses its title in place of Home.
-
-Switching is a reading preference for the current page, not a spec edit or undo
-entry. Workbench edits and skin changes retain it. A full page reload uses the
-authored default again; changing Presentation in the inspector takes precedence
-over the current reading preference.
+Adding a Home map does not create Views. Use View settings and Arrange to author
+panel placement, diagram visibility, step-control docking and the opening View.
+The Sidebar/Centerpiece setting and collapsible graph are retired. Convert older
+files using [the offline migration guide](panel-view-migration.md).
 
 ## Edit the shared layout
 
@@ -144,8 +119,7 @@ The Home tile uses a taller display with more vertical space between items and
 smaller device/room labels. Devices and people keep their original proportions.
 Specs and coordinate controls still use 320×180; the renderer and drag controls
 map between those coordinates and the taller view automatically. Do not rescale
-existing positions or add a new schema field. The centerpiece still caps its
-height relative to the viewport, with the step controls directly beneath it.
+existing positions or add a new schema field. Its arrangement controls the tile size and step-control attachment.
 
 The map's visual treatment is automatic: device icons, softly
 raised room walls, camera sweeps, breathing activity halos, swinging doors, and

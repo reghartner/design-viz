@@ -4,7 +4,7 @@
 Usage:
   python3 tools/export_gif.py <built-page.html> [--section <n>]
       [--width 1280] [--delay-ms 1600] [--margin 16] [--scale 2]
-      [--skin <name>] [--dim-alpha <0..1>] [--view <layout-id|home|flow|layout>]
+      [--skin <name>] [--dim-alpha <0..1>] [--view <view-id|layout-id|flow|layout>]
       [--out <path.gif | directory>] [--chrome <path>]
 
 Output lands HERE by default: beside the page, named after it — with the
@@ -30,8 +30,8 @@ than the viewport is captured in full. Pillow is used when available; a
 bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
 the command functional on a bare Python 3 installation.
 
---view selects a saved layout ID, or home/flow/layout on diagrams without
-named layouts. Each frame retains that view. Only its visible steps are
+--view selects an owner View ID when Views are authored, otherwise a saved
+arrangement ID (or flow/layout on diagrams without named arrangements). Each frame retains that view. Only its visible steps are
 captured, in path order; shared steps appear once on their first path, while
 alternate-only steps retain their own path state. Hidden steps still contribute
 their accumulated state. Omit --view to keep the page's authored default and
@@ -337,14 +337,11 @@ def _choose_view(diagram: dict[str, Any], reference: str) -> ViewTarget:
         # available only if its default profile can actually render.
         composition = diagram.get("sectionLayout")
         has_layout = isinstance(composition, dict) and isinstance(composition.get("default"), list)
-        panels = diagram.get("panels") if isinstance(diagram.get("panels"), list) else []
-        has_home = any(isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"]
-                       and (p["id"] == diagram.get("primaryPanel") or p.get("type") == "homemap")
-                       for p in panels)
-        available = (["layout", "home"] if has_layout else ["home"] if has_home else []) + ["flow"]
+        available = (["layout", "default"] if has_layout else []) + ["flow"]
         if reference in available:
-            canonical = "layout" if has_layout and reference in ("home", "layout") else reference
-            return ViewTarget(reference, canonical, "default" if canonical == "layout" else None)
+            # Geometry-only composition is still the ordinary flow presentation;
+            # its grid has the historical default ID, independently of URL aliases.
+            return ViewTarget(reference, "flow", "default" if has_layout else None)
     raise ValueError(f"--view {reference!r} is not available in this section (available: {', '.join(available)})")
 
 
@@ -363,8 +360,46 @@ def _diagram_paths(diagram: dict[str, Any]) -> list[tuple[str, list[int]]]:
     return paths or [("happy", list(range(len(steps))))]
 
 
-def _target_in_view(target: StepTarget, diagram: dict[str, Any], reference: str) -> StepTarget:
-    view = _choose_view(diagram, reference)
+def _owner_view(page: dict[str, Any], section: PageSection, reference: str) -> ViewTarget:
+    """Resolve exact owner View IDs to the selected section's arrangement.
+
+    Mirrors createTabViewController.apply: an omitted member layout uses the
+    diagram's authored default. Do not accept arrangement aliases here: the
+    runtime could route those to a different opening View.
+    """
+    owner = page
+    if section.tab_index is not None:
+        owner = page.get("blocks", page.get("sections"))[section.block_index]["tabs"][section.tab_index]
+    diagram = section.section["diagram"]
+    if not isinstance(owner.get("views"), list):
+        return _choose_view(diagram, reference)
+    choices = []
+    for view in owner["views"]:
+        if not isinstance(view, dict):
+            continue
+        members = [m for m in view.get("sections", [])
+                   if (m.get("section") if isinstance(m, dict) else m) == section.section.get("id")]
+        if len(members) == 1:
+            choices.append((view, members[0]))
+    matches = [(v, m) for v, m in choices if v.get("id") == reference]
+    if len(matches) != 1:
+        available = ", ".join(str(v.get("id")) for v, _ in choices)
+        raise ValueError(f"--view {reference!r} is not a unique View containing this section (available: {available})")
+    _, member = matches[0]
+    layout = member.get("layout") if isinstance(member, dict) else None
+    if layout is None:
+        layouts = diagram.get("layouts")
+        if isinstance(layouts, list) and layouts:
+            layout = next((v["id"] for v in layouts if v.get("id") == diagram.get("defaultLayout")), layouts[0]["id"])
+        else:
+            composition = diagram.get("sectionLayout")
+            layout = "layout" if isinstance(composition, dict) and isinstance(composition.get("default"), list) else "flow"
+    arrangement = _choose_view(diagram, layout)
+    return ViewTarget(reference, arrangement.canonical_id, arrangement.layout_id,
+                      arrangement.step_ids, arrangement.path_ids)
+
+
+def _target_in_view(target: StepTarget, diagram: dict[str, Any], view: ViewTarget) -> StepTarget:
     paths = _diagram_paths(diagram)
     if view.path_ids is not None:
         selected_paths = [path for path in paths if path[0] in view.path_ids]
@@ -387,7 +422,7 @@ def _target_in_view(target: StepTarget, diagram: dict[str, Any], reference: str)
         # path, never a view's renumbered visible chips.
         plan = build_step_fragments(
             [diagram["steps"][i] for i in indices],
-            diagram_reference=target.section_reference, view=reference,
+            diagram_reference=target.section_reference, view=view.reference,
             path=path_id if len(paths) > 1 or diagram.get("paths") else None)
         forced = forced or plan.forced_positional_refs
         for path_index, source_index in enumerate(indices):
@@ -425,7 +460,7 @@ def choose_target(spec: Any, section_number: int | None = None,
                    if target.section_number == section_number), None)
     if target is None:
         raise ValueError(f"section {section_number} is not addressable")
-    return _target_in_view(target, selected.section["diagram"], view) if view is not None else target
+    return _target_in_view(target, selected.section["diagram"], _owner_view(page, selected, view)) if view is not None else target
 
 
 def read_embedded_spec(page_path: pathlib.Path) -> Any:
@@ -620,10 +655,6 @@ def view_expression(section_reference: str, view: ViewTarget,
       }else{
         var grid=section.querySelector('.boardgrid');
         if(!visible(grid))return 'requested view is not visible';
-        if(expected==='home' && !grid.classList.contains('panel-first'))
-          return 'Home view is not active';
-        if(expected==='flow' && grid.classList.contains('panel-first'))
-          return 'Data flow view is not active';
       }
       if(sourceIndex!==null){
         var chip=section.querySelector('.schip[aria-current="true"]');
@@ -1370,8 +1401,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("built_page", metavar="built-page.html")
     parser.add_argument("--section", type=int,
                         help="1-based rendered section number (default: first step-through)")
-    parser.add_argument("--view", metavar="layout-id",
-                        help="saved layout ID, or home/flow/layout without named layouts; "
+    parser.add_argument("--view", metavar="view-id",
+                        help="authored owner View ID, otherwise arrangement ID or flow/layout; "
                              "capture only that view's visible steps (requires rebuilt HTML)")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--delay-ms", type=int, default=1600)

@@ -209,6 +209,13 @@ HTML. Its runtime-only package uses `Dockerfile.prebuilt`, installed as its
 ordinary Dockerfile by the packager; company source forks use the default
 source-building Dockerfile.
 
+`deploy/cloudflare/deploy.sh` is the smaller standalone option: it builds locally,
+copies the editor, starters, export template and an empty library index into an
+ignored `deploy/cloudflare/site/` directory, and uploads them to Cloudflare Workers
+as static assets. Gating the Worker with Cloudflare Access is a separate manual
+step. No catalog, Canon library or imported topology ships; the fork's company
+overlay is built in as usual. See [deploy/cloudflare/README.md](../deploy/cloudflare/README.md).
+
 ## Verification
 
 CI rebuilds the HTML for Python, Node, browser and example checks. Build

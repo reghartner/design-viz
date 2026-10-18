@@ -525,7 +525,7 @@ function panelTitle(card, title, el) {
   return el;
 }
 
-function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
+function buildPanels(asideEl, d, skin) {
   var folded = foldPanelStates(d);
   var visibility = foldPanelVisibility(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
@@ -546,7 +546,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     var body = document.createElement('div');
     body.className = 'pbody';
     card.appendChild(body);
-    (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
+    asideEl.appendChild(
       card
     );
     p = Object.assign({}, p, {brand: FlowBrand.effective(d.brand, p.brand)});

@@ -15,7 +15,6 @@
           "view": "step",
           "autoplay": false,
           "routing": "lanes",
-          "primaryPanel": "home",
           "nodes": {
             "controller": {
               "title": "Controller",

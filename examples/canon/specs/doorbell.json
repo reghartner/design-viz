@@ -9,7 +9,6 @@
           "A fictional, reviewable flow connected to mock Backstage services, source code, and trace evidence. No company services are contacted."
         ],
         "diagram": {
-          "primaryPanel": "home",
           "view": "step",
           "routing": "lanes",
           "nodes": {
@@ -434,7 +433,113 @@
               }
             }
           ],
-          "autoplay": false
+          "autoplay": false,
+          "layouts": [
+            {
+              "id": "home",
+              "name": "Home",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "outcome"
+                  },
+                  {
+                    "x": 16,
+                    "y": 6,
+                    "w": 8,
+                    "h": 10,
+                    "panel": "resident"
+                  },
+                  {
+                    "x": 16,
+                    "y": 16,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "delivery"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "panel:home",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 16,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "flow",
+              "name": "Data flow",
+              "sectionLayout": {
+                "columns": 24,
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 16,
+                    "h": 16
+                  },
+                  {
+                    "x": 0,
+                    "y": 16,
+                    "w": 16,
+                    "h": 12,
+                    "panel": "home"
+                  },
+                  {
+                    "x": 16,
+                    "y": 0,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "outcome"
+                  },
+                  {
+                    "x": 16,
+                    "y": 6,
+                    "w": 8,
+                    "h": 10,
+                    "panel": "resident"
+                  },
+                  {
+                    "x": 16,
+                    "y": 16,
+                    "w": 8,
+                    "h": 6,
+                    "panel": "delivery"
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 0,
+                    "y": 12,
+                    "w": 16,
+                    "h": 4
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home"
         },
         "id": "doorbell-flow"
       }
@@ -449,6 +554,31 @@
       "url": "https://example.test/designs/doorbell",
       "label": "Fictional doorbell HLD",
       "version": "1"
-    }
+    },
+    "views": [
+      {
+        "id": "section-1-home",
+        "name": "Home",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "doorbell-flow",
+            "layout": "home"
+          }
+        ]
+      },
+      {
+        "id": "section-1-flow",
+        "name": "Data flow",
+        "presentation": "standard",
+        "sections": [
+          {
+            "section": "doorbell-flow",
+            "layout": "flow"
+          }
+        ]
+      }
+    ],
+    "defaultView": "section-1-home"
   }
 }

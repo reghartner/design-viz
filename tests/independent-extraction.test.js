@@ -22,7 +22,7 @@ function fixture(){
       rows:[['client','accept','store','audit']],
       edges:[{from:'client',to:'accept',kind:'https',label:'submit'},{from:'accept',to:'store',kind:'orders',label:'persist',revealAt:2,hideAt:4},{from:'store',to:'audit',kind:'mqtt',label:'audit'}],
       panels:[{id:'queue',type:'queue',initial:{state:'empty'}},{id:'app',type:'deviceapp',device:'Order app',sources:[{id:'orders',label:'Orders',node:'accept'}],fields:[{id:'status',label:'Status',kind:'text',source:'orders'}],initial:{status:{value:'idle',status:'ready'}}}],
-      view:'step',autoplay:false,primaryPanel:'app',centerpiece:'app',sectionLayout:{default:[{x:0,y:0,w:8,h:10},{panel:'app',x:8,y:0,w:4,h:10},{panel:'queue',x:0,y:10,w:12,h:5}]},
+      view:'step',autoplay:false,centerpiece:'app',sectionLayout:{default:[{x:0,y:0,w:8,h:10},{panel:'app',x:8,y:0,w:4,h:10},{panel:'queue',x:0,y:10,w:12,h:5}]},
       layouts:[{id:'outage',name:'Outage',steps:['failed'],sectionLayout:{default:[{x:0,y:0,w:12,h:10},{panel:'app',x:0,y:10,w:8,h:8},{panel:'queue',x:8,y:10,w:4,h:8}]}}],defaultLayout:'outage',
       steps:[
         {id:'request',edge:'client->accept',text:'The customer submits an order.',lane:'request',codeRefs:[codeRef],panels:{app:{status:{value:'received'}}}},

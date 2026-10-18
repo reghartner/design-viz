@@ -9,7 +9,7 @@ async function reference(name,fn,purpose){const file='src/'+name+'.js',anchor={s
 const hub=await reference('porch-hub','receiveButton','Validate the press and await recording before sending a notification.');
 const recording=await reference('recording-service','createRecording','Wait up to 500 ms for the fake recording store.');
 const notify=await reference('notification-service','notifyResident','Send the resident a push containing the saved recording ID.');
-const d={view:'step',autoplay:false,primaryPanel:'home',routing:'lanes',nodes:{camera:{title:'Doorbell press',icon:'doorbell',tint:'dev'},hub:{title:'Porch hub',icon:'antenna',tint:'mqtt',binding:bind('porch-hub')},recording:{title:'Recording service',icon:'cloud',tint:'cmd',binding:bind('recording-service')},notification:{title:'Notification service',icon:'phone',tint:'data',binding:bind('notification-service')}},rows:[['camera','hub'],['recording','notification']],edges:[{from:'camera',to:'hub',kind:'int',label:'receiveButton(event)'},{from:'hub',to:'recording',kind:'int',label:'await createRecording'},{from:'hub',to:'notification',kind:'int',label:'await notifyResident'}],panels:[
+const d={view:'step',autoplay:false,routing:'lanes',nodes:{camera:{title:'Doorbell press',icon:'doorbell',tint:'dev'},hub:{title:'Porch hub',icon:'antenna',tint:'mqtt',binding:bind('porch-hub')},recording:{title:'Recording service',icon:'cloud',tint:'cmd',binding:bind('recording-service')},notification:{title:'Notification service',icon:'phone',tint:'data',binding:bind('notification-service')}},rows:[['camera','hub'],['recording','notification']],edges:[{from:'camera',to:'hub',kind:'int',label:'receiveButton(event)'},{from:'hub',to:'recording',kind:'int',label:'await createRecording'},{from:'hub',to:'notification',kind:'int',label:'await notifyResident'}],panels:[
 {id:'home',type:'homemap',title:'At the front door · illustrative',outline:{w:300,h:164},rooms:[{label:'PORCH',x:10,y:8,w:70,h:164},{label:'ENTRY',x:80,y:8,w:85,h:164},{label:'LIVING ROOM',x:165,y:8,w:145,h:164}],devices:[{id:'cam',kind:'camera',label:'Doorbell',x:52,y:58,facing:90,spread:65,range:80},{id:'door',kind:'entry',label:'Front door',x:95,y:90},{id:'hub',kind:'hub',label:'Home hub',x:220,y:70}],subjects:[{id:'visitor',label:'Visitor',x:32,y:150}],initial:{cam:'scan',door:'closed',hub:'idle',visitor:null}},
 {id:'outcome',type:'state',title:'Recording and delivery',states:['Ready','Button pressed','Recording requested','Recording saved','Resident notified','Timed out','No notification'],initial:{state:'Ready'}},
 {id:'resident',type:'phone',title:'Resident experience · illustrative',initial:{clock:'9:41'}}],steps:[
@@ -20,7 +20,30 @@ const d={view:'step',autoplay:false,primaryPanel:'home',routing:'lanes',nodes:{c
 {id:'notify',edge:'hub->notification',text:'Only after storage succeeds, the hub sends the saved recording ID to the notification service.',panels:{home:{cam:'scan',hub:'idle'},outcome:{state:'Resident notified'},resident:{notify:{app:'Fictional Home',title:'Doorbell recording ready',text:'Recording saved · resident notified'}}},codeRefs:[notify]},
 {id:'timeout',nodes:['recording'],text:'Alternate fixture: storage exceeds the 500 ms deadline. createRecording rejects; no recording is saved.',conditions:[{kind:'slow',label:'Storage deadline exceeded',nodeId:'recording'}],panels:{home:{cam:'scan',hub:'idle'},outcome:{state:'Timed out'}},tone:{recording:'alert'}},
 {id:'blocked',nodes:['hub'],failures:{'hub->notification':'blocked'},text:'The rejected recording prevents notifyResident from being called. The resident receives no misleading success alert.',panels:{outcome:{state:'No notification'}},tone:{notification:'dim'}}],paths:[{id:'happy',label:'Happy path',color:'#38BDF8',steps:['quiet','press','request','saved','notify']},{id:'timeout',label:'Storage timeout',color:'#FB923C',steps:['quiet','press','request','timeout','blocked']}]};
-const spec={page:{title:'Doorbell press → recording → resident notification',skin:'pastel',contract:'1',canon:{version:1,id:'doorbell',kind:'canonical',owner:'group:home/home-team'},generatedFrom:{url:'https://github.com/__MOCK_REPOSITORY__/blob/'+revision+'/README.md',label:'Fictional executable sample',version:revision.slice(0,8)},sections:[{heading:'One press, two possible outcomes',text:['This is a fictional end-to-end integration rehearsal. Service and API identities come from Backstage; code evidence points to real immutable GitHub commits.','The executable sample uses in-process function calls and fake storage/push ports. Home movement and phone presentation illustrate the intended experience; no real camera footage, network timing, or resident data is claimed.'],diagram:d}]}};
+// Both presentations are deliberately authored and share the same story objects.
+d.layouts=[
+  {id:'home',name:'Home',sectionLayout:{columns:24,default:[
+    {panel:'home',x:0,y:0,w:16,h:18},
+    {panel:'outcome',x:16,y:0,w:8,h:6},
+    {panel:'resident',x:16,y:6,w:8,h:10},
+    {controls:'steps',attachTo:'panel:home',x:0,y:12,w:16,h:6},
+    {x:0,y:18,w:16,h:12,hidden:true},
+  ]}},
+  {id:'flow',name:'Data flow',sectionLayout:{columns:24,default:[
+    {x:0,y:0,w:16,h:18},
+    {panel:'home',x:0,y:18,w:16,h:12},
+    {panel:'outcome',x:16,y:0,w:8,h:6},
+    {panel:'resident',x:16,y:6,w:8,h:10},
+    {controls:'steps',attachTo:'diagram',x:0,y:12,w:16,h:6},
+  ]}},
+];
+d.defaultLayout='home';
+const spec={page:{title:'Doorbell press → recording → resident notification',skin:'pastel',contract:'1',canon:{version:1,id:'doorbell',kind:'canonical',owner:'group:home/home-team'},generatedFrom:{url:'https://github.com/__MOCK_REPOSITORY__/blob/'+revision+'/README.md',label:'Fictional executable sample',version:revision.slice(0,8)},sections:[{id:'one-press-two-possible-outcomes',heading:'One press, two possible outcomes',text:['This is a fictional end-to-end integration rehearsal. Service and API identities come from Backstage; code evidence points to real immutable GitHub commits.','The executable sample uses in-process function calls and fake storage/push ports. Home movement and phone presentation illustrate the intended experience; no real camera footage, network timing, or resident data is claimed.'],diagram:d}]}};
+spec.page.views=[
+  {id:'section-1-home',name:'Home',presentation:'standard',sections:[{section:'one-press-two-possible-outcomes',layout:'home'}]},
+  {id:'section-1-flow',name:'Data flow',presentation:'standard',sections:[{section:'one-press-two-possible-outcomes',layout:'flow'}]},
+];
+spec.page.defaultView='section-1-home';
 const stamped=C.compatibility.stamp(spec);const checked=C.validateSpec(stamped);if(checked.errors.length||checked.warnings.length)throw new Error(JSON.stringify(checked));
 await writeFile('specs/doorbell.json',JSON.stringify(stamped,null,2)+'\n');
 await writeFile('registry.json',JSON.stringify({version:1,diagrams:[{id:'doorbell',path:'specs/doorbell.json',title:spec.page.title}]},null,2)+'\n');

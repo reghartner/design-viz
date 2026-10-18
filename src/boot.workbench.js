@@ -277,6 +277,7 @@ var previewDocumentSkin = false; /* explicit document-default preview bypasses t
 var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
   resolve:function(raw){return workbenchBuilder?workbenchBuilder.resolve(raw):raw;},
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
+  arrangementSection:function(request,next,previous){return workbenchBuilder?workbenchBuilder.arrangementSection(request,next,previous):null;},
   beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
   completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
 });

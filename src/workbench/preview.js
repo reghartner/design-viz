@@ -105,12 +105,32 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
     else if(stepper.current().n!==indices[0])stepper.jump(indices[0]);
   });
 }
+/* Arrange borrows a grid only for this authoring render. The controller's
+   accepted page and source remain authored data, including for export/save. */
+function workbenchArrangementSection(previous,next,index){
+  if(index===null || !previous)return null;
+  var before=workbenchPreviewSections(previous),after=workbenchPreviewSections(next),selected=before[index];
+  if(!selected)return null;
+  var matches=matchWorkbenchPreviewSections(before,after),found=null;
+  matches.forEach(function(prior,position){if(prior===selected)found=position;});
+  return found;
+}
+function workbenchArrangementPreviewPage(page,index){
+  if(!Number.isInteger(index) || index<0)return page;
+  var record=sectionRecords(page)[index],d=record && record.section.diagram;
+  if(!d || sectionLayoutItems(d,'default'))return page;
+  var display=JSON.parse(JSON.stringify(page)),diagram=sectionRecords(display)[index].section.diagram;
+  diagram.sectionLayout={columns:SECTION_LAYOUT_COLUMNS};
+  ['default','backstage','confluence'].forEach(function(profile){diagram.sectionLayout[profile]=sectionLayoutItems(d,profile) || sectionLayoutPreset(d,profile);});
+  return display;
+}
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
   var tabs = previousPage ? activeTabReferences(previousCtl) : null;
   var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
-  var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
+  var display=workbenchArrangementPreviewPage(page,lifecycle && lifecycle.arrangementSection);
+  var ctl = renderPage(view, display, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
   /* An unpublished draft has no public document ID. Its controls deliberately
      use this Workbench document as a local/recovery base; Canon supplies its
      stable published route in library.workbench.js. */
@@ -226,6 +246,7 @@ function createWorkbenchPreviewController(opts){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
+        arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);
           replaced=true;page=null;ctl=null;renderedText=null;

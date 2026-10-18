@@ -38,6 +38,8 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | two-way conversation, operator talk-down, device sounds, chimes, sirens, sound detection or audio failures | [audio-storytelling.md](audio-storytelling.md) — shared endpoint audio and the complete Sound at the door seed |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
+| interference, path difference, bright/dark fringes, or force, velocity and acceleration | [Waves & forces](physics-panels.md) — probe-driven wave geometry and explicit mass trials |
+| a conceptual RNA-copying lesson with baseline and hypothetical interruption paths | [The copy gate](viral-copy-gate.md) — sequence-free close-up, authored positions and counts, no efficacy prediction |
 | a sequence, aligned reads, an insertion or variant, a genome or plasmid map, pipeline stage counts, reading frames, or a small heatmap for a teaching page | [sequence-panels.md](sequence-panels.md) — six sequence-teaching panels and the sequencing walkthrough starter |
 | a venue seating map that fills section by section, group holds, promo waves, repricing, or importing a real seating chart | [venue-map.md](venue-map.md) — generic bowl or imported SVG; sold, held, price, tier and revenue modes |
 | messaging bus alternatives, cost per million messages, engineering components or break-even volume | [messaging-cost.md](messaging-cost.md) — two routes and explicit pricing assumptions |

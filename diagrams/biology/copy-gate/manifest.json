@@ -1,0 +1,22 @@
+{
+  "pages": [
+    {
+      "file": "copy-gate.html",
+      "spec": "copy-gate.spec.json",
+      "title": "At the copy gate: one genome, two outcomes",
+      "family": "copy-gate",
+      "description": "One shared viral entry path, then a conceptual RNA-copying fork with matched cell views and a primary-source claim ledger.",
+      "tags": [
+        "biology",
+        "teaching",
+        "cellscene",
+        "rnacopy",
+        "alternate-paths"
+      ],
+      "widgets": [
+        "cellscene",
+        "rnacopy"
+      ]
+    }
+  ]
+}

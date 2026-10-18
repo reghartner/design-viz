@@ -181,7 +181,7 @@ function initWorkbenchWelcome(opts){
   var json = document.getElementById('welcome-json');
   var templateGrid = document.getElementById('welcome-templates');
   var filter = 'all';
-  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices'};
+  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices', science:'Science'};
   var blank = {name:'Blank diagram', category:'blank', desc:'A clean canvas for your own nodes, connections, and story.',
     spec:welcomeBlankSpec()};
   function el(id){ return document.getElementById(id); }

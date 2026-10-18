@@ -177,6 +177,19 @@ test('venue CLI options are checked: ids, names, landmarks and venue-only flags 
   assert.equal(run.status, 2); assert.match(run.stderr, /--landmark is id:label:x:y/);
   run = cli([csv, '--capacity-total', '17250', '--venue', 'csv-hall', '--venue-name', 'CSV Hall', '--landmark', 'b:home: bench:400:322']);
   assert.equal(run.status, 0, run.stderr);
+  // Nothing from the file name or the data can close the comment or an inline <script>.
+  const hostile = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'seatmap-venue-'));
+  const hostileFile = path.join(hostile, 'a<img src=x onerror=alert(1)>*.csv');
+  try {
+    fs.writeFileSync(hostileFile, 'id,level,zone,capacity,label\n1,L,end,1,</script><b>\n2,L,end,1,\n3,L,end,1,\n4,L,end,1,\n');
+    const evil = cli([hostileFile, '--venue', 'evil', '--venue-name', 'Evil <Hall>']);
+    assert.equal(evil.status, 1, 'a name with markup is refused');
+    const safe = cli([hostileFile, '--venue', 'evil', '--venue-name', 'Evil */ Hall']);
+    assert.equal(safe.status, 0, safe.stderr);
+    assert.doesNotMatch(safe.stdout, /<\/|<b>|<img/);
+    assert.equal(safe.stdout.indexOf('*/'), safe.stdout.indexOf(' */\nSeatmapVenues.define(') + 1, 'the only comment end is the header’s own');
+    assert.equal(core(safe.stdout).SeatmapVenues.get('evil').seatmap.sections[0].label, '</script><b>');
+  } finally { fs.rmSync(hostile, {recursive: true, force: true}); }
   const F = core(run.stdout);
   assert.deepEqual(plain(F.SeatmapVenues.get('csv-hall').seatmap.landmarks), [{id: 'b', label: 'home: bench', x: 400, y: 322}]);
   assert.equal(F.SeatmapVenues.get('csv-hall').seatmap.geometry, 'bowl');
@@ -220,4 +233,14 @@ test('existing inline declarations render byte-identically to main, and the venu
   assert.doesNotMatch(raw, /"229"/);
   assert.match(raw, /UBS Arena, Elmont, NY/);
   assert.doesNotMatch(raw, /generic rink bowl/);
+});
+
+test('venue file comments reduce names and input file names to plain characters', async () => {
+  const {venueSource} = await import(TOOL);
+  const text = venueSource({id: 'x', name: 'A */ </script>', location: 'B\nC', seatmap: {rings: [], sections: [{label: '</script>'}]}}, 'in</script><img src=x>*/.svg');
+  const header = text.slice(0, text.indexOf('SeatmapVenues.define('));
+  assert.doesNotMatch(header, /[<>]/, header);
+  assert.equal(header.match(/\*\//g).length, 1, header);
+  assert.equal(header.split('\n').length, 4, header);
+  assert.doesNotMatch(text, /<\/script/i);
 });

@@ -9715,7 +9715,7 @@ p.reads-empty{margin:4px 0;font-size:11px}
         "heading": "Special panel fold rules",
         "accent": "green",
         "text": [
-         "Operations that only some types accept. Each is shown with a real panel. Times and rates are illustrative."
+         "Operations that only some types accept. Each is shown with a real panel. Times and rates are illustrative. The Home / Data flow switch above the diagram appears because a home map panel is present; it is normal Flowview behaviour, not part of this explanation."
         ],
         "diagram": {
          "view": "step",
@@ -9906,6 +9906,46 @@ p.reads-empty{margin:4px 0;font-size:11px}
             }
            ],
            "initial": {}
+          },
+          {
+           "id": "home",
+           "type": "homemap",
+           "title": "Home map: one-step signals",
+           "outline": {
+            "w": 300,
+            "h": 164
+           },
+           "devices": [
+            {
+             "id": "cam1",
+             "kind": "camera",
+             "label": "Porch cam",
+             "x": 46,
+             "y": 40,
+             "facing": 35,
+             "spread": 80,
+             "range": 70
+            },
+            {
+             "id": "door",
+             "kind": "entry",
+             "label": "Front door",
+             "x": 160,
+             "y": 158
+            },
+            {
+             "id": "hub",
+             "kind": "hub",
+             "label": "Hub",
+             "x": 160,
+             "y": 92
+            }
+           ],
+           "initial": {
+            "cam1": "scan",
+            "door": "closed",
+            "hub": "idle"
+           }
           },
           {
            "id": "ops",
@@ -10273,6 +10313,60 @@ p.reads-empty{margin:4px 0;font-size:11px}
                 "key": "panels.ops",
                 "value": "{\"end\": [\"up\"]}",
                 "rule": "closed; history retained"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-signal",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A purely transient patch.** Home-map `signals` draw a message from the porch camera to the hub at this step only and leave nothing in carried state; the camera's `detect` state does carry.",
+           "panels": {
+            "home": {
+             "cam1": "detect",
+             "signals": [
+              {
+               "from": "cam1",
+               "to": "hub"
+              }
+             ]
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.home",
+                "value": "{\"cam1\": \"detect\", \"signals\": [{\"from\": \"cam1\", \"to\": \"hub\"}]}",
+                "rule": "signal this step only; detect carried"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-signal-after",
+           "edges": [
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Next step, no patch:** no signal is drawn; the camera stays in `detect`. Compare the strand-scene cut, whose result is carried.",
+           "panels": {
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.home",
+                "value": "(no patch)",
+                "rule": "nothing from the signal remains"
                }
               }
              ]
@@ -10658,6 +10752,8 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "s-start",
             "s-mark",
             "s-end",
+            "s-signal",
+            "s-signal-after",
             "s-notify",
             "s-clear",
             "s-report",
@@ -10738,9 +10834,16 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "h": 8
            },
            {
-            "panel": "strand",
+            "panel": "home",
             "x": 8,
             "y": 24,
+            "w": 9,
+            "h": 9
+           },
+           {
+            "panel": "strand",
+            "x": 8,
+            "y": 33,
             "w": 9,
             "h": 10
            },
@@ -10784,10 +10887,13 @@ p.reads-empty{margin:4px 0;font-size:11px}
           "text": "**Step-local events with carried results**: strandscene and cellscene `events`."
          },
          {
+          "text": "**Purely transient patches** (drawn at their step, nothing carried): homemap `signals`."
+         },
+         {
           "text": "**Derived from story time**: battery drain and charge (with `charge` anchors and one-step `drain`); phone, deviceapp and appscreens clock and date; deviceapp card freshness from `reportedAt`."
          },
          {
-          "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`; seatmap `tierOf` (overrides a section's declared `tier`; deleting the entry restores it)."
+          "text": "**A step overrides a declared value** (built into each type): data-contract `columns`, `fields`, `fieldWidth`; screen and security `scene`; radar `threshold`; deviceapp card `source`, `icon`, `badgeMode`, `badgeText`, `badgeColor` (`null` restores the declared value); strandscene actor `label` and cellscene item `label`; seatmap `tierOf` (overrides a section's declared `tier`; deleting the entry restores it); homemap device and subject `icon` (`null` restores the declared icon)."
          },
          {
           "text": "**Whole-value state keyed by declared ids** (common fold: each patch replaces the whole carried value; the renderer fills in ids the value does not list): zoneframe `zones` (unlisted zones show their declared state), xray `layers` (unlisted layers show sealed), replicas `replicas`, an object keyed by replica id (unlisted replicas show unknown)."
@@ -11419,9 +11525,17 @@ p.reads-empty{margin:4px 0;font-size:11px}
               {
                "id": "c",
                "cells": {
-                "key": "fold cache (A or B)",
-                "value": "keyed by declaration content",
+                "key": "Option B cost",
+                "value": "cache keyed by declaration content",
                 "rule": "folds ≤ distinct declarations per path"
+               }
+              },
+              {
+               "id": "d",
+               "cells": {
+                "key": "Option A cost",
+                "value": "one fold per segment",
+                "rule": "A→B→A is three segments; resume state is part of the key"
                }
               },
               {
@@ -11529,6 +11643,34 @@ p.reads-empty{margin:4px 0;font-size:11px}
            ],
            "text": "**Story time, evidence and references use the effective declaration.** Interval rule: the time between step N−1 and step N uses the declaration in effect at step N−1. Example: drain 1 %/h, changed to 10 %/h at step 3, steps 2 h apart: step 3 drops 2 %, step 4 drops 20 %.",
            "panels": {
+            "effective": {
+             "rows": [
+              {
+               "id": "max",
+               "cells": {
+                "field": "max",
+                "value": "400",
+                "from": "declaration"
+               }
+              },
+              {
+               "id": "unit",
+               "cells": {
+                "field": "unit",
+                "value": "W",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "title",
+               "cells": {
+                "field": "title",
+                "value": "Draw (watts)",
+                "from": "panelDeclare (carried)"
+               }
+              }
+             ]
+            },
             "pjson": {
              "rows": [
               {
@@ -11776,16 +11918,16 @@ p.reads-empty{margin:4px 0;font-size:11px}
                "id": "c",
                "cells": {
                 "key": "validateDeclaration",
-                "value": "pure; no side effects",
-                "rule": "may run once per distinct declaration per path"
+                "value": "pure, no side effects",
+                "rule": "may run per distinct declaration"
                }
               },
               {
                "id": "d",
                "cells": {
                 "key": "renderers",
-                "value": "recompute when the declaration changes",
-                "rule": "no declaration caches on the host"
+                "value": "recompute on a new declaration",
+                "rule": "no host declaration cache"
                }
               }
              ]
@@ -11929,33 +12071,33 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "x": 0,
             "y": 0,
             "w": 13,
-            "h": 13
+            "h": 15
            },
            {
             "panel": "pjson",
             "x": 13,
             "y": 0,
             "w": 11,
-            "h": 8
+            "h": 9
            },
            {
             "panel": "effective",
             "x": 13,
-            "y": 8,
+            "y": 9,
             "w": 11,
-            "h": 5
+            "h": 6
            },
            {
             "controls": "steps",
             "x": 0,
-            "y": 13,
+            "y": 15,
             "w": 24,
             "h": 7
            },
            {
             "panel": "guarantees",
             "x": 0,
-            "y": 20,
+            "y": 22,
             "w": 24,
             "h": 14
            }

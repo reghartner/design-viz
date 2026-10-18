@@ -890,6 +890,18 @@ view. Steps skipped by a view still update visibility; alternate paths fold
 independently. Shared step assignments affect every path using that step.
 Compatibility metadata advertises `flow.panel-visibility`.
 
+### Panel setup changes per step
+
+Some panel types let a step change their setup fields the same way it changes
+state. Put the field in the step's panel patch: `{"panels":{"pw":{"max":800}}}`.
+The value carries forward along the path, `enterOnce` applies it to that step
+only, and `null` restores the declared value. `title` can change the same way;
+an empty string hides the heading. `id`, `type`, `initial`, `visible` and
+`brand` never change per step. A value the declaration would warn about warns
+at the patch path instead. Types that support this: `gauge` (`unit`, `max`,
+`title`). On other types, setup fields in a patch do not change the panel.
+Compatibility metadata advertises `flow.panel-setup-steps`.
+
 ### panels — synchronized inspector widgets
 
 `"panels": [...]` at the diagram level declares inspector widgets rendered in
@@ -1201,7 +1213,10 @@ perspectives" of one timeline). Types:
   `motifMatches[{frame,at,length}]` (`at` of the first matched codon; `length`
   in codons). Picker category Science & sequencing. Desktop-only editing.
 - `gauge` — numeric bar: `{"id":"pw","type":"gauge","unit":"mA","max":400,
-  "initial":{"value":2}}`. Patched via `{"value": <number>}`.
+  "initial":{"value":2}}`. Patched via `{"value": <number>}`. Steps may also
+  change `unit`, `max` and `title` (see [setup changes per step](#panel-setup-changes-per-step)):
+  `{"max": 800}` rescales the bar from that step on; a `max` that is not a
+  positive number shows the bar against 100, as in the declaration.
 - `replicas` — aligned positions for replicas, event consumers or device/cloud
   copies. Declare 1–8 unique string ids:
   `{"id":"copies","type":"replicas","unit":"records","replicas":[

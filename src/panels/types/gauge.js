@@ -29,6 +29,7 @@ PanelRegistry.extend('gauge', {
   order: 2,
   label: 'Gauge',
   since: '0.1.0',
+  unified: true,
 });
 
 PanelRegistry.extend('gauge', {

@@ -58,7 +58,7 @@ function panelPickerPreview(type, referenceImage, skin){
   var snapshot = panelPickerNamespace(host.cloneNode(true));
   cancelPanelMotion(host);
   var widget = document.createElement('div'); widget.className = 'pwidget pt-' + type;
-  var title = document.createElement('div'); title.className = 'ptitle'; title.textContent = sample.panel.title;
+  var title = document.createElement('div'); title.className = 'ptitle'; title.textContent = panelEffectiveDeclaration(sample.panel,sample.state).title;
   widget.appendChild(title); widget.appendChild(snapshot);
   return widget;
 }

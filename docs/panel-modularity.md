@@ -138,6 +138,39 @@ another non-copyable element. Access clipboard state through this context rather
 than referencing the builder initializer's private variables. Panel editing stays
 registry-dispatched; do not add type switches to the interaction owner.
 
+## Per-step setup changes (`unified`)
+
+A type opts in with `unified: true` in its definition. Steps may then change
+its setup fields exactly like state: a patch value carries forward,
+`enterOnce` holds it for one step, and `null` restores the declared value.
+Folds and renderers are unchanged. The folded state carries the values, and
+`panelEffectiveDeclaration(panel, state)` in `src/panels/shared.js` lays them
+over the declaration before rendering, the heading, `softwarePanelHTML`,
+visibility evidence and the picker title. Unflagged types get their own
+declaration object back.
+
+The overridable list is the names in `authoring.setupFields` plus `title`,
+or an explicit `unifiedFields: [...]`. `id`, `type`, `initial`, `visible` and
+`brand` are never overridden. The validator removes these names from a patch
+before calling `validatePatch`. It then runs `validateDeclaration` on the
+declaration in effect at that step and reports only the new warnings, at the
+patch path. `validatePatch` receives that effective declaration and its context.
+Compatibility reports `flow.panel-setup-steps` when a patch, `enterOnce` or
+`initial` sets one of these fields.
+
+Check these before flagging a type:
+
+- No state key has the same name as a setup field with a different meaning.
+  `zoneframe`, `xray` and `replicas` use the same name for different things.
+- State keys are not dynamic IDs (LED, tile, link or device IDs) that could
+  equal a setup field name.
+- The fold carries the setup field names: it does not drop unknown keys, and
+  it does not capture declaration data once, such as collection membership.
+- The type has no existing override that ignores invalid values and falls
+  back to the declaration (`data-contract`, `radar`).
+
+Flagged types: `gauge`.
+
 ## Styles and assembly
 
 Use a CSS string for a new panel, with a unique class prefix and shared skin

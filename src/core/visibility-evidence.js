@@ -38,7 +38,8 @@ function visibilityEvidence(raw,document){
     var descriptor=PanelRegistry.get(panel.type),evidence={supported:true,visible:true,reason:'Panel is eligible'};
     if(e.field!==undefined){
       if(!descriptor || !descriptor.visibilityEvidence)return stop('unsupported','Field visibility is unsupported for panel type '+panel.type);
-      evidence=descriptor.visibilityEvidence(panel,states[e.panel][resolved.pathIndex],e.field);
+      var state=states[e.panel][resolved.pathIndex];
+      evidence=descriptor.visibilityEvidence(panelEffectiveDeclaration(panel,state),state,e.field);
       if(!evidence || !evidence.supported)return stop('unsupported',evidence && evidence.reason || 'Field visibility is unsupported');
     }
     var items=view && sectionLayoutItems(d,e.profile || 'default',view.id);

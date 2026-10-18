@@ -264,6 +264,47 @@ function specStructureErrors(page){
   return errors;
 }
 
+/* A unified type's patch may carry setup fields. They are taken out before the
+   type's own patch rules run, and the declaration in effect at this step is
+   checked with the type's declaration rules; only warnings the override adds
+   are reported, at the patch path. `carry` holds the setup values carried into
+   this step along one path. */
+function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, errors){
+  var rest = Object.assign({}, patch), once = specObject(patch.enterOnce) ? Object.assign({}, patch.enterOnce) : null;
+  var step = Object.assign({}, carry), touched = false;
+  unified.fields.forEach(function(key){
+    if (panelOwn(rest, key)){ step[key] = rest[key]; delete rest[key]; touched = true; }
+    if (once && panelOwn(once, key)){ step[key] = once[key]; delete once[key]; touched = true; }
+  });
+  if (once) rest.enterOnce = once;
+  var effective = panelEffectiveDeclaration(decl, step), descriptor = PanelRegistry.get(decl.type);
+  if (effective === decl || !descriptor.validateDeclaration) return {patch:rest, panel:effective, context:unified.context};
+  var before = [], beforeErrors = [], after = [], afterErrors = [];
+  descriptor.validateDeclaration(decl, path, before, beforeErrors, d);
+  var context = descriptor.validateDeclaration(effective, path, after, afterErrors, d);
+  if (touched){
+    after.forEach(function(w){ if (before.indexOf(w) < 0) warnings.push(w); });
+    afterErrors.forEach(function(e){ if (beforeErrors.indexOf(e) < 0) errors.push(e); });
+  }
+  return {patch:rest, panel:effective, context:context};
+}
+/* Setup values carried into each step, per path: a step shared by several
+   paths can be reached with different carries. Steps on no path start from
+   the panel's initial values. */
+function unifiedStepCarries(d, pid, fields, start){
+  var out = [];
+  diagramPathList(d).forEach(function(path){
+    var carry = Object.assign({}, start);
+    path.indices.forEach(function(i){
+      var key = JSON.stringify(carry);
+      out[i] = out[i] || {};
+      out[i][key] = Object.assign({}, carry);
+      var patch = stepPanelPatch(d.steps[i]), own = patch && specObject(patch[pid]) ? patch[pid] : null;
+      if (own) fields.forEach(function(field){ if (panelOwn(own, field)) carry[field] = own[field]; });
+    });
+  });
+  return out.map(function(carries){ return carries && Object.keys(carries).map(function(key){ return carries[key]; }); });
+}
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
   var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
@@ -437,6 +478,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var panelIds = {};
   var panelDeclById = {};
   var panelContexts = Object.create(null);
+  var panelUnified = Object.create(null);
   (d.panels || []).forEach(function(p, pi){
     var PP = DP + '.panels[' + pi + ']';
     if (!p || typeof p !== 'object'){ errors.push(PP + ': must be an object {id, type, ...}'); return; }
@@ -452,6 +494,13 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
     if (descriptor && descriptor.validateDeclaration)
       panelContexts[p.id] = descriptor.validateDeclaration(p, PP, warnings, errors, d);
+    var unifiedFields = panelUnifiedFields(p.type);
+    if (unifiedFields){
+      var start = {};
+      unifiedFields.forEach(function(key){ if (panelOwn(p.initial, key)) start[key] = p.initial[key]; });
+      panelUnified[p.id] = {fields:unifiedFields, start:start, context:panelContexts[p.id],
+        carries:unifiedStepCarries(d, p.id, unifiedFields, start)};
+    }
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
@@ -532,8 +581,20 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           '; the engine ignores this patch');
       } else {
         var panel = panelDeclById[pid], descriptor = PanelRegistry.get(panel.type);
-        if (descriptor && descriptor.validatePatch)
-          descriptor.validatePatch(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panel, warnings, panelContexts[pid]);
+        var PSP = DP + '.steps[' + ti + '].panels.' + pid, unified = panelUnified[pid];
+        if (!unified){
+          if (descriptor && descriptor.validatePatch)
+            descriptor.validatePatch(patch[pid], PSP, panel, warnings, panelContexts[pid]);
+        } else {
+          /* One check per distinct carry reaching this step; repeats are reported once. */
+          var stepWarnings = [], stepErrors = [];
+          (unified.carries[ti] || [unified.start]).forEach(function(carry){
+            var own = unifiedPanelPatch(unified, carry, patch[pid], panel, d, PSP, stepWarnings, stepErrors);
+            if (descriptor.validatePatch) descriptor.validatePatch(own.patch, PSP, own.panel, stepWarnings, own.context);
+          });
+          stepWarnings.forEach(function(w, i){ if (stepWarnings.indexOf(w) === i) warnings.push(w); });
+          stepErrors.forEach(function(e, i){ if (stepErrors.indexOf(e) === i) errors.push(e); });
+        }
       }
     });
     if (st && st.lane && !lanes[st.lane])

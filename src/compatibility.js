@@ -8,6 +8,8 @@ var FlowviewCompatibility = (function(){
   var features = Object.create(null);
   var panelFeatures = /* @panel-features */ {};
   var sharedIconIds = /* @icon-ids */ [];
+  // Setup fields each unified panel type lets steps change, from its definition.
+  var unifiedPanelFields = /* @panel-unified */ {};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.local-handoff':'Same-spec diagram handoffs', 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
@@ -32,7 +34,8 @@ var FlowviewCompatibility = (function(){
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
     'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
-    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0']
+    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0'],
+    'flow.panel-setup-steps':['Panel setup changes per step','0.2.0']
   };
   Object.keys(released).forEach(function(id){features[id]={label:released[id][0],since:released[id][1]};});
   // Panel capabilities come from their definitions at build time.
@@ -86,6 +89,10 @@ var FlowviewCompatibility = (function(){
         used['panel.'+p.type]=true;
         if(p.brand && (p.type!=='phone' || p.brand.logoImage || p.brand.icon))used['media.branding']=true;
         if(p.visible!=null)used['flow.panel-visibility']=true;
+        var setup=unifiedPanelFields[p.type];
+        var setsUp=function(v){return object(v) && setup.some(function(key){return Object.prototype.hasOwnProperty.call(v,key);});};
+        if(setup && (setsUp(p.initial) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (object(s.panels)?s.panels:s.patch);
+          return object(patches) && object(patches[p.id]) && (setsUp(patches[p.id]) || setsUp(patches[p.id].enterOnce));})))used['flow.panel-setup-steps']=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||

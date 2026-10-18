@@ -9416,7 +9416,7 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (A table's `rows: []` clears by replacement; a device-app field `null` restores its declared value: Special fold rules tab.)",
+           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (Elsewhere: a table's `rows: []` clears by replacement; a device-app card property such as `{\"icon\": null}` restores its declared value, while `null` for a whole card clears that card: Special fold rules tab.)",
            "panels": {
             "funnel": {
              "counts": null
@@ -10682,6 +10682,65 @@ p.reads-empty{margin:4px 0;font-size:11px}
            }
           },
           {
+           "id": "s-cut-once",
+           "edges": [
+            "patch->fold",
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**A one-step event.** `enterOnce.events` cuts the strand for this step only; its result is shown here and discarded afterwards.",
+           "panels": {
+            "strand": {
+             "enterOnce": {
+              "events": [
+               {
+                "kind": "cut",
+                "site": "s1"
+               }
+              ]
+             },
+             "caption": "Cut for this step only."
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.strand",
+                "value": "{\"enterOnce\": {\"events\": [{\"kind\": \"cut\", \"site\": \"s1\"}]}}",
+                "rule": "cut shown; not carried"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
+           "id": "s-cut-once-after",
+           "edges": [
+            "fold->view"
+           ],
+           "time": "+0m",
+           "text": "**Next step: the strand is whole again.** The displayed snapshot at the previous step is not the carried state, which is why a resume point must come from carried state.",
+           "panels": {
+            "strand": {
+             "caption": "Whole again."
+            },
+            "sjson": {
+             "rows": [
+              {
+               "id": "a",
+               "cells": {
+                "key": "panels.strand",
+                "value": "{\"caption\": \"Whole again.\"}",
+                "rule": "carried state had no cut"
+               }
+              }
+             ]
+            }
+           }
+          },
+          {
            "id": "s-cut",
            "edges": [
             "patch->fold",
@@ -10764,6 +10823,8 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "s-icon-null",
             "s-once-limits",
             "s-bind",
+            "s-cut-once",
+            "s-cut-once-after",
             "s-cut",
             "s-after"
            ]
@@ -10803,54 +10864,54 @@ p.reads-empty{margin:4px 0;font-size:11px}
             "x": 0,
             "y": 10,
             "w": 24,
-            "h": 6
+            "h": 5
            },
            {
             "panel": "buffer",
             "x": 0,
-            "y": 16,
+            "y": 15,
             "w": 8,
             "h": 5
            },
            {
             "panel": "ops",
             "x": 0,
-            "y": 21,
+            "y": 20,
             "w": 8,
             "h": 6
            },
            {
             "panel": "cell",
             "x": 0,
-            "y": 27,
+            "y": 26,
             "w": 8,
             "h": 7
            },
            {
+            "panel": "strand",
+            "x": 8,
+            "y": 15,
+            "w": 9,
+            "h": 10
+           },
+           {
             "panel": "yard",
             "x": 8,
-            "y": 16,
+            "y": 25,
             "w": 9,
             "h": 8
            },
            {
             "panel": "home",
             "x": 8,
-            "y": 24,
+            "y": 33,
             "w": 9,
             "h": 9
            },
            {
-            "panel": "strand",
-            "x": 8,
-            "y": 33,
-            "w": 9,
-            "h": 10
-           },
-           {
             "panel": "app",
             "x": 17,
-            "y": 16,
+            "y": 15,
             "w": 7,
             "h": 18
            }
@@ -11414,8 +11475,9 @@ p.reads-empty{margin:4px 0;font-size:11px}
                "cells": {
                 "field": "max",
                 "value": "200",
-                "from": "panelDeclare (carried)"
-               }
+                "from": "panelDeclare (carried; one-step 50 ended)"
+               },
+               "status": "changed"
               },
               {
                "id": "unit",
@@ -11543,7 +11605,7 @@ p.reads-empty{margin:4px 0;font-size:11px}
                "cells": {
                 "key": "Option B",
                 "value": "refold whole path per declaration",
-                "rule": "earlier patches can change meaning"
+                "rule": "earlier patches and story-time intervals change"
                }
               }
              ]
@@ -11641,7 +11703,7 @@ p.reads-empty{margin:4px 0;font-size:11px}
            "edges": [
             "merge->derive"
            ],
-           "text": "**Story time, evidence and references use the effective declaration.** Interval rule: the time between step N−1 and step N uses the declaration in effect at step N−1. Example: drain 1 %/h, changed to 10 %/h at step 3, steps 2 h apart: step 3 drops 2 %, step 4 drops 20 %.",
+           "text": "**Story time, evidence and references use the effective declaration.** Under Option A the time between step N−1 and N uses the declaration in effect at N−1: drain 1 %/h changed to 10 %/h at step 3, steps 2 h apart, gives −2 % at step 3 and −20 % at step 4. Under Option B the new rate applies to every earlier interval as well.",
            "panels": {
             "effective": {
              "rows": [
@@ -11676,9 +11738,17 @@ p.reads-empty{margin:4px 0;font-size:11px}
               {
                "id": "a",
                "cells": {
-                "key": "battery interval",
-                "value": "rate in effect at the earlier step",
+                "key": "battery interval (A)",
+                "value": "rate at the earlier step",
                 "rule": "step 3: −2 %, step 4: −20 %"
+               }
+              },
+              {
+               "id": "d",
+               "cells": {
+                "key": "battery interval (B)",
+                "value": "rate applied to all intervals",
+                "rule": "earlier drain recomputed"
                }
               },
               {

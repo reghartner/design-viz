@@ -349,7 +349,7 @@ function locusHTML(panel, state) {
   return softwarePanelShell(h + '</div>', state);
 }
 PanelRegistry.define('locus', {
-  label: 'Genome map', since: '0.2.0', order: 43,
+  label: 'Genome map', since: '0.2.0', unified: true, order: 43,
   validateDeclaration: locusDeclarationWarnings, validatePatch: locusPatchWarnings,
   fold: function (panel, steps) {
     var arrayOrNull = function (value) { return value === null || Array.isArray(value); };

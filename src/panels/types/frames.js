@@ -164,7 +164,7 @@ function framesHTML(panel, state) {
 
 PanelRegistry.define('frames', {
   label: 'Reading frames',
-  since: '0.2.0',
+  since: '0.2.0', unified: true,
   order: 42,
   validateDeclaration: framesDeclarationWarnings,
   validatePatch: framesPatchWarnings,

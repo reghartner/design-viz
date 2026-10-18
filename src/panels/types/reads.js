@@ -323,7 +323,7 @@ function readsHTML(panel, state) {
   return softwarePanelShell(h + '</div>', state);
 }
 PanelRegistry.define('reads', {
-  label: 'Read alignment', since: '0.2.0', order: 41,
+  label: 'Read alignment', since: '0.2.0', unified: true, order: 41,
   validateDeclaration: readsDeclarationWarnings, validatePatch: readsPatchWarnings,
   fold: function (panel, steps) {
     var arrayOrNull = function (value) { return value === null || Array.isArray(value); };

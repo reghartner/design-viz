@@ -897,8 +897,9 @@ state. Put the field in the step's panel patch: `{"panels":{"pw":{"max":800}}}`.
 The value carries forward along the path, `enterOnce` applies it to that step
 only, and `null` restores the declared value. `title` can change the same way;
 an empty string hides the heading. `id`, `type`, `initial`, `visible` and
-`brand` never change per step. A value the declaration would warn about warns
-at the patch path instead. Types that support this, with their fields (all
+`brand` never change per step. A setup field in `initial` is the same as
+declaring it, and warns at the declared field's path. A value the declaration
+would warn about warns at the patch path instead. Types that support this, with their fields (all
 also take `title`):
 
 | Type | Setup fields a step can change |
@@ -910,6 +911,14 @@ also take `title`):
 | `table` | `columns` (rows are checked against the columns in effect) |
 | `checks` | `checks` |
 | `budget` | `metrics` |
+| `sequence` | `label`, `sequence`, `alphabet`, `start`, `strand`, `wrap` |
+| `frames` | `label`, `sequence`, `alphabet`, `start` |
+| `reads` | `reference`, `alphabet`, `start`, `label`, `maxReads`, `showMatches` |
+| `locus` | `length`, `unit`, `label`, `features` |
+
+For these types a setup field in a patch is not an unknown state field, and
+state such as `marks` or `reads` is checked against the setup in effect at
+that step.
 
 On other types, setup fields in a patch do not change the panel.
 Compatibility metadata advertises `flow.panel-setup-steps`.

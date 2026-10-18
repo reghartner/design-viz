@@ -267,8 +267,8 @@ function specStructureErrors(page){
 /* A unified type's patch may carry setup fields. They are taken out before the
    type's own patch rules run, and the declaration in effect at this step is
    checked with the type's declaration rules. Warnings the override adds, or
-   that name a field this step sets, are reported at the patch path. `carry` holds the setup values carried into
-   this step along one path. */
+   that name a field this step sets, are reported at the patch path. `carry`
+   holds the setup values carried into this step along one path. */
 function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, errors){
   var rest = Object.assign({}, patch), once = specObject(patch.enterOnce) ? Object.assign({}, patch.enterOnce) : null;
   var step = Object.assign({}, carry), touched = [];
@@ -281,7 +281,7 @@ function unifiedPanelPatch(unified, carry, patch, decl, d, path, warnings, error
   if (effective === decl || !descriptor.validateDeclaration) return {patch:rest, panel:effective, context:unified.context};
   /* `initial` was checked once with the declaration; leave it out here. */
   var before = [], beforeErrors = [], after = [], afterErrors = [];
-  var setup = Object.assign({}, decl), next = Object.assign({}, effective);
+  var setup = Object.assign({}, unified.declared), next = Object.assign({}, effective);
   delete setup.initial; delete next.initial;
   descriptor.validateDeclaration(setup, path, before, beforeErrors, d);
   var context = descriptor.validateDeclaration(next, path, after, afterErrors, d);
@@ -498,15 +498,21 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     var descriptor = PanelRegistry.get(p.type);
     if (!descriptor)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
-    if (descriptor && descriptor.validateDeclaration)
-      panelContexts[p.id] = descriptor.validateDeclaration(p, PP, warnings, errors, d);
-    var unifiedFields = panelUnifiedFields(p.type);
+    /* A unified type's setup fields in `initial` are part of its declaration:
+       they are checked as declared fields, and the rest of `initial` as state. */
+    var unifiedFields = panelUnifiedFields(p.type), declared = p, start = {};
     if (unifiedFields){
-      var start = {};
       unifiedFields.forEach(function(key){ if (panelOwn(p.initial, key)) start[key] = p.initial[key]; });
-      panelUnified[p.id] = {fields:unifiedFields, start:start, context:panelContexts[p.id],
-        carries:unifiedStepCarries(d, p.id, unifiedFields, start)};
+      if (Object.keys(start).length){
+        declared = Object.assign({}, panelEffectiveDeclaration(p, start), {initial:Object.assign({}, p.initial)});
+        Object.keys(start).forEach(function(key){ delete declared.initial[key]; });
+      }
     }
+    if (descriptor && descriptor.validateDeclaration)
+      panelContexts[p.id] = descriptor.validateDeclaration(declared, PP, warnings, errors, d);
+    if (unifiedFields)
+      panelUnified[p.id] = {fields:unifiedFields, start:start, declared:declared, context:panelContexts[p.id],
+        carries:unifiedStepCarries(d, p.id, unifiedFields, start)};
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){

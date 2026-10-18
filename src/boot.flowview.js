@@ -11,9 +11,12 @@ var backlinkData = parseBacklinks(backlinkBlock ? backlinkBlock.textContent : nu
 var deepLinkChannel = null;
 var pendingLinkBase = null;
 var bootFailed = false;
+var activeSkin = null; /* live host/picker selection, including before async boot */
 var workspaceRequest=readWorkspaceHandoff(window.location.hash);
 window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
+  if (SKIN_NAMES.indexOf(name) < 0) return false;
+  activeSkin = name;
   return applySkinClasses(document.body, view, name);
 };
 /* Host skin channel: an embedding shell (iframe parent) may post
@@ -46,7 +49,7 @@ function readCookieText(){
 function fail(msgs){
   bootFailed = true;
   pendingLinkBase = null;
-  applySkinClasses(document.body, view, DEFAULT_SKIN);
+  applySkinClasses(document.body, view, activeSkin || resolveSkin(readCookieText()));
   var pre = document.createElement('pre');
   pre.className = 'errbox';
   pre.textContent = 'Flowview: the spec did not render.\n\n' + msgs.map(function(m){ return '- ' + m; }).join('\n');
@@ -93,7 +96,9 @@ function applyEmbedMode(ctl){
     if (window.console) console.warn('flowspec: #embed section "' + req.section + '" not found');
     return;
   }
-  if (req.skin && SKIN_NAMES.indexOf(req.skin) >= 0) window.dvSetSkin(req.skin);
+  /* A host/picker selection received before async boot is newer than the
+     skin encoded in an embed URL and must not be replaced here. */
+  if (!activeSkin && req.skin && SKIN_NAMES.indexOf(req.skin) >= 0) window.dvSetSkin(req.skin);
   if (target.tabBlock != null && target.tab != null){
     var tb = ctl.tabBlocks[target.tabBlock - 1];
     /* activate=false: reveal the tab without rewriting the hash */
@@ -113,7 +118,11 @@ function boot(raw){
   var lint = v.errors.length ? [] : lintPage(page);
   v.warnings.concat(lint).forEach(function(w){ if (window.console) console.warn('flowspec: ' + w); });
   if (v.errors.length){ fail(v.errors); return; }
-  var bootSkin = resolveSkin(readCookieText(), page.skin);
+  /* A live host choice can arrive while ?spec is still loading. Keep it;
+     the saved page skin is only the standalone fallback when no host choice
+     or supported dv_skin cookie exists. */
+  var embedSkin=embedRequest && SKIN_NAMES.indexOf(embedRequest.skin)>=0?embedRequest.skin:null;
+  var bootSkin = activeSkin || embedSkin || resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
   var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,handoffHost:window.flowviewHandoffHost});

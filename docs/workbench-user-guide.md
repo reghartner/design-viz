@@ -61,6 +61,11 @@ description and tags (shown on published library cards and matched by
 **Search diagrams**), skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
+The site's current skin applies from the first render across the editor, published
+diagram reader, page preview and agent update preview, and stays selected when you
+open another diagram. The saved document skin remains export metadata; choosing a
+site skin never edits it. **Use document default** deliberately chooses that saved
+skin once, without making later documents replace the site selection.
 
 **Open file** and **File → Open working file…** make the selected file your
 working document. Valid ordinary edits and Undo/Redo autosave to that actual file;

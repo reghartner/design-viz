@@ -388,6 +388,11 @@ function initWorkbenchLibrary(opts){
       var loaded=await loadSpec(entry);if(signal.aborted)throw new Error('Detail request cancelled.');return loaded.spec;
     }};
   }
+  function selectedSkin(page){return typeof opts.skin==='function'?opts.skin(page):resolveSkin('',page && page.skin);}
+  function setSkin(name){
+    if(!current || SKIN_NAMES.indexOf(name)<0)return false;
+    return applySkinClasses(document.body,reader,name);
+  }
   var facets={team:document.getElementById('welcome-library-team'),service:document.getElementById('welcome-library-service'),topic:document.getElementById('welcome-library-topic')};
   var count=document.getElementById('welcome-library-count'),activeFilters=document.getElementById('welcome-library-active'),filterChips=document.getElementById('welcome-library-filter-chips');
   var recentSection=document.getElementById('welcome-library-recent'),recentItems=document.getElementById('welcome-library-recent-items');
@@ -546,7 +551,7 @@ function initWorkbenchLibrary(opts){
         // Validate the exact target against the actual renderer before saving
         // or switching projects. A bad fragment leaves the existing draft intact.
         var checked=normalize(JSON.parse(JSON.stringify(current.spec)));
-        ctl=renderPage(reader,checked,current.spec.page.skin,null,readerOptions());
+        ctl=renderPage(reader,checked,selectedSkin(checked),null,readerOptions());
         applyWorkspaceTarget(ctl,checked,handoff.target);retireViewer();
         opts.edit(JSON.parse(JSON.stringify(current.source)),handoff,true,current.topologyContext);openedBuild=true;return;
       }
@@ -554,7 +559,7 @@ function initWorkbenchLibrary(opts){
       document.getElementById('canon-reader-origin').textContent=origin+(handoff?' · Opened from '+(handoff.entity || 'Backstage'):'')+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
-      ctl=renderPage(reader,page,spec.page.skin,null,readerOptions());
+      ctl=renderPage(reader,page,selectedSkin(page),null,readerOptions());
       var remembered=opts.position && opts.position();
       if(remembered){
         try{applyWorkspaceTarget(ctl,page,remembered);}
@@ -562,7 +567,7 @@ function initWorkbenchLibrary(opts){
           // The published story may have changed while this history entry was
           // away. Rebuild once so a partially applied stale view/path cannot
           // replace the authored opening state.
-          ctl.destroy();reader.replaceChildren();ctl=renderPage(reader,page,spec.page.skin,null,readerOptions());
+          ctl.destroy();reader.replaceChildren();ctl=renderPage(reader,page,selectedSkin(page),null,readerOptions());
           if(opts.savePosition)opts.savePosition(null);
         }
       }
@@ -607,5 +612,5 @@ function initWorkbenchLibrary(opts){
   });
   window.addEventListener('pagehide',function(){sequence++;retireServiceRows();retireViewer();});
   window.addEventListener('pageshow',function(event){if(event.persisted && active)show(active,opts.selected());});
-  return {show:show,hide:stop};
+  return {show:show,hide:stop,setSkin:setSkin};
 }

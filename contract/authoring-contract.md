@@ -1584,7 +1584,7 @@ perspectives" of one timeline). Types:
   in view) — the one growing widget can never shift the widgets or step
   controls around it.
   Lines appended at the current step render as new for that step (a light
-  accent; no authoring). A line may carry an optional unique string `id`:
+  accent; no authoring). A line may carry an optional unique non-empty string `id`:
   `{"id":"retry-2","tag":"NET","text":"retry"}`. State `highlight` (one id,
   up to 8 ids, or null) highlights those lines. It carries like other state,
   `enterOnce: {"highlight":"retry-2"}` highlights for one step, and null

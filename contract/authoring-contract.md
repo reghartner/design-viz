@@ -906,7 +906,6 @@ also take `title`):
 | --- | --- |
 | `gauge` | `unit`, `max` |
 | `state`, `orbit` | `states`, `colors` |
-| `log` | `tags` (recolors every shown line, earlier ones included) |
 | `queue` | `title` only |
 | `table` | `columns` (rows are checked against the columns in effect) |
 | `checks` | `checks` |

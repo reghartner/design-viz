@@ -19,7 +19,6 @@ const plain = value => JSON.parse(JSON.stringify(value));
    declaration rules warn about, and that warning's suffix  */
 const CASES = {
   state: {panel: {states: ['OFF', 'RUN'], initial: {state: 'OFF'}}, field: 'states', value: ['OFF', 'SLEEP'], seen: 'SLEEP', declared: 'RUN'},
-  log: {panel: {tags: {NET: '#111111'}, initial: {log: [{tag: 'NET', text: 'up'}]}}, field: 'tags', value: {NET: '#222222'}, seen: '#222222', declared: '#111111'},
   orbit: {panel: {states: ['IDLE', 'BUSY'], initial: {state: 'IDLE'}}, field: 'states', value: ['IDLE', 'DONE'], seen: 'DONE', declared: 'BUSY',
     invalid: [[], '.states: orbit needs states:[...] — panel renders empty']},
   table: {panel: {columns: [{id: 'a', label: 'Alpha'}], initial: {rows: [{id: 'r', cells: {a: 1}}]}}, field: 'columns', value: [{id: 'a', label: 'Beta'}], seen: 'Beta', declared: 'Alpha',
@@ -45,8 +44,8 @@ function frames(d){
 
 test('exactly the approved types are flagged', () => {
   const flagged = C.PanelRegistry.types().filter(type => C.PanelRegistry.get(type).unified).sort();
-  assert.deepEqual(plain(flagged), ['budget', 'checks', 'frames', 'gauge', 'locus', 'log', 'orbit', 'queue', 'reads', 'sequence', 'state', 'table']);
-  for (const type of ['buffer', 'trace', 'cost', 'image', 'thermo', 'waterfall', 'leds', 'signal', 'tiles', 'zoneframe', 'xray', 'replicas', 'data-contract', 'radar'])
+  assert.deepEqual(plain(flagged), ['budget', 'checks', 'frames', 'gauge', 'locus', 'orbit', 'queue', 'reads', 'sequence', 'state', 'table']);
+  for (const type of ['log', 'buffer', 'trace', 'cost', 'image', 'thermo', 'waterfall', 'leds', 'signal', 'tiles', 'zoneframe', 'xray', 'replicas', 'data-contract', 'radar'])
     assert.equal(C.panelUnifiedFields(type), null, type);
 });
 

@@ -37,7 +37,6 @@ PanelRegistry.extend('log', {
   order: 3,
   label: 'Log',
   since: '0.1.0',
-  unified: true,
 });
 
 PanelRegistry.extend('log', {

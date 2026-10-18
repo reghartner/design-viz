@@ -84,7 +84,9 @@ function renderAll(C, d, folded) {
     states.forEach((state, i) => {
       /* The heading is part of the output; main has no effective declaration. */
       const title = C.panelEffectiveDeclaration ? C.panelEffectiveDeclaration(panel, state).title : panel.title;
-      try { C.renderPanelBody(host, panel, state, 'aurora', states, i, false); frames.push(String(title) + '\u0001' + (host.html || '')); }
+      /* Log marks lines appended at this step with `plog-new` (phase 4); that
+         token is the one intended change, so it is removed before hashing. */
+      try { C.renderPanelBody(host, panel, state, 'aurora', states, i, false); frames.push(String(title) + '\u0001' + (host.html || '').split(' plog-new').join('')); }
       catch (ex) { frames.push('throw:' + (ex && ex.message)); }
     });
     out[panel.id] = hash(frames.join('\u0000'));

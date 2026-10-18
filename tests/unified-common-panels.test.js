@@ -44,8 +44,8 @@ function frames(d){
 
 test('exactly the approved types are flagged', () => {
   const flagged = C.PanelRegistry.types().filter(type => C.PanelRegistry.get(type).unified).sort();
-  assert.deepEqual(plain(flagged), ['budget', 'checks', 'frames', 'gauge', 'locus', 'orbit', 'queue', 'reads', 'sequence', 'state', 'table']);
-  for (const type of ['log', 'buffer', 'trace', 'cost', 'image', 'thermo', 'waterfall', 'leds', 'signal', 'tiles', 'zoneframe', 'xray', 'replicas', 'data-contract', 'radar'])
+  assert.deepEqual(plain(flagged), ['budget', 'checks', 'frames', 'gauge', 'locus', 'log', 'orbit', 'queue', 'reads', 'sequence', 'state', 'table']);
+  for (const type of ['buffer', 'trace', 'cost', 'image', 'thermo', 'waterfall', 'leds', 'signal', 'tiles', 'zoneframe', 'xray', 'replicas', 'data-contract', 'radar'])
     assert.equal(C.panelUnifiedFields(type), null, type);
 });
 

@@ -44,6 +44,65 @@ test('without company.json every marked source assembles exactly as upstream tex
     {companyName:'YOUR COMPANY',logo:'YC',primaryColor:'#6750A4',secondaryColor:'#FFFFFF'});
 });
 
+test('company package list is an opt-in selection with validated names',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  fs.mkdirSync(path.join(root,'packages'),{recursive:true});
+  fs.cpSync(path.join(ROOT,'packages/science'),path.join(root,'packages/science'),{recursive:true});
+  assert.deepEqual(loader.enabledPackages(),[]);
+  write('company.json',{version:1,packages:['science']});
+  assert.deepEqual(loader.enabledPackages(),['science']);
+  assert.ok(loader.sourceFiles('validator.js').includes('@package/science/panels/types/rnacopy.js'));
+  write('company.json',{version:1,packages:['science','science']});
+  assert.throws(()=>loader.companyConfig(),/packages must be a list of unique/);
+  write('company.json',{version:1,packages:['../science']});
+  assert.throws(()=>loader.companyConfig(),/packages must be a list of unique/);
+});
+
+test('optional package helper, venue and type sources load in dependency order without default leakage',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  const pkg=path.join(root,'packages/sports-fixture');
+  for(const directory of ['panels','panels/venues','panels/types'])
+    fs.mkdirSync(path.join(pkg,directory),{recursive:true});
+  fs.writeFileSync(path.join(pkg,'package.json'),JSON.stringify({
+    name:'sports-fixture',templates:[],sourceFiles:[
+      'panels/types/fixture.js','panels/venues/fixture.js','panels/fixture-helper.js'
+    ],workbenchSourceFiles:['panels/fixture-import.js']
+  }));
+  fs.writeFileSync(path.join(pkg,'panels/fixture-helper.js'),"var PACKAGE_ORDER=['helper'];");
+  fs.writeFileSync(path.join(pkg,'panels/venues/fixture.js'),"PACKAGE_ORDER.push('venue');");
+  fs.writeFileSync(path.join(pkg,'panels/types/fixture.js'),"PACKAGE_ORDER.push('type');PanelRegistry.define('sports-fixture',{label:'Sports fixture'});");
+  fs.writeFileSync(path.join(pkg,'panels/fixture-import.js'),"var PACKAGE_WORKBENCH_IMPORT=true;");
+  assert.deepEqual(loader.enabledPackages(),[]);
+  assert.doesNotMatch(loader.readSource('validator.js'),/PACKAGE_ORDER/);
+  assert.ok(!loader.sourceFiles('builder.workbench.js').some(file=>file.includes('fixture-import')));
+  write('company.json',{version:1,packages:['sports-fixture']});
+  const selected=loader.sourceFiles('validator.js');
+  const packageFiles=selected.filter(file=>file.startsWith('@package/'));
+  assert.deepEqual(packageFiles,[
+    '@package/sports-fixture/panels/fixture-helper.js',
+    '@package/sports-fixture/panels/venues/fixture.js',
+    '@package/sports-fixture/panels/types/fixture.js'
+  ]);
+  const context={};vm.runInNewContext(loader.readSource('validator.js'),context);
+  assert.deepEqual(Array.from(context.PACKAGE_ORDER),['helper','venue','type']);
+  assert.equal(context.PanelRegistry.get('sports-fixture').label,'Sports fixture');
+  assert.ok(!loader.sourceFiles('validator.js').some(file=>file.includes('fixture-import')));
+  assert.ok(loader.sourceFiles('builder.workbench.js').includes('@package/sports-fixture/panels/fixture-import.js'));
+});
+
+test('company venue entries load only when the sports registry is selected',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  const venue=path.join(root,'company/panels/venues/fixture-hall.js');
+  fs.mkdirSync(path.dirname(venue),{recursive:true});
+  fs.writeFileSync(venue,"SeatmapVenues.define({id:'fixture-hall',name:'Fixture Hall',seatmap:{rings:[],sections:[]}});");
+  assert.ok(!loader.sourceFiles('validator.js').includes('@company/panels/venues/fixture-hall.js'));
+  const sports=path.join(root,'packages/sports');
+  fs.mkdirSync(sports,{recursive:true});
+  fs.writeFileSync(path.join(sports,'package.json'),JSON.stringify({name:'sports',sourceFiles:[],templates:[]}));
+  write('company.json',{version:1,packages:['sports']});
+  assert.ok(loader.sourceFiles('validator.js').includes('@company/panels/venues/fixture-hall.js'));
+});
+
 test('company.json replaces the labels, repository links and brand in assembled sources',t=>{
   const {loader,write}=scratchLoader(t);
   write('company.json',CONFIG);write('brand.json',BRAND);write('acme.png',PNG);

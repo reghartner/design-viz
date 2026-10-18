@@ -3,12 +3,15 @@ import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
+const scienceEnabled=(process.env.FLOWVIEW_PACKAGES||'').split(',').includes('science');
+test.skip(!scienceEnabled,'The science package is opt-in for browser builds.');
+
 const stories=[
-  {name:'wave lesson',spec:'diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:0,
+  {name:'wave lesson',spec:'packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:0,
     steps:[0,1,2,3,4],alternate:{path:'shutter',steps:[5]},panel:'.pwidget:has(.wavefield-panel)'},
-  {name:'force lesson',spec:'diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:1,
+  {name:'force lesson',spec:'packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:1,
     heading:'02 / When a moving puck accelerates backward',steps:[0,1,2,3,4],panel:'.pwidget:has(.forcebody)'},
-  {name:'RNA copy lesson',spec:'diagrams/biology/copy-gate/copy-gate.spec.json',section:0,
+  {name:'RNA copy lesson',spec:'packages/science/diagrams/biology/copy-gate/copy-gate.spec.json',section:0,
     steps:[0,1,2,3,4,5,6],alternate:{path:'interruption',steps:[7,8,9]},
     panel:'.pwidget:has(.cellscene),.pwidget:has(.rnacopy)'},
 ];

@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -49,7 +50,7 @@ test('strandscene template, picker example, feature label, styles and sizing use
   assert.match(css, /prefers-reduced-motion: reduce\)\{\.mech-move[^}]*transition:none\}\.mech-transient\{display:none\}/);
   assert.match(css, /@media print\{\.mech-transient\{display:none\}/);
   assert.ok(def.styles.indexOf('.bio-b-') < 0 && def.styles.indexOf('.bio-tone-') < 0 && def.styles.indexOf('--bio-letter:#') < 0, 'letter and tone palettes are reused, not redefined');
-  for (const file of ['src/panels/types/strandscene.js', 'src/panels/mech.js'])
+  for (const file of ['packages/science/panels/types/strandscene.js', 'packages/science/panels/mech.js'])
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), /requestAnimationFrame|setTimeout|setInterval/, file);
 });
 

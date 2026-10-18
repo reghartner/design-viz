@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 /* Seatmap venue library: registry lookup, declaration precedence, unknown ids,
    fork-added venues, the importer's venue output, the paths rink outline and
    proof that existing inline declarations render byte-identically. */
@@ -13,13 +14,13 @@ const {seatmapRenders} = require('./helpers/seatmap-renders.js');
 
 const ROOT = path.join(__dirname, '..');
 const TOOL = path.join(ROOT, 'tools/seatmap-import.mjs');
-const VENUE_FILE = path.join(ROOT, 'src/panels/venues/ubs-arena.js');
-const ARENA_SVG = path.join(ROOT, 'examples/sports/ubs-arena/arena.svg');
-const EXAMPLE = path.join(ROOT, 'examples/sports/venue-map.spec.json');
-/* The exact command that produced src/panels/venues/ubs-arena.js. */
+const VENUE_FILE = path.join(ROOT, 'packages/sports/panels/venues/ubs-arena.js');
+const ARENA_SVG = path.join(ROOT, 'packages/sports/examples/ubs-arena/arena.svg');
+const EXAMPLE = path.join(ROOT, 'packages/sports/examples/venue-map.spec.json');
+/* The exact command that produced packages/sports/panels/venues/ubs-arena.js. */
 const SEED_ARGS = [ARENA_SVG, '--level-map', '100-level:100 level,200-level:200 level,300-level:300 level', '--capacity-total', '17250',
   '--venue', 'ubs-arena', '--venue-name', 'UBS Arena', '--venue-location', 'Elmont, NY',
-  '--venue-note', 'Section numbering and positions from public seating guides, drawn as original polygons by examples/sports/ubs-arena/trace.py. Capacities are an illustrative even split of 17,250 seats, not venue data.',
+  '--venue-note', 'Section numbering and positions from public seating guides, drawn as original polygons by packages/sports/examples/ubs-arena/trace.py. Capacities are an illustrative even split of 17,250 seats, not venue data.',
   '--landmark', 'home-bench:home bench:428:302', '--landmark', 'away-bench:visitors:556:302', '--landmark', 'ice:ice:489:404'];
 
 function core(extra = '') {
@@ -39,8 +40,8 @@ const examplePanel = spec => spec.page.blocks[0].diagram.panels[0];
 const IDS = Array.from(C.SeatmapVenues.ids());
 const AVAILABLE = IDS.join(', ');
 
-test('the library ships exactly one venue, UBS Arena in Elmont, as data discovered from src/panels/venues', () => {
-  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'src/panels/venues')), ['ubs-arena.js']);
+test('the sports package ships exactly one venue, UBS Arena in Elmont', () => {
+  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'packages/sports/panels/venues')), ['ubs-arena.js']);
   assert.equal(IDS[0], 'ubs-arena');
   const [row] = plain(C.SeatmapVenues.list());
   assert.deepEqual({id: row.id, name: row.name, location: row.location, sections: row.sections, capacityNote: row.capacityNote},
@@ -56,8 +57,8 @@ test('the library ships exactly one venue, UBS Arena in Elmont, as data discover
   assert.equal(C.SeatmapVenues.get(7), null);
   // Venue files load after the library and before every panel type.
   const files = sourceFiles('validator.js');
-  assert.ok(files.indexOf('panels/venue-library.js') < files.indexOf('panels/venues/ubs-arena.js'));
-  assert.ok(files.indexOf('panels/venues/ubs-arena.js') < files.findIndex(f => f.startsWith('panels/types/')));
+  assert.ok(files.indexOf('@package/sports/panels/venue-library.js') < files.indexOf('@package/sports/panels/venues/ubs-arena.js'));
+  assert.ok(files.indexOf('@package/sports/panels/venues/ubs-arena.js') < files.findIndex(f => f.startsWith('panels/types/')));
   // A venue file is a single define call with a JSON literal: data only.
   const text = fs.readFileSync(VENUE_FILE, 'utf8');
   const literal = text.slice(text.indexOf('SeatmapVenues.define(') + 'SeatmapVenues.define('.length, text.lastIndexOf(');'));
@@ -146,18 +147,18 @@ test('a fork adds a venue with one file in company/panels/venues; the bundle dis
 test('the importer writes a venue entry file; the committed UBS Arena file is exactly its output', () => {
   const run = spawnSync(process.execPath, [TOOL, ...SEED_ARGS], {cwd: ROOT, encoding: 'utf8'});
   assert.equal(run.status, 0, run.stderr);
-  assert.equal(run.stdout, fs.readFileSync(VENUE_FILE, 'utf8'), 'regenerate src/panels/venues/ubs-arena.js with the seed command');
+  assert.equal(run.stdout, fs.readFileSync(VENUE_FILE, 'utf8'), 'regenerate packages/sports/panels/venues/ubs-arena.js with the seed command');
   assert.match(run.stderr, /field: rink outline 353\.9×150\.4 at 312,326\.6/);
   assert.match(run.stderr, /rings: 100-level "100 level": 21, 200-level "200 level": 33, 300-level "300 level": 26/);
   // The SVG itself is reproducible from trace.py and the CSV.
   const out = path.join(require('node:os').tmpdir(), 'seatmap-trace-' + process.pid + '.svg');
   try {
-    const traced = spawnSync('python3', [path.join(ROOT, 'examples/sports/ubs-arena/trace.py'), out], {encoding: 'utf8'});
+    const traced = spawnSync('python3', [path.join(ROOT, 'packages/sports/examples/ubs-arena/trace.py'), out], {encoding: 'utf8'});
     assert.equal(traced.status, 0, traced.stderr);
     assert.equal(fs.readFileSync(out, 'utf8'), fs.readFileSync(ARENA_SVG, 'utf8'));
   } finally { fs.rmSync(out, {force: true}); }
   // Capacities, zones and rings match the CSV import (section 329, not 229).
-  const csv = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples/sports/arena-sections.sections.json'), 'utf8'));
+  const csv = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/sports/examples/arena-sections.sections.json'), 'utf8'));
   const venue = C.SeatmapVenues.get('ubs-arena').seatmap;
   assert.deepEqual(plain(venue.sections.map(s => [s.id, s.ring, s.capacity, s.zone])), csv.sections.map(s => [s.id, s.ring, s.capacity, s.zone]));
   assert.ok(venue.sections.some(s => s.id === '329' && s.ring === '200-level'));
@@ -166,7 +167,7 @@ test('the importer writes a venue entry file; the committed UBS Arena file is ex
 
 test('venue CLI options are checked: ids, names, landmarks and venue-only flags without --venue', () => {
   const cli = args => spawnSync(process.execPath, [TOOL, ...args], {cwd: ROOT, encoding: 'utf8'});
-  const csv = path.join(ROOT, 'examples/sports/arena-sections.csv');
+  const csv = path.join(ROOT, 'packages/sports/examples/arena-sections.csv');
   let run = cli([csv, '--venue-name', 'X']);
   assert.equal(run.status, 2); assert.match(run.stderr, /need --venue ID/);
   run = cli([csv, '--venue', 'bad id', '--venue-name', 'X']);

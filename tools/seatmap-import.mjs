@@ -26,12 +26,12 @@
    id (101 → 1, 201A → 2).
 
    --venue writes a venue library entry instead of a fragment: one
-   SeatmapVenues.define({...}) call for src/panels/venues/<id>.js (upstream)
-   or company/panels/venues/<id>.js (a fork). See cookbook/venue-map.md.
+   SeatmapVenues.define({...}) call for packages/sports/panels/venues/<id>.js (upstream)
+   or company/panels/venues/<id>.js (a fork). See packages/sports/cookbook/venue-map.md.
 
-   No npm dependencies. The parsing lives in src/panels/seatmap-import.js and
+   No npm dependencies. The parsing lives in packages/sports/panels/seatmap-import.js and
    is shared with the workbench's Import seating chart… action; the strict
-   path tokenizer and normaliser are the panel's own (src/panels/sports.js). */
+   path tokenizer and normaliser are the panel's own (packages/sports/panels/sports.js). */
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_LIMIT = 512 * 1024;
-const SOURCES = ['panels/sports.js', 'panels/venue-library.js', 'panels/seatmap-import.js'].map(file => path.join(HERE, '../src', file));
+const SOURCES = ['sports.js', 'venue-library.js', 'seatmap-import.js'].map(file => path.join(HERE, '../packages/sports/panels', file));
 
 let shared = null;
 /* Evaluate the panel's own helpers, the venue library and the shared
@@ -69,7 +69,13 @@ export function venueProblems(entry) {
   const { readSource } = createRequire(import.meta.url)('./source-loader.cjs');
   const context = { URL, TextEncoder };
   vm.createContext(context);
-  vm.runInContext(readSource('validator.js'), context);
+  const selected = process.env.FLOWVIEW_PACKAGES;
+  process.env.FLOWVIEW_PACKAGES = [...new Set([...(selected ? selected.split(',') : []), 'sports'])].join(',');
+  try { vm.runInContext(readSource('validator.js'), context); }
+  finally {
+    if (selected === undefined) delete process.env.FLOWVIEW_PACKAGES;
+    else process.env.FLOWVIEW_PACKAGES = selected;
+  }
   const panel = Object.assign({ id: 'map', type: 'seatmap' }, entry.seatmap);
   const result = context.validate(context.normalize({ nodes: { n: {} }, rows: [['n']], panels: [panel] }));
   return [...result.errors, ...result.warnings].map(text => String(text).replace(/^.*?panels\[0\]\.?/, 'seatmap.'));

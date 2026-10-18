@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -35,7 +36,7 @@ test('rnacopy is discovered with a clean template, picker example, typed fields 
   assert.equal(panelAssets().features['panel.rnacopy'].since, '0.2.0');
   const css = readStyles('style.core.css');
   for (const pattern of [/\.rnacopy-frame\{/, /\.sk-daylight \.rnacopy/, /@media print\{\.rnacopy/, /prefers-reduced-motion:reduce\)\{\.rnacopy/]) assert.match(css, pattern);
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/types/rnacopy.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/types/rnacopy.js'), 'utf8');
   assert.doesNotMatch(source, /document\.|setTimeout|setInterval|requestAnimationFrame|fetch\(/);
 });
 

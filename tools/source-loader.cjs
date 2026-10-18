@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const sourceRoot = path.join(__dirname, '../src');
+const PACKAGES_PREFIX = '@packages/';
+const PACKAGE_PREFIX = '@package/';
 /* Fork-owned overlay. Upstream ships only company/README.md there, so forks keep
    panels, contract fragments, examples and tests out of upstream-owned files.
    Only this checkout's own source tree is overlaid; synthetic test roots are not. */
@@ -12,6 +14,17 @@ function companyDir(root = sourceRoot) {
   return path.resolve(root) === sourceRoot ? path.join(sourceRoot, '../company') : null;
 }
 function sourcePath(root, file) {
+  if (file.startsWith(PACKAGE_PREFIX)) {
+    // The first path segment is the package name; the rest is a manifest-owned file.
+    const segments = file.slice(PACKAGE_PREFIX.length).split('/');
+    const packageName = segments.shift();
+    const relative = segments.join('/');
+    const metadata = packageManifest(packageName, root);
+    if (!enabledPackages(root).includes(packageName) ||
+        ![...metadata.sourceFiles, ...(metadata.workbenchSourceFiles || [])].includes(relative))
+      throw new Error('Package source is not enabled: ' + file);
+    return path.join(packageDir(root, packageName), relative);
+  }
   if (!file.startsWith(COMPANY_PREFIX)) return path.join(root, file);
   const company = companyDir(root);
   if (!company) throw new Error('Company overlay source outside the checkout: ' + file);
@@ -102,11 +115,17 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'packages', 'backstage', 'site'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
-  const config = {companyName:null, repository:null, revision:null, brand:null, package:{}};
+  const config = {companyName:null, repository:null, revision:null, brand:null, package:{}, packages:[]};
+  if (raw.packages != null) {
+    if (!Array.isArray(raw.packages) || raw.packages.some(name => typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)) ||
+        new Set(raw.packages).size !== raw.packages.length)
+      throw companyError(file, 'packages must be a list of unique lowercase package names');
+    config.packages = raw.packages;
+  }
   if (raw.companyName != null) config.companyName = plainText(raw.companyName, file, 'companyName', 40);
   if (raw.repository != null) config.repository = repositoryUrl(raw.repository, file);
   if (raw.revision != null) {
@@ -181,11 +200,76 @@ function companyBrandSource(brand) {
   return '/* Company brand from company/company.json (fork-owned); generated at build time. */\n' +
     'var FLOWVIEW_COMPANY_BRAND_CONFIG = Object.freeze(' + JSON.stringify(brand).replace(/</g, '\\u003c') + ');';
 }
+function packageDir(root, name) {
+  if (path.resolve(root) !== sourceRoot || !/^[a-z][a-z0-9-]*$/.test(name))
+    throw new Error('Invalid package: ' + name);
+  return path.join(sourceRoot, '../packages', name);
+}
+function packageManifest(name, root = sourceRoot) {
+  const file = path.join(packageDir(root, name), 'package.json');
+  let metadata;
+  try { metadata = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (error) { throw new Error('Cannot read package ' + name + ': ' + error.message); }
+  if (!metadata || metadata.name !== name || !Array.isArray(metadata.sourceFiles) || !Array.isArray(metadata.templates) ||
+      (metadata.workbenchSourceFiles != null && !Array.isArray(metadata.workbenchSourceFiles)) ||
+      metadata.sourceFiles.some(file => typeof file !== 'string' ||
+        !/^panels\/(?:[a-z][a-z0-9-]*\.js|venues\/[a-z][a-z0-9-]*\.js|types\/[a-z][a-z0-9-]*\.js)$/.test(file)) ||
+      (metadata.workbenchSourceFiles || []).some(file => typeof file !== 'string' ||
+        !/^panels\/[a-z][a-z0-9-]*\.js$/.test(file)) ||
+      new Set([...metadata.sourceFiles, ...(metadata.workbenchSourceFiles || [])]).size !==
+        metadata.sourceFiles.length + (metadata.workbenchSourceFiles || []).length)
+    throw new Error('Invalid package manifest: ' + file);
+  for (const template of metadata.templates) {
+    if (!template || typeof template !== 'object' || Array.isArray(template) ||
+        typeof template.name !== 'string' || typeof template.desc !== 'string' ||
+        typeof template.source !== 'string' || !/^starters\/[a-z][a-z0-9-]*\.json$/.test(template.source))
+      throw new Error('Invalid package template in ' + file);
+  }
+  return metadata;
+}
+function sitePackageSelection(root = sourceRoot) {
+  const file = path.join(root, '../workbench/site.json');
+  if (!fs.existsSync(file)) return null;
+  let data;
+  try { data = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (error) { throw new Error('Invalid site config ' + file + ': ' + error.message); }
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !Object.hasOwn(data, 'packages')) return null;
+  const names = data.packages;
+  if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)) ||
+      new Set(names).size !== names.length)
+    throw new Error('Invalid site config ' + file + ': packages must be a list of unique lowercase package names');
+  return names;
+}
+function enabledPackages(root = sourceRoot) {
+  if (path.resolve(root) !== sourceRoot) return [];
+  // A site build may override the company default, including with an empty
+  // list. Explicit CLI preview packages remain additive to that selection.
+  const configured = Object.hasOwn(process.env, 'FLOWVIEW_PACKAGE_BASE')
+    ? process.env.FLOWVIEW_PACKAGE_BASE.split(',').filter(Boolean)
+    : process.env.FLOWVIEW_COMPANY_IDENTITY === 'off' ? []
+    : sitePackageSelection(root) ?? companyConfig(root)?.packages ?? [];
+  const selected = process.env.FLOWVIEW_PACKAGES ? process.env.FLOWVIEW_PACKAGES.split(',').filter(Boolean) : [];
+  const names = [...new Set([...configured, ...selected])].sort();
+  for (const name of names) packageManifest(name, root);
+  return names;
+}
 function manifest(root) { return JSON.parse(fs.readFileSync(path.join(root, 'source-bundles.json'), 'utf8')); }
 function sourceFiles(name, root = sourceRoot) {
   const config = manifest(root), entries = Object.hasOwn(config, name) ? config[name] : [name];
   if (!Array.isArray(entries)) throw new Error('Not a logical source bundle: ' + name);
   return entries.flatMap((entry) => {
+    // Fork venue entries extend the optional sports registry and must not run
+    // in builds that omit that registry.
+    if (entry === '@company/panels/venues/*.js' && !enabledPackages(root).includes('sports')) return [];
+    if (entry.startsWith(PACKAGES_PREFIX)) {
+      const directory = entry.endsWith('/*.js') ? entry.slice(PACKAGES_PREFIX.length, -5) : null;
+      if (!['panels', 'panels/venues', 'panels/types', 'workbench'].includes(directory))
+        throw new Error('Unknown package source slot: ' + entry);
+      return enabledPackages(root).flatMap(packageName => (directory === 'workbench'
+        ? packageManifest(packageName, root).workbenchSourceFiles || []
+        : packageManifest(packageName, root).sourceFiles.filter(file => path.posix.dirname(file) === directory))
+        .map(file => PACKAGE_PREFIX + packageName + '/' + file));
+    }
     const company = entry.startsWith(COMPANY_PREFIX);
     if (!entry.endsWith('/*.js')) {
       if (company) throw new Error('Company overlay entries must be directory globs: ' + entry);
@@ -228,6 +312,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
   });
 }
 function displayPath(file) {
+  if (file.startsWith(PACKAGE_PREFIX)) return 'packages/' + file.slice(PACKAGE_PREFIX.length);
   return file.startsWith(COMPANY_PREFIX) ? 'company/' + file.slice(COMPANY_PREFIX.length) : 'src/' + file;
 }
 function formatSources(records) {
@@ -358,11 +443,12 @@ function entrypointAssets(name, root = sourceRoot) {
   }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
-module.exports = { companyDir, companyConfig, companyAgentContext, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
+module.exports = { companyDir, companyConfig, companyAgentContext, packageManifest, sitePackageSelection, enabledPackages, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
   panelAssets, readStyles, fontAssets, fontCss, entrypointAssets };
 if (require.main === module) {
   const [mode, ...names] = process.argv.slice(2);
   if (mode === '--assets') process.stdout.write(JSON.stringify(panelAssets()));
+  else if (mode === '--packages' && !names.length) process.stdout.write(JSON.stringify(enabledPackages()));
   else if (mode === '--company' && !names.length) process.stdout.write(JSON.stringify(companyConfig()));
   else if (mode === '--agent-context' && !names.length) process.stdout.write(JSON.stringify(companyAgentContext()));
   else if (mode === '--styles' && names.length === 1) process.stdout.write(readStyles(names[0]));
@@ -372,5 +458,5 @@ if (require.main === module) {
   else if (mode === '--entry-assets' && names.length === 1) process.stdout.write(JSON.stringify(entrypointAssets(names[0])));
   else if (mode === '--font-css' && names.length === 1) process.stdout.write(fontCss(names[0]));
   else if (mode === '--module' && names.length === 2) process.stdout.write(moduleSource(names[0],names[1]));
-  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --agent-context | --styles STYLESHEET');
+  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --packages | --agent-context | --styles STYLESHEET');
 }

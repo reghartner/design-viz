@@ -6,9 +6,9 @@ import json
 import subprocess
 from pathlib import Path
 try:
-    from company_overlay import CONTRACT, AGENT_CONTEXT, company_agent_context, contract_text, kit_examples
+    from company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, company_agent_context, enabled_packages, contract_text, kit_examples
 except ModuleNotFoundError:
-    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, company_agent_context, contract_text, kit_examples
+    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, company_agent_context, enabled_packages, contract_text, kit_examples
 
 
 def folder_agent_kit(root, runtime):
@@ -17,6 +17,9 @@ def folder_agent_kit(root, runtime):
     context = company_agent_context(root)
     if context:
         files[AGENT_CONTEXT] = json.dumps(context, sort_keys=True) + '\n'
+    packages = enabled_packages(root)
+    if packages:
+        files[ENABLED_PACKAGES] = json.dumps(packages) + '\n'
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
                                  ('cookbook', ('*.md',)), ('docs', ('*.md',)),
                                  ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs'))]:
@@ -25,6 +28,12 @@ def folder_agent_kit(root, runtime):
                 relative = path.relative_to(root)
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
+    for name in packages:
+        directory = root / 'packages' / name
+        for pattern in ('*.md', '*.json'):
+            for path in sorted(directory.rglob(pattern)):
+                if path.is_file():
+                    files[path.relative_to(root).as_posix()] = path.read_text()
     # Company contract fragments travel inside the contract, never beside it.
     if (root / CONTRACT).is_file():
         files[CONTRACT] = contract_text(root)

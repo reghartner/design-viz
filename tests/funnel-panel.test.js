@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -29,7 +30,7 @@ test('funnel template, picker example, feature label and styles use ordinary dis
   assert.equal(panelAssets().features['panel.funnel'].since, '0.2.0');
   const css = readStyles('style.core.css');
   assert.match(css, /\.funnel-row/); assert.match(css, /\.funnel-bar\.dv-bar-enter/); assert.match(css, /prefers-reduced-motion/);
-  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/panels/types/funnel.js'), 'utf8');
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../packages/science/panels/types/funnel.js'), 'utf8');
   assert.doesNotMatch(source, /\.bio-tone-[a-z]*\s*\{/, 'the sequence panel owns the shared tone colours');
   assert.doesNotMatch(source, /document\.|setTimeout|fetch\(/);
   assert.equal(C.PanelRegistry.get('funnel').order, 44);

@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -57,7 +58,7 @@ test('cellscene template, picker example, feature label, styles and metadata use
   assert.equal(panelAssets().features['panel.cellscene'].since, '0.2.0');
   const css = readStyles('style.core.css');
   for (const rule of [/\.cellscene-view\{/, /\.cellscene-crossing\{/, /@keyframes cellsceneCross/, /\.cellscene-parent\{/, /prefers-reduced-motion:reduce\)\{\.cellscene-view/]) assert.match(css, rule);
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/types/cellscene.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/types/cellscene.js'), 'utf8');
   assert.doesNotMatch(source, /\.mech-[a-z-]*\s*\{/, 'the strandscene panel owns the shared .mech-* rules');
   assert.doesNotMatch(source, /document\.|setTimeout|setInterval|requestAnimationFrame|fetch\(/);
   assert.equal(C.PanelRegistry.get('cellscene').order, 47);

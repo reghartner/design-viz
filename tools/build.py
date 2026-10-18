@@ -31,9 +31,6 @@ SRC = ROOT / "src"
 # Keep metadata here, and the example itself in its existing authored location.
 WORKBENCH_TEMPLATES = [
     {"name": "Simple service flow", "desc": "A client, a service, and a store. Start with the essentials and make them yours.", "category": "engineering", "tag": "The essentials", "art": "flow", "source": "starters/minimal.json", "title": "Simple service flow"},
-    {"name": "Sequencing walkthrough", "desc": "Follow reads from a fictional plasmid through alignment, an insertion, its origin, a quality filter and a reading-frame check, with an in-frame and a frameshift ending.", "category": "engineering", "categories": ["business", "science"], "tag": "Science & sequencing · illustrative", "art": "branch", "source": "starters/sequencing-walkthrough.json"},
-    {"name": "Waves & forces", "desc": "Explore interference with a screen probe, then compare force, velocity and acceleration in explicit mass trials.", "category": "science", "tag": "Physics · idealized models", "art": "perspectives", "source": "starters/waves-and-forces.json"},
-    {"name": "The copy gate", "desc": "Follow conceptual RNA copying and compare a baseline with a hypothetical interruption. Sequence-free illustrations and authored counts, with no efficacy prediction.", "category": "science", "tag": "Biology · conceptual illustration", "art": "branch", "source": "starters/copy-gate.json"},
     {"name": "Messaging cost tradeoffs", "desc": "Compare an event bus with a queue and relay at 1M, 10M and 100M messages, including fixed costs and engineering nodes.", "category": "engineering", "categories": ["business"], "tag": "Cost & architecture · illustrative", "art": "branch", "source": "starters/messaging-cost.json"},
     {"name": "Retries & recovery", "desc": "Follow a request through retries, deadlines, and a circuit that opens and recovers.", "category": "engineering", "tag": "Alternate outcomes", "art": "branch", "source": "starters/resilience.json"},
     {"name": "A trace, explained", "desc": "Unpack a checkout request with concurrent spans and a recorded payment error.", "category": "engineering", "tag": "Observed execution · fictional", "art": "trace", "source": "starters/honeycomb-trace.json"},
@@ -60,9 +57,13 @@ def workbench_templates() -> str:
                 default_routing(tab)
 
     entries = []
-    for template in WORKBENCH_TEMPLATES:
-        entry = {key: value for key, value in template.items() if key not in ("source", "title")}
-        entry["spec"] = json.loads(read(template["source"]))
+    for template in WORKBENCH_TEMPLATES + package_templates():
+        entry = {key: value for key, value in template.items() if key not in ("source", "title", "package")}
+        if "package" in template:
+            spec_source = ROOT / 'packages' / template['package'] / template['source']
+            entry["spec"] = json.loads(spec_source.read_text())
+        else:
+            entry["spec"] = json.loads(read(template["source"]))
         # The legacy minimal example calls itself blank, but contains 3 nodes.
         if "title" in template:
             entry["spec"]["page"]["title"] = template["title"]
@@ -89,6 +90,27 @@ def site_config_path(config=None) -> pathlib.Path:
     return pathlib.Path(config).resolve() if config is not None else ROOT / 'workbench/site.json'
 
 
+def site_packages(config=None, *, no_config=False) -> list[str] | None:
+    """A site package list overrides the company default; absence inherits it."""
+    path = site_config_path(config)
+    if no_config or (config is None and not path.exists()):
+        return None
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError('expected a JSON object')
+        if 'packages' not in data:
+            return None
+        names = data['packages']
+        if (not isinstance(names, list) or any(not isinstance(name, str) or
+                not re.fullmatch(r'[a-z][a-z0-9-]*', name) for name in names) or
+                len(names) != len(set(names))):
+            raise ValueError('packages must be a list of unique lowercase package names')
+        return names
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Invalid site config {path}: {error}') from error
+
+
 def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
     """Read company-owned inputs without changing them. Paths belong to config."""
     path = site_config_path(config)
@@ -98,8 +120,8 @@ def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
                               'footer': 'One story. System flow, Home map, App screens, and Device app—moving together.'})
     try:
         data = json.loads(path.read_text())
-        if not isinstance(data, dict) or set(data) - {'examples'} != {'version', 'landing'}:
-            raise ValueError('expected only version, landing and optional examples fields')
+        if not isinstance(data, dict) or set(data) - {'examples', 'packages'} != {'version', 'landing'}:
+            raise ValueError('expected only version, landing and optional examples and packages fields')
         if type(data['version']) is not int or data['version'] != 1:
             raise ValueError('version must be 1')
         landing = data['landing']
@@ -159,6 +181,15 @@ def company() -> dict:
     return json.loads(loader('--company')) or {}
 
 
+def package_base(config=None, *, no_config=False) -> list[str] | None:
+    selected = site_packages(config, no_config=no_config)
+    if selected is not None:
+        return selected
+    # An external config that omits packages inherits the company default,
+    # never an unrelated in-tree workbench/site.json.
+    return company().get('packages', []) if config is not None else None
+
+
 def company_markers() -> dict:
     """Workbench skeleton values. Without company config they equal upstream's."""
     config = company()
@@ -212,6 +243,18 @@ def panel_assets() -> dict:
     return json.loads(loader('--assets'))
 
 
+def enabled_packages() -> list[str]:
+    return json.loads(loader('--packages'))
+
+
+def package_templates() -> list[dict]:
+    templates = []
+    for name in enabled_packages():
+        manifest = json.loads((ROOT / 'packages' / name / 'package.json').read_text())
+        templates.extend(dict(entry, package=name) for entry in manifest['templates'])
+    return templates
+
+
 def panel_css(name: str) -> str:
     return loader('--styles', name)
 
@@ -259,10 +302,20 @@ def main() -> int:
     parser.add_argument('--no-catalog', action='store_true',
                         help='hide the Welcome "From service catalog" actions, for hosts that publish no service catalog; '
                              'the editor Add menu keeps its catalog entry')
+    parser.add_argument('--package', action='append', default=[], metavar='NAME',
+                        help='include an optional content package; repeat for multiple packages (adds to company/site selection)')
     args = parser.parse_args()
+    os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
     if args.no_config:
         # Every loader subprocess (and the kit's arrangement tool) inherits this.
         os.environ['FLOWVIEW_COMPANY_IDENTITY'] = 'off'
+    site_selection = package_base(args.config, no_config=args.no_config)
+    if site_selection is not None:
+        os.environ['FLOWVIEW_PACKAGE_BASE'] = ','.join(site_selection)
+    if args.package:
+        selected = [name for name in os.environ.get('FLOWVIEW_PACKAGES', '').split(',') if name]
+        selected.extend(args.package)
+        os.environ['FLOWVIEW_PACKAGES'] = ','.join(selected)
     if args.runtime_only and args.config is not None:
         parser.error('--config requires an HTML build')
     runtime = canon_runtime()

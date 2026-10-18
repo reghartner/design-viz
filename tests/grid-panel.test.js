@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -33,7 +34,7 @@ test('grid template, picker example, feature label, styles and registry metadata
   assert.equal(panelAssets().features['panel.grid'].since, '0.2.0');
   const css = readStyles('style.core.css');
   assert.match(css, /\.grid-cell\{/); assert.match(css, /color-mix\(in srgb,var\(--grid-high\)/); assert.match(css, /prefers-reduced-motion/);
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/types/grid.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/types/grid.js'), 'utf8');
   assert.doesNotMatch(source, /\.bio-tone-[a-z]*\s*\{/); assert.doesNotMatch(source, /document\.|setTimeout|fetch\(/);
   assert.equal(C.PanelRegistry.get('grid').order, 45); assert.equal(C.panelAuthoring('grid').picker.order, 45);
   assert.deepEqual(plain(C.PanelRegistry.get('grid').layout.sectionSizing), {minWidth:240, preferredWidth:380, maxWidth:700, aspectPolicy:'content', grow:1});

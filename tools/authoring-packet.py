@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
-from company_overlay import company_agent_context, contract_text
+from company_overlay import company_agent_context, enabled_packages, contract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -224,6 +224,15 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     routes.update(path for feature in features for path in ROUTES.get(feature, []))
     # The maintained route table gives examples without embedding the cookbook.
     routes.add('cookbook/README.md')
+    for package in enabled_packages(ROOT):
+        manifest = json.loads((ROOT / 'packages' / package / 'package.json').read_text())
+        for panel in panels:
+            listed = manifest.get('routes', {}).get(panel, [])
+            for relative in [listed] if isinstance(listed, str) else listed:
+                path = Path(relative)
+                if path.is_absolute() or '..' in path.parts:
+                    raise ValueError('Package route escapes package: ' + relative)
+                routes.add('packages/' + package + '/' + path.as_posix())
     route_text = '\n'.join('- `' + path + '`' for path in sorted(routes) if (ROOT / path).exists())
     document = '# Focused authoring packet\n\nMode: ' + mode + '. Selection is the union of explicit choices and spec inference.\n\nPanels: ' + (', '.join(sorted(panels)) or 'none') + '. Features: ' + (', '.join(sorted(features)) or 'none') + '.\n\nThis packet is the primary authoring guidance: use its selected rules instead of preloading the full workflow, contract, cookbook or session manual. Linked references are on demand unless this packet names a needed worksheet/source route. Follow the active collaboration protocol for candidate approval; a packet does not grant publication or new story decisions. Fully specified small edits retain the scoped-edit exception below. Full documentation remains available on demand; source paths and relative links resolve from VIZ, not the packet output folder.\n\n' + '\n\n'.join(parts) + '\n\n## On-demand routes and examples\n\n' + route_text + '\n'
     baseline_paths = [CONTRACT, SKILL, WORKFLOW, REFS + 'worked-example.md', 'cookbook/README.md']

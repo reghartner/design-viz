@@ -5,11 +5,14 @@ type documented in contract/authoring-contract.md must be individually
 extractable, and the extracted block must be the contract's own text.
 """
 import importlib.util
+import json
 import re
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+
+from tools.company_overlay import enabled_packages
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOL = ROOT / "tools" / "widget_doc.py"
@@ -20,6 +23,11 @@ PANEL_TYPES = sorted(p.stem for p in (ROOT / "src/panels/types").glob("*.js"))
 assert len(PANEL_TYPES) >= 17, "panel modules not discovered"
 # A fork's company/panels/types are documented by company/contract fragments.
 PANEL_TYPES = sorted(PANEL_TYPES + [p.stem for p in (ROOT / "company/panels/types").glob("*.js")])
+for package in enabled_packages(ROOT):
+    manifest = json.loads((ROOT / "packages" / package / "package.json").read_text())
+    PANEL_TYPES.extend(Path(name).stem for name in manifest["sourceFiles"]
+                       if name.startswith("panels/types/"))
+PANEL_TYPES.sort()
 
 _spec = importlib.util.spec_from_file_location("widget_doc", TOOL)
 widget_doc = importlib.util.module_from_spec(_spec)

@@ -1,0 +1,16 @@
+{
+  "name": "sports",
+  "sourceFiles": [
+    "panels/sports.js",
+    "panels/venue-library.js",
+    "panels/venues/ubs-arena.js",
+    "panels/types/seatmap.js"
+  ],
+  "workbenchSourceFiles": [
+    "panels/seatmap-import.js"
+  ],
+  "routes": {
+    "seatmap": "cookbook/venue-map.md"
+  },
+  "templates": []
+}

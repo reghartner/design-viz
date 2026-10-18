@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,9 +14,11 @@ const HOSTILE = '<img src=x onerror=bad()>';
 
 test('mech.js is a pure shared helper bundled after bio.js with no DOM, timers or fetch', () => {
   const files = sourceFiles('validator.js');
-  assert.ok(files.indexOf('panels/mech.js') > files.indexOf('panels/bio.js'));
-  assert.ok(files.indexOf('panels/mech.js') < files.findIndex(name => name.startsWith('panels/types/')));
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/mech.js'), 'utf8');
+  assert.ok(files.indexOf('@package/science/panels/bio.js') >= 0);
+  assert.ok(files.indexOf('@package/science/panels/mech.js') > files.indexOf('@package/science/panels/bio.js'));
+  assert.ok(files.indexOf('@package/science/panels/mech.js') < files.indexOf('@package/science/panels/types/rnacopy.js'));
+  assert.ok(files.indexOf('@package/science/panels/mech.js') < files.findIndex(name => name.startsWith('panels/types/')));
+  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/mech.js'), 'utf8');
   assert.doesNotMatch(source, /requestAnimationFrame|setTimeout|setInterval|document\.|window\.|fetch\(/);
   assert.equal(C.MECH_SCENE.w, 560); assert.equal(C.MECH_SCENE.h, 315);
 });

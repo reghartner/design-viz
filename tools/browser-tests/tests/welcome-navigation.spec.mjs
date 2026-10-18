@@ -154,10 +154,10 @@ test('template navigation returns to the picker and Forward retains the same pro
   await page.locator('#welcome-resume').click();await expect(editor(page)).toBeVisible();await expect(src).toHaveValue(changed);
 });
 
-// #545 — Start new project text filter. Fixture: the 16 built-in templates + Blank,
+// #545 — Start new project text filter. Fixture: the 13 core built-in templates + Blank,
 // plus one routed team template (starters.json) in the company grid.
 // row | fixture | assertion (scoped) | rejects
-// 1 precondition | empty query, All examples | 18 cards including both new science starters, Blank and the team card; #welcome-template-empty hidden | a filter that starts narrowed or omits a starter
+// 1 precondition | empty query, All examples | core cards, Blank and the team card; #welcome-template-empty hidden | a filter that starts narrowed or omits a starter
 // 2 Tab + focus | picker after entry | Tab presses (no clicks) focus the "Search templates" searchbox; :focus-visible with a ≥2px non-none outline | a mouse-only field or a suppressed focus ring
 // 3 name, case-insensitive | "PERSPECTIVES" | visible titles exactly [One story, two perspectives] | case-sensitive or name-blind matching
 // 4 description | "deadlines" (only in Retries & recovery's desc) | exactly [Retries & recovery] | name-only matching
@@ -165,16 +165,21 @@ test('template navigation returns to the picker and Forward retains the same pro
 // 6 service name | "traffic router" (a node title only in Rollout decisions' spec) | exactly [Rollout decisions] | matching only card text
 // 7 team templates | "payroll" (name), "FINANCE" (desc), "tax ledger" (node title) | each exactly [Payroll handoff] from #welcome-company-grid | filtering only the built-in grid, or team templates by name only
 // 8 composes with tabs | "traffic router" + Connected devices | zero cards and the empty state; All examples restores [Rollout decisions] | a query that overrides or resets the category
-// 9 Science | empty query + Science, then each new starter name | only the three science starters, Blank and team card; each name narrows to its card; All examples preserves the query | missing science membership or category/query composition
+// 9 Science | only when the package is enabled, each starter can be found through the Science filter | unconditional science UI or missing package examples
 // 10 no matches | "zzqx" | zero visible cards (Blank included) and #welcome-template-empty visible naming the query | a blank grid, or Blank kept as a false match
-// 11 clear | empty query + All examples | all 18 original cards back, including both science starters; empty state hidden | a filter that cannot be undone
+// 11 clear | empty query + All examples | all original cards back; empty state hidden | a filter that cannot be undone
 const visibleTemplateTitles=page=>page.locator('#welcome-new-screen .welcome-template-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('.welcome-template-title').firstChild.textContent));
 test('Start new project filters built-in and team templates by name, description, tag and service name',async({page,server})=>{
   await page.route('**/starters.json',route=>route.fulfill({json:[{name:'Payroll handoff',desc:'Pay runs between finance systems.',spec:{page:{title:'Payroll',sections:[{diagram:{nodes:{a:{title:'Tax Ledger'}},rows:[['a']],edges:[]}}]}}}]}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
   await expect(page.locator('#welcome-company-grid .welcome-template-card')).toHaveCount(1);
   const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
-  expect(all).toHaveLength(18);expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions','Sequencing walkthrough','Waves & forces','The copy gate']));await expect(empty).toBeHidden();
+  const scienceEnabled=(process.env.FLOWVIEW_PACKAGES||'').split(',').includes('science');
+  expect(all).toHaveLength(scienceEnabled?18:15);
+  expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));
+  if(scienceEnabled)expect(all).toEqual(expect.arrayContaining(['Sequencing walkthrough','Waves & forces','The copy gate']));
+  else{expect(all).not.toContain('Sequencing walkthrough');expect(all).not.toContain('Waves & forces');expect(all).not.toContain('The copy gate');}
+  await expect(empty).toBeHidden();
   const search=page.getByRole('searchbox',{name:'Search templates'});
   for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
   await expect(search).toBeFocused();
@@ -195,13 +200,15 @@ test('Start new project filters built-in and team templates by name, description
   await query('tax ledger');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Payroll handoff']);
   await search.fill('');
   const science=page.locator('#welcome-template-filters').getByRole('button',{name:'Science',exact:true});
-  await science.click();await expect(science).toHaveAttribute('aria-pressed','true');
-  await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','Sequencing walkthrough','Waves & forces','The copy gate','Payroll handoff']);
-  await expect(empty).toBeHidden();
-  await query('The copy gate');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['The copy gate']);
-  await query('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
-  await page.locator('#welcome-template-filters').getByRole('button',{name:'All examples'}).click();
-  await expect(search).toHaveValue('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
+  if(scienceEnabled){
+    await science.click();await expect(science).toHaveAttribute('aria-pressed','true');
+    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','Sequencing walkthrough','Waves & forces','The copy gate','Payroll handoff']);
+    await expect(empty).toBeHidden();
+    await query('The copy gate');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['The copy gate']);
+    await query('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
+    await page.locator('#welcome-template-filters').getByRole('button',{name:'All examples'}).click();
+    await expect(search).toHaveValue('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
+  }else await expect(science).toHaveCount(0);
   await query('zzqx');await expect.poll(()=>visibleTemplateTitles(page)).toEqual([]);
   await expect(empty).toBeVisible();await expect(empty).toContainText('No templates match');await expect(empty).toContainText('zzqx');
   await search.fill('');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(all);await expect(empty).toBeHidden();

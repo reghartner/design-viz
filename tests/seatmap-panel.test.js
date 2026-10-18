@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -352,8 +353,10 @@ test('all authored text is escaped; the markup carries titles, aria totals, hatc
   assert.match(html, /<pattern id="spm-static"/);
   assert.match(html, /class="seatmap-hold" d="M[\d.,L]+Z" fill="url\(#spm-static\)"/);
   assert.match(html, /class="seatmap-sec seatmap-hi" data-sec="101"/);
-  assert.match(html, /fill="var\(--seatmap-accent\)" fill-opacity="0.640"/);
-  assert.match(html, /class="seatmap-lbl seatmap-lbl-on"/);
+  /* Fills walk the skin ramp (--seatmap-r1..r5): 60% sits halfway between r2 and r3; from 80% the ramp turns dark and labels invert. */
+  assert.match(html, /fill="color-mix\(in oklab, var\(--seatmap-r3\) 50%, var\(--seatmap-r2\)\)" fill-opacity="1.000"/);
+  assert.doesNotMatch(html, /class="seatmap-lbl seatmap-lbl-on"/);
+  assert.match(C.seatmapHTML(p, {sold:{101:90}}), /fill="color-mix\(in oklab, var\(--seatmap-r5\) 50%, var\(--seatmap-r4\)\)" fill-opacity="1.000"><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-on"/);
   assert.match(C.seatmapHTML(p, {mode:'tier'}), /fill="#D7A34F"[^>]*><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-dark"/);
   assert.match(html, /class="seatmap-outline"/);
   assert.match(html, /seatmap-stat-warn/);
@@ -397,7 +400,7 @@ test('typed authoring collects maps and modes through the shared field pipeline'
 });
 
 test('narrow lettered section ids stack their letter on a second line; labels below 9 units are hidden but keep their tooltip', () => {
-  const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/sports/arena-sections.sections.json'), 'utf8'));
+  const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '../packages/sports/examples/arena-sections.sections.json'), 'utf8'));
   const p = Object.assign({id:'map', type:'seatmap'}, seed);
   const m = C.seatmapModel(p, {});
   const by = Object.fromEntries(m.sections.map(s => [s.id, s]));

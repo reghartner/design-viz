@@ -1,9 +1,10 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','panels/seatmap-import','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','@package/sports/panels/seatmap-import','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -842,7 +843,7 @@ test('venue fields show where they come from; Edit a copy writes one field inlin
 
 test('Import seating chart… parses a CSV with the shared importer, writes it inline in place of the venue, and Undo restores the venue',async()=>{
   const fs=require('node:fs'),path=require('node:path');
-  const csv=fs.readFileSync(path.join(__dirname,'../examples/sports/arena-sections.csv'),'utf8');
+  const csv=fs.readFileSync(path.join(__dirname,'../packages/sports/examples/arena-sections.csv'),'utf8');
   const e=environment(),h=e.mount(seatmapSpec({venue:'ubs-arena',currency:'USD'}));h.inspector.render();
   aria(h.guide,'Total capacity for blank rows').value='17250';
   const input=aria(h.guide,'Import seating chart'),before=h.text;
@@ -850,7 +851,7 @@ test('Import seating chart… parses a CSV with the shared importer, writes it i
   input.files=[{name:'arena.csv',size:csv.length,text:async()=>csv}];input.fire('change');
   await settle();h.flush();
   const panel=JSON.parse(h.text).panels[0];
-  const expected=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/sports/arena-sections.sections.json'),'utf8'));
+  const expected=JSON.parse(fs.readFileSync(path.join(__dirname,'../packages/sports/examples/arena-sections.sections.json'),'utf8'));
   assert.equal(panel.venue,undefined);
   for(const key of ['geometry','bowl','rings','sections'])assert.deepEqual(panel[key],expected[key],key);
   for(const key of ['viewBox','field','landmarks'])assert.equal(panel[key],undefined,key);
@@ -863,7 +864,7 @@ test('Import seating chart… parses a CSV with the shared importer, writes it i
 
 test('an SVG chart imports paths with its rink outline; a broken chart reports an error and changes nothing',async()=>{
   const fs=require('node:fs'),path=require('node:path');
-  const svg=fs.readFileSync(path.join(__dirname,'../examples/sports/ubs-arena/arena.svg'),'utf8');
+  const svg=fs.readFileSync(path.join(__dirname,'../packages/sports/examples/ubs-arena/arena.svg'),'utf8');
   const e=environment(),h=e.mount(seatmapSpec(seatmapInline()));h.inspector.render();
   aria(h.guide,'Level map').value='100-level:100 level,200-level:200 level,300-level:300 level';
   aria(h.guide,'Import seating chart').files=[{name:'arena.svg',size:svg.length,text:async()=>svg}];

@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -217,4 +218,26 @@ test('an insertion longer than 24 letters is skipped, matching its validation wa
   assert.match(w, /reads\[1\]\.seq: only the first 240 letters render/);
   assert.match(w, /inserts\[1\]\.seq: expected 1–24 inserted dna letters — insertion skipped/);
   assert.doesNotMatch(C.readsHTML(p, state), /G{25}/);
+});
+
+
+test('marked depth bars split by aligned letter counts without gaps or clipped overhang', () => {
+  const p = {id:'r',type:'reads',reference:'ACG',start:10};
+  const state = {reads:[
+    {id:'a',at:10,seq:'ACG'},
+    {id:'b',at:9,seq:'TA-GT'},
+    {id:'c',at:10,seq:'TcG'},
+  ],marks:[{id:'variant',from:10,to:10,tone:'mismatch'}]};
+  const m = model(p, state);
+  assert.deepEqual(m.depth, [3,2,3]);
+  assert.deepEqual(m.alleles, [{A:2,T:1},{C:2},{G:3}]);
+  assert.equal(Object.values(m.alleles[0]).reduce((a,b)=>a+b,0), m.depth[0]);
+  const split = C.readsAlleleHTML(m, 0, true);
+  assert.match(split, /bio-b-a" style="flex:2"/);
+  assert.match(split, /bio-b-t" style="flex:1"/);
+  assert.ok(split.indexOf('bio-b-a') < split.indexOf('bio-b-t'), 'reference letter starts the stack');
+  assert.equal(C.readsAlleleHTML(m, 0, false), '');
+  assert.equal(C.readsAlleleHTML(m, 1, true), '');
+  assert.equal((C.readsHTML(p, state).match(/reads-dsplit/g) || []).length, 1);
+  assert.doesNotMatch(C.readsHTML(p, {...state,showDepth:false}), /reads-dsplit|reads-dline/);
 });

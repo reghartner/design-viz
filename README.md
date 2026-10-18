@@ -166,25 +166,6 @@ zero-based scale with **Auto**, **Compact** and **Expanded** density.
 Start with the [single-operation example](src/starters/operation-cost.json), or
 open **Messaging cost tradeoffs** in the workbench templates for the original
 1M / 10M / 100M comparison and its **Compact comparison** view.
-The workbench's **Start new project → Science** filter includes
-[Waves & forces](cookbook/physics-panels.md) and
-[The copy gate](cookbook/viral-copy-gate.md).
-The [physics starter](src/starters/waves-and-forces.json) uses `wavefield` for
-coherent-source path differences and screen intensity, plus `forcebody` for
-force vectors, independently authored velocity and acceleration from ΣF/m.
-The [biology starter](src/starters/copy-gate.json) uses `rnacopy` for a
-sequence-free conceptual close-up with baseline and hypothetical interruption
-paths. Copying positions, extent and counts are authored symbols; the story
-makes no efficacy prediction. Each recipe includes teaching assumptions and
-links to the complete editable source.
-The [sequence-teaching panels](cookbook/sequence-panels.md) add six generic
-science panels: `sequence` (letters with a coordinate ruler, highlighted ranges
-and a cursor), `frames` (three translated reading frames with stops and a motif),
-`reads` (aligned reads with mismatches, gaps, insertions and depth), `locus` (a
-linear genome or plasmid map with features, markers and arcs), `funnel` (stage
-counts for any filtering pipeline) and `grid` (a small value heatmap with
-significance marks). Open **Sequencing walkthrough** in the workbench templates
-for a fictional, step-driven classroom example with two endings.
 Use the [retries & circuits example](src/starters/resilience.json) for retry success, deadline admission,
 and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
 how to adapt their authored policies and timing.

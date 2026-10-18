@@ -181,7 +181,11 @@ function initWorkbenchWelcome(opts){
   var json = document.getElementById('welcome-json');
   var templateGrid = document.getElementById('welcome-templates');
   var filter = 'all';
-  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices', science:'Science'};
+  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices'};
+  templates.forEach(function(entry){
+    if (entry.category && !Object.prototype.hasOwnProperty.call(categories, entry.category))
+      categories[entry.category] = entry.categoryLabel || entry.category.charAt(0).toUpperCase() + entry.category.slice(1);
+  });
   var blank = {name:'Blank diagram', category:'blank', desc:'A clean canvas for your own nodes, connections, and story.',
     spec:welcomeBlankSpec()};
   function el(id){ return document.getElementById(id); }

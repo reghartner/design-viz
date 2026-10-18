@@ -48,11 +48,77 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  science-package-browser:
+    name: Science package desktop controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            tools/browser-tests/package-lock.json
+            apps/backstage/package-lock.json
+            apps/confluence/package-lock.json
+      - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
+      - run: npm ci --prefix apps/backstage --no-fund --no-audit
+      - run: npm ci --prefix apps/confluence --no-fund --no-audit
+      - name: Install the lockfile-pinned Playwright Chromium and Linux dependencies
+        run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
+      - name: Verify opt-in science stories and starter filter on desktop
+        env:
+          FLOWVIEW_PACKAGES: science
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs science-story-controls.spec.mjs sequence-panels.spec.mjs welcome-navigation.spec.mjs --grep 'keeps controls in view|sequencing walkthrough drives|Start new project filters'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: science-package-browser-results
+          path: |
+            tools/browser-tests/blob-report/
+            tools/browser-tests/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  sports-package-browser:
+    name: Sports package desktop controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            tools/browser-tests/package-lock.json
+            apps/backstage/package-lock.json
+            apps/confluence/package-lock.json
+      - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
+      - run: npm ci --prefix apps/backstage --no-fund --no-audit
+      - run: npm ci --prefix apps/confluence --no-fund --no-audit
+      - name: Install the lockfile-pinned Playwright Chromium and Linux dependencies
+        run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
+      - name: Verify opt-in venue story controls on desktop
+        env:
+          FLOWVIEW_PACKAGES: sports
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs sports-step-rail.spec.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sports-package-browser-results
+          path: |
+            tools/browser-tests/blob-report/
+            tools/browser-tests/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
   browser-contracts:
     name: browser-contracts
     runs-on: ubuntu-24.04
     if: always()
-    needs: browser-contract-shards
+    needs: [browser-contract-shards, science-package-browser, sports-package-browser]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -93,7 +159,9 @@ jobs:
         if: always()
         env:
           SHARD_RESULT: ${{ needs.browser-contract-shards.result }}
-        run: test "$SHARD_RESULT" = success
+          SCIENCE_RESULT: ${{ needs.science-package-browser.result }}
+          SPORTS_RESULT: ${{ needs.sports-package-browser.result }}
+        run: test "$SHARD_RESULT" = success && test "$SCIENCE_RESULT" = success && test "$SPORTS_RESULT" = success
 
   backstage-rehearsal:
     runs-on: ubuntu-latest

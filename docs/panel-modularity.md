@@ -148,11 +148,12 @@ the historical cascade against shared rules; new panels normally need no orderin
 metadata. Shared styles contain matching type-independent order markers. Do not
 duplicate rules between modules.
 
-`src/source-bundles.json` discovers `panels/types/*.js` deterministically, then
-the optional company overlay globs `@company/panels/*.js` (before the types)
-and `@company/panels/types/*.js` (after them). Seatmap venue data files
-(`panels/venues/*.js`, then `@company/panels/venues/*.js`) load after the
-helpers and before the types; see [venue map](../cookbook/venue-map.md). The
+`src/source-bundles.json` discovers core panel helpers and types, then the
+selected package helpers, venues, and types in dependency order. The optional
+company overlay globs `@company/panels/*.js`,
+`@company/panels/venues/*.js`, and `@company/panels/types/*.js` load in the
+corresponding slots. Package content is enabled by company config or an
+explicit build flag. The
 validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Named entrypoints order these bundles
 and select shared assets and deliberate exports. `tools/source-loader.cjs` owns

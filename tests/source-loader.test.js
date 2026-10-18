@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
-const {execFileSync}=require('node:child_process');
+const {execFileSync,spawnSync}=require('node:child_process');
 const loader=require('../tools/source-loader.cjs');
 const root=path.resolve(__dirname,'..'),plain=value=>JSON.parse(JSON.stringify(value));
 function fixture(t){
@@ -73,4 +73,33 @@ test('asset inventory keeps page CSS raw, ordered panel CSS and the explicit all
   for(const font of forge.fonts)assert.match(font.fontsource,/^@fontsource\/.+\/latin-\d+\.css$/);
   assert.equal((loader.fontCss('all').match(/@font-face/g)||[]).length,24);
   assert.throws(()=>loader.fontAssets('unknown'),/Unknown font profile/);
+});
+
+test('optional science package is absent by default and registered only after explicit selection',()=>{
+  const cli=(args,selected='')=>execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),...args],{
+    encoding:'utf8',maxBuffer:32*1024*1024,
+    env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:selected}
+  });
+  assert.deepEqual(JSON.parse(cli(['--packages'])),[]);
+  assert.deepEqual(JSON.parse(cli(['--packages'],'science')),['science']);
+  const names=['forcebody','rnacopy','wavefield'];
+  const baseline=JSON.parse(cli(['--files','validator.js']));
+  const selected=JSON.parse(cli(['--files','validator.js'],'science'));
+  for(const name of names){
+    assert.equal(baseline.some(file=>file.includes('/'+name+'.js')),false,name);
+    assert.ok(selected.includes('@package/science/panels/types/'+name+'.js'),name);
+  }
+  const basicAssets=JSON.parse(cli(['--assets']));
+  const scienceAssets=JSON.parse(cli(['--assets'],'science'));
+  for(const name of names){
+    assert.equal(Object.hasOwn(basicAssets.features,'panel.'+name),false,name);
+    assert.ok(Object.hasOwn(scienceAssets.features,'panel.'+name),name);
+  }
+  assert.doesNotMatch(cli(['--styles','style.core.css']),/\.wavefield-panel\{/);
+  assert.match(cli(['--styles','style.core.css'],'science'),/\.wavefield-panel\{/);
+  const unknown=spawnSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),'--packages'],{
+    encoding:'utf8',env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:'unknown'}
+  });
+  assert.notEqual(unknown.status,0);
+  assert.match(unknown.stderr,/Cannot read package unknown/);
 });

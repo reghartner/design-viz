@@ -155,7 +155,7 @@ jobs:
             tools/browser-tests/shard-results/
           if-no-files-found: ignore
           retention-days: 14
-      - name: Require every browser shard to pass
+      - name: Require every browser contract job to pass
         if: always()
         env:
           SHARD_RESULT: ${{ needs.browser-contract-shards.result }}

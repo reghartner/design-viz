@@ -12,11 +12,11 @@ import sys
 import unittest
 from pathlib import Path
 
-from tools.company_overlay import enabled_packages
-
 ROOT = Path(__file__).resolve().parent.parent
 TOOL = ROOT / "tools" / "widget_doc.py"
 CONTRACT = ROOT / "contract" / "authoring-contract.md"
+sys.path.insert(0, str(ROOT / 'tools'))
+from company_overlay import enabled_packages  # noqa: E402
 
 # Discover authored panel modules; there is no central type allowlist.
 PANEL_TYPES = sorted(p.stem for p in (ROOT / "src/panels/types").glob("*.js"))

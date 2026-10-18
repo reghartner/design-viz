@@ -4,16 +4,16 @@ import gzip
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.company_overlay import contract_text
-from tools.folder_agent_kit import folder_agent_kit
-
-
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'tools'))
+from company_overlay import contract_text  # noqa: E402
+from folder_agent_kit import folder_agent_kit  # noqa: E402
 
 
 def kit_files():

@@ -602,7 +602,7 @@
             "path->fold"
            ],
            "time": "+1h",
-           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (Elsewhere: a table's `rows: []` clears by replacement; a device-app card property such as `{\"icon\": null}` restores its declared value, while `null` for a whole card clears that card: Special fold rules tab.)",
+           "text": "**Whole-map clear.** `counts: null` forgets every key at once. (Elsewhere: a table's `rows: []` clears by replacement; a device-app card property such as `{\"icon\": null}` restores its declared value, while `null` for a whole card clears that card. The property case is shown on the Special fold rules tab.)",
            "panels": {
             "funnel": {
              "counts": null
@@ -1826,6 +1826,14 @@
               {
                "id": "e",
                "cells": {
+                "key": "strandscene / cellscene",
+                "value": "events for one step",
+                "rule": "result discarded next step"
+               }
+              },
+              {
+               "id": "f",
+               "cells": {
                 "key": "other custom folds",
                 "value": "each type's own rule",
                 "rule": "see its contract entry"
@@ -2060,18 +2068,18 @@
             "h": 5
            },
            {
-            "panel": "ops",
+            "panel": "home",
             "x": 0,
             "y": 20,
             "w": 8,
-            "h": 6
+            "h": 9
            },
            {
-            "panel": "cell",
+            "panel": "ops",
             "x": 0,
-            "y": 26,
+            "y": 29,
             "w": 8,
-            "h": 7
+            "h": 6
            },
            {
             "panel": "strand",
@@ -2088,11 +2096,11 @@
             "h": 8
            },
            {
-            "panel": "home",
+            "panel": "cell",
             "x": 8,
             "y": 33,
             "w": 9,
-            "h": 9
+            "h": 7
            },
            {
             "panel": "app",
@@ -2119,7 +2127,7 @@
         ],
         "bullets": [
          {
-          "text": "**Common fold** (22 types): shallow merge per key, `log` appends, buffer `mark` paints accumulate (compacted after 64 operations), `enterOnce` for one step: state, leds, gauge, log, image, waterfall, orbit, zoneframe, xray, queue, thermo, buffer, radar, signal, tiles, table, data-contract, checks, budget, cost, trace, replicas."
+          "text": "**Common fold** (22 types): shallow merge per key, `log` appends, buffer `mark` paints accumulate (compacted when more than 64 accumulate), `enterOnce` for one step: state, leds, gauge, log, image, waterfall, orbit, zoneframe, xray, queue, thermo, buffer, radar, signal, tiles, table, data-contract, checks, budget, cost, trace, replicas."
          },
          {
           "text": "**Custom fold** (20 types), each with its own rules: screen, battery, homemap, inflight, phone, deviceapp, appscreens, timeline, sequence, reads, frames, locus, funnel, grid, strandscene, cellscene, seatmap, chime, dispatch, security."
@@ -2760,6 +2768,34 @@
            ],
            "text": "**Folding: a decision is needed.** Option A, segment fold: each declaration change starts a new segment seeded from the carried state (without `enterOnce` overlays or one-step operations such as `drain`), so earlier steps are never reinterpreted; every fold needs a defined resume point, and phone, deviceapp, homemap and inflight need one written first. Option B, whole-path refold (PR #643): simpler, but a later declaration can make an earlier ignored patch take effect (for example a grid key declared later).",
            "panels": {
+            "effective": {
+             "rows": [
+              {
+               "id": "max",
+               "cells": {
+                "field": "max",
+                "value": "200",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "unit",
+               "cells": {
+                "field": "unit",
+                "value": "W",
+                "from": "panelDeclare (carried)"
+               }
+              },
+              {
+               "id": "title",
+               "cells": {
+                "field": "title",
+                "value": "Draw (watts)",
+                "from": "panelDeclare (carried)"
+               }
+              }
+             ]
+            },
             "pjson": {
              "rows": [
               {

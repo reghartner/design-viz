@@ -1501,32 +1501,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 4
+        "h": 7
        },
        {
         "panel": "map",
         "x": 0,
-        "y": 4,
+        "y": 7,
         "w": 14,
         "h": 16
        },
        {
         "panel": "crowd",
         "x": 0,
-        "y": 20,
+        "y": 23,
         "w": 14,
         "h": 3
        },
        {
         "panel": "facts",
         "x": 14,
-        "y": 4,
+        "y": 7,
         "w": 10,
         "h": 5
        },
        {
         "x": 14,
-        "y": 9,
+        "y": 12,
         "w": 10,
         "h": 14
        }
@@ -2513,25 +2513,25 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 4
+        "h": 7
        },
        {
         "panel": "season",
         "x": 0,
-        "y": 4,
+        "y": 7,
         "w": 12,
         "h": 8
        },
        {
         "x": 0,
-        "y": 12,
+        "y": 15,
         "w": 12,
         "h": 9
        },
        {
         "panel": "promos",
         "x": 12,
-        "y": 4,
+        "y": 7,
         "w": 12,
         "h": 17
        }
@@ -4303,32 +4303,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "panel": "lanes",
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 14,
         "h": 8
        },
        {
         "x": 0,
-        "y": 15,
+        "y": 16,
         "w": 14,
         "h": 16
        },
        {
         "panel": "slack",
         "x": 14,
-        "y": 7,
+        "y": 8,
         "w": 10,
         "h": 8
        },
        {
         "panel": "gates",
         "x": 14,
-        "y": 15,
+        "y": 16,
         "w": 10,
         "h": 16
        }
@@ -5373,32 +5373,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "panel": "map",
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 14,
         "h": 16
        },
        {
         "x": 14,
-        "y": 7,
+        "y": 8,
         "w": 10,
         "h": 16
        },
        {
         "panel": "holds",
         "x": 0,
-        "y": 23,
+        "y": 24,
         "w": 15,
         "h": 6
        },
        {
         "panel": "log",
         "x": 15,
-        "y": 23,
+        "y": 24,
         "w": 9,
         "h": 6
        }
@@ -6152,39 +6152,39 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 4
+        "h": 7
        },
        {
         "panel": "queue",
         "x": 0,
-        "y": 4,
+        "y": 7,
         "w": 14,
         "h": 4
        },
        {
         "panel": "map",
         "x": 0,
-        "y": 8,
+        "y": 11,
         "w": 14,
         "h": 16
        },
        {
         "panel": "checks",
         "x": 0,
-        "y": 24,
+        "y": 27,
         "w": 14,
         "h": 8
        },
        {
         "panel": "phone",
         "x": 14,
-        "y": 4,
+        "y": 7,
         "w": 10,
         "h": 14
        },
        {
         "x": 14,
-        "y": 18,
+        "y": 21,
         "w": 10,
         "h": 14
        }
@@ -7996,17 +7996,17 @@
         {
          "id": "purchased",
          "label": "Bought special offer",
-         "tone": "good"
+         "tone": "success"
         },
         {
          "id": "redeemed",
          "label": "Shirt picked up",
-         "tone": "feature"
+         "tone": "info"
         },
         {
          "id": "newfile",
          "label": "New to file",
-         "tone": "insert"
+         "tone": "violet"
         }
        ],
        "initial": {
@@ -10607,32 +10607,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 8
+        "h": 9
        },
        {
         "panel": "map",
         "x": 0,
-        "y": 8,
+        "y": 9,
         "w": 14,
         "h": 16
        },
        {
         "panel": "checks",
         "x": 14,
-        "y": 8,
+        "y": 9,
         "w": 10,
         "h": 15
        },
        {
         "panel": "ledger",
         "x": 0,
-        "y": 24,
+        "y": 25,
         "w": 14,
         "h": 12
        },
        {
         "x": 14,
-        "y": 23,
+        "y": 24,
         "w": 10,
         "h": 13
        }
@@ -11770,32 +11770,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 14,
         "h": 15
        },
        {
         "panel": "crm",
         "x": 0,
-        "y": 22,
+        "y": 23,
         "w": 14,
         "h": 5
        },
        {
         "panel": "app",
         "x": 14,
-        "y": 7,
+        "y": 8,
         "w": 10,
         "h": 13
        },
        {
         "panel": "life",
         "x": 14,
-        "y": 20,
+        "y": 21,
         "w": 10,
         "h": 7
        }
@@ -12801,39 +12801,39 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "panel": "gates",
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 12,
         "h": 13
        },
        {
         "panel": "gates2",
         "x": 12,
-        "y": 7,
+        "y": 8,
         "w": 12,
         "h": 13
        },
        {
         "x": 0,
-        "y": 20,
+        "y": 21,
         "w": 14,
         "h": 14
        },
        {
         "panel": "log",
         "x": 14,
-        "y": 20,
+        "y": 21,
         "w": 10,
         "h": 7
        },
        {
         "panel": "doors",
         "x": 14,
-        "y": 27,
+        "y": 28,
         "w": 10,
         "h": 7
        }
@@ -13083,17 +13083,17 @@
         {
          "id": "engaged",
          "label": "Engaged with the post",
-         "tone": "primer"
+         "tone": "teal"
         },
         {
          "id": "claimed",
          "label": "Claims · sponsor-held",
-         "tone": "mismatch"
+         "tone": "danger"
         },
         {
          "id": "redeemed",
          "label": "Redeems · sponsor-held",
-         "tone": "mismatch"
+         "tone": "danger"
         }
        ],
        "initial": {
@@ -14591,32 +14591,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 24,
         "h": 10
        },
        {
         "panel": "ops",
         "x": 0,
-        "y": 17,
+        "y": 18,
         "w": 14,
         "h": 9
        },
        {
         "panel": "fun",
         "x": 0,
-        "y": 26,
+        "y": 27,
         "w": 14,
         "h": 6
        },
        {
         "panel": "chk",
         "x": 14,
-        "y": 17,
+        "y": 18,
         "w": 10,
         "h": 15
        }
@@ -15058,12 +15058,12 @@
         {
          "id": "clicked",
          "label": "Clicked next game",
-         "tone": "feature"
+         "tone": "info"
         },
         {
          "id": "bought",
          "label": "Bought within 7 days",
-         "tone": "good"
+         "tone": "success"
         }
        ],
        "initial": {
@@ -15648,32 +15648,32 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 14,
         "h": 12
        },
        {
         "panel": "phone",
         "x": 14,
-        "y": 7,
+        "y": 8,
         "w": 10,
         "h": 15
        },
        {
         "panel": "list",
         "x": 0,
-        "y": 19,
+        "y": 20,
         "w": 14,
         "h": 10
        },
        {
         "panel": "funnel",
         "x": 14,
-        "y": 22,
+        "y": 23,
         "w": 10,
         "h": 7
        }
@@ -17189,12 +17189,12 @@
         {
          "id": "purchased",
          "label": "Purchased",
-         "tone": "good"
+         "tone": "success"
         },
         {
          "id": "converted",
          "label": "New members",
-         "tone": "feature"
+         "tone": "info"
         }
        ],
        "initial": {
@@ -18747,39 +18747,39 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 7
+        "h": 8
        },
        {
         "panel": "map",
         "x": 0,
-        "y": 7,
+        "y": 8,
         "w": 13,
         "h": 17
        },
        {
         "x": 13,
-        "y": 7,
+        "y": 8,
         "w": 11,
         "h": 17
        },
        {
         "panel": "ledger",
         "x": 0,
-        "y": 24,
+        "y": 25,
         "w": 13,
         "h": 12
        },
        {
         "panel": "season",
         "x": 13,
-        "y": 24,
+        "y": 25,
         "w": 11,
         "h": 4
        },
        {
         "panel": "funnel",
         "x": 13,
-        "y": 28,
+        "y": 29,
         "w": 11,
         "h": 8
        }

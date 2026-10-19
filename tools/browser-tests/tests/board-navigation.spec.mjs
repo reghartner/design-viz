@@ -1,3 +1,13 @@
+// Contract matrix for "zoom scrolls only over drawn content" (issue #669;
+// Chuck's ruling 2026-10-19: option 1, content-bounded scrolling while zoomed,
+// Fit diagram unchanged; coverage extends this file on both surfaces).
+// | row | fixture | assertion (scoped to the board) | rejects |
+// | zoomed, cards fit width: no horizontal scroll | 4 floated cards, graphFrame 800x300, + until SVG > board | board scrollWidth<=clientWidth+1 and its Scroll group hidden | scroll extent from viewBox width (main) |
+// | zoomed, cards fit height: no vertical scroll | same zoom | board scrollHeight<=clientHeight+1 | cropping width only |
+// | every card visible when the cards fit | same zoom | each [data-dv-node] rect inside the board's visible area | cropping without centering |
+// | zoomed past the cards: extent is cards + padding | + until cards > board | scroll extent < cards width + 120px and < SVG width - 120px | viewBox-wide extent |
+// | both ends reachable without clipping | Scroll arrows to each end | leftmost/rightmost card inside the visible area | crop that clips content edges |
+// | zoom readout and anchoring unchanged | existing test above | SVG width x1.25 per + | (existing assertions) |
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -70,6 +80,59 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   await page.screenshot({path:testInfo.outputPath('regular-navigation.png'),fullPage:true});
 });
 
+function marginSpec(){
+  const nodes={a:{title:'Member site'},b:{title:'Contentful'},c:{title:'Salesforce'},d:{title:'Ticketmaster'}};
+  const floats=[['a',215,70],['b',535,70],['c',215,220],['d',535,220]].map(([id,x,y])=>({id,side:'below',x,y}));
+  return {page:{title:'Margin zoom',sections:[{heading:'Small',diagram:{nodes,rows:[[]],floats,graphFrame:{x:0,y:0,w:800,h:300},
+    edges:[{from:'b',to:'a',label:'content'},{from:'c',to:'a',label:'click'},{from:'d',to:'c',label:'buy'}],view:'step',autoplay:false}}]}};
+}
+// Screen-pixel geometry of one board: its visible area below the sticky
+// legend, its scroll extent, the SVG and the union of its cards.
+const zoomGeometry=board=>board.evaluate(el=>{
+  const r=el.getBoundingClientRect(),d=el.offsetWidth?r.width/el.offsetWidth:1,legend=el.querySelector('.lg')?.getBoundingClientRect();
+  const svg=el.querySelector('.boardcanvas>svg').getBoundingClientRect(),cards=[...el.querySelectorAll('.boardcanvas [data-dv-node]')].map(n=>n.getBoundingClientRect());
+  const left=r.left+el.clientLeft*d,top=Math.max(r.top+el.clientTop*d,legend?legend.bottom:0);
+  return {visible:{left,right:left+el.clientWidth*d,top,bottom:r.top+(el.clientTop+el.clientHeight)*d},
+    cw:el.clientWidth,sw:el.scrollWidth,ch:el.clientHeight,sh:el.scrollHeight,d,svgW:svg.width,count:cards.length,
+    cards:cards.map(c=>({left:c.left,right:c.right,top:c.top,bottom:c.bottom})),
+    union:{left:Math.min(...cards.map(c=>c.left)),right:Math.max(...cards.map(c=>c.right)),top:Math.min(...cards.map(c=>c.top)),bottom:Math.max(...cards.map(c=>c.bottom))}};
+});
+const inside=(c,v)=>c.left>=v.left-1 && c.right<=v.right+1 && c.top>=v.top-1 && c.bottom<=v.bottom+1;
+for(const surface of ['standalone','workbench'])test(surface+' diagram zoom scrolls only over drawn content, not empty frame margin',async({page,server})=>{
+  const text=JSON.stringify(marginSpec());await page.setViewportSize({width:1000,height:1000});
+  if(surface==='standalone'){
+    const input=path.join(server.root,'margin-zoom.json');await writeFile(input,text);
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'margin-zoom.html')]);
+    await page.goto(server.origin+'/margin-zoom.html');
+  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
+  const board=page.locator('.board');await expect(board).toBeVisible();
+  const zoomIn=board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}),pan=board.getByRole('group',{name:'Horizontal diagram scroll'});
+  let g=await zoomGeometry(board);
+  // The fixture must leave wide empty frame margins around its four cards.
+  expect(g.count).toBe(4);expect(g.union.right-g.union.left).toBeLessThan(g.svgW*.65);
+  for(let i=0;i<12 && g.svgW<=g.cw*g.d+2;i++){await zoomIn.click();g=await zoomGeometry(board);}
+  // Contrasting precondition: the SVG frame is now wider than the board while
+  // the cards (plus a margin for labels and markers) still fit inside it.
+  expect(g.svgW).toBeGreaterThan(g.cw*g.d+2);
+  expect(g.union.right-g.union.left+60).toBeLessThan(g.cw*g.d);
+  expect(g.union.bottom-g.union.top+60).toBeLessThan(g.visible.bottom-g.visible.top);
+  expect(g.sw).toBeLessThanOrEqual(g.cw+1);
+  expect(g.sh).toBeLessThanOrEqual(g.ch+1);
+  await expect(pan).toBeHidden();
+  for(const card of g.cards)expect(inside(card,g.visible)).toBe(true);
+  for(let i=0;i<12 && g.union.right-g.union.left<=g.cw*g.d*1.4;i++){await zoomIn.click();g=await zoomGeometry(board);}
+  expect(g.union.right-g.union.left).toBeGreaterThan(g.cw*g.d*1.4);
+  await expect(pan).toBeVisible();
+  const extent=g.sw*g.d,cardsWidth=g.union.right-g.union.left;
+  expect(extent).toBeGreaterThanOrEqual(cardsWidth);
+  expect(extent).toBeLessThan(cardsWidth+120);
+  expect(extent).toBeLessThan(g.svgW-120);
+  const left=pan.getByRole('button',{name:'Scroll diagram left'}),right=pan.getByRole('button',{name:'Scroll diagram right'});
+  for(let i=0;i<20 && await left.isEnabled();i++)await left.click();
+  g=await zoomGeometry(board);expect(g.union.left).toBeGreaterThanOrEqual(g.visible.left-1);
+  for(let i=0;i<20 && await right.isEnabled();i++)await right.click();
+  g=await zoomGeometry(board);expect(g.union.right).toBeLessThanOrEqual(g.visible.right+1);
+});
 for(const surface of ['standalone','workbench'])test(surface+' keeps regular navigation separate from Explore camera',async({page,server})=>{
   const raw=spec(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}},

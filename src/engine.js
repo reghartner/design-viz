@@ -2634,9 +2634,12 @@ function createBoardNavigation(board, group, legend, changed){
   function unframe(){board.classList.remove('board-content-framed');FRAMED.forEach(function(name){board.style.removeProperty(name);});}
   /* A zoomed board scrolls over the drawn graph and its gutter, not the empty
      viewBox frame around it. Each axis keeps its unframed position (centered
-     across, top-aligned down) unless that would push drawn content out of view. */
+     across, top-aligned down) unless that would push drawn content out of view.
+     A borrowed (Explore) or unmeasurable board keeps its last framing, so a
+     suspended camera restores into the geometry it was saved in. */
   function frame(){
-    var svg=graph();if(!enabled() || !svg || !board.classList.contains('board-zoomed'))return unframe();
+    var svg=graph();if(!svg || !board.classList.contains('board-zoomed'))return unframe();
+    if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
     function axis(start,size,full,available,legacy){

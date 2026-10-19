@@ -375,9 +375,9 @@ async function auditCards(page,scope,skin){
   }
   return seen;
 }
-test('every node style preset stays readable, bordered and distinct in the editor skins while default cards are unchanged',async({page,server})=>{
-  // Eight skins each exercise 13 cards, all keyboard marks, tones, and export.
-  test.setTimeout(90000);
+// Keep each complete skin audit bounded; every skin now also checks SVG export.
+for(const editorSkin of ['aurora','blueprint','islanders','lavender','lilac','pastel','rose','terminal']){
+test('every node style preset stays readable, bordered and distinct in the editor skins while default cards are unchanged — '+editorSkin,async({page,server})=>{
   const raw=fixture();raw.page.sections[0].diagram=styledDiagram();
   await start(page,server,raw);
   // The hidden Node style select lists the field's tokens; this matrix must cover exactly those.
@@ -390,7 +390,7 @@ test('every node style preset stays readable, bordered and distinct in the edito
   const editorSkins=await page.locator('#workspace-appearance-body button[id^="sk-"]').evaluateAll(buttons=>buttons.map(b=>b.id.slice(3)));
   expect(editorSkins.sort()).toEqual(['aurora','blueprint','islanders','lavender','lilac','pastel','rose','terminal']);
   const section=page.locator('#section-overview'),ids=Object.keys(styledDiagram().nodes);let lastResting=null;
-  for(const skin of editorSkins){
+  for(const skin of [editorSkin]){
     await page.locator('#sk-'+skin).click();await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));
     const resting=await auditCards(page,'#section-overview',skin);lastResting=resting;
     // K5: Step mode, then the first step lights every card.
@@ -439,6 +439,7 @@ test('every node style preset stays readable, bordered and distinct in the edito
   await reader.close();
   for(const id of ['plain',...STYLE_TOKENS])expect(exported[id],id+' exported paint').toEqual({fill:liveCards[id].fill,stroke:liveCards[id].stroke});
 });
+}
 
 test('the standalone reader paints presets in Daylight and Editorial and keeps the lit-step highlight on a styled card (K1–K5)',async({page,server})=>{
   const {execFileSync}=await import('node:child_process'),{writeFile}=await import('node:fs/promises'),path=(await import('node:path')).default,{repo}=await import('../helpers/prepare.mjs');

@@ -11,11 +11,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SELECTED = {"science", "sports"}
 STORIES = {
-    "venue-map": "packages/sports/examples/venue-map.spec.json",
-    "sequencing-walkthrough": "packages/science/starters/sequencing-walkthrough.json",
-    "biology-teaching": "packages/science/diagrams/biology/cell-journey/biology-teaching.spec.json",
     "season-of-seats": "packages/sports/diagrams/season-of-seats/season-of-seats.spec.json",
-    "waves-and-forces": "packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json",
     "copy-gate": "packages/science/diagrams/biology/copy-gate/copy-gate.spec.json",
 }
 
@@ -111,7 +107,7 @@ def main(stage):
             (ROOT / "workbench/diagrams.json").read_bytes(),
             "Staged Canon index differs from selected build")
     require({entry["id"] for entry in index["diagrams"]} == set(STORIES) and
-            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly six Friends stories")
+            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly two Friends stories")
     hosted = json.loads((stage / "workbench/starters.json").read_text())
     require(len(hosted) == len(STORIES), "Hosted starter manifest omits a Friends story")
     for slug, package_path in STORIES.items():
@@ -125,7 +121,7 @@ def main(stage):
                 f"Hosted starter manifest does not expose editable {slug} story")
 
     print("Verified staged Friends workbench: science and sports panels, contracts, recipes, "
-          "built-in and hosted starters, six Canon stories, and selected-only authoring kit")
+          "built-in and hosted starters, two Canon stories, and selected-only authoring kit")
 
 
 if __name__ == "__main__":

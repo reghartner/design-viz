@@ -1,11 +1,7 @@
 {
   "version": 1,
   "diagrams": [
-    {"folder": "diagrams/friends/venue-map", "owner": "group:default/flowview-examples"},
-    {"folder": "diagrams/friends/sequencing-walkthrough", "owner": "group:default/flowview-examples"},
-    {"folder": "diagrams/friends/biology-teaching", "owner": "group:default/flowview-examples"},
     {"folder": "diagrams/friends/season-of-seats", "owner": "group:default/flowview-examples"},
-    {"folder": "diagrams/friends/waves-and-forces", "owner": "group:default/flowview-examples"},
     {"folder": "diagrams/friends/copy-gate", "owner": "group:default/flowview-examples"}
   ]
 }

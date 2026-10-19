@@ -17,7 +17,7 @@ const browser=await chromium.launch();
 try{
   const page=await browser.newPage();
   for(const tab of config.tabs){
-    const source=path.resolve(here,'../'+tab.source),raw=JSON.parse(await readFile(path.join(source,tab.source+'.spec.json'),'utf8'));
+    const source=path.resolve(here,'../'+tab.source),raw=JSON.parse(await readFile(path.join(repo,'diagrams/friends',tab.source,tab.source+'.spec.json'),'utf8'));
     assert.equal(raw.page.sections.length,1);
     const section=structuredClone(raw.page.sections[0]);
     for(const panel of section.diagram.panels)for(const screen of panel.screens){

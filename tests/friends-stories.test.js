@@ -13,10 +13,9 @@ test('Friends publishes the consolidated marketing document, four sports arcs an
   const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
   const registry=JSON.parse(fs.readFileSync(path.join(root,'canon.json')));
   assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'copy-gate','islanders-marketing']);
-  assert.equal(fs.readFileSync(path.join(root,'diagrams/friends/member-campaign/member-campaign.spec.json'),'utf8'),fs.readFileSync(path.join(root,'packages/sports/diagrams/member-campaign/member-campaign.spec.json'),'utf8'));
-  for(const id of ['group-night','fan-event-rsvp']){
-    const source=fs.readFileSync(path.join(root,'packages/sports/diagrams',id,id+'.spec.json'),'utf8');
-    assert.equal(fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.spec.json'),'utf8'),source);
+  for(const id of ['member-campaign','group-night','fan-event-rsvp']){
+    const source=fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.spec.json'),'utf8');
+    assert.ok(!fs.existsSync(path.join(root,'packages/sports/diagrams',id,id+'.spec.json')),'retired image-heavy output must not duplicate the active document in the offline kit');
     const raw=JSON.parse(source),result=runtime.validate(runtime.normalize(raw));
     assert.deepEqual(Array.from(result.errors),[]);assert.deepEqual(Array.from(result.warnings),[]);
     assert.equal(raw.page.sections[0].diagram.panels.length,2);
@@ -48,7 +47,7 @@ test('marketing consolidation preserves all approved story data in three native 
   const withoutPixels=value=>JSON.parse(JSON.stringify(value,(k,v)=>k==='src'&&typeof v==='string'&&v.startsWith('data:image/')?'[embedded image]':v));
   let paths=0,steps=0,panels=0;
   for(const [index,sourceId]of ['member-campaign','group-night','fan-event-rsvp'].entries()){
-    const original=JSON.parse(fs.readFileSync(path.join(root,'packages/sports/diagrams',sourceId,sourceId+'.spec.json'),'utf8'));
+    const original=JSON.parse(fs.readFileSync(path.join(root,'diagrams/friends',sourceId,sourceId+'.spec.json'),'utf8'));
     assert.deepEqual(withoutPixels(tabs[index].sections),withoutPixels(original.page.sections));
     const d=tabs[index].sections[0].diagram;paths+=d.paths.length;steps+=d.steps.length;panels+=d.panels.length;
   }

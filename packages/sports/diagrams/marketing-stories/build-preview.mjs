@@ -74,12 +74,11 @@ try{
     spec.page.canon={version:1,id,kind:'canonical',owner:'group:default/flowview-examples'};
     const output=JSON.stringify(compatibility.stamp(spec),null,2)+'\n';
     if(Buffer.byteLength(output)>2*1024*1024)throw Error('Spec exceeds portable 2 MiB limit: '+id);
-    await writeFile(path.join(dir,id+'.spec.json'),output);
     const canonDir=path.join(repo,'diagrams/friends',id);
     await mkdir(canonDir,{recursive:true});
     await writeFile(path.join(canonDir,id+'.spec.json'),output);
     await writeFile(path.join(canonDir,id+'.ledger.md'),await readFile(path.join(dir,id+'.ledger.md')));
-    execFileSync('python3',['tools/inject.py',path.join(dir,id+'.spec.json'),'template/flowview.html',path.join(local,'preview.html')],{cwd:repo,stdio:'inherit'});
+    execFileSync('python3',['tools/inject.py',path.join(canonDir,id+'.spec.json'),'template/flowview.html',path.join(local,'preview.html')],{cwd:repo,stdio:'inherit'});
     console.log(JSON.stringify({id,bytes:Buffer.byteLength(output),screens:{fan:panels.destination.length,marketing:panels.record.length},errors}));
     await page.close();
   }

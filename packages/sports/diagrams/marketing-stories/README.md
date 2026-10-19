@@ -12,7 +12,9 @@ Each sibling story folder owns:
 - story.source.json: narrative, nodes, edge meaning and native paths.
 - screens.source.html: focused fan and marketer mockups.
 - layout.source.json: production-arranged geometry followed by scoped manual layout refinement.
-- Matching spec, ledger and visibility files: portable native output and evidence.
+- Ledger and visibility files: source evidence and assertions. Retired standalone
+  specs live only in `diagrams/friends/<story>/` to avoid duplicating embedded
+  media in the offline authoring kit; the combined spec is the active example.
 
 This folder owns shared screen styling and capture/readback helpers. Official imagery
 comes from group-night/assets and member-campaign/assets; logo from sports/assets.

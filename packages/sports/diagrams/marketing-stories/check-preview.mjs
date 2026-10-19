@@ -9,7 +9,7 @@ const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../.
 const browser=await chromium.launch();
 try{
   for(const id of process.argv.slice(2).length?process.argv.slice(2):['group-night','fan-event-rsvp']){
-    const spec=JSON.parse(await readFile(path.join(repo,'packages/sports/diagrams',id,id+'.spec.json'),'utf8')),d=spec.page.sections[0].diagram;
+    const spec=JSON.parse(await readFile(path.join(repo,'diagrams/friends',id,id+'.spec.json'),'utf8')),d=spec.page.sections[0].diagram;
     for(const width of [1280,1440]){
       const page=await browser.newPage({viewport:{width,height:1100}}),errors=[];
       page.on('pageerror',e=>errors.push(e.message));

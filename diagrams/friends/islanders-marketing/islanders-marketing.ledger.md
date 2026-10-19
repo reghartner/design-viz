@@ -76,8 +76,12 @@ media packaging; presentation eligibility alone is not visual proof.
 
 ## Recovery and maintenance
 
-Original sources live in the sibling member-campaign, group-night and
-fan-event-rsvp folders; their original Canon folders are retained but unpublished.
+Narrative, layout, HTML, assets and ledgers live in the sibling member-campaign,
+group-night and fan-event-rsvp folders. Their image-heavy standalone specs live
+only in the original Canon folders, retained but unpublished. Duplicate package
+copies were removed after CI exposed the offline kit's 8 MiB envelope limit;
+the retained originals were byte-verified before removal. This avoids inflating
+every author's kit with retired output and leaves all safety limits unchanged.
 The generated spec and this ledger are mirrored together into
 diagrams/friends/islanders-marketing. The local build helper is build-document.mjs.
 Existing user drafts and files in Sandbox/temp are never overwritten.

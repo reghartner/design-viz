@@ -12,6 +12,12 @@ The original three Canon cards are retired. Their package sources and original
 Canon folders are retained for recovery; only this combined document is in the
 active registry. No remote deployment is implied.
 
+The retired image-heavy standalone specs live only in `diagrams/friends/`.
+Their duplicate package copies were removed to keep the offline authoring kit
+within its existing 8 MiB envelope limit. Narrative, layout, HTML, assets and
+ledgers remain in the package source folders; builders read/write the retained
+standalone originals. No story content or recovery original was discarded.
+
 ## Maintenance
 
 The generated spec and ledger are a pair. Preserve later Workbench edits before

@@ -75,13 +75,12 @@ try{
   // Preserve Chuck's exported layout and graph geometry; do not auto-arrange it.
   const require=createRequire(import.meta.url),{compatibility}=require(path.join(repo,'tools/arrange/core.cjs'));
   const output=JSON.stringify(compatibility.stamp(spec),null,2)+'\n';
-  if(Buffer.byteLength(output)>2*1024*1024)throw Error('Portable spec exceeds the 2 MiB reader limit');
-  await writeFile(path.join(here,'member-campaign.spec.json'),output);
+  if(Buffer.byteLength(output)>2*1024*1024)throw Error('Standalone source exceeds its 2 MiB packaging budget');
   const canonDir=path.join(repo,'diagrams/friends/member-campaign');
   await mkdir(canonDir,{recursive:true});
   await writeFile(path.join(canonDir,'member-campaign.spec.json'),output);
   await writeFile(path.join(canonDir,'member-campaign.ledger.md'),await readFile(path.join(here,'member-campaign.ledger.md')));
   // Replace the previously shared browser URL itself, not another hidden preview.
-  execFileSync('python3',['tools/inject.py',path.join(here,'member-campaign.spec.json'),'template/flowview.html',path.join(local,'preview.html')],{cwd:repo,stdio:'inherit'});
+  execFileSync('python3',['tools/inject.py',path.join(canonDir,'member-campaign.spec.json'),'template/flowview.html',path.join(local,'preview.html')],{cwd:repo,stdio:'inherit'});
   console.log(JSON.stringify({preview:'http://127.0.0.1:8879/.local/member-campaign/preview.html?theme=islanders',screens:screens.length,encoding:'UTF-8',errors}));
 }finally{await browser.close();}

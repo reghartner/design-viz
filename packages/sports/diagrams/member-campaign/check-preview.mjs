@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../..');
 const url='http://127.0.0.1:8879/.local/member-campaign/preview.html?theme=islanders#embed=member-campaign&sk=islanders';
-const spec=JSON.parse(await readFile(new URL('./member-campaign.spec.json',import.meta.url),'utf8'));
+const spec=JSON.parse(await readFile(path.join(repo,'diagrams/friends/member-campaign/member-campaign.spec.json'),'utf8'));
 const d=spec.page.sections[0].diagram;
 // story.source.json retains the geometry imported from Chuck's saved export.
 const saved=JSON.parse(await readFile(new URL('./story.source.json',import.meta.url),'utf8')).page.sections[0].diagram;

@@ -287,6 +287,11 @@ function panelGlideElements(host, glide) {
   return el ? [el] : [];
 }
 function cancelPanelMotion(host) {
+  if (host._panelMotionCleanup) {
+    var cleanup = host._panelMotionCleanup;
+    host._panelMotionCleanup = null;
+    cleanup();
+  }
   if (host._thTween && typeof cancelAnimationFrame === 'function')
     cancelAnimationFrame(host._thTween);
   host._thTween = null;
@@ -422,7 +427,10 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         html: '<div class="punknown">unknown panel type: ' + esc(String(panel.type)) + '</div>',
       };
   if (!animate) settlePanelPresentation(host, result);
-  if (host._lastHTML === result.html) return;
+  if (host._lastHTML === result.html) {
+    if (result.remountAfterMotionCancel && result.mounted && !host._panelMotionCleanup) result.mounted();
+    return;
+  }
   if (animate) cancelPanelMotion(host);
   var patched = result.patch && result.patch();
   host._lastHTML = result.baseline != null ? result.baseline : result.html;
@@ -481,11 +489,12 @@ function panelOrder(panels) {
   return fixed.concat(growing);
 }
 
-function buildPanels(asideEl, d, skin) {
+function buildPanels(asideEl, d, skin, initiallyActive) {
   var folded = foldPanelStates(d);
   var visibility = foldPanelVisibility(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
+  var active = initiallyActive !== false, currentStep = 0, currentAnimate = false, currentAmbient = false;
   panelOrder(d.panels).forEach(function (p) {
     if (!p || !p.id) return;
     var card = document.createElement('div');
@@ -511,16 +520,23 @@ function buildPanels(asideEl, d, skin) {
     var view = PanelViews.get(p.type),
       options = view ? view.options : {};
     var home = options.ambientInitial;
-    renderPanelBody(
-      body,
-      p,
-      home ? p.initial : (folded[p.id] || [])[0],
-      skin,
-      options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],
-      home ? -1 : 0,
-      false
-    );
+    if (active) renderPanelBody(body,p,home ? p.initial : (folded[p.id] || [])[0],skin,
+      options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],home ? -1 : 0,false);
   });
+  function paint(i, animate, ambient) {
+    Object.keys(hosts).forEach(function (pid) {
+      var states = folded[pid] || [],si = Math.min(i, states.length - 1),panel = hosts[pid].panel;
+      var view = PanelViews.get(panel.type),options = view ? view.options : {},homeAmbient = ambient && options.ambientInitial;
+      var shown = ambient || (visibility[pid] || [])[i] !== false,card = hosts[pid].card;
+      card.classList.toggle('panel-step-hidden', !shown);
+      Array.prototype.forEach.call(card.children, function(child){
+        if (!child.classList.contains('pbody') && !child.classList.contains('ptitle')) return;
+        child.inert = !shown;if (shown) child.removeAttribute('aria-hidden');else child.setAttribute('aria-hidden', 'true');
+      });
+      if(active)renderPanelBody(hosts[pid].body,panel,homeAmbient ? panel.initial : states[si],skin,
+        options.historyRequiresSteps && !traceNavigation ? [] : states,homeAmbient ? -1 : si,animate && shown);
+    });
+  }
   return {
     destroy: function () {
       Object.keys(hosts).forEach(function (id) {
@@ -533,34 +549,13 @@ function buildPanels(asideEl, d, skin) {
       traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
     },
     setStep: function (i, animate, ambient) {
-      Object.keys(hosts).forEach(function (pid) {
-        var states = folded[pid] || [];
-        var si = Math.min(i, states.length - 1);
-        var panel = hosts[pid].panel;
-        var view = PanelViews.get(panel.type),
-          options = view ? view.options : {};
-        var homeAmbient = ambient && options.ambientInitial;
-        // Ambient is an overview of every panel. Layout-level hidden tiles
-        // remain hidden independently. Keep attached playback controls usable.
-        var shown = ambient || (visibility[pid] || [])[i] !== false;
-        var card = hosts[pid].card;
-        card.classList.toggle('panel-step-hidden', !shown);
-        Array.prototype.forEach.call(card.children, function(child){
-          if (!child.classList.contains('pbody') && !child.classList.contains('ptitle')) return;
-          child.inert = !shown;
-          if (shown) child.removeAttribute('aria-hidden');
-          else child.setAttribute('aria-hidden', 'true');
-        });
-        renderPanelBody(
-          hosts[pid].body,
-          panel,
-          homeAmbient ? panel.initial : states[si],
-          skin,
-          options.historyRequiresSteps && !traceNavigation ? [] : states,
-          homeAmbient ? -1 : si,
-          animate && shown
-        );
-      });
+      currentStep=i;currentAnimate=!!animate;currentAmbient=!!ambient;paint(i,animate,ambient);
     },
+    setActive:function(next){
+      next=!!next;if(next===active)return;active=next;
+      if(!active)Object.keys(hosts).forEach(function(id){var body=hosts[id].body;cancelPanelMotion(body);body.replaceChildren();body._lastHTML=null;});
+      else paint(currentStep,false,currentAmbient);
+    },
+    active:function(){return active;},
   };
 }

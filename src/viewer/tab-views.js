@@ -27,6 +27,8 @@ function createTabViewController(ctl,page){
         if(rec.viewport)rec.viewport.setPresentation(member?owner.current.presentation:'standard');
         var wasHidden=rec.sectionEl.hidden;rec.sectionEl.hidden=!visible;
         if(rec.stepper){if(visible && wasHidden)rec.stepper.onShow();else if(!visible){rec.stepper.pause();rec.stepper.onHide();}}
+        if(!visible && rec.panelCtl)rec.panelCtl.setActive(false);
+        else if(visible && rec.panelCtl)requestAnimationFrame(function(){if(!rec.sectionEl.hidden)rec.panelCtl.setActive(true);});
       });
     }finally{updating=false;}
   }

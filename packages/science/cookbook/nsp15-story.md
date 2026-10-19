@@ -24,6 +24,15 @@ well outcomes, or the proposed source-to-recipient transit, and never replay a
 teaching beat. Reduced motion and print suppress the drift regardless of the
 authored setting.
 
+The dilution and origin reader stages expose those settings as persistent
+presentation controls: **Quiet / Glow / Bloom** map to
+`quiet / medium / lively`, and **Gentle / Normal / Brisk** map to
+`slow / normal / fast`. Play, pause, and replay act on presentation motion only;
+the authored phase, symbolic identities, well outcomes, evidence, and claim
+limits do not change. **Evidence + scene limits** opens a compact disclosure on
+the stage, while the Evidence panel immediately below retains the raw source
+reading.
+
 - Reporter: arrival → rare GFP restoration → newly infected descendants →
   sequence check. Cells fluoresce; the virus particle does not.
 - Dilution: dense mixed culture → one finite fan into nine illustrative wells →

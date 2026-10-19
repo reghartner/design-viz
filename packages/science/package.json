@@ -3,6 +3,7 @@
   "sourceFiles": [
     "panels/bio.js",
     "panels/mech.js",
+    "panels/canvas-scene.js",
     "panels/types/sequence.js",
     "panels/types/frames.js",
     "panels/types/reads.js",

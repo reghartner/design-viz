@@ -2894,7 +2894,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, activeDiagram, skin);
+    panelCtl = buildPanels(aside, activeDiagram, skin, !options || options.panelsActive !== false);
+    result.panelCtl = panelCtl;
   }
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
@@ -3096,12 +3097,16 @@ function renderPage(view, page, skin, backlinks, options){
   var deferredHides = [];
   var ctl = {page:page,documentDestinations:documentDestinations(documentReference(page),hostResolver,options.siteBaseUrl),view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
+  function activatePrintPanels(){ctl.sections.forEach(function(rec){if(rec.panelCtl)rec.panelCtl.setActive(true);});}
+  function restoreScreenPanels(){ctl.sections.forEach(function(rec){if(rec.panelCtl)rec.panelCtl.setActive(!rec.sectionEl.hidden && !rec.sectionEl.closest('[hidden]'));});}
+  if(typeof window!=='undefined'){window.addEventListener('beforeprint',activatePrintPanels);window.addEventListener('afterprint',restoreScreenPanels);}
   ctl.destroy = function(){
     ctl.destroyed = true;
     view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
     view.removeEventListener('tab-view-change',paintTabExploreIndicators);
     view.removeEventListener('navigation-mounted',paintTabExploreIndicators);
     if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();
+    if(typeof window!=='undefined'){window.removeEventListener('beforeprint',activatePrintPanels);window.removeEventListener('afterprint',restoreScreenPanels);}
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.externalHandoffs)ctl.externalHandoffs.destroy();
     if(ctl.details)ctl.details.destroy();
@@ -3128,7 +3133,7 @@ function renderPage(view, page, skin, backlinks, options){
       });
     });
   }
-  function addSection(container){
+  function addSection(container,sectionOptions){
     var record = records[gi], sec = record.section;
     var number = record.number, reference = record.reference;
     var built = buildSection(container, sec, gi++, reference, protos, renderSkin, lanes, backlinks,
@@ -3143,14 +3148,15 @@ function renderPage(view, page, skin, backlinks, options){
           });
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
-      }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
+      }, function(){ if (ctl.onChange) ctl.onChange(); }, Object.assign({},options,sectionOptions || {}));
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, detailOnly:!!sec.detailOnly, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                presentation:built.presentation, viewport:built.viewport,
+               panelCtl:built.panelCtl,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
-    return built;
+    built.runtime=rec;return built;
   }
   pageBlocks.forEach(function(block, bi){
     if (block.type === 'section'){
@@ -3190,10 +3196,12 @@ function renderPage(view, page, skin, backlinks, options){
       panel.setAttribute('role', 'tabpanel');
       panel.setAttribute('aria-labelledby', btn.id);
       panel._steppers = [];
+      panel._records = [];
       view.appendChild(panel);
       t.sections.forEach(function(sec){
-        var built = addSection(panel);
+        var built = addSection(panel,{panelsActive:ti===0});
         if (built.stepper) panel._steppers.push(built.stepper);
+        panel._records.push(built.runtime);
       });
       panels.push(panel); buttons.push(btn); copyButtons.push(copy); slugs.push(slugify(t.label));
     });
@@ -3206,9 +3214,9 @@ function renderPage(view, page, skin, backlinks, options){
         b.setAttribute('tabindex', i === idx ? '0' : '-1');
       });
       panels.forEach(function(p, i){
-        var wasHidden = p.hidden;
-        p.hidden = i !== idx;
-        p._steppers.forEach(function(s){ i === idx ? (wasHidden && s.onShow()) : s.onHide(); });
+        var wasHidden = p.hidden,show=i===idx;
+        if(show){p.hidden=false;p._steppers.forEach(function(s){if(wasHidden)s.onShow();});requestAnimationFrame(function(){if(!p.hidden)p._records.forEach(function(r){if(r.panelCtl)r.panelCtl.setActive(true);});});}
+        else {p._steppers.forEach(function(s){s.onHide();});p._records.forEach(function(r){if(r.panelCtl)r.panelCtl.setActive(false);});p.hidden=true;}
       });
       if (activate !== false){
         changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});

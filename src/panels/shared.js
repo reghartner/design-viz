@@ -299,7 +299,8 @@ function cancelPanelMotion(host) {
   host._panelMotionCleanup = null;
   if (typeof cleanup === 'function') cleanup();
   if (host._panelFrames) {
-    host._panelFrames.forEach(function (id) { cancelAnimationFrame(id); });
+    if (typeof cancelAnimationFrame === 'function')
+      host._panelFrames.forEach(function (id) { cancelAnimationFrame(id); });
     host._panelFrames.clear();
   }
   if (host._thTween && typeof cancelAnimationFrame === 'function')

@@ -72,7 +72,7 @@ node tools/canon/library.mjs --registry canon.json --out workbench/diagrams.json
 python3 - "$ROOT/workbench/diagrams.json" <<'PY'
 import json, pathlib, sys
 index = json.loads(pathlib.Path(sys.argv[1]).read_text())
-expected = {'season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate', 'islanders-marketing'}
+expected = {'season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'nsp15-insertion-evidence', 'islanders-marketing'}
 entries = index.get('diagrams', [])
 ids = {entry.get('id') for entry in entries}
 if len(entries) != len(expected) or ids != expected:
@@ -102,7 +102,7 @@ for entry in json.loads(index_file.read_text())['diagrams']:
     shutil.copy2(source, destination)
 PY
 cp template/flowview.html "$STAGE/template/"
-for slug in season-of-seats sell-the-inventory serve-game-night build-next-season copy-gate islanders-marketing; do
+for slug in season-of-seats sell-the-inventory serve-game-night build-next-season nsp15-insertion-evidence islanders-marketing; do
   mkdir -p "$STAGE/diagrams/friends/$slug"
   cp "diagrams/friends/$slug/$slug.spec.json" "$STAGE/diagrams/friends/$slug/"
 done
@@ -110,7 +110,7 @@ python3 - "$STAGE" <<'PY'
 import json, pathlib, sys
 stage = pathlib.Path(sys.argv[1])
 starters = []
-for slug in ('season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate', 'islanders-marketing'):
+for slug in ('season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'nsp15-insertion-evidence', 'islanders-marketing'):
     spec = json.loads((stage / 'diagrams/friends' / slug / (slug + '.spec.json')).read_text())
     starters.append({'name': spec['page']['title'],
                      'desc': spec['page'].get('description') or 'Friends library story',

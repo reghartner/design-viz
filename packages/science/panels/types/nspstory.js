@@ -367,8 +367,8 @@ PanelRegistry.define('nspstory', {
   layout:{height:11,fallbackHeight:11,canvasSizing:{mode:'fixed-aspect',aspect:760/410,resizeAxis:'width'},sectionSizing:{minWidth:480,preferredWidth:760,maxWidth:1400,aspectPolicy:'fixed',bodyAspect:760/410,grow:1,contentSelector:'.nspstory-frame',ancillarySelector:'.nspstory-caption'}},
   authoring:{initialFields:true,transientFields:NSPSTORY_FIELDS.slice(),
     template:{title:'NSP15 evidence lesson',scene:'reporter',ambient:true,ambientIntensity:'quiet',ambientTempo:'slow',initial:{phase:0}},
-    setupFields:[['scene','enum',NSPSTORY_SCENES],['ambient','bool'],['ambientIntensity','enum',NSPSTORY_AMBIENT_INTENSITIES],['ambientTempo','enum',NSPSTORY_AMBIENT_TEMPOS],['initial','json']],patchFields:[['phase','num'],['caption','text']],
-    fieldMeta:{scene:{label:'Lesson'},ambient:{label:'Illustrative motion',help:'Reporter position scan or ambient motion; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity'},ambientTempo:{label:'Ambient tempo'},phase:{label:'Lesson phase (0–3)',help:'Four complete authored frames per lesson. Steps change the explanation directly; motion is illustrative only.'},caption:{label:'Evidence and limits'}},
+    setupFields:[['scene','text'],['ambient','jsonAny'],['ambientIntensity','text'],['ambientTempo','text'],['initial','json']],patchFields:[['phase','num'],['caption','text']],
+    fieldMeta:{scene:{label:'Lesson',help:'reporter, dilution, origin, or evidence.'},ambient:{label:'Illustrative motion',help:'true or false. Reporter position scan or ambient motion; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity',help:'quiet, medium, or lively.'},ambientTempo:{label:'Ambient tempo',help:'slow, normal, or fast.'},phase:{label:'Lesson phase (0–3)',help:'Four complete authored frames per lesson. Steps change the explanation directly; motion is illustrative only.'},caption:{label:'Evidence and limits'}},
     picker:{order:51,name:'NSP15 evidence story',category:'Science & sequencing',tagline:'Four SVG preprint lessons',description:'Schematic RNA reporter, dilution and source inference cartoons plus the published HCoV-OC43 comparison. Each lesson has four phases and a still state.'},
     example:function(sample) { sample.state={phase:2}; return sample; }
   },
@@ -390,6 +390,16 @@ PanelRegistry.define('nspstory', {
 .docview:has(#section-green-reporter) .stepline .stepid{display:none}
 @media screen{.docview:has(#section-green-reporter){padding-top:12px;padding-bottom:20px}.docview:has(#section-green-reporter) .doc-title{font:500 23px/1.2 Georgia,serif}.docview:has(#section-green-reporter) .doc-sec{margin-top:10px;padding:10px 12px 12px;background:#0b1923;border-color:#254350}.docview:has(#section-green-reporter) .sec-eyebrow{font-size:9px;margin:0}.docview:has(#section-green-reporter) .sec-h{font-size:16px;margin:0 0 3px}.docview:has(#section-green-reporter) .sec-teaser{margin-bottom:4px}.docview:has(#section-green-reporter) .section-layout-grid{margin-top:6px}}
 .nspstory-dock{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;background:#030b14;flex:none;border-top:1px solid #193b49}
+/* Pair the lesson's fixed dark section surface with its own intro text.
+   Keep panel, transport, floating prose-window and print palettes unchanged. */
+@media screen{
+ .docview:has(#section-green-reporter) .doc-sec>.sec-heading-row .sec-h,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-teaser .teasertext,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose :is(.sec-text,.sec-bullets,strong,b){color:#dceef4}
+ .docview:has(#section-green-reporter) .doc-sec>.sec-teaser .teasermore{color:#a7bdc8}
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose a{color:#8ce8cd}
+}
 .nspstory-dock .nspstory-controls{position:relative;right:auto;bottom:auto;flex:1;flex-wrap:wrap;justify-content:flex-end;border:0;box-shadow:none;padding:0;background:transparent;gap:5px}
 .nspstory-dock .nspstory-disclosure{position:relative;left:auto;bottom:auto;width:auto;flex:none}
 .nspstory-dock .nspstory-choice button{padding:7px 4px}.nspstory-dock .nspstory-choice>span{font-size:8px}

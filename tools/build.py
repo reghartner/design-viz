@@ -249,9 +249,12 @@ def enabled_packages() -> list[str]:
 
 def package_templates() -> list[dict]:
     templates = []
+    selections = (json.loads(loader('--company')) or {}).get('packageContent', {})
     for name in enabled_packages():
         manifest = json.loads((ROOT / 'packages' / name / 'package.json').read_text())
-        templates.extend(dict(entry, package=name) for entry in manifest['templates'])
+        selection = selections.get(name)
+        templates.extend(dict(entry, package=name) for entry in manifest['templates']
+                         if selection is None or entry['source'] in selection['templates'])
     return templates
 
 

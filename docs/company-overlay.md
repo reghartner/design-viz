@@ -44,6 +44,19 @@ Each enabled package contributes its manifest, panel contracts, examples,
 recipes, and guide under `packages/<name>/`; its guide is
 `packages/<name>/README.md`. Unselected package files are absent from the kit.
 
+A company may narrow a package's published content with `packageContent`:
+each package key maps to `templates` (declared starter source paths) and
+`kitFiles` (exact package-relative Markdown/JSON paths). Both lists are required;
+paths must be unique existing files inside that package. A selection cannot widen
+a package's own `kitFiles` list. It must retain `package.json`, `contract.md`, every
+manifest route, and each selected starter. The exported manifest reflects the
+selected templates and files, while runtime panels remain available. Theme and
+example globs cannot reintroduce excluded package files. Omit the selection to
+retain the package defaults; disabling company identity disables these restrictions.
+Reusable guides retain their original text and may link to upstream examples
+excluded by the content selection. Those examples remain in the repository;
+manifest routes and selected starter references must still resolve in the kit.
+
 ## Build-time themes
 
 An optional `theme` field in `company/company.json` selects a JSON manifest

@@ -115,7 +115,7 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'packages', 'backstage', 'site', 'theme'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'packages', 'packageContent', 'backstage', 'site', 'theme'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
@@ -130,6 +130,35 @@ function companyConfig(root = sourceRoot) {
         new Set(raw.packages).size !== raw.packages.length)
       throw companyError(file, 'packages must be a list of unique lowercase package names');
     config.packages = raw.packages;
+  }
+  if (raw.packageContent != null) {
+    if (typeof raw.packageContent !== 'object' || Array.isArray(raw.packageContent))
+      throw companyError(file, 'packageContent must be an object keyed by package name');
+    config.packageContent = {};
+    for (const [name, selection] of Object.entries(raw.packageContent)) {
+      const manifest = packageManifest(name, root), directory = packageDir(root, name);
+      if (!selection || typeof selection !== 'object' || Array.isArray(selection) ||
+          Object.keys(selection).some(key => !['templates', 'kitFiles'].includes(key)) ||
+          !Array.isArray(selection.templates) || !Array.isArray(selection.kitFiles))
+        throw companyError(file, 'packageContent.' + name + ' requires templates and kitFiles lists');
+      for (const key of ['templates', 'kitFiles']) {
+        if (selection[key].some(value => typeof value !== 'string' || !value || value.includes('\\') ||
+            path.posix.normalize(value) !== value || path.isAbsolute(value) ||
+            !inside(directory, path.resolve(directory, value)) || !/\.(md|json)$/.test(value) ||
+            !fs.existsSync(path.resolve(directory, value)) || !fs.statSync(path.resolve(directory, value)).isFile() ||
+            !inside(fs.realpathSync(directory), fs.realpathSync(path.resolve(directory, value)))) ||
+            new Set(selection[key]).size !== selection[key].length)
+          throw companyError(file, 'packageContent.' + name + '.' + key + ' must list unique existing package-local Markdown or JSON files');
+      }
+      if (selection.templates.some(source => !manifest.templates.some(template => template.source === source)))
+        throw companyError(file, 'packageContent.' + name + '.templates must select declared package templates');
+      if (manifest.kitFiles && selection.kitFiles.some(value => !manifest.kitFiles.includes(value)))
+        throw companyError(file, 'packageContent.' + name + '.kitFiles cannot widen the package kit');
+      const required = ['package.json', 'contract.md', ...Object.values(manifest.routes || {}).flat(), ...selection.templates];
+      if (required.some(value => !selection.kitFiles.includes(value)))
+        throw companyError(file, 'packageContent.' + name + '.kitFiles must retain the manifest, contract, routes and selected templates');
+      config.packageContent[name] = selection;
+    }
   }
   if (raw.companyName != null) config.companyName = plainText(raw.companyName, file, 'companyName', 40);
   if (raw.repository != null) config.repository = repositoryUrl(raw.repository, file);

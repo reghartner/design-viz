@@ -80,8 +80,8 @@ test('invalid phases and fields warn; invalid patches retain state; transient an
 test('ambient authoring settings validate, serialize and visibly control atmosphere', () => {
   const authoring=C.PanelRegistry.get('nspstory').authoring;
   assert.deepEqual(plain(authoring.setupFields.slice(0,4)),[
-    ['scene','enum',['reporter','dilution','origin','evidence']],['ambient','bool'],
-    ['ambientIntensity','enum',['quiet','medium','lively']],['ambientTempo','enum',['slow','normal','fast']]
+    ['scene','text'],['ambient','jsonAny'],
+    ['ambientIntensity','text'],['ambientTempo','text']
   ]);
   const lively={...panel('reporter'),ambient:true,ambientIntensity:'lively',ambientTempo:'fast'};
   const livelyHTML=C.nspstoryHTML(lively,{phase:0});

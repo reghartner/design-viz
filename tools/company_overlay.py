@@ -87,6 +87,17 @@ def company_theme(root):
     return json.loads(exported.read_text()) if exported.is_file() else {}
 
 
+def package_content(root):
+    """Validated company content restrictions; absent in generic/source-free builds."""
+    loader = Path(root) / 'tools/source-loader.cjs'
+    if not loader.is_file():
+        return {}
+    result = subprocess.run(['node', str(loader), '--company'], capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError(result.stderr.strip())
+    return (json.loads(result.stdout) or {}).get('packageContent', {})
+
+
 def contract_fragments(root):
     """[(repository-relative path, text)] in file-name order."""
     directory = company_dir(root) / 'contract'

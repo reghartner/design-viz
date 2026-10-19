@@ -28,41 +28,82 @@ try {
    const controls=root.locator('.termbar');
    // Visit every step and then revisit the first to catch stale carried state.
    const order=[...section.diagram.steps.keys(),0];
-   for(const step of order){
+   for(const [visit,step] of order.entries()){
     await controls.locator(`[data-step-source="${step}"]`).first().click();
     await root.locator('.dv-caption-old').waitFor({state:'detached'});
     assert((await controls.innerText()).includes(section.diagram.steps[step].text),`${section.id}/${step}: wrong narrative`);
     const scene=root.locator('.nspstory');
     if(await scene.count()){
+     const screen=scene.locator('.nspstory-screen-frame');
      assert.equal(await scene.getAttribute('data-phase'),String(step),`${section.id}: visual phase must follow forward/back seek`);
+     const atmosphere={
+      'green-reporter':['on','medium','slow'],'limiting-dilution':['on','quiet','slow'],
+      'origin-map':['on','quiet','slow'],'class-signature':['off','quiet','slow']
+     }[section.id];
+     if(atmosphere)assert.deepEqual(await scene.evaluate(el=>[el.dataset.ambient,el.dataset.ambientIntensity,el.dataset.ambientTempo]),atmosphere,`${section.id}: authored ambient settings must reach rendering`);
      const animations=await scene.evaluate(el=>el.getAnimations({subtree:true}).map(a=>a.animationName));
      if(reducedMotion==='reduce')assert.deepEqual(animations,[],'Reduced motion must be still');
-     // Sample real CSS motion at a controlled midpoint, then settle. This tests
-     // interpolation without depending on screenshots racing a wall-clock delay.
-     if(reducedMotion==='no-preference'&&['reporter','dilution','evidence'].includes(await scene.getAttribute('data-scene'))&&step===1){
-      assert(animations.length>0,`${section.id}: expected live animation`);
+     if(reducedMotion==='no-preference'){
+      const ambient=animations.filter(name=>name==='nspAmbientDrift');
+      const teaching=animations.filter(name=>name!=='nspAmbientDrift');
+      const ambientCount={'green-reporter':3,'limiting-dilution':3,'origin-map':2,'class-signature':0}[section.id];
+      if(ambientCount!==undefined)assert.equal(ambient.length,ambientCount,`${section.id}: decorative ambient layer must stay separate from the teaching beat`);
+      const expected={
+       'green-reporter':[['nspArrive'],['nspSwitch'],['nspDescendant','nspDescendant'],[]],
+       'limiting-dilution':[[],['nspSeparate','nspSeparate','nspSeparate'],['nspReveal'],['nspReveal']],
+       'class-signature':[['nspRowFocus','nspEmphasis'],['nspRowFocus','nspEmphasis','nspReveal'],['nspRowFocus','nspEmphasis','nspReveal'],[]],
+       'origin-map':[[],[],[],['nspProposal','nspFragment']]
+      }[section.id];
+      if(expected){
+       const expectedNames=visit===0&&step===0?[]:expected[step];
+       assert.deepEqual(teaching.sort(),expectedNames.slice().sort(),`${section.id}/${step}: only this phase's teaching beat may run`);
+      }
+     }
+     if(section.id==='green-reporter'&&step===2){
+      if(reducedMotion==='no-preference')await scene.evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a.animationName==='nspAmbientDrift').forEach(a=>{a.pause();a.currentTime=4500;}));
+      await page.screenshot({path:path.join(output,`${viewport.width}-ambient-${reducedMotion==='reduce'?'reduced':'normal'}.png`)});
+     }
+     // Fixed values must agree with labels at the start, middle and end of the
+     // emphasis animation. No bar may interpolate from another observation.
+     if(reducedMotion==='no-preference'&&section.id==='class-signature'&&step===1){
+      for(const time of [0,250,500]){
+       await scene.evaluate((el,time)=>el.getAnimations({subtree:true}).forEach(a=>{a.pause();a.currentTime=time;}),time);
+       const sampled=await screen.locator('[data-rate]').evaluateAll(els=>els.map(e=>({id:e.dataset.rate,width:e.getBBox().width})));
+       const expected=[33.9,6.93,16.7,.2,.98,.99];
+       sampled.forEach((bar,i)=>assert(Math.abs(bar.width-expected[i]*11.4)<.05,`${bar.id} changed geometry at ${time}ms`));
+       const labels=(await screen.locator('.nspstory-value').allTextContents()).map(Number);
+       assert.deepEqual(labels,expected,`Published labels must match the six sampled bars at ${time}ms`);
+       await page.screenshot({path:path.join(output,`${viewport.width}-evidence-${time}ms.png`)});
+      }
      }
      if(reducedMotion==='no-preference'&&section.id==='origin-map'&&step===3){
-      const mid=await scene.evaluate(el=>{const a=el.getAnimations({subtree:true}).find(x=>x.animationName==='nspFragment');if(!a)return null;a.pause();a.currentTime=1400;return getComputedStyle(el.querySelector('.nspstory-fragment')).transform;});
-      assert(mid&&mid!=='none'&&mid!=='matrix(1, 0, 0, 1, 0, 0)','Fragment must visibly move along proposed path');
-      await page.screenshot({path:path.join(output,`${viewport.width}-proposed-mid-motion.png`)});
+      for(const [label,time] of [['0',0],['25',425],['50',850],['75',1275],['end',1700]]){
+       const sample=await screen.evaluate((svg,time)=>{const animations=svg.closest('.nspstory').getAnimations({subtree:true});const fragmentAnimation=animations.find(x=>x.animationName==='nspFragment');if(!fragmentAnimation)return null;animations.forEach(a=>a.pause());fragmentAnimation.currentTime=time;const fragment=svg.querySelector('.nspstory-fragment').getBoundingClientRect();const hit=[...svg.querySelectorAll('text')].filter(text=>{const b=text.getBoundingClientRect();return fragment.left<b.right&&fragment.right>b.left&&fragment.top<b.bottom&&fragment.bottom>b.top;}).map(text=>text.textContent);return {transform:getComputedStyle(svg.querySelector('.nspstory-fragment')).transform,hit};},time);
+       assert(sample&&sample.transform!=='none',`Fragment must have a defined position at ${label}%`);
+       assert.deepEqual(sample.hit,[],`Proposed fragment crossed text at ${label}%`);
+       await page.screenshot({path:path.join(output,`${viewport.width}-proposed-${label}.png`)});
+      }
      }
-     await scene.evaluate(el=>el.getAnimations({subtree:true}).forEach(a=>a.finish()));
-     if(section.id==='green-reporter')assert.equal(await scene.locator('.nspstory-green').count(),step===0?0:step===1?1:3,'Cell signal and descendants must reset');
-     if(section.id==='limiting-dilution')assert.equal(await scene.locator('.nspstory-separate').count(),step===0?0:3,'Founder distribution must reset');
+     await scene.evaluate(el=>el.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect.getComputedTiming().endTime)).forEach(a=>a.finish()));
+     if(section.id==='green-reporter')assert.equal(await screen.locator('.nspstory-green').count(),step===0?0:step===1?1:3,'Cell signal and descendants must reset');
+     if(section.id==='limiting-dilution')assert.equal(await screen.locator('.nspstory-separate').count(),step===1?3:0,'Founder distribution runs only in phase 1');
      if(section.id==='origin-map'){
-      assert((await scene.innerText()).includes(step===0?'Tandem · nearby':'Distal · separated'),'Wrong donor/recipient arc');
-      assert.equal(await scene.locator('.nspstory-fragment').count(),step===3?1:0,'Proposed fragment appears only in model step');
-      if(step===3)assert((await scene.innerText()).includes('PROPOSED / NOT OBSERVED'));
+      assert((await screen.textContent()).includes(step===0?'Tandem · nearby':'Distal · separated'),'Wrong donor/recipient arc');
+      assert.equal(await screen.locator('.nspstory-fragment').count(),step===3?1:0,'Proposed fragment appears only in model step');
+      if(step===3)assert((await screen.textContent()).includes('PROPOSED / NOT OBSERVED'));
      }
      if(section.id==='class-signature'){
-      const widths=await scene.locator('[data-rate]').evaluateAll(els=>els.map(e=>e.getBBox().width));
+      const widths=await screen.locator('[data-rate]').evaluateAll(els=>els.map(e=>e.getBBox().width));
       const expected=[33.9,6.93,16.7,.2,.98,.99].map(v=>v*11.4);
       widths.forEach((w,i)=>assert(Math.abs(w-expected[i])<.05,'Terminal bars must use the same truthful linear scale'));
      }
      // SVG text cannot silently escape the artwork's viewBox.
      const clipped=await scene.locator('svg text').evaluateAll(els=>els.filter(e=>{const b=e.getBBox();return b.x<0||b.y<0||b.x+b.width>760||b.y+b.height>410;}).map(e=>e.textContent));
      assert.deepEqual(clipped,[],`${section.id}: clipped scene labels`);
+    }
+    if(section.id==='analysis-ladder'){
+     const guide=await root.locator('.pwidget').filter({hasText:'FIVE QUESTIONS'}).innerText();
+     for(const label of ['1 · Read','2 · Find','3 · Match','4 · Compare','5 · Interpret'])assert(guide.includes(label),`${label} must remain visible`);
     }
     const geometry=await root.evaluate(el=>{
      const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
@@ -91,13 +132,29 @@ try {
  const printPage=await browser.newPage({viewport:{width:1440,height:900}});
  await printPage.goto(pathToFileURL(path.join(here,'nsp15-insertion-evidence.html')).href);
  const printSkip=printPage.getByText('Skip tour',{exact:true});if(await printSkip.isVisible())await printSkip.click();
- const originIndex=spec.page.sections.findIndex(s=>s.id==='origin-map');
- await printPage.getByRole('button',{name:spec.page.sections[originIndex].heading,exact:true}).first().click();
- await printPage.locator('section.doc-sec').nth(originIndex).locator('[data-step-source="3"]').first().click();
- await printPage.emulateMedia({media:'print'});
- assert.equal(await printPage.locator('.nspstory').evaluateAll(els=>els.reduce((n,el)=>n+el.getAnimations({subtree:true}).length,0)),0,'Print must not animate any lesson');
- assert.equal(await printPage.locator('.nspstory-fragment').evaluate(el=>getComputedStyle(el).transform),'none','Print keeps final fragment position');
- await printPage.screenshot({path:path.join(output,'print-still.png'),fullPage:true});
+ const printSections=['green-reporter','limiting-dilution','class-signature','origin-map'];
+ for(const [printIndex,id] of printSections.entries()){
+  const index=spec.page.sections.findIndex(s=>s.id===id), selectedPhase=printIndex%4;
+  await printPage.emulateMedia({media:'screen'});
+  await printPage.getByRole('button',{name:spec.page.sections[index].heading,exact:true}).first().click();
+  await printPage.locator('section.doc-sec').nth(index).locator(`[data-step-source="${selectedPhase}"]`).first().click();
+  const scene=printPage.locator('section.doc-sec').nth(index).locator('.nspstory');
+  await printPage.emulateMedia({media:'print'});
+  assert.equal(await scene.evaluate(el=>el.getAnimations({subtree:true}).length),0,`${id}: print must not animate`);
+  assert.equal(await scene.locator('.nspstory-screen-frame').evaluate(el=>getComputedStyle(el).display),'none',`${id}: selected screen frame must not print`);
+  assert.equal(await scene.locator('.nspstory-print-frame').evaluate(el=>getComputedStyle(el).display),'block',`${id}: deterministic summary must print`);
+  assert.equal(await scene.locator('.nspstory-print-frame').evaluate(el=>getComputedStyle(el).filter),'none',`${id}: print uses direct grayscale colors`);
+  if(id==='green-reporter')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('8/18 green isolates'));
+  if(id==='limiting-dilution')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('Sequence confirms the selected lineage'));
+  if(id==='origin-map')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('incorporation happens is unresolved'));
+  if(id==='class-signature'){
+   const widths=await scene.locator('.nspstory-print-frame [data-rate]').evaluateAll(els=>els.map(e=>e.getBBox().width));
+   [33.9,6.93,16.7,.2,.98,.99].forEach((v,i)=>assert(Math.abs(widths[i]-v*11.4)<.05,'Print bars keep all published values'));
+   assert.equal(await scene.locator('.nspstory-print-frame .nspstory-wt').first().evaluate(el=>getComputedStyle(el).fill),'rgb(34, 34, 34)');
+   assert.equal(await scene.locator('.nspstory-print-frame .nspstory-inactive').first().evaluate(el=>getComputedStyle(el).fill),'rgb(153, 153, 153)');
+  }
+  await printPage.screenshot({path:path.join(output,`print-${id}-phase-${selectedPhase}.png`),fullPage:true});
+ }
  await printPage.close();
  await fs.writeFile(path.join(output,'results.json'),JSON.stringify({browser:browser.version(),checks:results},null,2));
  console.log(`PASS: ${results.length} distinct desktop states; backward seeks; controls/panels in viewport; no clipped panel content or browser/network errors. Screenshots: ${output}`);

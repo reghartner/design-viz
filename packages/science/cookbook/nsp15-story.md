@@ -10,6 +10,12 @@ successive steps. `caption` accepts text or null; `enterOnce` supports the
 same state fields. Sparse patches carry state and path/seek behavior uses
 the ordinary panel fold. Invalid phases warn and retain the prior state.
 
+Decorative atmosphere is an explicit setup choice: `ambient` enables it,
+`ambientIntensity` accepts `quiet | medium | lively`, and `ambientTempo`
+accepts `slow | normal | fast`. These settings change only background drift;
+they never move evidence bars or replay a teaching beat. Reduced motion and
+print suppress the drift regardless of the authored setting.
+
 - Reporter: arrival → rare GFP restoration → newly infected descendants →
   sequence check. Cells fluoresce; the virus particle does not.
 - Dilution: mixed positive culture → illustrative one/multiple/zero founders →
@@ -18,14 +24,17 @@ the ordinary panel fold. Invalid phases warn and retain the prior state.
 - Origin: tandem → distal match → inferred origin → proposed fragment transfer.
   The moving fragment is explicitly proposed; incorporation is unresolved.
 - Evidence: all → distal → tandem → median size. Bars use the published
-  HCoV-OC43 rounded cpm on one linear scale. Animation contracts the inactive
-  comparison bar from the WT length; it is a comparison, not a time series.
-  Exact terminal rates remain labeled. The ≥11 nt mapped subsets do not
+  HCoV-OC43 rounded cpm on one linear scale. Every bar keeps its published
+  width and label at every animation sample; only the current comparison
+  emphasis moves. The ≥11 nt mapped subsets do not
   partition the ≥2 nt total. This panel is specific to this paper's numbers.
 
-All animations are finite. Reduced motion and print render the complete,
-labeled final frame. No scripts, requests, sequences, timers, or experimental
-parameters are supplied by a spec. Authoring acceptance is desktop only.
+All animations are finite and phase-specific; later teaching phases do not
+replay earlier arrival, reveal, separation, or transfer beats. Reduced motion
+shows the selected frame immediately. Print replaces it with a deterministic,
+complete lesson summary independent of the selected phase. No scripts,
+requests, sequences, timers, or experimental parameters are supplied by a
+spec. Authoring acceptance is desktop only.
 
 The editable example is
 `packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json`;

@@ -3,9 +3,12 @@
 - `nspstory` — purpose-built animated lessons for the Bianco et al. NSP15
   preprint. Declare `scene` as `reporter`, `dilution`, `origin`, or `evidence`.
   State accepts `phase` (integer 0–3, default 0) and `caption` (text or null).
+  Setup also accepts `ambient` (boolean), `ambientIntensity`
+  (`quiet|medium|lively`) and `ambientTempo` (`slow|normal|fast`). These settings
+  affect decorative background drift only; reduced motion and print suppress it.
   Sparse patches carry; `enterOnce` accepts the same fields. Invalid fields
   warn and are ignored. Four authored phases explain each lesson, with finite
-  CSS motion and complete still endpoints for reduced motion and print.
+  teaching motion and deterministic lesson summaries for print.
   Evidence rates are specific to the paper's HCoV-OC43 comparison; source
   transfer is explicitly proposed and the incorporation mechanism unresolved.
   No sequence, experimental parameters, probability, or molecular timescale

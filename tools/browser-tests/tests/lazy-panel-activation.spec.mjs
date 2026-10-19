@@ -135,12 +135,12 @@ test('direct page Views defer excluded sections until selected',async({page,serv
 
 test('returning to a Screen panel restores its settled CSS scene without replay',async({page,server})=>{
   const raw=fixture(),diagram=raw.page.blocks[0].tabs[0].sections[0].diagram;
-  diagram.panels=[{id:'alpha',type:'screen',title:'Garage',scene:'garage-opening',initial:{mode:'active'}}];
+  diagram.panels=[{id:'alpha',type:'screen',title:'Entry',scene:'person-through-door',initial:{mode:'active'}}];
   diagram.steps.forEach(step=>{step.panels={alpha:{mode:'active'}};});
   await open(page,server,raw);
-  await expect(page.locator('#section-alpha .garage-moving')).toHaveCount(1);
+  await expect(page.locator('#section-alpha .entry-person')).toHaveCount(1);
   await tab(page,'Two');await expect(page.locator('#section-alpha .pbody')).toBeEmpty();
-  await tab(page,'One');await expect(page.locator('#section-alpha .garage-moving')).toHaveCount(1);
+  await tab(page,'One');await expect(page.locator('#section-alpha .entry-person')).toHaveCount(1);
   const animations=await page.locator('#section-alpha .pbody').evaluate(el=>el.getAnimations({subtree:true})
     .filter(a=>Number.isFinite(a.effect.getComputedTiming().endTime)).map(a=>a.playState));
   expect(animations.length).toBeGreaterThan(0);expect(animations.every(state=>state==='finished')).toBe(true);

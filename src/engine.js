@@ -1920,7 +1920,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     boardDiv.classList.remove('dv-step-tween');
     clearCaptionTween();
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, cur, true), []);
-    if (panelCtl) panelCtl.setStep(cur, false);
+    if (panelCtl) panelCtl.setStep(mode === 'ambient' ? 0 : cur, false, mode === 'ambient');
   }
   function syncToggle(){
     btnAmb.setAttribute('aria-pressed', mode === 'ambient' ? 'true' : 'false');
@@ -2840,6 +2840,21 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
                 contractCards:Array.prototype.slice.call(box.querySelectorAll('.ctcard')),
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
+  var sectionVisible = options && options.deferPanels ? null : true;
+  result.setVisible = function (visible, activatePanels) {
+    var wasVisible = sectionVisible;
+    sectionVisible = visible;
+    if (result.stepper && wasVisible !== visible) {
+      if (!visible) {
+        /* Pause first: returning to a chapter restores its place, not autoplay.
+           onHide settles the current step before any panel is unmounted. */
+        var settle = function(){result.stepper.pause();result.stepper.onHide();};
+        if (panelCtl) panelCtl.setActive(false, settle);
+        else settle();
+      } else if (wasVisible === false) result.stepper.onShow();
+    }
+    if (panelCtl) panelCtl.setActive(visible && activatePanels !== false);
+  };
   if (!sec.diagram) return result;
 
   if (typeof FlowCanon!=='undefined'){
@@ -2894,8 +2909,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, activeDiagram, skin, !options || options.panelsActive !== false);
-    result.panelCtl = panelCtl;
+    panelCtl = buildPanels(aside, activeDiagram, skin, {active: !(options && options.deferPanels)});
+    result.panels = panelCtl;
   }
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
@@ -3094,19 +3109,46 @@ function renderPage(view, page, skin, backlinks, options){
   var gi = 0;
   var pageBlocks = blocksOf(page);
   var records = sectionRecords(page);
+  var deferredPanelSections = new Set();
+  tabViewOwners(page).forEach(function(owner){
+    var selectable = owner.tabBlock !== null || owner.source.views || tabViewDefinitions(owner).length > 1;
+    owner.records.forEach(function(record){if(selectable || record.domainOnly)deferredPanelSections.add(record.number);});
+  });
   var deferredHides = [];
   var ctl = {page:page,documentDestinations:documentDestinations(documentReference(page),hostResolver,options.siteBaseUrl),view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
-  function activatePrintPanels(){ctl.sections.forEach(function(rec){if(rec.panelCtl)rec.panelCtl.setActive(true);});}
-  function restoreScreenPanels(){ctl.sections.forEach(function(rec){if(rec.panelCtl)rec.panelCtl.setActive(!rec.sectionEl.hidden && !rec.sectionEl.closest('[hidden]'));});}
-  if(typeof window!=='undefined'){window.addEventListener('beforeprint',activatePrintPanels);window.addEventListener('afterprint',restoreScreenPanels);}
+  var panelActivationDepth = 0;
+  /* Tab and View membership meet here. Neither navigation path may activate
+     a section that the other path still excludes. Shells remain measurable
+     during construction; panel bodies activate only after both are applied. */
+  ctl.syncSectionVisibility = function(rec){
+    if (ctl.rendering || ctl.destroyed) return;
+    var tab = rec.sectionEl.closest('.tabpanel');
+    rec.setVisible(!rec.sectionEl.hidden && !(tab && tab.hidden), panelActivationDepth === 0);
+  };
+  /* Synchronous navigation probes (such as tour planning) inspect the shells
+     without mounting every chapter they temporarily select. */
+  ctl.withPanelActivationSuspended = function(callback){
+    panelActivationDepth++;
+    try{return callback();}
+    finally{panelActivationDepth--;if(!panelActivationDepth)ctl.sections.forEach(ctl.syncSectionVisibility);}
+  };
+  function beforePrint(){
+    ctl.sections.forEach(function(rec){
+      if(rec.stepper)rec.stepper.pause();
+      if(rec.panels)rec.panels.setPrinting(true);
+    });
+  }
+  function afterPrint(){ctl.sections.forEach(function(rec){if(rec.panels)rec.panels.setPrinting(false);});}
+  var printWindow = view.ownerDocument && view.ownerDocument.defaultView;
+  if(printWindow){printWindow.addEventListener('beforeprint',beforePrint);printWindow.addEventListener('afterprint',afterPrint);}
   ctl.destroy = function(){
     ctl.destroyed = true;
+    if(printWindow){printWindow.removeEventListener('beforeprint',beforePrint);printWindow.removeEventListener('afterprint',afterPrint);}
     view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
     view.removeEventListener('tab-view-change',paintTabExploreIndicators);
     view.removeEventListener('navigation-mounted',paintTabExploreIndicators);
     if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();
-    if(typeof window!=='undefined'){window.removeEventListener('beforeprint',activatePrintPanels);window.removeEventListener('afterprint',restoreScreenPanels);}
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.externalHandoffs)ctl.externalHandoffs.destroy();
     if(ctl.details)ctl.details.destroy();
@@ -3133,7 +3175,7 @@ function renderPage(view, page, skin, backlinks, options){
       });
     });
   }
-  function addSection(container,sectionOptions){
+  function addSection(container){
     var record = records[gi], sec = record.section;
     var number = record.number, reference = record.reference;
     var built = buildSection(container, sec, gi++, reference, protos, renderSkin, lanes, backlinks,
@@ -3148,15 +3190,14 @@ function renderPage(view, page, skin, backlinks, options){
           });
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
-      }, function(){ if (ctl.onChange) ctl.onChange(); }, Object.assign({},options,sectionOptions || {}));
+      }, function(){ if (ctl.onChange) ctl.onChange(); }, Object.assign({},options,{deferPanels:deferredPanelSections.has(number)}));
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, detailOnly:!!sec.detailOnly, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               presentation:built.presentation, viewport:built.viewport,
-               panelCtl:built.panelCtl,
+               presentation:built.presentation, viewport:built.viewport, panels:built.panels, setVisible:built.setVisible,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
-    built.runtime=rec;return built;
+    return built;
   }
   pageBlocks.forEach(function(block, bi){
     if (block.type === 'section'){
@@ -3195,14 +3236,8 @@ function renderPage(view, page, skin, backlinks, options){
       panel.className = 'tabpanel';
       panel.setAttribute('role', 'tabpanel');
       panel.setAttribute('aria-labelledby', btn.id);
-      panel._steppers = [];
-      panel._records = [];
       view.appendChild(panel);
-      t.sections.forEach(function(sec){
-        var built = addSection(panel,{panelsActive:ti===0});
-        if (built.stepper) panel._steppers.push(built.stepper);
-        panel._records.push(built.runtime);
-      });
+      t.sections.forEach(function(){ addSection(panel); });
       panels.push(panel); buttons.push(btn); copyButtons.push(copy); slugs.push(slugify(t.label));
     });
     var tabCtl = null;
@@ -3214,10 +3249,11 @@ function renderPage(view, page, skin, backlinks, options){
         b.setAttribute('tabindex', i === idx ? '0' : '-1');
       });
       panels.forEach(function(p, i){
-        var wasHidden = p.hidden,show=i===idx;
-        if(show){p.hidden=false;p._steppers.forEach(function(s){if(wasHidden)s.onShow();});requestAnimationFrame(function(){if(!p.hidden)p._records.forEach(function(r){if(r.panelCtl)r.panelCtl.setActive(true);});});}
-        else {p._steppers.forEach(function(s){s.onHide();});p._records.forEach(function(r){if(r.panelCtl)r.panelCtl.setActive(false);});p.hidden=true;}
+        p.hidden = i !== idx;
       });
+      /* Release departed resources before activating the destination, even
+         when navigating backwards through the tab order. */
+      ctl.sections.filter(function(rec){return rec.tabBlock===tabBlockIndex;}).sort(function(a,b){return (a.tab===idx)-(b.tab===idx);}).forEach(ctl.syncSectionVisibility);
       if (activate !== false){
         changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});
         if(ctl.views){var primary=ctl.views.primary(tabBlockIndex,idx);if(primary)ctl.views.ensure(primary,undefined,true);}
@@ -3251,7 +3287,6 @@ function renderPage(view, page, skin, backlinks, options){
   view.addEventListener('tab-view-change',paintTabExploreIndicators);
   // URL and preview restoration select silently, then mount their navigation.
   view.addEventListener('navigation-mounted',paintTabExploreIndicators);
-  ctl.rendering = false;
   ctl.manifest = {
     tabBlocks:ctl.tabBlocks.map(function(tb){
       return {index:tb.index, count:tb.count, slugs:tb.slugs.slice()};
@@ -3276,6 +3311,8 @@ function renderPage(view, page, skin, backlinks, options){
       ctl.activeTarget = {kind:'diagram', section:initialDirect.number};
   }
   ctl.views=createTabViewController(ctl,page);
+  ctl.rendering = false;
+  ctl.sections.forEach(ctl.syncSectionVisibility);
   paintTabExploreIndicators();
   var viewInitial=ctl.views.primary(ctl.tabBlocks.length?1:null,ctl.tabBlocks.length?0:null);
   if(viewInitial)ctl.activeTarget={kind:'diagram',section:viewInitial.number};

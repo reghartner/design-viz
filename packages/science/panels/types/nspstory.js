@@ -32,8 +32,8 @@ function nspstoryModel(panel, state) {
   s.ambientIntensity = NSPSTORY_AMBIENT_INTENSITIES.indexOf(panel.ambientIntensity) >= 0 ? panel.ambientIntensity : 'quiet';
   s.ambientTempo = NSPSTORY_AMBIENT_TEMPOS.indexOf(panel.ambientTempo) >= 0 ? panel.ambientTempo : 'slow';
   var lessons = {
-    reporter:[['A particle arrives. The cell stays dark.', 'Incoming particle → infected cell; GFP reporter off.'],
-      ['A rare change restores the green signal.', 'A frame-restoring change permits GFP in an infected cell; the particle is not green.'],
+    reporter:[['Read the message three letters at a time.', 'The shifted leader changes the three-letter grouping reaching GFP. GFP remains present; the GFP reporter is off.'],
+      ['A rare length change restores the reading frame.', 'An RNA insertion adds letters to the message—extra symbols here. This restoring insertion realigns GFP groups; the infected cell, not the particle, can glow.'],
       ['The trait can travel with a virus lineage.', 'Newly infected cells can inherit the reporter phenotype through a virus lineage. A green culture can still be mixed.'],
       ['Green is a clue. Sequence is the check.', 'Both WT and inactive NSP15 yielded green isolates. Insertions were found in 8 of 18 examined WT isolates; no inserts greater than 2 nt in the inactive group.']],
     dilution:[['Make a crowd easier to follow.', 'A dense symbolic mixture can include several lineages. Green signal does not prove a single lineage.'],
@@ -62,27 +62,43 @@ function nspstoryCell(x, y, green, size, cls) {
     '<path d="M-22,12q14,-22 28,0t28,0"/></g></g>';
 }
 function nspstoryArrow(path, cls) { return '<path class="nspstory-arrow ' + (cls || '') + '" d="' + path + '"/>'; }
+// These glyphs are placeholders, not nucleotide sequence or actual mutation size.
+// Grouping starts upstream of GFP. Preserve the SAME GFP glyphs in both strips.
+function nspstoryReporterReading(phase) {
+  var gfp=[0,2,1,1,0,2,2,1,0,0,1,2];
+  var rows=[{id:'shifted',leader:[1,0,2,0,2,1,0],added:[],title:'SHIFTED LEADER · GFP OUT OF FRAME'},
+    {id:'restored',leader:[1,0,2,0,2,1,0,1,2],added:[7,8],title:'RESTORING INSERTION · GFP IN FRAME'}];
+  rows.forEach(function(row,i){
+    row.gfp=gfp.slice();row.tokens=row.leader.concat(row.gfp);row.boundary=row.leader.length;
+    row.active=i===(phase===0?0:1);row.groups=[];
+    for(var start=0;start<row.tokens.length;start+=3)row.groups.push({start:start,end:Math.min(start+3,row.tokens.length)});
+  });
+  return {rows:rows,green:phase>0,output:phase===0?'No functional GFP':'Cell makes functional GFP',
+    summary:'Reading frame means where three-letter groups begin. The wide boxes group three abstract symbols from an upstream START; the ellipsis means the message continues. An RNA insertion adds letters to the message, shown as extra symbols. The two individually outlined, plus-marked symbols are added in the lower leader. The deliberately frameshifted leader immediately before GFP puts the GFP boundary inside a group; the restored state puts it at a group boundary. GFP symbols are unchanged. Symbol counts and length change are schematic, not a sequence or actual mutation size. GFP is a reporter clue, not a direct NSP15 measurement.'};
+}
 function nspstoryReporter(m) {
-  var phase = m.phase, green = phase > 0, h = '';
-  h += '<rect class="nspstory-zone" x="20" y="90" width="720" height="215" rx="22"/>';
-  h += nspstoryText(44, 120, '01 / ARRIVAL', 'kicker') + nspstoryText(245, 120, '02 / REPORTER', 'kicker') + nspstoryText(520, 120, '03 / LINEAGE', 'kicker');
-  h += nspstoryArrow('M88,203H199m-10,-7 10,7 -10,7');
-  h += '<g transform="translate(226,203)"><g class="nspstory-particle ' + (phase === 0 && !m.print ? 'nspstory-arrive' : '') + '"><circle r="14"/><path d="M-21,0H21M0,-21V21M-15,-15L15,15M-15,15L15,-15"/></g></g>';
-  h += nspstoryText(112, 257, 'Virus particle', 'label', 'middle') + nspstoryText(112, 278, 'never “green” itself', 'small', 'middle');
-  h += nspstoryCell(315, 202, green, 71, phase === 1 && !m.print ? 'nspstory-switch' : '');
-  h += nspstoryText(315, 207, green ? 'GFP ON' : 'GFP OFF', 'celltext', 'middle');
-  h += nspstoryText(315, 278, green ? 'Cell makes fluorescent protein' : 'Reporter message out of frame', 'small', 'middle');
-  h += nspstoryArrow('M400,203H478m-10,-7 10,7 -10,7', phase < 2 ? 'nspstory-faint' : '');
-  if (phase >= 2) {
-    h += nspstoryCell(561, 178, true, 39, phase === 2 && !m.print ? 'nspstory-descendant' : '') + nspstoryCell(653, 222, true, 39, phase === 2 && !m.print ? 'nspstory-descendant nspstory-later' : '');
-    h += nspstoryText(605, 278, 'Newly infected cells', 'small', 'middle');
-  } else {
-    h += nspstoryCell(561, 178, false, 39, 'nspstory-faint') + nspstoryCell(653, 222, false, 39, 'nspstory-faint');
-    h += nspstoryText(605, 278, 'A trait can be passed on', 'small', 'middle');
-  }
-  h += '<rect class="nspstory-band" x="20" y="324" width="720" height="53" rx="12"/>';
-  var footer = phase === 0 ? 'A dark cell does not mean “no virus.” It means no working GFP signal.' : phase === 1 ? 'A rare frame-restoring insertion OR deletion can turn the reporter on.' : phase === 2 ? 'A green-positive culture can still contain other lineages. Next: separate them.' : 'WT: insertions in 8/18 green isolates. Inactive: no inserts >2 nt in 16 examined.';
-  h += nspstoryText(38, 356, footer, 'small');
+  var reading=nspstoryReporterReading(m.phase),h='';
+  h+=nspstoryText(24,91,'From START → consecutive groups of 3 letters (abstract symbols below)','small');
+  reading.rows.forEach(function(row,i){
+    var y=159+i*108,boundary=78+row.boundary*20;
+    h+='<rect class="nspstory-zone" x="20" y="'+(y-49)+'" width="524" height="99" rx="12"/>';
+    h+=nspstoryText(32,y-29,row.title,'kicker');
+    h+=nspstoryText(32,y-7,'START','small')+nspstoryText(83,y-7,'leader','small')+nspstoryText(boundary+6,y-7,'GFP region','small');
+    h+=nspstoryArrow('M35,'+(y+15)+'h31m-7,-5 7,5 -7,5');
+    row.groups.forEach(function(group){h+='<rect class="nspstory-reading-group" x="'+(78+group.start*20)+'" y="'+(y+2)+'" width="56" height="27" rx="5"/>';});
+    row.tokens.forEach(function(shape,j){h+='<g class="nspstory-token" transform="translate('+(87+j*20)+','+(y+15)+')">'+(shape===0?'<circle r="5"/>':shape===1?'<rect x="-5" y="-5" width="10" height="10" rx="1"/>':'<path d="M0,-6L6,5H-6Z"/>')+'</g>';});
+    row.added.forEach(function(j){h+='<rect class="nspstory-added-symbol" x="'+(79+j*20)+'" y="'+(y+5)+'" width="16" height="20" rx="2"/>'+nspstoryText(87+j*20,y-6,'+','small','middle');});
+    h+=nspstoryText(87+row.tokens.length*20,y+19,'…','small');
+    h+='<path class="nspstory-arrow" d="M'+boundary+','+(y-3)+'v36"/>';
+    h+=nspstoryText(83,y+45,i?'GFP groups line up again.':'GFP is present, but grouped differently.','small');
+  });
+  h+=nspstoryText(642,120,'AFTER RESTORATION','kicker','middle')+nspstoryText(642,142,'infected cell','small','middle')+nspstoryCell(642,201,reading.green,62,'');
+  h+=nspstoryText(642,206,reading.green?'GFP ON':'GFP OFF','celltext','middle')+nspstoryText(642,268,reading.green?'Functional GFP':'No functional GFP','small','middle');
+  h+=nspstoryArrow('M544,282C567,282 565,201 578,201m-7,-5 7,5 -7,5');
+  h+=nspstoryCell(612,290,true,20,'')+nspstoryCell(674,290,true,20,'')+nspstoryText(642,327,'Newly infected cells','small','middle');
+  h+=nspstoryText(24,346,'Insertion = extra RNA letters. Outlined symbols are added; no actual sequence or size.','small');
+  h+=nspstoryText(24,371,'WT: insertions in 8/18 green isolates. Inactive: no inserts >2 nt in 16 examined.','small');
+  h+=nspstoryText(24,394,'GFP is a reporter clue, not a direct NSP15 measurement.','small');
   return h;
 }
 function nspstoryToken(x, y, shape, cls, fromX, fromY, size) {
@@ -179,9 +195,9 @@ var NSPSTORY_WELLS=[
   {state:'empty',shapes:[]},{state:'mixed',shapes:[2,0]},{state:'candidate',shapes:[1]}
 ];
 function nspstoryCanvasFrame(m) {
-  return '<div class="nspstory-frame nspstory-screen-frame nspstory-canvas-frame" role="img" aria-label="' + esc(m.aria) + '">' +
+  return '<div class="nspstory-frame nspstory-screen-frame nspstory-canvas-frame" role="img" aria-label="' + esc(m.aria+(m.scene==='reporter'?' '+nspstoryReporterReading(m.phase).summary:'')) + '">' +
     '<canvas class="nspstory-canvas" aria-hidden="true"></canvas>' +
-    '<span class="nspstory-a11y">' + esc(m.aria) + (m.scene==='dilution'?' Illustrative fixed 3 by 3 field: '+NSPSTORY_WELLS.map(function(w,i){return 'well '+(i+1)+' '+w.state;}).join('; ')+'.':'') + '</span>' +
+    '<span class="nspstory-a11y">' + esc(m.aria) + (m.scene==='reporter'?' '+esc(nspstoryReporterReading(m.phase).summary):'') + (m.scene==='dilution'?' Illustrative fixed 3 by 3 field: '+NSPSTORY_WELLS.map(function(w,i){return 'well '+(i+1)+' '+w.state;}).join('; ')+'.':'') + '</span>' +
     (m.scene==='dilution'?NSPSTORY_WELLS.map(function(w,i){return '<span class="nspstory-canvas-outcome" data-well="'+(i+1)+'" data-state="'+w.state+'">'+w.state+'</span>';}).join(''):'') + '</div>';
 }
 function nspstoryEase(value) { value=Math.max(0,Math.min(1,value));return value*value*(3-2*value); }
@@ -256,17 +272,55 @@ function nspstoryCanvasBackdrop(ctx,state,image,intensity){
   if(image&&image.complete&&image.naturalWidth){var scale=Math.max(w/image.naturalWidth,h/image.naturalHeight),iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;ctx.save();ctx.globalAlpha=.26+bloom*.3;ctx.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();}
   for(var i=0;i<24;i++){var x=((i*67)%101)/101*w+Math.sin(atmosphereTime/1900+i)*6*bloom,y=((i*37)%97)/97*h;ctx.fillStyle=i%2?'#53e6cd':'#b18aff';ctx.globalAlpha=.1+bloom*.22;ctx.beginPath();ctx.arc(x,y,1+(i%3)*.45,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;return bloom;
 }
+function nspstoryReporterViewport(width,height){
+  var scale=Math.min(width/760,height/410);
+  return {scale:scale,x:(width-760*scale)/2,y:(height-410*scale)/2,width:760*scale,height:410*scale};
+}
 function nspstoryDrawReporterCanvas(ctx,state,m,image){
-  var w=state.width,h=state.height,bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),phase=m.phase;
-  var duration=4000,authored=state.reduced || !m.ambient || phase!==0?duration:Math.min(duration,state.elapsed);
-  var clearing=ctx.createRadialGradient(w*.5,h*.28,0,w*.5,h*.28,w*.42);clearing.addColorStop(0,'rgba(3,13,24,.98)');clearing.addColorStop(1,'rgba(3,13,24,0)');ctx.fillStyle=clearing;ctx.fillRect(0,0,w,h*.55);
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#bed3dc';ctx.font='600 11px "IBM Plex Mono",monospace';ctx.fillText('ILLUSTRATIVE · REPORTER SIGNAL IS NOT THE VIRUS',w/2,h*.13);
-  var fs=Math.min(47,Math.max(32,w/20));ctx.font='500 '+fs+'px Georgia,serif';ctx.fillStyle='#f6fbff';ctx.fillText('A green cell is a clue.',w/2,h*.25);ctx.font='500 '+Math.max(16,fs*.38)+'px Georgia,serif';ctx.fillStyle='#8cebd1';ctx.fillText(phase===0?'Arrival can leave the reporter dark.':phase===1?'A rare frame-restoring change permits GFP.':phase===2?'The reporter phenotype can travel with a lineage.':'Sequence is the check.',w/2,h*.34);
-  function cell(x,y,r,green,alpha){ctx.save();ctx.globalAlpha=alpha;var g=ctx.createRadialGradient(x-r*.2,y-r*.2,0,x,y,r*1.3);g.addColorStop(0,green?'rgba(87,244,180,.5)':'rgba(80,132,154,.4)');g.addColorStop(1,'rgba(5,18,29,.18)');ctx.fillStyle=g;ctx.strokeStyle=green?'#58e6a5':'#6f9baa';ctx.lineWidth=2.2;ctx.shadowColor=green?'#53e6a5':'#65bad0';ctx.shadowBlur=(10+bloom*18);ctx.beginPath();ctx.ellipse(x,y,r,r*.78,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle=green?'#9bffd2':'#99aeb7';ctx.font='600 '+Math.max(10,r*.2)+'px "IBM Plex Mono",monospace';ctx.fillText(green?'GFP ON':'GFP OFF',x,y);ctx.restore();}
-  var cy=h*.65;ctx.strokeStyle='rgba(138,210,218,.35)';ctx.setLineDash([4,8]);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(w*.2,cy);ctx.bezierCurveTo(w*.34,cy-h*.12,w*.42,cy,w*.48,cy);ctx.moveTo(w*.56,cy);ctx.bezierCurveTo(w*.67,cy-h*.1,w*.75,cy,w*.84,cy);ctx.stroke();ctx.setLineDash([]);
-  var px=w*.18+Math.min(1,authored/(duration*.3))*w*.2;ctx.fillStyle='#b18aff';ctx.shadowColor='#b18aff';ctx.shadowBlur=14+bloom*10;ctx.beginPath();ctx.arc(px,cy,9,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
-  cell(w*.5,cy,Math.min(74,h*.17),phase>0,1);cell(w*.72,cy-h*.07,Math.min(42,h*.1),phase>=2,phase>=2?1:.24);cell(w*.84,cy+h*.07,Math.min(42,h*.1),phase>=2,phase>=2?1:.24);
-  ctx.font='500 12px "IBM Plex Sans",sans-serif';ctx.textAlign='left';ctx.fillStyle='#a8bec8';ctx.fillText('Particle arrives',w*.08,h*.88);ctx.textAlign='center';ctx.fillText('cell makes fluorescent protein',w*.5,h*.88);ctx.textAlign='right';ctx.fillStyle=phase===3?'#ffc66d':'#a8bec8';ctx.fillText(phase===3?'green clue · sequence-check': 'lineage phenotype',w*.93,h*.88);state.canvasProgress=authored/duration;
+  var bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),reading=nspstoryReporterReading(m.phase);
+  var still=state.reduced||!m.ambient,beat=still?0:state.elapsed/1100,viewport=nspstoryReporterViewport(state.width,state.height);
+  ctx.fillStyle='rgba(3,13,24,.72)';ctx.fillRect(0,0,state.width,state.height);
+  // The flex frame can be wider or taller than the authored scene. Contain the
+  // complete 760 × 410 drawing uniformly; never stretch glyphs, cells or type.
+  ctx.save();ctx.translate(viewport.x,viewport.y);ctx.scale(viewport.scale,viewport.scale);ctx.textBaseline='middle';
+  function text(value,x,y,size,color,align,serif){ctx.textAlign=align||'left';ctx.font=(serif?'500 ':'600 ')+size+'px '+(serif?'Georgia,serif':'"IBM Plex Sans",sans-serif');ctx.fillStyle=color||'#dbeaf1';ctx.fillText(value,x,y);}
+  text('ILLUSTRATIVE · THE GFP READING FRAME',24,23,13,'#98b8c9');
+  text('Read three. Then the next three.',24,57,32,'#f3faff','left',true);
+  text('Reading frame = where the three-letter groups begin.',24,87,17,'#9be7d7');
+  reading.rows.forEach(function(row,i){
+    var y=172+i*111,boundary=78+row.boundary*20,color=i?'#6de7c3':'#adc4e5';
+    ctx.fillStyle=row.active?'rgba(29,62,77,.78)':'rgba(13,35,51,.82)';nspstoryRoundRect(ctx,18,y-60,528,108,12);ctx.fill();
+    ctx.strokeStyle=row.active?color:'rgba(124,166,192,.28)';ctx.lineWidth=row.active?1.6:1;ctx.stroke();
+    text(i?'02 / RESTORED BY INSERTION':'01 / OUT OF FRAME',30,y-42,18,color);
+    text('START',25,y-14,14,'#dbeaf1');text('leader',83,y-14,17,'#d6c6ff');text('GFP region',boundary+7,y-14,17,'#9af5dd');
+    ctx.strokeStyle='#b7d0dd';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(35,y+14);ctx.lineTo(66,y+14);ctx.lineTo(59,y+9);ctx.moveTo(66,y+14);ctx.lineTo(59,y+19);ctx.stroke();
+    row.groups.forEach(function(group,index){
+      var shine=row.active?.15+(still?0:Math.pow((Math.cos(beat-index*.65)+1)/2,8)*.25):.05;
+      ctx.fillStyle='rgba(128,185,218,'+shine+')';ctx.strokeStyle='rgba(153,196,218,.55)';ctx.lineWidth=1;
+      nspstoryRoundRect(ctx,78+group.start*20,y,56,29,5);ctx.fill();ctx.stroke();
+    });
+    row.tokens.forEach(function(shape,j){
+      var x=87+j*20,cy=y+14;ctx.fillStyle=j<row.boundary?'#c4adff':'#73eed0';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=row.active?3+bloom*4:0;ctx.beginPath();
+      if(shape===0)ctx.arc(x,cy,5,0,Math.PI*2);else if(shape===1)ctx.rect(x-5,cy-5,10,10);else{ctx.moveTo(x,cy-6);ctx.lineTo(x+6,cy+5);ctx.lineTo(x-6,cy+5);ctx.closePath();}ctx.fill();ctx.shadowBlur=0;
+    });
+    row.added.forEach(function(j){ctx.strokeStyle='#f3faff';ctx.lineWidth=1.5;nspstoryRoundRect(ctx,79+j*20,y+4,16,20,2);ctx.stroke();text('+',87+j*20,y-14,18,'#f3faff','center');});
+    text('…',87+row.tokens.length*20,y+14,15,'#abc7d6');
+    ctx.strokeStyle='#80eed4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(boundary,y-6);ctx.lineTo(boundary,y+32);ctx.stroke();
+    text(i?'Extra symbols → groups realign.':'Shifted leader → different GFP grouping.',83,y+39,16,'#b7d0dd');
+  });
+  function cell(x,y,r,green){
+    var glow=ctx.createRadialGradient(x-r*.2,y-r*.2,0,x,y,r*1.3);glow.addColorStop(0,green?'rgba(87,244,180,.5)':'rgba(80,132,154,.35)');glow.addColorStop(1,'rgba(5,18,29,.18)');
+    ctx.fillStyle=glow;ctx.strokeStyle=green?'#58e6a5':'#8daaba';ctx.lineWidth=2;ctx.shadowColor=green?'#53e6a5':'#65bad0';ctx.shadowBlur=8+bloom*(12+4*Math.sin(beat));ctx.beginPath();ctx.ellipse(x,y,r,r*.78,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+  }
+  text('INFECTED CELL',646,139,17,'#c0d7e3','center');
+  cell(646,207,64,reading.green);text(reading.green?'GFP ON':'GFP OFF',646,207,20,reading.green?'#9bffd2':'#d0e0eb','center');
+  text(reading.output,646,268,15,reading.green?'#9bffd2':'#d0e0eb','center');
+  var routeY=m.phase===0?187:298;ctx.strokeStyle=reading.green?'#6de7c3':'#adc4e5';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(546,routeY);ctx.bezierCurveTo(569,routeY,560,207,579,207);ctx.stroke();
+  if(m.phase>=2){cell(622,309,18,true);cell(671,309,18,true);text('Newly infected cells',646,342,13,'#b7d0dd','center');}
+  else{text(m.phase===0?'Lower row: possible':'Only restoring changes',646,304,15,'#adc4d3','center');text(m.phase===0?'restored state':'turn the reporter on',646,325,15,'#adc4d3','center');}
+  text('Boxes = 3 · outlined symbols = added · no actual sequence or size.',24,357,14,'#b7d0dd');
+  text(m.phase===3?'Green is a clue; sequence-check the recovered lineage.':'GFP is a reporter clue, not a direct NSP15 measurement.',24,383,16,m.phase===3?'#ffc66d':'#d6e7ee');
+  ctx.restore();state.canvasProgress=1;
 }
 function nspstoryDrawOriginCanvas(ctx,state,m,image){
   var w=state.width,h=state.height,bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),phase=m.phase;
@@ -301,7 +355,7 @@ function nspstoryControls(m) {
   var limits=m.scene === 'dilution'
     ? '<strong>Scene limits</strong><span>Fixed illustrative outcomes—not well counts, probabilities, or a protocol. A single-looking well is a candidate, not proof.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>'
     : m.scene === 'origin' ? '<strong>Scene limits</strong><span>Solid marks show the observed match and insertion. The dashed relationship and moving fragment are proposed, not observed.</span><span><b>Evidence:</b> 12,063 / 13,816 long WT inserts mapped to virus; incorporation remains unresolved.</span>'
-    : '<strong>Scene limits</strong><span>The particle is not green. GFP is a reporter signal, and a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
+    : '<strong>Scene limits</strong><span>Symbols replace letters; counts and length changes are schematic, not an actual sequence or mutation size. The infected cell makes GFP, not the particle. GFP is a reporter clue, not a direct NSP15 measurement; a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
   return '<div class="nspstory-dock"><details class="nspstory-disclosure"><summary>Evidence + limits</summary><div>' + limits + '</div></details>' +
     '<div class="nspstory-controls" aria-label="Illustrative motion controls">' +
       choices('Light',['quiet','medium','lively'],['Quiet','Glow','Bloom'],m.ambientIntensity) +
@@ -354,7 +408,7 @@ function nspstoryBindControls(host, panel) {
 }
 function nspstoryPrintFrame(m) {
   var phases={reporter:3,dilution:3,origin:3,evidence:1};
-  var headings={reporter:'Reporter lineage + sequence check',dilution:'Dilution outcomes + selection boundary',origin:'Source → recipient · proposed, unresolved',evidence:'Published HCoV-OC43 comparison'};
+  var headings={reporter:'Reading frame → GFP → sequence check',dilution:'Dilution outcomes + selection boundary',origin:'Source → recipient · proposed, unresolved',evidence:'Published HCoV-OC43 comparison'};
   var copy=Object.assign({},m,{phase:phases[m.scene],heading:headings[m.scene],print:true});
   var draw={reporter:nspstoryReporter,dilution:nspstoryDilution,origin:nspstoryOrigin,evidence:nspstoryEvidence};
   return '<svg class="nspstory-frame nspstory-print-frame" viewBox="0 0 760 410" role="img" aria-label="Print summary: ' + esc(headings[m.scene]) + '"><title>Print summary: ' + esc(headings[m.scene]) + '</title><g aria-hidden="true">' +
@@ -453,6 +507,8 @@ PanelRegistry.define('nspstory', {
 .nspstory-value{font:600 16px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
 .nspstory-contrast{font:600 14px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
 .nspstory-zone,.nspstory-band{fill:var(--ns-zone)}
+.nspstory-reading-group{fill:var(--ns-paper);stroke:var(--ns-line);stroke-width:1}
+.nspstory-added-symbol{fill:none;stroke:var(--ns-ink);stroke-width:1.5}
 .nspstory-arrow{stroke:var(--ns-muted);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .nspstory-particle{fill:#ebe7f6;stroke:var(--ns-violet);stroke-width:2}.nspstory-particle path{fill:none}
 .nspstory-cell ellipse{fill:#e4e9eb;stroke:#94a5ae;stroke-width:2}.nspstory-cell circle{fill:#cbd6da}.nspstory-cell path{fill:none;stroke:#abbac0;stroke-width:2}

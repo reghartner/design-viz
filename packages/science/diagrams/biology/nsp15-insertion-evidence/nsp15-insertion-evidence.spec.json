@@ -23,10 +23,10 @@
             "sections": [
               {
                 "id": "green-reporter",
-                "heading": "01 / How does a rare lineage make cells glow?",
+                "heading": "01 / How does reading frame control the green signal?",
                 "accent": "green",
                 "text": [
-                  "Bianco et al. · preprint, not peer reviewed. An out-of-frame GFP reporter starts dark. A rare frame-restoring indel lets infected cells fluoresce; the virus particle itself is not green. [Fig. 1]"
+                  "Bianco et al. · preprint, not peer reviewed. Cells read a genetic message in three-letter groups. A deliberately frameshifted leader immediately before GFP shifts that grouping; a rare restoring length change can let infected cells make GFP. The particle itself is not green. [Fig. 1]"
                 ],
                 "diagram": {
                   "view": "step",
@@ -56,7 +56,7 @@
                     {
                       "id": "frame",
                       "type": "nspstory",
-                      "title": "ILLUSTRATIVE · green clue and lineage",
+                      "title": "ILLUSTRATIVE · read the GFP message",
                       "scene": "reporter",
                       "ambient": true,
                       "ambientIntensity": "medium",
@@ -110,7 +110,7 @@
                   "steps": [
                     {
                       "id": "dark",
-                      "text": "A virus particle carries the reporter into a cell. When the GFP message is out of frame, the infected cell stays dark. GFP is a fluorescent protein: the cell can glow, but the particle itself is not green. This cartoon has no molecular timescale. [Fig. 1a]",
+                      "text": "Read from START in groups of three. A deliberately frameshifted leader immediately before GFP shifts its grouping—not its presence. The infected cell makes no functional GFP and stays dark. [Fig. 1a]",
                       "panels": {
                         "frame": {
                           "phase": 0
@@ -120,7 +120,7 @@
                     },
                     {
                       "id": "restored",
-                      "text": "A rare insertion or deletion can repair the grouping of the reporter message. The infected cell can then make functional GFP and glow green. A virus lineage carrying that genetic change can pass the reporter trait to newly infected cells. [Fig. 1a–c]",
+                      "text": "An RNA insertion adds letters to the message: the outlined symbols are new. A rare restoring insertion or deletion realigns GFP’s groups. The cell can then make fluorescent GFP—not the particle. Not every length change restores the frame. [Fig. 1a–c]",
                       "panels": {
                         "frame": {
                           "phase": 1
@@ -130,7 +130,7 @@
                     },
                     {
                       "id": "screen",
-                      "text": "A green-positive well is a clue that at least one compatible variant is present. It may still contain several virus lineages. Finding a glowing well and recovering a separable mutant lineage are different steps. [Fig. 1b]",
+                      "text": "A virus lineage carrying the restoring change can pass the GFP reporter trait to newly infected cells. A green-positive well is a clue that at least one compatible variant is present, but may contain several lineages. Finding a glowing well and recovering a separable mutant lineage are different steps. [Fig. 1b]",
                       "panels": {
                         "frame": {
                           "phase": 2

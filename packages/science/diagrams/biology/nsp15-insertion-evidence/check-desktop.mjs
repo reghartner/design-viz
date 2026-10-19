@@ -16,7 +16,19 @@ try {
  for(const width of [1280,1440])for(const reducedMotion of ['no-preference','reduce']){
   const page=await browser.newPage({viewport:{width,height:900},reducedMotion});
   const errors=[];
-  await page.addInitScript(()=>localStorage.setItem('dv_tour_v1','done'));
+  await page.addInitScript(()=>{
+   localStorage.setItem('dv_tour_v1','done');
+   // Measure the actual raster-to-CSS transform, not only the authored viewport.
+   const ellipse=CanvasRenderingContext2D.prototype.ellipse;
+   CanvasRenderingContext2D.prototype.ellipse=function(x,y,rx,ry,...rest){
+    if(x===646&&y===207&&this.canvas.closest('.nspstory[data-scene="reporter"]')){
+     const transform=this.getTransform(),rect=this.canvas.getBoundingClientRect();
+     window.reporterPaintGeometry={scaleX:Math.hypot(transform.a,transform.b)*rect.width/this.canvas.width,
+      scaleY:Math.hypot(transform.c,transform.d)*rect.height/this.canvas.height,frameWidth:rect.width,frameHeight:rect.height};
+    }
+    return ellipse.call(this,x,y,rx,ry,...rest);
+   };
+  });
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.route(/^https?:\/\//,route=>{errors.push('Unexpected network: '+route.request().url());return route.abort();});
@@ -39,6 +51,11 @@ try {
      await expect(canvas).toHaveAttribute('data-canvas-live','true');
      await expect(canvas).toHaveAttribute('data-canvas-running',String(reducedMotion==='no-preference'));
      const box=await canvas.boundingBox();assert(box.width>300&&box.height>120,'Canvas must have usable desktop geometry');
+     if(section.id==='green-reporter'){
+      const geometry=await page.evaluate(()=>window.reporterPaintGeometry);
+      assert(geometry&&Math.abs(geometry.scaleX/geometry.scaleY-1)<.003,'Reporter glyphs and type must preserve equal X/Y scale in the actual CSS frame');
+      assert(geometry.scaleX*760<=geometry.frameWidth+1&&geometry.scaleY*410<=geometry.frameHeight+1,'The complete Reporter drawing must fit without cropping');
+     }
      if(reducedMotion==='reduce'){
       await expect(scene.locator('[data-nsp-action="play"]')).toBeDisabled();
       await expect(canvas).toHaveAttribute('data-canvas-progress','1.000');

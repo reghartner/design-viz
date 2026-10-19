@@ -101,7 +101,7 @@ test('ambient authoring settings validate, serialize and visibly control atmosph
 });
 
 test('lessons expose truthful final frames, accessible summaries and escaped captions', () => {
-  assert.match(screenFrame(C.nspstoryHTML(panel('reporter'),{phase:0})),/GFP reporter off/);
+  assert.match(screenFrame(C.nspstoryHTML(panel('reporter'),{phase:0})),/GFP reporter is off/);
   assert.match(C.nspstoryHTML(panel('reporter'),{phase:2}),/Newly infected cells/);
   const wells=screenFrame(C.nspstoryHTML(panel('dilution'),{phase:1}));
   assert.equal(count(wells,/data-well="[1-9]"/g),9);
@@ -237,12 +237,53 @@ test('Canvas paints synchronously without rAF and retires live reduced-motion li
   C.requestAnimationFrame=originalRAF;
 });
 
+test('lazy Canvas observes reduced motion while unmounted with one lifetime listener', () => {
+  const original={raf:C.requestAnimationFrame,caf:C.cancelAnimationFrame,resize:C.ResizeObserver,intersection:C.IntersectionObserver};
+  try {
+    for(const legacy of [false,true]){
+      const listeners=new Set(),frames=new Map(),changes=[],painted=[];
+      let next=0,intersect,contexts=0,disconnected=false;
+      const media={matches:false};
+      if(legacy){media.addListener=fn=>listeners.add(fn);media.removeListener=fn=>listeners.delete(fn);}
+      else{media.addEventListener=(type,fn)=>listeners.add(fn);media.removeEventListener=(type,fn)=>listeners.delete(fn);}
+      const change=value=>{media.matches=value;for(const listener of listeners)listener({matches:value});};
+      C.requestAnimationFrame=fn=>{frames.set(++next,fn);return next;};C.cancelAnimationFrame=id=>frames.delete(id);
+      C.ResizeObserver=class{observe(){}disconnect(){}};
+      C.IntersectionObserver=class{constructor(fn){intersect=shown=>fn([{target:canvas,isIntersecting:shown}]);}observe(){}disconnect(){disconnected=true;}};
+      const canvas={isConnected:true,ownerDocument:{defaultView:{matchMedia:()=>media}},getClientRects:()=>[{}],closest:()=>null,
+        getBoundingClientRect:()=>({width:500,height:300}),getContext:()=>{contexts++;return {setTransform(){}};},setAttribute(){}};
+      const host={saved:{prefs:{intensity:'medium'},playing:true,elapsed:55,reduced:true}};
+      const proxy=C.scienceLazyCanvasScene(host,canvas,{memoryKey:'saved',render:(ctx,state)=>painted.push(state.reduced),onStateChange:state=>changes.push(state.reduced)});
+      assert.equal(proxy.state.reduced,false,'Current media preference overrides stale saved state');
+      assert.equal(proxy.canAnimate(),true);assert.equal(listeners.size,1);assert.equal(contexts,0);
+      change(true);
+      assert.equal(proxy.state.reduced,true);assert.equal(proxy.canAnimate(),false);assert.equal(changes.at(-1),true);
+      assert.equal(frames.size,0);assert.equal(contexts,0,'An offscreen preference change must not mount a drawing context');
+      proxy.pause();proxy.play();assert.equal(proxy.state.playing,false,'Reduced motion prevents Play even without an inner controller');
+      change(false);proxy.play();intersect(true);
+      assert.equal(proxy.live(),true);assert.equal(painted.at(-1),false);assert.equal(proxy.state.elapsed,55);
+      assert.equal(listeners.size,1,'Mount must not add an inner media listener');
+      change(true);
+      for(const [id,fn] of [...frames]){frames.delete(id);fn(16);}
+      assert.equal(proxy.canAnimate(),false);assert.equal(painted.at(-1),true);assert.equal(frames.size,0);
+      intersect(false);assert.equal(proxy.live(),false);assert.equal(listeners.size,1);
+      change(false);assert.equal(proxy.canAnimate(),true);assert.equal(changes.at(-1),false);assert.equal(frames.size,0);
+      change(true);intersect(true);
+      assert.equal(painted.at(-1),true,'Remount paints the latest reduced-motion state synchronously');
+      assert.equal(listeners.size,1);assert.equal(frames.size,0);
+      const lateListener=[...listeners][0];proxy.destroy();proxy.destroy();
+      assert.equal(disconnected,true);assert.equal(listeners.size,0);assert.equal(frames.size,0);assert.equal(proxy.canAnimate(),false);
+      const count=changes.length;lateListener({matches:false});assert.equal(changes.length,count,'Queued media events cannot notify a destroyed proxy');
+    }
+  } finally { C.requestAnimationFrame=original.raf;C.cancelAnimationFrame=original.caf;C.ResizeObserver=original.resize;C.IntersectionObserver=original.intersection; }
+});
+
 test('teaching motion ends once, while reduced-motion source transit uses the terminal endpoint', () => {
   const lines=[];
   const ctx=new Proxy({createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}}),moveTo:(x,y)=>lines.push([x,y])},{get:(target,key)=>target[key]||(()=>{})});
   const state={width:600,height:360,elapsed:15000,reduced:false,prefs:{intensity:'quiet',tempo:'fast'}};
   C.nspstoryDrawReporterCanvas(ctx,state,C.nspstoryModel(panel('reporter'),{phase:0}),null);
-  assert.equal(state.canvasProgress,1,'Completed reporter arrival cannot restart on later decorative loops');
+  assert.equal(state.canvasProgress,1,'Reporter grouping is complete; decorative light must not hide its geometry');
   C.nspstoryDrawDilution(ctx,state,C.nspstoryModel(panel('dilution'),{phase:1}),null);
   assert.equal(state.canvasProgress,1,'Completed dilution spread cannot restart on later decorative loops');
   state.reduced=true;state.elapsed=0;
@@ -262,4 +303,58 @@ test('travelling lineage shapes agree with every fixed well, including empty wel
     assert.equal(travellers.length,9);
     for(const well of travellers)assert.deepEqual(well.actual,well.expected,'Tokens cannot change identity or enter an authored empty well');
   } finally { C.nspstoryCurve=original.curve;C.nspstoryCanvasToken=original.token;C.nspstoryDrawWell=original.well; }
+});
+
+test('reporter groups from the upstream start without losing the downstream GFP message', () => {
+  for(let phase=0;phase<4;phase++){
+    const reading=plain(C.nspstoryReporterReading(phase)),[shifted,restored]=reading.rows;
+    assert.deepEqual(shifted.gfp,restored.gfp,'Only upstream schematic length changes; GFP glyphs must remain identical');
+    assert.deepEqual(restored.leader.slice(0,shifted.leader.length),shifted.leader,'The insertion preserves the existing leader symbols');
+    assert.deepEqual(restored.added,[7,8],'Only the extra leader symbols carry addition marks');
+    assert.equal(shifted.boundary%3,1,'Shifted GFP boundary falls inside a triplet');
+    assert.equal(restored.boundary%3,0,'Restored GFP boundary begins a triplet');
+    for(const row of reading.rows){
+      assert.deepEqual(row.tokens.slice(row.boundary),row.gfp);
+      assert.deepEqual(row.groups.map(group=>group.start),row.groups.map((group,index)=>index*3),'Grouping is anchored at START, never restarted at GFP');
+    }
+    assert.equal(reading.green,phase>0);
+    assert.equal(reading.rows.find(row=>row.active).id,phase===0?'shifted':'restored');
+    const accessible=screenFrame(C.nspstoryHTML(panel('reporter'),{phase}));
+    for(const phrase of [/three-letter groups/,/GFP symbols are unchanged/,/not a sequence or actual mutation size/,/not a direct NSP15 measurement/])assert.match(accessible,phrase);
+  }
+});
+
+test('reporter dark and green Canvas labels stay truthful in live and reduced-motion scenes', () => {
+  for(const reduced of [false,true])for(let phase=0;phase<4;phase++){
+    const labels=[];
+    const ctx=new Proxy({fillText:text=>labels.push(text),createRadialGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]||(()=>{})});
+    const state={width:760,height:410,elapsed:0,reduced,prefs:{intensity:'medium',tempo:'slow'}};
+    C.nspstoryDrawReporterCanvas(ctx,state,C.nspstoryModel(panel('reporter'),{phase}),null);
+    assert.ok(labels.includes('START'));assert.ok(labels.includes('leader'));assert.ok(labels.includes('GFP region'));
+    assert.equal(labels.includes('GFP ON'),phase>0);
+    assert.equal(labels.includes('Cell makes functional GFP'),phase>0);
+    assert.equal(labels.includes('GFP OFF'),phase===0);
+    assert.equal(labels.includes('No functional GFP'),phase===0);
+    assert.equal(state.canvasProgress,1,'All grouping geometry is visible even at the first frame');
+  }
+  const printed=printFrame(C.nspstoryHTML(panel('reporter'),{phase:0}));
+  for(const phrase of [/SHIFTED LEADER/,/GFP OUT OF FRAME/,/GFP IN FRAME/,/START/,/GFP region/,/direct NSP15 measurement/])assert.match(printed,phrase);
+  assert.equal(count(printed,/class="nspstory-reading-group"/g),14,'Both strips retain their triplet boxes in print');
+  assert.equal(count(printed,/class="nspstory-added-symbol"/g),2,'The added symbols remain identifiable in print');
+  assert.match(printed,/Insertion = extra RNA letters/);
+  assert.match(readStyles('style.core.css'),/\.nspstory-reading-group\{[^}]*stroke:var\(--ns-line\)/,'Print boxes must remain distinct from the strip background');
+});
+
+test('Reporter contains its authored aspect without stretching at desktop and resized frame dimensions', () => {
+  for(const [width,height] of [[504,232],[598,251],[860,282],[420,600],[760,410]])for(const reduced of [false,true]){
+    const viewport=plain(C.nspstoryReporterViewport(width,height)),scales=[],translations=[];
+    assert.ok(viewport.width<=width+.001&&viewport.height<=height+.001,'The complete scene fits its frame');
+    assert.ok(Math.abs(viewport.width/viewport.height-760/410)<1e-10);
+    assert.ok(Math.abs(viewport.x*2+viewport.width-width)<1e-10);
+    assert.ok(Math.abs(viewport.y*2+viewport.height-height)<1e-10);
+    const ctx=new Proxy({scale:(x,y)=>scales.push([x,y]),translate:(x,y)=>translations.push([x,y]),createRadialGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]||(()=>{})});
+    C.nspstoryDrawReporterCanvas(ctx,{width,height,elapsed:0,reduced,prefs:{}},C.nspstoryModel(panel('reporter'),{phase:1}),null);
+    assert.deepEqual(scales,[[viewport.scale,viewport.scale]],'Glyphs, cells and text use one identical X/Y scale');
+    assert.deepEqual(translations,[[viewport.x,viewport.y]],'Unused space is balanced around the scene');
+  }
 });

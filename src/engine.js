@@ -2642,12 +2642,14 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    function axis(start,size,full,available,legacy){
-      var lead=(start-full)*scale,extent=size*scale,room=Math.max(available,extent);
+    // The SVG clips at its viewBox, so the framed box never extends past it.
+    function axis(start,size,full,length,available,legacy){
+      var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
+      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.max(available,extent);
       return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
     }
-    var across=axis(ink.x,ink.w,box.x,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
-        down=axis(ink.y,ink.h,box.y,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;});
+    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
+        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;});
     board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
     board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
     board.classList.add('board-content-framed');

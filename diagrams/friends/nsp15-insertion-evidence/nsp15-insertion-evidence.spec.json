@@ -51,13 +51,30 @@
             {
               "id": "frame",
               "type": "nspstory",
-              "title": "THE GREEN CLUE · follow the reporter trait",
+              "title": "ILLUSTRATIVE · green clue and lineage",
               "scene": "reporter",
               "ambient": true,
               "ambientIntensity": "medium",
               "ambientTempo": "slow",
               "initial": {
                 "phase": 0
+              }
+            },
+            {
+              "id": "reporter-evidence",
+              "type": "table",
+              "title": "EVIDENCE / LIMITS · Fig. 1",
+              "columns": [
+                {"id": "layer", "label": "Layer"},
+                {"id": "reading", "label": "Published reading"}
+              ],
+              "initial": {
+                "rows": [
+                  {"id": "isolates", "cells": {"layer": "Observed", "reading": "18 WT; 16 inactive GFP-positive isolates examined."}},
+                  {"id": "sequence", "cells": {"layer": "Sequence", "reading": "Insertions: 8/18 WT; none >2 nt in inactive."}},
+                  {"id": "limit", "cells": {"layer": "Limit", "reading": "Green is not NSP15-specific."}}
+                ],
+                "note": "Fig. 1c,d; Results 87–104. Selected isolates, not all viral genomes."
               }
             }
           ],
@@ -117,7 +134,14 @@
                 "panel": "frame",
                 "x": 0,
                 "y": 4,
-                "w": 24,
+                "w": 17,
+                "h": 11
+              },
+              {
+                "panel": "reporter-evidence",
+                "x": 17,
+                "y": 4,
+                "w": 7,
                 "h": 11
               },
               {
@@ -133,10 +157,10 @@
       },
       {
         "id": "limiting-dilution",
-        "heading": "02 / Fewer founders make the green trait traceable",
+        "heading": "02 / Make a crowd easier to follow",
         "accent": "green",
         "text": [
-          "Limiting dilution spreads a mixed population so that fewer lineages start each positive culture. It helps separate a rare reporter-restoring variant from its neighbors. This is a conceptual explanation, not an experimental recipe."
+          "The illustrative panel makes the crowd-to-wells idea visible. The adjacent evidence/limits panel keeps reporter selection, sequence confirmation, and the 8/18 denominator separate. This is not an experimental recipe."
         ],
         "diagram": {
           "view": "step",
@@ -166,16 +190,33 @@
           {
             "id": "founders",
             "type": "nspstory",
-              "title": "FROM A MIXTURE TO A TRACEABLE LINEAGE",
+              "title": "ILLUSTRATIVE · crowd → candidate well",
               "scene": "dilution",
               "ambient": true,
-              "ambientIntensity": "quiet",
+              "ambientIntensity": "medium",
               "ambientTempo": "slow",
               "initial": {
-              "phase": 0
+                "phase": 0
+              }
+            },
+            {
+              "id": "dilution-evidence",
+              "type": "table",
+              "title": "EVIDENCE / LIMITS · assay",
+              "columns": [
+                {"id": "layer", "label": "Layer"},
+                {"id": "reading", "label": "What it supports"}
+              ],
+              "initial": {
+                "rows": [
+                  {"id": "confirm", "cells": {"layer": "Sequence", "reading": "Links a recovered phenotype to its reporter change."}},
+                  {"id": "selection", "cells": {"layer": "Selection", "reading": "Only GFP-restoring changes enter this screen."}},
+                  {"id": "denominator", "cells": {"layer": "Denominator", "reading": "8/18 is examined WT green isolates, not all genomes."}}
+                ],
+                "note": "Fig. 1b–d; Results 87–124. Wells are illustrative—not counts or probabilities."
+              }
             }
-          }
-        ],
+          ],
           "steps": [
             {
               "id": "mixture",
@@ -189,7 +230,7 @@
             },
             {
               "id": "separate",
-              "text": "With fewer founders, a positive culture is more likely to descend from a single lineage. That reduces ambiguity about which genome carries the green-reporting trait. Some cultures receive no founder. [Fig. 1b]",
+              "text": "The schematic fans the mixture into nine example wells: empty, mixed, or single-looking candidates. These are illustrative outcomes, not counts, probabilities, or instructions. [Fig. 1b]",
               "panels": {
                 "founders": {
                   "phase": 1
@@ -199,7 +240,7 @@
             },
             {
               "id": "verify",
-              "text": "The authors followed green-positive isolates and checked the reporter region’s sequence. This connects a phenotype to a recovered genotype. Dilution helps separation; sequencing identifies the change. [Fig. 1c,d]",
+              "text": "A single-looking well is a candidate, not proof of one lineage. The authors followed green-positive isolates and checked the reporter region’s sequence, connecting a recovered phenotype to its reporter change. [Fig. 1c,d]",
               "panels": {
                 "founders": {
                   "phase": 2
@@ -232,7 +273,14 @@
                 "panel": "founders",
                 "x": 0,
                 "y": 4,
-                "w": 24,
+                "w": 17,
+                "h": 11
+              },
+              {
+                "panel": "dilution-evidence",
+                "x": 17,
+                "y": 4,
+                "w": 7,
                 "h": 11
               },
               {
@@ -537,7 +585,7 @@
               "title": "ACTIVITY CONTRAST · published rates, shared scale",
               "scene": "evidence",
               "ambient": false,
-              "ambientIntensity": "quiet",
+              "ambientIntensity": "medium",
               "ambientTempo": "slow",
               "initial": {
                 "phase": 0
@@ -710,7 +758,7 @@
         "heading": "05 / Where did the added material come from?",
         "accent": "cyan",
         "text": [
-          "A donor is a matching source region; a recipient is the insertion location. Dashed links mean inferred origin. Only the last step animates a proposed transfer, with its uncertainty kept on screen."
+          "The illustrative panel separates source, recipient, and proposed transit. The adjacent evidence panel retains the published nested counts and source note. Dashed links mean inferred origin; only the last step animates a proposed transit."
         ],
         "diagram": {
           "view": "step",
@@ -742,10 +790,10 @@
             {
               "id": "map",
               "type": "nspstory",
-              "title": "SOURCE → INSERTION · evidence and proposed interpretation",
+              "title": "ILLUSTRATIVE · source → insertion proposal",
               "scene": "origin",
               "ambient": true,
-              "ambientIntensity": "quiet",
+              "ambientIntensity": "medium",
               "ambientTempo": "slow",
               "initial": {
                 "phase": 0
@@ -754,7 +802,7 @@
             {
               "id": "origin",
               "type": "funnel",
-              "title": "HCoV-OC43 WT · nested sets",
+              "title": "EVIDENCE · HCoV-OC43 WT nested counts",
               "unit": "unique insertion events",
               "stages": [
                 {
@@ -784,7 +832,7 @@
           "steps": [
             {
               "id": "define",
-              "text": "Tandem means a neighboring duplication. Distal means the matching source is elsewhere. Mapping gives an inferred origin, not a direct view of molecular transfer. [Extended Data Fig. 1b]",
+              "text": "Solid marks locate a matching source and the recipient’s unexpected patch. The source boundary is conceptual: mapping gives an inferred origin, not a direct view of fragment generation or transfer. [Extended Data Fig. 1b]",
               "panels": {
                 "map": {
                   "phase": 0
@@ -814,7 +862,7 @@
             },
             {
               "id": "model",
-              "text": "Together, activity dependence and source/recipient patterns support the authors’ fragment-generation model. The exact incorporation mechanism remains unresolved; the chart does not establish a unique biochemical route. [Discussion]",
+              "text": "Together, activity dependence and source/recipient patterns support the authors’ proposed fragment-generation model. The transit shown here was not observed. Incorporation remains unresolved; the chart does not establish a unique biochemical route. [Discussion]",
               "panels": {
                 "map": {
                   "phase": 3

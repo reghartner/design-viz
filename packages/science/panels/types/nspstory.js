@@ -242,7 +242,7 @@ function nspstoryDrawDilution(ctx,state,m,image) {
     var col=i%3,row=Math.floor(i/3),end={x:w*cols[col],y:h*rows[row]},start={x:w*(col===0?.1:col===2?.9:row%2?.12:.88),y:h*.19};
     var side=col===0?-.04:col===2?.04:(start.x<w/2?.06:-.06),cp1={x:start.x+w*side,y:h*.42},cp2={x:end.x+(start.x<w/2?-w*.07:w*.07),y:end.y-h*.08};
     ctx.save();ctx.globalAlpha=.08+.36*routeAlpha;ctx.strokeStyle=pathColors[col];ctx.lineWidth=1.2+bloom*1.4;ctx.shadowColor=pathColors[col];ctx.shadowBlur=6+bloom*13;ctx.setLineDash([2,8]);ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,end.x,end.y);ctx.stroke();ctx.restore();
-    if(authored>=900 && authored<3000){var local=Math.max(0,Math.min(1,travel-(i%3)*.075));if(local>0&&local<1){var point=nspstoryCurve(local,start,cp1,cp2,end);nspstoryCanvasToken(ctx,point.x,point.y,i%3,Math.max(4,wellRx*.1),1,bloom+.35);}}
+    if(authored>=900 && authored<3000){var local=Math.max(0,Math.min(1,travel-(i%3)*.075));if(local>0&&local<1){var point=nspstoryCurve(local,start,cp1,cp2,end);NSPSTORY_WELLS[i].shapes.forEach(function(shape,index){nspstoryCanvasToken(ctx,point.x+(index?6:0),point.y,shape,Math.max(4,wellRx*.1),1,bloom+.35);});}}
     nspstoryDrawWell(ctx,end.x,end.y,wellRx,NSPSTORY_WELLS[i],phase===2&&i===4,still?1:Math.max(.32,arrival),bloom);
   }
   ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.font='500 '+Math.max(9,Math.min(12,w/96))+'px "IBM Plex Sans",sans-serif';ctx.fillStyle='#9fb6c1';ctx.fillText('Shapes = lineages · positions and counts are not data',Math.max(12,w*.025),h*.96,w*.7);

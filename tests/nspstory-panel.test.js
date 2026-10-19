@@ -249,3 +249,17 @@ test('teaching motion ends once, while reduced-motion source transit uses the te
   C.nspstoryDrawOriginCanvas(ctx,state,C.nspstoryModel(panel('origin'),{phase:3}),null);
   assert.deepEqual(lines.at(-1),[600*.84-22,360*.63-360*.05],'Reduced motion places the proposed fragment at its terminal endpoint');
 });
+
+test('travelling lineage shapes agree with every fixed well, including empty wells', () => {
+  const original={curve:C.nspstoryCurve,token:C.nspstoryCanvasToken,well:C.nspstoryDrawWell};
+  const travellers=[];let current=[];
+  const ctx=new Proxy({createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]||(()=>{})});
+  try {
+    C.nspstoryCurve=(...args)=>{current=[];return original.curve(...args);};
+    C.nspstoryCanvasToken=(ctx,x,y,shape)=>current.push(shape);
+    C.nspstoryDrawWell=(ctx,x,y,rx,well)=>travellers.push({actual:current.slice(),expected:plain(well.shapes)});
+    C.nspstoryDrawDilution(ctx,{width:600,height:360,elapsed:1800,reduced:false,prefs:{}},C.nspstoryModel(panel('dilution'),{phase:1}),null);
+    assert.equal(travellers.length,9);
+    for(const well of travellers)assert.deepEqual(well.actual,well.expected,'Tokens cannot change identity or enter an authored empty well');
+  } finally { C.nspstoryCurve=original.curve;C.nspstoryCanvasToken=original.token;C.nspstoryDrawWell=original.well; }
+});

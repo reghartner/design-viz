@@ -217,14 +217,15 @@ function nspstoryDrawWell(ctx,x,y,rx,well,focus,arrival,bloom) {
 function nspstoryDrawDilution(ctx,state,m,image) {
   var w=state.width,h=state.height,prefs=state.prefs,intensity=prefs.intensity || m.ambientIntensity;
   var duration={slow:5300,normal:4000,fast:3200}[prefs.tempo || m.ambientTempo] || 4000;
-  var still=state.reduced || !m.ambient, authored=still?4000:(state.elapsed%duration)/duration*4000;
+  var still=state.reduced || !m.ambient, authored=still || m.phase!==1?4000:Math.min(4000,state.elapsed);
   var bloom=intensity==='lively'?1:intensity==='medium'?.48:0, phase=m.phase;
   ctx.clearRect(0,0,w,h);ctx.fillStyle='#030d18';ctx.fillRect(0,0,w,h);
   if(image && image.complete && image.naturalWidth){
     var scale=Math.max(w/image.naturalWidth,h/image.naturalHeight),iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;
     ctx.save();ctx.globalAlpha=intensity==='lively'?.66:intensity==='medium'?.5:.32;ctx.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();
   }
-  var drift=still?0:Math.sin(state.elapsed/2100)*w*.012;
+  var atmosphereTime=state.elapsed*({slow:.72,normal:1,fast:1.34}[prefs.tempo]||1);
+  var drift=still?0:Math.sin(atmosphereTime/2100)*w*.012;
   [[.19,.18,'rgba(56,230,195,.18)'],[.78,.2,'rgba(168,118,255,.19)'],[.52,.05,'rgba(42,139,214,.12)']].forEach(function(g,i){var x=w*g[0]+drift*(i-1),y=h*g[1];var grad=ctx.createRadialGradient(x,y,0,x,y,w*.25);grad.addColorStop(0,g[2]);grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);});
   var particleAlpha=intensity==='quiet'?.18:intensity==='lively'?.58:.36;
   for(var p=0;p<32;p++){var seed=(p*47)%101/101,x=(seed*w+(!still?Math.sin(state.elapsed/1300+p)*12:0))%w,y=((p*83)%97)/97*h*.58;ctx.fillStyle=p%3===0?'#b18aff':p%3===1?'#53e6cd':'#8ccde8';ctx.globalAlpha=particleAlpha*(.3+(p%5)/7);ctx.beginPath();ctx.arc(x,y,1+(p%3)*.55,0,Math.PI*2);ctx.fill();}
@@ -233,7 +234,7 @@ function nspstoryDrawDilution(ctx,state,m,image) {
   for(var c=0;c<44;c++){var cx=cloudLeft+((c*73)%101)/101*cloudWidth,cy=cloudY+Math.sin(c*2.1)*h*.035+((c*31)%17)/17*h*.08;nspstoryCanvasToken(ctx,cx,cy,c%3,Math.max(3.5,Math.min(7,w/150)),.35+(c%7)/11,bloom);}
   var clearing=ctx.createRadialGradient(w/2,h*.3,0,w/2,h*.3,w*.4);clearing.addColorStop(0,'rgba(3,13,24,.99)');clearing.addColorStop(.55,'rgba(3,13,24,.9)');clearing.addColorStop(1,'rgba(3,13,24,0)');ctx.fillStyle=clearing;ctx.fillRect(0,h*.08,w,h*.42);
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#bfd5df';ctx.font='600 '+Math.max(10,Math.min(12,w/92))+'px "IBM Plex Mono",monospace';ctx.letterSpacing='2px';ctx.globalAlpha=.84;ctx.fillText('ILLUSTRATIVE · FIXED IDENTITIES AND OUTCOMES',w/2,h*.155);
-  var headline=Math.max(34,Math.min(48,w/21));ctx.font='500 '+headline+'px Georgia,"Times New Roman",serif';ctx.fillStyle='#f4fbff';ctx.globalAlpha=1;ctx.fillText('Make a crowd',w/2,h*.245);ctx.fillText('easier to follow.',w/2,h*.335);
+  var headline=Math.max(20,Math.min(44,w/21,h*.085));ctx.letterSpacing='0px';ctx.font='500 '+headline+'px Georgia,"Times New Roman",serif';ctx.fillStyle='#f4fbff';ctx.globalAlpha=1;ctx.fillText('Make a crowd',w/2,h*.245);ctx.fillText('easier to follow.',w/2,h*.335);
   ctx.font='500 '+Math.max(15,headline*.36)+'px Georgia,"Times New Roman",serif';ctx.fillStyle='#88eed4';ctx.fillText(phase<2?'One authored spread · nine fixed examples':phase===2?'Follow a candidate · then sequence-check':'The green screen selects only one slice',w/2,h*.415);
   var cols=[.27,.5,.73],rows=[.54,.68,.81],wellRx=Math.min(48,w*.09,h*.125),routeAlpha=nspstoryEase((authored-450)/750),travel=nspstoryEase((authored-900)/1800),arrival=nspstoryEase((authored-2400)/900);
   var pathColors=['#53e6cd','#b18aff','#ffc66d'];
@@ -244,8 +245,8 @@ function nspstoryDrawDilution(ctx,state,m,image) {
     if(authored>=900 && authored<3000){var local=Math.max(0,Math.min(1,travel-(i%3)*.075));if(local>0&&local<1){var point=nspstoryCurve(local,start,cp1,cp2,end);nspstoryCanvasToken(ctx,point.x,point.y,i%3,Math.max(4,wellRx*.1),1,bloom+.35);}}
     nspstoryDrawWell(ctx,end.x,end.y,wellRx,NSPSTORY_WELLS[i],phase===2&&i===4,still?1:Math.max(.32,arrival),bloom);
   }
-  ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.font='500 '+Math.max(10,Math.min(12,w/96))+'px "IBM Plex Sans",sans-serif';ctx.fillStyle='#9fb6c1';ctx.fillText('Shapes identify lineages · positions and counts are not data',Math.max(18,w*.025),h*.475);
-  ctx.textAlign='right';ctx.fillStyle=phase===3?'#ffc66d':'#91a8b2';ctx.fillText(phase===3?'SELECTED SLICE · SEQUENCE CONFIRMS':'candidate ≠ proof',w-Math.max(18,w*.025),h*.475);
+  ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.font='500 '+Math.max(9,Math.min(12,w/96))+'px "IBM Plex Sans",sans-serif';ctx.fillStyle='#9fb6c1';ctx.fillText('Shapes = lineages · positions and counts are not data',Math.max(12,w*.025),h*.96,w*.7);
+  ctx.textAlign='right';ctx.fillStyle=phase===3?'#ffc66d':'#91a8b2';ctx.fillText('candidate ≠ proof',w-Math.max(12,w*.025),h*.96,w*.23);
   state.canvasProgress=authored/4000;
 }
 function nspstoryCanvasBackdrop(ctx,state,image,intensity){
@@ -257,7 +258,7 @@ function nspstoryCanvasBackdrop(ctx,state,image,intensity){
 }
 function nspstoryDrawReporterCanvas(ctx,state,m,image){
   var w=state.width,h=state.height,bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),phase=m.phase;
-  var duration={slow:5300,normal:4000,fast:3200}[state.prefs.tempo]||4000,authored=state.reduced?duration:(state.elapsed%duration);
+  var duration=4000,authored=state.reduced || !m.ambient || phase!==0?duration:Math.min(duration,state.elapsed);
   var clearing=ctx.createRadialGradient(w*.5,h*.28,0,w*.5,h*.28,w*.42);clearing.addColorStop(0,'rgba(3,13,24,.98)');clearing.addColorStop(1,'rgba(3,13,24,0)');ctx.fillStyle=clearing;ctx.fillRect(0,0,w,h*.55);
   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#bed3dc';ctx.font='600 11px "IBM Plex Mono",monospace';ctx.fillText('ILLUSTRATIVE · REPORTER SIGNAL IS NOT THE VIRUS',w/2,h*.13);
   var fs=Math.min(47,Math.max(32,w/20));ctx.font='500 '+fs+'px Georgia,serif';ctx.fillStyle='#f6fbff';ctx.fillText('A green cell is a clue.',w/2,h*.25);ctx.font='500 '+Math.max(16,fs*.38)+'px Georgia,serif';ctx.fillStyle='#8cebd1';ctx.fillText(phase===0?'Arrival can leave the reporter dark.':phase===1?'A rare frame-restoring change permits GFP.':phase===2?'The reporter phenotype can travel with a lineage.':'Sequence is the check.',w/2,h*.34);
@@ -274,7 +275,7 @@ function nspstoryDrawOriginCanvas(ctx,state,m,image){
   var sy=h*.63,lx=w*.16,rx=w*.84;ctx.lineCap='round';ctx.strokeStyle='#526f83';ctx.lineWidth=17;ctx.beginPath();ctx.moveTo(w*.08,sy);ctx.bezierCurveTo(w*.32,sy-h*.05,w*.67,sy+h*.05,w*.92,sy);ctx.stroke();ctx.strokeStyle='#b18aff';ctx.lineWidth=15;ctx.beginPath();ctx.moveTo(lx-w*.055,sy);ctx.lineTo(lx+w*.055,sy);ctx.stroke();ctx.strokeStyle='#53e6cd';ctx.beginPath();ctx.moveTo(rx-w*.045,sy);ctx.lineTo(rx+w*.045,sy);ctx.stroke();
   ctx.setLineDash([8,9]);ctx.strokeStyle='#ffc66d';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,sy-h*.05);ctx.bezierCurveTo(w*.34,h*.42,w*.66,h*.42,rx,sy-h*.05);ctx.stroke();ctx.setLineDash([]);
   ctx.font='600 12px "IBM Plex Mono",monospace';ctx.fillStyle='#ddd4ff';ctx.textAlign='center';ctx.fillText('MATCHING SOURCE',lx,sy+h*.13);ctx.fillStyle='#b3f7df';ctx.fillText('RECIPIENT / INSERTION',rx,sy+h*.13);
-  if(phase===3){var travel=nspstoryEase(Math.min(1,state.elapsed/1500)),p=nspstoryCurve(travel,{x:lx,y:sy-h*.05},{x:w*.34,y:h*.42},{x:w*.66,y:h*.42},{x:rx,y:sy-h*.05});ctx.strokeStyle='#d8cbff';ctx.lineWidth=10;ctx.shadowColor='#b18aff';ctx.shadowBlur=12+bloom*12;ctx.beginPath();ctx.moveTo(p.x-22,p.y);ctx.lineTo(p.x+22,p.y);ctx.stroke();ctx.shadowBlur=0;}
+  if(phase===3){var travel=nspstoryEase(state.reduced || !m.ambient?1:Math.min(1,state.elapsed/1500)),p=nspstoryCurve(travel,{x:lx,y:sy-h*.05},{x:w*.34,y:h*.42},{x:w*.66,y:h*.42},{x:rx,y:sy-h*.05});ctx.strokeStyle='#d8cbff';ctx.lineWidth=10;ctx.shadowColor='#b18aff';ctx.shadowBlur=12+bloom*12;ctx.beginPath();ctx.moveTo(p.x-22,p.y);ctx.lineTo(p.x+22,p.y);ctx.stroke();ctx.shadowBlur=0;}
   ctx.textAlign='left';ctx.fillStyle='#a8bec8';ctx.font='500 12px "IBM Plex Sans",sans-serif';ctx.fillText('Solid marks = observed sequence match and insertion',w*.05,h*.9);ctx.textAlign='right';ctx.fillStyle='#ffc66d';ctx.fillText('incorporation unresolved',w*.95,h*.9);state.canvasProgress=phase===3?Math.min(1,state.elapsed/1500):1;
 }
 function nspstoryMountCanvas(host,panel,m) {
@@ -282,12 +283,12 @@ function nspstoryMountCanvas(host,panel,m) {
   var view=canvas.ownerDocument && canvas.ownerDocument.defaultView,image=view && view.Image ? new view.Image() : null;
   var prefs=host._nspstoryPrefs;
   if(!prefs || prefs.scene!==m.scene)prefs=host._nspstoryPrefs={scene:m.scene,intensity:panel.ambientIntensity || 'quiet',tempo:panel.ambientTempo || 'slow',playing:true};
-  var durations={slow:5300,normal:4000,fast:3200};
+  if(host._nspstoryPhase!==m.phase){delete host._nspstoryCanvasMemory;host._nspstoryPhase=m.phase;}
   var renderScene=m.scene==='reporter'?nspstoryDrawReporterCanvas:m.scene==='origin'?nspstoryDrawOriginCanvas:nspstoryDrawDilution;
-  var controller=scienceLazyCanvasScene(host,canvas,{memoryKey:'_nspstoryCanvasMemory',prefs:{intensity:prefs.intensity,tempo:prefs.tempo},shouldAnimate:function(){return m.ambient;},beforePrefs:function(state,next){
-    if(m.scene!=='origin' && next.tempo && next.tempo!==state.prefs.tempo){var oldDuration=durations[state.prefs.tempo] || 4000,newDuration=durations[next.tempo] || 4000;state.elapsed=(state.elapsed%oldDuration)/oldDuration*newDuration;}
-  },onStateChange:function(state){canvas.setAttribute('data-canvas-reduced',String(state.reduced));},render:function(ctx,state){renderScene(ctx,state,m,image);canvas.setAttribute('data-canvas-progress',state.canvasProgress.toFixed(3));}});
+  var controller=scienceLazyCanvasScene(host,canvas,{memoryKey:'_nspstoryCanvasMemory',prefs:{intensity:prefs.intensity,tempo:prefs.tempo},shouldAnimate:function(){return m.ambient;},onStateChange:function(state){canvas.setAttribute('data-canvas-reduced',String(state.reduced));if(host._nspstoryRefreshControls)host._nspstoryRefreshControls(state.reduced);},render:function(ctx,state){renderScene(ctx,state,m,image);canvas.setAttribute('data-canvas-reduced',String(state.reduced));canvas.setAttribute('data-canvas-progress',(state.reduced?1:state.canvasProgress).toFixed(3));}});
   if(image){image.onload=function(){if(controller)controller.requestDraw();};image.src=NSPSTORY_ATMOSPHERE;}
+  var cleanup=host._panelMotionCleanup;
+  host._panelMotionCleanup=function(){if(image)image.onload=null;if(cleanup)cleanup();host._nspstoryRefreshControls=null;};
   host._nspstoryCanvas=controller;return controller;
 }
 function nspstoryControls(m) {
@@ -301,12 +302,12 @@ function nspstoryControls(m) {
     ? '<strong>Scene limits</strong><span>Fixed illustrative outcomes—not well counts, probabilities, or a protocol. A single-looking well is a candidate, not proof.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>'
     : m.scene === 'origin' ? '<strong>Scene limits</strong><span>Solid marks show the observed match and insertion. The dashed relationship and moving fragment are proposed, not observed.</span><span><b>Evidence:</b> 12,063 / 13,816 long WT inserts mapped to virus; incorporation remains unresolved.</span>'
     : '<strong>Scene limits</strong><span>The particle is not green. GFP is a reporter signal, and a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
-  return '<details class="nspstory-disclosure"><summary>Evidence + limits</summary><div>' + limits + '</div></details>' +
+  return '<div class="nspstory-dock"><details class="nspstory-disclosure"><summary>Evidence + limits</summary><div>' + limits + '</div></details>' +
     '<div class="nspstory-controls" aria-label="Illustrative motion controls">' +
       choices('Light',['quiet','medium','lively'],['Quiet','Glow','Bloom'],m.ambientIntensity) +
       choices('Tempo',['slow','normal','fast'],['Gentle','Normal','Brisk'],m.ambientTempo) +
       '<div class="nspstory-choice nspstory-playback" role="group" aria-label="Playback"><span class="nspstory-playback-status">Motion</span><button type="button" data-nsp-action="play" aria-pressed="true">Play</button><button type="button" data-nsp-action="pause" aria-pressed="false">Pause</button><button type="button" data-nsp-action="replay">Replay</button></div>' +
-    '</div>';
+    '</div></div>';
 }
 function nspstoryBindControls(host, panel) {
   if (!host || typeof host.querySelector !== 'function') return;
@@ -344,10 +345,11 @@ function nspstoryBindControls(host, panel) {
     else prefs.playing=action === 'play';
     apply();
   }; });
-  if (!animations().length && !(canvasController && canvasController.canAnimate())) {
-    var status=root.querySelector('.nspstory-playback-status');if(status)status.textContent='Reduced motion · still';
-    Array.from(root.querySelectorAll('[data-nsp-action]')).forEach(function (button) { button.disabled=true; });
-  }
+  host._nspstoryRefreshControls=function(reduced){
+    var status=root.querySelector('.nspstory-playback-status');if(status)status.textContent=reduced?'Reduced motion · still':'Motion';
+    Array.from(root.querySelectorAll('[data-nsp-action]')).forEach(function(button){button.disabled=reduced;});
+  };
+  host._nspstoryRefreshControls(!!(canvasController && !canvasController.canAnimate()));
   apply();
 }
 function nspstoryPrintFrame(m) {
@@ -397,6 +399,49 @@ PanelRegistry.define('nspstory', {
 .nspstory-frame{display:block;width:100%;min-height:0;flex:1 1 auto;background:var(--ns-paper);border:1px solid var(--ns-line);border-radius:15px;box-sizing:border-box;overflow:hidden}.nspstory[data-scene="dilution"] .nspstory-screen-frame,.nspstory[data-scene="origin"] .nspstory-screen-frame{background:radial-gradient(circle at 23% 41%,#143d3b 0,#081c27 22%,transparent 45%),radial-gradient(circle at 78% 45%,#261b45 0,#10172d 24%,transparent 46%),linear-gradient(145deg,#030811,#071725 58%,#090c1b);border:0;border-radius:0}
 .nspstory-canvas-frame{position:relative;background:#030d18!important}.nspstory-canvas{display:block;width:100%;height:100%}.nspstory-a11y,.nspstory-canvas-outcome{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 .nspstory-print-frame{display:none}
+.docview:has(#section-green-reporter) .stepline.dv-caption-old{display:none}.docview:has(#section-green-reporter) .stepline.dv-caption-new{animation:none}
+.docview:has(#section-green-reporter) .stepline .stepid{display:none}
+@media screen{.docview:has(#section-green-reporter){padding-top:12px;padding-bottom:20px}.docview:has(#section-green-reporter) .doc-title{font:500 23px/1.2 Georgia,serif}.docview:has(#section-green-reporter) .doc-sec{margin-top:10px;padding:10px 12px 12px;background:#0b1923;border-color:#254350}.docview:has(#section-green-reporter) .sec-eyebrow{font-size:9px;margin:0}.docview:has(#section-green-reporter) .sec-h{font-size:16px;margin:0 0 3px}.docview:has(#section-green-reporter) .sec-teaser{margin-bottom:4px}.docview:has(#section-green-reporter) .section-layout-grid{margin-top:6px}}
+.nspstory-dock{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;background:#030b14;flex:none;border-top:1px solid #193b49}
+.nspstory-dock .nspstory-controls{position:relative;right:auto;bottom:auto;flex:1;flex-wrap:wrap;justify-content:flex-end;border:0;box-shadow:none;padding:0;background:transparent;gap:5px}
+.nspstory-dock .nspstory-disclosure{position:relative;left:auto;bottom:auto;width:auto;flex:none}
+.nspstory-dock .nspstory-choice button{padding:7px 4px}.nspstory-dock .nspstory-choice>span{font-size:8px}
+.nspstory[data-scene="evidence"]{--ns-ink:#e9f7fa;--ns-muted:#a2bac7;--ns-line:#274554;--ns-paper:#06131e;--ns-zone:#102737}
+.nspstory[data-scene="evidence"] .nspstory-screen-frame{background:radial-gradient(ellipse at 10% 0,#153f43,#06131e 70%);border:0;border-radius:0}
+.nspstory[data-scene="evidence"] .nspstory-gridline{stroke:#2a4655}.nspstory[data-scene="evidence"] .nspstory-row-focus{fill:#224d4c;fill-opacity:.5}
+.nspstory[data-scene="evidence"] .nspstory-wt{fill:#6be2bb}.nspstory[data-scene="evidence"] .nspstory-inactive{fill:#bba1ed}
+.nspstory[data-scene="evidence"] .nspstory-heading{font:500 25px Georgia,serif}.nspstory[data-scene="evidence"] .nspstory-value{fill:#effcff}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .pwidget{--dink:#e3f4f6;--dtext:#b7cdd6;--dfaint:#839fab;--dline:#294553;background:linear-gradient(145deg,#0d2330,#06131d);border-color:#294957;box-shadow:0 12px 32px #03101a33}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .pwidget>.ptitle{background:#081923;color:#b6cdd5;border-color:#294653;font:600 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.07em}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .swtable{border-collapse:separate;border-spacing:0 9px;font:13px/1.6 'IBM Plex Sans',sans-serif}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .swtable td{padding:12px 10px;background:#102936;border-top:1px solid #294958;border-bottom:1px solid #294958;color:#c5dce3;white-space:normal}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .swtable td:first-child{color:#8ce8cd;border-left:2px solid #3a8b81;border-radius:7px 0 0 7px;font-weight:600}
+.doc-sec:is(#section-green-reporter,#section-limiting-dilution,#section-analysis-ladder,#section-class-signature,#section-origin-map,#section-second-virus,#section-assay-limits) .swtable td:last-child{border-radius:0 7px 7px 0}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tbody td:first-child{font:500 19px/1.5 Georgia,serif;min-width:120px;box-shadow:inset 3px 0 #3a8b81}
+#section-analysis-ladder .pwidget[data-dv-panel="1"] .swtable tbody td:first-child{font-size:12px;white-space:nowrap}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable{display:block;border:0;background:transparent;overflow:visible}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tbody{display:grid;gap:14px;padding:8px 4px}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr{position:relative;display:grid;grid-template-columns:42% 1fr;align-items:center;min-height:51px;padding:0 8px 0 32px;border:1px solid #315969;border-radius:12px;background:linear-gradient(110deg,#10323e,#0b1d2c);box-shadow:inset 0 1px #69bfbc18}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr:not(:last-child)::before{content:'';position:absolute;left:16px;top:100%;height:15px;border-left:1px dashed #65c5bc;opacity:.65}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr::after{content:'';position:absolute;left:11px;top:calc(50% - 5px);width:9px;height:9px;border-radius:50%;background:#4c8d97;border:1px solid #80c9cf;box-shadow:0 0 9px #74d8d74d}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable td{display:block;background:transparent!important;border:0!important;box-shadow:none!important;padding:8px 5px;min-width:0!important}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable td:first-child{font:500 18px/1.25 Georgia,serif}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable td:last-child{position:absolute;right:5px;top:0;padding:0;transform:translateY(-50%)}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swrow-neutral .swbadge{display:none}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr.swrow-changed{border-color:#68e8c4;background:linear-gradient(110deg,#1c504f,#133039);box-shadow:0 0 20px #43d9b21c,inset 0 0 20px #54c9ab12}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr.swrow-changed::after{background:#b0ffe0;border-color:#ddfff3;box-shadow:0 0 15px #5cfdc8}
+#section-analysis-ladder .pwidget[data-dv-panel="0"] .swbadge{background:#123b38;color:#9efbd6;border-color:#66c8aa}
+#section-analysis-ladder .swtable .swrow-changed td{background:#173f44;border-color:#65d6b1}
+#section-analysis-ladder .pwidget:first-child .swtable tbody td:first-child{color:#a1ffe0}
+#section-assay-limits .swtable tbody td{height:60px;box-sizing:border-box;padding:7px 8px;font-size:12px}
+#section-assay-limits .swtable{border-spacing:0 6px}
+#section-second-virus .swtable tbody td{padding:7px 8px;font-size:12px}
+#section-assay-limits .pwidget[data-dv-panel="1"] .swtable td:first-child{color:#f3ca88;border-left-color:#ac814c}
+#section-second-virus .pwidget[data-dv-panel="1"]{border-top:3px solid #b49be5}
+#section-second-virus .pwidget[data-dv-panel="0"]{border-top:3px solid #69d9b6}
+.doc-sec:is(#section-class-signature,#section-second-virus) .grid-value{font-size:25px;font-weight:500}
+.doc-sec:is(#section-origin-map,#section-second-virus) .funnel-count{font-size:18px}.doc-sec:is(#section-origin-map,#section-second-virus) .funnel-label{font-size:12px}.doc-sec:is(#section-origin-map,#section-second-virus) .funnel-row{padding-top:12px;padding-bottom:12px}
 .nspstory-caption{font:13px/1.45 'IBM Plex Sans',sans-serif;margin:9px 2px 0;color:var(--dtext);overflow-wrap:anywhere;flex:none}.nspstory[data-scene="reporter"] .nspstory-caption,.nspstory[data-scene="dilution"] .nspstory-caption,.nspstory[data-scene="origin"] .nspstory-caption{margin:0;padding:9px 14px 10px;color:#afc3cd;background:#050b13;border-top:1px solid #183241}
 .doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) .pwidget{background:#07131d;border-color:#254353;box-shadow:0 12px 32px #03101a33}.doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) .pwidget>.ptitle{background:#0a1a25;color:#bcd2dc;border-color:#294653;font:600 10px/1.35 'IBM Plex Mono',monospace;letter-spacing:.08em}.doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) .pbody{color:#e8f5f8}.doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) :is(table,.ptable,.pgrid){color:#e8f5f8}.doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) :is(th,.th){color:#79e6c4}.doc-sec:is(#section-analysis-ladder,#section-class-signature,#section-second-virus,#section-assay-limits) :is(td,.td){border-color:#294653}
 .nspstory-heading{font:600 25px 'IBM Plex Sans',sans-serif;fill:var(--ns-ink);letter-spacing:-.02em}
@@ -443,6 +488,8 @@ PanelRegistry.define('nspstory', {
 @keyframes nspEmphasis{from{stroke-dasharray:0 600}to{stroke-dasharray:600 0}}
 @keyframes nspAmbientDrift{from{transform:translate(-3px,2px);opacity:.45}to{transform:translate(4px,-3px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.nspstory *{animation:none!important;transition:none!important}.nspstory-playback{opacity:.58}}
+@media print{#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr{background:#fff!important;box-shadow:none!important;border-color:#777!important}}
+@media print{.docview:has(#section-green-reporter) .pwidget{--dink:#111;--dtext:#333;--dfaint:#555;background:#fff!important;color:#111!important;border-color:#777!important;box-shadow:none!important}.docview:has(#section-green-reporter) .pwidget>.ptitle,.docview:has(#section-green-reporter) .swtable td,.docview:has(#section-green-reporter) .swtable th{background:#fff!important;color:#111!important;border-color:#777!important;box-shadow:none!important}.nspstory-dock{display:none!important}}
 @media print{.pt-nspstory:has(.nspstory){background:#fff!important;border-color:#bbb!important;box-shadow:none!important}.pt-nspstory:has(.nspstory)>.ptitle{background:#fff!important;color:#222!important}}
 @media print{.nspstory,.nspstory[data-scene]{break-inside:avoid;--ns-ink:#111;--ns-muted:#444;--ns-line:#777;--ns-paper:#fff;--ns-zone:#f2f2f2;--ns-green:#444;--ns-violet:#777}.nspstory *{animation:none!important;transition:none!important;filter:none!important}.nspstory-screen-frame,.nspstory-caption,.nspstory-controls,.nspstory-disclosure{display:none!important}.nspstory-print-frame{display:block!important;background:#fff;print-color-adjust:exact}.nspstory-print-frame .nspstory-wt{fill:#222}.nspstory-print-frame .nspstory-inactive{fill:#999}.nspstory-print-frame .nspstory-row-focus{fill:#e5e5e5}.nspstory-print-frame .nspstory-culture{fill:#eee;stroke:#444}.nspstory-print-frame .nspstory-crowd-aura{fill:none;stroke:#bbb}.nspstory-print-frame .nspstory-crowd-halo{fill:#f6f6f6;stroke:#aaa}.nspstory-print-frame .nspstory-token{fill:#777;stroke:#222}.nspstory-print-frame .nspstory-stream{stroke:#888}.nspstory-print-frame .nspstory-well-glow{fill:none;stroke:#bbb}.nspstory-print-frame .nspstory-well-glass{fill:#fff;stroke:#555}.nspstory-print-frame .nspstory-welllabel,.nspstory-print-frame .nspstory-wellmark{fill:#222}.nspstory-print-frame .nspstory-check{stroke:#222}.nspstory-print-frame .nspstory-origin-field{fill:#fff;stroke:#777}.nspstory-print-frame .nspstory-origin-aura{fill:none;stroke:#ddd}.nspstory-print-frame .nspstory-rna{stroke:#aaa}.nspstory-print-frame .nspstory-source{stroke:#555}.nspstory-print-frame .nspstory-source-pattern,.nspstory-print-frame .nspstory-fragment-pattern,.nspstory-print-frame .nspstory-insert-pattern{stroke:#fff}.nspstory-print-frame .nspstory-insert,.nspstory-print-frame .nspstory-fragment-line{stroke:#222}.nspstory-print-frame .nspstory-match,.nspstory-print-frame .nspstory-boundary-mark{stroke:#555}.nspstory-print-frame .nspstory-proposed rect{fill:#eee;stroke:#555}.nspstory-print-frame .nspstory-proposed text{fill:#222}.nspstory-print-frame .nspstory-editorial{fill:#111}}
 `

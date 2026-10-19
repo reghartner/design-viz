@@ -24,7 +24,7 @@ well outcomes, or the proposed source-to-recipient transit, and never replay a
 teaching beat. Reduced motion and print suppress the drift regardless of the
 authored setting.
 
-The dilution and origin reader stages expose those settings as persistent
+The reporter, dilution and origin reader stages expose those settings as persistent
 presentation controls: **Quiet / Glow / Bloom** map to
 `quiet / medium / lively`, and **Gentle / Normal / Brisk** map to
 `slow / normal / fast`. Play, pause, and replay act on presentation motion only;
@@ -51,12 +51,23 @@ reading.
   emphasis moves. The ≥11 nt mapped subsets do not
   partition the ≥2 nt total. This panel is specific to this paper's numbers.
 
-All animations are finite and phase-specific; later teaching phases do not
+Teaching beats are finite and phase-specific; later teaching phases do not
 replay earlier arrival, reveal, separation, or transfer beats. Reduced motion
 shows the selected frame immediately. Print replaces it with a deterministic,
 complete lesson summary independent of the selected phase. No scripts,
 requests, sequences, timers, or experimental parameters are supplied by a
 spec. Authoring acceptance is desktop only.
+
+The eight-tab example renders only the active chapter. Reporter, Separate and
+Find source use a bounded Canvas 2D stage with a persistent control dock and
+an adjacent evidence panel. Decorative particles continue while Play is active;
+tempo changes only that atmosphere, never the finite teaching timeline. The
+shared panel lifetime cancels frames and observers on tab departure or destroy.
+The remaining chapters use an illuminated five-station reading ladder, literal
+comparison bars, clearly separate datasets, and paired evidence/boundary cards.
+Sources stays static. Collapsed introductions keep the desktop stage prominent;
+all prose remains available from the section disclosure. Print uses complete,
+deterministic SVG lesson summaries instead of the live Canvas.
 
 The editable example is
 `packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json`;

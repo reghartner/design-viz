@@ -42,9 +42,9 @@ test('nspstory discovery, starter parity and all four declared lessons validate'
       const artPanel=section.diagram.panels.find(item=>item.title.startsWith('ILLUSTRATIVE ·'));
       const evidencePanel=section.diagram.panels.find(item=>item.title.startsWith('EVIDENCE'));
       const art=layout.find(item=>item.panel===artPanel.id), evidence=layout.find(item=>item.panel===evidencePanel.id);
-      assert.deepEqual([art.x,art.w],[2,20],`${id} needs an intentional 20-column illustrative stage`);
-      assert.deepEqual([evidence.x,evidence.w],[2,20],`${id} needs raw evidence aligned beneath the stage`);
-      assert.ok(evidence.y>=art.y+art.h,`${id} raw evidence must follow rather than flank the illustrative stage`);
+      assert.deepEqual([art.x,art.w],[0,14],`${id} needs a compact illustrative stage`);
+      assert.deepEqual([evidence.x,evidence.w],[14,10],`${id} needs an adjacent readable evidence rail`);
+      assert.equal(evidence.y,art.y,`${id} evidence must be visible beside the illustration`);
     }
   }
   assert.match(source,/18 WT; 16 inactive GFP-positive isolates examined/);
@@ -101,7 +101,7 @@ test('ambient authoring settings validate, serialize and visibly control atmosph
 });
 
 test('lessons expose truthful final frames, accessible summaries and escaped captions', () => {
-  assert.match(screenFrame(C.nspstoryHTML(panel('reporter'),{phase:0})),/reporter stays dark/);
+  assert.match(screenFrame(C.nspstoryHTML(panel('reporter'),{phase:0})),/GFP reporter off/);
   assert.match(C.nspstoryHTML(panel('reporter'),{phase:2}),/Newly infected cells/);
   const wells=screenFrame(C.nspstoryHTML(panel('dilution'),{phase:1}));
   assert.equal(count(wells,/data-well="[1-9]"/g),9);
@@ -222,4 +222,30 @@ test('Canvas lifecycle is bounded; reduced motion and print keep terminal geomet
   assert.match(helper,/data-canvas-live/);
   for(const scene of ['reporter','dilution','origin'])assert.match(screenFrame(C.nspstoryHTML(panel(scene),{phase:0},true)),/<canvas class="nspstory-canvas"/);
   assert.doesNotMatch(screenFrame(C.nspstoryHTML(panel('evidence'),{phase:0},true)),/<canvas/);
+});
+
+test('Canvas paints synchronously without rAF and retires live reduced-motion listeners', () => {
+  const originalRAF=C.requestAnimationFrame;
+  C.requestAnimationFrame=undefined;
+  let paints=0,listener,removed=false;
+  const canvas={ownerDocument:{defaultView:{matchMedia:()=>({matches:true,addEventListener(type,fn){listener=fn;},removeEventListener(type,fn){removed=fn===listener;}})}},
+    getBoundingClientRect:()=>({width:500,height:300}),getContext:()=>({setTransform(){}}),setAttribute(){}};
+  const controller=C.scienceCanvasScene({},canvas,{render:()=>paints++});
+  assert.equal(paints,1,'A settled render is painted before mount returns, including without rAF');
+  assert.equal(controller.canAnimate(),false);
+  controller.destroy();assert.equal(removed,true);
+  C.requestAnimationFrame=originalRAF;
+});
+
+test('teaching motion ends once, while reduced-motion source transit uses the terminal endpoint', () => {
+  const lines=[];
+  const ctx=new Proxy({createRadialGradient:()=>({addColorStop(){}}),createLinearGradient:()=>({addColorStop(){}}),moveTo:(x,y)=>lines.push([x,y])},{get:(target,key)=>target[key]||(()=>{})});
+  const state={width:600,height:360,elapsed:15000,reduced:false,prefs:{intensity:'quiet',tempo:'fast'}};
+  C.nspstoryDrawReporterCanvas(ctx,state,C.nspstoryModel(panel('reporter'),{phase:0}),null);
+  assert.equal(state.canvasProgress,1,'Completed reporter arrival cannot restart on later decorative loops');
+  C.nspstoryDrawDilution(ctx,state,C.nspstoryModel(panel('dilution'),{phase:1}),null);
+  assert.equal(state.canvasProgress,1,'Completed dilution spread cannot restart on later decorative loops');
+  state.reduced=true;state.elapsed=0;
+  C.nspstoryDrawOriginCanvas(ctx,state,C.nspstoryModel(panel('origin'),{phase:3}),null);
+  assert.deepEqual(lines.at(-1),[600*.84-22,360*.63-360*.05],'Reduced motion places the proposed fragment at its terminal endpoint');
 });

@@ -3,7 +3,7 @@
     "title": "The insertion signature of NSP15",
     "subtitle": "Reading Bianco et al. · an evidence journey across two coronaviruses",
     "description": "Animated guide to Bianco et al.’s NSP15 preprint: a rare GFP lineage, limiting-dilution intuition, inferred RNA origins, and the selective loss of distal insertions.",
-    "skin": "daylight",
+    "skin": "aurora",
     "tags": [
       "science",
       "biology",
@@ -154,35 +154,36 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "frame",
-                        "x": 2,
-                        "y": 4,
-                        "w": 20,
-                        "h": 13
+                        "x": 0,
+                        "y": 3,
+                        "w": 14,
+                        "h": 11
                       },
                       {
                         "panel": "reporter-evidence",
-                        "x": 2,
-                        "y": 17,
-                        "w": 20,
-                        "h": 6
+                        "x": 14,
+                        "y": 3,
+                        "w": 10,
+                        "h": 11
                       },
                       {
                         "x": 0,
-                        "y": 23,
+                        "y": 22,
                         "w": 24,
                         "h": 3,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -322,35 +323,36 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "founders",
-                        "x": 2,
-                        "y": 4,
-                        "w": 20,
-                        "h": 14
+                        "x": 0,
+                        "y": 3,
+                        "w": 14,
+                        "h": 11
                       },
                       {
                         "panel": "dilution-evidence",
-                        "x": 2,
-                        "y": 18,
-                        "w": 20,
-                        "h": 6
+                        "x": 14,
+                        "y": 3,
+                        "w": 10,
+                        "h": 11
                       },
                       {
                         "x": 0,
-                        "y": 24,
+                        "y": 23,
                         "w": 24,
                         "h": 3,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -707,24 +709,31 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "ladder",
-                        "x": 2,
-                        "y": 4,
-                        "w": 20,
-                        "h": 7
+                        "x": 0,
+                        "y": 3,
+                        "w": 14,
+                        "h": 11
                       },
                       {
                         "panel": "analysis",
-                        "x": 2,
-                        "y": 11,
-                        "w": 20,
-                        "h": 4
+                        "x": 14,
+                        "y": 3,
+                        "w": 10,
+                        "h": 11
+                      },
+                      {
+                        "x": 0,
+                        "y": 14,
+                        "w": 24,
+                        "h": 3,
+                        "hidden": true
                       }
                     ]
                   },
@@ -765,7 +774,8 @@
                       "noSpread": true
                     }
                   ]
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -943,42 +953,43 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "comparison",
-                        "x": 2,
-                        "y": 4,
+                        "x": 0,
+                        "y": 3,
                         "w": 14,
                         "h": 11
                       },
                       {
                         "panel": "sizes",
-                        "x": 16,
-                        "y": 4,
-                        "w": 6,
+                        "x": 14,
+                        "y": 3,
+                        "w": 10,
                         "h": 5
                       },
                       {
                         "panel": "denominator",
-                        "x": 16,
-                        "y": 9,
-                        "w": 6,
+                        "x": 14,
+                        "y": 8,
+                        "w": 10,
                         "h": 6
                       },
                       {
                         "x": 0,
-                        "y": 24,
+                        "y": 23,
                         "w": 24,
                         "h": 4,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -1108,35 +1119,36 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "map",
-                        "x": 2,
-                        "y": 4,
-                        "w": 20,
-                        "h": 13
+                        "x": 0,
+                        "y": 3,
+                        "w": 14,
+                        "h": 11
                       },
                       {
                         "panel": "origin",
-                        "x": 2,
-                        "y": 17,
-                        "w": 20,
-                        "h": 6
+                        "x": 14,
+                        "y": 3,
+                        "w": 10,
+                        "h": 11
                       },
                       {
                         "x": 0,
-                        "y": 23,
+                        "y": 22,
                         "w": 24,
                         "h": 3,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -1431,42 +1443,43 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "paired",
-                        "x": 2,
-                        "y": 4,
-                        "w": 10,
+                        "x": 0,
+                        "y": 3,
+                        "w": 12,
                         "h": 5
                       },
                       {
                         "panel": "cross",
-                        "x": 2,
-                        "y": 9,
-                        "w": 10,
+                        "x": 0,
+                        "y": 8,
+                        "w": 12,
                         "h": 6
                       },
                       {
                         "panel": "deep",
                         "x": 12,
-                        "y": 4,
-                        "w": 10,
+                        "y": 3,
+                        "w": 12,
                         "h": 11
                       },
                       {
                         "x": 0,
-                        "y": 24,
+                        "y": 23,
                         "w": 24,
                         "h": 4,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -1913,35 +1926,36 @@
                     "default": [
                       {
                         "controls": "steps",
-                        "x": 2,
+                        "x": 0,
                         "y": 0,
-                        "w": 20,
-                        "h": 4
+                        "w": 24,
+                        "h": 3
                       },
                       {
                         "panel": "audit",
-                        "x": 2,
-                        "y": 4,
-                        "w": 10,
+                        "x": 0,
+                        "y": 3,
+                        "w": 12,
                         "h": 11
                       },
                       {
                         "panel": "limits",
                         "x": 12,
-                        "y": 4,
-                        "w": 10,
+                        "y": 3,
+                        "w": 12,
                         "h": 11
                       },
                       {
                         "x": 0,
-                        "y": 19,
+                        "y": 18,
                         "w": 24,
                         "h": 5,
                         "hidden": true
                       }
                     ]
                   }
-                }
+                },
+                "collapsed": true
               }
             ]
           },
@@ -1992,6 +2006,7 @@
           }
         ]
       }
-    ]
+    ],
+    "brand": false
   }
 }

@@ -8,7 +8,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var record=detailSection(page,rec.reference);
     var frame={rec:rec,section:record.section,page:page,root:rec,original:true};
     frames.set(rec.sectionEl,frame);liveRoots.set(rec.reference,frame);
-    if(rec.detailOnly || rec.viewExcluded){rec.sectionEl.hidden=true;if(rec.stepper){rec.stepper.pause();rec.stepper.onHide();}}
+    if(rec.detailOnly || rec.viewExcluded){rec.sectionEl.hidden=true;ctl.syncSectionVisibility(rec);}
   });
   function current(){return session && session.stack[session.stack.length-1];}
   function retire(frame){
@@ -41,7 +41,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   }
   function restoreOriginal(frame){
     frame.rec.sectionEl.hidden=!!(frame.rec.detailOnly || frame.rec.viewExcluded || frame.rec.viewOwner && frame.rec.viewOwner.current.presentation==='explore' && frame.rec.viewOwner.selected!==frame.rec);
-    if(frame.rec.stepper && !frame.rec.sectionEl.hidden)frame.rec.stepper.onShow();
+    ctl.syncSectionVisibility(frame.rec);
   }
   function close(silent){
     cancel();if(!session)return;
@@ -56,7 +56,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var returnNode=departed && departed.via;
     while(session.stack.length>index+1)retire(session.stack.pop());
     var frame=current();frame.rec.sectionEl.hidden=false;
-    if(frame.rec.stepper)frame.rec.stepper.onShow();
+    ctl.syncSectionVisibility(frame.rec);
     if(index===0){session=null;}
     if(!silent){
       changed(true);
@@ -77,7 +77,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     });
     if(options.authoring && frame.page===page){
       var edit=document.createElement('button');edit.type='button';edit.textContent='Edit detail section';edit.className='detail-edit';
-      edit.addEventListener('click',function(){var ref=sectionRecords(page).find(function(r){return r.section===frame.section;});if(!ref)return;close(true);var original=liveRoots.get(ref.reference);if(original){original.rec.sectionEl.hidden=false;original.rec.sectionEl.scrollIntoView({block:'start'});ctl.view.dispatchEvent(new CustomEvent('detail-edit-section',{detail:{reference:ref.reference}}));}});nav.appendChild(edit);
+      edit.addEventListener('click',function(){var ref=sectionRecords(page).find(function(r){return r.section===frame.section;});if(!ref)return;close(true);var original=liveRoots.get(ref.reference);if(original){original.rec.sectionEl.hidden=false;ctl.syncSectionVisibility(original.rec);original.rec.sectionEl.scrollIntoView({block:'start'});ctl.view.dispatchEvent(new CustomEvent('detail-edit-section',{detail:{reference:ref.reference}}));}});nav.appendChild(edit);
     }
     frame.rec.sectionEl.prepend(nav);
     if(frame.originStep){var context=document.createElement('p');context.className='detail-context';context.textContent='From '+frame.originStep;nav.after(context);}
@@ -158,7 +158,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     try{applyStep(next,target);}catch(error){retire(next);throw error;}
     next.via=id;next.external=detail.spec?{spec:detail.spec,revision:detail.revision,section:detail.section}:null;
     next.originStep=frame.rec.stepper && frame.rec.stepper.mode()==='step' ? 'step '+(frame.rec.stepper.current().n+1):null;
-    frame.rec.sectionEl.hidden=true;session.stack.push(next);breadcrumb(next);changed(true);
+    frame.rec.sectionEl.hidden=true;ctl.syncSectionVisibility(frame.rec);session.stack.push(next);breadcrumb(next);changed(true);
     var heading=next.rec.sectionEl.querySelector('.detail-breadcrumb button');if(heading)heading.focus();
   }
   function open(frame,id){
@@ -240,7 +240,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   ctl.view.addEventListener('pointerdown',cancelInteraction,true);
 
   return {snapshot:snapshot,restore:restore,close:close,
-    showSection:function(reference){var frame=liveRoots.get(reference);if(!frame || ctl.views && !ctl.views.ensure(frame.rec,undefined,true))return false;close(true);liveRoots.forEach(function(f){restoreOriginal(f);});if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
+    showSection:function(reference){var frame=liveRoots.get(reference);if(!frame || ctl.views && !ctl.views.ensure(frame.rec,undefined,true))return false;close(true);liveRoots.forEach(function(f){restoreOriginal(f);});if(frame){frame.rec.sectionEl.hidden=false;ctl.syncSectionVisibility(frame.rec);}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
     // Reader chrome (header, Contents) names each open level below the root.
     activeTrail:function(){return session?session.stack.slice(1).map(function(frame){return {label:label(frame),title:frame.section.heading || frame.section.id || 'Detail'};}):[];},

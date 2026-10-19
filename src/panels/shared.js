@@ -286,7 +286,22 @@ function panelGlideElements(host, glide) {
   var el = host.querySelector(glide.selector);
   return el ? [el] : [];
 }
+function panelAnimationFrame(host, callback) {
+  var frames = host._panelFrames || (host._panelFrames = new Set());
+  var id = requestAnimationFrame(function () { frames.delete(id); callback(); });
+  frames.add(id);
+  return id;
+}
 function cancelPanelMotion(host) {
+  /* Mounted renderers own external resources through this idempotent hook.
+     Clear it first so cleanup can safely cancel nested presentation work. */
+  var cleanup = host._panelMotionCleanup;
+  host._panelMotionCleanup = null;
+  if (typeof cleanup === 'function') cleanup();
+  if (host._panelFrames) {
+    host._panelFrames.forEach(function (id) { cancelAnimationFrame(id); });
+    host._panelFrames.clear();
+  }
   if (host._thTween && typeof cancelAnimationFrame === 'function')
     cancelAnimationFrame(host._thTween);
   host._thTween = null;
@@ -351,8 +366,8 @@ function tweenPanelLevel(host, level, animate) {
     fill.style.transition = 'none';
     fill.style.width = prev.pct.toFixed(1) + '%';
     void fill.getBoundingClientRect();
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
+    panelAnimationFrame(host, function () {
+      panelAnimationFrame(host, function () {
         if (host._ifEpoch !== epoch) return;
         fill.style.transition = '';
         fill.style.width = pctNow.toFixed(1) + '%';
@@ -400,8 +415,8 @@ function tweenPanelBars(host, bars, animate) {
   if (!tweens.length) return;
   var epoch = host._ifEpoch;
   void tweens[0].el.getBoundingClientRect();
-  requestAnimationFrame(function () {
-    requestAnimationFrame(function () {
+  panelAnimationFrame(host, function () {
+    panelAnimationFrame(host, function () {
       if (host._ifEpoch !== epoch) return;
       tweens.forEach(function (tween) {
         tween.el.style.transition = '';
@@ -415,14 +430,20 @@ function tweenPanelBars(host, bars, animate) {
    history only; they never participate in state folding or alternate paths. */
 function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePresentation) {
   var render = PanelViews.get(panel.type),
-    animate = animatePresentation !== false && !RM;
+    animate = animatePresentation !== false && !RM,
+    hadResources = typeof host._panelMotionCleanup === 'function';
   var result = render
     ? render(host, panel, state || {}, skin, states, stepIdx, animate)
     : {
         html: '<div class="punknown">unknown panel type: ' + esc(String(panel.type)) + '</div>',
       };
   if (!animate) settlePanelPresentation(host, result);
-  if (host._lastHTML === result.html) return;
+  if (host._lastHTML === result.html) {
+    /* Settling can dispose a live Canvas/observer even when its markup stays
+       identical. Re-establish the settled presentation in that case. */
+    if (!animate && hadResources && result.mounted) result.mounted();
+    return;
+  }
   if (animate) cancelPanelMotion(host);
   var patched = result.patch && result.patch();
   host._lastHTML = result.baseline != null ? result.baseline : result.html;
@@ -433,8 +454,8 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       glideEpoch = host._ifEpoch;
     if (subjects.length) {
       for (var i = 0; i < subjects.length; i++) void subjects[i].getBoundingClientRect();
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
+      panelAnimationFrame(host, function () {
+        panelAnimationFrame(host, function () {
           if (host._ifEpoch !== glideEpoch) return;
           for (var j = 0; j < subjects.length; j++) subjects[j].style.transform = 'translate(0,0)';
         });
@@ -467,6 +488,14 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   }
   if (result.bars) tweenPanelBars(host, result.bars, animate);
 }
+function settlePanelAnimations(host) {
+  if (!host.getAnimations) return;
+  host.getAnimations({subtree:true}).forEach(function(animation){
+    /* Legacy CSS scenes may not consume the renderer's animate flag. Finish
+       their finite entrance motion when restoring, while keeping ambient loops. */
+    if (animation.effect && Number.isFinite(animation.effect.getComputedTiming().endTime) && animation.playState !== 'idle') animation.finish();
+  });
+}
 
 /* log panels are the only widgets that GROW as steps append lines, so they
    always render at the BOTTOM of the panel column — nothing below them can
@@ -481,11 +510,23 @@ function panelOrder(panels) {
   return fixed.concat(growing);
 }
 
-function buildPanels(asideEl, d, skin) {
+function buildPanels(asideEl, d, skin, options) {
   var folded = foldPanelStates(d);
   var visibility = foldPanelVisibility(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
+  var active = !options || options.active !== false, destroyed = false, printing = false;
+  function renderHost(host, animate) {
+    var current = host.current;
+    renderPanelBody(host.body, host.panel, current.state, skin, current.states, current.index, animate);
+    host.mountedBefore = true;
+  }
+  function unmount(host) {
+    cancelPanelMotion(host.body);
+    host.body.querySelectorAll('canvas').forEach(function(canvas){canvas.width=0;canvas.height=0;});
+    host.body.replaceChildren();
+    delete host.body._lastHTML;
+  }
   panelOrder(d.panels).forEach(function (p) {
     if (!p || !p.id) return;
     var card = document.createElement('div');
@@ -505,26 +546,52 @@ function buildPanels(asideEl, d, skin) {
       card
     );
     p = Object.assign({}, p, {brand: FlowBrand.effective(d.brand, p.brand)});
-    hosts[p.id] = { panel: p, body: body, card: card };
+    var host = hosts[p.id] = { panel: p, body: body, card: card };
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
     var view = PanelViews.get(p.type),
       options = view ? view.options : {};
     var home = options.ambientInitial;
-    renderPanelBody(
-      body,
-      p,
-      home ? p.initial : (folded[p.id] || [])[0],
-      skin,
-      options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],
-      home ? -1 : 0,
-      false
-    );
+    host.current = {state: home ? p.initial : (folded[p.id] || [])[0],
+      states: options.historyRequiresSteps && !traceNavigation ? [] : folded[p.id] || [],
+      index: home ? -1 : 0};
+    if (active) renderHost(host, false);
   });
   return {
     destroy: function () {
+      destroyed = true;
+      Object.keys(hosts).forEach(function (id) { unmount(hosts[id]); });
+    },
+    setActive: function (next, settle) {
+      if (destroyed) return;
+      var changed = active !== next;
+      /* Gate renderer calls before the stepper settles. Its hide callback can
+         update the snapshot, but cannot mount a fresh body during departure.
+         Dispose the old presentation only after that callback completes. */
+      active = next;
+      try { if (!next && settle) settle(); }
+      finally {
+        if (changed && !printing) Object.keys(hosts).forEach(function (id) {
+          if (active) {
+            var host = hosts[id], restoring = host.mountedBefore;
+            renderHost(host, false);
+            if (restoring) settlePanelAnimations(host.body);
+          }
+          else unmount(hosts[id]);
+        });
+      }
+    },
+    /* Print CSS exposes every tab. Materialize a static snapshot, then release
+       its live resources while leaving the painted DOM/Canvas for printing. */
+    setPrinting: function (next) {
+      if (destroyed || printing === next) return;
+      printing = next;
       Object.keys(hosts).forEach(function (id) {
-        cancelPanelMotion(hosts[id].body);
+        var host = hosts[id];
+        unmount(host);
+        if (printing || active) renderHost(host, false);
+        if (printing || active) settlePanelAnimations(host.body);
+        if (printing) cancelPanelMotion(host.body);
       });
     },
     setDiagram: function (next) {
@@ -533,6 +600,7 @@ function buildPanels(asideEl, d, skin) {
       traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
     },
     setStep: function (i, animate, ambient) {
+      if (destroyed) return;
       Object.keys(hosts).forEach(function (pid) {
         var states = folded[pid] || [];
         var si = Math.min(i, states.length - 1);
@@ -551,15 +619,10 @@ function buildPanels(asideEl, d, skin) {
           if (shown) child.removeAttribute('aria-hidden');
           else child.setAttribute('aria-hidden', 'true');
         });
-        renderPanelBody(
-          hosts[pid].body,
-          panel,
-          homeAmbient ? panel.initial : states[si],
-          skin,
-          options.historyRequiresSteps && !traceNavigation ? [] : states,
-          homeAmbient ? -1 : si,
-          animate && shown
-        );
+        hosts[pid].current = {state: homeAmbient ? panel.initial : states[si],
+          states: options.historyRequiresSteps && !traceNavigation ? [] : states,
+          index: homeAmbient ? -1 : si};
+        if (active && !printing) renderHost(hosts[pid], animate && shown);
       });
     },
   };

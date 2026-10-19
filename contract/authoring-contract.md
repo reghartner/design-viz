@@ -93,14 +93,12 @@ append them under "Company contract additions". See
 - `skin` — optional page default. One of `"aurora"` (dark),
   `"daylight"` (light, print-friendly), `"editorial"`, `"terminal"`,
   `"pastel"` (default), `"blueprint"`, `"rose"`, `"lavender"`, `"lilac"` (Opus Lilac),
-  or `"islanders"` (royal blue, orange and pale ice). On standalone load, a valid
-  `?theme=` query overrides a valid `dv_skin` cookie and this field; otherwise
-  the cookie wins, then this field, then `"pastel"`. The Workbench shell uses
-  query, cookie, then Pastel; saved document defaults remain an explicit choice.
-  A consuming site can then switch live with `window.dvSetSkin(name)`; it does
-  not change the cookie. An explicit live choice updates an existing valid
-  `theme` query so reloads and shared links use that choice. Invalid query values
-  are ignored. Omit `skin` unless the request says otherwise.
+  or `"islanders"` (blue, orange, ice). Standalone precedence: valid `?theme=`,
+  valid `dv_skin` cookie, this field, then `"pastel"`. Workbench uses query,
+  cookie, then Pastel; document defaults are an explicit choice.
+  `window.dvSetSkin(name)` switches live without changing the cookie and updates
+  an existing valid `theme` query for reloads/shared links. Invalid query values
+  are ignored. Omit `skin` unless requested.
 - `protocols` — optional; only needed to ADD edge kinds beyond the built-ins
   (see "Edge kinds"). `color` is one hex string, or
   `{"aurora": "#..", "daylight": "#.."}` for per-skin colors.

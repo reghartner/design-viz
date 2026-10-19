@@ -287,6 +287,8 @@ const LEGACY_CARD={
   rose:{fill:'rgb(255, 255, 255)',stroke:'rgb(224, 195, 206)',t1:'rgb(74, 44, 58)',t2:'rgb(122, 95, 108)'},
   lavender:{fill:'rgb(255, 253, 248)',stroke:'rgb(205, 186, 219)',t1:'rgb(68, 50, 79)',t2:'rgb(114, 93, 123)'},
   lilac:{fill:'rgb(255, 255, 255)',stroke:'rgb(214, 198, 227)',t1:'rgb(58, 42, 72)',t2:'rgb(110, 92, 126)'},
+  // Islanders is new, so pin its intentional baseline alongside the legacy skins.
+  islanders:{fill:'rgb(255, 255, 255)',stroke:'rgb(139, 168, 202)',t1:'rgb(7, 30, 66)',t2:'rgb(83, 106, 128)'},
   aurora:{fill:'rgb(16, 26, 44)',stroke:'rgb(37, 54, 79)',t1:'rgb(234, 242, 255)',t2:'rgb(126, 147, 184)'},
   terminal:{fill:'rgb(12, 20, 17)',stroke:'rgb(38, 53, 47)',t1:'rgb(228, 238, 233)',t2:'rgb(116, 135, 126)'},
   blueprint:{fill:'rgb(8, 54, 109)',stroke:'rgb(166, 231, 243)',t1:'rgb(255, 255, 255)',t2:'rgb(184, 215, 231)'}
@@ -374,6 +376,8 @@ async function auditCards(page,scope,skin){
   return seen;
 }
 test('every node style preset stays readable, bordered and distinct in the editor skins while default cards are unchanged',async({page,server})=>{
+  // Eight skins each exercise 13 cards, all keyboard marks, tones, and export.
+  test.setTimeout(90000);
   const raw=fixture();raw.page.sections[0].diagram=styledDiagram();
   await start(page,server,raw);
   // The hidden Node style select lists the field's tokens; this matrix must cover exactly those.
@@ -384,7 +388,7 @@ test('every node style preset stays readable, bordered and distinct in the edito
   await page.locator('#section-overview [data-dv-node="plain"]').focus();await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
   await page.locator('#workspace-appearance>summary').click();
   const editorSkins=await page.locator('#workspace-appearance-body button[id^="sk-"]').evaluateAll(buttons=>buttons.map(b=>b.id.slice(3)));
-  expect(editorSkins.sort()).toEqual(['aurora','blueprint','lavender','lilac','pastel','rose','terminal']);
+  expect(editorSkins.sort()).toEqual(['aurora','blueprint','islanders','lavender','lilac','pastel','rose','terminal']);
   const section=page.locator('#section-overview'),ids=Object.keys(styledDiagram().nodes);let lastResting=null;
   for(const skin of editorSkins){
     await page.locator('#sk-'+skin).click();await expect(page.locator('body')).toHaveClass(new RegExp('\\bsk-'+skin+'\\b'));

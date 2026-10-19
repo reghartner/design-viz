@@ -66,7 +66,7 @@ test('failed Resume archive keeps recovered draft on Welcome with a direct downl
 
 test('the Flowview brand is a real workbench navigation target and still returns home in-app',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const homeLink=page.locator('#workbench-home');
- await expect(homeLink).toHaveAttribute('href','/workbench.html');
+ await expect(homeLink).toHaveAttribute('href',server.origin+'/workbench.html');
  const modified=await homeLink.evaluate(link=>{
    let observed=false,defaultPrevented;
    const observe=event=>{observed=true;defaultPrevented=event.defaultPrevented;event.preventDefault();};

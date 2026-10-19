@@ -383,6 +383,14 @@ test('runtime packaging builds missing HTML from source and ignores stale local 
   t.after(() => rm(temporary, {recursive:true, force:true}));
   const source = path.join(temporary, 'source'), destination = path.join(temporary, 'designer');
   await run('git', ['clone', '--shared', '--quiet', root, source], temporary);
+  // Exercise a package-selecting fork even when upstream has no company defaults.
+  const companyFile = path.join(source, 'company/company.json');
+  await mkdir(path.dirname(companyFile), {recursive:true});
+  await writeFile(companyFile, JSON.stringify({version:1,companyName:'Package fixture',
+    repository:'https://github.com/fixture/design-viz',packages:['science','sports']}));
+  await run('git', ['add', 'company/company.json'], source);
+  await run('git', ['-c', 'user.name=Flowview fixture', '-c', 'user.email=fixture@example.test',
+    'commit', '-qm', 'Select optional runtime packages'], source);
   for (const name of ['template/flowview.html', 'workbench/flowspec.html']) {
     await assert.rejects(access(path.join(source, name)), {code:'ENOENT'});
     await mkdir(path.dirname(path.join(source, name)), {recursive:true});
@@ -398,6 +406,10 @@ test('runtime packaging builds missing HTML from source and ignores stale local 
     assert.equal(await readFile(path.join(source, name), 'utf8'), 'STALE_LOCAL_HTML_MUST_NOT_SHIP');
   }
   assert.equal(await readFile(path.join(destination, 'workbench/catalog.json'), 'utf8'), '{"companyCatalog":true}');
+  const viewer = await readFile(path.join(destination, 'template/flowview.html'), 'utf8');
+  assert.match(viewer, /panel\.rnacopy/);
+  assert.match(viewer, /panel\.seatmap/);
+  await assert.rejects(access(path.join(destination, 'packages')), {code:'ENOENT'});
   assert.equal(await readFile(path.join(destination, 'deploy/workbench/Dockerfile'), 'utf8'),
     await readFile(path.join(source, 'deploy/workbench/Dockerfile.prebuilt'), 'utf8'));
   assert.equal((await run('git', ['status', '--porcelain'], source)).stdout, '');

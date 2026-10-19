@@ -1739,6 +1739,9 @@ body.sk-islanders .welcome{--welcome-ink:#071E42;--welcome-sub:#536A80;--welcome
 body.sk-islanders.welcome-active{background:radial-gradient(ellipse at 0% 0%,#DCEAF8,transparent 60%),#F4F8FC;}
 body.sk-islanders .workbench-header :is(.workbench-brand-detail,.workbench-header-links a,.workbench-header-links button){color:#D3E4F5;}
 body.sk-islanders .workbench-mark{color:#FC4C02;}
+/* Royal blue disappears against the dark Ink preset; use the team's orange
+   for its editor selection/membership marks, leaving semantic tones intact. */
+body.sk-islanders .docview g.node.ns-ink{--accent:#FC4C02;}
 body.sk-islanders .welcome-button-primary{background:#003087;color:#FFFFFF;border-color:#003087;}
 body.sk-islanders :is(.welcome-action,.welcome-library-entry,.library-controls,.canon-recent-link){background:#F5F9FC;border-color:#C8D9E8;color:#003087;}
 body.sk-islanders :is(.welcome-kicker,.welcome-back,.library-active-filters button,.library-recent-heading button){color:#003087;}

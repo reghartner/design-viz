@@ -38,14 +38,12 @@ test('default core retains generic panels and excludes domain panels', () => {
   assert.deepEqual(result.types, ['grid','funnel']);
 });
 
-test('sports alone validates the full season story without science sources or unknown panel types', () => {
-  const story = 'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json';
-  assert.ok(fs.existsSync(path.join(root, story)));
-  const result = run('sports', [story]);
+test('sports alone validates all four season arcs without science sources or unknown panel types', () => {
+  const stories=['season-of-seats','sell-the-inventory','serve-game-night','build-next-season'].map(id=>`packages/sports/diagrams/${id}/${id}.spec.json`);
+  const result = run('sports', stories);
   assert.deepEqual(result.packages, ['sports']);
   assert.deepEqual(result.types, ['grid','funnel','seatmap']);
-  assert.deepEqual(result.reports[0].errors, []);
-  assert.deepEqual(result.reports[0].warnings, []);
+  for(const report of result.reports){assert.deepEqual(report.errors, [], report.file);assert.deepEqual(report.warnings, [], report.file);}
 });
 
 test('science alone uses core generic panels and validates the sequencing starter', () => {
@@ -86,6 +84,9 @@ test('published standalone stories contain only their selected package runtime',
     ['packages/science/examples/membrane-signal/membrane-signal.html', 'science', ['sports','physics']],
     ['packages/science/examples/strand-cut/strand-cut.html', 'science', ['sports','physics']],
     ['packages/sports/diagrams/season-of-seats/season-of-seats.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/sell-the-inventory/sell-the-inventory.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/serve-game-night/serve-game-night.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/build-next-season/build-next-season.html', 'sports', ['science','physics']],
     ['packages/sports/examples/venue-map.html', 'sports', ['science','physics']],
   ];
   for (const [file, selected, excluded] of exports) {

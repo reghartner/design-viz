@@ -17,7 +17,7 @@ test('standalone async boot keeps live host and cookie choices with the saved sk
     await route.fulfill({json:spec('aurora','Saved fallback')});
   });
 
-  await page.goto(server.origin+'/template/flowview.html?spec=skin-async.json#embed=story&sk=daylight');await requested;
+  await page.goto(server.origin+'/template/flowview.html?spec=skin-async.json&theme=islanders#embed=story&sk=daylight');await requested;
   await page.evaluate(()=>window.dvSetSkin('terminal'));releaseAsync();
   await expect(page.locator('.doc-title')).toHaveText('Async host choice');
   await expect(page.locator('body')).toHaveClass(/\bsk-terminal\b/);await expect(page.locator('#docview')).toHaveClass(/\bsk-terminal\b/);

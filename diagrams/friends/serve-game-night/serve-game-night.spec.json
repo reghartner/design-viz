@@ -1,0 +1,5129 @@
+{
+ "page": {
+  "title": "3 · Serve and learn from game night",
+  "description": "Follow Islanders fans from ticket transfer to entry, sponsor rewards and the morning-after recap. Public facts cited; operational flows and uncited figures are illustrative.",
+  "skin": "islanders",
+  "contract": "1",
+  "tags": [
+   "sports",
+   "marketing",
+   "sports-marketing",
+   "ticketing",
+   "islanders",
+   "promotions",
+   "giveaways",
+   "group-sales",
+   "pricing",
+   "crm",
+   "sponsorship",
+   "renewals"
+  ],
+  "protocols": {
+   "ticket": {
+    "label": "ticket / barcode",
+    "color": "#003087"
+   },
+   "feed": {
+    "label": "data to CRM",
+    "color": "#2f9e8f"
+   },
+   "partner": {
+    "label": "partner data (often not shared)",
+    "color": "#a39e93"
+   },
+   "walk": {
+    "label": "fans on foot",
+    "color": "#447B9C"
+   }
+  },
+  "sections": [
+   {
+    "id": "buyer-is-not-attendee",
+    "heading": "The buyer is not the attendee",
+    "accent": "violet",
+    "source": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting",
+    "text": [
+     "Entry at UBS Arena is mobile only, and each barcode appears in the app 48 hours before puck drop ([Islanders mobile tickets](https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting)). Primary tickets are sold through Ticketmaster ([Islanders tickets](https://www.nhl.com/islanders/tickets/islanders-tickets)). After that, a ticket can stay with its buyer, move to a friend, or be resold, and each route leaves a different trail in the team's data.",
+     "Follow seat 6 of a two-seat order through each route: the ticket's lifecycle, the buyer's phone, the CRM record and the feeds each route lights. Dana R. and Sam K. are fictional, and the systems, feeds and figures are illustrative reconstructions of common practice, not any team's or vendor's internals."
+    ],
+    "bullets": [
+     {
+      "text": "**The lesson:** the *scan list*, not the order list, says who was in the building."
+     },
+     {
+      "text": "**Why it matters:** giveaway counts, recap emails, loyalty points and churn signals all change with it."
+     },
+     {
+      "text": "**The opportunity:** transfer recipients have attended but never bought, so they are warm first-purchase prospects."
+     }
+    ],
+    "diagram": {
+     "view": "step",
+     "storyTime": {
+      "start": "2026-11-20T12:00",
+      "end": "2026-11-28T10:00",
+      "clock": "12h",
+      "date": "short"
+     },
+     "nodes": {
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "orders",
+       "icon": "server",
+       "tint": "cmd",
+       "link": "https://www.nhl.com/islanders/tickets/islanders-tickets"
+      },
+      "wallet": {
+       "title": "Team app",
+       "sub": "code at T-48h",
+       "icon": "phone",
+       "tint": "dev",
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting"
+      },
+      "transfers": {
+       "title": "Transfers",
+       "sub": "and resale",
+       "icon": "key",
+       "tint": "auth"
+      },
+      "gate": {
+       "title": "Gate scan",
+       "sub": "valid code",
+       "icon": "door",
+       "tint": "dev"
+      },
+      "pos": {
+       "title": "POS / F&B",
+       "sub": "concessions",
+       "icon": "terminal",
+       "tint": "cmd"
+      },
+      "sponsor": {
+       "title": "Sponsor app",
+       "sub": "claims",
+       "icon": "package",
+       "tint": "cmd"
+      },
+      "crm": {
+       "title": "CRM",
+       "sub": "fan identity",
+       "icon": "db",
+       "tint": "data"
+      },
+      "email": {
+       "title": "Email / push",
+       "sub": "recap, offers",
+       "icon": "chime",
+       "tint": "mqtt"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "email",
+       "side": "below",
+       "x": 349,
+       "y": 466
+      },
+      {
+       "id": "gate",
+       "side": "below",
+       "x": 575,
+       "y": 70
+      },
+      {
+       "id": "pos",
+       "side": "below",
+       "x": 575,
+       "y": 334
+      },
+      {
+       "id": "sponsor",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "transfers",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "wallet",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      }
+     ],
+     "edges": [
+      {
+       "from": "ticketing",
+       "to": "wallet",
+       "kind": "ticket",
+       "label": "tickets · barcode T-48h",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": -14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": 14.96
+        }
+       ]
+      },
+      {
+       "from": "wallet",
+       "to": "transfers",
+       "kind": "ticket",
+       "label": "send or list seat",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -63.64,
+         "dy": -44
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 63.64,
+         "dy": 44
+        }
+       ]
+      },
+      {
+       "from": "transfers",
+       "to": "ticketing",
+       "kind": "ticket",
+       "label": "void + re-issue",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "wallet",
+       "to": "gate",
+       "kind": "ticket",
+       "label": "scan barcode",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "ticketing",
+       "to": "crm",
+       "kind": "feed",
+       "label": "orders: the buyer",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "transfers",
+       "to": "crm",
+       "kind": "feed",
+       "label": "recipient contact",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 63.64,
+         "dy": -44
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -63.64,
+         "dy": 44
+        }
+       ]
+      },
+      {
+       "from": "gate",
+       "to": "crm",
+       "kind": "feed",
+       "label": "scans: who came",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -115.05,
+         "dy": -88
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 115.05,
+         "dy": 88
+        }
+       ]
+      },
+      {
+       "from": "pos",
+       "to": "crm",
+       "kind": "feed",
+       "label": "F&B spend",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "sponsor",
+       "to": "crm",
+       "kind": "partner",
+       "ret": true,
+       "label": "often not shared",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "crm",
+       "to": "email",
+       "kind": "feed",
+       "label": "recap to scan list",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "life",
+       "type": "orbit",
+       "title": "Seat 6 · ticket lifecycle",
+       "states": [
+        "PURCHASED",
+        "IN APP",
+        "LIVE",
+        "TRANSFERRED",
+        "RESOLD",
+        "SCANNED"
+       ],
+       "colors": {
+        "PURCHASED": "#6b7bd6",
+        "IN APP": "#6b7bd6",
+        "LIVE": "#2f8f5b",
+        "TRANSFERRED": "#d9822b",
+        "RESOLD": "#a26bd6",
+        "SCANNED": "#2f6fd1"
+       },
+       "initial": {
+        "state": "PURCHASED"
+       }
+      },
+      {
+       "id": "app",
+       "type": "deviceapp",
+       "title": "Dana's phone · illustrative fan app",
+       "device": "My tickets",
+       "subtitle": "Fri Nov 27 · vs WPG · UBS Arena",
+       "appName": "Team app",
+       "fields": [
+        {
+         "id": "seat6",
+         "label": "Sec 312 · Row 6",
+         "icon": "lock",
+         "freshness": "off",
+         "badgeMode": "custom",
+         "badgeText": "Pending",
+         "badgeColor": "#53617a"
+        },
+        {
+         "id": "seat5",
+         "label": "Sec 312 · Row 6",
+         "icon": "lock",
+         "freshness": "off",
+         "badgeMode": "custom",
+         "badgeText": "Pending",
+         "badgeColor": "#53617a"
+        }
+       ],
+       "initial": {
+        "phoneScreen": "app",
+        "seat5": {
+         "value": "Seat 5",
+         "status": "loading",
+         "detail": "Barcode appears 48 h before puck drop"
+        },
+        "seat6": {
+         "value": "Seat 6",
+         "status": "loading",
+         "detail": "Barcode appears 48 h before puck drop"
+        }
+       },
+       "brand": {
+        "app": "Team app (illustrative)",
+        "logo": "TA",
+        "accent": "#DDE3FA",
+        "fg": "#2B3A8C"
+       }
+      },
+      {
+       "id": "crm",
+       "type": "table",
+       "title": "CRM: who the team thinks was there",
+       "columns": [
+        {
+         "id": "person",
+         "label": "Person"
+        },
+        {
+         "id": "bought",
+         "label": "Bought"
+        },
+        {
+         "id": "scanned",
+         "label": "Scanned"
+        },
+        {
+         "id": "crm",
+         "label": "CRM record"
+        }
+       ],
+       "initial": {
+        "rows": [],
+        "note": "Names are fictional. Flows are illustrative."
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "buy",
+       "time": "2026-11-20T12:10",
+       "edge": "ticketing->crm",
+       "nodes": [
+        "ticketing",
+        "crm"
+       ],
+       "text": "**Dana R.** (a fictional buyer) buys two seats for the **Sorokin bobblehead night**, Fri Nov 27 vs Winnipeg ([promo schedule](https://nhl.com/islanders/tickets/promotional-schedule)): Sec 312, Row 6, seats 5 and 6. Ticketing writes one order, and CRM files one person as the attendee of both seats. That is an *assumption*, not a fact.",
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule",
+       "panels": {
+        "life": {
+         "state": "PURCHASED",
+         "via": "order, 2 seats"
+        },
+        "app": {
+         "seat5": {
+          "value": "Seat 5",
+          "status": "loading",
+          "detail": "Barcode appears 48 h before puck drop",
+          "badgeMode": "custom",
+          "badgeText": "Pending",
+          "badgeColor": "#53617a"
+         },
+         "seat6": {
+          "value": "Seat 6",
+          "status": "loading",
+          "detail": "Barcode appears 48 h before puck drop",
+          "badgeMode": "custom",
+          "badgeText": "Pending",
+          "badgeColor": "#53617a"
+         }
+        },
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "not yet",
+            "crm": "buyer = attendee (assumed)"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "One order, one name. CRM assumes the buyer fills both seats."
+        }
+       }
+      },
+      {
+       "id": "account",
+       "time": "2026-11-24T19:30",
+       "edge": "ticketing->wallet",
+       "nodes": [
+        "ticketing",
+        "wallet"
+       ],
+       "text": "**T-72h.** Both tickets sit in Dana's account in the fan app, but there is nothing to scan yet. Entry at UBS Arena is mobile only, and the official help page says barcodes appear in the app **48 hours before** a home game ([mobile tickets](https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting)).",
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting",
+       "panels": {
+        "life": {
+         "state": "IN APP",
+         "via": "no barcode yet"
+        },
+        "app": {
+         "seat5": {
+          "status": "stale",
+          "detail": "Barcode appears 48 h before puck drop",
+          "badgeText": "No barcode"
+         },
+         "seat6": {
+          "status": "stale",
+          "detail": "Barcode appears 48 h before puck drop",
+          "badgeText": "No barcode"
+         }
+        }
+       }
+      },
+      {
+       "id": "live",
+       "time": "2026-11-25T19:30",
+       "edge": "ticketing->wallet",
+       "nodes": [
+        "ticketing",
+        "wallet"
+       ],
+       "text": "**T-48h: the barcodes go live.** A push says the tickets are ready and both cards can be added to Apple or Google Wallet. From here on, *whoever holds a live barcode* is who gets in. Seat 6 is where the story forks.",
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting",
+       "panels": {
+        "life": {
+         "state": "LIVE",
+         "via": "T-48h release"
+        },
+        "app": {
+         "notify": {
+          "app": "Team app",
+          "title": "Your tickets are ready",
+          "text": "Barcodes for Fri vs WPG are live. Add them to Wallet."
+         },
+         "seat5": {
+          "status": "ready",
+          "detail": "Secure barcode · Add to Wallet",
+          "badgeText": "Ready",
+          "badgeColor": "#2f8f5b",
+          "icon": "key"
+         },
+         "seat6": {
+          "status": "ready",
+          "detail": "Secure barcode · Add to Wallet",
+          "badgeText": "Ready",
+          "badgeColor": "#2f8f5b",
+          "icon": "key"
+         }
+        }
+       }
+      },
+      {
+       "id": "own-scan",
+       "time": "2026-11-27T18:52",
+       "edge": "wallet->gate",
+       "nodes": [
+        "wallet",
+        "gate"
+       ],
+       "text": "**Owner keeps seat 6.** Dana arrives with a friend and scans both barcodes from one phone. The gate records two valid scans on one account. The friend walks in, but no system learns who the friend is.",
+       "panels": {
+        "life": {
+         "state": "SCANNED",
+         "via": "Dana's phone"
+        },
+        "app": {
+         "clear": true,
+         "seat5": {
+          "status": "ready",
+          "detail": "Scanned 6:52 PM",
+          "badgeText": "Scanned",
+          "badgeColor": "#3b6fd1",
+          "icon": "door"
+         },
+         "seat6": {
+          "status": "ready",
+          "detail": "Scanned 6:52 PM",
+          "badgeText": "Scanned",
+          "badgeColor": "#3b6fd1",
+          "icon": "door"
+         }
+        }
+       }
+      },
+      {
+       "id": "own-feed",
+       "time": "2026-11-27T21:40",
+       "edges": [
+        "gate->crm",
+        "pos->crm"
+       ],
+       "nodes": [
+        "gate",
+        "pos",
+        "crm",
+        "sponsor"
+       ],
+       "failures": {
+        "sponsor->crm": "blocked"
+       },
+       "text": "**Scans and spend flow to CRM.** Two scans and one card swipe at concessions land on Dana's record. The sponsor's app may log a claim tonight, but that feed is *often not shared back*, so it never reaches the fan record (illustrative).",
+       "panels": {
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "2 scans",
+            "crm": "attended ×2 · F&B $38"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "friend",
+           "cells": {
+            "person": "(friend in seat 6)",
+            "bought": "—",
+            "scanned": "on Dana's scan",
+            "crm": "not in CRM"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "One person on record, two scans. F&B amount illustrative."
+        }
+       }
+      },
+      {
+       "id": "own-after",
+       "time": "2026-11-28T09:00",
+       "edge": "crm->email",
+       "nodes": [
+        "crm",
+        "email"
+       ],
+       "text": "**The morning after.** One recap email goes to Dana, the giveaway count says two bobbleheads went to one fan, and Dana's churn score reads *engaged*. All true, but the friend who sat in seat 6 is still invisible to marketing.",
+       "panels": {
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "2 scans",
+            "crm": "recap sent · engaged"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "friend",
+           "cells": {
+            "person": "(friend in seat 6)",
+            "bought": "—",
+            "scanned": "on Dana's scan",
+            "crm": "no record · no email"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Counts by scan: 2 attended. Known people: 1."
+        }
+       }
+      },
+      {
+       "id": "xfer-send",
+       "time": "2026-11-26T17:45",
+       "edge": "wallet->transfers",
+       "nodes": [
+        "wallet",
+        "transfers"
+       ],
+       "text": "**Dana transfers seat 6** to a friend, **Sam K.** (also fictional), by email from the app. Sam accepts. Dana's card for seat 6 now reads *transferred* and no longer holds a barcode.",
+       "panels": {
+        "life": {
+         "state": "TRANSFERRED",
+         "via": "Sam accepted"
+        },
+        "app": {
+         "notify": {
+          "app": "Team app",
+          "title": "Transfer accepted",
+          "text": "Sam K. accepted Sec 312 · Row 6 · Seat 6."
+         },
+         "seat6": {
+          "status": "error",
+          "detail": "Transferred to Sam K.",
+          "badgeText": "Transferred",
+          "badgeColor": "#b7791f",
+          "icon": "person"
+         }
+        }
+       }
+      },
+      {
+       "id": "xfer-reissue",
+       "time": "2026-11-26T17:46",
+       "edges": [
+        "transfers->ticketing",
+        "transfers->crm"
+       ],
+       "nodes": [
+        "transfers",
+        "ticketing",
+        "crm"
+       ],
+       "text": "**Void and re-issue.** The old barcode is cancelled and Sam gets a new one in his own account (illustrative of common practice). The transfer carries Sam's contact, so CRM gains a person who never placed an order.",
+       "panels": {
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "not yet",
+            "crm": "buyer · 1 seat transferred"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "sam",
+           "cells": {
+            "person": "Sam K.",
+            "bought": "0",
+            "scanned": "not yet",
+            "crm": "transfer recipient"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Sam's contact came with the transfer, not with a purchase."
+        }
+       }
+      },
+      {
+       "id": "xfer-scan",
+       "time": "2026-11-27T19:05",
+       "edges": [
+        "wallet->gate",
+        "gate->crm"
+       ],
+       "nodes": [
+        "wallet",
+        "gate",
+        "crm"
+       ],
+       "failures": {
+        "sponsor->crm": "blocked"
+       },
+       "text": "**Game night: two phones, two people.** Dana scans seat 5 and Sam scans seat 6 from his own app. The scan feed credits the attendance to the person who held the barcode, not to the buyer.",
+       "panels": {
+        "life": {
+         "state": "SCANNED",
+         "via": "Sam's new barcode"
+        },
+        "app": {
+         "clear": true,
+         "seat5": {
+          "detail": "Scanned 7:03 PM",
+          "badgeText": "Scanned",
+          "badgeColor": "#3b6fd1",
+          "icon": "door"
+         }
+        },
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "1 scan",
+            "crm": "attended"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "sam",
+           "cells": {
+            "person": "Sam K.",
+            "bought": "0",
+            "scanned": "1 scan",
+            "crm": "attended, never bought"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "The scan list, not the order list, says who was there."
+        }
+       }
+      },
+      {
+       "id": "xfer-after",
+       "time": "2026-11-28T09:00",
+       "edge": "crm->email",
+       "nodes": [
+        "crm",
+        "email"
+       ],
+       "text": "**Best prospect on file.** Sam lands in the *attended, never bought* segment: he has already sat in the seat, so a first-purchase offer is a warm ask (an illustrative segment, extending the first-time-buyer segments vendors describe, e.g. [Proem Sports](https://www.proemsports.com/post/5-personalised-segments-to-strengthen-relationships-with-your-fans)). This works only because the post-game send keys on scans, not orders.",
+       "link": "https://www.proemsports.com/post/5-personalised-segments-to-strengthen-relationships-with-your-fans",
+       "panels": {
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "1 scan",
+            "crm": "recap sent"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "sam",
+           "cells": {
+            "person": "Sam K.",
+            "bought": "0",
+            "scanned": "1 scan",
+            "crm": "recap + first-purchase offer"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Segment logic illustrative; the attended-never-bought segment is the author's extension of vendor-described first-time-buyer segments."
+        }
+       }
+      },
+      {
+       "id": "sell-list",
+       "time": "2026-11-26T10:15",
+       "edge": "wallet->transfers",
+       "nodes": [
+        "wallet",
+        "transfers"
+       ],
+       "text": "**Dana can't use seat 6, so she lists it for resale** on a marketplace linked to her account. Until it sells, her barcode stays live and the seat is still hers.",
+       "panels": {
+        "life": {
+         "state": "LIVE",
+         "via": "listed for resale"
+        },
+        "app": {
+         "seat6": {
+          "status": "loading",
+          "detail": "Listed for resale",
+          "badgeText": "Listed",
+          "badgeColor": "#b7791f"
+         }
+        }
+       }
+      },
+      {
+       "id": "sell-sold",
+       "time": "2026-11-26T22:30",
+       "edge": "transfers->ticketing",
+       "nodes": [
+        "transfers",
+        "ticketing",
+        "crm"
+       ],
+       "failures": {
+        "transfers->crm": "blocked"
+       },
+       "text": "**Sold.** Dana's seat 6 barcode is voided and a new one goes to the secondary buyer. In this illustration the marketplace keeps the buyer's contact, so nothing new reaches CRM.",
+       "panels": {
+        "life": {
+         "state": "RESOLD",
+         "via": "old barcode void"
+        },
+        "app": {
+         "notify": {
+          "app": "Team app",
+          "title": "Your ticket sold",
+          "text": "Sec 312 · Row 6 · Seat 6 sold. Its barcode is no longer valid."
+         },
+         "seat6": {
+          "status": "error",
+          "detail": "Sold · barcode void",
+          "badgeText": "Void",
+          "badgeColor": "#c2414b",
+          "icon": "lock"
+         }
+        },
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "not yet",
+            "crm": "buyer · 1 seat resold"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "seat6",
+           "cells": {
+            "person": "Seat 6 holder",
+            "bought": "resale",
+            "scanned": "not yet",
+            "crm": "attendee unknown"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "The resale buyer's identity may or may not reach the team."
+        }
+       }
+      },
+      {
+       "id": "sell-scan",
+       "time": "2026-11-27T19:10",
+       "edges": [
+        "wallet->gate",
+        "gate->crm"
+       ],
+       "nodes": [
+        "wallet",
+        "gate",
+        "crm"
+       ],
+       "failures": {
+        "sponsor->crm": "blocked"
+       },
+       "text": "**Game night: a stranger in seat 6.** The new barcode scans fine. The gate knows a valid ticket entered, but CRM can only attach that scan to a seat, not to a person.",
+       "panels": {
+        "life": {
+         "state": "SCANNED",
+         "via": "unknown holder"
+        },
+        "app": {
+         "clear": true,
+         "seat5": {
+          "detail": "Scanned 7:08 PM",
+          "badgeText": "Scanned",
+          "badgeColor": "#3b6fd1",
+          "icon": "door"
+         }
+        },
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "1 scan",
+            "crm": "attended"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "seat6",
+           "cells": {
+            "person": "Seat 6 holder",
+            "bought": "resale",
+            "scanned": "1 scan",
+            "crm": "attended · attendee unknown"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "A scan with no name: counted, but not marketable."
+        }
+       }
+      },
+      {
+       "id": "sell-after",
+       "time": "2026-11-28T09:00",
+       "edge": "crm->email",
+       "nodes": [
+        "crm",
+        "email"
+       ],
+       "text": "**The gap in the morning.** The recap goes only to Dana. The bobblehead count is right (two scans), but one attendee can't be thanked, re-marketed or credited with points. For a member account, attendance points accrue through the linked ticket account ([Isles Rewards](https://www.nhl.com/islanders/tickets/membership/isles-rewards)).",
+       "link": "https://www.nhl.com/islanders/tickets/membership/isles-rewards",
+       "panels": {
+        "crm": {
+         "rows": [
+          {
+           "id": "dana",
+           "cells": {
+            "person": "Dana R.",
+            "bought": "2 seats",
+            "scanned": "1 scan",
+            "crm": "recap sent"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "seat6",
+           "cells": {
+            "person": "Seat 6 holder",
+            "bought": "resale",
+            "scanned": "1 scan",
+            "crm": "no email · no points"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Known people: 1. Attendees: 2."
+        }
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "owner",
+       "label": "Owner uses seat 6",
+       "steps": [
+        "buy",
+        "account",
+        "live",
+        "own-scan",
+        "own-feed",
+        "own-after"
+       ]
+      },
+      {
+       "id": "transfer",
+       "label": "Transferred to a friend",
+       "color": "#e08a3c",
+       "steps": [
+        "buy",
+        "account",
+        "live",
+        "xfer-send",
+        "xfer-reissue",
+        "xfer-scan",
+        "xfer-after"
+       ]
+      },
+      {
+       "id": "resale",
+       "label": "Resold",
+       "color": "#a26bd6",
+       "steps": [
+        "buy",
+        "account",
+        "live",
+        "sell-list",
+        "sell-sold",
+        "sell-scan",
+        "sell-after"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 10,
+      "w": 662,
+      "h": 511
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+       },
+       {
+        "x": 0,
+        "y": 9,
+        "w": 14,
+        "h": 15
+       },
+       {
+        "panel": "crm",
+        "x": 0,
+        "y": 24,
+        "w": 14,
+        "h": 5
+       },
+       {
+        "panel": "app",
+        "x": 14,
+        "y": 9,
+        "w": 10,
+        "h": 13
+       },
+       {
+        "panel": "life",
+        "x": 14,
+        "y": 22,
+        "w": 10,
+        "h": 7
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "gate-night",
+    "heading": "Ten thousand hats, six doors",
+    "accent": "amber",
+    "source": "https://nhl.com/islanders/tickets/promotional-schedule",
+    "text": [
+     "On a *first 10,000* night the count is never only total supply. It is ten thousand hats split across six doors, drawn down at different speeds by a Park crowd at one entrance and a train at another. The Islanders gave camo hats to the first 10,000 on Military Appreciation nights in [2024](https://thehockeynews.com/nhl/new-york-islanders/players/new-york-islanders-promo-nights-group-nights-ubs-arena-release) and [2025](https://www.amny.com/sports/islanders-giveaways-25-26-8-19-25); on **Nov 7, 2026 vs New Jersey** it is a Ford camo hat ([schedule](https://nhl.com/islanders/tickets/promotional-schedule)).",
+     "Each bar counts **claims on one gate's stock**: hats handed out there, cases sent to another gate, and first-10,000 fans turned away. NEAR, AT and OVER LIMIT are the ops desk's cues. Names, dates, The Park on the Plaza, the AmEx and NE entrances and the LIRR station are public facts. Gates C to F, every split, count, case size and time are illustrative, and the scan, inventory and radio flow is a reconstruction of common practice, not any team's or vendor's system."
+    ],
+    "bullets": [
+     "**Fork at T-45:** choose *Move cases* or *No action* below the step controls. Both end with every gate out and the last hat logged",
+     "**The difference is who got the hat,** not how many: the sponsor recap reads 10,000 either way",
+     "**Operator fix:** put a live per-gate count against allotment in front of the ops desk"
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "app": {
+       "title": "Team app",
+       "sub": "mobile ticket",
+       "icon": "phone",
+       "tint": "dev",
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting"
+      },
+      "park": {
+       "title": "Park on Plaza",
+       "sub": "opens T-3.5h",
+       "icon": "person",
+       "tint": "auth",
+       "link": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088"
+      },
+      "lirr": {
+       "title": "LIRR · Elmont",
+       "sub": "train arrivals",
+       "icon": "router",
+       "tint": "mqtt",
+       "link": "https://nhl.com/islanders/arena/getting-here"
+      },
+      "scan": {
+       "title": "Gate scan",
+       "sub": "6 entrances",
+       "icon": "shield",
+       "tint": "cmd"
+      },
+      "promo": {
+       "title": "Promo stock",
+       "sub": "10,000 hats",
+       "icon": "package",
+       "tint": "data"
+      },
+      "ops": {
+       "title": "Event ops desk",
+       "sub": "runners",
+       "icon": "headset",
+       "tint": "cmd"
+      },
+      "sponsor": {
+       "title": "Sponsor · Ford",
+       "sub": "recap",
+       "icon": "monitor",
+       "tint": "auth",
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "app",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "lirr",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "ops",
+       "side": "below",
+       "x": 349,
+       "y": 480
+      },
+      {
+       "id": "park",
+       "side": "below",
+       "x": 575,
+       "y": 202
+      },
+      {
+       "id": "promo",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "scan",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "sponsor",
+       "side": "below",
+       "x": 575,
+       "y": 334
+      }
+     ],
+     "edges": [
+      {
+       "from": "promo",
+       "to": "ops",
+       "kind": "int",
+       "label": "limit alerts",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.38
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.38
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 18
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -18
+        }
+       ],
+       "labelDx": -58
+      },
+      {
+       "from": "ops",
+       "to": "promo",
+       "kind": "int",
+       "ret": true,
+       "label": "cases moved",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.62
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.62
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": -18
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": 18
+        }
+       ],
+       "labelDx": 58
+      },
+      {
+       "from": "park",
+       "to": "scan",
+       "kind": "walk",
+       "label": "AmEx entrance",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "lirr",
+       "to": "scan",
+       "kind": "walk",
+       "label": "train surge",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "app",
+       "to": "scan",
+       "kind": "https",
+       "label": "barcode scan",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "scan",
+       "to": "promo",
+       "kind": "int",
+       "label": "handouts by gate",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "promo",
+       "to": "sponsor",
+       "kind": "https",
+       "label": "recap by gate",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "gates",
+       "type": "budget",
+       "title": "Hat stock · main doors (claims vs allotment)",
+       "metrics": [
+        {
+         "id": "amex",
+         "label": "AmEx entrance (north)",
+         "unit": "hats",
+         "max": 2600,
+         "warn": 2200
+        },
+        {
+         "id": "ne",
+         "label": "NE entrance · box office",
+         "unit": "hats",
+         "max": 1600,
+         "warn": 1360
+        },
+        {
+         "id": "c",
+         "label": "Gate C · LIRR walk (illus.)",
+         "unit": "hats",
+         "max": 2000,
+         "warn": 1700
+        },
+        {
+         "id": "moved",
+         "label": "Hats moved into Gate C (runner capacity 1,000)",
+         "unit": "hats",
+         "max": 1000
+        }
+       ],
+       "initial": {
+        "values": {
+         "amex": null,
+         "ne": null,
+         "c": null,
+         "moved": null
+        },
+        "note": "Allotments not yet staged."
+       }
+      },
+      {
+       "id": "gates2",
+       "type": "budget",
+       "title": "Hat stock · side doors (illustrative split)",
+       "metrics": [
+        {
+         "id": "d",
+         "label": "Gate D (illus.)",
+         "unit": "hats",
+         "max": 1200,
+         "warn": 1020
+        },
+        {
+         "id": "e",
+         "label": "Gate E (illus.)",
+         "unit": "hats",
+         "max": 1000,
+         "warn": 850
+        },
+        {
+         "id": "f",
+         "label": "Gate F · lot side (illus.)",
+         "unit": "hats",
+         "max": 1600,
+         "warn": 1360
+        }
+       ],
+       "initial": {
+        "values": {
+         "d": null,
+         "e": null,
+         "f": null
+        },
+        "note": "Gates C to F are illustrative."
+       }
+      },
+      {
+       "id": "doors",
+       "type": "timeline",
+       "title": "Arrival rhythm (illustrative) · Park opens at 0, puck drop at 3h30m · dots are beats, × = beats in the window",
+       "span": "3h30m",
+       "lanes": [
+        {
+         "id": "park",
+         "label": "Park",
+         "every": "30m"
+        },
+        {
+         "id": "amex",
+         "label": "AmEx",
+         "every": "10m"
+        },
+        {
+         "id": "lirr",
+         "label": "LIRR",
+         "every": "20m"
+        },
+        {
+         "id": "ops",
+         "label": "Ops check",
+         "every": "10m"
+        }
+       ],
+       "initial": {
+        "now": "0m"
+       }
+      },
+      {
+       "id": "log",
+       "type": "log",
+       "title": "Ops channel",
+       "tags": {
+        "OPS": "#7C6FD6",
+        "SCAN": "#3E8FC9",
+        "PROMO": "#C08A2E",
+        "GUEST": "#D0606E"
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "plan",
+       "nodes": [
+        "promo",
+        "ops"
+       ],
+       "edge": "promo->ops",
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule",
+       "text": "**Sat Nov 7, 2026 vs New Jersey: Military Appreciation.** A Ford camo hat goes to the *first 10,000* fans ([schedule](https://nhl.com/islanders/tickets/promotional-schedule)). Promotions splits the 10,000 across six doors by expected entry share. Only the AmEx and NE entrances are real names; Gates C to F and every split are illustrative.",
+       "panels": {
+        "gates": {
+         "note": "Staged: 2,600 · 1,600 · 2,000 · 1,200 · 1,000 · 1,600 = 10,000. Bars count claims on each gate's stock; the tick on each bar marks NEAR LIMIT.",
+         "values": {
+          "amex": 0,
+          "ne": 0,
+          "c": 0,
+          "moved": 0
+         }
+        },
+        "doors": {
+         "now": "0m"
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PROMO",
+           "text": "T-4:00  10,000 hats staged in 6 gate allotments"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 0,
+          "e": 0,
+          "f": 0
+         }
+        }
+       }
+      },
+      {
+       "id": "park",
+       "nodes": [
+        "park"
+       ],
+       "link": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088",
+       "text": "**T-3.5h: The Park on the Plaza opens** outside the American Express entrance on the north side, with $5 beers in the Heineken Beer Garden and the Isles Lab Swag Shack ([NHL.com](https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088)). Fans gather on the plaza, but the doors are still shut, so no hats move yet.",
+       "panels": {
+        "doors": {
+         "now": "0m",
+         "events": [
+          {
+           "at": "0m",
+           "lane": "park",
+           "label": "Park opens",
+           "kind": "ok"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "OPS",
+           "text": "T-3:30  Park on the Plaza open · gates closed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "amex",
+       "edges": [
+        "app->scan",
+        "park->scan",
+        "scan->promo"
+       ],
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting",
+       "text": "**T-90 (illustrative): the AmEx entrance scans first.** The Park crowd is already outside it. Entry is mobile-only and barcodes have been in the app since T-48h ([Islanders](https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting)). Each scan that earns a hat is counted against the AmEx allotment.",
+       "panels": {
+        "gates": {
+         "note": "AmEx 700 / 2,600. The other five doors are not open yet.",
+         "values": {
+          "amex": 700,
+          "ne": 0,
+          "c": 0
+         }
+        },
+        "doors": {
+         "now": "2h",
+         "events": [
+          {
+           "at": "2h",
+           "lane": "amex",
+           "label": "first scan",
+           "kind": "info"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "SCAN",
+           "text": "T-1:30  AmEx entrance first scan"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 0,
+          "e": 0,
+          "f": 0
+         }
+        }
+       }
+      },
+      {
+       "id": "doors",
+       "edges": [
+        "app->scan",
+        "scan->promo"
+       ],
+       "text": "**T-60: all six doors open.** The AmEx entrance is already more than half through its stock. The other gates start from zero, so the race is uneven from the first minute.",
+       "panels": {
+        "gates": {
+         "note": "2,520 hats out. AmEx carries the Park crowd.",
+         "values": {
+          "amex": 1500,
+          "ne": 300,
+          "c": 250
+         }
+        },
+        "doors": {
+         "now": "2h30m"
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "OPS",
+           "text": "T-1:00  all six gates scanning"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 150,
+          "e": 120,
+          "f": 200
+         }
+        }
+       }
+      },
+      {
+       "id": "train",
+       "edges": [
+        "lirr->scan",
+        "scan->promo"
+       ],
+       "link": "https://nhl.com/islanders/arena/getting-here",
+       "text": "**T-50: a full train empties at the Elmont-UBS Arena station** ([getting here](https://nhl.com/islanders/arena/getting-here)). The walk funnels most riders to one door, Gate C (illustrative). Its count jumps by 1,470 in ten minutes and crosses the warning line: **NEAR LIMIT**.",
+       "panels": {
+        "gates": {
+         "note": "Gate C 1,720 / 2,000: NEAR LIMIT.",
+         "values": {
+          "amex": 1800,
+          "ne": 450,
+          "c": 1720
+         }
+        },
+        "doors": {
+         "now": "2h40m",
+         "events": [
+          {
+           "at": "2h40m",
+           "lane": "lirr",
+           "label": "surge → Gate C",
+           "kind": "alert"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "SCAN",
+           "text": "T-0:50  Gate C +1,470 in 10 min (train)"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 300,
+          "e": 250,
+          "f": 450
+         }
+        }
+       }
+      },
+      {
+       "id": "limit",
+       "edge": "promo->ops",
+       "tone": {
+        "ops": "warn"
+       },
+       "text": "**T-45: Gate C is AT LIMIT.** Its last case is open while the lot-side Gate F sits at half (800 of 1,600). The hats exist; they are at the wrong door. The ops desk has to decide now.",
+       "panels": {
+        "gates": {
+         "note": "Gate C 2,000 / 2,000: AT LIMIT. Gate F 800 / 1,600. 3,770 hats still in the building.",
+         "values": {
+          "amex": 2050,
+          "ne": 600,
+          "c": 2000
+         }
+        },
+        "doors": {
+         "now": "2h45m",
+         "events": [
+          {
+           "at": "2h45m",
+           "lane": "ops",
+           "label": "C at limit",
+           "kind": "alert"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "OPS",
+           "text": "T-0:45  ALERT Gate C 2,000/2,000 · Gate F 800/1,600"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 420,
+          "e": 360,
+          "f": 800
+         }
+        }
+       }
+      },
+      {
+       "id": "move",
+       "edge": "ops->promo",
+       "tone": {
+        "ops": "ok"
+       },
+       "text": "**Move cases.** Runners take 4 cases from Gate F and 2 from Gate E to Gate C (100 hats a case, illustrative). Gate C stays AT LIMIT on its own stock and hands out the moved hats; those 600 count against F and E, so their bars jump.",
+       "panels": {
+        "gates": {
+         "note": "600 hats moved: F 800 → 1,200 and E 360 → 560. Gate C keeps handing out.",
+         "values": {
+          "amex": 2100,
+          "ne": 640,
+          "c": 2000,
+          "moved": 600
+         }
+        },
+        "doors": {
+         "now": "2h47m",
+         "events": [
+          {
+           "at": "2h47m",
+           "lane": "ops",
+           "label": "6 cases → C",
+           "kind": "ok"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "OPS",
+           "text": "T-0:43  runners: 4 cases F→C, 2 cases E→C"
+          },
+          {
+           "tag": "SCAN",
+           "text": "T-0:41  Gate C handing out again"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 450,
+          "e": 560,
+          "f": 1200
+         }
+        }
+       }
+      },
+      {
+       "id": "move-drain",
+       "edges": [
+        "app->scan",
+        "scan->promo"
+       ],
+       "text": "**T-25: doors drain evenly.** The AmEx entrance and Gate E run out; the rest are NEAR or AT LIMIT. No first-10,000 fan has been turned away at any door.",
+       "panels": {
+        "gates": {
+         "note": "9,550 hats claimed. Turned away: 0. Gate C is still handing out the 600 moved-in hats.",
+         "values": {
+          "amex": 2600,
+          "ne": 1400,
+          "c": 2000,
+          "moved": 600
+         }
+        },
+        "doors": {
+         "now": "3h5m"
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PROMO",
+           "text": "T-0:25  AmEx OUT · Gate E OUT"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 1050,
+          "e": 1000,
+          "f": 1500
+         }
+        }
+       }
+      },
+      {
+       "id": "move-out",
+       "edges": [
+        "scan->promo",
+        "promo->sponsor"
+       ],
+       "tone": {
+        "ops": null
+       },
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule",
+       "text": "**T-15: every gate is out.** The last hat goes at the NE entrance at T-15. The recap to Ford shows 10,000 handed out and none of the first 10,000 turned away. The lesson: rarely a shortage, usually stock in the wrong place.",
+       "panels": {
+        "gates": {
+         "note": "10,000 of 10,000 out, 0 turned away. Gate C handed out 2,600: its own 2,000 plus 600 moved in (400 from F, 200 from E). Last hat T-15 (illustrative).",
+         "values": {
+          "amex": 2600,
+          "ne": 1600,
+          "c": 2000,
+          "moved": 600
+         }
+        },
+        "doors": {
+         "now": "3h15m",
+         "events": [
+          {
+           "at": "3h15m",
+           "lane": "ops",
+           "label": "last hat",
+           "kind": "ok"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PROMO",
+           "text": "T-0:15  LAST HAT · NE entrance · 10,000/10,000"
+          },
+          {
+           "tag": "PROMO",
+           "text": "recap → Ford: 0 turned away"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 1200,
+          "e": 1000,
+          "f": 1600
+         }
+        }
+       }
+      },
+      {
+       "id": "gone",
+       "failures": {
+        "ops->promo": "blocked"
+       },
+       "edges": [
+        "lirr->scan",
+        "scan->promo"
+       ],
+       "tone": {
+        "ops": "alert"
+       },
+       "text": "**No action.** No runner is sent. Gate C keeps scanning fans who are inside the first 10,000 and tells them the hats are gone: **OVER LIMIT**. Meanwhile about 2,000 hats sit in cases at Gates D, E and F.",
+       "panels": {
+        "gates": {
+         "note": "Gate C over by 250: fans told \"gone\" while stock sits elsewhere.",
+         "values": {
+          "amex": 2150,
+          "ne": 700,
+          "c": 2250,
+          "moved": 0
+         }
+        },
+        "doors": {
+         "now": "2h50m",
+         "miss": [
+          {
+           "lane": "ops",
+           "at": "2h50m"
+          }
+         ],
+         "events": [
+          {
+           "at": "2h50m",
+           "label": "C says gone",
+           "kind": "alert"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "GUEST",
+           "text": "T-0:40  Gate C: \"hats are gone\" · complaints start"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 480,
+          "e": 420,
+          "f": 900
+         }
+        }
+       }
+      },
+      {
+       "id": "gone-drain",
+       "edges": [
+        "app->scan",
+        "scan->promo"
+       ],
+       "text": "**T-25: the complaints pile up.** Gate C is 600 over, and guest services logs fans holding scanned tickets who were promised a hat. The AmEx entrance is out, while lot-side Gate F still has 350 hats for fans who have not arrived yet.",
+       "panels": {
+        "gates": {
+         "note": "Gate C over by 600. 9,020 hats out; 980 still in cases.",
+         "values": {
+          "amex": 2600,
+          "ne": 1350,
+          "c": 2600,
+          "moved": 0
+         }
+        },
+        "doors": {
+         "now": "3h5m"
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "GUEST",
+           "text": "T-0:30  12 complaints · Gate C"
+          },
+          {
+           "tag": "GUEST",
+           "text": "T-0:25  31 complaints · Gate C (illustrative)"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 1000,
+          "e": 820,
+          "f": 1250
+         }
+        }
+       }
+      },
+      {
+       "id": "gone-out",
+       "edges": [
+        "scan->promo",
+        "promo->sponsor"
+       ],
+       "tone": {
+        "ops": null
+       },
+       "text": "**T-8: every gate is out, later.** The last hat goes to a late arrival at Gate F, after 600 earlier fans at Gate C left with nothing. The recap to Ford still says 10,000 handed out; only the gate view shows who missed out.",
+       "panels": {
+        "gates": {
+         "note": "10,000 out, but 600 of the first 10,000 turned away at Gate C; 0 hats were moved. Last hat T-8 (illustrative).",
+         "values": {
+          "amex": 2600,
+          "ne": 1600,
+          "c": 2600,
+          "moved": 0
+         }
+        },
+        "doors": {
+         "now": "3h22m",
+         "events": [
+          {
+           "at": "3h22m",
+           "lane": "ops",
+           "label": "last hat",
+           "kind": "alert"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PROMO",
+           "text": "T-0:08  LAST HAT · Gate F · 10,000/10,000"
+          },
+          {
+           "tag": "PROMO",
+           "text": "recap → Ford: 600 turned away at Gate C"
+          }
+         ]
+        },
+        "gates2": {
+         "values": {
+          "d": 1200,
+          "e": 1000,
+          "f": 1600
+         }
+        }
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "move",
+       "label": "Move cases",
+       "color": "#3FA37A",
+       "steps": [
+        "plan",
+        "park",
+        "amex",
+        "doors",
+        "train",
+        "limit",
+        "move",
+        "move-drain",
+        "move-out"
+       ]
+      },
+      {
+       "id": "none",
+       "label": "No action",
+       "color": "#E0796B",
+       "steps": [
+        "plan",
+        "park",
+        "amex",
+        "doors",
+        "train",
+        "limit",
+        "gone",
+        "gone-drain",
+        "gone-out"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 15,
+      "w": 662,
+      "h": 530
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "panel": "gates",
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 13
+       },
+       {
+        "panel": "gates2",
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 13
+       },
+       {
+        "x": 0,
+        "y": 21,
+        "w": 14,
+        "h": 14
+       },
+       {
+        "panel": "log",
+        "x": 14,
+        "y": 21,
+        "w": 10,
+        "h": 7
+       },
+       {
+        "panel": "doors",
+        "x": 14,
+        "y": 28,
+        "w": 10,
+        "h": 7
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "score-first",
+    "heading": "Score first, eat free tomorrow",
+    "bullets": [
+     "Chick-fil-A's Score First promotion at UBS Arena is real and cited; the game, times, counts and contracted assets are illustrative.",
+     "Pick a path: if the Islanders score first the chain runs for two days; if the opponent does, it stays idle.",
+     "Either way the night ends with a sponsor recap: what was delivered, what was made good, and what the team cannot see."
+    ],
+    "diagram": {
+     "view": "step",
+     "rows": [
+      []
+     ],
+     "nodes": {
+      "game": {
+       "title": "On the ice",
+       "sub": "first goal",
+       "icon": "monitor",
+       "tint": "dev"
+      },
+      "feed": {
+       "title": "Event feed",
+       "sub": "official stats",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "board": {
+       "title": "Board + PA",
+       "sub": "cue · horn",
+       "icon": "chime",
+       "tint": "mqtt"
+      },
+      "social": {
+       "title": "Team social",
+       "sub": "trigger post",
+       "icon": "cloud",
+       "tint": "mqtt"
+      },
+      "app": {
+       "title": "Sponsor app",
+       "sub": "next-day reward",
+       "icon": "phone",
+       "tint": "auth"
+      },
+      "store": {
+       "title": "Restaurants",
+       "sub": "sponsor-held",
+       "icon": "package",
+       "tint": "auth"
+      },
+      "proof": {
+       "title": "Asset log",
+       "sub": "recap proof",
+       "icon": "db",
+       "tint": "data"
+      }
+     },
+     "edges": [
+      {
+       "from": "game",
+       "to": "feed",
+       "kind": "int",
+       "label": "goal"
+      },
+      {
+       "from": "feed",
+       "to": "board",
+       "kind": "int",
+       "label": "cue"
+      },
+      {
+       "from": "feed",
+       "to": "social",
+       "kind": "int",
+       "label": "trigger"
+      },
+      {
+       "from": "social",
+       "to": "app",
+       "kind": "https",
+       "label": "claim Mon"
+      },
+      {
+       "from": "app",
+       "to": "store",
+       "kind": "https",
+       "label": "redeem"
+      },
+      {
+       "from": "board",
+       "to": "proof",
+       "kind": "int",
+       "label": "aired"
+      },
+      {
+       "from": "store",
+       "to": "proof",
+       "kind": "int",
+       "label": "claims?"
+      }
+     ],
+     "panels": [
+      {
+       "id": "ops",
+       "type": "table",
+       "title": "The trigger chain, lane by lane (illustrative systems)",
+       "columns": [
+        {
+         "id": "lane",
+         "label": "Lane",
+         "width": 120
+        },
+        {
+         "id": "state",
+         "label": "State",
+         "width": 90
+        },
+        {
+         "id": "what",
+         "label": "What"
+        }
+       ],
+       "initial": {
+        "rows": [
+         {
+          "id": "game",
+          "cells": {
+           "lane": "Game",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "feed",
+          "cells": {
+           "lane": "Event feed",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "board",
+          "cells": {
+           "lane": "Board + PA",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "social",
+          "cells": {
+           "lane": "Social",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "app",
+          "cells": {
+           "lane": "App unlock",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "store",
+          "cells": {
+           "lane": "Restaurants",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         },
+         {
+          "id": "proof",
+          "cells": {
+           "lane": "Asset log",
+           "state": "idle",
+           "what": "—"
+          },
+          "status": "neutral"
+         }
+        ]
+       }
+      },
+      {
+       "id": "chk",
+       "type": "checks",
+       "title": "Tonight's contracted sponsor assets (illustrative)",
+       "checks": [
+        {
+         "id": "led",
+         "label": "LED ribbon rotation, every period"
+        },
+        {
+         "id": "pa1",
+         "label": "Sponsor PA read, P1 TV timeout"
+        },
+        {
+         "id": "pa3",
+         "label": "Sponsor PA read, P3 last TV timeout"
+        },
+        {
+         "id": "graphic",
+         "label": "Score First board graphic (if triggered)"
+        },
+        {
+         "id": "post",
+         "label": "Score First social post (if triggered)"
+        },
+        {
+         "id": "makegood",
+         "label": "Make-good booked for any missed asset"
+        },
+        {
+         "id": "data",
+         "label": "Claim counts shared with the team"
+        }
+       ],
+       "initial": {
+        "results": {}
+       }
+      },
+      {
+       "id": "fun",
+       "type": "funnel",
+       "title": "Score First reach to redemption (illustrative counts)",
+       "unit": "fans",
+       "stages": [
+        {
+         "id": "reach",
+         "label": "Reached: arena + social",
+         "tone": "accent"
+        },
+        {
+         "id": "engaged",
+         "label": "Engaged with the post",
+         "tone": "teal"
+        },
+        {
+         "id": "claimed",
+         "label": "Claims · sponsor-held",
+         "tone": "danger"
+        },
+        {
+         "id": "redeemed",
+         "label": "Redeems · sponsor-held",
+         "tone": "danger"
+        }
+       ],
+       "initial": {
+        "counts": {}
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "contract",
+       "text": "**Before puck drop.** Chick-fil-A's *Score First* promotion is real: when the Islanders score first in a regular-season home game at UBS Arena, Chick-fil-A One app users can claim a free reward the next day, at participating Tri-State restaurants, one per account, no purchase needed. Take a Saturday night home game, Nov 7, 2026 vs New Jersey (7 p.m. on the schedule). The game below is made up; the sponsor assets on the checklist are illustrative.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {},
+         "note": "Seven contracted items for tonight (illustrative). Nothing delivered yet."
+        },
+        "fun": {
+         "note": "Nothing to count until something happens on the ice."
+        }
+       },
+       "link": "https://www.nhl.com/islanders/fans/chick-fil-a-promo",
+       "nodes": [
+        "proof"
+       ]
+      },
+      {
+       "id": "puck-drop",
+       "text": "**Puck drop.** The game clock starts and so do the assets that run whatever the score: the LED ribbon rotates in its slots and the P1 PA read airs at the first TV timeout. The trigger lanes sit idle. Nothing in the chain can fire until the first goal, and only the first goal counts.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "P1 rotation ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          }
+         },
+         "note": "Two assets delivered. Five waiting."
+        }
+       },
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule",
+       "nodes": [
+        "game",
+        "board"
+       ],
+       "edge": "board->proof"
+      },
+      {
+       "id": "isles-goal",
+       "text": "**8:14 of P1: the Islanders score first** (illustrative). The official event feed records the goal, and that one data point is the trigger. Game presentation gets the cue: the goal horn, then the Score First graphic on the board and a PA line telling fans to open the sponsor app on Monday.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "live",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "added"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "live",
+            "what": "NYI first goal"
+           },
+           "status": "added"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "live",
+            "what": "Score First cue"
+           },
+           "status": "added"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "live",
+            "what": "assets"
+           },
+           "status": "added"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "P1 rotation ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "graphic": {
+           "status": "pass",
+           "detail": "on the board 7:29 pm (illustrative)"
+          }
+         },
+         "note": "Trigger met. The board graphic is now delivered."
+        },
+        "fun": {
+         "counts": {
+          "reach": 14900
+         },
+         "active": "reach",
+         "note": "Reach starts with the fans in the bowl: 14,900 scanned (illustrative)."
+        }
+       },
+       "edges": [
+        "game->feed",
+        "feed->board"
+       ]
+      },
+      {
+       "id": "chain-fires",
+       "text": "**The chain fans out.** The feed's job is done once the goal is official. Team social posts the trigger (\"Isles scored first, claim Monday\"), and the post keeps collecting reach long after the cue on the board is gone. The reward itself is not live yet: the next lane to open is the sponsor's, two days from now.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "live",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "live",
+            "what": "post: claim Mon"
+           },
+           "status": "added"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "live",
+            "what": "assets"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "P1 and P2 rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "graphic": {
+           "status": "pass",
+           "detail": "on the board 7:29 pm (illustrative)"
+          },
+          "post": {
+           "status": "pass",
+           "detail": "posted 7:31 pm (illustrative)"
+          }
+         },
+         "note": "Four of seven delivered."
+        },
+        "fun": {
+         "counts": {
+          "reach": 96000,
+          "engaged": 3100
+         },
+         "active": "engaged",
+         "note": "Arena plus social impressions, and clicks and shares on the post (illustrative)."
+        }
+       },
+       "edge": "feed->social"
+      },
+      {
+       "id": "overtime-a",
+       "text": "**Tied after 60 minutes, so overtime.** The run of show switches to its overtime script and the sponsor read slotted for the last P3 TV timeout is cut. That is a contracted asset not delivered: the checklist shows it amber, and the activation manager books a make-good read for the next home game. Losing in OT changes nothing for fans: the trigger was the first goal.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "live",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "done",
+            "what": "post: claim Mon"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "cut",
+            "what": "P3 read cut · make-good"
+           },
+           "status": "changed"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "all three rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "pa3": {
+           "status": "warn",
+           "detail": "cut: overtime script took the slot"
+          },
+          "graphic": {
+           "status": "pass",
+           "detail": "on the board 7:29 pm (illustrative)"
+          },
+          "post": {
+           "status": "pass",
+           "detail": "posted 7:31 pm (illustrative)"
+          },
+          "makegood": {
+           "status": "pass",
+           "detail": "extra PA read added to the next home game"
+          }
+         },
+         "note": "One miss, one make-good. Proof is a log, not a memory."
+        },
+        "fun": {
+         "counts": {
+          "reach": 168000,
+          "engaged": 6200
+         },
+         "active": null
+        }
+       },
+       "edge": "board->proof",
+       "tone": {
+        "proof": "warn"
+       }
+      },
+      {
+       "id": "final-horn-a",
+       "text": "**Final horn after overtime.** The game lane and the in-game asset log close together: everything the contract promised inside the arena has now run, been cut and made good, or been correctly skipped. Whether anything happens after tonight depends only on who scored first.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "done",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "done",
+            "what": "post: claim Mon"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "made good",
+            "what": "P3 read cut · make-good"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       },
+       "nodes": [
+        "game",
+        "proof"
+       ],
+       "tone": {
+        "proof": null
+       }
+      },
+      {
+       "id": "sunday-a",
+       "text": "**Sunday: the gap.** The post has done most of its work, and nothing can be claimed. Participating restaurants are closed on Sundays, which is why a Saturday trigger is claimed on Monday. The step axis shows it plainly: the event happened two lanes and a full day before the reward exists.",
+       "panels": {
+        "fun": {
+         "counts": {
+          "reach": 182000,
+          "engaged": 7400
+         },
+         "note": "Team-side numbers are final: 182,000 reached, 7,400 engaged (illustrative)."
+        },
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "done",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "done",
+            "what": "post: claim Mon"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "made good",
+            "what": "P3 read cut · make-good"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       },
+       "link": "https://www.nhl.com/islanders/fans/chick-fil-a-promo",
+       "nodes": [
+        "social"
+       ]
+      },
+      {
+       "id": "monday-a",
+       "text": "**Monday: the sponsor's app unlocks the reward** and fans redeem at participating Tri-State restaurants. Both lanes run on the sponsor's systems, so the team sees the bars open but none of the counts: claims and redemptions sit in the sponsor's app and POS.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "done",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "done",
+            "what": "post: claim Mon"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "live",
+            "what": "Mon: reward live"
+           },
+           "status": "added"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "live",
+            "what": "Tri-State"
+           },
+           "status": "added"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "made good",
+            "what": "P3 read cut · make-good"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "fun": {
+         "counts": {
+          "claimed": null,
+          "redeemed": null
+         },
+         "active": null,
+         "note": "Claims and redemptions: sponsor-held: not shared with the team (illustrative contract)."
+        }
+       },
+       "link": "https://www.nhl.com/islanders/fans/chick-fil-a-promo",
+       "edges": [
+        "social->app",
+        "app->store"
+       ]
+      },
+      {
+       "id": "recap-a",
+       "text": "**The recap for the sponsor.** The team can prove four in-game assets, plus the cut P3 read and its make-good, and it can report reach and engagement. It cannot report claims or redemptions, because the contract never asked for them. The fix is a contract line, not a dashboard: claim counts by game, shared within a week.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "done",
+            "what": "Sat Nov 7 vs NJD"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "done",
+            "what": "NYI first goal"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "Score First cue"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "done",
+            "what": "post: claim Mon"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "done",
+            "what": "Mon: reward live"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "live",
+            "what": "Tri-State"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "made good",
+            "what": "P3 read cut · make-good"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "all three rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "pa3": {
+           "status": "warn",
+           "detail": "cut in OT, make-good booked"
+          },
+          "graphic": {
+           "status": "pass",
+           "detail": "on the board 7:29 pm (illustrative)"
+          },
+          "post": {
+           "status": "pass",
+           "detail": "posted 7:31 pm (illustrative)"
+          },
+          "makegood": {
+           "status": "pass",
+           "detail": "extra PA read added to the next home game"
+          },
+          "data": {
+           "status": "fail",
+           "detail": "not in the contract: no claim data"
+          }
+         },
+         "note": "Delivered and proven: 5 passes, 1 warn with make-good. Attribution: missing."
+        },
+        "fun": {
+         "active": null,
+         "note": "Reach and engagement are the team's. Claims and redemptions stay with the sponsor."
+        }
+       },
+       "edges": [
+        "board->proof",
+        "store->proof"
+       ],
+       "failures": {
+        "store->proof": "blocked"
+       }
+      },
+      {
+       "id": "opp-goal",
+       "text": "**6:02 of P1: New Jersey scores first** (illustrative). The event feed records a first goal, but the wrong team's, so the trigger condition fails for the whole night. No cue goes to the board, no post is queued and no unlock is scheduled.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "P1 rotation ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "graphic": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "post": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          }
+         },
+         "note": "Trigger-only assets skip; they are not misses."
+        },
+        "fun": {
+         "note": "No reward tonight: nothing to count."
+        }
+       },
+       "edge": "game->feed",
+       "tone": {
+        "feed": "warn"
+       }
+      },
+      {
+       "id": "no-reward",
+       "text": "**The Isles equalize in P2, and it does not matter.** The promotion keys on the first goal only. The horn and goal song run as normal, but the Score First lanes stay idle. This is the budget side of a trigger promo: its cost, and its reach, rise and fall with how often the team scores first.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "live",
+            "what": "horn only"
+           },
+           "status": "added"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "P1 and P2 rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "graphic": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "post": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          }
+         },
+         "note": "Two delivered, two correctly skipped."
+        },
+        "fun": {
+         "note": "No reward tonight: no post, so no Score First reach."
+        }
+       },
+       "nodes": [
+        "board"
+       ],
+       "tone": {
+        "feed": null
+       }
+      },
+      {
+       "id": "overtime-b",
+       "text": "**Tied after 60 minutes, so overtime.** The run of show switches to its overtime script and the sponsor read slotted for the last P3 TV timeout is cut. Contracted assets are owed whatever the score: the read turns amber and a make-good is booked for the next home game.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "horn only"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "all three rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "pa3": {
+           "status": "warn",
+           "detail": "cut: overtime script took the slot"
+          },
+          "graphic": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "post": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "makegood": {
+           "status": "pass",
+           "detail": "extra PA read added to the next home game"
+          }
+         },
+         "note": "Same miss as any OT night, same make-good."
+        }
+       },
+       "edge": "board->proof",
+       "tone": {
+        "proof": "warn"
+       }
+      },
+      {
+       "id": "final-horn-b",
+       "text": "**Final horn after overtime.** The game lane and the in-game asset log close together: everything the contract promised inside the arena has now run, been cut and made good, or been correctly skipped. Whether anything happens after tonight depends only on who scored first.",
+       "panels": {
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "horn only"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       },
+       "nodes": [
+        "game",
+        "proof"
+       ],
+       "tone": {
+        "proof": null
+       }
+      },
+      {
+       "id": "after-b",
+       "text": "**Sunday, then Monday.** The sponsor's lanes never open: no unlock, no restaurant traffic. The funnel's last stages still read sponsor-held, a reminder that even on a night it fires, the team would not see the claims.",
+       "panels": {
+        "fun": {
+         "counts": {
+          "claimed": null,
+          "redeemed": null
+         },
+         "note": "No reward tonight. On a trigger night these stages would still be sponsor-held: not shared."
+        },
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "horn only"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       },
+       "nodes": [
+        "app",
+        "store"
+       ]
+      },
+      {
+       "id": "recap-b",
+       "text": "**The recap for the sponsor, on a night without a trigger.** The proof is shorter but still owed: three assets delivered, one cut and made good, two correctly skipped. The open question is the same as on a trigger night: claim data is not in the contract.",
+       "panels": {
+        "chk": {
+         "results": {
+          "led": {
+           "status": "pass",
+           "detail": "all three rotations ran"
+          },
+          "pa1": {
+           "status": "pass",
+           "detail": "read aired 7:21 pm (illustrative)"
+          },
+          "pa3": {
+           "status": "warn",
+           "detail": "cut in OT, make-good booked"
+          },
+          "graphic": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "post": {
+           "status": "skip",
+           "detail": "not triggered tonight"
+          },
+          "makegood": {
+           "status": "pass",
+           "detail": "extra PA read added to the next home game"
+          },
+          "data": {
+           "status": "fail",
+           "detail": "not in the contract: no claim data"
+          }
+         },
+         "note": "Proof: 3 passes, 1 warn with make-good, 2 skips. Attribution: missing."
+        },
+        "ops": {
+         "rows": [
+          {
+           "id": "game",
+           "cells": {
+            "lane": "Game",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "feed",
+           "cells": {
+            "lane": "Event feed",
+            "state": "no trigger",
+            "what": "NJD first"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "board",
+           "cells": {
+            "lane": "Board + PA",
+            "state": "done",
+            "what": "horn only"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "social",
+           "cells": {
+            "lane": "Social",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "app",
+           "cells": {
+            "lane": "App unlock",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "store",
+           "cells": {
+            "lane": "Restaurants",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "proof",
+           "cells": {
+            "lane": "Asset log",
+            "state": "idle",
+            "what": "—"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       },
+       "edges": [
+        "board->proof",
+        "store->proof"
+       ],
+       "failures": {
+        "store->proof": "blocked"
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "isles-first",
+       "label": "Isles score first",
+       "color": "#4F9CF0",
+       "steps": [
+        "contract",
+        "puck-drop",
+        "isles-goal",
+        "chain-fires",
+        "overtime-a",
+        "final-horn-a",
+        "sunday-a",
+        "monday-a",
+        "recap-a"
+       ]
+      },
+      {
+       "id": "opp-first",
+       "label": "Opponent scores first",
+       "color": "#F28C5B",
+       "steps": [
+        "contract",
+        "puck-drop",
+        "opp-goal",
+        "no-reward",
+        "overtime-b",
+        "final-horn-b",
+        "after-b",
+        "recap-b"
+       ]
+      }
+     ],
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 10
+       },
+       {
+        "panel": "ops",
+        "x": 0,
+        "y": 18,
+        "w": 14,
+        "h": 9
+       },
+       {
+        "panel": "fun",
+        "x": 0,
+        "y": 27,
+        "w": 14,
+        "h": 6
+       },
+       {
+        "panel": "chk",
+        "x": 14,
+        "y": 18,
+        "w": 10,
+        "h": 15
+       }
+      ]
+     },
+     "floats": [
+      {
+       "id": "game",
+       "side": "below",
+       "x": 110,
+       "y": 50
+      },
+      {
+       "id": "feed",
+       "side": "below",
+       "x": 330,
+       "y": 50
+      },
+      {
+       "id": "board",
+       "side": "below",
+       "x": 550,
+       "y": 50
+      },
+      {
+       "id": "social",
+       "side": "below",
+       "x": 330,
+       "y": 160
+      },
+      {
+       "id": "app",
+       "side": "below",
+       "x": 550,
+       "y": 160
+      },
+      {
+       "id": "store",
+       "side": "below",
+       "x": 770,
+       "y": 160
+      },
+      {
+       "id": "proof",
+       "side": "below",
+       "x": 770,
+       "y": 50
+      }
+     ],
+     "graphFrame": {
+      "x": 0,
+      "y": 0,
+      "w": 880,
+      "h": 220
+     }
+    },
+    "text": [
+     "A trigger promotion turns one moment of the game into a sponsor's marketing event. When the Islanders score first at a regular-season home game, Chick-fil-A's Score First promotion unlocks a free reward in the sponsor's app the next day: the team runs the cue in the building, and the sponsor runs the reward."
+    ]
+   },
+   {
+    "id": "morning-after",
+    "heading": "The morning after",
+    "accent": "pink",
+    "text": [
+     "The final horn is not the end of the night's marketing. By 8 a.m. the fan's phone holds the team's recap, a sponsor's reward and a partner's offer, and two rules decide whether any of it works: **send to the people who came**, and **match the tone to the score**.",
+     "Public facts (the Dec 1, 2026 GOAT USA Night, Chick-fil-A Score First, the Belmont Park offer, mobile-only entry) are cited on the steps that use them. The CRM, scan, ticketing and email flows are illustrative reconstructions of common practice, not any team's or vendor's systems. The game result, send times, message wording and every count are illustrative."
+    ],
+    "bullets": [
+     "**Scan list, not order list:** the recap audience is who walked in, including friends on transferred tickets.",
+     "**Tone follows the result:** highlight-led after a win, next-game-led after a loss.",
+     "**The stack is a budget:** three cards show; the fourth becomes *+1 more*."
+    ],
+    "diagram": {
+     "storyTime": {
+      "start": "2026-12-01T21:55",
+      "end": "2026-12-09T00:00",
+      "clock": "12h",
+      "date": "short"
+     },
+     "nodes": {
+      "feed": {
+       "title": "Game feed",
+       "sub": "final score",
+       "icon": "signal",
+       "tint": "mqtt"
+      },
+      "scan": {
+       "title": "Gate scan",
+       "sub": "scan list",
+       "icon": "door",
+       "tint": "dev"
+      },
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "orders",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "crm": {
+       "title": "CRM",
+       "sub": "audience",
+       "icon": "person",
+       "tint": "data"
+      },
+      "email": {
+       "title": "Email / push",
+       "sub": "8 a.m.",
+       "icon": "cloud",
+       "tint": "mqtt"
+      },
+      "sponsor": {
+       "title": "Sponsor app",
+       "sub": "Score First",
+       "icon": "phone",
+       "tint": "auth"
+      },
+      "partner": {
+       "title": "Belmont Park",
+       "sub": "race days",
+       "icon": "house",
+       "tint": "auth"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "email",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "feed",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "partner",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      },
+      {
+       "id": "scan",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "sponsor",
+       "side": "below",
+       "x": 575,
+       "y": 70
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 575,
+       "y": 334
+      }
+     ],
+     "edges": [
+      {
+       "from": "scan",
+       "to": "crm",
+       "kind": "https",
+       "label": "scan list",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "ticketing",
+       "to": "crm",
+       "kind": "https",
+       "label": "orders",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -63.64,
+         "dy": 44
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 63.64,
+         "dy": -44
+        }
+       ]
+      },
+      {
+       "from": "feed",
+       "to": "crm",
+       "kind": "https",
+       "label": "final result",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "crm",
+       "to": "email",
+       "kind": "int",
+       "label": "audience",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -13.5,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -13.5,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "feed",
+       "to": "sponsor",
+       "kind": "https",
+       "label": "scored first?",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "partner",
+       "to": "email",
+       "kind": "https",
+       "label": "race-day offer",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "email",
+       "to": "crm",
+       "kind": "https",
+       "ret": true,
+       "label": "opens",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 13.5,
+         "dy": -14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 13.5,
+         "dy": 14.96
+        }
+       ]
+      },
+      {
+       "from": "email",
+       "to": "ticketing",
+       "kind": "https",
+       "label": "next-game link",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "phone",
+       "type": "deviceapp",
+       "title": "A fan's phone, the morning after",
+       "device": "Fan's phone",
+       "appName": "Team app",
+       "subtitle": "illustrative",
+       "brand": {
+        "app": "Team app (illustrative)",
+        "logo": "TA",
+        "accent": "#DDE3FA",
+        "fg": "#2B3A8C"
+       },
+       "initial": {
+        "phoneScreen": "home"
+       }
+      },
+      {
+       "id": "list",
+       "type": "table",
+       "title": "Who gets the morning email",
+       "columns": [
+        {
+         "id": "who",
+         "label": "Audience"
+        },
+        {
+         "id": "n",
+         "label": "Fans"
+        },
+        {
+         "id": "gets",
+         "label": "Morning message"
+        }
+       ],
+       "initial": {
+        "rows": []
+       }
+      },
+      {
+       "id": "funnel",
+       "type": "funnel",
+       "title": "Recap funnel (illustrative)",
+       "unit": "fans",
+       "stages": [
+        {
+         "id": "delivered",
+         "label": "Recap delivered",
+         "tone": "accent"
+        },
+        {
+         "id": "opened",
+         "label": "Opened",
+         "tone": "accent"
+        },
+        {
+         "id": "clicked",
+         "label": "Clicked next game",
+         "tone": "info"
+        },
+        {
+         "id": "bought",
+         "label": "Bought within 7 days",
+         "tone": "success"
+        }
+       ],
+       "initial": {
+        "counts": {}
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "horn",
+       "time": "2026-12-01T22:04",
+       "nodes": [
+        "feed",
+        "scan"
+       ],
+       "text": "**Final horn**, Tuesday Dec 1, 2026: Florida at UBS Arena, GOAT USA Night, with a Chuck the Goat ornament for the first 10,000 fans (promo schedule). This game is still on the schedule, so its result is the fork. Two recap drafts are already written; the game feed decides which one goes. The phone is quiet.",
+       "delta": true,
+       "deltaText": "Date, opponent and giveaway are from the Islanders' 2026-27 promotional schedule. Times and the result are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ],
+       "panels": {
+        "list": {
+         "rows": [
+          {
+           "id": "orders",
+           "cells": {
+            "who": "Ticket buyers (order list)",
+            "n": "pending",
+            "gets": "pending"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "own",
+           "cells": {
+            "who": "Scanned attendees",
+            "n": "pending",
+            "gets": "pending"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "xfer",
+           "cells": {
+            "who": "Transfer recipients",
+            "n": "pending",
+            "gets": "pending"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Candidate audiences, counted after the horn."
+        },
+        "funnel": {
+         "note": "Nothing sent yet: the recap goes out at 8 a.m."
+        }
+       }
+      },
+      {
+       "id": "orders",
+       "time": "2026-12-01T22:20",
+       "edge": "ticketing->crm",
+       "text": "The easy audience is the **order list**: 5,840 accounts bought the 15,980 seats sold (illustrative). A buyer of four seats gets one email, and the three friends who sat beside them get nothing.",
+       "panels": {
+        "list": {
+         "rows": [
+          {
+           "id": "orders",
+           "cells": {
+            "who": "Ticket buyers (order list)",
+            "n": "5,840",
+            "gets": "one recap per order"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "seats",
+           "cells": {
+            "who": "Seats sold",
+            "n": "15,980",
+            "gets": "nobody, if you mail orders"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Order list: one row per purchase, not per person in a seat."
+        }
+       }
+      },
+      {
+       "id": "scans",
+       "time": "2026-12-01T22:35",
+       "edges": [
+        "scan->crm",
+        "ticketing->crm"
+       ],
+       "text": "CRM keys the recap to the **scan list** instead: who actually walked in. Mobile-only entry means a transferred ticket had to be accepted into an account, so **2,850 transfer recipients** now have an email on file, the guests from the lifecycle section. 860 no-shows get a short note, not a recap of a game they missed.",
+       "delta": true,
+       "deltaText": "Mobile-only entry is the Islanders' stated policy. The 'missed you' note is a recommended tactic from a podcast blurb, not verified. Counts illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Islanders mobile tickets",
+         "url": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting"
+        },
+        {
+         "label": "'We miss you' email tactic (unverified)",
+         "url": "https://origin-www.audible.com.br/es_US/pd/B0F9MMWHHX"
+        }
+       ],
+       "panels": {
+        "list": {
+         "rows": [
+          {
+           "id": "own",
+           "cells": {
+            "who": "Scanned, own ticket",
+            "n": "9,850",
+            "gets": "recap"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "xfer",
+           "cells": {
+            "who": "Scanned, transferred ticket",
+            "n": "2,850",
+            "gets": "recap (new to file)"
+           },
+           "status": "added"
+          },
+          {
+           "id": "nocontact",
+           "cells": {
+            "who": "Scanned, no contact on file",
+            "n": "2,420",
+            "gets": "none"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "noshow",
+           "cells": {
+            "who": "Sold, never scanned",
+            "n": "860",
+            "gets": "short 'missed you' note"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Recap audience: 9,850 + 2,850 = 12,700 contactable attendees (illustrative)."
+        }
+       }
+      },
+      {
+       "id": "win",
+       "time": "2026-12-01T22:40",
+       "edge": "feed->crm",
+       "tone": {
+        "feed": "ok"
+       },
+       "text": "**Win path.** The feed posts an Islanders win (illustrative). CRM picks the **highlight-led** draft: a celebratory subject line, the cinematic recap video up top and the next home game second.",
+       "delta": true,
+       "deltaText": "The Islanders publish cinematic video recaps on NHL.com; the email wording here is illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Example Islanders cinematic recap",
+         "url": "https://www.nhl.com/fr/islanders/video/topic/features/cinematic-recap-nyi-7-nsh-4-6369501216112"
+        }
+       ],
+       "panels": {
+        "list": {
+         "note": "Tone: WIN · highlight-led recap, next game second."
+        }
+       }
+      },
+      {
+       "id": "build-win",
+       "time": "2026-12-01T23:30",
+       "edge": "crm->email",
+       "nodes": [
+        "email"
+       ],
+       "text": "Overnight, CRM hands **12,700** contactable attendees and the win draft to the email platform, scheduled for 8 a.m. Sending at midnight would land under a night of sleep; 8 a.m. lands with the commute (send time illustrative).",
+       "panels": {
+        "funnel": {
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "claim-win",
+       "time": "2026-12-02T06:30",
+       "edge": "feed->sponsor",
+       "nodes": [
+        "sponsor"
+       ],
+       "tone": {
+        "sponsor": "ok"
+       },
+       "text": "The Islanders **scored first**, so the Chick-fil-A Score First promo fired: app users can claim a free reward the next day, Wednesday Dec 2. This card comes from the **sponsor's** app on the sponsor's clock; the team sees none of the claims.",
+       "delta": true,
+       "deltaText": "Score First rules are from the Islanders' promo page. Notification wording and time are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Chick-fil-A Score First promo",
+         "url": "https://www.nhl.com/islanders/fans/chick-fil-a-promo"
+        }
+       ],
+       "panels": {
+        "phone": {
+         "notify": {
+          "app": "Sponsor app",
+          "title": "Score First reward",
+          "text": "Isles scored first. Claim your free reward today."
+         }
+        }
+       }
+      },
+      {
+       "id": "belmont",
+       "time": "2026-12-02T07:30",
+       "edge": "partner->email",
+       "nodes": [
+        "partner",
+        "email"
+       ],
+       "text": "**Belmont Park**: since Oct 8, game-day ticket holders can claim free general admission to Belmont Park on race days, through an offer sent with claiming instructions. It goes out win or lose, because it rewards being there, not the score.",
+       "delta": true,
+       "deltaText": "The Belmont Park offer is from the Islanders' Oct 1, 2026 fan-experience announcement. Channel and wording here are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Islanders new fan experiences 2026-27",
+         "url": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088"
+        }
+       ],
+       "panels": {
+        "phone": {
+         "notify": {
+          "app": "Mail",
+          "title": "Free race-day entry",
+          "text": "Your game-day ticket gets you into Belmont Park on race days."
+         }
+        }
+       }
+      },
+      {
+       "id": "recap-win",
+       "time": "2026-12-02T08:00",
+       "edge": "crm->email",
+       "nodes": [
+        "email"
+       ],
+       "text": "**8:00 a.m.** The recap lands: a celebratory subject, the highlights, then one button for the next home game. Same send to the buyer and to the friend on the transferred seat.",
+       "panels": {
+        "phone": {
+         "notify": {
+          "app": "Mail",
+          "title": "Relive last night's win",
+          "text": "Highlights from last night, then grab seats for the next home game."
+         }
+        },
+        "funnel": {
+         "counts": {
+          "delivered": 12700
+         },
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "survey",
+       "time": "2026-12-02T08:05",
+       "nodes": [
+        "email"
+       ],
+       "text": "A **survey** follows five minutes later. The stack now competes for attention: the phone shows three cards, so on the win path the Score First claim has slid into **+1 more**. Order the sends so the one you need read is on top.",
+       "panels": {
+        "phone": {
+         "notify": {
+          "app": "Mail",
+          "title": "How was last night?",
+          "text": "Five quick questions about your night at UBS Arena."
+         }
+        }
+       }
+      },
+      {
+       "id": "opens-win",
+       "time": "2026-12-02T20:00",
+       "edge": "email->crm",
+       "text": "By evening the engagement comes back: **6,350 opened** and **1,080 clicked** the next home game (illustrative). A win makes the recap easy to open.",
+       "panels": {
+        "funnel": {
+         "counts": {
+          "opened": 6350,
+          "clicked": 1080
+         },
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "bought-win",
+       "time": "2026-12-08T22:00",
+       "edges": [
+        "email->ticketing",
+        "ticketing->crm"
+       ],
+       "tone": {
+        "ticketing": "ok"
+       },
+       "text": "Seven days on, the phone shows an order confirmation, not the morning-after stack: **240** recap recipients bought a next-game ticket. **64** of them came on a friend's transferred ticket: new buyers the order list would never have mailed (illustrative).",
+       "panels": {
+        "funnel": {
+         "counts": {
+          "bought": 240
+         },
+         "active": null
+        },
+        "list": {
+         "rows": [
+          {
+           "id": "own",
+           "cells": {
+            "who": "Scanned, own ticket",
+            "n": "9,850",
+            "gets": "recap · 176 bought"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "xfer",
+           "cells": {
+            "who": "Scanned, transferred ticket",
+            "n": "2,850",
+            "gets": "recap · 64 bought"
+           },
+           "status": "added"
+          },
+          {
+           "id": "noshow",
+           "cells": {
+            "who": "Sold, never scanned",
+            "n": "860",
+            "gets": "missed-you note only"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "total",
+           "cells": {
+            "who": "All recap recipients",
+            "n": "12,700",
+            "gets": "recap · 240 bought"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Next-game buyers by recipient type, 7 days after the win (illustrative)."
+        },
+        "phone": {
+         "clear": true,
+         "notify": {
+          "app": "Team app",
+          "title": "Order confirmed",
+          "text": "2 seats for the next home game. Barcode appears 48 h before puck drop."
+         }
+        }
+       }
+      },
+      {
+       "id": "loss",
+       "time": "2026-12-01T22:40",
+       "edge": "feed->crm",
+       "tone": {
+        "feed": "warn"
+       },
+       "text": "**Loss path.** The feed posts a loss (illustrative). CRM picks the **next-game-led** draft. No celebratory copy goes out after a loss: the email leads with the next home game and keeps the recap to a line.",
+       "panels": {
+        "list": {
+         "note": "Tone: LOSS · next-game-led, recap kept short."
+        }
+       }
+      },
+      {
+       "id": "build-loss",
+       "time": "2026-12-01T23:30",
+       "edge": "crm->email",
+       "nodes": [
+        "email"
+       ],
+       "text": "The audience does not change with the score: the same **12,700** attendees are queued for 8 a.m. Only the draft changed.",
+       "panels": {
+        "funnel": {
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "claim-loss",
+       "time": "2026-12-02T06:30",
+       "failures": {
+        "feed->sponsor": "blocked"
+       },
+       "nodes": [
+        "feed",
+        "sponsor"
+       ],
+       "tone": {
+        "sponsor": "dim"
+       },
+       "text": "On this path the **opponent scored first**, so Score First never fired: no reward today. The trigger is the first goal, not the result, so a loss can still unlock it; this path assumes it did not.",
+       "delta": true,
+       "deltaText": "Score First rules are from the Islanders' promo page.",
+       "deltaLinks": [
+        {
+         "label": "Chick-fil-A Score First promo",
+         "url": "https://www.nhl.com/islanders/fans/chick-fil-a-promo"
+        }
+       ],
+       "panels": {}
+      },
+      {
+       "id": "recap-loss",
+       "time": "2026-12-02T08:00",
+       "edge": "crm->email",
+       "nodes": [
+        "email"
+       ],
+       "text": "**8:00 a.m.** The next-game-led email lands: the next home game's opponent and seats first, last night's result in one line. Same send to buyers and transfer recipients.",
+       "panels": {
+        "phone": {
+         "notify": {
+          "app": "Mail",
+          "title": "Next up: the next home game",
+          "text": "Seats for the next home game, plus a short look back at last night."
+         }
+        },
+        "funnel": {
+         "counts": {
+          "delivered": 12700
+         },
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "opens-loss",
+       "time": "2026-12-02T20:00",
+       "edge": "email->crm",
+       "text": "Fewer fans open the morning after a loss: **5,210 opened** and **720 clicked** the next game (illustrative). With no Score First card, the stack is three messages, all visible.",
+       "panels": {
+        "funnel": {
+         "counts": {
+          "opened": 5210,
+          "clicked": 720
+         },
+         "active": null
+        }
+       }
+      },
+      {
+       "id": "bought-loss",
+       "time": "2026-12-08T22:00",
+       "edges": [
+        "email->ticketing",
+        "ticketing->crm"
+       ],
+       "text": "Seven days on, the phone shows an order confirmation, not the morning-after stack: **150** bought a next-game ticket, **33** of them transfer recipients (illustrative). Lower than the win, but the next-game-led copy still sells; a recap that ignored the result would read as tone-deaf.",
+       "panels": {
+        "funnel": {
+         "counts": {
+          "bought": 150
+         },
+         "active": null
+        },
+        "list": {
+         "rows": [
+          {
+           "id": "own",
+           "cells": {
+            "who": "Scanned, own ticket",
+            "n": "9,850",
+            "gets": "recap · 117 bought"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "xfer",
+           "cells": {
+            "who": "Scanned, transferred ticket",
+            "n": "2,850",
+            "gets": "recap · 33 bought"
+           },
+           "status": "added"
+          },
+          {
+           "id": "noshow",
+           "cells": {
+            "who": "Sold, never scanned",
+            "n": "860",
+            "gets": "missed-you note only"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "total",
+           "cells": {
+            "who": "All recap recipients",
+            "n": "12,700",
+            "gets": "recap · 150 bought"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Next-game buyers by recipient type, 7 days after the loss (illustrative)."
+        },
+        "phone": {
+         "clear": true,
+         "notify": {
+          "app": "Team app",
+          "title": "Order confirmed",
+          "text": "2 seats for the next home game. Barcode appears 48 h before puck drop."
+         }
+        }
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "win",
+       "label": "Islanders win",
+       "color": "#34d399",
+       "steps": [
+        "horn",
+        "orders",
+        "scans",
+        "win",
+        "build-win",
+        "claim-win",
+        "belmont",
+        "recap-win",
+        "survey",
+        "opens-win",
+        "bought-win"
+       ]
+      },
+      {
+       "id": "loss",
+       "label": "Islanders lose",
+       "color": "#fb923c",
+       "steps": [
+        "horn",
+        "orders",
+        "scans",
+        "loss",
+        "build-loss",
+        "claim-loss",
+        "belmont",
+        "recap-loss",
+        "survey",
+        "opens-loss",
+        "bought-loss"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 10,
+      "w": 662,
+      "h": 384
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "x": 0,
+        "y": 8,
+        "w": 14,
+        "h": 12
+       },
+       {
+        "panel": "phone",
+        "x": 14,
+        "y": 8,
+        "w": 10,
+        "h": 15
+       },
+       {
+        "panel": "list",
+        "x": 0,
+        "y": 20,
+        "w": 14,
+        "h": 10
+       },
+       {
+        "panel": "funnel",
+        "x": 14,
+        "y": 23,
+        "w": 10,
+        "h": 7
+       }
+      ]
+     },
+     "view": "step"
+    }
+   }
+  ],
+  "flowview": {
+   "authoredWith": "0.2.0",
+   "minVersion": "0.2.0",
+   "features": [
+    "content.deviceapp",
+    "content.deviceapp-badges",
+    "content.deviceapp-freshness",
+    "content.deviceapp-navigation",
+    "flow.alternates",
+    "flow.drilldown",
+    "flow.failures",
+    "flow.step-colors",
+    "flow.story-time",
+    "layout.arranged",
+    "layout.cubic-curves",
+    "layout.edge-ports",
+    "layout.free-nodes",
+    "layout.graph-frame",
+    "layout.grid-24",
+    "media.node-styles",
+    "media.shared-icons",
+    "panel.budget",
+    "panel.checks",
+    "panel.cost",
+    "panel.deviceapp",
+    "panel.funnel",
+    "panel.gauge",
+    "panel.grid",
+    "panel.inflight",
+    "panel.log",
+    "panel.orbit",
+    "panel.phone",
+    "panel.queue",
+    "panel.seatmap",
+    "panel.state",
+    "panel.table",
+    "panel.tiles",
+    "panel.timeline"
+   ]
+  },
+  "brand": {
+   "app": "Islanders · A season of seats",
+   "logo": "NY",
+   "accent": "#003087"
+  }
+ }
+}

@@ -10,9 +10,9 @@ var NODE_STYLE_SET = ["slate", "rose", "ember", "amber", "moss", "teal", "sky", 
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
 
-var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac'];
+var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac','islanders'];
 /* Accepted source/host values include legacy skins; pickers offer this catalog. */
-var SELECTABLE_SKINS = ['aurora','pastel','blueprint','terminal','rose','lavender','lilac'];
+var SELECTABLE_SKINS = ['aurora','pastel','blueprint','terminal','rose','lavender','lilac','islanders'];
 function skinLabel(name){return name==='lilac'?'Opus Lilac':name.charAt(0).toUpperCase()+name.slice(1);}
 var DEFAULT_SKIN = 'pastel';
 var SKINS = {

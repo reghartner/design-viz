@@ -17,6 +17,7 @@ window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
   activeSkin = name;
+  updateThemeURL(window,name);
   return applySkinClasses(document.body, view, name);
 };
 /* Host skin channel: an embedding shell (iframe parent) may post
@@ -49,7 +50,7 @@ function readCookieText(){
 function fail(msgs){
   bootFailed = true;
   pendingLinkBase = null;
-  applySkinClasses(document.body, view, activeSkin || resolveSkin(readCookieText()));
+  applySkinClasses(document.body, view, activeSkin || resolveSkin(readCookieText(),null,window.location.search));
   var pre = document.createElement('pre');
   pre.className = 'errbox';
   pre.textContent = 'Flowview: the spec did not render.\n\n' + msgs.map(function(m){ return '- ' + m; }).join('\n');
@@ -98,7 +99,7 @@ function applyEmbedMode(ctl){
   }
   /* A host/picker selection received before async boot is newer than the
      skin encoded in an embed URL and must not be replaced here. */
-  if (!activeSkin && req.skin && SKIN_NAMES.indexOf(req.skin) >= 0) window.dvSetSkin(req.skin);
+  if (!activeSkin && !querySkin(window.location.search) && req.skin && SKIN_NAMES.indexOf(req.skin) >= 0) window.dvSetSkin(req.skin);
   if (target.tabBlock != null && target.tab != null){
     var tb = ctl.tabBlocks[target.tabBlock - 1];
     /* activate=false: reveal the tab without rewriting the hash */
@@ -122,7 +123,7 @@ function boot(raw){
      the saved page skin is only the standalone fallback when no host choice
      or supported dv_skin cookie exists. */
   var embedSkin=embedRequest && SKIN_NAMES.indexOf(embedRequest.skin)>=0?embedRequest.skin:null;
-  var bootSkin = activeSkin || embedSkin || resolveSkin(readCookieText(), page.skin);
+  var bootSkin = activeSkin || querySkin(window.location.search) || embedSkin || resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
   var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,handoffHost:window.flowviewHandoffHost});
@@ -180,7 +181,7 @@ var specParam = /[?&]spec=([^&#]+)/.exec(window.location.search);
 var isDemo = !!(raw && raw.page && raw.page.__demo);
 
 if (specParam && (isDemo || parseErr)){
-  applySkinClasses(document.body, view, resolveSkin(readCookieText()));
+  applySkinClasses(document.body, view, resolveSkin(readCookieText(),null,window.location.search));
   var specUrl = decodeURIComponent(specParam[1]);
   fetch(specUrl).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status);

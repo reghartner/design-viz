@@ -2,12 +2,14 @@
 
 This branch is the Friends company fork overlay. `company/company.json` enables
 the science and sports packages for this site. The upstream default build
-remains core-only. `canon.json` publishes two reviewed documents copied from
+remains core-only. `canon.json` publishes five reviewed documents copied from
 those packages into `diagrams/friends/`:
 
-- Season of seats: an Islanders marketing story that uses the arena map across
-  distinct buyer, offer, and renewal decisions
+- Create demand (`season-of-seats`): the Schaefer effect, schedule, bobblehead clock, and group holds
   (`packages/sports/diagrams/season-of-seats/season-of-seats.spec.json`)
+- Sell the inventory (`sell-the-inventory`): on-sale day, pricing, heritage-night offers, and giveaway eligibility
+- Serve and learn from game night (`serve-game-night`): ticket transfers, gate operations, sponsor rewards, and recap
+- Build the next season (`build-next-season`): membership conversion and the renewal fork
 - Copy gate: a conceptual virology story for an RNA sequencing researcher
   (`packages/science/diagrams/biology/copy-gate/copy-gate.spec.json`)
 
@@ -18,16 +20,27 @@ reviewed upstream package content without appearing in this site's library.
 
 When upstream changes one of these specs, copy the reviewed version into its
 matching `diagrams/friends/<slug>/<slug>.spec.json` before preparing the site.
-The deployment script requires exactly these two Canon IDs and thumbnails.
+The deployment script requires exactly these five Canon IDs and distinct thumbnails.
 It builds the selected packages, keeps the diagram library, and hides the
 service catalog. The default build is restored when the script exits.
 
 The build embeds science starter templates and both packages' panel code in
 the Workbench and viewer. The Workbench also embeds an offline authoring kit
 with the selected contracts, recipes, and source story specs. The hosted
-`workbench/starters.json` exposes editable copies of both Friends stories.
+`workbench/starters.json` exposes editable copies of all five Friends stories.
 `prepare` verifies those contents against the actual staged HTML and fails if
 one is absent or an unselected package appears.
+
+The four sports sources live at `packages/sports/diagrams/<slug>/<slug>.spec.json`
+and retain all 14 chapters and 173 steps. The numbered library titles establish
+the reading order; their READMEs link the previous and next arcs. The original
+`season-of-seats` URL remains the first arc. Authoring is desktop-only.
+
+Share `?theme=islanders` for an Islanders-themed welcome/library, or
+`?diagram=season-of-seats&theme=islanders` for the first arc. A valid query theme
+wins over the saved cookie and document default on initial load. Theme selectors
+update that existing query preference without writing a cookie or changing the
+source. Invalid values are ignored and omitted from canonical share links.
 
 Set `FLOWVIEW_CF_WORKER` in the environment or in ignored
 `deploy/cloudflare/local.env` (see `deploy/cloudflare/local.env.example`).
@@ -37,6 +50,16 @@ No Cloudflare account credentials or Worker name belong in this branch.
 sh company/friends-deploy.sh prepare
 sh company/friends-deploy.sh deploy
 ```
+
+Desktop theme/link smoke checks (also prepares locally, never deploys):
+
+```sh
+cd tools/browser-tests
+npx playwright test -c friends-islanders.config.mjs
+```
+
+The browser report includes the library, all four opening readers and focused
+arena, heatmap, funnel and card screenshots at a 1440-pixel desktop viewport.
 
 `prepare` creates `deploy/cloudflare/site/` and
 `deploy/cloudflare/.generated/wrangler.jsonc` without uploading. Inspect the

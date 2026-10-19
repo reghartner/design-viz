@@ -26,7 +26,8 @@ import a seating chart. Company venues go in `company/panels/venues/` and are
 loaded only when this package is enabled. Authoring and editing these
 documents is desktop only.
 
-The [Season of seats](diagrams/season-of-seats/README.md) is a 14-chapter,
-173-step teaching story that uses the venue map throughout the ticketing
-season. It includes the authored spec and a source review. Public facts are
+The [Season of seats](diagrams/season-of-seats/README.md) is a four-diagram,
+14-chapter, 173-step teaching story that uses the venue map throughout the ticketing
+season: Create demand, Sell the inventory, Serve and learn from game night, and
+Build the next season. It includes the authored specs and a shared source review. Public facts are
 cited in the story; operational flows and uncited figures are illustrative.

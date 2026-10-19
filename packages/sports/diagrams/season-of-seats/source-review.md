@@ -1,4 +1,11 @@
-# Fact-check log: sports-marketing.spec.json
+# Fact-check log: A season of seats (all four arcs)
+
+The reviewed source was split on 2026-10-19 into [Create demand](season-of-seats.spec.json),
+[Sell the inventory](../sell-the-inventory/sell-the-inventory.spec.json),
+[Serve and learn from game night](../serve-game-night/serve-game-night.spec.json), and
+[Build the next season](../build-next-season/build-next-season.spec.json).
+All 14 section IDs, 173 authored steps, citations and source caveats remain in
+their original order. This is the historical source review, not a new fact-check.
 
 Independent fact-check, 2026-10-18. Each row: claim, verdict, source. "Fixed" means the spec was edited. Validator: 0 errors, 0 warnings after edits; page re-rendered to sports-marketing.html.
 

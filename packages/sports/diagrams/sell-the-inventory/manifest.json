@@ -1,0 +1,36 @@
+{
+  "pages": [
+    {
+      "file": "sell-the-inventory.html",
+      "spec": "sell-the-inventory.spec.json",
+      "title": "2 · Sell the inventory",
+      "family": "season-of-seats",
+      "description": "On-sale queues, pricing, heritage-night offers and giveaway eligibility for an Islanders season. Public facts cited; operational flows and uncited figures are illustrative.",
+      "tags": [
+        "sports",
+        "marketing",
+        "sports-marketing",
+        "ticketing",
+        "islanders",
+        "promotions",
+        "giveaways",
+        "group-sales",
+        "pricing",
+        "crm",
+        "sponsorship",
+        "renewals"
+      ],
+      "widgets": [
+        "budget",
+        "checks",
+        "deviceapp",
+        "funnel",
+        "log",
+        "queue",
+        "seatmap",
+        "table",
+        "tiles"
+      ]
+    }
+  ]
+}

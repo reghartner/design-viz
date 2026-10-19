@@ -400,6 +400,9 @@ PanelRegistry.define('locus', {
 .locus-empty{margin:6px 0 0;font-size:11px;color:var(--dfaint)}
 @media (prefers-reduced-motion:reduce){.locus-feature{transition:none}}
 @media print{.locus-feature,.locus-key,.locus-marker-dot,.locus-arclabel{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.locus-head{margin-bottom:10px}.locus-feature{border-radius:4px;box-shadow:inset 0 1px 0 #ffffff22}.locus-track{fill:color-mix(in srgb,var(--dtext) 5%,transparent)}.locus-meta{font-variant-numeric:tabular-nums}
 `,
   authoring: {
     initialFields: true,

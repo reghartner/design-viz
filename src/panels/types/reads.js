@@ -382,6 +382,9 @@ p.reads-empty{margin:4px 0;font-size:11px}
 .reads-key{display:inline-flex;align-items:center;justify-content:center;width:12px;height:8px;border-radius:2px;font-size:8px;line-height:1}
 .reads-key-clip{background:color-mix(in srgb,var(--dtext) 18%,transparent);opacity:.5}
 @media print{.reads-scroll{max-height:none;overflow:visible}.reads-cell,.reads-band,.reads-dcell i,.reads-wedge{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.reads-head{margin-bottom:10px}.reads-scroll{padding-top:8px;padding-bottom:10px;border-radius:9px;scrollbar-width:thin}.reads-name{font-weight:600}.reads-panel{--reads-cell:16px}.reads-match{color:var(--dtext)}
 `,
   authoring: {
     initialFields: true,

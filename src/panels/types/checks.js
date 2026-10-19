@@ -85,6 +85,10 @@ PanelRegistry.extend('checks', {
 
 PanelRegistry.extend('checks', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-checks .swchecks{display:grid;gap:4px}.pt-checks .swchecks li{padding:6px 10px;border:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);border-radius:9px;background:color-mix(in srgb,var(--dtext) 3%,transparent)}.pt-checks .swcheckhead{flex-wrap:wrap;gap:5px}.pt-checks .swdetail{margin-top:3px;line-height:1.5}
+`},
     {
       order: 282,
       css: String.raw`.swsummary,.swcheckhead{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}

@@ -83,6 +83,9 @@
 @keyframes chime-sound{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
 @media(prefers-reduced-motion:reduce){.chime-motion .chime-bars i{animation:none}}
 @media print{.chime-motion .chime-bars i{animation:none}.chime-panel{break-inside:avoid}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.chime-device{box-shadow:inset 0 1px 0 color-mix(in srgb,var(--dink) 10%,transparent);border-radius:20px}.chime-panel{gap:18px;padding:4px 0}.chime-status{letter-spacing:-.3px}.chime-text{color:var(--dtext);line-height:1.6}.chime-bars{gap:4px}
 `
   });
 })();

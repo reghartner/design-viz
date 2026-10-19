@@ -732,6 +732,9 @@ PanelRegistry.define('strandscene', {
 .mech-box .swnote{margin-top:8px}
 @media (prefers-reduced-motion: reduce){.mech-move,.mech-nt,.mech-site{transition:none}.mech-transient{display:none}.mech-appear{animation:none}}
 @media print{.mech-transient{display:none}.mech-frame,.mech-sw,.mech-site{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.mech-frame{border-radius:12px}.mech-t-caption{font-weight:600}.mech-grid{opacity:.6}.mech-actor path{filter:drop-shadow(0 2px 3px #00000033)}.mech-tag rect{rx:5px}
 `,
   authoring: {
     initialFields: true,

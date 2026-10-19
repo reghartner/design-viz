@@ -129,6 +129,10 @@ PanelRegistry.extend('waterfall', {
 
 PanelRegistry.extend('waterfall', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-waterfall .wfall{gap:9px}.pt-waterfall .wflabel{width:clamp(72px,32%,128px);flex-shrink:1}.pt-waterfall .wftrack{height:13px;min-width:25px}.pt-waterfall .wfms{font-variant-numeric:tabular-nums;flex:none}.pt-waterfall .wfrow.hl .wfbar{box-shadow:none}.pt-waterfall .wfrow.hl .wflabel{font-weight:700}
+`},
     {
       order: 259,
       css: String.raw`.wf-timed{max-height:350px; overflow:auto;}
@@ -336,3 +340,5 @@ PanelRegistry.extend('waterfall', {
     },
   },
 });
+
+PanelRegistry.extend('waterfall', {layout: {sectionSizing: { minWidth: 260, preferredWidth: 380, maxWidth: 700, aspectPolicy: 'content', grow: 1 }}});

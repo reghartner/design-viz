@@ -33,6 +33,10 @@ PanelRegistry.extend('gauge', {
 
 PanelRegistry.extend('gauge', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-gauge .gaugeval{font-size:26px;letter-spacing:-1px;margin-bottom:12px;font-variant-numeric:tabular-nums}.pt-gauge .gaugeunit{font-size:12px;letter-spacing:0;opacity:.8}.pt-gauge .gaugebar{height:10px;background:color-mix(in srgb,var(--dtext) 10%,transparent)}
+`},
     {
       order: 326,
       css: String.raw`.gaugeval{font:700 16px 'IBM Plex Mono',monospace; margin-bottom:6px;}
@@ -118,4 +122,4 @@ PanelRegistry.extend('gauge', {
   },
 });
 
-PanelRegistry.extend('gauge', {layout: {sectionSizing: { minWidth: 160, preferredWidth: 200, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+PanelRegistry.extend('gauge', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 160, preferredWidth: 200, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

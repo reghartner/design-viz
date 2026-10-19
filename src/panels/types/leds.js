@@ -24,6 +24,10 @@ PanelRegistry.extend('leds', {
 
 PanelRegistry.extend('leds', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-leds .ledrow{gap:8px}.pt-leds .led{padding:8px 10px;border:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);border-radius:8px;background:color-mix(in srgb,var(--dtext) 3%,transparent);gap:9px}.pt-leds .leddot{width:10px;height:10px;flex:none}
+`},
     {
       order: 316,
       css: String.raw`.ledrow{display:flex; flex-wrap:wrap; gap:12px;}
@@ -181,4 +185,4 @@ PanelRegistry.extend('leds', {
   },
 });
 
-PanelRegistry.extend('leds', {layout: {sectionSizing: { minWidth: 150, preferredWidth: 180, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 150, preferredWidth: 180, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

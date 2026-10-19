@@ -473,13 +473,17 @@ PanelRegistry.extend('radar', {
   order: 15,
   label: 'Radar',
   since: '0.1.0',
-  layout: {
+  layout: {sectionSizing: { minWidth: 240, preferredWidth: 340, maxWidth: 600, aspectPolicy: 'fixed', grow: 0, bodyAspect: 320 / 180, contentSelector: '.rdframe' },
     canvasSizing: { mode: 'fixed-aspect', aspect: 320 / 180, resizeAxis: 'width' },
   },
 });
 
 PanelRegistry.extend('radar', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-radar .rdbox{border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);border-radius:12px}.pt-radar .rdzlbl{font-size:10px}.pt-radar .rdring{stroke-dasharray:2 4;opacity:.8}.pt-radar .rdtrack{stroke-width:1.7}.pt-radar .rdzone{stroke-linejoin:round}.pt-radar .rdsensor{filter:drop-shadow(0 1px 3px #0006)}
+`},
     {
       order: 827,
       css: String.raw`.rdbox{border-radius:8px; overflow:hidden;}
@@ -490,7 +494,7 @@ PanelRegistry.extend('radar', {
 .rdthresh{fill:none; stroke:#FFB454; stroke-width:1.5; stroke-dasharray:5 4;}
 .rdzone{fill:rgba(94,115,150,.08); stroke:#3B4A63; stroke-width:1.2; stroke-dasharray:4 4;}
 .rdzone.occ{fill:rgba(56,225,255,.14); stroke:#38E1FF; stroke-dasharray:none;}
-.rdzlbl{font:600 9px 'IBM Plex Mono',monospace; fill:#55627A;}
+.rdzlbl{font:600 9px 'IBM Plex Mono',monospace; fill:#91A6C1;}
 .rdzlbl.occ{fill:#8AE8FF;}
 .rdsweep line{stroke:#38E1FF; stroke-width:1.2; opacity:.28; stroke-linecap:round;}
 .rdsweep{transform-box:view-box; animation:sensorSweep 3.2s ease-in-out infinite alternate;}
@@ -643,7 +647,9 @@ PanelRegistry.extend('radar', {
         state = sample.state,
         states = sample.states,
         step = sample.step;
+      panel.threshold=100;panel.zones=[{id:'approach',label:'Approach',points:[[150,73],[224,73],[246,120],[162,138]]}];
       state = { subject: { x: 195, y: 90 }, alert: true };
+      states=[{subject:{x:230,y:65}},{subject:{x:212,y:78}},state];step=2;
       panel.initial = builderClone(state);
 
       return { panel: panel, state: state, states: states, step: step };

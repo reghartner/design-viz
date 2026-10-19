@@ -233,6 +233,9 @@
 .sk-terminal .dispatch-hero,.sk-terminal .dispatch-unit,.sk-terminal .dispatch-brief,.sk-blueprint .dispatch-hero,.sk-blueprint .dispatch-unit,.sk-blueprint .dispatch-brief{border-radius:3px;}
 @media(prefers-reduced-motion:reduce){.dispatch *{animation:none!important;transition:none!important;}.dispatch-lights-on .dispatch-lamp-a,.dispatch-lights-on .dispatch-lamp-b{opacity:1;}}
 @media print{.dispatch{--dispatch-accent:#333!important;--dispatch-good:#333!important;--dispatch-warn:#333!important;--dispatch-bad:#333!important;--panel-bg:#fff;color:#222;}.dispatch *{animation:none!important;transition:none!important;box-shadow:none!important;}.dispatch-hero,.dispatch-unit,.dispatch-brief{background:#fff;border:1px solid #999;}.dispatch-unit{break-inside:avoid;}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.dispatch-status{letter-spacing:-.6px}.dispatch-unit{background:color-mix(in srgb,var(--dtext) 3%,transparent);padding:12px}.dispatch-scene{border-radius:12px}.dispatch-hero{border-radius:12px}.dispatch-brief{line-height:1.65}.dispatch-roster{gap:7px}
 `
   });
 })();

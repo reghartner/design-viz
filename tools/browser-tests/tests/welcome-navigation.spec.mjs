@@ -155,7 +155,8 @@ test('template navigation returns to the picker and Forward retains the same pro
 });
 
 // #545 — Start new project text filter. Fixture: the 13 core built-in templates + Blank,
-// plus one routed team template (starters.json) in the company grid.
+// plus one routed team template (starters.json) in the company grid and any
+// explicitly enabled package templates.
 // row | fixture | assertion (scoped) | rejects
 // 1 precondition | empty query, All examples | core cards, Blank and the team card; #welcome-template-empty hidden | a filter that starts narrowed or omits a starter
 // 2 Tab + focus | picker after entry | Tab presses (no clicks) focus the "Search templates" searchbox; :focus-visible with a ≥2px non-none outline | a mouse-only field or a suppressed focus ring
@@ -176,13 +177,15 @@ test('Start new project filters built-in and team templates by name, description
   const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
   const enabledPackages=new Set((process.env.FLOWVIEW_PACKAGES||'').split(','));
   const scienceEnabled=enabledPackages.has('science'),physicsEnabled=enabledPackages.has('physics');
-  expect(all).toHaveLength(15+Number(scienceEnabled)+Number(physicsEnabled));
+  const scienceTitles=['From viral RNA copying to sequencing evidence','The insertion signature of NSP15'];
+  const physicsTitles=['Waves & forces'];
+  expect(all).toHaveLength(15+(scienceEnabled?scienceTitles.length:0)+(physicsEnabled?physicsTitles.length:0));
   expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));
   expect(all).not.toContain('Sequencing walkthrough');
-  if(scienceEnabled)expect(all).toContain('From viral RNA copying to sequencing evidence');
-  else expect(all).not.toContain('From viral RNA copying to sequencing evidence');
-  if(physicsEnabled)expect(all).toContain('Waves & forces');
-  else expect(all).not.toContain('Waves & forces');
+  if(scienceEnabled)expect(all).toEqual(expect.arrayContaining(scienceTitles));
+  else for(const title of scienceTitles)expect(all).not.toContain(title);
+  if(physicsEnabled)expect(all).toEqual(expect.arrayContaining(physicsTitles));
+  else for(const title of physicsTitles)expect(all).not.toContain(title);
   await expect(empty).toBeHidden();
   const search=page.getByRole('searchbox',{name:'Search templates'});
   for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
@@ -206,9 +209,10 @@ test('Start new project filters built-in and team templates by name, description
   const science=page.locator('#welcome-template-filters').getByRole('button',{name:'Science',exact:true});
   if(scienceEnabled){
     await science.click();await expect(science).toHaveAttribute('aria-pressed','true');
-    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','From viral RNA copying to sequencing evidence','Payroll handoff']);
+    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram',...scienceTitles,'Payroll handoff']);
     await expect(empty).toBeHidden();
     await query('RNA-seq');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['From viral RNA copying to sequencing evidence']);
+    await query('NSP15');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['The insertion signature of NSP15']);
   }else await expect(science).toHaveCount(0);
   const physics=page.locator('#welcome-template-filters').getByRole('button',{name:'Physics',exact:true});
   if(physicsEnabled){

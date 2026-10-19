@@ -434,9 +434,10 @@ PanelRegistry.define('nspstory', {
 #section-analysis-ladder .pwidget[data-dv-panel="0"] .swbadge{background:#123b38;color:#9efbd6;border-color:#66c8aa}
 #section-analysis-ladder .swtable .swrow-changed td{background:#173f44;border-color:#65d6b1}
 #section-analysis-ladder .pwidget:first-child .swtable tbody td:first-child{color:#a1ffe0}
-#section-assay-limits .swtable tbody td{height:60px;box-sizing:border-box;padding:7px 8px;font-size:12px}
+.doc-sec#section-assay-limits .swtable tbody td{height:56px;box-sizing:border-box;padding:7px 8px;font-size:12px}
 #section-assay-limits .swtable{border-spacing:0 6px}
-#section-second-virus .swtable tbody td{padding:7px 8px;font-size:12px}
+.doc-sec#section-second-virus .swtable tbody td{padding:6px 8px;font-size:12px}
+.doc-sec#section-class-signature .swtable tbody td{padding:8px 10px}
 #section-assay-limits .pwidget[data-dv-panel="1"] .swtable td:first-child{color:#f3ca88;border-left-color:#ac814c}
 #section-second-virus .pwidget[data-dv-panel="1"]{border-top:3px solid #b49be5}
 #section-second-virus .pwidget[data-dv-panel="0"]{border-top:3px solid #69d9b6}
@@ -488,6 +489,7 @@ PanelRegistry.define('nspstory', {
 @keyframes nspEmphasis{from{stroke-dasharray:0 600}to{stroke-dasharray:600 0}}
 @keyframes nspAmbientDrift{from{transform:translate(-3px,2px);opacity:.45}to{transform:translate(4px,-3px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.nspstory *{animation:none!important;transition:none!important}.nspstory-playback{opacity:.58}}
+@media print{.docview:has(#section-green-reporter){--dink:#111;--dtext:#333;--dfaint:#555}}
 @media print{#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr{background:#fff!important;box-shadow:none!important;border-color:#777!important}}
 @media print{.docview:has(#section-green-reporter) .pwidget{--dink:#111;--dtext:#333;--dfaint:#555;background:#fff!important;color:#111!important;border-color:#777!important;box-shadow:none!important}.docview:has(#section-green-reporter) .pwidget>.ptitle,.docview:has(#section-green-reporter) .swtable td,.docview:has(#section-green-reporter) .swtable th{background:#fff!important;color:#111!important;border-color:#777!important;box-shadow:none!important}.nspstory-dock{display:none!important}}
 @media print{.pt-nspstory:has(.nspstory){background:#fff!important;border-color:#bbb!important;box-shadow:none!important}.pt-nspstory:has(.nspstory)>.ptitle{background:#fff!important;color:#222!important}}

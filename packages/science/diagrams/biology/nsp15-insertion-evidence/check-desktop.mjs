@@ -72,12 +72,14 @@ try {
      const geometry=await root.evaluate(el=>{
       const panels=[...el.querySelectorAll('.pwidget')].filter(e=>e.getClientRects().length);
       return {overflow:document.documentElement.scrollWidth-innerWidth,
+       tableOverflow:[...el.querySelectorAll('.swtablewrap')].filter(e=>e.clientHeight>0&&e.scrollHeight>e.clientHeight+2).map(e=>({scroll:e.scrollHeight,client:e.clientHeight})),
        panels:panels.map(e=>({title:e.querySelector('.ptitle')?.textContent,left:e.getBoundingClientRect().left,right:e.getBoundingClientRect().right})),
        clipped:[...el.querySelectorAll('.pwidget,.nspstory-dock,.swtablewrap')].filter(e=>e.clientWidth>0&&e.scrollWidth>e.clientWidth+2).map(e=>e.className)};
      });
      assert(geometry.overflow<=1,'No horizontal desktop page overflow');
      for(const p of geometry.panels)assert(p.left>=0&&p.right<=width+1,p.title+' stays in the desktop');
      assert.deepEqual(geometry.clipped,[],'Panel content fits its allocated width');
+     assert.deepEqual(geometry.tableOverflow,[],'All evidence rows fit without an inner scroll');
      await root.screenshot({path:path.join(output,width+'-'+reducedMotion+'-'+section.id+'.png')});
     }
    }

@@ -100,6 +100,28 @@ work for the shared lifecycle, not separate animation loops. Camera screens use
 `patch` to preserve an animated scene while changing overlays. Read
 [Screen](../src/panels/types/screen.js) before adding surgical DOM updates.
 
+Panel bodies activate only while their section belongs to both the selected
+Tab and View. Lightweight cards and navigation remain mounted; folded state
+continues to update while inactive. Activation renders the latest snapshot
+with `animate: false` after the section becomes visible. Departure pauses and
+settles the step before unmounting its bodies. Returning restores that step
+without restarting playback; finite CSS entrance animations are finished on
+remount. Ordinary documents still render all visible sections on opening.
+The default tour's synchronous discovery pass inspects navigation shells with
+panel activation suspended, then restores the original selection.
+
+A renderer that needs a Canvas, animation loop, observer or external listener
+creates it in `mounted`, and assigns an idempotent
+`host._panelMotionCleanup` function to cancel frames, disconnect observers and
+remove listeners. `cancelPanelMotion` invokes and clears this hook on settling,
+replacement, deactivation and destruction. Cleanup must leave the last painted
+DOM/Canvas intact; the shared lifecycle removes the body when unmounting. A
+settled render must paint synchronously, and its `mounted` callback must be
+safe to repeat after cleanup even when the HTML is unchanged. This also makes
+printing safe: `beforeprint` materializes settled snapshots for hidden tabs and
+immediately releases their live resources; `afterprint` restores normal lazy
+activation. Persisted panel state belongs in the fold, never in mounted DOM.
+
 The editor generates ordinary controls from `setupFields` and `patchFields`.
 `expandPatchFields(panel)` adds fields derived from configuration. The picker
 clones `template` and passes a fresh `{panel, state, states, step}` to

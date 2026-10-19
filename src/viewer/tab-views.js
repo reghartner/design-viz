@@ -25,9 +25,10 @@ function createTabViewController(ctl,page){
         rec.viewExcluded=!member;rec.viewingMode=owner.current.presentation;
         if(member && rec.presentation){var layout=member.layout || rec.presentation.defaultView();if(rec.presentation.viewId()!==layout)rec.presentation.setView(layout);}
         if(rec.viewport)rec.viewport.setPresentation(member?owner.current.presentation:'standard');
-        var wasHidden=rec.sectionEl.hidden;rec.sectionEl.hidden=!visible;
-        if(rec.stepper){if(visible && wasHidden)rec.stepper.onShow();else if(!visible){rec.stepper.pause();rec.stepper.onHide();}}
+        rec.sectionEl.hidden=!visible;
       });
+      // Deactivate departed sections before any entering View starts resources.
+      owner.records.map(function(record){return record.runtime;}).sort(function(a,b){return Number(b.sectionEl.hidden)-Number(a.sectionEl.hidden);}).forEach(ctl.syncSectionVisibility);
     }finally{updating=false;}
   }
   function notify(owner){

@@ -43,7 +43,14 @@ export async function vendorFlowview(source, destination) {
       await mkdir(path.dirname(target), {recursive:true});
       await copyFile(path.join(source, name), target);
     }
-    execFileSync('python3', ['tools/build.py'], {cwd:buildRoot, stdio:'inherit'});
+    // This portable source set intentionally excludes packages/. Ignore the
+    // source checkout's company selection and any caller package environment
+    // so the prebuilt rehearsal runtime contains core Flowview only.
+    execFileSync('python3', ['tools/build.py', '--no-config'], {
+      cwd:buildRoot,
+      env:{...process.env, FLOWVIEW_COMPANY_IDENTITY:'off', FLOWVIEW_PACKAGES:''},
+      stdio:'inherit'
+    });
     const publisher = path.join(buildRoot, 'apps/backstage');
     execFileSync('npm', ['ci', '--no-audit', '--no-fund'], {cwd:publisher, stdio:'inherit'});
     execFileSync('npm', ['run', 'build'], {cwd:publisher, stdio:'inherit'});

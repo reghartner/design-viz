@@ -66,13 +66,13 @@ if sorted(selected) != ["science", "sports"]:
 python3 tools/build.py --no-catalog
 node tools/canon/library.mjs --registry canon.json --out workbench/diagrams.json --thumbnails
 
-# The generated index must point only to the five reviewed Friends documents.
+# The generated index must point only to the six active Friends documents.
 # This also catches a stale or accidentally empty canon.json before replacing
 # a previously prepared site.
 python3 - "$ROOT/workbench/diagrams.json" <<'PY'
 import json, pathlib, sys
 index = json.loads(pathlib.Path(sys.argv[1]).read_text())
-expected = {'season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate'}
+expected = {'season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate', 'islanders-marketing'}
 entries = index.get('diagrams', [])
 ids = {entry.get('id') for entry in entries}
 if len(entries) != len(expected) or ids != expected:
@@ -102,7 +102,7 @@ for entry in json.loads(index_file.read_text())['diagrams']:
     shutil.copy2(source, destination)
 PY
 cp template/flowview.html "$STAGE/template/"
-for slug in season-of-seats sell-the-inventory serve-game-night build-next-season copy-gate; do
+for slug in season-of-seats sell-the-inventory serve-game-night build-next-season copy-gate islanders-marketing; do
   mkdir -p "$STAGE/diagrams/friends/$slug"
   cp "diagrams/friends/$slug/$slug.spec.json" "$STAGE/diagrams/friends/$slug/"
 done
@@ -110,7 +110,7 @@ python3 - "$STAGE" <<'PY'
 import json, pathlib, sys
 stage = pathlib.Path(sys.argv[1])
 starters = []
-for slug in ('season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate'):
+for slug in ('season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season', 'copy-gate', 'islanders-marketing'):
     spec = json.loads((stage / 'diagrams/friends' / slug / (slug + '.spec.json')).read_text())
     starters.append({'name': spec['page']['title'],
                      'desc': spec['page'].get('description') or 'Friends library story',

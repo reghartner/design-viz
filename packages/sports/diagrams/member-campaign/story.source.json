@@ -1,0 +1,333 @@
+{
+  "page": {
+    "title": "Your people. Our Island.",
+    "subtitle": "A member campaign, from the email promise to the content and ticket offer behind it.",
+    "skin": "islanders",
+    "brand": false,
+    "protocols": {
+      "campaign": {
+        "label": "Illustrative campaign handoff",
+        "color": "#00539b"
+      }
+    },
+    "sections": [
+      {
+        "id": "member-campaign",
+        "heading": "From member email to guest tickets",
+        "text": "Follow the steps: system flow, marketing workspace and fan phone stay in sync. Campaign and integrations are illustrative; imagery is from the Islanders' official membership pages. A/B are walkthrough annotations, not fan-facing UI. The 9:41 clock is display-only.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "email": {
+              "title": "Salesforce",
+              "sub": "Email journeys",
+              "icon": "speaker"
+            },
+            "content": {
+              "title": "Contentful",
+              "sub": "Copy + CTA",
+              "icon": "db"
+            },
+            "membership": {
+              "title": "Member site",
+              "sub": "Member gate",
+              "icon": "person"
+            },
+            "tickets": {
+              "title": "Ticketmaster",
+              "sub": "Ticketing",
+              "icon": "package"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "floats": [
+            {
+              "id": "membership",
+              "side": "below",
+              "x": 207.4,
+              "y": 70
+            },
+            {
+              "id": "content",
+              "side": "below",
+              "x": 535,
+              "y": 70
+            },
+            {
+              "id": "email",
+              "side": "below",
+              "x": 207.4,
+              "y": 299.8
+            },
+            {
+              "id": "tickets",
+              "side": "below",
+              "x": 535,
+              "y": 299.8
+            }
+          ],
+          "edges": [
+            {
+              "from": "email",
+              "to": "membership",
+              "kind": "campaign",
+              "label": "Click email CTA"
+            },
+            {
+              "from": "content",
+              "to": "membership",
+              "kind": "campaign",
+              "label": "Campaign content"
+            },
+            {
+              "from": "membership",
+              "to": "tickets",
+              "kind": "campaign",
+              "label": "Ticket options"
+            },
+            {
+              "from": "tickets",
+              "to": "email",
+              "kind": "campaign",
+              "label": "Confirmed purchase"
+            }
+          ],
+          "steps": [
+            {
+              "id": "email",
+              "text": "**The promotion.** This is the member email from Salesforce Marketing Cloud. The phone shows its actual creative and the campaign link the fan will click.",
+              "nodes": [
+                "email"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "email"
+                },
+                "record": {
+                  "screen": "email"
+                }
+              }
+            },
+            {
+              "id": "member",
+              "text": "Click Explore member guest tickets. The member website checks sign-in and membership, then shows the promised guest-access content. Recognition alone is not ticketing authorization.",
+              "edge": "email->membership",
+              "panels": {
+                "destination": {
+                  "screen": "member"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "cms",
+              "text": "**Match the content to the page.** The Contentful mockup shows the same official Islanders photo used on the phone. Compare A (headline) and B (button); the destination points to the member ticket offer.",
+              "edge": "content->membership",
+              "panels": {
+                "record": {
+                  "screen": "content"
+                },
+                "destination": {
+                  "screen": "member-linked"
+                }
+              }
+            },
+            {
+              "id": "tickets",
+              "text": "View guest-ticket options leads to the matching Ticketmaster Account Manager offer. Ticketmaster verifies eligibility and supplies inventory and prices; this concept does not simulate checkout.",
+              "edge": "membership->tickets",
+              "panels": {
+                "destination": {
+                  "screen": "ticketing"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "followup",
+              "text": "**Stop the reminder after purchase.** In this simulated outcome, an illustrative integration supplies Ticketmaster's confirmed purchase to Salesforce Marketing Cloud. At the reminder decision, this member matches the Purchased path and exits; a click alone does not qualify.",
+              "edge": "tickets->email",
+              "panels": {
+                "destination": {
+                  "screen": "confirmation"
+                },
+                "record": {
+                  "screen": "journey"
+                }
+              }
+            },
+            {
+              "id": "signin",
+              "text": "The same email link opens a sign-in gate when membership is not verified. Preserve the campaign destination so the fan does not have to find the offer again.",
+              "edge": "email->membership",
+              "panels": {
+                "destination": {
+                  "screen": "signin"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "verified",
+              "text": "After illustrative member verification, return to the original landing page and its guest-ticket CTA. No credentials are collected by this demo.",
+              "nodes": [
+                "membership"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "member"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "expired",
+              "text": "An old email still points to this campaign, but the offer has ended. Serve the published fallback copy and remove the expired member-offer checkout link.",
+              "edge": "email->membership",
+              "panels": {
+                "destination": {
+                  "screen": "expired"
+                },
+                "record": {
+                  "screen": "ended"
+                }
+              }
+            },
+            {
+              "id": "paused",
+              "text": "**Replace the expired promise.** Contentful supplies the fallback headline and button. A and B match the phone; the new destination is regular tickets, with no expired member offer.",
+              "edge": "content->membership",
+              "panels": {
+                "record": {
+                  "screen": "ended"
+                },
+                "destination": {
+                  "screen": "expired-linked"
+                }
+              }
+            },
+            {
+              "id": "general",
+              "text": "The fallback opens regular ticket options. Preserve campaign attribution if appropriate, but carry no expired member entitlement into ticketing.",
+              "edge": "membership->tickets",
+              "panels": {
+                "destination": {
+                  "screen": "general"
+                },
+                "record": {
+                  "screen": "ended"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "member",
+              "label": "Recognized member",
+              "steps": [
+                "email",
+                "member",
+                "cms",
+                "tickets",
+                "followup"
+              ]
+            },
+            {
+              "id": "signin",
+              "label": "Needs sign-in",
+              "steps": [
+                "email",
+                "signin",
+                "verified",
+                "tickets"
+              ]
+            },
+            {
+              "id": "ended",
+              "label": "Offer has ended",
+              "steps": [
+                "email",
+                "expired",
+                "paused",
+                "general"
+              ]
+            }
+          ],
+          "graphFrame": {
+            "x": 0,
+            "y": 0,
+            "w": 800,
+            "h": 300
+          },
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 8,
+                "h": 13
+              },
+              {
+                "x": 0,
+                "y": 13,
+                "w": 18,
+                "h": 7,
+                "controls": "steps"
+              },
+              {
+                "x": 8,
+                "y": 0,
+                "w": 10,
+                "h": 13,
+                "panel": "record"
+              },
+              {
+                "x": 18,
+                "y": 0,
+                "w": 6,
+                "h": 17,
+                "panel": "destination"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": [
+        "flow.alternates",
+        "flow.drilldown",
+        "layout.arranged",
+        "layout.cubic-curves",
+        "layout.edge-ports",
+        "layout.free-nodes",
+        "layout.graph-frame",
+        "layout.grid-24",
+        "media.shared-icons",
+        "panel.appscreens",
+        "panel.table"
+      ]
+    },
+    "contract": "1",
+    "canon": {
+      "version": 1,
+      "id": "member-campaign",
+      "kind": "canonical",
+      "owner": "group:default/flowview-examples"
+    }
+  }
+}

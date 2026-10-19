@@ -1,0 +1,175 @@
+{
+  "rows": [
+    []
+  ],
+  "floats": [
+    {
+      "id": "content",
+      "side": "below",
+      "x": 123,
+      "y": 70
+    },
+    {
+      "id": "email",
+      "side": "below",
+      "x": 349,
+      "y": 202
+    },
+    {
+      "id": "registration",
+      "side": "below",
+      "x": 123,
+      "y": 202
+    },
+    {
+      "id": "site",
+      "side": "below",
+      "x": 349,
+      "y": 70
+    }
+  ],
+  "edges": [
+    {
+      "from": "email",
+      "to": "site",
+      "label": "Click link",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "top",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "bottom",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 0,
+          "dy": -14.96
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 0,
+          "dy": 14.96
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "site",
+      "label": "Content",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "right",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "left",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 31.59,
+          "dy": 0
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": -31.59,
+          "dy": 0
+        }
+      ]
+    },
+    {
+      "from": "site",
+      "to": "registration",
+      "label": "RSVP",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "left",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "right",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": -63.64,
+          "dy": -44
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 63.64,
+          "dy": 44
+        }
+      ]
+    },
+    {
+      "from": "registration",
+      "to": "email",
+      "label": "Status + opt-in",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "right",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "left",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 31.59,
+          "dy": 0
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": -31.59,
+          "dy": 0
+        }
+      ]
+    }
+  ],
+  "graphFrame": {
+    "x": 18,
+    "y": 10,
+    "w": 436,
+    "h": 252
+  },
+  "sectionLayout": {
+    "columns": 24,
+    "default": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 13
+      },
+      {
+        "x": 0,
+        "y": 13,
+        "w": 18,
+        "h": 7,
+        "controls": "steps"
+      },
+      {
+        "x": 8,
+        "y": 0,
+        "w": 10,
+        "h": 13,
+        "panel": "record"
+      },
+      {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 17,
+        "panel": "destination"
+      }
+    ]
+  }
+}

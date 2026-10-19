@@ -1,0 +1,11 @@
+{
+  "retrieved": "2026-10-19",
+  "purpose": "User-requested local Islanders marketing mockup. Imagery is real; campaign and app integrations remain illustrative. No ownership or publication license is asserted.",
+  "sourcePage": "https://www.nhl.com/islanders/tickets/membership/",
+  "rights": "New York Islanders / NHL and respective rights holders; not newly licensed or public-domain assets.",
+  "assets": [
+    {"file":"crowd.jpg","source":"https://media.d3.nhle.com/image/private/t_ratio16_9-size30/f_auto/prd/co3w0j5pmp8zucf2ay25.jpg","sourceLabel":"Priority Access to Playoff Tickets","description":"Fans waving orange towels at UBS Arena. Used as atmosphere, not to promise playoff access in the fictional offer."},
+    {"file":"members.jpg","source":"https://media.d3.nhle.com/image/private/t_ratio16_9-size30/f_auto/prd/atyullii4gdj6ctjvi2s.jpg","sourceLabel":"Meet the Team","description":"Official membership photo with people in Islanders jerseys. Used as illustrative community imagery, not a new benefit or a photo of the fictional purchaser."},
+    {"file":"membership-banner.png","source":"https://media.d3.nhle.com/image/private/t_w_720/f_png/prd/en6fm8qfaugwvn0aetxj.png","description":"Official The Tide Is Rising membership banner; retained intact in the regular-ticket concept."}
+  ]
+}

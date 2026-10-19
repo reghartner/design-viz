@@ -1,0 +1,181 @@
+{
+  "rows": [
+    []
+  ],
+  "floats": [
+    {
+      "id": "email",
+      "side": "below",
+      "x": 123,
+      "y": 70
+    },
+    {
+      "id": "content",
+      "side": "below",
+      "x": 349,
+      "y": 70
+    },
+    {
+      "id": "site",
+      "side": "below",
+      "x": 236,
+      "y": 218
+    },
+    {
+      "id": "sales",
+      "side": "below",
+      "x": 123,
+      "y": 366
+    },
+    {
+      "id": "tickets",
+      "side": "below",
+      "x": 349,
+      "y": 366
+    }
+  ],
+  "edges": [
+    {
+      "from": "email",
+      "to": "site",
+      "label": "Click link",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "top",
+        "offset": 0.25
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 0,
+          "dy": 14
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 0,
+          "dy": -14
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "site",
+      "label": "Page content",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+      },
+      "toPort": {
+        "side": "top",
+        "offset": 0.75
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 0,
+          "dy": 14
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 0,
+          "dy": -14
+        }
+      ]
+    },
+    {
+      "from": "site",
+      "to": "sales",
+      "label": "Inquiry",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "bottom",
+        "offset": 0.25
+      },
+      "toPort": {
+        "side": "top",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 0,
+          "dy": 14
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 0,
+          "dy": -14
+        }
+      ]
+    },
+    {
+      "from": "site",
+      "to": "tickets",
+      "label": "Tickets",
+      "kind": "campaign",
+      "fromPort": {
+        "side": "bottom",
+        "offset": 0.75
+      },
+      "toPort": {
+        "side": "top",
+        "offset": 0.5
+      },
+      "curveControls": [
+        {
+          "t": 0.3333333333333333,
+          "dx": 0,
+          "dy": 14
+        },
+        {
+          "t": 0.6666666666666666,
+          "dx": 0,
+          "dy": -14
+        }
+      ]
+    }
+  ],
+  "graphFrame": {
+    "x": 18,
+    "y": 15,
+    "w": 436,
+    "h": 406
+  },
+  "sectionLayout": {
+    "columns": 24,
+    "default": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 13
+      },
+      {
+        "x": 0,
+        "y": 13,
+        "w": 18,
+        "h": 7,
+        "controls": "steps"
+      },
+      {
+        "x": 8,
+        "y": 0,
+        "w": 10,
+        "h": 13,
+        "panel": "record"
+      },
+      {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 17,
+        "panel": "destination"
+      }
+    ]
+  }
+}

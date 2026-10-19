@@ -5,6 +5,7 @@
     {"folder": "diagrams/friends/sell-the-inventory", "owner": "group:default/flowview-examples"},
     {"folder": "diagrams/friends/serve-game-night", "owner": "group:default/flowview-examples"},
     {"folder": "diagrams/friends/build-next-season", "owner": "group:default/flowview-examples"},
-    {"folder": "diagrams/friends/copy-gate", "owner": "group:default/flowview-examples"}
+    {"folder": "diagrams/friends/copy-gate", "owner": "group:default/flowview-examples"},
+    {"folder": "diagrams/friends/islanders-marketing", "owner": "group:default/flowview-examples"}
   ]
 }

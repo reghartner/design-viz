@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "expectations": [
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "landing",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "landing",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "inquiry",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "inquiry",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "handoff",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "handoff",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "next",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "next",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "landing",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "landing",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "choice",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "choice",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "options",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "options",
+      "panel": "record",
+      "visible": true
+    }
+  ]
+}

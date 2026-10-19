@@ -21,14 +21,14 @@ test('shared Islanders theme survives library, reader, home, copied links and ex
   await expect(page.locator('.islanders-site-mark')).toBeVisible();
   expect(await page.locator('.islanders-site-mark').evaluate(img=>img.complete && img.naturalWidth===2000)).toBe(true);
   await page.locator('#welcome-library').click();
-  await expect(page.locator('.canon-library-card')).toHaveCount(5);
+  await expect(page.locator('.canon-library-card')).toHaveCount(6);
   await expect(page.locator('.islanders-card-mark:visible')).toHaveCount(4);
   await expect(page.locator('.canon-library-card[data-id="copy-gate"] .islanders-card-mark')).toHaveCount(0);
   const cards=page.locator('.canon-library-open');
   const hrefs=await cards.evaluateAll(nodes=>nodes.map(n=>n.href));
   expect(hrefs.every(href=>new URL(href).searchParams.get('theme')==='islanders')).toBe(true);
   const previews=await page.locator('.canon-library-preview img').evaluateAll(nodes=>nodes.map(n=>n.src));
-  expect(new Set(previews).size).toBe(5);
+  expect(new Set(previews).size).toBe(6);
   await capture(page,testInfo,'islanders-library-desktop');
   await cards.filter({hasText:'1 · Create demand'}).click();
   await expect(page.locator('#canon-reader')).toHaveClass(/\bsk-islanders\b/);

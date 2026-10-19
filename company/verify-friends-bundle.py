@@ -16,6 +16,7 @@ STORIES = {
     "serve-game-night": "packages/sports/diagrams/serve-game-night/serve-game-night.spec.json",
     "build-next-season": "packages/sports/diagrams/build-next-season/build-next-season.spec.json",
     "copy-gate": "packages/science/diagrams/biology/copy-gate/copy-gate.spec.json",
+    "islanders-marketing": "packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json",
 }
 
 
@@ -116,7 +117,7 @@ def main(stage):
             (ROOT / "workbench/diagrams.json").read_bytes(),
             "Staged Canon index differs from selected build")
     require({entry["id"] for entry in index["diagrams"]} == set(STORIES) and
-            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly five Friends stories")
+            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly six active Friends documents")
     hosted = json.loads((stage / "workbench/starters.json").read_text())
     require(len(hosted) == len(STORIES), "Hosted starter manifest omits a Friends story")
     for slug, package_path in STORIES.items():
@@ -130,7 +131,7 @@ def main(stage):
                 f"Hosted starter manifest does not expose editable {slug} story")
 
     print("Verified staged Friends workbench: science and sports panels, contracts, recipes, "
-          "built-in and hosted starters, five Canon stories, and selected-only authoring kit")
+          "built-in and hosted starters, six active Canon documents, and selected-only authoring kit")
 
 
 if __name__ == "__main__":

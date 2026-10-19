@@ -9,10 +9,19 @@ const arcs=[
   ['serve-game-night',['buyer-is-not-attendee','gate-night','score-first','morning-after'],58],
   ['build-next-season',['friend-to-member','clinch-or-fade'],25],
 ];
-test('Friends publishes four complete sports arcs and the science story with matching package sources',()=>{
+test('Friends publishes the consolidated marketing document, four sports arcs and the science story',()=>{
   const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
   const registry=JSON.parse(fs.readFileSync(path.join(root,'canon.json')));
-  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'copy-gate']);
+  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'copy-gate','islanders-marketing']);
+  assert.equal(fs.readFileSync(path.join(root,'diagrams/friends/member-campaign/member-campaign.spec.json'),'utf8'),fs.readFileSync(path.join(root,'packages/sports/diagrams/member-campaign/member-campaign.spec.json'),'utf8'));
+  for(const id of ['group-night','fan-event-rsvp']){
+    const source=fs.readFileSync(path.join(root,'packages/sports/diagrams',id,id+'.spec.json'),'utf8');
+    assert.equal(fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.spec.json'),'utf8'),source);
+    const raw=JSON.parse(source),result=runtime.validate(runtime.normalize(raw));
+    assert.deepEqual(Array.from(result.errors),[]);assert.deepEqual(Array.from(result.warnings),[]);
+    assert.equal(raw.page.sections[0].diagram.panels.length,2);
+    assert.ok(Buffer.byteLength(source)<2*1024*1024);
+  }
   let panels=0,steps=0;
   for(const [id,sections,count] of arcs){
     const text=fs.readFileSync(path.join(root,`packages/sports/diagrams/${id}/${id}.spec.json`),'utf8'),raw=JSON.parse(text),page=runtime.normalize(raw);
@@ -26,4 +35,25 @@ test('Friends publishes four complete sports arcs and the science story with mat
     panels+=raw.page.sections.reduce((n,s)=>n+s.diagram.panels.length,0);steps+=count;
   }
   assert.equal(steps,173);assert.equal(panels,46);
+});
+
+test('marketing consolidation preserves all approved story data in three native tabs',()=>{
+  const id='islanders-marketing',folder=path.join(root,'packages/sports/diagrams',id);
+  const text=fs.readFileSync(path.join(folder,id+'.spec.json'),'utf8'),raw=JSON.parse(text);
+  assert.ok(Buffer.byteLength(text)<4*1024*1024,'whole-file Workbench import limit');
+  for(const suffix of ['spec.json','ledger.md'])assert.equal(fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.'+suffix),'utf8'),fs.readFileSync(path.join(folder,id+'.'+suffix),'utf8'));
+  assert.equal(raw.page.canon.id,id);
+  const tabs=raw.page.blocks[0].tabs;
+  assert.deepEqual(tabs.map(t=>t.label),['Member campaign','Group night','Fan event RSVP']);
+  const withoutPixels=value=>JSON.parse(JSON.stringify(value,(k,v)=>k==='src'&&typeof v==='string'&&v.startsWith('data:image/')?'[embedded image]':v));
+  let paths=0,steps=0,panels=0;
+  for(const [index,sourceId]of ['member-campaign','group-night','fan-event-rsvp'].entries()){
+    const original=JSON.parse(fs.readFileSync(path.join(root,'packages/sports/diagrams',sourceId,sourceId+'.spec.json'),'utf8'));
+    assert.deepEqual(withoutPixels(tabs[index].sections),withoutPixels(original.page.sections));
+    const d=tabs[index].sections[0].diagram;paths+=d.paths.length;steps+=d.steps.length;panels+=d.panels.length;
+  }
+  assert.equal(paths,8);assert.equal(steps,30);assert.equal(panels,6);
+  const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
+  const normalized=runtime.normalize(raw),result=runtime.validate(normalized);
+  assert.deepEqual(Array.from(result.errors),[]);assert.deepEqual(Array.from(result.warnings),[]);assert.deepEqual(Array.from(runtime.lintPage(normalized)),[]);
 });

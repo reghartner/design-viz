@@ -22,7 +22,9 @@ new constraints on saved widths.
 Compact gauge, battery, temperature, buffer, LEDs, tiles and signal bodies opt
 into existing canvas content-fit sizing (480px maximum); charts/maps keep their
 aspect policies and dense reports retain scroll regions. Phone/device-app
-portraits retain their intrinsic device shape. App screens removes the fixed
+portraits retain their intrinsic device shape. Phone has a 220px native handset
+and a 254px panel minimum that includes horizontal chrome; composition estimates
+its current notification sizing and 10px body text. App screens removes the fixed
 390px body minimum and derives its unsized stage from panel width. Saved section
 tiles continue to fit the screenshot within their available body.
 
@@ -56,7 +58,7 @@ physical material/light palette; UI surfaces use the existing skin tokens.
 | `locus` | Separated heading and clearer feature bands | Gene regions (biology) | 360 / 600 / 1000 |
 | `log` | Intrinsic short-log height, alternating event rows, wrapped text | Device event log | 240 / 340 / 700 |
 | `orbit` | Wider intrinsic lifecycle drawing and clearer current-state label | Camera lifecycle | 220 / 280 / 420 |
-| `phone` | Larger notification text, roomier cards and refined handset | Home security notification | 202 / 210 / 250 |
+| `phone` | Larger notification text, roomier cards and refined handset | Home security notification | 254 / 270 / 320 |
 | `queue` | Clearer held-message slot and bounded message text | Queued camera events | 190 / 250 / 450 |
 | `radar` | Refined field border, range rings, track and zone labels; range/approach preview | Motion range and occupancy | 240 / 340 / 600 |
 | `reads` | Larger alignment cells, separated header and calmer scroller | Sequence alignment (biology) | 360 / 560 / 1000 |

@@ -40,3 +40,17 @@ test('new stock clips wait, play independently, preserve overlays, and offer sti
   expect(await page.locator('.garage-moving,.side-gate-leaf').evaluateAll(els=>els.every(e=>e.getAnimations().length===0&&e.getBoundingClientRect().height>0))).toBe(true);
  }
 });
+
+// A native width promise includes panel chrome, not just the handset itself.
+test('phone minimum retains its native handset width under every skin',async({page},info)=>{
+ await page.setContent(html);
+ for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
+  await page.evaluate(skin=>{paint(skin,null);[...gallery.children].filter(e=>e.dataset.type!=='phone').forEach(e=>e.remove());},skin);
+  const card=page.locator('.pt-phone'),frame=card.locator('.phoneframe');
+  await card.evaluate(e=>{e.style.boxSizing='border-box';});
+  expect(await card.evaluate(e=>e.getBoundingClientRect().width),skin).toBeCloseTo(254,0);
+  expect(await frame.evaluate(e=>e.getBoundingClientRect().width),skin).toBeCloseTo(220,0);
+  expect(await card.evaluate(e=>e.scrollWidth-e.clientWidth),skin).toBe(0);
+  await card.screenshot({path:info.outputPath('phone-'+skin+'-minimum.png')});
+ }
+});

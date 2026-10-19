@@ -95,8 +95,9 @@ function panelSize(p,s,width,layout={}){
  case 'phone':{
   foot=0;extra=0;
   const cards=(s.notifications||[]).slice(0,3),audio=s.audio?180+Math.min(2,lines(s.audio.text,130,8))*12:0;
-  h=Math.max(270,80+cards.length*64+audio)+(s.notifications?.length>3?14:0);
-  nativeLimits={kind:'fixed-width',contentWidth:178,notificationLimit:3,notificationTextLines:2,nominalBodyFontPx:8,warning:'Native notification titles and bodies are clamped; larger tiles do not reveal or enlarge them.'};break;}
+  // Refreshed frame: 210px notification well, 76px cards, 8px gaps and handset chrome.
+  h=Math.max(300,65+Math.max(210,cards.length*76+Math.max(0,cards.length-1)*8)+audio)+(s.notifications?.length>3?14:0);
+  nativeLimits={kind:'fixed-width',contentWidth:220,notificationLimit:3,notificationTextLines:2,nominalBodyFontPx:cards.length?10:8,warning:'Native notification titles and bodies are clamped; larger tiles do not reveal or enlarge them.'};break;}
  case 'deviceapp':h=80;bodyWidthCap=330;nativeLimits={kind:'capped-aspect',maxContentWidth:330,warning:'Native phone fits both body dimensions up to 330px; internal scrolling, truncation and compact text remain native limits.'};break;
  case 'screen':h=80;extra=screenAudioHeight(s,inner);break;
  case 'appscreens':{const selected=(p.screens||[]).find(x=>x.id===s.screen),first=(p.screens||[]).find(x=>x.width&&x.height);const aspect=first?first.width/first.height:p.frame==='none'?1.6:9/19.5;h=inner/aspect+rows(selected?[selected.label,selected.caption]:[]);break;}
@@ -104,8 +105,13 @@ function panelSize(p,s,width,layout={}){
  case 'security':h=520+lines(s.operator,inner)*20;break;
  case 'dispatch':h=360+rows(p.units||p.responders||p.teams)+lines(s.detail||s.status,inner)*20;break;
  case 'trace':h=390+rows(p.spans||p.operations||[])*.7;scroll=true;break;
- case 'cost':h=430+rows(p.components||p.items||p.metrics||p.options)+lines(p.assumptions,inner,12)*18;break;
- case 'budget':h=170+rows(p.categories||p.items||p.components);break;
+ case 'cost':{
+  // Expanded routes span five rows (six for comparisons) with new 10px gaps.
+  // Compact/auto-narrow routes use their own existing 4px/5px spacing.
+  const expanded=p.density==='expanded'||(p.density!=='compact'&&inner>510),routeGaps=Array.isArray(p.routes)&&p.routes.length===2?5:4;
+  h=430+(expanded?routeGaps*10:0)+rows(p.components||p.items||p.metrics||p.options)+lines(p.assumptions,inner,12)*18;break;}
+ // Each real metric owns a wrapping label/badge, large value, track and remaining-budget line.
+ case 'budget':h=(p.metrics||p.items||[]).reduce((n,m)=>n+110+Math.max(1,lines(m.label||m.id,Math.max(50,inner-95),11))*17,0);break;
  case 'timeline':h=80+rows(p.events||s.events||p.items);break;
  case 'waterfall':h=70+rows(p.rows||p.spans||p.items||s.items);break;
  case 'replicas':h=85+Math.min(480,(p.replicas||[]).reduce((n,r)=>n+155+lines(s.replicas?.[r.id]?.series,inner,11)*17,0));break;

@@ -262,7 +262,11 @@ test('mixed distribution uses equal rendered gaps from menu and Inspector at two
   await node(page).focus();await page.keyboard.press('Shift+F10');
   if(direction==='horizontal')await menu(page).getByRole('menuitem',{name:'Distribute horizontally',exact:true}).click();
   else{await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await page.locator('#guide').getByRole('button',{name:'Distribute vertically',exact:true}).click();}
-  const after=await source(page);expect(after).not.toBe(before);const moved=(await graphBoxes(page)).sort((a,b)=>a[axis]-b[axis]);expect(moved[0][axis]).toBeCloseTo(min,1);expect(moved[2][axis]+moved[2][size]).toBeCloseTo(max,1);expect(moved[1][axis]-moved[0][axis]-moved[0][size]).toBeCloseTo(moved[2][axis]-moved[1][axis]-moved[1][size],1);expect(JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].h).toBe(400);await history(page,before,after);await closeTools(page);
+  const after=await source(page);expect(after).not.toBe(before);const moved=(await graphBoxes(page)).sort((a,b)=>a[axis]-b[axis]);
+  // CSS layout quantizes rectangles before inverse zoom maps them to graph units.
+  // Keep the visual error below one eighth of a CSS pixel at either zoom.
+  const scale=await page.locator('.explore-board .boardcanvas>svg').evaluate(el=>el.getScreenCTM().a),tolerance=.125/scale;
+  expect(Math.abs(moved[0][axis]-min)).toBeLessThanOrEqual(tolerance);expect(Math.abs(moved[2][axis]+moved[2][size]-max)).toBeLessThanOrEqual(tolerance);expect(Math.abs((moved[1][axis]-moved[0][axis]-moved[0][size])-(moved[2][axis]-moved[1][axis]-moved[1][size]))).toBeLessThanOrEqual(tolerance);expect(JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].h).toBe(400);await history(page,before,after);await closeTools(page);
  }
 });
 for(const width of [1280,1440])test('Fit selection frames mixed bounds around Inspector and floating controls at '+width,async({page,server},info)=>{

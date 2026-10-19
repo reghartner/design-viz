@@ -1,4 +1,4 @@
-import {test,expect,chooseNavigation,paste} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation,paste,inspectPageElement} from '../helpers/test.mjs';
 import {CORE_EDITOR_SKINS,auditEditorStyle} from '../helpers/node-styles.mjs';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -184,6 +184,45 @@ test('Friends NSP15 opens all eight tabs with readable dark-section text in both
     }
   }
   await testInfo.attach('nsp15-rendered-text-contrast',{body:JSON.stringify(results,null,2),contentType:'application/json'});
+});
+
+test('Friends NSP15 setup controls commit strings and Boolean motion without JSON quoting',async({page,server},testInfo)=>{
+  test.setTimeout(90000); // Four edits, each checked through a full Undo/Redo render.
+  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence');
+  await page.locator('#canon-reader-edit').click();
+  const panel=page.locator('#docview .pt-nspstory').first();
+  await inspectPageElement(page,panel.locator('.ptitle'));
+  const inspector=page.locator('#guide'),src=page.locator('#src');
+  const source=async()=>JSON.parse(await src.inputValue());
+  const firstPanel=raw=>raw.page.blocks[0].tabs[0].sections[0].diagram.panels[0];
+  const original=await source();
+  async function verifyUndoRedo(before){
+    const after=await src.inputValue();
+    await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
+    await page.locator('#redo-builder').click();await expect(src).toHaveValue(after);
+    // Undo/Redo rebuilds the board and clears its element selection.
+    await inspectPageElement(page,panel.locator('.ptitle'));
+  }
+  for(const [label,key,value] of [['Lesson','scene','dilution'],['Ambient intensity','ambientIntensity','lively'],['Ambient tempo','ambientTempo','fast']]){
+    const input=inspector.getByLabel(label,{exact:true});
+    await expect(input).toHaveJSProperty('tagName','INPUT');
+    const before=await src.inputValue();
+    await input.fill(value);await input.press('Tab');
+    await expect.poll(async()=>firstPanel(await source())[key]).toBe(value);
+    await verifyUndoRedo(before);
+  }
+  const motion=inspector.getByLabel('Illustrative motion',{exact:true});
+  await expect(motion).toHaveJSProperty('tagName','TEXTAREA');
+  const before=await src.inputValue();
+  await motion.fill('false');await motion.press('Tab');
+  await expect.poll(async()=>firstPanel(await source()).ambient).toBe(false);
+  await verifyUndoRedo(before);
+  const updated=await source(),expected=structuredClone(original);
+  Object.assign(firstPanel(expected),{scene:'dilution',ambientIntensity:'lively',ambientTempo:'fast',ambient:false});
+  expect(updated).toEqual(expected);
+  await expect(panel.locator('.nspstory')).toHaveAttribute('data-scene','dilution');
+  await expect(panel.locator('.nspstory')).toHaveAttribute('data-ambient','off');
+  await capture(page,testInfo,'friends-nsp15-editor-setup-desktop');
 });
 
 test('marketing tabs retain their panels and the desktop editor retains the selected theme',async({page,server},testInfo)=>{

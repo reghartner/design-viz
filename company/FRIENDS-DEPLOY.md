@@ -11,12 +11,13 @@ those packages into `diagrams/friends/`:
 - Serve and learn from game night (`serve-game-night`): ticket transfers, gate operations, sponsor rewards, and recap
 - Build the next season (`build-next-season`): membership conversion and the renewal fork
 - Islanders marketing stories (`islanders-marketing`): three native tabs—Member campaign, Group night, and Fan event RSVP—with all eight approved alternate paths
-- Copy gate: a conceptual virology story for an RNA sequencing researcher
-  (`packages/science/diagrams/biology/copy-gate/copy-gate.spec.json`)
+- The insertion signature of NSP15: eight tabs following the reporter lineage,
+  insertion evidence, and assay limits from the reviewed preprint story
+  (`packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json`)
 
 The standalone venue map repeats the arena concepts already used in the
 Islanders story, so it is not a separate Friends document. Physics, broad
-biology, and the illustrative DNA sequencing walkthrough remain available as
+biology, Copy gate, and the illustrative DNA sequencing walkthrough remain available as
 reviewed upstream package content without appearing in this site's library.
 
 When upstream changes one of these specs, copy the reviewed version into its
@@ -25,12 +26,23 @@ The deployment script requires exactly these six Canon IDs and distinct thumbnai
 It builds the selected packages, keeps the diagram library, and hides the
 service catalog. The default build is restored when the script exits.
 
-The build embeds science starter templates and both packages' panel code in
+The build embeds only the NSP15 science starter and both packages' panel code in
 the Workbench and viewer. The Workbench also embeds an offline authoring kit
 with the selected contracts, recipes, and source story specs. The hosted
 `workbench/starters.json` exposes editable copies of all six active Friends documents.
 `prepare` verifies those contents against the actual staged HTML and fails if
 one is absent or an unselected package appears.
+
+`company/company.json` selects NSP15 through `packageContent.science`. The
+downloaded kit includes its current story, starter, and guide, together with the
+contracts and routes needed for the retained science runtime. Older science
+story/example specs are excluded. Its exported package manifest lists only the
+selected starter and kit files. Generic builds with company identity disabled,
+or a replacement company without this selection, retain the complete science
+package. The retired Copy gate files remain in the repository for maintenance.
+Reusable panel guidance can still link to those upstream examples; the examples
+remain in the repository but are intentionally absent from the Friends kit.
+All manifest routes and selected starter paths resolve inside the downloaded kit.
 
 The four sports sources live at `packages/sports/diagrams/<slug>/<slug>.spec.json`
 and retain all 14 chapters and 173 steps. The numbered library titles establish

@@ -15,7 +15,7 @@ STORIES = {
     "sell-the-inventory": "packages/sports/diagrams/sell-the-inventory/sell-the-inventory.spec.json",
     "serve-game-night": "packages/sports/diagrams/serve-game-night/serve-game-night.spec.json",
     "build-next-season": "packages/sports/diagrams/build-next-season/build-next-season.spec.json",
-    "copy-gate": "packages/science/diagrams/biology/copy-gate/copy-gate.spec.json",
+    "nsp15-insertion-evidence": "packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json",
     "islanders-marketing": "packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json",
 }
 
@@ -30,6 +30,8 @@ def embedded_kit(html):
         r'<script type="application/json" id="flowview-folder-kit">(.*?)</script>',
         html, re.S)
     require(match is not None, "Workbench has no folder-agent kit")
+    require(len(match.group(1).encode('utf-8')) <= 8 * 1024 * 1024,
+            "Embedded kit envelope exceeds the existing 8 MiB folder-agent limit")
     envelope = json.loads(match.group(1))
     raw = gzip.decompress(base64.b64decode(envelope["gzip"], validate=True))
     require(hashlib.sha256(raw).hexdigest() == envelope["sha256"],
@@ -63,10 +65,19 @@ def main(stage):
     require({key.split("/")[1] for key in kit if key.startswith("packages/")} == SELECTED,
             "Folder-agent kit includes an unselected package or omits a selected one")
     contract = kit["contract/authoring-contract.md"]
+    selections = json.loads((ROOT / 'company/company.json').read_text()).get('packageContent', {})
     for name in SELECTED:
         prefix = f"packages/{name}/"
         manifest = json.loads((ROOT / prefix / "package.json").read_text())
-        require(kit[prefix + "package.json"] == (ROOT / prefix / "package.json").read_text(),
+        expected_manifest = dict(manifest)
+        if name in selections:
+            selection = selections[name]
+            expected_manifest['templates'] = [entry for entry in manifest['templates']
+                                              if entry['source'] in selection['templates']]
+            expected_manifest['kitFiles'] = selection['kitFiles']
+            require({key[len(prefix):] for key in kit if key.startswith(prefix)} == set(selection['kitFiles']),
+                    f"{name} authoring kit differs from company content selection")
+        require(json.loads(kit[prefix + "package.json"]) == expected_manifest,
                 f"{name} manifest differs in downloaded authoring kit")
         require(f"<!-- {prefix}contract.md -->" in contract,
                 f"{name} panel contract is absent from combined authoring contract")
@@ -103,14 +114,13 @@ def main(stage):
     templates = embedded_templates(html)
     require(templates == expected_templates, "Staged built-in starter catalog differs from selected build")
     expected_names = [entry["name"] for entry in build.WORKBENCH_TEMPLATES]
-    for name in ("science", "sports"):
-        manifest = json.loads((ROOT / "packages" / name / "package.json").read_text())
-        expected_names.extend(entry["name"] for entry in manifest.get("templates", []))
-        for source in manifest.get("templates", []):
-            require(any(entry["name"] == source["name"] for entry in templates),
-                    f"{name} built-in starter is missing: {source['name']}")
+    expected_names.extend(entry['name'] for entry in build.package_templates())
     require([entry["name"] for entry in templates] == expected_names,
             "Starter catalog has missing or unselected package templates")
+    require([entry['name'] for entry in templates if entry.get('category') == 'science'] ==
+            ['The insertion signature of NSP15'], 'Friends must expose only the NSP15 science starter')
+    require({path for path in kit if path.startswith('packages/science/') and path.endswith('.spec.json')} ==
+            {STORIES['nsp15-insertion-evidence']}, 'Friends kit contains a retired science story')
 
     index = json.loads((stage / "workbench/diagrams.json").read_text())
     require((stage / "workbench/diagrams.json").read_bytes() ==
@@ -119,6 +129,8 @@ def main(stage):
     require({entry["id"] for entry in index["diagrams"]} == set(STORIES) and
             len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly six active Friends documents")
     hosted = json.loads((stage / "workbench/starters.json").read_text())
+    require({path.name for path in (stage / 'diagrams/friends').iterdir()} == set(STORIES),
+            'Staged Friends assets include a retired story')
     require(len(hosted) == len(STORIES), "Hosted starter manifest omits a Friends story")
     for slug, package_path in STORIES.items():
         source = (ROOT / package_path).read_text()

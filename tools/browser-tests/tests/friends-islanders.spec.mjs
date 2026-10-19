@@ -34,7 +34,9 @@ test('shared Islanders theme survives library, reader, home, copied links and ex
   await page.locator('#welcome-library').click();
   await expect(page.locator('.canon-library-card')).toHaveCount(6);
   await expect(page.locator('.islanders-card-mark:visible')).toHaveCount(4);
-  await expect(page.locator('.canon-library-card[data-id="copy-gate"] .islanders-card-mark')).toHaveCount(0);
+  await expect(page.locator('.canon-library-card[data-id="copy-gate"]')).toHaveCount(0);
+  await expect(page.locator('.canon-library-card[data-id="nsp15-insertion-evidence"]')).toHaveCount(1);
+  await expect(page.locator('.canon-library-card[data-id="nsp15-insertion-evidence"] .islanders-card-mark')).toHaveCount(0);
   const cards=page.locator('.canon-library-open');
   const hrefs=await cards.evaluateAll(nodes=>nodes.map(n=>n.href));
   expect(hrefs.every(href=>new URL(href).searchParams.get('theme')==='islanders')).toBe(true);
@@ -126,11 +128,24 @@ test('standalone reader honors shared theme over cookie, source and embed, then 
   await expect(page.locator('#docview')).toHaveClass(/\bsk-terminal\b/);
 });
 
-test('science reader has no Islanders marks even with the shared theme',async({page,server})=>{
-  await page.goto(server.origin+shell+'?diagram=copy-gate&theme=islanders');
+test('Friends NSP15 opens all eight tabs without Islanders marks',async({page,server},testInfo)=>{
+  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence&theme=islanders');
   await expect(page.locator('#canon-reader .doc-sec').first()).toBeVisible();
   await expect(page.locator('.islanders-site-mark')).toBeHidden();
   await expect(page.locator('#canon-reader .seatmap-islanders-logo')).toHaveCount(0);
+  const reader=page.locator('#canon-reader');
+  await expect(reader.locator('.reader-tree-tab')).toHaveCount(8);
+  const spec=await (await page.request.get(server.origin+'/diagrams/friends/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json')).json();
+  for(const [index,tab] of spec.page.blocks[0].tabs.entries()){
+    await chooseNavigation(reader.locator('.explore-navigation'),'Tab',tab.label);
+    await expect(reader.locator('#section-'+tab.sections[0].id)).toBeVisible();
+    await capture(page,testInfo,'friends-nsp15-tab-'+(index+1)+'-desktop');
+  }
+  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence');
+  await expect(reader.locator('.doc-sec:visible').first()).toBeVisible();
+  await expect(reader).toHaveClass(new RegExp('\\bsk-'+spec.page.skin+'\\b'));
+  await chooseNavigation(reader.locator('.explore-navigation'),'Tab',spec.page.blocks[0].tabs[1].label);
+  await capture(page,testInfo,'friends-nsp15-default-theme-desktop');
 });
 
 test('marketing tabs retain their panels and the desktop editor retains the selected theme',async({page,server},testInfo)=>{

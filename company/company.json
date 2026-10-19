@@ -2,5 +2,21 @@
   "version": 1,
   "companyName": "Flowview for Friends",
   "packages": ["science", "sports"],
+  "packageContent": {
+    "science": {
+      "templates": ["starters/nsp15-insertion-evidence.json"],
+      "kitFiles": [
+        "package.json",
+        "contract.md",
+        "cookbook/cell-scenes.md",
+        "cookbook/sequence-panels.md",
+        "cookbook/viral-copy-gate.md",
+        "cookbook/nsp15-story.md",
+        "examples/strand-cut/README.md",
+        "starters/nsp15-insertion-evidence.json",
+        "diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json"
+      ]
+    }
+  },
   "theme": "themes/islanders/theme.json"
 }

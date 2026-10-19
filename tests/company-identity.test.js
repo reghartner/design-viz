@@ -58,6 +58,34 @@ test('company package list is an opt-in selection with validated names',t=>{
   assert.throws(()=>loader.companyConfig(),/packages must be a list of unique/);
 });
 
+test('company content selection rejects invalid paths and preserves portable manifest dependencies',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  fs.cpSync(path.join(ROOT,'packages/science'),path.join(root,'packages/science'),{recursive:true});
+  const manifest=loader.packageManifest('science');
+  const selection={templates:['starters/nsp15-insertion-evidence.json'],
+    kitFiles:['package.json','contract.md',...new Set(Object.values(manifest.routes)), 'starters/nsp15-insertion-evidence.json']};
+  const config=value=>({version:1,packages:['science'],packageContent:{science:value}});
+  write('company.json',config(selection));
+  assert.deepEqual(loader.companyConfig().packageContent.science,selection);
+  for(const value of [[],{}, {...selection,unknown:true}, {...selection,templates:['starters/sequencing-walkthrough.json']},
+    {...selection,templates:[...selection.templates,...selection.templates]},
+    ...['../outside.md','/tmp/outside.md','cookbook/../contract.md','cookbook\\\\cell-scenes.md','missing.json','panels/bio.js'].map(file=>({...selection,kitFiles:[...selection.kitFiles,file]})),
+    {...selection,kitFiles:selection.kitFiles.filter(file=>file!=='cookbook/nsp15-story.md')},
+    {...selection,kitFiles:selection.kitFiles.filter(file=>file!=='starters/nsp15-insertion-evidence.json')}]){
+    write('company.json',config(value));assert.throws(()=>loader.companyConfig(),/packageContent/);
+  }
+  fs.symlinkSync(path.join(root,'src/starters/minimal.json'),path.join(root,'packages/science/escape.json'));
+  write('company.json',config({...selection,kitFiles:[...selection.kitFiles,'escape.json']}));
+  assert.throws(()=>loader.companyConfig(),/packageContent/);
+  fs.writeFileSync(path.join(root,'packages/science/package.json'),JSON.stringify({...manifest,
+    kitFiles:selection.kitFiles.filter(file=>file!=='starters/nsp15-insertion-evidence.json')}));
+  write('company.json',config(selection));
+  assert.throws(()=>loader.companyConfig(),/cannot widen/);
+  write('company.json',{version:1,packages:['science']});
+  assert.equal(loader.companyConfig().packageContent,undefined);
+  assert.equal(loader.packageManifest('science').templates.length,2);
+});
+
 test('company theme manifests validate names, local resources and disabled selection',t=>{
   const {write,loader}=scratchLoader(t);
   write('company.json',{version:1,theme:'theme.json'});

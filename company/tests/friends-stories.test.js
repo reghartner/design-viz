@@ -12,7 +12,7 @@ const arcs=[
 test('Friends publishes the consolidated marketing document, four sports arcs and the science story',()=>{
   const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
   const registry=JSON.parse(fs.readFileSync(path.join(root,'canon.json')));
-  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'copy-gate','islanders-marketing']);
+  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'nsp15-insertion-evidence','islanders-marketing']);
   for(const id of ['member-campaign','group-night','fan-event-rsvp']){
     const source=fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.spec.json'),'utf8');
     assert.ok(!fs.existsSync(path.join(root,'packages/sports/diagrams',id,id+'.spec.json')),'retired image-heavy output must not duplicate the active document in the offline kit');

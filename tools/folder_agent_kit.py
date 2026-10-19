@@ -6,9 +6,9 @@ import json
 import subprocess
 from pathlib import Path
 try:
-    from company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples
+    from company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples, package_content
 except ModuleNotFoundError:
-    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples
+    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples, package_content
 
 
 def folder_agent_kit(root, runtime):
@@ -18,6 +18,7 @@ def folder_agent_kit(root, runtime):
     if context:
         files[AGENT_CONTEXT] = json.dumps(context, sort_keys=True) + '\n'
     packages = enabled_packages(root)
+    selections = package_content(root)
     theme = company_theme(root)
     if theme:
         # Portable tools need only the guidance path, not build inputs.
@@ -47,12 +48,19 @@ def folder_agent_kit(root, runtime):
     for name in packages:
         directory = root / 'packages' / name
         manifest = json.loads((directory / 'package.json').read_text())
+        selection = selections.get(name)
+        if selection is not None:
+            manifest['templates'] = [entry for entry in manifest['templates']
+                                     if entry['source'] in selection['templates']]
+            manifest['kitFiles'] = selection['kitFiles']
         if 'kitFiles' in manifest:
             for relative in manifest['kitFiles']:
                 path = directory / relative
                 if not path.is_file() or not path.resolve().is_relative_to(directory.resolve()):
                     raise ValueError('Invalid package kit file: ' + relative)
                 files[path.relative_to(root).as_posix()] = path.read_text()
+            if selection is not None:
+                files[f'packages/{name}/package.json'] = json.dumps(manifest, indent=2) + '\n'
             continue
         for pattern in ('*.md', '*.json'):
             for path in sorted(directory.rglob(pattern)):
@@ -88,6 +96,12 @@ def folder_agent_kit(root, runtime):
     for path in sorted((root / 'tools/arrange').iterdir()):
         if path.suffix in ('.cjs', '.json'):
             files[path.relative_to(root).as_posix()] = path.read_text()
+    # Company examples and theme globs cannot reintroduce excluded payloads.
+    for name, selection in selections.items():
+        prefix = f'packages/{name}/'
+        allowed = {prefix + relative for relative in selection['kitFiles']}
+        files = {key: value for key, value in files.items()
+                 if not key.startswith(prefix) or key in allowed}
     raw = json.dumps({'files': files}, sort_keys=True, ensure_ascii=True).encode()
     return json.dumps({'sha256': hashlib.sha256(raw).hexdigest(),
                        'gzip': base64.b64encode(gzip.compress(raw, mtime=0)).decode(),

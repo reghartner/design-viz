@@ -21,7 +21,7 @@ generated outputs are unchanged.
 ## Optional packages
 
 `company/company.json` selects content packages for a company build. For example,
-`"packages": ["science", "sports"]` includes both teaching and venue content;
+`"packages": ["science", "sports"]` includes biology teaching and venue content;
 without `packages`, the generated viewer, workbench, validator, and offline
 agent kit use the core catalog only. Source files remain in the checkout, but
 unselected packages are absent from the generated outputs and authoring context.
@@ -30,7 +30,9 @@ An optional `"packages"` list in `workbench/site.json` (or the file passed with
 site; omit the field to inherit the company list. `--package NAME` adds a
 package to the effective selection for a local preview. Generic `grid` and
 `funnel` panels remain in the core catalog. Selecting sports alone never pulls
-in science panels, examples or biology guidance.
+in biology panels, examples or guidance. Physics is a separate package:
+`"packages": ["physics"]` adds wave and force panels, its story and authoring
+guidance. Selecting science and sports does not load physics.
 For a local preview, use `python3 tools/build.py --package science --package sports`.
 When authoring against an external site config, pass the same file to the
 repository tools: `node tools/validate.js --config path/to/site.json story.json`
@@ -39,7 +41,8 @@ Use `python3 tools/widget_doc.py --config path/to/site.json cellscene` for a
 single panel's contract under that same selection.
 The downloaded offline kit already carries the selected package context.
 Each package has its own manifest, panel contracts, examples, and recipes under
-`packages/<name>/`. See the [science guide](../packages/science/README.md) and
+`packages/<name>/`. See the [science guide](../packages/science/README.md),
+[physics guide](../packages/physics/README.md), and
 [sports guide](../packages/sports/README.md).
 
 ## Panels and helper modules

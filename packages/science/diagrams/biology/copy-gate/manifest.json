@@ -3,18 +3,21 @@
     {
       "file": "copy-gate.html",
       "spec": "copy-gate.spec.json",
-      "title": "At the copy gate: one genome, two outcomes",
+      "title": "From viral RNA copying to sequencing evidence",
       "family": "copy-gate",
-      "description": "One shared viral entry path, then a conceptual RNA-copying fork with matched cell views and a primary-source claim ledger.",
+      "description": "A two-act +RNA virus lesson: a conceptual copy gate, then a strand-aware RNA-seq reading exercise with explicit claim limits.",
       "tags": [
         "biology",
+        "virology",
+        "rna-seq",
         "teaching",
-        "cellscene",
-        "rnacopy",
         "alternate-paths"
       ],
       "widgets": [
         "cellscene",
+        "funnel",
+        "grid",
+        "locus",
         "rnacopy"
       ]
     }

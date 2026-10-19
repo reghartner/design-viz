@@ -99,8 +99,9 @@ test('opt-in package browser jobs select their package and desktop checks',()=>{
   assert.equal(sports['runs-on'],'ubuntu-24.04');
   const scienceCheck=stepByName(science,'Verify opt-in science stories and starter filter on desktop');
   const sportsCheck=stepByName(sports,'Verify opt-in venue story controls on desktop');
-  assert.equal(scienceCheck.env.FLOWVIEW_PACKAGES,'science');
+  assert.equal(scienceCheck.env.FLOWVIEW_PACKAGES,'science,physics');
   assert.match(scienceCheck.run,/science-story-controls\.spec\.mjs/);
+  assert.match(scienceCheck.run,/virology story/);
   assert.equal(sportsCheck.env.FLOWVIEW_PACKAGES,'sports');
   assert.match(sportsCheck.run,/sports-step-rail\.spec\.mjs/);
 });

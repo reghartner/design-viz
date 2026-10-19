@@ -9,12 +9,14 @@ const packages=(process.env.FLOWVIEW_PACKAGES||'').split(',');
 // CI exercises every authored state; use the smaller sample only for local iteration.
 const allSteps=process.env.FLOWVIEW_SHOWCASE_SAMPLE!=='1';
 const showcases=[
-  {name:'science showcase',package:'science',spec:'packages/science/diagrams/biology/cell-journey/biology-teaching.spec.json'},
-  {name:'sports showcase',package:'sports',spec:'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json'},
+  {name:'science showcase',package:'science',spec:'packages/science/diagrams/biology/cell-journey/biology-teaching.spec.json',sections:13},
+  {name:'virology story',package:'science',spec:'packages/science/diagrams/biology/copy-gate/copy-gate.spec.json',sections:4},
+  {name:'sports showcase',package:'sports',spec:'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json',sections:14},
 ];
 const screenshotSections={
-  science:new Set(['replication-fork','translation-codons','membrane-pump','nerve-impulse','sequencing-run']),
-  sports:new Set(['schaefer-effect','first-10000-vs-everyone','gate-night','score-first','morning-after','clinch-or-fade']),
+  'science showcase':new Set(['replication-fork','translation-codons','membrane-pump','nerve-impulse','sequencing-run']),
+  'virology story':new Set(['journey','rna-evidence']),
+  'sports showcase':new Set(['schaefer-effect','first-10000-vs-everyone','gate-night','score-first','morning-after','clinch-or-fade']),
 };
 
 function selectedSteps(section){
@@ -98,7 +100,13 @@ function assertLayout(g,viewport,context){
     expect(panel.panel.rect.bottom,context+' '+panel.key+' bottom').toBeLessThanOrEqual(panel.tile.rect.bottom+1);
     for(const [name,part] of [['card',panel.panel],['body',panel.body]])if(part){
       expect(part.scrollWidth,context+' '+panel.key+' '+name+' horizontal fit').toBeLessThanOrEqual(part.clientWidth+1);
-      if(part.scrollHeight>part.clientHeight+1)
+      // A body can extend past its own box without clipping if visible
+      // overflow stays inside a fully fitting panel card.
+      const extra=part.scrollHeight-part.clientHeight;
+      const bodyFitsCard=name==='body'&&part.overflowY==='visible'&&
+        panel.panel.scrollHeight<=panel.panel.clientHeight+1&&
+        part.rect.bottom+extra<=panel.panel.rect.bottom+1;
+      if(extra>1&&!bodyFitsCard)
         expect(['auto','scroll'],context+' '+panel.key+' '+name+' vertical overflow is reachable').toContain(part.overflowY);
     }
   }
@@ -113,8 +121,8 @@ for(const showcase of showcases){
         await page.setViewportSize(viewport);
         const source=JSON.parse(await readFile(path.join(repo,showcase.spec),'utf8'));
         const sections=source.page.sections;
-        expect(sections.length).toBe(showcase.package==='science'?13:14);
-        const output=path.join(server.root,showcase.package+'-showcase-desktop.html');
+        expect(sections.length).toBe(showcase.sections);
+        const output=path.join(server.root,showcase.name.replace(/\s+/g,'-')+'-showcase-desktop.html');
         execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,showcase.spec),
           path.join(repo,'template/flowview.html'),output]);
         await page.goto(server.origin+'/'+path.basename(output));
@@ -122,6 +130,7 @@ for(const showcase of showcases){
         await expect(page.locator('.reader-tree-section')).toHaveCount(sections.length);
         const failures=[],failureSections=new Set();
         for(const [sectionIndex,section] of sections.entries()){
+          if(!section.diagram)continue;
           await page.locator('.reader-tree-section').nth(sectionIndex).click();
           const controls=page.locator('#section-'+section.id+' .section-layout-tile[data-layout-key="steps"]>.termbar');
           await expect(controls).toBeVisible();
@@ -151,11 +160,11 @@ for(const showcase of showcases){
             }
             }
           }
-          if(process.env.FLOWVIEW_SCREENSHOT_DIR&&screenshotSections[showcase.package].has(section.id)){
+          if(process.env.FLOWVIEW_SCREENSHOT_DIR&&screenshotSections[showcase.name].has(section.id)){
             await mkdir(process.env.FLOWVIEW_SCREENSHOT_DIR,{recursive:true});
             await page.locator('#section-'+section.id).screenshot({
               path:path.join(process.env.FLOWVIEW_SCREENSHOT_DIR,
-                `${showcase.package}-${section.id}-${viewport.width}x${viewport.height}.png`),
+                `${showcase.name.replace(/\s+/g,'-')}-${section.id}-${viewport.width}x${viewport.height}.png`),
             });
           }
         }

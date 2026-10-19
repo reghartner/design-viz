@@ -13,7 +13,7 @@ const loader = require('./tools/source-loader.cjs');
 const C = {URL, TextEncoder, console};
 vm.createContext(C);
 vm.runInContext(loader.readSource('validator.js'), C);
-const types = ['grid', 'funnel', 'seatmap', 'sequence'].filter(type => C.PanelRegistry.get(type));
+const types = ['grid', 'funnel', 'seatmap', 'sequence', 'forcebody', 'wavefield'].filter(type => C.PanelRegistry.get(type));
 const files = process.argv.slice(1);
 const reports = files.map(file => {
   const spec = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -56,6 +56,15 @@ test('science alone uses core generic panels and validates the sequencing starte
   assert.deepEqual(result.reports[0].warnings, []);
 });
 
+test('physics alone validates its story without science panels', () => {
+  const story = 'packages/physics/diagrams/waves-and-forces/waves-and-forces.spec.json';
+  const result = run('physics', [story]);
+  assert.deepEqual(result.packages, ['physics']);
+  assert.deepEqual(result.types, ['grid','funnel','forcebody','wavefield']);
+  assert.deepEqual(result.reports[0].errors, []);
+  assert.deepEqual(result.reports[0].warnings, []);
+});
+
 test('combined selection retains one core definition of each generic panel and validates both domain stories', () => {
   const result = run('science,sports', [
     'packages/science/starters/sequencing-walkthrough.json',
@@ -71,18 +80,19 @@ test('combined selection retains one core definition of each generic panel and v
 
 test('published standalone stories contain only their selected package runtime', () => {
   const exports = [
-    ['packages/science/diagrams/biology/cell-journey/biology-teaching.html', 'science', 'sports'],
-    ['packages/science/diagrams/biology/copy-gate/copy-gate.html', 'science', 'sports'],
-    ['packages/science/diagrams/physics/waves-and-forces/waves-and-forces.html', 'science', 'sports'],
-    ['packages/science/examples/membrane-signal/membrane-signal.html', 'science', 'sports'],
-    ['packages/science/examples/strand-cut/strand-cut.html', 'science', 'sports'],
-    ['packages/sports/diagrams/season-of-seats/season-of-seats.html', 'sports', 'science'],
-    ['packages/sports/examples/venue-map.html', 'sports', 'science'],
+    ['packages/science/diagrams/biology/cell-journey/biology-teaching.html', 'science', ['sports','physics']],
+    ['packages/science/diagrams/biology/copy-gate/copy-gate.html', 'science', ['sports','physics']],
+    ['packages/physics/diagrams/waves-and-forces/waves-and-forces.html', 'physics', ['science','sports']],
+    ['packages/science/examples/membrane-signal/membrane-signal.html', 'science', ['sports','physics']],
+    ['packages/science/examples/strand-cut/strand-cut.html', 'science', ['sports','physics']],
+    ['packages/sports/diagrams/season-of-seats/season-of-seats.html', 'sports', ['science','physics']],
+    ['packages/sports/examples/venue-map.html', 'sports', ['science','physics']],
   ];
   for (const [file, selected, excluded] of exports) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');
     assert.ok(html.includes(`/* ---- packages/${selected}/panels/`), `${file} lacks ${selected} runtime`);
-    assert.ok(!html.includes(`/* ---- packages/${excluded}/panels/`), `${file} embeds ${excluded} runtime`);
+    for (const name of excluded)
+      assert.ok(!html.includes(`/* ---- packages/${name}/panels/`), `${file} embeds ${name} runtime`);
     const embedded = html.match(/<script type="application\/json" id="flowspec">\s*([\s\S]*?)<\/script>/);
     assert.ok(embedded, `${file} lacks an embedded spec`);
     const specFile = file.replace(/\.html$/, '.spec.json');

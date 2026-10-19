@@ -31,7 +31,7 @@ class OptionalPackageContextTest(unittest.TestCase):
     def test_default_agent_kit_and_packet_exclude_optional_material(self):
         with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': ''}):
             files = kit_files()
-            self.assertFalse(any(path.startswith(('packages/science/', 'packages/sports/')) for path in files))
+            self.assertFalse(any(path.startswith(('packages/science/', 'packages/physics/', 'packages/sports/')) for path in files))
             self.assertNotIn('tools/enabled-packages.json', files)
             contract = files['contract/authoring-contract.md']
             for name in ('wavefield', 'forcebody', 'rnacopy', 'sequence', 'frames', 'reads', 'locus', 'strandscene', 'cellscene', 'seatmap'):
@@ -51,18 +51,21 @@ class OptionalPackageContextTest(unittest.TestCase):
             files = kit_files()
             self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['science'])
             for path in ('packages/science/package.json',
-                         'packages/science/cookbook/physics-panels.md',
                          'packages/science/cookbook/cell-scenes.md',
                          'packages/science/cookbook/viral-copy-gate.md',
                          'packages/science/starters/copy-gate.json',
-                         'packages/science/starters/waves-and-forces.json',
                          'packages/science/starters/sequencing-walkthrough.json',
                          'packages/science/cookbook/sequence-panels.md'):
                 self.assertIn(path, files)
             contract = contract_text(ROOT)
-            for name in ('wavefield', 'forcebody', 'rnacopy', 'sequence', 'frames', 'reads', 'locus', 'funnel', 'grid', 'strandscene', 'cellscene'):
+            self.assertFalse(any(path.startswith('packages/physics/') for path in files))
+            self.assertNotIn('panel.wavefield', files['tools/canon/generated-runtime.cjs'])
+            self.assertNotIn('panel.forcebody', files['tools/canon/generated-runtime.cjs'])
+            for name in ('rnacopy', 'sequence', 'frames', 'reads', 'locus', 'funnel', 'grid', 'strandscene', 'cellscene'):
                 self.assertIn('- `' + name + '` —', contract)
                 self.assertEqual(files['contract/authoring-contract.md'].count('- `' + name + '` —'), 1)
+            for name in ('wavefield', 'forcebody'):
+                self.assertNotIn('- `' + name + '` —', contract)
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 for name in ('contract/authoring-contract.md', 'tools/company_overlay.py',
@@ -74,10 +77,28 @@ class OptionalPackageContextTest(unittest.TestCase):
                 self.assertEqual(names.split().count('rnacopy'), 1)
             packet = packet_for('rnacopy')
             self.assertIn('packages/science/cookbook/viral-copy-gate.md', packet)
-            self.assertNotIn('packages/science/cookbook/physics-panels.md', packet)
+            self.assertNotIn('packages/physics/', packet)
             cell_packet = packet_for('cellscene')
             self.assertIn('packages/science/cookbook/cell-scenes.md', cell_packet)
             self.assertNotIn('packages/science/cookbook/viral-copy-gate.md', cell_packet)
+
+    def test_selected_physics_package_has_only_physics_context(self):
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'physics'}):
+            files = kit_files()
+            self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['physics'])
+            for path in ('packages/physics/package.json',
+                         'packages/physics/cookbook/physics-panels.md',
+                         'packages/physics/starters/waves-and-forces.json'):
+                self.assertIn(path, files)
+            self.assertFalse(any(path.startswith('packages/science/') for path in files))
+            contract = files['contract/authoring-contract.md']
+            for name in ('wavefield', 'forcebody'):
+                self.assertIn('- `' + name + '` —', contract)
+            for name in ('rnacopy', 'sequence', 'reads', 'cellscene'):
+                self.assertNotIn('- `' + name + '` —', contract)
+            packet = packet_for('wavefield')
+            self.assertIn('packages/physics/cookbook/physics-panels.md', packet)
+            self.assertNotIn('packages/science/', packet)
 
 
     def test_selected_sports_package_adds_venue_context_only(self):

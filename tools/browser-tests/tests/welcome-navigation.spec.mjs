@@ -174,11 +174,15 @@ test('Start new project filters built-in and team templates by name, description
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
   await expect(page.locator('#welcome-company-grid .welcome-template-card')).toHaveCount(1);
   const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
-  const scienceEnabled=(process.env.FLOWVIEW_PACKAGES||'').split(',').includes('science');
-  expect(all).toHaveLength(scienceEnabled?18:15);
+  const enabledPackages=new Set((process.env.FLOWVIEW_PACKAGES||'').split(','));
+  const scienceEnabled=enabledPackages.has('science'),physicsEnabled=enabledPackages.has('physics');
+  expect(all).toHaveLength(15+Number(scienceEnabled)+Number(physicsEnabled));
   expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));
-  if(scienceEnabled)expect(all).toEqual(expect.arrayContaining(['Sequencing walkthrough','Waves & forces','The copy gate']));
-  else{expect(all).not.toContain('Sequencing walkthrough');expect(all).not.toContain('Waves & forces');expect(all).not.toContain('The copy gate');}
+  expect(all).not.toContain('Sequencing walkthrough');
+  if(scienceEnabled)expect(all).toContain('From viral RNA copying to sequencing evidence');
+  else expect(all).not.toContain('From viral RNA copying to sequencing evidence');
+  if(physicsEnabled)expect(all).toContain('Waves & forces');
+  else expect(all).not.toContain('Waves & forces');
   await expect(empty).toBeHidden();
   const search=page.getByRole('searchbox',{name:'Search templates'});
   for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
@@ -202,13 +206,19 @@ test('Start new project filters built-in and team templates by name, description
   const science=page.locator('#welcome-template-filters').getByRole('button',{name:'Science',exact:true});
   if(scienceEnabled){
     await science.click();await expect(science).toHaveAttribute('aria-pressed','true');
-    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','Sequencing walkthrough','Waves & forces','The copy gate','Payroll handoff']);
+    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','From viral RNA copying to sequencing evidence','Payroll handoff']);
     await expect(empty).toBeHidden();
-    await query('The copy gate');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['The copy gate']);
+    await query('RNA-seq');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['From viral RNA copying to sequencing evidence']);
+  }else await expect(science).toHaveCount(0);
+  const physics=page.locator('#welcome-template-filters').getByRole('button',{name:'Physics',exact:true});
+  if(physicsEnabled){
+    await search.fill('');
+    await physics.click();await expect(physics).toHaveAttribute('aria-pressed','true');
+    await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Blank diagram','Waves & forces','Payroll handoff']);
     await query('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
     await page.locator('#welcome-template-filters').getByRole('button',{name:'All examples'}).click();
     await expect(search).toHaveValue('Waves & forces');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(['Waves & forces']);
-  }else await expect(science).toHaveCount(0);
+  }else await expect(physics).toHaveCount(0);
   await query('zzqx');await expect.poll(()=>visibleTemplateTitles(page)).toEqual([]);
   await expect(empty).toBeVisible();await expect(empty).toContainText('No templates match');await expect(empty).toContainText('zzqx');
   await search.fill('');await expect.poll(()=>visibleTemplateTitles(page)).toEqual(all);await expect(empty).toBeHidden();

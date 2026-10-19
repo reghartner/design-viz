@@ -164,7 +164,7 @@ PanelRegistry.define('forcebody', {
       velocity:{label:'Authored velocity (m/s)',help:'{x,y}: +x right, +y up. Draws a schematic dashed direction arrow. Never calculated from forces or time.',nullLabel:'Velocity unspecified'},
       caption:{label:'Caption',nullLabel:'No caption'},note:{label:'Explanation',nullLabel:'No explanation'}
     },
-    picker:{order:48,name:'Force body',category:'Science & sequencing',tagline:'Force changes velocity',description:'A puck with up to four force vectors, net force and a = ΣF/m. Authored velocity distinguishes ongoing motion from acceleration; compare mass in separate trials.'},
+    picker:{order:48,name:'Force body',category:'Physics',tagline:'Force changes velocity',description:'A puck with up to four force vectors, net force and a = ΣF/m. Authored velocity distinguishes ongoing motion from acceleration; compare mass in separate trials.'},
     example:function (sample) {
       sample.state.forces = [{label:'Opposing push',x:-4,y:0}]; sample.state.velocity = {x:2,y:0}; sample.state.caption = 'Moving right, accelerating left';
       sample.state.note = 'An opposing force slows a moving puck. It does not make its velocity reverse instantly.';

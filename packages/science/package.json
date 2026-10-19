@@ -9,43 +9,23 @@
     "panels/types/locus.js",
     "panels/types/strandscene.js",
     "panels/types/cellscene.js",
-    "panels/types/forcebody.js",
-    "panels/types/rnacopy.js",
-    "panels/types/wavefield.js"
+    "panels/types/rnacopy.js"
   ],
   "routes": {
     "cellscene": "cookbook/cell-scenes.md",
-    "forcebody": "cookbook/physics-panels.md",
     "frames": "cookbook/sequence-panels.md",
     "locus": "cookbook/sequence-panels.md",
     "reads": "cookbook/sequence-panels.md",
     "rnacopy": "cookbook/viral-copy-gate.md",
     "sequence": "cookbook/sequence-panels.md",
-    "strandscene": "examples/strand-cut/README.md",
-    "wavefield": "cookbook/physics-panels.md"
+    "strandscene": "examples/strand-cut/README.md"
   },
   "templates": [
     {
-      "name": "Sequencing walkthrough",
-      "desc": "Follow reads from a fictional plasmid through alignment, an insertion, its origin, a quality filter and a reading-frame check, with an in-frame and a frameshift ending.",
+      "name": "From viral RNA copying to sequencing evidence",
+      "desc": "Trace conceptual +RNA copying and a hypothetical interruption, then interpret illustrative RNA-seq reads on a genome map. Detection alone does not establish ongoing replication or infectious virus.",
       "category": "science",
-      "tag": "Science & sequencing · illustrative",
-      "art": "branch",
-      "source": "starters/sequencing-walkthrough.json"
-    },
-    {
-      "name": "Waves & forces",
-      "desc": "Explore interference with a screen probe, then compare force, velocity and acceleration in explicit mass trials.",
-      "category": "science",
-      "tag": "Physics · idealized models",
-      "art": "perspectives",
-      "source": "starters/waves-and-forces.json"
-    },
-    {
-      "name": "The copy gate",
-      "desc": "Follow conceptual RNA copying and compare a baseline with a hypothetical interruption. Sequence-free illustrations and authored counts, with no efficacy prediction.",
-      "category": "science",
-      "tag": "Biology · conceptual illustration",
+      "tag": "Virology · RNA-seq interpretation",
       "art": "branch",
       "source": "starters/copy-gate.json"
     }

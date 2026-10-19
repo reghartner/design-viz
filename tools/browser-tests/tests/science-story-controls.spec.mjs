@@ -3,21 +3,21 @@ import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
-const scienceEnabled=(process.env.FLOWVIEW_PACKAGES||'').split(',').includes('science');
-test.skip(!scienceEnabled,'The science package is opt-in for browser builds.');
+const selectedPackages=new Set((process.env.FLOWVIEW_PACKAGES||'').split(','));
 
 const stories=[
-  {name:'wave lesson',spec:'packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:0,
+  {name:'wave lesson',package:'physics',spec:'packages/physics/diagrams/waves-and-forces/waves-and-forces.spec.json',section:0,
     steps:[0,1,2,3,4],alternate:{path:'shutter',steps:[5]},panel:'.pwidget:has(.wavefield-panel)'},
-  {name:'force lesson',spec:'packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json',section:1,
+  {name:'force lesson',package:'physics',spec:'packages/physics/diagrams/waves-and-forces/waves-and-forces.spec.json',section:1,
     heading:'02 / When a moving puck accelerates backward',steps:[0,1,2,3,4],panel:'.pwidget:has(.forcebody)'},
-  {name:'RNA copy lesson',spec:'packages/science/diagrams/biology/copy-gate/copy-gate.spec.json',section:0,
+  {name:'RNA copy lesson',package:'science',spec:'packages/science/diagrams/biology/copy-gate/copy-gate.spec.json',section:0,
     steps:[0,1,2,3,4,5,6],alternate:{path:'interruption',steps:[7,8,9]},
     panel:'.pwidget:has(.cellscene),.pwidget:has(.rnacopy)'},
 ];
 
 for(const story of stories)for(const viewport of [{width:1280,height:800},{width:1440,height:900}]){
   test(`${story.name} keeps controls in view and panels unclipped at ${viewport.width}×${viewport.height}`,async({page,server})=>{
+    test.skip(!selectedPackages.has(story.package),`${story.package} package is opt-in for browser builds.`);
     await page.setViewportSize(viewport);
     const output=path.join(server.root,'science-story-controls.html');
     execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,story.spec),

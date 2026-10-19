@@ -1,9 +1,9 @@
 # Physics teaching panels: waves and forces
 
 Open **Two invisible sums: waves and forces** from the workbench starters, or
-open the maintained [spec](../diagrams/physics/waves-and-forces/waves-and-forces.spec.json)
+open the maintained [spec](../diagrams/waves-and-forces/waves-and-forces.spec.json)
 directly. Its two chapters are complete teaching stories; the
-[ledger](../diagrams/physics/waves-and-forces/waves-and-forces.ledger.md)
+[ledger](../diagrams/waves-and-forces/waves-and-forces.ledger.md)
 records the model assumptions, example values, and source basis.
 
 | Panel | What the learner sees | What changes in a step |
@@ -64,8 +64,8 @@ right. The caption explains that A is slowing at that instant.
    long captions, reduced motion, and print output.
 
 ```sh
-node tools/validate.js packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json
-python3 tools/page_build.py packages/science/diagrams/physics/waves-and-forces/waves-and-forces.spec.json
+node tools/validate.js packages/physics/diagrams/waves-and-forces/waves-and-forces.spec.json
+python3 tools/page_build.py packages/physics/diagrams/waves-and-forces/waves-and-forces.spec.json
 ```
 
 Edit the JSON spec, then rebuild. The adjacent HTML and manifest are generated

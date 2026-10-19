@@ -1,4 +1,4 @@
-process.env.FLOWVIEW_PACKAGES = 'science';
+process.env.FLOWVIEW_PACKAGES = 'physics';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');

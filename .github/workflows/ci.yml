@@ -49,7 +49,7 @@ jobs:
           retention-days: 14
 
   science-package-browser:
-    name: Science package desktop controls
+    name: Science and physics package desktop controls
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -69,8 +69,8 @@ jobs:
         run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
       - name: Verify opt-in science stories and starter filter on desktop
         env:
-          FLOWVIEW_PACKAGES: science
-        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs science-story-controls.spec.mjs sequence-panels.spec.mjs welcome-navigation.spec.mjs showcase-desktop.spec.mjs --grep 'keeps controls in view|sequencing walkthrough drives|Start new project filters|science showcase'
+          FLOWVIEW_PACKAGES: science,physics
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs science-story-controls.spec.mjs sequence-panels.spec.mjs welcome-navigation.spec.mjs showcase-desktop.spec.mjs --grep 'keeps controls in view|sequencing walkthrough drives|Start new project filters|science showcase|virology story'
       - uses: actions/upload-artifact@v7
         if: always()
         with:

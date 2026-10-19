@@ -289,15 +289,21 @@ class BuildTests(unittest.TestCase):
 
     def test_science_templates_require_explicit_package_selection(self):
         default = json.loads(build.workbench_templates())
-        self.assertFalse(any(item['name'] in ('Waves & forces', 'The copy gate') for item in default))
+        self.assertFalse(any(item['name'] in ('Waves & forces', 'From viral RNA copying to sequencing evidence') for item in default))
         self.assertNotIn('panel.wavefield', self.texts['flowspec.html'])
         self.assertNotIn('panel.rnacopy', self.texts['flowspec.html'])
         with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'science'}):
             selected = json.loads(build.workbench_templates())
             self.assertEqual(build.enabled_packages(), ['science'])
-        added = [item for item in selected if item['name'] in ('Waves & forces', 'The copy gate')]
-        self.assertEqual([item['name'] for item in added], ['Waves & forces', 'The copy gate'])
+        added = [item for item in selected if item['name'] == 'From viral RNA copying to sequencing evidence']
+        self.assertEqual([item['name'] for item in added], ['From viral RNA copying to sequencing evidence'])
         self.assertTrue(all(item['category'] == 'science' for item in added))
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'physics'}):
+            physics = json.loads(build.workbench_templates())
+            self.assertEqual(build.enabled_packages(), ['physics'])
+        added = [item for item in physics if item['name'] == 'Waves & forces']
+        self.assertEqual([item['name'] for item in added], ['Waves & forces'])
+        self.assertEqual(added[0]['category'], 'physics')
 
     def test_flowview_has_separate_empty_derived_backlink_block(self):
         blocks = BACKLINK_RE.findall(self.texts["flowview.html"])

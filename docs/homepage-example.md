@@ -49,11 +49,12 @@ The value is a relative path (resolved against the served `workbench/flowspec.ht
 
 ### Optional: select content packages for this site
 
-Add `"packages": ["science", "sports"]` to include both optional packages in
+Add `"packages": ["science", "sports"]` to include biology and sports packages in
 this site's viewer, workbench, validator and agent kit. The list overrides the
 company default in `company/company.json`; `"packages": []` makes this site
 core-only. Omit the field to inherit the company list. `--package NAME` adds a
-package for a local preview. See [optional packages](company-overlay.md#optional-packages).
+package for a local preview. Add `"physics"` only for a site that needs wave
+and force content. See [optional packages](company-overlay.md#optional-packages).
 
 The builder only reads config and spec. It never injects changes into either source file. Generated `workbench/flowspec.html` and `template/flowview.html` remain ignored outputs; don't edit or commit them.
 

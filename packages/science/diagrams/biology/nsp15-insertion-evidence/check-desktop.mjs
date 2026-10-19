@@ -53,7 +53,7 @@ try {
      assert.equal(await scene.locator('canvas').count(),0);
      assert(await scene.evaluate(el=>el===savedScience.root&&el.querySelector('.nspstory-screen-frame')===savedScience.svg&&el.querySelector('.nspstory-ambient')===savedScience.ambient&&el.querySelector('.nspstory-controls')===savedScience.controls),'Step preserves root, SVG, ambient layer and controls');
      const geometry=await svg.evaluate(el=>{const m=el.getScreenCTM(),r=el.getBoundingClientRect();return {tag:el.tagName,viewBox:el.getAttribute('viewBox'),x:Math.hypot(m.a,m.b),y:Math.hypot(m.c,m.d),width:r.width,height:r.height,opacity:getComputedStyle(el).opacity,sceneOpacity:getComputedStyle(el.querySelector('.nspstory-scene')).opacity};});
-     const reporter=section.id==='green-reporter',viewWidth=reporter?560:760,viewHeight=reporter?610:410;
+     const reporter=section.id==='green-reporter',viewWidth=reporter?560:760,viewHeight=reporter?280:410;
      assert.equal(geometry.tag,'svg');assert.equal(geometry.viewBox,'0 0 '+viewWidth+' '+viewHeight);
      assert(geometry.width>300&&geometry.height>120);
      assert(Math.abs(geometry.x/geometry.y-1)<.003,'Drawing preserves proportional scale');
@@ -72,10 +72,10 @@ try {
       });
       if(!reporterBounds)reporterBounds={stage:bounds.stage,card:bounds.card,dock:bounds.dock,caption:bounds.caption};
       for(const key of ['stage','card','dock','caption'])for(const dimension of ['width','height'])assert(Math.abs(bounds[key][dimension]-reporterBounds[key][dimension])<.1,'Reporter '+key+' '+dimension+' stays stable through forward/reverse steps');
-      assert(Math.abs(bounds.stage.width/bounds.stage.height-560/610)<.003,'Reporter has an independently authored near-square stage');
+      assert(Math.abs(bounds.stage.width/bounds.stage.height-560/280)<.003,'Reporter has a compact landscape stage');
       assert(bounds.captionFits,'The reserved caption region contains all authored prose');
       assert(bounds.contentFits,'Reporter artwork, controls and caption all fit inside the card');
-      for(const text of bounds.text){assert(text.x>=0&&text.y>=0&&text.right<=560&&text.bottom<=610,'Reporter text stays inside its drawing: '+text.text);if(text.primary)assert(text.size>=12,'Reporter teaching text remains readable: '+text.text);}
+      for(const text of bounds.text){assert(text.x>=0&&text.y>=0&&text.right<=560&&text.bottom<=280,'Reporter text stays inside its drawing: '+text.text);if(text.primary)assert(text.size>=12,'Reporter teaching text remains readable: '+text.text);}
       await root.screenshot({path:path.join(output,width+'-'+reducedMotion+'-reporter-phase-'+step+'.png')});
      }
      assert.equal(geometry.opacity,'1');assert.equal(geometry.sceneOpacity,'1','Complete authored states have no entrance fade');
@@ -132,6 +132,7 @@ try {
      await root.screenshot({path:path.join(output,width+'-'+reducedMotion+'-'+section.id+'.png')});
     }
    }
+   if(section.id==='green-reporter'&&reducedMotion==='no-preference'){await scene.locator('[data-nsp-action="pause"]').click();await frame(page);}
    const hasScene=await scene.count(),saved=hasScene?await motion(scene):null;
    if(hasScene)await scene.evaluate(el=>{window.retiredScience=el;window.retiredAnimations=el.getAnimations({subtree:true});});
    results.push({width,reducedMotion,tab:tab.label,steps:section.diagram.steps.length});
@@ -144,7 +145,7 @@ try {
     if(reporterBounds){const returned=await svg.boundingBox();assert(Math.abs(returned.width-reporterBounds.stage.width)<.1&&Math.abs(returned.height-reporterBounds.stage.height)<.1,'Reporter stage preserves its geometry on tab return');results.push({width,reducedMotion,reporterBounds});}
     if(saved.times.length){
      assert.deepEqual((await motion(scene)).times,saved.times,'Tab return preserves the paused timeline');
-     await expect(scene).toHaveAttribute('data-live-intensity','lively');await expect(scene).toHaveAttribute('data-live-tempo','fast');
+     if(section.id!=='green-reporter'){await expect(scene).toHaveAttribute('data-live-intensity','lively');await expect(scene).toHaveAttribute('data-live-tempo','fast');}
     }
    }
   }

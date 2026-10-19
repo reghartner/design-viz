@@ -1,4 +1,4 @@
-/* Purpose-built, sequence-free lessons for the Bianco et al. NSP15 preprint.
+/* Purpose-built, schematic lessons for the Bianco et al. NSP15 preprint.
    Authored frames switch directly; motion is decorative, never molecular
    dynamics. All geometry exists without motion, including in print. */
 var NSPSTORY_SCENES = ['reporter', 'dilution', 'origin', 'evidence'];
@@ -32,7 +32,7 @@ function nspstoryModel(panel, state) {
   s.ambientTempo = NSPSTORY_AMBIENT_TEMPOS.indexOf(panel.ambientTempo) >= 0 ? panel.ambientTempo : 'slow';
   var lessons = {
     reporter:[['Read the message three letters at a time.', 'The shifted leader changes the three-letter grouping reaching GFP. GFP remains present; the GFP reporter is off.'],
-      ['A rare length change restores the reading frame.', 'An RNA insertion adds letters to the message—extra symbols here. This restoring insertion realigns GFP groups; the infected cell, not the particle, can glow.'],
+      ['A rare length change restores the reading frame.', 'An RNA insertion adds letters before GFP. This restoring insertion realigns GFP groups; the infected cell, not the particle, can glow.'],
       ['The trait can travel with a virus lineage.', 'Newly infected cells can inherit the reporter phenotype through a virus lineage. A green culture can still be mixed.'],
       ['Green is a clue. Sequence is the check.', 'Both WT and inactive NSP15 yielded green isolates. Insertions were found in 8 of 18 examined WT isolates; no inserts greater than 2 nt in the inactive group.']],
     dilution:[['Make a crowd easier to follow.', 'A dense symbolic mixture can include several lineages. Green signal does not prove a single lineage.'],
@@ -61,48 +61,51 @@ function nspstoryCell(x, y, green, size, cls) {
     '<path d="M-22,12q14,-22 28,0t28,0"/></g></g>';
 }
 function nspstoryArrow(path, cls) { return '<path class="nspstory-arrow ' + (cls || '') + '" d="' + path + '"/>'; }
-// These glyphs are placeholders, not nucleotide sequence or actual mutation size.
-// Grouping starts upstream of GFP. Preserve the SAME GFP glyphs in both strips.
+// Invented RNA letters teach grouping only: not actual sequence or mutation size.
+// Like Sequence Track / Reading Frames, use letter cells and coordinate cursors.
+// Grouping starts upstream of GFP. Preserve the SAME GFP letters in both strips.
 function nspstoryReporterReading(phase) {
-  var gfp=[0,2,1,1,0,2,2,1,0,0,1,2];
-  var rows=[{id:'shifted',leader:[1,0,2,0,2,1,0],added:[],title:'SHIFTED LEADER · GFP OUT OF FRAME'},
-    {id:'restored',leader:[1,0,2,0,2,1,0,1,2],added:[7,8],title:'RESTORING INSERTION · GFP IN FRAME'}];
+  var gfp='ACGUACGUACGU'.split('');
+  var rows=[{id:'shifted',leader:'CAGUACG'.split(''),added:[],title:'SHIFTED LEADER · GFP OUT OF FRAME'},
+    {id:'restored',leader:'CAGUACGUA'.split(''),added:[7,8],title:'INSERTION BEFORE GFP · GROUPING RESTORED'}];
   rows.forEach(function(row,i){
     row.gfp=gfp.slice();row.tokens=row.leader.concat(row.gfp);row.boundary=row.leader.length;
     row.active=i===(phase===0?0:1);row.groups=[];
     for(var start=0;start<row.tokens.length;start+=3)row.groups.push({start:start,end:Math.min(start+3,row.tokens.length)});
   });
   return {rows:rows,green:phase>0,output:phase===0?'No functional GFP':'Cell makes functional GFP',
-    summary:'Reading frame means where three-letter groups begin. The wide boxes group three abstract symbols from an upstream START; the ellipsis means the message continues. An RNA insertion adds letters to the message, shown as extra symbols. The two individually outlined, plus-marked symbols are added in the lower leader. The deliberately frameshifted leader immediately before GFP puts the GFP boundary inside a group; the restored state puts it at a group boundary. GFP symbols are unchanged. Symbol counts and length change are schematic, not a sequence or actual mutation size. GFP is a reporter clue, not a direct NSP15 measurement.'};
+    summary:'Reading frame means where three-letter groups begin. Boxed A/C/G/U letters are schematic, not actual sequence or mutation size. Groups of three begin at upstream START; the position index scans these groups, not a molecular timescale. The two plus-marked letters are added before GFP in the lower row. GFP begins inside a group in the shifted row and at a group boundary in the restored row. GFP symbols are unchanged. The cell makes GFP, not the particle. GFP is a reporter clue, not a direct NSP15 measurement.'};
 }
 function nspstoryReporter(m) {
   var reading=nspstoryReporterReading(m.phase),h='';
-  h+=nspstoryText(24,116,'From START → groups of 3 abstract symbols.','small');
   reading.rows.forEach(function(row,i){
-    var y=202+i*120,boundary=78+row.boundary*20;
-    h+='<rect class="nspstory-zone'+(row.active?' nspstory-reading-active':'')+'" x="20" y="'+(y-65)+'" width="520" height="108" rx="12"/>';
-    h+=nspstoryText(32,y-39,row.title,'kicker');
-    h+=nspstoryText(32,y-13,'START','small')+nspstoryText(96,y-13,'leader','small')+nspstoryText(boundary+6,y-13,'GFP region','small');
-    h+=nspstoryArrow('M35,'+(y+10)+'h31m-7,-5 7,5 -7,5');
-    row.groups.forEach(function(group){h+='<rect class="nspstory-reading-group" x="'+(78+group.start*20)+'" y="'+(y-3)+'" width="56" height="27" rx="5"/>';});
-    row.tokens.forEach(function(shape,j){h+='<g class="nspstory-token nspstory-token-'+shape+'" transform="translate('+(87+j*20)+','+(y+10)+')">'+(shape===0?'<circle r="5"/>':shape===1?'<rect x="-5" y="-5" width="10" height="10" rx="1"/>':'<path d="M0,-6L6,5H-6Z"/>')+'</g>';});
-    row.added.forEach(function(j){h+='<rect class="nspstory-added-symbol" x="'+(79+j*20)+'" y="'+y+'" width="16" height="20" rx="2"/>'+nspstoryText(87+j*20,y-13,'+','small','middle');});
-    h+=nspstoryText(87+row.tokens.length*20,y+14,'…','small');
-    h+='<path class="nspstory-arrow" d="M'+boundary+','+(y-8)+'v36"/>';
-    h+=nspstoryText(83,y+39,i?'GFP groups line up again.':'GFP is present, but grouped differently.','small');
+    var y=90+i*90,boundary=28+row.boundary*24;
+    h+='<g class="nspstory-reading-row" data-reading-row="'+row.id+'"><rect class="nspstory-zone" x="16" y="'+(y-43)+'" width="528" height="76" rx="8"/>';
+    h+=nspstoryText(28,y-30,row.title,'kicker');
+    h+=nspstoryText(28,y-10,'START → leader','small')+nspstoryText(boundary+5,y-10,'GFP region →','small');
+    row.groups.forEach(function(group){h+='<rect class="nspstory-reading-group" x="'+(27+group.start*24)+'" y="'+(y-2)+'" width="'+((group.end-group.start)*24-1)+'" height="30" rx="4"/>';});
+    row.tokens.forEach(function(letter,j){
+      h+='<rect class="nspstory-letter-cell'+(row.added.indexOf(j)>=0?' nspstory-added-symbol':'')+'" x="'+(29+j*24)+'" y="'+(y+1)+'" width="20" height="24" rx="3"/>'+nspstoryText(39+j*24,y+19,letter,'letter','middle');
+    });
+    row.added.forEach(function(j){h+=nspstoryText(39+j*24,y-10,'+','small','middle');});
+    h+='<path class="nspstory-gfp-boundary" d="M'+boundary+','+(y-5)+'v36"/>';
+    h+=nspstoryText(35+row.tokens.length*24,y+19,'…','small');
+    h+='</g>';
   });
-  h+=nspstoryText(24,389,'Insertion = extra RNA letters. Outlined symbols are added.','small');
-  h+=nspstoryText(24,411,'Schematic counts—not an actual sequence or mutation size.','small');
-  h+='<path class="nspstory-gridline" d="M24,426H536"/>';
-  h+=nspstoryText(112,451,'INFECTED CELL','kicker','middle')+nspstoryCell(112,493,reading.green,49,'');
-  h+=nspstoryText(112,499,reading.green?'GFP ON':'GFP OFF','celltext','middle');
-  h+=nspstoryText(216,459,reading.output,'label');
-  if(m.phase>=2)h+=nspstoryCell(264,492,true,18,'')+nspstoryCell(326,492,true,18,'')+nspstoryText(216,527,'Newly infected cells','small');
-  else h+=nspstoryText(216,490,m.phase===0?'Lower row: possible restored state.':'Only restoring changes turn GFP on.','small')+nspstoryText(216,515,'The cell makes GFP, not the particle.','small');
-  h+=nspstoryText(24,555,'WT: insertions in 8/18 green isolates.','small');
-  h+=nspstoryText(24,575,'Inactive: no inserts >2 nt in 16 examined.','small');
-  h+=nspstoryText(24,595,'GFP is a reporter clue, not a direct NSP15 measurement.','small');
+  h+=nspstoryText(24,244,'Boxed RNA letters; + letters added before GFP.','small');
+  h+=nspstoryText(24,266,'Not actual sequence or mutation size. GFP is a reporter clue.','small');
   return h;
+}
+// Persistent layer: the position pill and three-letter highlight scan together.
+// Each group holds long enough to read; the clock is illustrative, not kinetic.
+function nspstoryReporterScan() {
+  var h='<g class="nspstory-reporter-scan" aria-hidden="true">';
+  [90,180].forEach(function(y,row){
+    h+='<g class="nspstory-scan-row" data-scan-row="'+row+'"><g class="nspstory-scan-cursor">';
+    for(var i=0;i<7;i++)h+='<g class="nspstory-scan-position" style="--nsp-index:'+i+'" data-position="'+(i*3+1)+'"><rect class="nspstory-triplet-focus" x="27" y="'+(y-2)+'" width="'+(row===0&&i===6?23:71)+'" height="30" rx="4"/><rect class="nspstory-position-pill" x="27" y="'+(y+29)+'" width="36" height="17" rx="7"/>'+nspstoryText(45,y+42,String(i*3+1),'position','middle')+'</g>';
+    h+='</g></g>';
+  });
+  return h+'</g>';
 }
 function nspstoryToken(x, y, shape, cls, fromX, fromY, size) {
   size = size || 10;
@@ -188,7 +191,7 @@ function nspstoryAmbient(m) {
   var scene=m.scene;
   if(!m.ambient)return '';
   var cls='nspstory-ambient nspstory-ambient-'+m.ambientIntensity+' nspstory-ambient-'+m.ambientTempo;
-  if(scene==='reporter')return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="520" cy="464" r="3"/><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="476" cy="477" r="35"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="35" cy="450" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="509" cy="91" r="3"/></g>';
+  if(scene==='reporter')return nspstoryReporterScan();
   if(scene==='origin')return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-primary" cx="292" cy="205" r="76"/><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="478" cy="235" r="58"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="262" cy="112" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="482" cy="309" r="4"/></g>';
   if(scene==='dilution')return '<g class="'+cls+'" aria-hidden="true"><path class="nspstory-ambient-line nspstory-ambient-primary" d="M227,109C357,82 527,92 706,111"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="248" cy="154" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="284" cy="278" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="692" cy="207" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="665" cy="326" r="2.5"/></g>';
   return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="314" cy="202" r="102"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="457" cy="148" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="711" cy="166" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="472" cy="290" r="3"/></g>';
@@ -204,11 +207,11 @@ function nspstoryControls(m) {
     ? '<strong>Scene limits</strong><span>Fixed illustrative outcomes—not well counts, probabilities, or a protocol. A single-looking well is a candidate, not proof.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>'
     : m.scene === 'origin' ? '<strong>Scene limits</strong><span>Solid marks show the observed match and insertion. The dashed relationship and highlighted fragment represent a proposed transfer, not an observation.</span><span><b>Evidence:</b> 12,063 / 13,816 long WT inserts mapped to virus; incorporation remains unresolved.</span>'
     : m.scene === 'evidence' ? '<strong>Scene limits</strong><span>Published values stay fixed. Decorative background motion does not represent a biological rate.</span>'
-    : '<strong>Scene limits</strong><span>Symbols replace letters; counts and length changes are schematic, not an actual sequence or mutation size. The infected cell makes GFP, not the particle. GFP is a reporter clue, not a direct NSP15 measurement; a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
+    : '<strong>Scene limits</strong><span>A/C/G/U letters and positions are schematic, not actual sequence or mutation size. The infected cell makes GFP, not the particle. GFP is a reporter clue, not a direct NSP15 measurement; a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
   return '<div class="nspstory-dock"><details class="nspstory-disclosure"><summary>Evidence + limits</summary><div>' + limits + '</div></details>' +
     '<div class="nspstory-controls" aria-label="Illustrative motion controls">' +
-      choices('Light',['quiet','medium','lively'],['Quiet','Glow','Bloom'],m.ambientIntensity) +
-      choices('Tempo',['slow','normal','fast'],['Gentle','Normal','Brisk'],m.ambientTempo) +
+      (m.scene==='reporter'?'':choices('Light',['quiet','medium','lively'],['Quiet','Glow','Bloom'],m.ambientIntensity) +
+      choices('Tempo',['slow','normal','fast'],['Gentle','Normal','Brisk'],m.ambientTempo)) +
       '<div class="nspstory-choice nspstory-playback" role="group" aria-label="Decorative motion"><span class="nspstory-playback-status">Motion</span><button type="button" data-nsp-action="play" aria-pressed="true">Play</button><button type="button" data-nsp-action="pause" aria-pressed="false">Pause</button><button type="button" data-nsp-action="replay">Restart motion</button></div>' +
     '</div></div>';
 }
@@ -253,7 +256,13 @@ function nspstoryBindControls(host, panel) {
     var status=root.querySelector('.nspstory-playback-status');
     if(status)status.textContent=reduced?'Reduced motion · still':'Motion';
     animations().forEach(function(animation){
-      if(!prefs.playing || reduced)animation.pause();
+      if(!prefs.playing || reduced){
+        var pausedTime=animation.currentTime;
+        animation.pause();
+        // Reporter snapshots must match the visible scan even if tab hiding
+        // removes its CSS timelines before the asynchronous pause settles.
+        if(scene==='reporter' && pausedTime!=null)animation.currentTime=pausedTime;
+      }
       else if(animation.playState==='paused')animation.play();
     });
   }
@@ -300,26 +309,27 @@ function nspstoryPrintFrame(m) {
   var copy=Object.assign({},m,{phase:phases[m.scene],heading:headings[m.scene],print:true});
   var draw={reporter:nspstoryReporter,dilution:nspstoryDilution,origin:nspstoryOrigin,evidence:nspstoryEvidence};
   return '<svg class="nspstory-frame nspstory-print-frame" viewBox="'+nspstoryViewBox(m)+'" role="img" aria-label="Print summary: ' + esc(headings[m.scene]) + '"><title>Print summary: ' + esc(headings[m.scene]) + '</title><g aria-hidden="true">' +
-    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NOT TO SCALE','kicker') +
+    nspstoryText(24,m.scene==='reporter'?16:28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NOT TO SCALE','kicker') +
     (m.scene==='reporter'?nspstoryScene(copy):nspstoryText(24,61,copy.heading,'heading') + draw[m.scene](copy)) + '</g></svg>';
 }
-function nspstoryViewBox(m){return m.scene==='reporter'?'0 0 560 610':'0 0 760 410';}
+function nspstoryViewBox(m){return m.scene==='reporter'?'0 0 560 280':'0 0 760 410';}
 function nspstorySummary(m) {
   return m.aria+(m.scene==='reporter'?' '+nspstoryReporterReading(m.phase).summary:m.scene==='dilution'?' Fixed illustrative 3 by 3 field: wells 1, 5 and 9 are candidates; wells 2, 6 and 7 are empty; wells 3, 4 and 8 are mixed.':'');
 }
 function nspstoryScene(m) {
   var draw = {reporter:nspstoryReporter, dilution:nspstoryDilution, origin:nspstoryOrigin, evidence:nspstoryEvidence};
   if(m.scene==='reporter'){
-    var lines=m.print?['Reading frame → GFP','→ sequence check']:[['Read the message','three letters at a time.'],['A rare length change','restores the reading frame.'],['The trait can travel','with a virus lineage.'],['Green is a clue.','Sequence is the check.']][m.phase];
-    return nspstoryText(24,64,lines[0],'heading')+nspstoryText(24,94,lines[1],'heading')+draw.reporter(m);
+    var heading=m.print?'Reading frame → GFP → sequence check':nspstoryReporterHeading(m.phase);
+    return '<text x="24" y="42" class="nspstory-heading nspstory-reporter-heading">'+esc(heading)+'</text>'+draw.reporter(m);
   }
   return nspstoryText(24,66,m.heading,m.scene === 'origin' ? 'editorial' : 'heading') + draw[m.scene](m);
 }
+function nspstoryReporterHeading(phase){return ['Read in groups of three.','Insertion restores grouping.','Newly infected cells can inherit GFP.','Green is a clue. Sequence is the check.'][phase];}
 function nspstoryHTML(panel, state) {
   var m = nspstoryModel(panel, state), summary=nspstorySummary(m);
   var screen='<svg class="nspstory-frame nspstory-screen-frame" viewBox="'+nspstoryViewBox(m)+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + esc(summary) + '"><title>' + esc(summary) + '</title>' +
     '<g aria-hidden="true">' +
-    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':m.scene==='reporter'?'ILLUSTRATIVE · NO MOLECULAR TIMESCALE':'ILLUSTRATIVE / CONCEPTUAL · NO MOLECULAR TIMESCALE','kicker') +
+    nspstoryText(24,m.scene==='reporter'?16:28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':m.scene==='reporter'?'SCHEMATIC RNA · POSITION INDEX →':'ILLUSTRATIVE / CONCEPTUAL · NO MOLECULAR TIMESCALE','kicker') +
     '<g class="nspstory-scene">'+nspstoryScene(m)+'</g>'+nspstoryAmbient(m)+'</g></svg>';
   return '<div class="nspstory" data-scene="' + m.scene + '" data-phase="' + m.phase + '" data-ambient="' + (m.ambient?'on':'off') + '" data-ambient-intensity="' + m.ambientIntensity + '" data-ambient-tempo="' + m.ambientTempo + '">' +
     screen + nspstoryControls(m) + nspstoryPrintFrame(m) +
@@ -333,7 +343,8 @@ function nspstoryPatch(host,m) {
   if(root.getAttribute('data-phase')!==String(m.phase)) {
     // Complete authored geometry replaces only the lesson layer in one task.
     // The SVG viewport, ambient layer, controls, focus and disclosure persist.
-    root.querySelector('.nspstory-scene').innerHTML=nspstoryScene(m);
+    if(m.scene==='reporter')root.querySelector('.nspstory-reporter-heading').textContent=nspstoryReporterHeading(m.phase);
+    else root.querySelector('.nspstory-scene').innerHTML=nspstoryScene(m);
     root.setAttribute('data-phase',String(m.phase));
   }
   frame.setAttribute('aria-label',nspstorySummary(m));
@@ -357,8 +368,8 @@ PanelRegistry.define('nspstory', {
   authoring:{initialFields:true,transientFields:NSPSTORY_FIELDS.slice(),
     template:{title:'NSP15 evidence lesson',scene:'reporter',ambient:true,ambientIntensity:'quiet',ambientTempo:'slow',initial:{phase:0}},
     setupFields:[['scene','enum',NSPSTORY_SCENES],['ambient','bool'],['ambientIntensity','enum',NSPSTORY_AMBIENT_INTENSITIES],['ambientTempo','enum',NSPSTORY_AMBIENT_TEMPOS],['initial','json']],patchFields:[['phase','num'],['caption','text']],
-    fieldMeta:{scene:{label:'Lesson'},ambient:{label:'Ambient atmosphere',help:'Decorative background motion only; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity'},ambientTempo:{label:'Ambient tempo'},phase:{label:'Lesson phase (0–3)',help:'Four complete authored frames per lesson. Steps change the explanation directly; motion is decorative only.'},caption:{label:'Evidence and limits'}},
-    picker:{order:51,name:'NSP15 evidence story',category:'Science & sequencing',tagline:'Four SVG preprint lessons',description:'Sequence-free reporter, dilution and source inference cartoons plus the published HCoV-OC43 comparison. Each lesson has four phases and a still state.'},
+    fieldMeta:{scene:{label:'Lesson'},ambient:{label:'Illustrative motion',help:'Reporter position scan or ambient motion; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity'},ambientTempo:{label:'Ambient tempo'},phase:{label:'Lesson phase (0–3)',help:'Four complete authored frames per lesson. Steps change the explanation directly; motion is illustrative only.'},caption:{label:'Evidence and limits'}},
+    picker:{order:51,name:'NSP15 evidence story',category:'Science & sequencing',tagline:'Four SVG preprint lessons',description:'Schematic RNA reporter, dilution and source inference cartoons plus the published HCoV-OC43 comparison. Each lesson has four phases and a still state.'},
     example:function(sample) { sample.state={phase:2}; return sample; }
   },
   styles:String.raw`
@@ -368,9 +379,12 @@ PanelRegistry.define('nspstory', {
 .nspstory[data-scene="reporter"],.nspstory[data-scene="dilution"],.nspstory[data-scene="origin"]{--ns-ink:#eefbff;--ns-muted:#a7bdc8;--ns-line:#2b4653;--ns-paper:#06131c;--ns-zone:#0b202a;--ns-green:#55e49c;--ns-violet:#a993ff}
 .nspstory-frame{display:block;width:100%;min-height:0;flex:1 1 auto;background:var(--ns-paper);border:1px solid var(--ns-line);border-radius:15px;box-sizing:border-box;overflow:hidden}.nspstory[data-scene="dilution"] .nspstory-screen-frame,.nspstory[data-scene="origin"] .nspstory-screen-frame{background:radial-gradient(circle at 23% 41%,#143d3b 0,#081c27 22%,transparent 45%),radial-gradient(circle at 78% 45%,#261b45 0,#10172d 24%,transparent 46%),linear-gradient(145deg,#030811,#071725 58%,#090c1b);border:0;border-radius:0}
 .nspstory-screen-frame{aspect-ratio:760/410}.nspstory[data-scene="reporter"] .nspstory-screen-frame{background:radial-gradient(ellipse at 86% 45%,#123b35,#06131c 58%)}
-.nspstory[data-scene="reporter"] .nspstory-frame{flex:none;height:auto;aspect-ratio:560/610}
-.nspstory[data-scene="reporter"] .nspstory-small{font-size:16px}.nspstory[data-scene="reporter"] .nspstory-kicker{font-size:14px;letter-spacing:.015em}.nspstory[data-scene="reporter"] .nspstory-heading{font-size:27px}.nspstory[data-scene="reporter"] .nspstory-label{font-size:18px}
-.nspstory[data-scene="reporter"] .nspstory-caption{box-sizing:border-box;min-height:calc(4.35em + 20px)}
+.nspstory[data-scene="reporter"] .nspstory-frame{flex:none;height:auto;aspect-ratio:560/280}
+.nspstory[data-scene="reporter"] .nspstory-small{font-size:14px}.nspstory[data-scene="reporter"] .nspstory-kicker{font-size:12px;letter-spacing:.015em}.nspstory[data-scene="reporter"] .nspstory-heading{font-size:22px}.nspstory[data-scene="reporter"] .nspstory-label{font-size:18px}
+/* Reporter already has the full authored step above, an SVG summary, and the
+   adjacent evidence rail. Do not duplicate that paragraph inside the tile. */
+.nspstory[data-scene="reporter"] .nspstory-caption{display:none}
+.nspstory[data-scene="reporter"] .nspstory-dock{padding:3px 6px}
 .nspstory-print-frame{display:none}
 .docview:has(#section-green-reporter) .stepline.dv-caption-old{display:none}.docview:has(#section-green-reporter) .stepline.dv-caption-new{animation:none}
 .docview:has(#section-green-reporter) .stepline .stepid{display:none}
@@ -428,6 +442,15 @@ PanelRegistry.define('nspstory', {
 .nspstory-zone,.nspstory-band{fill:var(--ns-zone)}
 .nspstory-reading-active{stroke:var(--ns-green);stroke-width:1.4}
 .nspstory-reading-group{fill:var(--ns-paper);stroke:var(--ns-line);stroke-width:1}
+.nspstory-letter-cell{fill:var(--ns-zone);stroke:var(--ns-line);stroke-width:.6}.nspstory-letter{font:600 17px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
+.nspstory-gfp-boundary{fill:none;stroke:var(--ns-violet);stroke-width:2}
+.nspstory-reporter-scan{pointer-events:none}.nspstory-triplet-focus{fill:#55e49c22;stroke:var(--ns-green);stroke-width:2}.nspstory-position-pill{fill:var(--ns-green)}.nspstory-position{font:600 12px 'IBM Plex Mono',monospace;fill:#051a12}
+.nspstory-scan-position{opacity:0}.nspstory-scan-position:first-child{opacity:1}
+.nspstory[data-phase="0"] [data-scan-row="1"],.nspstory:not([data-phase="0"]) [data-scan-row="0"]{opacity:.22}
+.nspstory[data-motion-live="true"][data-ambient="on"] .nspstory-scan-position{animation:nspReadGroup 7s linear calc((var(--nsp-index) - 7) * 1s) infinite}
+.nspstory[data-motion-live="true"][data-ambient="on"] .nspstory-scan-cursor{animation:nspReadCursor 7s linear infinite}
+@keyframes nspReadGroup{0%,14.27%{opacity:1}14.29%,100%{opacity:0}}
+@keyframes nspReadCursor{0%,10%{transform:translateX(0)}14.285%,24.285%{transform:translateX(72px)}28.571%,38.571%{transform:translateX(144px)}42.857%,52.857%{transform:translateX(216px)}57.142%,67.142%{transform:translateX(288px)}71.428%,81.428%{transform:translateX(360px)}85.714%,96%{transform:translateX(432px)}100%{transform:translateX(0)}}
 .nspstory-added-symbol{fill:none;stroke:var(--ns-ink);stroke-width:1.5}
 .nspstory-arrow{stroke:var(--ns-muted);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .nspstory-particle{fill:#ebe7f6;stroke:var(--ns-violet);stroke-width:2}.nspstory-particle path{fill:none}

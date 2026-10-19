@@ -47,8 +47,8 @@ test('nspstory discovery, starter parity and all four declared lessons validate'
       assert.equal(evidence.y,art.y,`${id} evidence must be visible beside the illustration`);
     }else{
       const layout=section.diagram.sectionLayout.default,art=layout.find(item=>item.panel==='frame'),evidence=layout.find(item=>item.panel==='reporter-evidence');
-      assert.deepEqual([art.x,art.w,art.h],[0,12,19],'Reporter gets a narrower, taller stage for the recomposed SVG');
-      assert.deepEqual([evidence.x,evidence.w,evidence.h],[12,12,11],'Reporter evidence remains a compact adjacent rail');
+      assert.deepEqual([art.x,art.w,art.h],[0,14,10],'Reporter is a compact landscape letter track');
+      assert.deepEqual([evidence.x,evidence.w,evidence.h],[14,10,10],'Reporter evidence remains an adjacent rail');
     }
   }
   assert.match(source,/18 WT; 16 inactive GFP-positive isolates examined/);
@@ -89,7 +89,7 @@ test('ambient authoring settings validate, serialize and visibly control atmosph
   for(const scene of ['reporter','dilution','origin','evidence']){
     const svgHTML=screenFrame(C.nspstoryHTML({...panel(scene),ambient:true,ambientIntensity:'medium',ambientTempo:'slow'},{phase:1}));
     assert.match(svgHTML,/<svg class="nspstory-frame nspstory-screen-frame"/);
-    assert.match(svgHTML,/nspstory-ambient-medium nspstory-ambient-slow/);
+    assert.match(svgHTML,scene==='reporter'?/nspstory-reporter-scan/:/nspstory-ambient-medium nspstory-ambient-slow/);
     assert.doesNotMatch(svgHTML,/<canvas/);
   }
   const controls=C.nspstoryHTML({...panel('dilution'),ambient:true,ambientIntensity:'medium',ambientTempo:'slow'},{phase:1});
@@ -140,7 +140,7 @@ test('lessons expose truthful final frames, accessible summaries and escaped cap
 test('all lessons use proportional SVG and replace complete authored states', () => {
   for(const scene of ['reporter','dilution','origin','evidence'])for(let phase=0;phase<4;phase++) {
     const frame=screenFrame(C.nspstoryHTML(panel(scene),{phase},true));
-    assert.match(frame,new RegExp('viewBox="'+(scene==='reporter'?'0 0 560 610':'0 0 760 410')+'" preserveAspectRatio="xMidYMid meet"'));
+    assert.match(frame,new RegExp('viewBox="'+(scene==='reporter'?'0 0 560 280':'0 0 760 410')+'" preserveAspectRatio="xMidYMid meet"'));
     assert.match(frame,/class="nspstory-scene"/);
     assert.doesNotMatch(frame,/<canvas/);
     assert.doesNotMatch(C.nspstoryHTML(panel(scene),{phase},true),/class="nspstory nspstory-motion"/,'Phase changes show complete geometry without entrance fades');
@@ -166,7 +166,7 @@ test('published comparison bars and labels stay fixed at every phase', () => {
 
 test('print summaries are complete and independent of selected phase', () => {
   const expectations={
-    reporter:[/Newly infected cells/,/8\/18 green isolates/,/no inserts &gt;2 nt/],
+    reporter:[/SHIFTED LEADER/,/INSERTION BEFORE GFP/,/GROUPING RESTORED/,/Not actual sequence or mutation size/],
     dilution:[/data-well="1"/,/data-well="9"/,/>candidate</,/>mixed</,/>empty</,/Candidate, not proof/,/sequence-check the recovered lineage/],
     origin:[/MATCHING SOURCE/,/RECIPIENT \/ INSERTION/,/PROPOSED \/ NOT OBSERVED/,/dashed = inferred source link/,/incorporation unresolved/],
     evidence:[/33\.9/,/6\.93/,/16\.7/,/>0\.2</,/0\.98/,/0\.99/]
@@ -269,18 +269,18 @@ test('lazy Canvas observes reduced motion while unmounted with one lifetime list
   } finally { C.requestAnimationFrame=original.raf;C.cancelAnimationFrame=original.caf;C.ResizeObserver=original.resize;C.IntersectionObserver=original.intersection; }
 });
 
-test('SVG patch preserves the frame and controls while changing only lesson geometry', () => {
+test('Reporter patch preserves every letter, cursor and control while updating the explanation', () => {
   const frame={setAttribute(key,value){this[key]=value;},querySelector(){return title;}},title={};
   let replacements=0;
-  const content={set innerHTML(value){replacements++;this.value=value;}},caption={};
+  const content={set innerHTML(value){replacements++;this.value=value;}},caption={},heading={};
   const root={attrs:{'data-scene':'reporter','data-phase':'0','data-ambient':'on'},getAttribute(key){return this.attrs[key];},
-    setAttribute(key,value){this.attrs[key]=value;},querySelector(selector){return {'.nspstory-screen-frame':frame,'.nspstory-scene':content,'.nspstory-caption':caption}[selector];}};
+    setAttribute(key,value){this.attrs[key]=value;},querySelector(selector){return {'.nspstory-screen-frame':frame,'.nspstory-scene':content,'.nspstory-caption':caption,'.nspstory-reporter-heading':heading}[selector];}};
   const host={querySelector:()=>root};
   const result=C.PanelViews.get('nspstory')(host,panel('reporter'),{phase:1,caption:'Restored'},null,[],1,true);
   assert.equal(result.patch(),true);
-  assert.equal(replacements,1);assert.match(content.value,/GFP ON/);assert.equal(caption.textContent,'Restored');
+  assert.equal(replacements,0);assert.match(heading.textContent,/Insertion restores grouping/);assert.equal(caption.textContent,'Restored');
   assert.equal(frame['aria-label'],title.textContent);
-  assert.equal(result.patch(),true);assert.equal(replacements,1,'Same phase does not rewrite the teaching layer');
+  assert.equal(result.patch(),true);assert.equal(replacements,0,'Same phase does not rewrite the teaching layer');
   assert.equal(C.nspstoryPatch(host,C.nspstoryModel(panel('origin'),{phase:0})),false,'A different lesson requires a fresh mount');
 });
 
@@ -299,28 +299,27 @@ test('reporter groups from the upstream start without losing the downstream GFP 
     assert.equal(reading.green,phase>0);
     assert.equal(reading.rows.find(row=>row.active).id,phase===0?'shifted':'restored');
     const accessible=screenFrame(C.nspstoryHTML(panel('reporter'),{phase}));
-    for(const phrase of [/three-letter groups/,/GFP symbols are unchanged/,/not a sequence or actual mutation size/,/not a direct NSP15 measurement/])assert.match(accessible,phrase);
+    for(const phrase of [/three-letter groups/,/GFP symbols are unchanged/,/not actual sequence or mutation size/,/not a direct NSP15 measurement/])assert.match(accessible,phrase);
+    assert.ok(shifted.tokens.every(letter=>/^[ACGU]$/.test(letter)));
   }
 });
 
 test('Reporter SVG labels stay truthful in live and still frames', () => {
   for(let phase=0;phase<4;phase++){
     const frame=screenFrame(C.nspstoryHTML(panel('reporter'),{phase}));
-    for(const label of ['START','leader','GFP region'])assert.match(frame,new RegExp('>'+label+'<'));
-    assert.equal(frame.includes('>GFP ON<'),phase>0);
-    assert.equal(frame.includes('>GFP OFF<'),phase===0);
-    assert.equal(frame.includes('>Newly infected cells<'),phase>=2,'Lineage descendants belong to the later teaching phases');
-    assert.equal(count(frame,/nspstory-reading-active/g),1,'Exactly one row is the current reading-frame state');
+    for(const label of ['START → leader','GFP region →'])assert.match(frame,new RegExp('>'+label+'<'));
+    assert.match(frame,/nspstory-reporter-scan/);
+    assert.equal(count(frame,/class="nspstory-letter"/g),40,'Every schematic letter has a visible box');
     assert.equal(count(frame,/class="nspstory-reading-group"/g),14);
-    assert.equal(count(frame,/class="nspstory-added-symbol"/g),2);
-    assert.match(frame,/viewBox="0 0 560 610"/,'Reporter uses its own portrait composition rather than stretching the wide scene');
+    assert.equal(count(frame,/nspstory-added-symbol/g),2);
+    assert.match(frame,/viewBox="0 0 560 280"/,'Reporter uses a compact landscape letter track');
   }
   const printed=printFrame(C.nspstoryHTML(panel('reporter'),{phase:0}));
-  assert.match(printed,/viewBox="0 0 560 610"/,'Print uses the same complete Reporter geometry');
-  for(const phrase of [/SHIFTED LEADER/,/GFP OUT OF FRAME/,/GFP IN FRAME/,/START/,/GFP region/,/direct NSP15 measurement/])assert.match(printed,phrase);
+  assert.match(printed,/viewBox="0 0 560 280"/,'Print uses the same complete Reporter geometry');
+  for(const phrase of [/SHIFTED LEADER/,/GFP OUT OF FRAME/,/GROUPING RESTORED/,/START/,/GFP region/,/GFP is a reporter clue/])assert.match(printed,phrase);
   assert.equal(count(printed,/class="nspstory-reading-group"/g),14);
-  assert.equal(count(printed,/class="nspstory-added-symbol"/g),2);
-  assert.match(printed,/Insertion = extra RNA letters/);
+  assert.equal(count(printed,/nspstory-added-symbol/g),2);
+  assert.match(printed,/letters added before GFP/);
 });
 
 test('SVG settings and cleanup retain timelines and retire reduced-motion listeners', () => {

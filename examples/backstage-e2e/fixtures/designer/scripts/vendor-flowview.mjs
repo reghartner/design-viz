@@ -35,22 +35,23 @@ export async function vendorFlowview(source, destination) {
   // Offline-kit examples carry an .agent-kit marker; company/ is the fork overlay.
   const marked = tracked.filter(name => name.startsWith('examples/') && path.posix.basename(name) === '.agent-kit')
     .map(name => path.posix.dirname(name) + '/');
+  const selectedPackages = JSON.parse(execFileSync(process.execPath, ['tools/source-loader.cjs', '--packages'], {
+    cwd:source, encoding:'utf8'
+  }));
+  if (!Array.isArray(selectedPackages) || selectedPackages.some(name => typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)))
+    throw new Error('Flowview package selection is not a list of package names.');
+  const packageInputs = selectedPackages.map(name => 'packages/' + name + '/');
   const inputs = ['src/', 'tools/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
-    '.claude/skills/hld-to-page/', 'examples/canon/', ...marked, 'company/', 'diagrams/'];
+    '.claude/skills/hld-to-page/', 'examples/canon/', ...marked, 'company/', 'diagrams/', ...packageInputs];
   try {
     for (const name of tracked.filter(name => ['canon.json', 'LICENSE'].includes(name) || inputs.some(prefix => name.startsWith(prefix)))) {
       const target = path.join(buildRoot, name);
       await mkdir(path.dirname(target), {recursive:true});
       await copyFile(path.join(source, name), target);
     }
-    // This portable source set intentionally excludes packages/. Ignore the
-    // source checkout's company selection and any caller package environment
-    // so the prebuilt rehearsal runtime contains core Flowview only.
-    execFileSync('python3', ['tools/build.py', '--no-config'], {
-      cwd:buildRoot,
-      env:{...process.env, FLOWVIEW_COMPANY_IDENTITY:'off', FLOWVIEW_PACKAGES:''},
-      stdio:'inherit'
-    });
+    // Selected package source is present only in this disposable build root;
+    // the destination allowlist below still distributes no packages/ tree.
+    execFileSync('python3', ['tools/build.py'], {cwd:buildRoot, stdio:'inherit'});
     const publisher = path.join(buildRoot, 'apps/backstage');
     execFileSync('npm', ['ci', '--no-audit', '--no-fund'], {cwd:publisher, stdio:'inherit'});
     execFileSync('npm', ['run', 'build'], {cwd:publisher, stdio:'inherit'});

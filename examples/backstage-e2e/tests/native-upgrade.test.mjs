@@ -97,7 +97,7 @@ test('install preparation builds and packs the publisher, and changed bytes refr
   assert.equal(keyed, prebuilt, 'The npm 12 report shape stages the same package');
 });
 
-test('runtime vendoring builds distributions and excludes source and unrelated private files', async t => {
+test('runtime vendoring builds selected packages but distributes no source or unrelated private files', async t => {
   const temp = await mkdtemp(path.join(tmpdir(), 'native-vendor-'));
   t.after(() => rm(temp, {recursive: true, force: true}));
   const source = path.join(temp, 'source'), designer = path.join(temp, 'designer');
@@ -112,11 +112,13 @@ test('runtime vendoring builds distributions and excludes source and unrelated p
   await file(source, 'src/native/mount.d.ts', 'export interface NativeViewer {}');
   await file(source, 'tools/canon/entity-diagrams.d.mts', 'export function buildEntityDiagramIndex(): unknown;');
   await file(source, 'company/company.json', JSON.stringify({version:1, packages:['science','sports']}));
+  await file(source, 'tools/source-loader.cjs', 'if(process.argv[2]!=="--packages")throw new Error("unexpected mode");process.stdout.write(JSON.stringify(["science","sports"]));\n');
+  await file(source, 'packages/science/build-marker.txt', 'science package input');
+  await file(source, 'packages/sports/build-marker.txt', 'sports package input');
   // This isolated package-boundary fixture supplies a tiny builder; the full
   // rehearsal test exercises the actual engine build from a clean clone. The
-  // company config deliberately selects packages absent from the portable
-  // source set, so this also locks the vendoring build to core-only mode.
-  await file(source, 'tools/build.py', 'import os, sys\nfrom pathlib import Path\nassert sys.argv[1:] == ["--no-config"]\nassert os.environ.get("FLOWVIEW_COMPANY_IDENTITY") == "off"\nassert os.environ.get("FLOWVIEW_PACKAGES") == ""\nassert not Path("packages").exists()\nfor name in ["template/flowview.html", "workbench/flowspec.html", "tools/canon/generated-runtime.cjs"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
+  // company config selects both package inputs for the disposable build root.
+  await file(source, 'tools/build.py', 'import sys\nfrom pathlib import Path\nassert sys.argv[1:] == []\nassert Path("company/company.json").is_file()\nassert Path("packages/science/build-marker.txt").read_text() == "science package input"\nassert Path("packages/sports/build-marker.txt").read_text() == "sports package input"\nfor name in ["template/flowview.html", "workbench/flowspec.html", "tools/canon/generated-runtime.cjs"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
   await file(source, 'deploy/workbench/Dockerfile.prebuilt', 'FROM nginx:stable-alpine\n');
   await file(source, 'company-private.txt', 'DO_NOT_VENDOR');
   for (const args of [['init', '--quiet'], ['config', 'user.name', 'Fixture'], ['config', 'user.email', 'fixture@example.test'], ['remote', 'add', 'origin', 'https://github.com/fixture/runtime'], ['add', '.'], ['commit', '--quiet', '-m', 'Native fixture']])
@@ -138,6 +140,6 @@ test('runtime vendoring builds distributions and excludes source and unrelated p
   assert.equal(await readFile(path.join(designer, 'tools/canon/generated-runtime.cjs'), 'utf8'), 'built fixture');
   const distribution = JSON.parse(await readFile(path.join(designer, 'apps/backstage/package.json'), 'utf8'));
   assert.equal(distribution.scripts, undefined);
-  for (const name of ['apps/backstage/build.mjs', 'apps/backstage/src', 'src/native/mount.d.ts', 'tools/canon/generated-runtime.cjs'])
+  for (const name of ['apps/backstage/build.mjs', 'apps/backstage/src', 'src/native/mount.d.ts', 'packages/science', 'packages/sports', 'tools/canon/generated-runtime.cjs'])
     await assert.rejects(access(path.join(name.startsWith('tools/') ? source : designer, name)), {code:'ENOENT'});
 });

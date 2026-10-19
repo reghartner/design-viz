@@ -29,8 +29,8 @@ Use the [general cell-scene recipe](cookbook/cell-scenes.md),
 [sequence recipe](cookbook/sequence-panels.md) for complete stories and panel
 selection. Authoring and editing these documents is desktop only.
 
-The [NSP15 story recipe](cookbook/nsp15-story.md) describes four finite animated
-lessons for the Bianco et al. preprint, with reduced-motion and print stills.
+The [NSP15 story recipe](cookbook/nsp15-story.md) describes four SVG lessons for
+the Bianco et al. preprint, with decorative motion and complete print stills.
 
 The [cell journey](diagrams/biology/cell-journey/README.md) is a longer desktop
 biology showcase: 13 lessons covering replication through sequencing, with a

@@ -163,14 +163,14 @@
                         "panel": "frame",
                         "x": 0,
                         "y": 3,
-                        "w": 14,
-                        "h": 11
+                        "w": 12,
+                        "h": 19
                       },
                       {
                         "panel": "reporter-evidence",
-                        "x": 14,
+                        "x": 12,
                         "y": 3,
-                        "w": 10,
+                        "w": 12,
                         "h": 11
                       },
                       {
@@ -1997,7 +1997,7 @@
                     {
                       "k": "Visual provenance",
                       "v": "Original animated conceptual lessons + native Flowview evidence panels",
-                      "g": "Finite motion illustrates authored explanations, not molecular dynamics. Source transfer is marked proposed; donor matching is inferred. Bars use published rounded rates on one linear scale, with a static endpoint for reduced motion and print. No exact sequences, site coordinates or experimental procedures."
+                      "g": "Complete SVG frames show authored explanations; background motion is decorative, not molecular dynamics. Source transfer is marked proposed; donor matching is inferred. Bars use published rounded rates on one linear scale, with complete stills for reduced motion and print. No exact sequences, site coordinates or experimental procedures."
                     }
                   ]
                 }

@@ -1,11 +1,10 @@
 /* Purpose-built, sequence-free lessons for the Bianco et al. NSP15 preprint.
-   Motion interpolates authored explanations, never molecular dynamics. All
-   final geometry exists without animation, including reduced-motion/print. */
+   Authored frames switch directly; motion is decorative, never molecular
+   dynamics. All geometry exists without motion, including in print. */
 var NSPSTORY_SCENES = ['reporter', 'dilution', 'origin', 'evidence'];
 var NSPSTORY_FIELDS = ['phase', 'caption'];
 var NSPSTORY_AMBIENT_INTENSITIES = ['quiet', 'medium', 'lively'];
 var NSPSTORY_AMBIENT_TEMPOS = ['slow', 'normal', 'fast'];
-var NSPSTORY_ATMOSPHERE = /* @panel-asset:../assets/nspstory-atmosphere.jpg */ '';
 function nspstoryClean(raw, path, warnings, allowOnce) {
   var out = {};
   function warn(key, text) { if (warnings) warnings.push(path + key + ': ' + text); }
@@ -43,7 +42,7 @@ function nspstoryModel(panel, state) {
     origin:[['Read the source and the unexpected patch.', 'Solid marks show a matching source and the observed recipient insertion. The apparent source boundary is only conceptual.'],
       ['A separated match defines the distal class.', 'The source and recipient are linked by sequence matching, not direct observation of fragment transfer.'],
       ['Matching supports an inferred origin.', '87 percent of WT inserts at least 11 nt map to the virus. A source match is inferred.'],
-      ['Proposed transit, not an observed mechanism.', 'A dashed inference and moving fragment illustrate the proposed model. Incorporation remains unresolved.']],
+      ['Proposed transit, not an observed mechanism.', 'A dashed inference and highlighted fragment illustrate the proposed model. Incorporation remains unresolved.']],
     evidence:[['All insertions: fewer with inactive NSP15.', 'HCoV-OC43 all insertions at least 2 nt: WT 33.9 versus inactive NSP15 6.93 cpm.'],
       ['Distal insertions show the strongest loss.', 'HCoV-OC43 mapped distal inserts at least 11 nt: WT 16.7 versus inactive NSP15 0.2 cpm, reported 84-fold contrast.'],
       ['Nearby duplications do not show that loss.', 'HCoV-OC43 mapped tandem inserts at least 11 nt: WT 0.98 versus inactive NSP15 0.99 cpm.'],
@@ -78,27 +77,31 @@ function nspstoryReporterReading(phase) {
 }
 function nspstoryReporter(m) {
   var reading=nspstoryReporterReading(m.phase),h='';
-  h+=nspstoryText(24,91,'From START → consecutive groups of 3 letters (abstract symbols below)','small');
+  h+=nspstoryText(24,116,'From START → groups of 3 abstract symbols.','small');
   reading.rows.forEach(function(row,i){
-    var y=159+i*108,boundary=78+row.boundary*20;
-    h+='<rect class="nspstory-zone" x="20" y="'+(y-49)+'" width="524" height="99" rx="12"/>';
-    h+=nspstoryText(32,y-29,row.title,'kicker');
-    h+=nspstoryText(32,y-7,'START','small')+nspstoryText(83,y-7,'leader','small')+nspstoryText(boundary+6,y-7,'GFP region','small');
-    h+=nspstoryArrow('M35,'+(y+15)+'h31m-7,-5 7,5 -7,5');
-    row.groups.forEach(function(group){h+='<rect class="nspstory-reading-group" x="'+(78+group.start*20)+'" y="'+(y+2)+'" width="56" height="27" rx="5"/>';});
-    row.tokens.forEach(function(shape,j){h+='<g class="nspstory-token" transform="translate('+(87+j*20)+','+(y+15)+')">'+(shape===0?'<circle r="5"/>':shape===1?'<rect x="-5" y="-5" width="10" height="10" rx="1"/>':'<path d="M0,-6L6,5H-6Z"/>')+'</g>';});
-    row.added.forEach(function(j){h+='<rect class="nspstory-added-symbol" x="'+(79+j*20)+'" y="'+(y+5)+'" width="16" height="20" rx="2"/>'+nspstoryText(87+j*20,y-6,'+','small','middle');});
-    h+=nspstoryText(87+row.tokens.length*20,y+19,'…','small');
-    h+='<path class="nspstory-arrow" d="M'+boundary+','+(y-3)+'v36"/>';
-    h+=nspstoryText(83,y+45,i?'GFP groups line up again.':'GFP is present, but grouped differently.','small');
+    var y=202+i*120,boundary=78+row.boundary*20;
+    h+='<rect class="nspstory-zone'+(row.active?' nspstory-reading-active':'')+'" x="20" y="'+(y-65)+'" width="520" height="108" rx="12"/>';
+    h+=nspstoryText(32,y-39,row.title,'kicker');
+    h+=nspstoryText(32,y-13,'START','small')+nspstoryText(96,y-13,'leader','small')+nspstoryText(boundary+6,y-13,'GFP region','small');
+    h+=nspstoryArrow('M35,'+(y+10)+'h31m-7,-5 7,5 -7,5');
+    row.groups.forEach(function(group){h+='<rect class="nspstory-reading-group" x="'+(78+group.start*20)+'" y="'+(y-3)+'" width="56" height="27" rx="5"/>';});
+    row.tokens.forEach(function(shape,j){h+='<g class="nspstory-token nspstory-token-'+shape+'" transform="translate('+(87+j*20)+','+(y+10)+')">'+(shape===0?'<circle r="5"/>':shape===1?'<rect x="-5" y="-5" width="10" height="10" rx="1"/>':'<path d="M0,-6L6,5H-6Z"/>')+'</g>';});
+    row.added.forEach(function(j){h+='<rect class="nspstory-added-symbol" x="'+(79+j*20)+'" y="'+y+'" width="16" height="20" rx="2"/>'+nspstoryText(87+j*20,y-13,'+','small','middle');});
+    h+=nspstoryText(87+row.tokens.length*20,y+14,'…','small');
+    h+='<path class="nspstory-arrow" d="M'+boundary+','+(y-8)+'v36"/>';
+    h+=nspstoryText(83,y+39,i?'GFP groups line up again.':'GFP is present, but grouped differently.','small');
   });
-  h+=nspstoryText(642,120,'AFTER RESTORATION','kicker','middle')+nspstoryText(642,142,'infected cell','small','middle')+nspstoryCell(642,201,reading.green,62,'');
-  h+=nspstoryText(642,206,reading.green?'GFP ON':'GFP OFF','celltext','middle')+nspstoryText(642,268,reading.green?'Functional GFP':'No functional GFP','small','middle');
-  h+=nspstoryArrow('M544,282C567,282 565,201 578,201m-7,-5 7,5 -7,5');
-  h+=nspstoryCell(612,290,true,20,'')+nspstoryCell(674,290,true,20,'')+nspstoryText(642,327,'Newly infected cells','small','middle');
-  h+=nspstoryText(24,346,'Insertion = extra RNA letters. Outlined symbols are added; no actual sequence or size.','small');
-  h+=nspstoryText(24,371,'WT: insertions in 8/18 green isolates. Inactive: no inserts >2 nt in 16 examined.','small');
-  h+=nspstoryText(24,394,'GFP is a reporter clue, not a direct NSP15 measurement.','small');
+  h+=nspstoryText(24,389,'Insertion = extra RNA letters. Outlined symbols are added.','small');
+  h+=nspstoryText(24,411,'Schematic counts—not an actual sequence or mutation size.','small');
+  h+='<path class="nspstory-gridline" d="M24,426H536"/>';
+  h+=nspstoryText(112,451,'INFECTED CELL','kicker','middle')+nspstoryCell(112,493,reading.green,49,'');
+  h+=nspstoryText(112,499,reading.green?'GFP ON':'GFP OFF','celltext','middle');
+  h+=nspstoryText(216,459,reading.output,'label');
+  if(m.phase>=2)h+=nspstoryCell(264,492,true,18,'')+nspstoryCell(326,492,true,18,'')+nspstoryText(216,527,'Newly infected cells','small');
+  else h+=nspstoryText(216,490,m.phase===0?'Lower row: possible restored state.':'Only restoring changes turn GFP on.','small')+nspstoryText(216,515,'The cell makes GFP, not the particle.','small');
+  h+=nspstoryText(24,555,'WT: insertions in 8/18 green isolates.','small');
+  h+=nspstoryText(24,575,'Inactive: no inserts >2 nt in 16 examined.','small');
+  h+=nspstoryText(24,595,'GFP is a reporter clue, not a direct NSP15 measurement.','small');
   return h;
 }
 function nspstoryToken(x, y, shape, cls, fromX, fromY, size) {
@@ -138,13 +141,13 @@ function nspstoryDilution(m) {
   h += '</g>';
   if (phase === 2 || m.print) h += '<g class="nspstory-candidate-note ' + (phase === 2 && !m.print ? 'nspstory-reveal' : '') + '"><path class="nspstory-check" d="M517,205l12,12 22,-29"/>' + nspstoryText(704, 329, 'FOLLOW + SEQUENCE-CHECK', 'kicker', 'end') + '</g>';
   if (phase === 3 || m.print) h += '<rect class="nspstory-selection ' + (phase === 3 && !m.print ? 'nspstory-boundary' : '') + '" x="389" y="91" width="318" height="229" rx="28"/>';
-  h += nspstoryText(31, 338, m.print ? 'Candidate, not proof. Outcomes are illustrative; sequence-check the recovered lineage.' : phase === 3 ? 'SELECTED SLICE · this screen misses changes that do not restore GFP' : phase === 2 ? 'SINGLE-LOOKING = CANDIDATE, NOT PROOF' : phase === 1 ? 'ONE FINITE DISPERSION · OUTCOMES STAY FIXED' : 'ILLUSTRATIVE FIELD · NO COUNTS, PROBABILITIES, OR PROTOCOL', 'kicker');
+  h += nspstoryText(31, 338, m.print ? 'Candidate, not proof. Outcomes are illustrative; sequence-check the recovered lineage.' : phase === 3 ? 'SELECTED SLICE · this screen misses changes that do not restore GFP' : phase === 2 ? 'SINGLE-LOOKING = CANDIDATE, NOT PROOF' : phase === 1 ? 'ILLUSTRATIVE SEPARATION · OUTCOMES STAY FIXED' : 'ILLUSTRATIVE FIELD · NO COUNTS, PROBABILITIES, OR PROTOCOL', 'kicker');
   return h;
 }
 function nspstoryOrigin(m) {
   var phase = m.phase, h = '';
   h += '<rect class="nspstory-origin-field" x="20" y="86" width="720" height="252" rx="28"/><circle class="nspstory-origin-aura nspstory-origin-aura-source" cx="157" cy="235" r="92"/><circle class="nspstory-origin-aura nspstory-origin-aura-recipient" cx="612" cy="235" r="92"/>';
-  h += '<g class="nspstory-proposed ' + (phase === 3 && !m.print ? 'nspstory-proposal-beat' : '') + '"><rect x="527" y="19" width="205" height="29" rx="14"/>' + nspstoryText(542, 39, 'PROPOSED / NOT OBSERVED', 'kicker') + '</g>';
+  h += '<g class="nspstory-proposed ' + (phase === 3 && !m.print ? 'nspstory-proposal-beat' : '') + '"><rect x="527" y="9" width="205" height="24" rx="12"/>' + nspstoryText(542, 26, 'PROPOSED / NOT OBSERVED', 'kicker') + '</g>';
   h += nspstoryText(53, 119, 'MATCHING SOURCE', 'kicker') + nspstoryText(53, 142, 'solid mark · sequence match', 'small');
   h += nspstoryText(520, 119, 'RECIPIENT / INSERTION', 'kicker') + nspstoryText(520, 142, 'solid mark · unexpected patch', 'small');
   h += '<path class="nspstory-rna" d="M48,252C166,230 274,270 383,251S601,229 716,252"/>';
@@ -185,168 +188,13 @@ function nspstoryAmbient(m) {
   var scene=m.scene;
   if(!m.ambient)return '';
   var cls='nspstory-ambient nspstory-ambient-'+m.ambientIntensity+' nspstory-ambient-'+m.ambientTempo;
+  if(scene==='reporter')return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="520" cy="464" r="3"/><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="476" cy="477" r="35"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="35" cy="450" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="509" cy="91" r="3"/></g>';
   if(scene==='origin')return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-primary" cx="292" cy="205" r="76"/><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="478" cy="235" r="58"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="262" cy="112" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="482" cy="309" r="4"/></g>';
   if(scene==='dilution')return '<g class="'+cls+'" aria-hidden="true"><path class="nspstory-ambient-line nspstory-ambient-primary" d="M227,109C357,82 527,92 706,111"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="248" cy="154" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="284" cy="278" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="692" cy="207" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="665" cy="326" r="2.5"/></g>';
   return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="314" cy="202" r="102"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="457" cy="148" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="711" cy="166" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="472" cy="290" r="3"/></g>';
 }
-var NSPSTORY_WELLS=[
-  {state:'candidate',shapes:[0]},{state:'empty',shapes:[]},{state:'mixed',shapes:[1,2]},
-  {state:'mixed',shapes:[0,1]},{state:'candidate',shapes:[2]},{state:'empty',shapes:[]},
-  {state:'empty',shapes:[]},{state:'mixed',shapes:[2,0]},{state:'candidate',shapes:[1]}
-];
-function nspstoryCanvasFrame(m) {
-  return '<div class="nspstory-frame nspstory-screen-frame nspstory-canvas-frame" role="img" aria-label="' + esc(m.aria+(m.scene==='reporter'?' '+nspstoryReporterReading(m.phase).summary:'')) + '">' +
-    '<canvas class="nspstory-canvas" aria-hidden="true"></canvas>' +
-    '<span class="nspstory-a11y">' + esc(m.aria) + (m.scene==='reporter'?' '+esc(nspstoryReporterReading(m.phase).summary):'') + (m.scene==='dilution'?' Illustrative fixed 3 by 3 field: '+NSPSTORY_WELLS.map(function(w,i){return 'well '+(i+1)+' '+w.state;}).join('; ')+'.':'') + '</span>' +
-    (m.scene==='dilution'?NSPSTORY_WELLS.map(function(w,i){return '<span class="nspstory-canvas-outcome" data-well="'+(i+1)+'" data-state="'+w.state+'">'+w.state+'</span>';}).join(''):'') + '</div>';
-}
-function nspstoryEase(value) { value=Math.max(0,Math.min(1,value));return value*value*(3-2*value); }
-function nspstoryCurve(point,a,b,c,d) {
-  var u=1-point;
-  return {x:u*u*u*a.x+3*u*u*point*b.x+3*u*point*point*c.x+point*point*point*d.x,
-    y:u*u*u*a.y+3*u*u*point*b.y+3*u*point*point*c.y+point*point*point*d.y};
-}
-function nspstoryRoundRect(ctx,x,y,w,h,r) {
-  r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
-}
-function nspstoryCanvasToken(ctx,x,y,shape,size,alpha,bloom) {
-  var colors=['#b18aff','#ffc66d','#53e6cd'];ctx.save();ctx.translate(x,y);ctx.globalAlpha=alpha;
-  if(bloom){ctx.shadowColor=colors[shape];ctx.shadowBlur=16+bloom*10;}
-  ctx.fillStyle=colors[shape];ctx.strokeStyle='#effcff';ctx.lineWidth=1.2;
-  ctx.beginPath();
-  if(shape===0)ctx.arc(0,0,size,0,Math.PI*2);
-  else if(shape===1)nspstoryRoundRect(ctx,-size,-size,size*2,size*2,size*.28);
-  else {ctx.moveTo(0,-size*1.15);ctx.lineTo(size*1.08,size*.9);ctx.lineTo(-size*1.08,size*.9);ctx.closePath();}
-  ctx.fill();ctx.globalAlpha=alpha*.74;ctx.stroke();ctx.restore();
-}
-function nspstoryDrawWell(ctx,x,y,rx,well,focus,arrival,bloom) {
-  var ry=rx*.31, depth=rx*.48;
-  ctx.save();ctx.globalAlpha=.42+.58*arrival;
-  var aura=ctx.createRadialGradient(x,y,rx*.1,x,y,rx*1.25);aura.addColorStop(0,focus?'rgba(83,230,205,.24)':'rgba(88,164,203,.13)');aura.addColorStop(1,'rgba(4,16,29,0)');ctx.fillStyle=aura;ctx.beginPath();ctx.ellipse(x,y,rx*1.28,ry*2.2,0,0,Math.PI*2);ctx.fill();
-  var glass=ctx.createLinearGradient(x,y-ry,x,y+depth);glass.addColorStop(0,'rgba(32,82,105,.32)');glass.addColorStop(.48,'rgba(6,22,38,.8)');glass.addColorStop(1,'rgba(43,116,137,.3)');ctx.fillStyle=glass;ctx.beginPath();ctx.moveTo(x-rx,y);ctx.quadraticCurveTo(x-rx*.96,y+depth*.88,x-rx*.7,y+depth);ctx.quadraticCurveTo(x,y+depth+ry*.68,x+rx*.7,y+depth);ctx.quadraticCurveTo(x+rx*.96,y+depth*.88,x+rx,y);ctx.closePath();ctx.fill();
-  ctx.strokeStyle=focus?'rgba(83,230,205,.94)':'rgba(120,209,239,.62)';ctx.lineWidth=focus?2.4:1.4;ctx.shadowColor=focus?'#53e6cd':'#5bc5e4';ctx.shadowBlur=(focus?18:9)+(bloom*7);ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.stroke();
-  ctx.shadowBlur=0;ctx.strokeStyle='rgba(188,237,250,.3)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(x,y+depth*.86,rx*.7,ry*.42,0,0,Math.PI);ctx.stroke();
-  ctx.strokeStyle='rgba(220,250,255,.18)';ctx.beginPath();ctx.moveTo(x-rx*.86,y+2);ctx.quadraticCurveTo(x-rx*.78,y+depth*.76,x-rx*.52,y+depth*.9);ctx.moveTo(x+rx*.86,y+2);ctx.quadraticCurveTo(x+rx*.78,y+depth*.76,x+rx*.52,y+depth*.9);ctx.stroke();
-  well.shapes.forEach(function(shape,index){nspstoryCanvasToken(ctx,x+(well.shapes.length>1?(index?rx*.2:-rx*.2):0),y+2,shape,Math.max(4.5,rx*.085),arrival,bloom);});
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='600 '+Math.max(10,rx*.21)+'px "IBM Plex Mono",monospace';ctx.fillStyle=focus?'#84f5d8':'#c2d5df';ctx.globalAlpha=.7+.3*arrival;ctx.fillText(well.state.toUpperCase(),x,y+depth*.68);ctx.restore();
-}
-function nspstoryDrawDilution(ctx,state,m,image) {
-  var w=state.width,h=state.height,prefs=state.prefs,intensity=prefs.intensity || m.ambientIntensity;
-  var duration={slow:5300,normal:4000,fast:3200}[prefs.tempo || m.ambientTempo] || 4000;
-  var still=state.reduced || !m.ambient, authored=still || m.phase!==1?4000:Math.min(4000,state.elapsed);
-  var bloom=intensity==='lively'?1:intensity==='medium'?.48:0, phase=m.phase;
-  ctx.clearRect(0,0,w,h);ctx.fillStyle='#030d18';ctx.fillRect(0,0,w,h);
-  if(image && image.complete && image.naturalWidth){
-    var scale=Math.max(w/image.naturalWidth,h/image.naturalHeight),iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;
-    ctx.save();ctx.globalAlpha=intensity==='lively'?.66:intensity==='medium'?.5:.32;ctx.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();
-  }
-  var atmosphereTime=state.elapsed*({slow:.72,normal:1,fast:1.34}[prefs.tempo]||1);
-  var drift=still?0:Math.sin(atmosphereTime/2100)*w*.012;
-  [[.19,.18,'rgba(56,230,195,.18)'],[.78,.2,'rgba(168,118,255,.19)'],[.52,.05,'rgba(42,139,214,.12)']].forEach(function(g,i){var x=w*g[0]+drift*(i-1),y=h*g[1];var grad=ctx.createRadialGradient(x,y,0,x,y,w*.25);grad.addColorStop(0,g[2]);grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);});
-  var particleAlpha=intensity==='quiet'?.18:intensity==='lively'?.58:.36;
-  for(var p=0;p<32;p++){var seed=(p*47)%101/101,x=(seed*w+(!still?Math.sin(state.elapsed/1300+p)*12:0))%w,y=((p*83)%97)/97*h*.58;ctx.fillStyle=p%3===0?'#b18aff':p%3===1?'#53e6cd':'#8ccde8';ctx.globalAlpha=particleAlpha*(.3+(p%5)/7);ctx.beginPath();ctx.arc(x,y,1+(p%3)*.55,0,Math.PI*2);ctx.fill();}
-  ctx.globalAlpha=1;
-  var cloudY=h*.105,cloudWidth=Math.min(w*.74,860),cloudLeft=(w-cloudWidth)/2;
-  for(var c=0;c<44;c++){var cx=cloudLeft+((c*73)%101)/101*cloudWidth,cy=cloudY+Math.sin(c*2.1)*h*.035+((c*31)%17)/17*h*.08;nspstoryCanvasToken(ctx,cx,cy,c%3,Math.max(3.5,Math.min(7,w/150)),.35+(c%7)/11,bloom);}
-  var clearing=ctx.createRadialGradient(w/2,h*.3,0,w/2,h*.3,w*.4);clearing.addColorStop(0,'rgba(3,13,24,.99)');clearing.addColorStop(.55,'rgba(3,13,24,.9)');clearing.addColorStop(1,'rgba(3,13,24,0)');ctx.fillStyle=clearing;ctx.fillRect(0,h*.08,w,h*.42);
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#bfd5df';ctx.font='600 '+Math.max(10,Math.min(12,w/92))+'px "IBM Plex Mono",monospace';ctx.letterSpacing='2px';ctx.globalAlpha=.84;ctx.fillText('ILLUSTRATIVE · FIXED IDENTITIES AND OUTCOMES',w/2,h*.155);
-  var headline=Math.max(20,Math.min(44,w/21,h*.085));ctx.letterSpacing='0px';ctx.font='500 '+headline+'px Georgia,"Times New Roman",serif';ctx.fillStyle='#f4fbff';ctx.globalAlpha=1;ctx.fillText('Make a crowd',w/2,h*.245);ctx.fillText('easier to follow.',w/2,h*.335);
-  ctx.font='500 '+Math.max(15,headline*.36)+'px Georgia,"Times New Roman",serif';ctx.fillStyle='#88eed4';ctx.fillText(phase<2?'One authored spread · nine fixed examples':phase===2?'Follow a candidate · then sequence-check':'The green screen selects only one slice',w/2,h*.415);
-  var cols=[.27,.5,.73],rows=[.54,.68,.81],wellRx=Math.min(48,w*.09,h*.125),routeAlpha=nspstoryEase((authored-450)/750),travel=nspstoryEase((authored-900)/1800),arrival=nspstoryEase((authored-2400)/900);
-  var pathColors=['#53e6cd','#b18aff','#ffc66d'];
-  for(var i=0;i<9;i++){
-    var col=i%3,row=Math.floor(i/3),end={x:w*cols[col],y:h*rows[row]},start={x:w*(col===0?.1:col===2?.9:row%2?.12:.88),y:h*.19};
-    var side=col===0?-.04:col===2?.04:(start.x<w/2?.06:-.06),cp1={x:start.x+w*side,y:h*.42},cp2={x:end.x+(start.x<w/2?-w*.07:w*.07),y:end.y-h*.08};
-    ctx.save();ctx.globalAlpha=.08+.36*routeAlpha;ctx.strokeStyle=pathColors[col];ctx.lineWidth=1.2+bloom*1.4;ctx.shadowColor=pathColors[col];ctx.shadowBlur=6+bloom*13;ctx.setLineDash([2,8]);ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,end.x,end.y);ctx.stroke();ctx.restore();
-    if(authored>=900 && authored<3000){var local=Math.max(0,Math.min(1,travel-(i%3)*.075));if(local>0&&local<1){var point=nspstoryCurve(local,start,cp1,cp2,end);NSPSTORY_WELLS[i].shapes.forEach(function(shape,index){nspstoryCanvasToken(ctx,point.x+(index?6:0),point.y,shape,Math.max(4,wellRx*.1),1,bloom+.35);});}}
-    nspstoryDrawWell(ctx,end.x,end.y,wellRx,NSPSTORY_WELLS[i],phase===2&&i===4,still?1:Math.max(.32,arrival),bloom);
-  }
-  ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.font='500 '+Math.max(9,Math.min(12,w/96))+'px "IBM Plex Sans",sans-serif';ctx.fillStyle='#9fb6c1';ctx.fillText('Shapes = lineages · positions and counts are not data',Math.max(12,w*.025),h*.96,w*.7);
-  ctx.textAlign='right';ctx.fillStyle=phase===3?'#ffc66d':'#91a8b2';ctx.fillText('candidate ≠ proof',w-Math.max(12,w*.025),h*.96,w*.23);
-  state.canvasProgress=authored/4000;
-}
-function nspstoryCanvasBackdrop(ctx,state,image,intensity){
-  var w=state.width,h=state.height,bloom=intensity==='lively'?1:intensity==='medium'?.5:.12;
-  var atmosphereTime=state.elapsed*({slow:.72,normal:1,fast:1.34}[state.prefs.tempo]||1);
-  ctx.clearRect(0,0,w,h);ctx.fillStyle='#030d18';ctx.fillRect(0,0,w,h);
-  if(image&&image.complete&&image.naturalWidth){var scale=Math.max(w/image.naturalWidth,h/image.naturalHeight),iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;ctx.save();ctx.globalAlpha=.26+bloom*.3;ctx.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);ctx.restore();}
-  for(var i=0;i<24;i++){var x=((i*67)%101)/101*w+Math.sin(atmosphereTime/1900+i)*6*bloom,y=((i*37)%97)/97*h;ctx.fillStyle=i%2?'#53e6cd':'#b18aff';ctx.globalAlpha=.1+bloom*.22;ctx.beginPath();ctx.arc(x,y,1+(i%3)*.45,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;return bloom;
-}
-function nspstoryReporterViewport(width,height){
-  var scale=Math.min(width/760,height/410);
-  return {scale:scale,x:(width-760*scale)/2,y:(height-410*scale)/2,width:760*scale,height:410*scale};
-}
-function nspstoryDrawReporterCanvas(ctx,state,m,image){
-  var bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),reading=nspstoryReporterReading(m.phase);
-  var still=state.reduced||!m.ambient,beat=still?0:state.elapsed/1100,viewport=nspstoryReporterViewport(state.width,state.height);
-  ctx.fillStyle='rgba(3,13,24,.72)';ctx.fillRect(0,0,state.width,state.height);
-  // The flex frame can be wider or taller than the authored scene. Contain the
-  // complete 760 × 410 drawing uniformly; never stretch glyphs, cells or type.
-  ctx.save();ctx.translate(viewport.x,viewport.y);ctx.scale(viewport.scale,viewport.scale);ctx.textBaseline='middle';
-  function text(value,x,y,size,color,align,serif){ctx.textAlign=align||'left';ctx.font=(serif?'500 ':'600 ')+size+'px '+(serif?'Georgia,serif':'"IBM Plex Sans",sans-serif');ctx.fillStyle=color||'#dbeaf1';ctx.fillText(value,x,y);}
-  text('ILLUSTRATIVE · THE GFP READING FRAME',24,23,13,'#98b8c9');
-  text('Read three. Then the next three.',24,57,32,'#f3faff','left',true);
-  text('Reading frame = where the three-letter groups begin.',24,87,17,'#9be7d7');
-  reading.rows.forEach(function(row,i){
-    var y=172+i*111,boundary=78+row.boundary*20,color=i?'#6de7c3':'#adc4e5';
-    ctx.fillStyle=row.active?'rgba(29,62,77,.78)':'rgba(13,35,51,.82)';nspstoryRoundRect(ctx,18,y-60,528,108,12);ctx.fill();
-    ctx.strokeStyle=row.active?color:'rgba(124,166,192,.28)';ctx.lineWidth=row.active?1.6:1;ctx.stroke();
-    text(i?'02 / RESTORED BY INSERTION':'01 / OUT OF FRAME',30,y-42,18,color);
-    text('START',25,y-14,14,'#dbeaf1');text('leader',83,y-14,17,'#d6c6ff');text('GFP region',boundary+7,y-14,17,'#9af5dd');
-    ctx.strokeStyle='#b7d0dd';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(35,y+14);ctx.lineTo(66,y+14);ctx.lineTo(59,y+9);ctx.moveTo(66,y+14);ctx.lineTo(59,y+19);ctx.stroke();
-    row.groups.forEach(function(group,index){
-      var shine=row.active?.15+(still?0:Math.pow((Math.cos(beat-index*.65)+1)/2,8)*.25):.05;
-      ctx.fillStyle='rgba(128,185,218,'+shine+')';ctx.strokeStyle='rgba(153,196,218,.55)';ctx.lineWidth=1;
-      nspstoryRoundRect(ctx,78+group.start*20,y,56,29,5);ctx.fill();ctx.stroke();
-    });
-    row.tokens.forEach(function(shape,j){
-      var x=87+j*20,cy=y+14;ctx.fillStyle=j<row.boundary?'#c4adff':'#73eed0';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=row.active?3+bloom*4:0;ctx.beginPath();
-      if(shape===0)ctx.arc(x,cy,5,0,Math.PI*2);else if(shape===1)ctx.rect(x-5,cy-5,10,10);else{ctx.moveTo(x,cy-6);ctx.lineTo(x+6,cy+5);ctx.lineTo(x-6,cy+5);ctx.closePath();}ctx.fill();ctx.shadowBlur=0;
-    });
-    row.added.forEach(function(j){ctx.strokeStyle='#f3faff';ctx.lineWidth=1.5;nspstoryRoundRect(ctx,79+j*20,y+4,16,20,2);ctx.stroke();text('+',87+j*20,y-14,18,'#f3faff','center');});
-    text('…',87+row.tokens.length*20,y+14,15,'#abc7d6');
-    ctx.strokeStyle='#80eed4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(boundary,y-6);ctx.lineTo(boundary,y+32);ctx.stroke();
-    text(i?'Extra symbols → groups realign.':'Shifted leader → different GFP grouping.',83,y+39,16,'#b7d0dd');
-  });
-  function cell(x,y,r,green){
-    var glow=ctx.createRadialGradient(x-r*.2,y-r*.2,0,x,y,r*1.3);glow.addColorStop(0,green?'rgba(87,244,180,.5)':'rgba(80,132,154,.35)');glow.addColorStop(1,'rgba(5,18,29,.18)');
-    ctx.fillStyle=glow;ctx.strokeStyle=green?'#58e6a5':'#8daaba';ctx.lineWidth=2;ctx.shadowColor=green?'#53e6a5':'#65bad0';ctx.shadowBlur=8+bloom*(12+4*Math.sin(beat));ctx.beginPath();ctx.ellipse(x,y,r,r*.78,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowBlur=0;
-  }
-  text('INFECTED CELL',646,139,17,'#c0d7e3','center');
-  cell(646,207,64,reading.green);text(reading.green?'GFP ON':'GFP OFF',646,207,20,reading.green?'#9bffd2':'#d0e0eb','center');
-  text(reading.output,646,268,15,reading.green?'#9bffd2':'#d0e0eb','center');
-  var routeY=m.phase===0?187:298;ctx.strokeStyle=reading.green?'#6de7c3':'#adc4e5';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(546,routeY);ctx.bezierCurveTo(569,routeY,560,207,579,207);ctx.stroke();
-  if(m.phase>=2){cell(622,309,18,true);cell(671,309,18,true);text('Newly infected cells',646,342,13,'#b7d0dd','center');}
-  else{text(m.phase===0?'Lower row: possible':'Only restoring changes',646,304,15,'#adc4d3','center');text(m.phase===0?'restored state':'turn the reporter on',646,325,15,'#adc4d3','center');}
-  text('Boxes = 3 · outlined symbols = added · no actual sequence or size.',24,357,14,'#b7d0dd');
-  text(m.phase===3?'Green is a clue; sequence-check the recovered lineage.':'GFP is a reporter clue, not a direct NSP15 measurement.',24,383,16,m.phase===3?'#ffc66d':'#d6e7ee');
-  ctx.restore();state.canvasProgress=1;
-}
-function nspstoryDrawOriginCanvas(ctx,state,m,image){
-  var w=state.width,h=state.height,bloom=nspstoryCanvasBackdrop(ctx,state,image,state.prefs.intensity||m.ambientIntensity),phase=m.phase;
-  var clearing=ctx.createRadialGradient(w*.5,h*.25,0,w*.5,h*.25,w*.4);clearing.addColorStop(0,'rgba(3,13,24,.98)');clearing.addColorStop(1,'rgba(3,13,24,0)');ctx.fillStyle=clearing;ctx.fillRect(0,0,w,h*.5);
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ffc66d';ctx.font='600 11px "IBM Plex Mono",monospace';ctx.fillText('PROPOSED / NOT OBSERVED',w/2,h*.11);var fs=Math.min(45,Math.max(31,w/21));ctx.font='500 '+fs+'px Georgia,serif';ctx.fillStyle='#f6fbff';ctx.fillText('A match suggests an origin.',w/2,h*.24);ctx.font='500 '+Math.max(15,fs*.36)+'px Georgia,serif';ctx.fillStyle='#91e8d2';ctx.fillText('Observed endpoints · inferred relationship · unresolved incorporation',w/2,h*.34);
-  var sy=h*.63,lx=w*.16,rx=w*.84;ctx.lineCap='round';ctx.strokeStyle='#526f83';ctx.lineWidth=17;ctx.beginPath();ctx.moveTo(w*.08,sy);ctx.bezierCurveTo(w*.32,sy-h*.05,w*.67,sy+h*.05,w*.92,sy);ctx.stroke();ctx.strokeStyle='#b18aff';ctx.lineWidth=15;ctx.beginPath();ctx.moveTo(lx-w*.055,sy);ctx.lineTo(lx+w*.055,sy);ctx.stroke();ctx.strokeStyle='#53e6cd';ctx.beginPath();ctx.moveTo(rx-w*.045,sy);ctx.lineTo(rx+w*.045,sy);ctx.stroke();
-  ctx.setLineDash([8,9]);ctx.strokeStyle='#ffc66d';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,sy-h*.05);ctx.bezierCurveTo(w*.34,h*.42,w*.66,h*.42,rx,sy-h*.05);ctx.stroke();ctx.setLineDash([]);
-  ctx.font='600 12px "IBM Plex Mono",monospace';ctx.fillStyle='#ddd4ff';ctx.textAlign='center';ctx.fillText('MATCHING SOURCE',lx,sy+h*.13);ctx.fillStyle='#b3f7df';ctx.fillText('RECIPIENT / INSERTION',rx,sy+h*.13);
-  if(phase===3){var travel=nspstoryEase(state.reduced || !m.ambient?1:Math.min(1,state.elapsed/1500)),p=nspstoryCurve(travel,{x:lx,y:sy-h*.05},{x:w*.34,y:h*.42},{x:w*.66,y:h*.42},{x:rx,y:sy-h*.05});ctx.strokeStyle='#d8cbff';ctx.lineWidth=10;ctx.shadowColor='#b18aff';ctx.shadowBlur=12+bloom*12;ctx.beginPath();ctx.moveTo(p.x-22,p.y);ctx.lineTo(p.x+22,p.y);ctx.stroke();ctx.shadowBlur=0;}
-  ctx.textAlign='left';ctx.fillStyle='#a8bec8';ctx.font='500 12px "IBM Plex Sans",sans-serif';ctx.fillText('Solid marks = observed sequence match and insertion',w*.05,h*.9);ctx.textAlign='right';ctx.fillStyle='#ffc66d';ctx.fillText('incorporation unresolved',w*.95,h*.9);state.canvasProgress=phase===3?Math.min(1,state.elapsed/1500):1;
-}
-function nspstoryMountCanvas(host,panel,m) {
-  var canvas=host.querySelector('.nspstory-canvas');if(!canvas)return null;
-  var view=canvas.ownerDocument && canvas.ownerDocument.defaultView,image=view && view.Image ? new view.Image() : null;
-  var prefs=host._nspstoryPrefs;
-  if(!prefs || prefs.scene!==m.scene)prefs=host._nspstoryPrefs={scene:m.scene,intensity:panel.ambientIntensity || 'quiet',tempo:panel.ambientTempo || 'slow',playing:true};
-  if(host._nspstoryPhase!==m.phase){delete host._nspstoryCanvasMemory;host._nspstoryPhase=m.phase;}
-  var renderScene=m.scene==='reporter'?nspstoryDrawReporterCanvas:m.scene==='origin'?nspstoryDrawOriginCanvas:nspstoryDrawDilution;
-  var controller=scienceLazyCanvasScene(host,canvas,{memoryKey:'_nspstoryCanvasMemory',prefs:{intensity:prefs.intensity,tempo:prefs.tempo},shouldAnimate:function(){return m.ambient;},onStateChange:function(state){canvas.setAttribute('data-canvas-reduced',String(state.reduced));if(host._nspstoryRefreshControls)host._nspstoryRefreshControls(state.reduced);},render:function(ctx,state){renderScene(ctx,state,m,image);canvas.setAttribute('data-canvas-reduced',String(state.reduced));canvas.setAttribute('data-canvas-progress',(state.reduced?1:state.canvasProgress).toFixed(3));}});
-  if(image){image.onload=function(){if(controller)controller.requestDraw();};image.src=NSPSTORY_ATMOSPHERE;}
-  var cleanup=host._panelMotionCleanup;
-  host._panelMotionCleanup=function(){if(image)image.onload=null;if(cleanup)cleanup();host._nspstoryRefreshControls=null;};
-  host._nspstoryCanvas=controller;return controller;
-}
 function nspstoryControls(m) {
-  if (m.scene === 'evidence') return '';
+  if (m.scene === 'evidence' && !m.ambient) return '';
   function choices(kind, values, labels, selected) {
     return '<div class="nspstory-choice" role="group" aria-label="' + kind + '"><span>' + kind + '</span>' + values.map(function (value,i) {
       return '<button type="button" data-nsp-' + kind.toLowerCase() + '="' + value + '" aria-pressed="' + (value === selected) + '">' + labels[i] + '</button>';
@@ -354,76 +202,144 @@ function nspstoryControls(m) {
   }
   var limits=m.scene === 'dilution'
     ? '<strong>Scene limits</strong><span>Fixed illustrative outcomes—not well counts, probabilities, or a protocol. A single-looking well is a candidate, not proof.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>'
-    : m.scene === 'origin' ? '<strong>Scene limits</strong><span>Solid marks show the observed match and insertion. The dashed relationship and moving fragment are proposed, not observed.</span><span><b>Evidence:</b> 12,063 / 13,816 long WT inserts mapped to virus; incorporation remains unresolved.</span>'
+    : m.scene === 'origin' ? '<strong>Scene limits</strong><span>Solid marks show the observed match and insertion. The dashed relationship and highlighted fragment represent a proposed transfer, not an observation.</span><span><b>Evidence:</b> 12,063 / 13,816 long WT inserts mapped to virus; incorporation remains unresolved.</span>'
+    : m.scene === 'evidence' ? '<strong>Scene limits</strong><span>Published values stay fixed. Decorative background motion does not represent a biological rate.</span>'
     : '<strong>Scene limits</strong><span>Symbols replace letters; counts and length changes are schematic, not an actual sequence or mutation size. The infected cell makes GFP, not the particle. GFP is a reporter clue, not a direct NSP15 measurement; a green culture can still contain multiple lineages.</span><span><b>Evidence:</b> 8/18 examined WT green isolates carried insertions; sequence checks the recovered reporter region.</span>';
   return '<div class="nspstory-dock"><details class="nspstory-disclosure"><summary>Evidence + limits</summary><div>' + limits + '</div></details>' +
     '<div class="nspstory-controls" aria-label="Illustrative motion controls">' +
       choices('Light',['quiet','medium','lively'],['Quiet','Glow','Bloom'],m.ambientIntensity) +
       choices('Tempo',['slow','normal','fast'],['Gentle','Normal','Brisk'],m.ambientTempo) +
-      '<div class="nspstory-choice nspstory-playback" role="group" aria-label="Playback"><span class="nspstory-playback-status">Motion</span><button type="button" data-nsp-action="play" aria-pressed="true">Play</button><button type="button" data-nsp-action="pause" aria-pressed="false">Pause</button><button type="button" data-nsp-action="replay">Replay</button></div>' +
+      '<div class="nspstory-choice nspstory-playback" role="group" aria-label="Decorative motion"><span class="nspstory-playback-status">Motion</span><button type="button" data-nsp-action="play" aria-pressed="true">Play</button><button type="button" data-nsp-action="pause" aria-pressed="false">Pause</button><button type="button" data-nsp-action="replay">Restart motion</button></div>' +
     '</div></div>';
 }
+// The host survives lazy tab activation. Only preferences and animation times
+// survive with it; no detached DOM, image, Canvas or recurring JS frame is held.
 function nspstoryBindControls(host, panel) {
-  if (!host || typeof host.querySelector !== 'function') return;
-  var root=host.querySelector('.nspstory'), ambient=root && root.querySelector('.nspstory-ambient');
-  if (!root || !root.querySelector('.nspstory-controls')) return;
-  var scene=root.getAttribute('data-scene'), prefs=host._nspstoryPrefs, canvasController=host._nspstoryCanvas;
+  var root=host.querySelector('.nspstory');
+  if (!root) return;
+  var scene=root.getAttribute('data-scene'), prefs=host._nspstoryPrefs;
   if (!prefs || prefs.scene !== scene) prefs=host._nspstoryPrefs={scene:scene,intensity:panel.ambientIntensity || 'quiet',tempo:panel.ambientTempo || 'slow',playing:true};
+  var view=host.ownerDocument && host.ownerDocument.defaultView;
+  var media=view && view.matchMedia ? view.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var retired=false, reduced=!!(media && media.matches), memory=host._nspstoryMotion;
+  var snapshot={times:[],at:0,playing:false}, owned=[];
+  var buttons=Array.from(root.querySelectorAll('[data-nsp-light],[data-nsp-tempo],[data-nsp-action]'));
   function animations() { return typeof root.getAnimations === 'function' ? root.getAnimations({subtree:true}) : []; }
-  function finiteAnimations() { return animations().filter(function (animation) { return Number.isFinite(animation.effect.getComputedTiming().endTime); }); }
-  function apply() {
-    root.setAttribute('data-live-intensity',prefs.intensity); root.setAttribute('data-live-tempo',prefs.tempo);
-    if (ambient) {
-      NSPSTORY_AMBIENT_INTENSITIES.forEach(function (value) { ambient.classList.remove('nspstory-ambient-'+value); });
-      NSPSTORY_AMBIENT_TEMPOS.forEach(function (value) { ambient.classList.remove('nspstory-ambient-'+value); });
-      ambient.classList.add('nspstory-ambient-'+prefs.intensity,'nspstory-ambient-'+prefs.tempo);
-    }
-    root.setAttribute('data-playing',prefs.playing?'true':'false');
-    Array.from(root.querySelectorAll('[data-nsp-light]')).forEach(function (button) { button.setAttribute('aria-pressed',String(button.getAttribute('data-nsp-light') === prefs.intensity)); });
-    Array.from(root.querySelectorAll('[data-nsp-tempo]')).forEach(function (button) { button.setAttribute('aria-pressed',String(button.getAttribute('data-nsp-tempo') === prefs.tempo)); });
-    Array.from(root.querySelectorAll('[data-nsp-action]')).forEach(function (button) {
-      var action=button.getAttribute('data-nsp-action');
-      if (action !== 'replay') button.setAttribute('aria-pressed',String(action === (prefs.playing ? 'play' : 'pause')));
-    });
-    animations().forEach(function (animation) {
-      if (!prefs.playing && (animation.playState === 'running' || animation.playState === 'pending')) animation.pause();
-      else if (prefs.playing && animation.playState === 'paused') animation.play();
-    });
-    if(canvasController){canvasController.setPrefs({intensity:prefs.intensity,tempo:prefs.tempo});if(prefs.playing)canvasController.play();else canvasController.pause();}
+  function now(){return view && view.performance ? view.performance.now() : Date.now();}
+  function remember(){
+    owned=animations();
+    snapshot={times:owned.map(function(animation){return animation.currentTime || 0;}),at:now(),playing:prefs.playing && !reduced};
   }
-  Array.from(root.querySelectorAll('[data-nsp-light]')).forEach(function (button) { button.onclick=function () { prefs.intensity=button.getAttribute('data-nsp-light');apply(); }; });
-  Array.from(root.querySelectorAll('[data-nsp-tempo]')).forEach(function (button) { button.onclick=function () { prefs.tempo=button.getAttribute('data-nsp-tempo');apply(); }; });
-  Array.from(root.querySelectorAll('[data-nsp-action]')).forEach(function (button) { button.onclick=function () {
-    var action=button.getAttribute('data-nsp-action');
-    if (action === 'replay') { prefs.playing=true;if(canvasController)canvasController.replay();finiteAnimations().forEach(function (animation) { animation.cancel();animation.play(); }); }
-    else prefs.playing=action === 'play';
-    apply();
-  }; });
-  host._nspstoryRefreshControls=function(reduced){
-    var status=root.querySelector('.nspstory-playback-status');if(status)status.textContent=reduced?'Reduced motion · still':'Motion';
-    Array.from(root.querySelectorAll('[data-nsp-action]')).forEach(function(button){button.disabled=reduced;});
-  };
-  host._nspstoryRefreshControls(!!(canvasController && !canvasController.canAnimate()));
+  function apply() {
+    if (retired) return;
+    var ambient=root.querySelector('.nspstory-ambient');
+    root.setAttribute('data-live-intensity',prefs.intensity);
+    root.setAttribute('data-live-tempo',prefs.tempo);
+    root.setAttribute('data-playing',String(prefs.playing && !reduced));
+    root.setAttribute('data-reduced-motion',String(reduced));
+    if (ambient) {
+      NSPSTORY_AMBIENT_INTENSITIES.forEach(function(value){ambient.classList.toggle('nspstory-ambient-'+value,value===prefs.intensity);});
+      NSPSTORY_AMBIENT_TEMPOS.forEach(function(value){ambient.classList.toggle('nspstory-ambient-'+value,value===prefs.tempo);});
+    }
+    buttons.forEach(function(button){
+      var light=button.getAttribute('data-nsp-light'),tempo=button.getAttribute('data-nsp-tempo'),action=button.getAttribute('data-nsp-action');
+      if (light) button.setAttribute('aria-pressed',String(light===prefs.intensity));
+      if (tempo) button.setAttribute('aria-pressed',String(tempo===prefs.tempo));
+      if (action) {
+        button.disabled=reduced || root.getAttribute('data-ambient')==='off';
+        if(action!=='replay')button.setAttribute('aria-pressed',String(action===(prefs.playing && !reduced?'play':'pause')));
+      }
+    });
+    var status=root.querySelector('.nspstory-playback-status');
+    if(status)status.textContent=reduced?'Reduced motion · still':'Motion';
+    animations().forEach(function(animation){
+      if(!prefs.playing || reduced)animation.pause();
+      else if(animation.playState==='paused')animation.play();
+    });
+  }
+  root.setAttribute('data-motion-live','true');
   apply();
+  // CSS timelines are rebuilt synchronously after lifecycle cleanup. Restore
+  // their time before painting, including on tab return and same-phase settling.
+  if(memory && memory.scene===scene)animations().forEach(function(animation,i){
+    if(memory.times[i]!=null)animation.currentTime=memory.times[i];
+  });
+  remember();
+  buttons.forEach(function(button){button.onclick=function(){
+    if(retired)return;
+    var light=button.getAttribute('data-nsp-light'),tempo=button.getAttribute('data-nsp-tempo'),action=button.getAttribute('data-nsp-action');
+    if(light)prefs.intensity=light;
+    if(tempo)prefs.tempo=tempo;
+    if(action && !reduced){
+      prefs.playing=action!=='pause';
+      if(action==='replay')animations().forEach(function(animation){animation.currentTime=0;});
+    }
+    apply();
+    remember();
+  };});
+  function changed(){if(retired)return;reduced=!!media.matches;apply();remember();}
+  if(media){if(media.addEventListener)media.addEventListener('change',changed);else if(media.addListener)media.addListener(changed);}
+  host._panelMotionCleanup=function(){
+    if(retired)return;
+    retired=true;
+    var active=animations(),elapsed=snapshot.playing?Math.max(0,now()-snapshot.at):0;
+    // Tab visibility may cancel CSS animations before the panel's cleanup runs.
+    // Recover their clock from the last controls/mount snapshot in that case.
+    host._nspstoryMotion={scene:scene,times:active.length?active.map(function(animation){return animation.currentTime;}):snapshot.times.map(function(time){return time+elapsed;})};
+    root.setAttribute('data-motion-live','false');
+    owned.concat(active).forEach(function(animation){animation.cancel();});
+    // Commit removal of the CSS animation before a synchronous remount.
+    if(root.getBoundingClientRect)root.getBoundingClientRect();
+    buttons.forEach(function(button){button.onclick=null;});
+    if(media){if(media.removeEventListener)media.removeEventListener('change',changed);else if(media.removeListener)media.removeListener(changed);}
+  };
 }
 function nspstoryPrintFrame(m) {
   var phases={reporter:3,dilution:3,origin:3,evidence:1};
   var headings={reporter:'Reading frame → GFP → sequence check',dilution:'Dilution outcomes + selection boundary',origin:'Source → recipient · proposed, unresolved',evidence:'Published HCoV-OC43 comparison'};
   var copy=Object.assign({},m,{phase:phases[m.scene],heading:headings[m.scene],print:true});
   var draw={reporter:nspstoryReporter,dilution:nspstoryDilution,origin:nspstoryOrigin,evidence:nspstoryEvidence};
-  return '<svg class="nspstory-frame nspstory-print-frame" viewBox="0 0 760 410" role="img" aria-label="Print summary: ' + esc(headings[m.scene]) + '"><title>Print summary: ' + esc(headings[m.scene]) + '</title><g aria-hidden="true">' +
+  return '<svg class="nspstory-frame nspstory-print-frame" viewBox="'+nspstoryViewBox(m)+'" role="img" aria-label="Print summary: ' + esc(headings[m.scene]) + '"><title>Print summary: ' + esc(headings[m.scene]) + '</title><g aria-hidden="true">' +
     nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NOT TO SCALE','kicker') +
-    nspstoryText(24,61,copy.heading,'heading') + draw[m.scene](copy) + '</g></svg>';
+    (m.scene==='reporter'?nspstoryScene(copy):nspstoryText(24,61,copy.heading,'heading') + draw[m.scene](copy)) + '</g></svg>';
 }
-function nspstoryHTML(panel, state, animate) {
-  var m = nspstoryModel(panel, state);
+function nspstoryViewBox(m){return m.scene==='reporter'?'0 0 560 610':'0 0 760 410';}
+function nspstorySummary(m) {
+  return m.aria+(m.scene==='reporter'?' '+nspstoryReporterReading(m.phase).summary:m.scene==='dilution'?' Fixed illustrative 3 by 3 field: wells 1, 5 and 9 are candidates; wells 2, 6 and 7 are empty; wells 3, 4 and 8 are mixed.':'');
+}
+function nspstoryScene(m) {
   var draw = {reporter:nspstoryReporter, dilution:nspstoryDilution, origin:nspstoryOrigin, evidence:nspstoryEvidence};
-  var screen=m.scene!=='evidence' ? nspstoryCanvasFrame(m) : '<svg class="nspstory-frame nspstory-screen-frame" viewBox="0 0 760 410" role="img" aria-label="' + esc(m.aria) + '"><title>' + esc(m.aria) + '</title><g aria-hidden="true">' +
-    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NO MOLECULAR TIMESCALE','kicker') +
-    nspstoryText(24,66,m.heading,m.scene === 'origin' ? 'editorial' : 'heading') + nspstoryAmbient(m) + draw[m.scene](m) + '</g></svg>';
-  return '<div class="nspstory' + (animate ? ' nspstory-motion' : '') + '" data-scene="' + m.scene + '" data-phase="' + m.phase + '" data-ambient="' + (m.ambient?'on':'off') + '" data-ambient-intensity="' + m.ambientIntensity + '" data-ambient-tempo="' + m.ambientTempo + '">' +
+  if(m.scene==='reporter'){
+    var lines=m.print?['Reading frame → GFP','→ sequence check']:[['Read the message','three letters at a time.'],['A rare length change','restores the reading frame.'],['The trait can travel','with a virus lineage.'],['Green is a clue.','Sequence is the check.']][m.phase];
+    return nspstoryText(24,64,lines[0],'heading')+nspstoryText(24,94,lines[1],'heading')+draw.reporter(m);
+  }
+  return nspstoryText(24,66,m.heading,m.scene === 'origin' ? 'editorial' : 'heading') + draw[m.scene](m);
+}
+function nspstoryHTML(panel, state) {
+  var m = nspstoryModel(panel, state), summary=nspstorySummary(m);
+  var screen='<svg class="nspstory-frame nspstory-screen-frame" viewBox="'+nspstoryViewBox(m)+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + esc(summary) + '"><title>' + esc(summary) + '</title>' +
+    '<g aria-hidden="true">' +
+    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':m.scene==='reporter'?'ILLUSTRATIVE · NO MOLECULAR TIMESCALE':'ILLUSTRATIVE / CONCEPTUAL · NO MOLECULAR TIMESCALE','kicker') +
+    '<g class="nspstory-scene">'+nspstoryScene(m)+'</g>'+nspstoryAmbient(m)+'</g></svg>';
+  return '<div class="nspstory" data-scene="' + m.scene + '" data-phase="' + m.phase + '" data-ambient="' + (m.ambient?'on':'off') + '" data-ambient-intensity="' + m.ambientIntensity + '" data-ambient-tempo="' + m.ambientTempo + '">' +
     screen + nspstoryControls(m) + nspstoryPrintFrame(m) +
     '<p class="nspstory-caption">' + esc(m.caption || m.aria) + '</p></div>';
+}
+function nspstoryPatch(host,m) {
+  var root=host.querySelector && host.querySelector('.nspstory');
+  if(!root || root.getAttribute('data-scene')!==m.scene ||
+    root.getAttribute('data-ambient')!==(m.ambient?'on':'off'))return false;
+  var frame=root.querySelector('.nspstory-screen-frame');
+  if(root.getAttribute('data-phase')!==String(m.phase)) {
+    // Complete authored geometry replaces only the lesson layer in one task.
+    // The SVG viewport, ambient layer, controls, focus and disclosure persist.
+    root.querySelector('.nspstory-scene').innerHTML=nspstoryScene(m);
+    root.setAttribute('data-phase',String(m.phase));
+  }
+  frame.setAttribute('aria-label',nspstorySummary(m));
+  frame.querySelector('title').textContent=nspstorySummary(m);
+  root.querySelector('.nspstory-caption').textContent=m.caption || m.aria;
+  return true;
 }
 PanelRegistry.define('nspstory', {
   label:'NSP15 evidence story', since:'0.2.0', order:51,
@@ -436,13 +352,13 @@ PanelRegistry.define('nspstory', {
   },
   validatePatch:function(patch,path,panel,warnings) { nspstoryClean(patch,path,warnings,true); },
   fold:function(panel,steps) { return foldSanitizedPanelStates(panel,steps,function(raw,once) { return nspstoryClean(raw,'state',null,once); }); },
-  render:function(host,panel,state,skin,states,step,animate) { var model=nspstoryModel(panel,state);return {html:nspstoryHTML(panel,state,animate),remountAfterMotionCancel:model.scene!=='evidence',mounted:function () { if(model.scene!=='evidence')nspstoryMountCanvas(host,panel,model);nspstoryBindControls(host,panel); }}; },
+  render:function(host,panel,state) { var model=nspstoryModel(panel,state);return {html:nspstoryHTML(panel,state),patch:function(){return nspstoryPatch(host,model);},mounted:function () { nspstoryBindControls(host,panel); }}; },
   layout:{height:11,fallbackHeight:11,canvasSizing:{mode:'fixed-aspect',aspect:760/410,resizeAxis:'width'},sectionSizing:{minWidth:480,preferredWidth:760,maxWidth:1400,aspectPolicy:'fixed',bodyAspect:760/410,grow:1,contentSelector:'.nspstory-frame',ancillarySelector:'.nspstory-caption'}},
   authoring:{initialFields:true,transientFields:NSPSTORY_FIELDS.slice(),
     template:{title:'NSP15 evidence lesson',scene:'reporter',ambient:true,ambientIntensity:'quiet',ambientTempo:'slow',initial:{phase:0}},
     setupFields:[['scene','enum',NSPSTORY_SCENES],['ambient','bool'],['ambientIntensity','enum',NSPSTORY_AMBIENT_INTENSITIES],['ambientTempo','enum',NSPSTORY_AMBIENT_TEMPOS],['initial','json']],patchFields:[['phase','num'],['caption','text']],
-    fieldMeta:{scene:{label:'Lesson'},ambient:{label:'Ambient atmosphere',help:'Decorative background motion only; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity'},ambientTempo:{label:'Ambient tempo'},phase:{label:'Lesson phase (0–3)',help:'Four authored frames per lesson. Animation explains the frame; it does not simulate biology.'},caption:{label:'Evidence and limits'}},
-    picker:{order:51,name:'NSP15 evidence story',category:'Science & sequencing',tagline:'Four animated preprint lessons',description:'Sequence-free reporter, dilution and source inference cartoons plus the published HCoV-OC43 comparison. Each lesson has four phases and a still state.'},
+    fieldMeta:{scene:{label:'Lesson'},ambient:{label:'Ambient atmosphere',help:'Decorative background motion only; it never changes evidence or teaches a biological timescale.'},ambientIntensity:{label:'Ambient intensity'},ambientTempo:{label:'Ambient tempo'},phase:{label:'Lesson phase (0–3)',help:'Four complete authored frames per lesson. Steps change the explanation directly; motion is decorative only.'},caption:{label:'Evidence and limits'}},
+    picker:{order:51,name:'NSP15 evidence story',category:'Science & sequencing',tagline:'Four SVG preprint lessons',description:'Sequence-free reporter, dilution and source inference cartoons plus the published HCoV-OC43 comparison. Each lesson has four phases and a still state.'},
     example:function(sample) { sample.state={phase:2}; return sample; }
   },
   styles:String.raw`
@@ -451,7 +367,10 @@ PanelRegistry.define('nspstory', {
 .nspstory{--ns-ink:#20354a;--ns-muted:#596b7a;--ns-line:#ccd9df;--ns-paper:#fffefa;--ns-zone:#f2f6f5;--ns-green:#19865b;--ns-violet:#7163a8;color:var(--ns-ink);min-width:0;min-height:0;flex:1;display:flex;flex-direction:column;position:relative;scroll-margin-top:112px}
 .nspstory[data-scene="reporter"],.nspstory[data-scene="dilution"],.nspstory[data-scene="origin"]{--ns-ink:#eefbff;--ns-muted:#a7bdc8;--ns-line:#2b4653;--ns-paper:#06131c;--ns-zone:#0b202a;--ns-green:#55e49c;--ns-violet:#a993ff}
 .nspstory-frame{display:block;width:100%;min-height:0;flex:1 1 auto;background:var(--ns-paper);border:1px solid var(--ns-line);border-radius:15px;box-sizing:border-box;overflow:hidden}.nspstory[data-scene="dilution"] .nspstory-screen-frame,.nspstory[data-scene="origin"] .nspstory-screen-frame{background:radial-gradient(circle at 23% 41%,#143d3b 0,#081c27 22%,transparent 45%),radial-gradient(circle at 78% 45%,#261b45 0,#10172d 24%,transparent 46%),linear-gradient(145deg,#030811,#071725 58%,#090c1b);border:0;border-radius:0}
-.nspstory-canvas-frame{position:relative;background:#030d18!important}.nspstory-canvas{display:block;width:100%;height:100%}.nspstory-a11y,.nspstory-canvas-outcome{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.nspstory-screen-frame{aspect-ratio:760/410}.nspstory[data-scene="reporter"] .nspstory-screen-frame{background:radial-gradient(ellipse at 86% 45%,#123b35,#06131c 58%)}
+.nspstory[data-scene="reporter"] .nspstory-frame{flex:none;height:auto;aspect-ratio:560/610}
+.nspstory[data-scene="reporter"] .nspstory-small{font-size:16px}.nspstory[data-scene="reporter"] .nspstory-kicker{font-size:14px;letter-spacing:.015em}.nspstory[data-scene="reporter"] .nspstory-heading{font-size:27px}.nspstory[data-scene="reporter"] .nspstory-label{font-size:18px}
+.nspstory[data-scene="reporter"] .nspstory-caption{box-sizing:border-box;min-height:calc(4.35em + 20px)}
 .nspstory-print-frame{display:none}
 .docview:has(#section-green-reporter) .stepline.dv-caption-old{display:none}.docview:has(#section-green-reporter) .stepline.dv-caption-new{animation:none}
 .docview:has(#section-green-reporter) .stepline .stepid{display:none}
@@ -507,6 +426,7 @@ PanelRegistry.define('nspstory', {
 .nspstory-value{font:600 16px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
 .nspstory-contrast{font:600 14px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
 .nspstory-zone,.nspstory-band{fill:var(--ns-zone)}
+.nspstory-reading-active{stroke:var(--ns-green);stroke-width:1.4}
 .nspstory-reading-group{fill:var(--ns-paper);stroke:var(--ns-line);stroke-width:1}
 .nspstory-added-symbol{fill:none;stroke:var(--ns-ink);stroke-width:1.5}
 .nspstory-arrow{stroke:var(--ns-muted);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -523,7 +443,7 @@ PanelRegistry.define('nspstory', {
 .nspstory-match{stroke:#e6ad50;stroke-width:2.5;stroke-dasharray:7 7;fill:none}.nspstory-proposed rect{fill:#332614;stroke:#e2a944}.nspstory-proposed text{fill:#ffd58b}
 .nspstory-fragment-line{stroke:var(--ns-violet);stroke-width:10;stroke-linecap:round}.nspstory-fragment-pattern{stroke:#eee6ff;stroke-width:2;stroke-linecap:round}
 .nspstory-gridline{stroke:#dfe5e9;stroke-width:1}.nspstory-row-focus{fill:#e7f2ec;fill-opacity:.65}.nspstory-wt{fill:#248a6a}.nspstory-inactive{fill:#9775b9}.nspstory-emphasis{fill:none;stroke:var(--ns-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.nspstory-ambient{pointer-events:none;opacity:.16;--nsp-ambient-primary:14s;--nsp-ambient-secondary:18s}.nspstory-ambient-medium{opacity:.3}.nspstory-ambient-lively{opacity:.48}.nspstory-ambient-normal{--nsp-ambient-primary:10s;--nsp-ambient-secondary:13s}.nspstory-ambient-fast{--nsp-ambient-primary:6.5s;--nsp-ambient-secondary:8.5s}.nspstory-ambient-line,.nspstory-ambient-ring{fill:none;stroke:#66d6ad;stroke-width:1.4;stroke-linecap:round}.nspstory-ambient-ring{stroke:#718bb8;stroke-dasharray:3 9}.nspstory-ambient-dot{fill:#71e4b4}
+.nspstory-ambient{pointer-events:none;opacity:.38;--nsp-ambient-primary:8s;--nsp-ambient-secondary:11s}.nspstory-ambient-medium{opacity:.65;filter:drop-shadow(0 0 4px #63d6bb)}.nspstory-ambient-lively{opacity:.95;filter:drop-shadow(0 0 9px #63d6bb)}.nspstory-ambient-normal{--nsp-ambient-primary:5s;--nsp-ambient-secondary:7s}.nspstory-ambient-fast{--nsp-ambient-primary:2.8s;--nsp-ambient-secondary:4s}.nspstory-ambient-line,.nspstory-ambient-ring{fill:none;stroke:#66d6ad;stroke-width:1.4;stroke-linecap:round}.nspstory-ambient-ring{stroke:#718bb8;stroke-dasharray:3 9}.nspstory-ambient-dot{fill:#71e4b4}
 .nspstory-controls{position:absolute;z-index:3;right:12px;bottom:48px;display:flex;align-items:center;gap:7px;padding:6px 7px;border:1px solid #5d839866;border-radius:13px;background:#030a12f2;color:#bad0d9;box-shadow:0 8px 28px #0008}.nspstory-choice{display:flex;align-items:center;gap:2px}.nspstory-choice>span{margin:0 3px 0 0;font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:#7895a4}.nspstory-choice button{appearance:none;border:1px solid transparent;border-radius:7px;padding:6px 4px;background:transparent;color:#b4c9d2;font:600 10px/1 'IBM Plex Mono',monospace;cursor:pointer}.nspstory-choice button:hover{border-color:#527182;color:#eefbff}.nspstory-choice button[aria-pressed="true"]{border-color:#61d9ae78;background:#173c38;color:#9bffda}.nspstory-choice button:disabled{cursor:default;opacity:.42}.nspstory-playback{padding-left:7px;border-left:1px solid #35515f}.nspstory-disclosure{position:absolute;z-index:4;left:12px;bottom:49px;width:165px;color:#a9c0ca;font:11px/1.4 'IBM Plex Sans',sans-serif}.nspstory-disclosure summary{display:inline-flex;align-items:center;min-height:31px;padding:0 10px;border:1px solid #50718466;border-radius:10px;background:#040c14f5;color:#d2e1e6;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.03em;cursor:pointer;list-style:none}.nspstory-disclosure summary::-webkit-details-marker{display:none}.nspstory-disclosure[open]>div{position:absolute;left:0;bottom:38px;width:265px;display:grid;gap:7px;padding:12px;border:1px solid #52728480;border-radius:12px;background:#04101bf8;box-shadow:0 14px 38px #000b}.nspstory-disclosure strong{color:#f0f8fb;font:600 15px/1.2 Georgia,'Times New Roman',serif}.nspstory-disclosure span{display:block}.nspstory-disclosure b{color:#70e6b1}
 .nspstory-motion .nspstory-screen-frame .nspstory-arrive{animation:nspArrive .75s cubic-bezier(.22,.7,.2,1) both}
 .nspstory-motion .nspstory-screen-frame .nspstory-switch{animation:nspSwitch .6s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-descendant{animation:nspDescendant .8s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-descendant.nspstory-later{animation-delay:.14s}
@@ -532,7 +452,8 @@ PanelRegistry.define('nspstory', {
 .nspstory-motion .nspstory-screen-frame .nspstory-reveal,.nspstory-motion .nspstory-screen-frame .nspstory-boundary{animation:nspReveal .4s ease both}
 .nspstory-motion .nspstory-screen-frame .nspstory-proposal-beat{animation:nspProposal .3s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-fragment{animation:nspFragment 1.4s cubic-bezier(.25,.55,.35,1) .3s both}
 .nspstory-motion .nspstory-screen-frame .nspstory-row-focus{animation:nspRowFocus .18s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-emphasis{animation:nspEmphasis .5s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-contrast{animation:nspReveal .2s ease .5s both}
-.nspstory-screen-frame .nspstory-ambient-primary{animation:nspAmbientDrift var(--nsp-ambient-primary) ease-in-out infinite alternate}.nspstory-screen-frame .nspstory-ambient-secondary{animation:nspAmbientDrift var(--nsp-ambient-secondary) ease-in-out -3s infinite alternate}
+.nspstory[data-motion-live="true"] .nspstory-screen-frame .nspstory-ambient-primary{animation:nspAmbientDrift var(--nsp-ambient-primary) ease-in-out -2s infinite alternate}.nspstory[data-motion-live="true"] .nspstory-screen-frame .nspstory-ambient-secondary{animation:nspAmbientDrift var(--nsp-ambient-secondary) ease-in-out -3s infinite alternate}
+.nspstory[data-playing="false"] .nspstory-screen-frame *{animation-play-state:paused!important}
 @keyframes nspArrive{from{transform:translateX(-104px)}to{transform:translateX(0)}}
 @keyframes nspSwitch{from{opacity:.35}to{opacity:1}}
 @keyframes nspDescendant{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
@@ -543,7 +464,7 @@ PanelRegistry.define('nspstory', {
 @keyframes nspFragment{from{transform:translateX(-462px)}to{transform:translateX(0)}}
 @keyframes nspRowFocus{from{opacity:0}to{opacity:1}}
 @keyframes nspEmphasis{from{stroke-dasharray:0 600}to{stroke-dasharray:600 0}}
-@keyframes nspAmbientDrift{from{transform:translate(-3px,2px);opacity:.45}to{transform:translate(4px,-3px);opacity:1}}
+@keyframes nspAmbientDrift{from{transform:translate(-18px,10px);opacity:.35}to{transform:translate(22px,-14px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.nspstory *{animation:none!important;transition:none!important}.nspstory-playback{opacity:.58}}
 @media print{.docview:has(#section-green-reporter){--dink:#111;--dtext:#333;--dfaint:#555}}
 @media print{#section-analysis-ladder .pwidget[data-dv-panel="0"] .swtable tr{background:#fff!important;box-shadow:none!important;border-color:#777!important}}

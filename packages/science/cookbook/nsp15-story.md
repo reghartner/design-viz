@@ -20,22 +20,23 @@ Decorative atmosphere is an explicit setup choice: `ambient` enables it,
 `ambientIntensity` accepts `quiet | medium | lively`, and `ambientTempo`
 accepts `slow | normal | fast`. These settings visibly change only decorative
 background rings, particles, and field drift; they never move evidence bars,
-well outcomes, or the proposed source-to-recipient transit, and never replay a
-teaching beat. Reduced motion and print suppress the drift regardless of the
+well outcomes, or the proposed source-to-recipient relationship. Reduced motion
+and print suppress the drift regardless of the
 authored setting.
 
 The reporter, dilution and origin reader stages expose those settings as persistent
 presentation controls: **Quiet / Glow / Bloom** map to
 `quiet / medium / lively`, and **Gentle / Normal / Brisk** map to
-`slow / normal / fast`. Play, pause, and replay act on presentation motion only;
+`slow / normal / fast`. **Play**, **Pause**, and **Restart motion** act on
+decorative motion only; restarting resets its clock, while
 the authored phase, symbolic identities, well outcomes, evidence, and claim
-limits do not change. **Evidence + scene limits** opens a compact disclosure on
-the stage, while the Evidence panel immediately below retains the raw source
+limits do not change. **Evidence + limits** opens a compact disclosure on
+the stage, while the adjacent Evidence panel retains the raw source
 reading.
 
-- Reporter: arrival → rare GFP restoration → newly infected descendants →
+- Reporter: shifted reading frame → rare GFP restoration → newly infected descendants →
   sequence check. Cells fluoresce; the virus particle does not.
-- Dilution: dense mixed culture → one finite fan into nine illustrative wells →
+- Dilution: dense mixed culture → nine fixed illustrative well outcomes →
   candidate follow and sequence-check → reporter selection boundary. Every
   well is labeled empty, mixed, or candidate; shapes represent lineages. A
   single-looking candidate is not proof. The scene supplies no protocol,
@@ -43,31 +44,34 @@ reading.
 - Origin: matching source + recipient insertion → distal relationship → inferred
   origin → proposed fragment transit. Solid marks carry the observed sequence
   relationship; the source boundary is conceptual, the connector is dashed,
-  and the amber `PROPOSED / NOT OBSERVED` badge remains visible. The one moving
-  fragment is explicitly illustrative; incorporation is unresolved.
+  and the amber `PROPOSED / NOT OBSERVED` badge remains visible. The highlighted
+  fragment represents proposed transfer; incorporation is unresolved.
 - Evidence: all → distal → tandem → median size. Bars use the published
   HCoV-OC43 rounded cpm on one linear scale. Every bar keeps its published
-  width and label at every animation sample; only the current comparison
-  emphasis moves. The ≥11 nt mapped subsets do not
+  width and label at every step; only the current comparison
+  emphasis changes. The ≥11 nt mapped subsets do not
   partition the ≥2 nt total. This panel is specific to this paper's numbers.
 
-Teaching beats are finite and phase-specific; later teaching phases do not
-replay earlier arrival, reveal, separation, or transfer beats. Reduced motion
-shows the selected frame immediately. Print replaces it with a deterministic,
+Teaching phases switch directly between complete SVG states without entrance
+fades. The SVG viewport, decorative layer and control dock persist across steps.
+Reduced motion shows the selected frame immediately. Print replaces it with a deterministic,
 complete lesson summary independent of the selected phase. No scripts,
 requests, sequences, timers, or experimental parameters are supplied by a
 spec. Authoring acceptance is desktop only.
 
 The eight-tab example renders only the active chapter. Reporter, Separate and
-Find source use a bounded Canvas 2D stage with a persistent control dock and
+Find source use proportional SVG stages with a persistent control dock and
 an adjacent evidence panel. Decorative particles continue while Play is active;
-tempo changes only that atmosphere, never the finite teaching timeline. The
-shared panel lifetime cancels frames and observers on tab departure or destroy.
+tempo changes only that atmosphere, never the authored teaching state. The
+panel lifetime cancels CSS animations and removes its motion-preference listener
+on tab departure or destroy. Returning restores settings and the decorative
+clock without replaying an entrance. These panels allocate no Canvas, image,
+observer or JavaScript animation-frame loop.
 The remaining chapters use an illuminated five-station reading ladder, literal
 comparison bars, clearly separate datasets, and paired evidence/boundary cards.
 Sources stays static. Collapsed introductions keep the desktop stage prominent;
 all prose remains available from the section disclosure. Print uses complete,
-deterministic SVG lesson summaries instead of the live Canvas.
+deterministic SVG lesson summaries instead of the selected screen phase.
 
 The editable example is
 `packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json`;

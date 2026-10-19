@@ -35,14 +35,14 @@ function nspstoryModel(panel, state) {
       ['A rare change restores the green signal.', 'A frame-restoring change permits GFP in an infected cell; the particle is not green.'],
       ['The trait can travel with a virus lineage.', 'Newly infected cells can inherit the reporter phenotype through a virus lineage. A green culture can still be mixed.'],
       ['Green is a clue. Sequence is the check.', 'Both WT and inactive NSP15 yielded green isolates. Insertions were found in 8 of 18 examined WT isolates; no inserts greater than 2 nt in the inactive group.']],
-    dilution:[['One glowing culture can hide a mixture.', 'Several symbolic lineages occupy one culture. Green signal does not prove a single lineage.'],
-      ['Fewer founders make lineages separable.', 'Illustrative cultures receive one, several or zero founders. Occupancy remains uncertain.'],
-      ['Follow the trait, then read the change.', 'A separated positive lineage is followed and its reporter sequence checked.'],
+    dilution:[['Make a crowd easier to follow.', 'A dense symbolic mixture can include several lineages. Green signal does not prove a single lineage.'],
+      ['Spread the mixture into illustrative wells.', 'Nine example wells show empty, mixed, or single-looking candidate outcomes. They are not counts, probabilities, or a protocol.'],
+      ['Follow a candidate, then sequence-check.', 'A single-looking well is a candidate, not proof. The recovered reporter region is sequence-checked.'],
       ['The green screen sees only a selected slice.', 'Reporter-restoring variants are selected. Other changes remain outside this screen.']],
-    origin:[['Nearby copy or distant match?', 'Tandem means a neighboring duplication; distal means a matching source elsewhere.'],
-      ['The matching source is far away.', 'A distant source and an insertion site are linked by a sequence match, not direct observation of transfer.'],
-      ['Matching is evidence of origin.', '87 percent of WT inserts at least 11 nt map to the virus. A source match is inferred.'],
-      ['Proposed: a fragment becomes an insertion.', 'Proposed fragment generation and insertion elsewhere. The incorporation mechanism is unresolved.']],
+    origin:[['Read the source and the unexpected patch.', 'Solid marks show a matching source and the observed recipient insertion. The apparent source boundary is only conceptual.'],
+      ['A separated match defines the distal class.', 'The source and recipient are linked by sequence matching, not direct observation of fragment transfer.'],
+      ['Matching supports an inferred origin.', '87 percent of WT inserts at least 11 nt map to the virus. A source match is inferred.'],
+      ['Proposed transit, not an observed mechanism.', 'A dashed inference and moving fragment illustrate the proposed model. Incorporation remains unresolved.']],
     evidence:[['All insertions: fewer with inactive NSP15.', 'HCoV-OC43 all insertions at least 2 nt: WT 33.9 versus inactive NSP15 6.93 cpm.'],
       ['Distal insertions show the strongest loss.', 'HCoV-OC43 mapped distal inserts at least 11 nt: WT 16.7 versus inactive NSP15 0.2 cpm, reported 84-fold contrast.'],
       ['Nearby duplications do not show that loss.', 'HCoV-OC43 mapped tandem inserts at least 11 nt: WT 0.98 versus inactive NSP15 0.99 cpm.'],
@@ -84,45 +84,57 @@ function nspstoryReporter(m) {
   h += nspstoryText(38, 356, footer, 'small');
   return h;
 }
-function nspstoryToken(x, y, shape, cls, fromX, fromY) {
-  var glyph = shape === 0 ? '<circle r="10"/>' : shape === 1 ? '<rect x="-9" y="-9" width="18" height="18" rx="3"/>' : '<path d="M0,-11L11,9H-11Z"/>';
+function nspstoryToken(x, y, shape, cls, fromX, fromY, size) {
+  size = size || 10;
+  var glyph = shape === 0 ? '<circle r="' + size + '"/>' : shape === 1 ? '<rect x="-' + (size - 1) + '" y="-' + (size - 1) + '" width="' + (size - 1) * 2 + '" height="' + (size - 1) * 2 + '" rx="3"/>' : '<path d="M0,-' + (size + 1) + 'L' + (size + 1) + ',' + (size - 1) + 'H-' + (size + 1) + 'Z"/>';
   return '<g transform="translate(' + x + ',' + y + ')"><g class="nspstory-token nspstory-token-' + shape + ' ' + (cls || '') + '" style="--nsp-dx:' + (fromX || 0) + 'px;--nsp-dy:' + (fromY || 0) + 'px">' + glyph + '</g></g>';
 }
 function nspstoryDilution(m) {
-  var h = '', phase = m.phase;
-  h += '<circle class="nspstory-culture nspstory-positive" cx="118" cy="199" r="70"/>';
-  [[94,179,0],[127,174,1],[100,217,2],[140,210,0]].forEach(function (p) { h += nspstoryToken(p[0],p[1],p[2]); });
-  h += nspstoryText(118, 299, 'Mixed + green-positive', 'label', 'middle');
-  h += nspstoryText(118, 322, 'Shapes = lineages', 'small', 'middle');
-  h += nspstoryArrow('M209,199H270m-10,-7 10,7 -10,7', phase === 0 ? 'nspstory-faint' : '');
-  [[350,'One founder'],[501,'Still mixed'],[652,'No founder']].forEach(function (p,i) {
-    h += '<circle class="nspstory-culture ' + (phase > 0 && i < 2 ? 'nspstory-positive' : '') + '" cx="' + p[0] + '" cy="199" r="57"/>';
-    h += nspstoryText(p[0], 289, phase === 0 ? 'Possible culture' : p[1], 'label', 'middle');
-    if (phase > 0 && i < 2) h += nspstoryToken(p[0],199,0,phase === 1 && !m.print ? 'nspstory-separate' : '',118-p[0],0);
-    if (phase > 0 && i === 1) h += nspstoryToken(p[0]+24,218,1,phase === 1 && !m.print ? 'nspstory-separate nspstory-later' : '',118-p[0]-24,-19);
-    if (phase > 0 && i === 2) h += nspstoryText(p[0], 205, '∅', 'empty', 'middle');
+  var h = '', phase = m.phase, crowdX = 122, crowdY = 214;
+  h += '<g class="nspstory-crowd"><circle class="nspstory-crowd-halo" cx="' + crowdX + '" cy="' + crowdY + '" r="92"/><circle class="nspstory-culture nspstory-positive" cx="' + crowdX + '" cy="' + crowdY + '" r="72"/>';
+  [[88,176,0],[115,169,1],[143,177,2],[166,196,0],[84,211,1],[115,205,2],[143,216,0],[166,231,1],[91,241,2],[119,244,0],[146,253,1],[105,276,2],[132,272,0],[69,229,0],[154,158,1],[73,191,2]].forEach(function (p) { h += nspstoryToken(p[0],p[1],p[2],'',0,0,6); });
+  h += '</g>' + nspstoryText(crowdX, 319, 'MIXED CROWD', 'kicker', 'middle') + nspstoryText(crowdX, 339, 'shapes = symbolic lineages', 'small', 'middle');
+  h += '<g class="nspstory-fan ' + (phase === 0 ? 'nspstory-faint' : '') + '"><path d="M212,182C268,154 294,132 329,124"/><path d="M218,214H329"/><path d="M212,246C268,274 294,296 329,304"/></g>';
+  h += nspstoryText(514, 91, 'ILLUSTRATIVE OUTCOMES · NOT COUNTS', 'kicker', 'middle');
+  var wells=[
+    {x:366,y:132,state:'candidate',shape:[0]},{x:486,y:132,state:'empty',shape:[]},{x:606,y:132,state:'mixed',shape:[1,2]},
+    {x:366,y:218,state:'mixed',shape:[0,1]},{x:486,y:218,state:'candidate',shape:[2]},{x:606,y:218,state:'empty',shape:[]},
+    {x:366,y:304,state:'empty',shape:[]},{x:486,y:304,state:'mixed',shape:[2,0]},{x:606,y:304,state:'candidate',shape:[1]}
+  ];
+  h += '<g class="nspstory-well-field ' + (phase === 0 ? 'nspstory-preview' : '') + '">';
+  wells.forEach(function (well,i) {
+    var focus=(phase === 2 || m.print) && i === 4;
+    h += '<g class="nspstory-well nspstory-well-' + well.state + (focus ? ' nspstory-candidate-focus' : '') + '" data-well="' + (i + 1) + '" data-state="' + well.state + '"><circle cx="' + well.x + '" cy="' + well.y + '" r="34"/>';
+    if (!well.shape.length) h += nspstoryText(well.x,well.y-3,'—','wellmark','middle');
+    well.shape.forEach(function (shape,j) {
+      var x=well.x+(well.shape.length === 2 ? (j ? 10 : -10) : 0), y=well.y-7;
+      var cls=phase === 1 && !m.print ? 'nspstory-disperse nspstory-spread-' + (i + j) : '';
+      h += nspstoryToken(x,y,shape,cls,crowdX-x,crowdY-y,6);
+    });
+    h += nspstoryText(well.x,well.y+23,well.state,'welllabel','middle') + '</g>';
   });
-  if (phase === 2 || m.print) h += '<g class="' + (phase === 2 && !m.print ? 'nspstory-reveal' : '') + '"><path class="nspstory-check" d="M326,208l17,17 32,-43"/>' + nspstoryText(350, 321, 'Follow + sequence-check', 'small', 'middle') + '</g>';
-  if (phase === 3 || m.print) h += '<rect class="nspstory-selection ' + (phase === 3 && !m.print ? 'nspstory-boundary' : '') + '" x="284" y="132" width="133" height="137" rx="14"/>';
-  h += nspstoryText(26, 365, m.print ? 'Outcomes are illustrative; dilution does not prove one founder. Sequence confirms the selected lineage.' : phase === 3 ? 'Selection boundary: this screen misses changes that do not restore GFP.' : phase === 0 ? 'Green signal says “a reporter-restoring variant is present,” not “all are the same.”' : 'Illustrative possibilities, not probabilities. Dilution never guarantees one founder.', 'small');
+  h += '</g>';
+  if (phase === 2 || m.print) h += '<g class="nspstory-candidate-note ' + (phase === 2 && !m.print ? 'nspstory-reveal' : '') + '"><path class="nspstory-check" d="M455,217l12,12 22,-29"/>' + nspstoryText(656, 312, 'FOLLOW + SEQUENCE-CHECK', 'kicker', 'end') + '</g>';
+  if (phase === 3 || m.print) h += '<rect class="nspstory-selection ' + (phase === 3 && !m.print ? 'nspstory-boundary' : '') + '" x="322" y="96" width="326" height="250" rx="22"/>';
+  h += '<rect class="nspstory-band" x="20" y="354" width="720" height="38" rx="11"/>';
+  h += nspstoryText(38, 379, m.print ? 'Candidate, not proof. Outcomes are illustrative; sequence-check the recovered lineage.' : phase === 3 ? 'Selection caveat · this screen misses changes that do not restore GFP.' : phase === 2 ? 'Single-looking is a candidate, not proof · follow + sequence-check.' : phase === 1 ? 'One dispersion · illustrative outcomes, not probabilities or a protocol.' : 'A green culture may contain several lineages. First, see the crowd.', 'small');
   return h;
 }
 function nspstoryOrigin(m) {
-  var phase = m.phase, h = '', distal = phase > 0;
-  h += nspstoryText(distal ? 28 : 342, 122, distal ? 'Matching source' : 'Neighboring source', 'label');
-  h += nspstoryText(528, 122, 'Recipient / insertion', 'label');
-  h += '<path class="nspstory-rna" d="M36,253H724"/>';
-  h += '<path class="nspstory-source" d="M' + (distal ? '92' : '478') + ',253h62"/>';
-  h += '<path class="nspstory-insert" d="M582,253v-24h62v24"/>';
-  h += '<path class="nspstory-match" d="M' + (distal ? '123' : '509') + ',238Q' + (distal ? '365,4' : '558,126') + ' 613,222"/>';
-  h += nspstoryText(distal ? 28 : 452, distal ? 154 : 173, distal ? 'Distal · separated' : 'Tandem · nearby', 'label');
-  if (phase === 3) {
-    h += '<g class="nspstory-proposed"><rect x="526" y="73" width="201" height="30" rx="8"/>' + nspstoryText(540, 93, 'PROPOSED / NOT OBSERVED', 'kicker') + '</g>';
-    h += '<g transform="translate(613,229)"><g class="nspstory-fragment"><path class="nspstory-fragment-line" d="M-30,0h60"/><path class="nspstory-fragment-pattern" d="M-18,-6v12M0,-6v12M18,-6v12"/></g></g>';
-  }
-  h += nspstoryText(32, 292, 'Abstract RNA · no sequence or site coordinates', 'small');
-  h += '<rect class="nspstory-band" x="20" y="324" width="720" height="53" rx="12"/>';
-  h += nspstoryText(38, 356, phase === 0 ? 'A nearby duplication and a distant match describe different insertion classes.' : phase === 1 ? 'Published median donor–recipient distance: ~10 kb. This drawing is not to scale.' : phase === 2 ? '12,063 / 13,816 WT inserts ≥11 nt map to the virus (87%). Origin is inferred.' : 'The motion illustrates the authors’ model. How incorporation happens is unresolved.', 'small');
+  var phase = m.phase, h = '';
+  h += '<rect class="nspstory-origin-field" x="20" y="83" width="720" height="239" rx="25"/>';
+  h += '<g class="nspstory-proposed ' + (phase === 3 && !m.print ? 'nspstory-proposal-beat' : '') + '"><rect x="526" y="16" width="207" height="29" rx="9"/>' + nspstoryText(542, 36, 'PROPOSED / NOT OBSERVED', 'kicker') + '</g>';
+  h += nspstoryText(54, 119, 'MATCHING SOURCE', 'kicker') + nspstoryText(54, 143, 'solid mark = sequence match', 'small');
+  h += nspstoryText(526, 119, 'RECIPIENT / INSERTION', 'kicker') + nspstoryText(526, 143, 'solid mark = unexpected patch', 'small');
+  h += '<path class="nspstory-rna" d="M48,248C173,231 273,264 383,247S602,229 716,249"/>';
+  h += '<path class="nspstory-source" d="M102,241C126,238 157,239 187,243"/><path class="nspstory-source-pattern" d="M119,230v20M144,229v20M169,232v20"/>';
+  h += '<path class="nspstory-boundary-mark" d="M197,218v50"/>';
+  h += '<path class="nspstory-insert" d="M582,244q29,-7 62,0"/><path class="nspstory-insert-pattern" d="M596,231v22M613,229v22M630,231v22"/>';
+  h += '<path class="nspstory-match" d="M151,222C260,151 481,151 613,222"/>';
+  h += nspstoryText(54, 299, 'inferred boundary / unexpected patch', 'small') + nspstoryText(706, 299, 'dashed = inferred source link', 'small', 'end');
+  if (phase === 3 || m.print) h += '<g transform="translate(613,244)"><g class="nspstory-fragment"><path class="nspstory-fragment-line" d="M-28,0h56"/><path class="nspstory-fragment-pattern" d="M-17,-7v14M0,-7v14M17,-7v14"/></g></g>';
+  h += '<rect class="nspstory-band" x="20" y="341" width="720" height="51" rx="12"/>';
+  h += nspstoryText(38, 372, m.print ? 'Observed match + insertion; proposed transit; incorporation unresolved. Abstract and not to scale.' : phase === 0 ? 'Nearby match = tandem · separated matching source = distal.' : phase === 1 ? 'Published median source–recipient distance: ~10 kb · abstract, not to scale.' : phase === 2 ? '12,063 / 13,816 WT inserts ≥11 nt map to virus (87%) · origin inferred.' : 'One proposed transit · incorporation unresolved; no unique cleavage mechanism is shown.', 'small');
   return h;
 }
 function nspstoryEvidence(m) {
@@ -153,9 +165,9 @@ function nspstoryAmbient(m) {
   var scene=m.scene;
   if(!m.ambient)return '';
   var cls='nspstory-ambient nspstory-ambient-'+m.ambientIntensity+' nspstory-ambient-'+m.ambientTempo;
-  if(scene==='origin')return '<g class="'+cls+'" aria-hidden="true"><path class="nspstory-ambient-line nspstory-ambient-primary" d="M184,193C292,177 430,195 548,177"/><path class="nspstory-ambient-line nspstory-ambient-secondary" d="M196,279C322,267 449,281 548,270"/></g>';
-  if(scene==='dilution')return '<g class="'+cls+'" aria-hidden="true"><path class="nspstory-ambient-line nspstory-ambient-primary" d="M225,112C355,94 518,105 706,121"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="244" cy="151" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="258" cy="244" r="3"/></g>';
-  return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="457" cy="148" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="711" cy="166" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="472" cy="290" r="3"/></g>';
+  if(scene==='origin')return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-primary" cx="292" cy="205" r="76"/><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="478" cy="235" r="58"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="262" cy="112" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="482" cy="309" r="4"/></g>';
+  if(scene==='dilution')return '<g class="'+cls+'" aria-hidden="true"><path class="nspstory-ambient-line nspstory-ambient-primary" d="M227,109C357,82 527,92 706,111"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="248" cy="154" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="284" cy="278" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="692" cy="207" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="665" cy="326" r="2.5"/></g>';
+  return '<g class="'+cls+'" aria-hidden="true"><circle class="nspstory-ambient-ring nspstory-ambient-secondary" cx="314" cy="202" r="102"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="457" cy="148" r="4"/><circle class="nspstory-ambient-dot nspstory-ambient-secondary" cx="711" cy="166" r="3"/><circle class="nspstory-ambient-dot nspstory-ambient-primary" cx="472" cy="290" r="3"/></g>';
 }
 function nspstoryPrintFrame(m) {
   var phases={reporter:3,dilution:3,origin:3,evidence:1};
@@ -163,7 +175,7 @@ function nspstoryPrintFrame(m) {
   var copy=Object.assign({},m,{phase:phases[m.scene],heading:headings[m.scene],print:true});
   var draw={reporter:nspstoryReporter,dilution:nspstoryDilution,origin:nspstoryOrigin,evidence:nspstoryEvidence};
   return '<svg class="nspstory-frame nspstory-print-frame" viewBox="0 0 760 410" role="img" aria-label="Print summary: ' + esc(headings[m.scene]) + '"><title>Print summary: ' + esc(headings[m.scene]) + '</title><g aria-hidden="true">' +
-    nspstoryText(24,28,m.scene==='evidence'?'PUBLISHED COMPARISON / FIXED VALUES':'CONCEPTUAL SUMMARY / NOT TO SCALE','kicker') +
+    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NOT TO SCALE','kicker') +
     nspstoryText(24,61,copy.heading,'heading') + draw[m.scene](copy) + '</g></svg>';
 }
 function nspstoryHTML(panel, state, animate) {
@@ -171,8 +183,8 @@ function nspstoryHTML(panel, state, animate) {
   var draw = {reporter:nspstoryReporter, dilution:nspstoryDilution, origin:nspstoryOrigin, evidence:nspstoryEvidence};
   return '<div class="nspstory' + (animate ? ' nspstory-motion' : '') + '" data-scene="' + m.scene + '" data-phase="' + m.phase + '" data-ambient="' + (m.ambient?'on':'off') + '" data-ambient-intensity="' + m.ambientIntensity + '" data-ambient-tempo="' + m.ambientTempo + '">' +
     '<svg class="nspstory-frame nspstory-screen-frame" viewBox="0 0 760 410" role="img" aria-label="' + esc(m.aria) + '"><title>' + esc(m.aria) + '</title><g aria-hidden="true">' +
-    nspstoryText(24,28,m.scene==='evidence'?'PUBLISHED COMPARISON / ANIMATED READING':'CONCEPTUAL STORY / NO MOLECULAR TIMESCALE','kicker') +
-    nspstoryText(24,61,m.heading,'heading') + draw[m.scene](m) + nspstoryAmbient(m) + '</g></svg>' + nspstoryPrintFrame(m) +
+    nspstoryText(24,28,m.scene==='evidence'?'EVIDENCE / PUBLISHED FIXED VALUES':'ILLUSTRATIVE / CONCEPTUAL · NO MOLECULAR TIMESCALE','kicker') +
+    nspstoryText(24,61,m.heading,'heading') + nspstoryAmbient(m) + draw[m.scene](m) + '</g></svg>' + nspstoryPrintFrame(m) +
     '<p class="nspstory-caption">' + esc(m.caption || m.aria) + '</p></div>';
 }
 PanelRegistry.define('nspstory', {
@@ -198,6 +210,7 @@ PanelRegistry.define('nspstory', {
   styles:String.raw`
 .section-layout-tile>.pt-nspstory{display:flex;flex-direction:column;overflow:hidden}.section-layout-tile>.pt-nspstory>.ptitle{flex:none}.section-layout-tile>.pt-nspstory>.pbody{display:flex;flex:1;min-height:0;flex-direction:column}
 .nspstory{--ns-ink:#20354a;--ns-muted:#596b7a;--ns-line:#ccd9df;--ns-paper:#fffefa;--ns-zone:#f2f6f5;--ns-green:#19865b;--ns-violet:#7163a8;color:var(--ns-ink);min-width:0;min-height:0;flex:1;display:flex;flex-direction:column}
+.nspstory[data-scene="reporter"],.nspstory[data-scene="dilution"],.nspstory[data-scene="origin"]{--ns-ink:#eefbff;--ns-muted:#a7bdc8;--ns-line:#2b4653;--ns-paper:#06131c;--ns-zone:#0b202a;--ns-green:#55e49c;--ns-violet:#a993ff}
 .nspstory-frame{display:block;width:100%;min-height:0;flex:1 1 auto;background:var(--ns-paper);border:1px solid var(--ns-line);border-radius:15px;box-sizing:border-box;overflow:hidden}
 .nspstory-print-frame{display:none}
 .nspstory-caption{font:13px/1.45 'IBM Plex Sans',sans-serif;margin:9px 2px 0;color:var(--dtext);overflow-wrap:anywhere;flex:none}
@@ -212,34 +225,35 @@ PanelRegistry.define('nspstory', {
 .nspstory-particle{fill:#ebe7f6;stroke:var(--ns-violet);stroke-width:2}.nspstory-particle path{fill:none}
 .nspstory-cell ellipse{fill:#e4e9eb;stroke:#94a5ae;stroke-width:2}.nspstory-cell circle{fill:#cbd6da}.nspstory-cell path{fill:none;stroke:#abbac0;stroke-width:2}
 .nspstory-green ellipse{fill:#b6edc8;stroke:var(--ns-green);stroke-width:2.5}.nspstory-green circle{fill:#70c994}.nspstory-green path{stroke:#44a974}
+.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-particle{fill:#1d1a34;stroke:#b5a3ff}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-cell ellipse{fill:#102833;stroke:#587482}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-cell circle{fill:#294451}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-cell path{stroke:#66818c}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-green ellipse{fill:#10372c;stroke:#5ce7a1}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-green circle{fill:#2e9366}.nspstory[data-scene="reporter"] .nspstory-screen-frame .nspstory-green path{stroke:#62dca1}
 .nspstory-celltext{font:600 18px 'IBM Plex Mono',monospace;fill:var(--ns-ink)}
-.nspstory-faint{opacity:.3}.nspstory-culture{fill:#f5f6f8;stroke:var(--ns-line);stroke-width:3}.nspstory-positive{fill:#e4f5e8;stroke:var(--ns-green)}
-.nspstory-token{stroke-width:2}.nspstory-token-0{fill:#7364aa;stroke:#504274}.nspstory-token-1{fill:#e6b365;stroke:#a57739}.nspstory-token-2{fill:#83b1c9;stroke:#446f88}
-.nspstory-empty{font:30px 'IBM Plex Sans',sans-serif;fill:#81919b}.nspstory-check{fill:none;stroke:#13734e;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
-.nspstory-selection{fill:none;stroke:#b47829;stroke-width:2;stroke-dasharray:7 5}
-.nspstory-rna{stroke:#8fa8b7;stroke-width:9;fill:none;stroke-linecap:round}.nspstory-source{stroke:var(--ns-violet);stroke-width:12;stroke-linecap:round;fill:none}.nspstory-insert{stroke:var(--ns-green);stroke-width:9;fill:none;stroke-linejoin:round}
-.nspstory-match{stroke:#8c7ab8;stroke-width:2.5;stroke-dasharray:6 6;fill:none}.nspstory-proposed rect{fill:#fff1d9;stroke:#c99b51}.nspstory-proposed text{fill:#815716}
+.nspstory-faint{opacity:.3}.nspstory-culture{fill:#0c2430;stroke:var(--ns-line);stroke-width:2}.nspstory-positive{fill:#102d28;stroke:var(--ns-green)}.nspstory-crowd-halo{fill:none;stroke:#35b87c;stroke-opacity:.2;stroke-width:16}.nspstory-fan path{fill:none;stroke:#5d7b88;stroke-width:1.5;stroke-dasharray:4 7}.nspstory-preview{opacity:.28}
+.nspstory-token{stroke-width:1.7}.nspstory-token-0{fill:#a993ff;stroke:#d3c9ff}.nspstory-token-1{fill:#efb65d;stroke:#ffe0a5}.nspstory-token-2{fill:#66b9d8;stroke:#b9eaff}
+.nspstory-well>circle{fill:#0a1d27;stroke:#45616c;stroke-width:1.5}.nspstory-well-candidate>circle{fill:#0d2b25;stroke:#45c88b}.nspstory-well-mixed>circle{fill:#171d34;stroke:#9181cd}.nspstory-well-empty>circle{fill:#0b1921;stroke:#40545d}.nspstory-welllabel{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.04em;fill:#b9cad1}.nspstory-wellmark{font:20px 'IBM Plex Sans',sans-serif;fill:#61737b}.nspstory-candidate-focus>circle{stroke:#73f1b2;stroke-width:4}.nspstory-check{fill:none;stroke:#65e8a5;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.nspstory-candidate-note .nspstory-kicker{fill:#70e8ad}
+.nspstory-selection{fill:none;stroke:#e6ad50;stroke-width:2;stroke-dasharray:7 5}
+.nspstory-origin-field{fill:#071923;stroke:#274450;stroke-width:1.5}.nspstory-rna{stroke:#385965;stroke-width:12;fill:none;stroke-linecap:round}.nspstory-source{stroke:var(--ns-violet);stroke-width:14;stroke-linecap:round;fill:none}.nspstory-source-pattern,.nspstory-fragment-pattern{stroke:#eee9ff;stroke-width:2;stroke-linecap:round}.nspstory-boundary-mark{stroke:#e6ad50;stroke-width:2;stroke-dasharray:4 4}.nspstory-insert{stroke:var(--ns-green);stroke-width:13;fill:none;stroke-linecap:round}.nspstory-insert-pattern{stroke:#d7ffeb;stroke-width:2;stroke-linecap:round}
+.nspstory-match{stroke:#e6ad50;stroke-width:2.5;stroke-dasharray:7 7;fill:none}.nspstory-proposed rect{fill:#332614;stroke:#e2a944}.nspstory-proposed text{fill:#ffd58b}
 .nspstory-fragment-line{stroke:var(--ns-violet);stroke-width:10;stroke-linecap:round}.nspstory-fragment-pattern{stroke:#eee6ff;stroke-width:2;stroke-linecap:round}
 .nspstory-gridline{stroke:#dfe5e9;stroke-width:1}.nspstory-row-focus{fill:#e7f2ec;fill-opacity:.65}.nspstory-wt{fill:#248a6a}.nspstory-inactive{fill:#9775b9}.nspstory-emphasis{fill:none;stroke:var(--ns-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.nspstory-ambient{pointer-events:none;opacity:.18;--nsp-ambient-primary:12s;--nsp-ambient-secondary:16s}.nspstory-ambient-medium{opacity:.28}.nspstory-ambient-lively{opacity:.4}.nspstory-ambient-normal{--nsp-ambient-primary:9s;--nsp-ambient-secondary:12s}.nspstory-ambient-fast{--nsp-ambient-primary:6s;--nsp-ambient-secondary:8s}.nspstory-ambient-line{fill:none;stroke:#8eb9b0;stroke-width:1.5;stroke-linecap:round}.nspstory-ambient-dot{fill:#62b88e}
+.nspstory-ambient{pointer-events:none;opacity:.16;--nsp-ambient-primary:14s;--nsp-ambient-secondary:18s}.nspstory-ambient-medium{opacity:.3}.nspstory-ambient-lively{opacity:.48}.nspstory-ambient-normal{--nsp-ambient-primary:10s;--nsp-ambient-secondary:13s}.nspstory-ambient-fast{--nsp-ambient-primary:6.5s;--nsp-ambient-secondary:8.5s}.nspstory-ambient-line,.nspstory-ambient-ring{fill:none;stroke:#66d6ad;stroke-width:1.4;stroke-linecap:round}.nspstory-ambient-ring{stroke:#718bb8;stroke-dasharray:3 9}.nspstory-ambient-dot{fill:#71e4b4}
 .nspstory-motion .nspstory-screen-frame .nspstory-arrive{animation:nspArrive .75s cubic-bezier(.22,.7,.2,1) both}
 .nspstory-motion .nspstory-screen-frame .nspstory-switch{animation:nspSwitch .6s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-descendant{animation:nspDescendant .8s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-descendant.nspstory-later{animation-delay:.14s}
-.nspstory-motion .nspstory-screen-frame .nspstory-separate{animation:nspSeparate .9s cubic-bezier(.2,.7,.2,1) both}.nspstory-motion .nspstory-screen-frame .nspstory-separate.nspstory-later{animation-delay:.12s}
+.nspstory-motion .nspstory-screen-frame .nspstory-disperse{animation:nspDisperse .72s cubic-bezier(.2,.7,.2,1) both}.nspstory-motion .nspstory-screen-frame .nspstory-spread-1{animation-delay:.03s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-2{animation-delay:.06s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-3{animation-delay:.09s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-4{animation-delay:.12s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-5{animation-delay:.15s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-6{animation-delay:.18s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-7{animation-delay:.21s}.nspstory-motion .nspstory-screen-frame .nspstory-spread-8{animation-delay:.24s}
 .nspstory-motion .nspstory-screen-frame .nspstory-reveal,.nspstory-motion .nspstory-screen-frame .nspstory-boundary{animation:nspReveal .4s ease both}
-.nspstory-motion .nspstory-screen-frame .nspstory-proposed{animation:nspProposal .3s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-fragment{animation:nspFragment 1.4s cubic-bezier(.25,.55,.35,1) .3s both}
+.nspstory-motion .nspstory-screen-frame .nspstory-proposal-beat{animation:nspProposal .3s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-fragment{animation:nspFragment 1.4s cubic-bezier(.25,.55,.35,1) .3s both}
 .nspstory-motion .nspstory-screen-frame .nspstory-row-focus{animation:nspRowFocus .18s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-emphasis{animation:nspEmphasis .5s ease both}.nspstory-motion .nspstory-screen-frame .nspstory-contrast{animation:nspReveal .2s ease .5s both}
 .nspstory-screen-frame .nspstory-ambient-primary{animation:nspAmbientDrift var(--nsp-ambient-primary) ease-in-out infinite alternate}.nspstory-screen-frame .nspstory-ambient-secondary{animation:nspAmbientDrift var(--nsp-ambient-secondary) ease-in-out -3s infinite alternate}
 @keyframes nspArrive{from{transform:translateX(-104px)}to{transform:translateX(0)}}
 @keyframes nspSwitch{from{opacity:.35}to{opacity:1}}
 @keyframes nspDescendant{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
-@keyframes nspSeparate{from{transform:translate(var(--nsp-dx),var(--nsp-dy));opacity:.4}to{transform:translate(0,0);opacity:1}}
+@keyframes nspDisperse{from{transform:translate(var(--nsp-dx),var(--nsp-dy));opacity:.2}to{transform:translate(0,0);opacity:1}}
 @keyframes nspReveal{from{opacity:0}to{opacity:1}}
 @keyframes nspProposal{from{opacity:0}to{opacity:1}}
-@keyframes nspFragment{from{transform:translateX(-490px)}to{transform:translateX(0)}}
+@keyframes nspFragment{from{transform:translateX(-462px)}to{transform:translateX(0)}}
 @keyframes nspRowFocus{from{opacity:0}to{opacity:1}}
 @keyframes nspEmphasis{from{stroke-dasharray:0 600}to{stroke-dasharray:600 0}}
 @keyframes nspAmbientDrift{from{transform:translate(-3px,2px);opacity:.45}to{transform:translate(4px,-3px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.nspstory *{animation:none!important;transition:none!important}}
-@media print{.nspstory{break-inside:avoid;--ns-ink:#111;--ns-muted:#444;--ns-line:#777;--ns-paper:#fff;--ns-zone:#f2f2f2;--ns-green:#444;--ns-violet:#777}.nspstory *{animation:none!important;transition:none!important;filter:none!important}.nspstory-screen-frame,.nspstory-caption{display:none!important}.nspstory-print-frame{display:block!important;background:#fff;print-color-adjust:exact}.nspstory-print-frame .nspstory-wt{fill:#222}.nspstory-print-frame .nspstory-inactive{fill:#999}.nspstory-print-frame .nspstory-row-focus{fill:#e5e5e5}.nspstory-print-frame .nspstory-proposed rect{fill:#eee;stroke:#555}.nspstory-print-frame .nspstory-proposed text{fill:#222}}
+@media print{.nspstory,.nspstory[data-scene]{break-inside:avoid;--ns-ink:#111;--ns-muted:#444;--ns-line:#777;--ns-paper:#fff;--ns-zone:#f2f2f2;--ns-green:#444;--ns-violet:#777}.nspstory *{animation:none!important;transition:none!important;filter:none!important}.nspstory-screen-frame,.nspstory-caption{display:none!important}.nspstory-print-frame{display:block!important;background:#fff;print-color-adjust:exact}.nspstory-print-frame .nspstory-wt{fill:#222}.nspstory-print-frame .nspstory-inactive{fill:#999}.nspstory-print-frame .nspstory-row-focus{fill:#e5e5e5}.nspstory-print-frame .nspstory-culture{fill:#eee;stroke:#444}.nspstory-print-frame .nspstory-crowd-halo{stroke:#aaa}.nspstory-print-frame .nspstory-token{fill:#777;stroke:#222}.nspstory-print-frame .nspstory-well>circle{fill:#fff;stroke:#555}.nspstory-print-frame .nspstory-welllabel,.nspstory-print-frame .nspstory-wellmark{fill:#222}.nspstory-print-frame .nspstory-check{stroke:#222}.nspstory-print-frame .nspstory-origin-field{fill:#fff;stroke:#777}.nspstory-print-frame .nspstory-rna{stroke:#aaa}.nspstory-print-frame .nspstory-source{stroke:#555}.nspstory-print-frame .nspstory-source-pattern,.nspstory-print-frame .nspstory-fragment-pattern,.nspstory-print-frame .nspstory-insert-pattern{stroke:#fff}.nspstory-print-frame .nspstory-insert,.nspstory-print-frame .nspstory-fragment-line{stroke:#222}.nspstory-print-frame .nspstory-match,.nspstory-print-frame .nspstory-boundary-mark{stroke:#555}.nspstory-print-frame .nspstory-proposed rect{fill:#eee;stroke:#555}.nspstory-print-frame .nspstory-proposed text{fill:#222}}
 `
 });

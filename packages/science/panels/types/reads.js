@@ -273,11 +273,13 @@ function readsCellHTML(cell, model) {
   return '<span class="' + classes + '" style="--c:' + cell.col + '" title="' + esc(title) + '">' + esc(text) +
     (cell.insert ? '<i class="reads-wedge bio-tone-insert" title="' + esc('insertion ' + cell.insert) + '">▲</i>' : '') + '</span>';
 }
-/* Decorative column highlights: each reference mark tints its columns in
-   every lane-bearing row, so a site reads straight down the pile. */
-function readsHighlightHTML(model) {
+/* Decorative column highlights: each reference mark draws one column from
+   the reference row down to the last read, absolutely placed on the grid
+   (grid lines `from`/`to`), so a site reads straight down the pile without
+   a tile per row. */
+function readsHighlightHTML(model, from, to) {
   return model.marks.map(function (mark) {
-    return '<span class="reads-hl bio-tone-' + mark.tone + '" style="--c:' + mark.col + ';--w:' + mark.span + '" aria-hidden="true"></span>';
+    return '<span class="reads-hl bio-tone-' + mark.tone + '" style="--c:' + mark.col + ';--w:' + mark.span + ';grid-row:' + from + '/' + to + '" aria-hidden="true"></span>';
   }).join('');
 }
 /* Decorative allele split for one depth bar (IGV-style): at a marked column
@@ -308,14 +310,14 @@ function readsHTML(panel, state) {
   var model = readsModel(panel, state), h = '';
   var title = (model.label ? model.label + ' ' : 'Reference ') + bioFormatCoord(model.start) + '–' + bioFormatCoord(model.end) + ' (' + model.alphabet + ')';
   var summary = title + ', ' + model.rows.length + (model.rows.length === 1 ? ' read' : ' reads') + ', depth up to ' + model.maxDepth;
-  h += '<div class="reads-panel" role="region" aria-label="' + esc('Read alignment: ' + summary) + '">';
+  h += '<div class="reads-panel panel-fill-column" role="region" aria-label="' + esc('Read alignment: ' + summary) + '">';
   h += '<div class="reads-head"><span class="reads-title">' + esc(model.label || 'Reference') + '</span><span class="reads-meta">' +
     esc(bioFormatCoord(model.start) + '–' + bioFormatCoord(model.end) + ' · ' + model.alphabet + ' · ' + model.rows.length + (model.rows.length === 1 ? ' read' : ' reads') +
       (model.focusFound ? ' · focus ' + model.focus : '')) + '</span></div>';
   if (!model.valid) return softwarePanelShell(h + '<p class="reads-empty">Declare a reference sequence to align reads.</p></div>', state);
   h += '<div class="reads-scroll panel-fill-scroll" tabindex="0"><div class="reads-grid' + (model.showMatches ? ' reads-letters' : '') + '" style="--reads-cols:' + model.grid.columns + '">';
   if (model.showDepth) {
-    h += '<div class="reads-row reads-depth"><span class="reads-name">depth</span><span class="reads-cells">' + readsHighlightHTML(model);
+    h += '<div class="reads-row reads-depth"><span class="reads-name">depth</span><span class="reads-cells">';
     model.reference.forEach(function (cell, i) {
       var value = model.depth[i], pct = model.maxDepth ? Math.round(value / model.maxDepth * 100) : 0,
         split = readsAlleleHTML(model, i, model.marks.some(function (mark) { return cell.coord >= mark.from && cell.coord <= mark.to; }));
@@ -326,7 +328,7 @@ function readsHTML(panel, state) {
   h += '<div class="reads-row reads-ruler" aria-hidden="true"><span class="reads-name"></span><span class="reads-cells">';
   model.ruler.forEach(function (tick) { h += '<span class="reads-tick" style="--c:' + tick.col + '">' + esc(tick.label) + '</span>'; });
   h += '</span></div>';
-  h += '<div class="reads-row reads-ref"><span class="reads-name">' + esc(model.label || 'ref') + '</span><span class="reads-cells">' + readsHighlightHTML(model);
+  h += '<div class="reads-row reads-ref"><span class="reads-name">' + esc(model.label || 'ref') + '</span><span class="reads-cells">';
   model.reference.forEach(function (cell) {
     h += '<span class="reads-cell ' + bioLetterClass(cell.unknown ? '?' : cell.ch) + '" style="--c:' + cell.col + '" title="' + esc(bioFormatCoord(cell.coord)) + '">' + esc(cell.ch) + '</span>';
   });
@@ -343,7 +345,7 @@ function readsHTML(panel, state) {
       row.counts.gap + ' gap, ' + (row.counts.clip + row.truncatedLeft + row.truncatedRight) + ' clipped' + (row.inserts.length ? ', ' + row.inserts.length + ' insertion' : '');
     h += '<div class="reads-row reads-read' + (row.focus ? ' reads-focus' : '') + (row.dim ? ' reads-dim' : '') + '" title="' + esc(detail) + '">' +
       '<span class="reads-name">' + (row.tone !== 'neutral' ? '<span class="reads-dot bio-tone-' + row.tone + '"></span>' : '') +
-      (row.strand ? '<b class="reads-strand">' + esc(row.strand) + '</b>' : '') + esc(row.label) + '</span><span class="reads-cells">' + readsHighlightHTML(model);
+      (row.strand ? '<b class="reads-strand">' + esc(row.strand) + '</b>' : '') + esc(row.label) + '</span><span class="reads-cells">';
     if (row.cells.length) h += '<span class="reads-lane' + (row.strand === '+' ? ' reads-lane-plus' : row.strand === '-' ? ' reads-lane-minus' : '') +
       '" style="--c:' + row.cells[0].col + ';--w:' + (row.cells[row.cells.length - 1].col - row.cells[0].col + 1) + '" aria-hidden="true"></span>';
     if (row.outside) h += '<span class="reads-outside" style="--c:0">' + esc('outside the reference (at ' + bioFormatCoord(row.at) + ')') + '</span>';
@@ -353,10 +355,12 @@ function readsHTML(panel, state) {
     h += '</span></div>';
   });
   if (!model.rows.length) h += '<div class="reads-row"><span class="reads-name"></span><span class="reads-cells"><span class="reads-empty" style="--c:0">No reads at this step</span></span></div>';
-  h += '</div></div>';
+  var refLine = model.showDepth ? 3 : 2;
+  h += readsHighlightHTML(model, refLine, refLine + 1 + (model.marks.length ? 1 : 0) + Math.max(model.rows.length, 1)) + '</div></div>';
   var legend = [];
   model.marks.forEach(function (mark) {
-    legend.push('<li><span class="reads-key bio-tone-' + mark.tone + '"></span>' + esc((mark.label || mark.id) + ' ' + bioFormatCoord(mark.from) + '–' + bioFormatCoord(mark.to)) + '</li>');
+    legend.push('<li><span class="reads-key bio-tone-' + mark.tone + '"></span>' + esc(mark.label || mark.id) + ' <small>' +
+      esc(bioFormatCoord(mark.from) + (mark.to !== mark.from ? '–' + bioFormatCoord(mark.to) : '')) + '</small></li>');
   });
   model.inserts.forEach(function (insert) {
     legend.push('<li><span class="reads-key bio-tone-insert">▲</span>' + esc(insert.seq + ' after ' + bioFormatCoord(insert.after) + ' in ' + insert.read +
@@ -393,13 +397,13 @@ body.sk-blueprint .reads-meta{border-radius:2px}
 .sk-aurora .reads-scroll,body.sk-pastel .reads-scroll{border-color:transparent}
 body.sk-blueprint .reads-scroll{border-radius:0;border-color:var(--sq-well-line)}
 .reads-scroll:focus-visible{outline:2px solid var(--sq-accent,var(--dink));outline-offset:2px}
-.reads-grid{display:inline-grid;grid-template-columns:max-content max-content;min-width:100%;font:11px/1 'IBM Plex Mono',monospace}
+.reads-grid{position:relative;display:inline-grid;grid-template-columns:max-content max-content;min-width:100%;font:11px/1 'IBM Plex Mono',monospace}
 .reads-row{display:contents}
 .reads-name{display:flex;align-items:center;gap:5px;padding:0 10px 0 8px;height:calc(var(--reads-cell) + 4px);font:500 11px/1 'IBM Plex Sans',sans-serif;color:var(--sq-text,var(--dink));white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
 .reads-dot{flex:none;width:7px;height:7px;border-radius:50%;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone,currentColor) 70%,var(--sq-edge-mix,var(--dink)))}
 .reads-strand{font:600 11px/1 'IBM Plex Mono',monospace;color:var(--sq-muted,var(--dfaint))}
 .reads-cells{position:relative;display:grid;grid-template-columns:repeat(var(--reads-cols),var(--reads-cell));grid-template-rows:var(--reads-cell);align-items:center;height:calc(var(--reads-cell) + 4px);padding-right:var(--reads-cell)}
-.reads-cell,.reads-dcell,.reads-tick,.reads-band,.reads-more,.reads-outside,.reads-empty,.reads-lane,.reads-hl,.reads-dline{grid-row:1;grid-column:calc(var(--c) + 1)}
+.reads-cell,.reads-dcell,.reads-tick,.reads-band,.reads-more,.reads-outside,.reads-empty,.reads-lane,.reads-dline{grid-row:1;grid-column:calc(var(--c) + 1)}
 .reads-cell{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;width:var(--reads-cell);height:var(--reads-cell);border-radius:3px;text-align:center}
 /* Zero-specificity fallbacks: the shared .bio-tone-* classes (owned by the sequence panel) win whenever present. */
 :where(.reads-mismatch,.reads-band,.reads-key,.reads-dot,.reads-wedge){background:color-mix(in srgb,var(--dtext) 22%,transparent)}
@@ -409,9 +413,11 @@ body.sk-blueprint .reads-scroll{border-radius:0;border-color:var(--sq-well-line)
 .reads-lane-plus{border-radius:4px 0 0 4px;clip-path:polygon(0 0,calc(100% - 5px) 0,100% 50%,calc(100% - 5px) 100%,0 100%)}
 .reads-lane-minus{border-radius:0 4px 4px 0;clip-path:polygon(5px 0,100% 0,100% 100%,5px 100%,0 50%)}
 body.sk-blueprint .reads-lane{border-radius:0;background:rgba(127,227,255,.12);box-shadow:inset 0 0 0 1px rgba(127,227,255,.35)}
-/* A reference mark tints its column through every row. */
-.reads-hl{position:relative;z-index:1;grid-column:calc(var(--c) + 1)/span var(--w);align-self:stretch;height:100%;border-radius:0;pointer-events:none}
-.reads-hl[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 12%,transparent)}
+/* A reference mark is one tinted column from the reference row to the last
+   read, with hairline tone edges: a site reads straight down the pile. */
+.reads-hl{position:absolute;z-index:1;grid-column:2;top:0;bottom:0;left:calc(var(--c) * var(--reads-cell));width:calc(var(--w) * var(--reads-cell));border-radius:4px;pointer-events:none}
+.reads-hl[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 9%,transparent);border:0;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 26%,transparent)}
+body.sk-blueprint .reads-hl{border-radius:0}
 .reads-match{color:var(--sq-muted,var(--dfaint))}
 .reads-match:not(.bio-b){color:transparent}
 .reads-match:not(.bio-b)::before{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;border-radius:50%;background:var(--sq-muted,var(--dfaint));opacity:.8}
@@ -419,14 +425,20 @@ body.sk-blueprint .reads-lane{border-radius:0;background:rgba(127,227,255,.12);b
 .reads-mismatch{font-weight:700}
 /* Mismatch tiles are the printed callouts of the pile: a bad-soft tile with
    a tone edge, lifted 1 px. Blueprint draws them as line art instead. */
-.reads-mismatch[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 14%,var(--sq-surface,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 62%,var(--sq-surface,transparent)),var(--sq-lift,0 0 0 0 transparent)}
-body.sk-blueprint .reads-mismatch[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 26%,var(--sq-surface));box-shadow:inset 0 0 0 1px var(--bio-tone)}
+.reads-mismatch[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) var(--reads-mm,24%),var(--sq-surface,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 70%,var(--sq-surface,transparent)),var(--sq-lift,0 0 0 0 transparent)}
+body.sk-pastel .reads-mismatch{--reads-mm:24%}
+/* On the pink tile the base letter leans toward the ink so it stays AA. */
+@media screen{body.sk-pastel .reads-mismatch.bio-b{color:color-mix(in srgb,var(--bio-letter) 68%,#24324A)}}
+.sk-aurora .reads-mismatch{--reads-mm:22%}
+body.sk-blueprint .reads-mismatch[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 30%,var(--sq-surface));box-shadow:inset 0 0 0 1px var(--bio-tone)}
 .reads-gap{color:transparent;letter-spacing:0}
 .reads-gap::before{content:'';position:absolute;left:0;right:0;top:50%;height:1.5px;margin-top:-.75px;background:var(--sq-muted,var(--dfaint))}
 .reads-clip{opacity:.7;color:var(--sq-muted,var(--dfaint));font-style:italic}
 .reads-wedge{position:absolute;right:-5px;bottom:-5px;z-index:2;width:9px;height:7px;padding:0;font-size:10px;line-height:1;font-style:normal;color:transparent;overflow:hidden;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}
 .reads-wedge[class*="bio-tone-"]{background:var(--bio-tone)}
 .reads-focus .reads-lane{background:var(--sq-accent-soft,color-mix(in srgb,var(--dink) 14%,transparent));box-shadow:inset 0 0 0 1px var(--sq-accent-line,color-mix(in srgb,var(--dink) 60%,transparent))}
+/* The focused read is the one raised lane in the pile. */
+:is(.sk-aurora,.sk-pastel) .reads-focus .reads-lane{position:relative;z-index:1;box-shadow:inset 0 0 0 1px var(--sq-accent-line),var(--sq-raise)}
 .reads-focus .reads-lane-plus,.reads-focus .reads-lane-minus{background:var(--sq-accent-line,color-mix(in srgb,var(--dink) 30%,transparent))}
 .reads-focus .reads-name{font-weight:700;color:var(--sq-accent-ink,var(--dink));box-shadow:inset 3px 0 0 var(--sq-accent,var(--dink))}
 /* Other reads step back but stay readable (never below .7): the accent lane
@@ -442,11 +454,11 @@ body.sk-blueprint .reads-mismatch[class*="bio-tone-"]{background:color-mix(in sr
 .reads-dcell{position:relative;z-index:0;display:flex;align-items:flex-end;width:var(--reads-cell);height:22px;padding:0 2px;box-sizing:border-box}
 .reads-dcell i{display:block;width:100%;min-height:1px;border-radius:1px 1px 0 0;background:color-mix(in srgb,var(--dink) 38%,transparent)}
 .sk-aurora .reads-dcell,body.sk-pastel .reads-dcell,body.sk-blueprint .reads-dcell{padding:0}
-/* Coverage area on the sequential ramp (seq-3 at the top to seq-1 at the
-   base) under an accent step line. */
-.sk-aurora .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#1A7896,#18345A) left bottom/100% 22px no-repeat}
-body.sk-pastel .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#8796E0,#D9DFF7) left bottom/100% 22px no-repeat}
-body.sk-blueprint .reads-dcell i{border-radius:0;background:rgba(127,227,255,.22)}
+/* Coverage is a neutral slate area (the authored captions call it the grey
+   bars) under a muted step line; only the allele split carries colour. */
+.sk-aurora .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#2E4466,#1D2A40) left bottom/100% 22px no-repeat}
+body.sk-pastel .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#C9D2E1,#EEF1F5) left bottom/100% 22px no-repeat}
+body.sk-blueprint .reads-dcell i{border-radius:0;background:rgba(148,188,213,.28)}
 /* Allele split at a marked site: base-coloured segments, reference letter at
    the bottom, so a heterozygous column reads as G 3 / A 2 at a glance. */
 .reads-dcell.reads-dsplit i,:is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-dcell.reads-dsplit i{display:flex;flex-direction:column-reverse;gap:1px;margin:0 1.5px;width:auto;flex:1;background:none}
@@ -455,7 +467,8 @@ body.sk-blueprint .reads-dcell i{border-radius:0;background:rgba(127,227,255,.22
 body.sk-blueprint .reads-dsplit b{border-radius:0;background:color-mix(in srgb,var(--bio-letter,#7FE3FF) 55%,var(--sq-surface));box-shadow:inset 0 0 0 1px var(--bio-letter,#7FE3FF)}
 .reads-dline{display:none}
 .sk-aurora .reads-dline,body.sk-pastel .reads-dline,body.sk-blueprint .reads-dline{display:block;position:relative;z-index:2;grid-column:calc(var(--c) + 1)/span var(--w);align-self:end;width:100%;height:22px;overflow:visible;pointer-events:none}
-.reads-dline path{fill:none;stroke:var(--sq-accent,var(--sq-muted,currentColor));stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.reads-dline path{fill:none;stroke:var(--reads-dline,var(--sq-muted,currentColor));stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+body.sk-pastel .reads-dline{--reads-dline:#5F6C84}.sk-aurora .reads-dline{--reads-dline:#8DA2C6}body.sk-blueprint .reads-dline{--reads-dline:#94BCD5}
 /* The peak depth as a quiet scale tag (IGV's data range). */
 .reads-dscale{display:none}
 :is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-dscale{display:block;grid-row:1;grid-column:1;position:relative;z-index:3;align-self:start;justify-self:start;margin-top:-1px;padding:0 4px;border-radius:999px;font:600 10px/12px 'IBM Plex Mono',monospace;color:var(--sq-muted);background:color-mix(in srgb,var(--sq-well) 82%,transparent);font-variant-numeric:tabular-nums lining-nums;pointer-events:none;white-space:nowrap}
@@ -464,16 +477,16 @@ body.sk-blueprint .reads-dscale{border-radius:0}
 /* In the shaped skins the letter keeps its full AA colour; lower support is
    carried by a lighter weight and a faint, unlifted tile. */
 :is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-mismatch.reads-low-support[class*="bio-tone-"]{opacity:1;font-weight:500;background:color-mix(in srgb,var(--bio-tone) 6%,var(--sq-surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 38%,var(--sq-surface))}
-body.sk-blueprint .reads-dline path{stroke:var(--sq-accent);stroke-linecap:square;stroke-linejoin:miter}
+body.sk-blueprint .reads-dline path{stroke-linecap:square;stroke-linejoin:miter}
 .reads-ruler .reads-cells,.reads-ruler .reads-name{height:16px}
 .reads-ruler .reads-cells{grid-template-rows:16px}
 .reads-tick{position:relative;font:500 10px/12px 'IBM Plex Mono',monospace;color:var(--sq-muted,var(--dfaint));font-variant-numeric:tabular-nums lining-nums;white-space:nowrap;padding-left:3px;border-left:1px solid var(--sq-line-strong,color-mix(in srgb,var(--dtext) 35%,transparent));height:12px;align-self:end}
 .reads-ref .reads-cell{font-weight:600;color:var(--sq-ink,var(--dink))}
 .sk-aurora .reads-ref .reads-cell,body.sk-pastel .reads-ref .reads-cell,body.sk-blueprint .reads-ref .reads-cell{color:var(--sq-ink)}
-/* The reference keeps ink letters with a thin base-coloured key under each. */
-/* Printed-figure band: each reference base sits on a 10 % tile of its own
-   colour whose bottom edge is the base-coloured key. */
-.sk-aurora .reads-ref .reads-cell,body.sk-pastel .reads-ref .reads-cell{border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--bio-letter,transparent) 10%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--bio-letter,transparent) 85%,transparent);width:calc(var(--reads-cell) - 2px);justify-self:center}
+/* The reference keeps quiet ink letters, each over a short 2 px dash of its
+   base colour: a key ribbon that never competes with the mismatches. */
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-ref .reads-cell::after{content:'';position:absolute;left:3px;right:3px;bottom:-2px;height:2px;border-radius:1px;background:var(--bio-letter,transparent)}
+body.sk-blueprint .reads-ref .reads-cell::after{border-radius:0}
 .reads-marks .reads-cells,.reads-marks .reads-name{height:10px}
 .reads-marks .reads-cells{grid-template-rows:6px}
 .reads-band{grid-column:calc(var(--c) + 1)/span var(--w);height:6px;box-sizing:border-box;border-radius:var(--sq-r,3px)}
@@ -484,6 +497,11 @@ body.sk-blueprint .reads-dline path{stroke:var(--sq-accent);stroke-linecap:squar
 p.reads-empty{margin:4px 0;font-size:11.5px;font-style:normal;line-height:1.4}
 .reads-legend{list-style:none;display:flex;flex-wrap:wrap;gap:3px 14px;margin:8px 0 0;padding:0;font-size:11.5px;line-height:15px;color:var(--sq-text,var(--dfaint))}
 .reads-legend li{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums lining-nums}
+.reads-legend small{font-size:11px;color:var(--sq-muted,var(--dfaint))}
+/* In a sized layout tile the alignment well takes the spare height, so the
+   key and caption settle at the foot of the card instead of floating. */
+.section-layout-tile .reads-scroll{display:flex;flex-direction:column}
+.section-layout-tile .reads-grid{flex:none;margin-block:auto}
 .reads-key{flex:none;display:inline-flex;align-items:center;justify-content:center;width:10px;height:10px;border-radius:3px;font-size:10px;line-height:1;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone,currentColor) var(--sq-edge-k,70%),var(--sq-edge-mix,var(--dink)))}
 .reads-key[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) var(--sq-tint,30%),var(--sq-surface,transparent))}
 .reads-key.bio-tone-insert{color:transparent;background:var(--bio-tone);box-shadow:none;border-radius:0;clip-path:polygon(50% 8%,100% 92%,0 92%)}

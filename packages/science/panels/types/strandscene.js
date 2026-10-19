@@ -392,17 +392,23 @@ function strandsceneModel(panel, state) {
     var box = mechShapeBox(actor.shape, actor.size), x, y, coord = null, piece = null;
     if (bioPosition(at) && at <= lastUpper) {
       coord = at; piece = pieceOfUpper(at);
-      var grip = yU + piece.dy - 5 - box.h / 2;
+      var grip = yU + piece.dy - 13 - box.h / 2;
       x = mechNum(layout.xOf(at) + piece.dx);
-      /* grip on the letters when bound or active; hover above when scanning,
-         higher still while binding (room for a cap on the same letters) and
-         lifted away when released. */
-      y = mechNum(st === 'bound' || st === 'active' ? grip : st === 'released' ? grip - 60 : st === 'binding' ? grip - 40 : grip - 20);
+      /* bound or active: the actor's base rests on the upper backbone, so
+         the bases it grips stay readable below it; hover above when
+         scanning, higher still while binding (room for a cap on the same
+         letters) and lifted away when released. */
+      y = mechNum(st === 'bound' || st === 'active' ? grip : st === 'released' ? grip - 52 : st === 'binding' ? grip - 32 : grip - 14);
     } else if (panelObject(at)) { x = at.x; y = at.y; }
     else { x = SS_FREE.x; y = SS_FREE.y; }
     return { id: actor.id, role: actor.role, shape: actor.shape, size: actor.size, label: label, state: st, x: x, y: y, w: box.w, h: box.h,
       at: coord, piece: piece ? piece.index : null, hidden: coord !== null && (coord < layout.from || coord > layout.to) };
   });
+  /* One accent owns "now": the pool goes to the last-declared active actor
+     on the strand; other active actors keep their glow only. */
+  var lead = null;
+  actors.forEach(function (actor) { if (actor.state === 'active' && !actor.hidden) lead = actor; });
+  actors.forEach(function (actor) { actor.lead = actor === lead; });
   var hotSites = {};
   actors.forEach(function (actor) {
     if (actor.at === null || ['binding', 'bound', 'active'].indexOf(actor.state) < 0) return;
@@ -479,9 +485,10 @@ function ssLetterMarkup(letter, model, delay) {
   if (model.beads) return '<circle class="' + cls + ' mech-bead" cx="' + letter.x + '" cy="' + letter.y + '" r="5.5"' + style + '/>' +
     '<circle class="mech-bead-hi' + (letter.passed ? ' mech-passed' : '') + (delay != null ? ' mech-appear' : '') + '" cx="' + mechNum(letter.x - 1.7) + '" cy="' + mechNum(letter.y - 1.9) + '" r="1.7"' + style + '/>';
   /* A base block: a soft tile in the letter's tone that hangs off the
-     backbone (above the letter on the upper strand, below on the lower);
-     an unwound lower letter's tile is centred on the letter. */
-  var tw = mechNum(Math.max(4, model.layout.pitch * 0.82)), up = letter.strand === 'upper', ly = letter.y, ty = mechNum(up ? ly - 11 : letter.open ? ly - 10 : ly - 9);
+     backbone (above the letter on the upper strand, below on the lower).
+     An unwound lower letter rides its own displaced backbone, so its tile
+     keeps the same offset from the rail. */
+  var tw = mechNum(Math.max(4, model.layout.pitch * 0.82)), up = letter.strand === 'upper', ly = letter.y, ty = mechNum(up ? ly - 11 : ly - 9);
   return '<rect class="mech-ntbg ' + cls.replace('mech-nt ', '') + '" x="' + mechNum(letter.x - tw / 2) + '" y="' + ty + '" width="' + tw + '" height="20" rx="' + mechNum(Math.min(4, tw / 3)) + '"' + style + '/>' +
     '<text class="mech-t-nt ' + cls + '" x="' + letter.x + '" y="' + mechNum(ly + 5) + '"' + style + '>' + esc(letter.ch) + '</text>';
 }
@@ -494,26 +501,43 @@ function ssPieceMarkup(model, piece, motion) {
      is a sugar-phosphate ribbon: a lit tube with a phosphate bead between
      neighbouring bases and, at its 3′ side, a small arrowhead that shows
      the strand's 5′→3′ direction (rightward above, leftward below). */
-  function rail(all, y, threeOnLeft) {
+  /* The backbone follows its bases: where an unwound stretch drops away,
+     the rail bows down with it in a smooth S so the opened bases ride
+     their own displaced backbone instead of sitting on the straight one. */
+  function railPath(shown, off, x1, x2, lift) {
+    var f = mechNum, p = model.layout.pitch, yOf = function (l) { return l.y + off - lift; };
+    var d = 'M' + f(x1 + (lift ? 2 : 0)) + ',' + f(yOf(shown[0]));
+    for (var i = 0; i < shown.length - 1; i++) {
+      var a = shown[i], b = shown[i + 1], ya = yOf(a), yb = yOf(b);
+      if (ya === yb) { d += 'L' + f(b.x) + ',' + f(yb); continue; }
+      /* hug the deeper (open) base so its whole tile clears the rail */
+      var deeperB = off < 0 ? yb < ya : yb > ya;
+      var s0 = deeperB ? a.x - 0.05 * p : a.x + 0.45 * p, s1 = deeperB ? b.x - 0.45 * p : b.x + 0.05 * p, k = (s1 - s0) * 0.5;
+      d += 'L' + f(s0) + ',' + f(ya) + 'C' + f(s0 + k) + ',' + f(ya) + ' ' + f(s1 - k) + ',' + f(yb) + ' ' + f(s1) + ',' + f(yb) + 'L' + f(b.x) + ',' + f(yb);
+    }
+    return d + 'L' + f(x2 - (lift ? 2 : 0)) + ',' + f(yOf(shown[shown.length - 1]));
+  }
+  function rail(all, off, threeOnLeft) {
     var shown = all.filter(function (l) { return !l.hidden; });
     if (!shown.length) return '';
     var leftEnd = shown[0] === all[0], rightEnd = shown[shown.length - 1] === all[all.length - 1];
     var x1 = shown[0].x - (leftEnd ? 12 : half), x2 = shown[shown.length - 1].x + (rightEnd ? 12 : half);
-    var out = '<line class="mech-rail" x1="' + mechNum(x1) + '" y1="' + y + '" x2="' + mechNum(x2) + '" y2="' + y + '"/>' +
-      '<line class="mech-rail-hi" x1="' + mechNum(x1 + 2) + '" y1="' + mechNum(y - 1.2) + '" x2="' + mechNum(x2 - 2) + '" y2="' + mechNum(y - 1.2) + '"/>';
+    var out = '<path class="mech-rail" d="' + railPath(shown, off, x1, x2, 0) + '"/>' +
+      '<path class="mech-rail-hi" d="' + railPath(shown, off, x1, x2, 1.2) + '"/>';
     if (half >= 5) {
       var beads = '', r = mechNum(Math.min(1.7, half * 0.18));
-      for (var i = 0; i < shown.length - 1; i++) if (shown[i + 1].coord === shown[i].coord + 1) beads += 'M' + mechNum(shown[i].x + half) + ',' + y + 'h0';
+      for (var i = 0; i < shown.length - 1; i++) if (shown[i + 1].coord === shown[i].coord + 1 && shown[i + 1].y === shown[i].y) beads += 'M' + mechNum(shown[i].x + half) + ',' + mechNum(shown[i].y + off) + 'h0';
       if (beads) out += '<path class="mech-phos" d="' + beads + '" stroke-width="' + mechNum(r * 2) + '"/>';
     }
     if (!model.beads && model.alphabet !== 'protein') {
+      var endL = threeOnLeft ? shown[0] : shown[shown.length - 1], y = mechNum(endL.y + off);
       var tip = threeOnLeft ? x1 - 5 : x2 + 5, base = threeOnLeft ? x1 + 1.5 : x2 - 1.5;
       out += '<path class="mech-rail-end" d="M' + mechNum(base) + ',' + mechNum(y - 4.6) + 'L' + mechNum(tip) + ',' + y + 'L' + mechNum(base) + ',' + mechNum(y + 4.6) + 'Z"/>';
     }
     return out;
   }
   if (upper.length) {
-    h += rail(upper, yU - 12);
+    h += rail(upper, -12);
     upper.forEach(function (letter) {
       if (letter.hidden) return;
       var delay = appear && letter.extended && appear.upper && letter.coord > appear.upper ? (letter.coord - appear.upper - 1) * 120 : null;
@@ -523,39 +547,44 @@ function ssPieceMarkup(model, piece, motion) {
   if (lower.length) {
     var pairIn = appear && appear.pair;
     h += '<g class="mech-lower' + (pairIn ? ' mech-appear' : '') + '">';
-    h += rail(lower, yL + 12, true);
+    h += rail(lower, 12, true);
     lower.forEach(function (letter) {
       if (letter.hidden) return;
       var delay = appear && letter.extended && appear.lower && letter.coord > appear.lower ? (letter.coord - appear.lower - 1) * 120 : null;
       h += ssLetterMarkup(letter, model, delay);
     });
-    /* Each half-rung takes the tone of the base it grows from; between the
-       two halves the hydrogen bonds are drawn as fine ticks, two for A·T
-       (A·U) and three for G·C, so the pairing rule is visible. */
+    /* Each half-rung is one round-capped stroke in the tone of the base it
+       grows from; in the gap between the halves the hydrogen bonds are
+       hair-fine strokes, two for A·T (A·U) and three for G·C, so the
+       pairing rule is visible without boxing the rung in. */
     var letterAt = function (list, coord) { var hit = null; list.forEach(function (l) { if (l.coord === coord) hit = l; }); return hit; };
     var toneOf = function (list, coord) { var hit = letterAt(list, coord); return hit ? hit.cls + ' ' : ''; };
-    var gap = mechNum(Math.min(2.6, model.layout.pitch * 0.15)), hbTop = yU + 15.5, hbBottom = (yL - 13) - 0.5;
+    var gap = mechNum(Math.min(2.6, model.layout.pitch * 0.15)), hbTop = yU + 17.5, hbBottom = yL - 17.5;
     rungs.forEach(function (rung, i) {
       if (rung.x < model.layout.xOf(model.layout.from) - 1 || rung.x > model.layout.xOf(model.layout.to) + 1) return;
       var style = pairIn ? ' style="animation-delay:' + Math.min(i * 40, 600) + 'ms"' : '';
       var a = letterAt(upper, rung.coord), b = letterAt(lower, rung.coord), pair = a && b ? (a.ch + b.ch).toUpperCase() : '';
       var bonds = pair === 'GC' || pair === 'CG' ? 3 : 2, hb = '';
       for (var k = 0; k < bonds; k++) { var bx = mechNum(rung.x + (k - (bonds - 1) / 2) * gap); hb += 'M' + bx + ',' + hbTop + 'V' + hbBottom; }
-      h += '<line class="' + toneOf(upper, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yU + 10) + '" x2="' + rung.x + '" y2="' + (yU + 15) + '"' + style + '/>' +
+      h += '<line class="' + toneOf(upper, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yU + 11) + '" x2="' + rung.x + '" y2="' + (yU + 15) + '"' + style + '/>' +
         '<path class="mech-hb' + (pairIn ? ' mech-appear' : '') + '" d="' + hb + '"' + style + '/>' +
-        '<line class="' + toneOf(lower, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yL - 13) + '" x2="' + rung.x + '" y2="' + (yL - 8) + '"' + style + '/>';
+        '<line class="' + toneOf(lower, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yL - 15) + '" x2="' + rung.x + '" y2="' + (yL - 11) + '"' + style + '/>';
     });
     h += '</g>';
   }
   var glide = motion && motion.pieces[piece.index] ? mechGlideStyle(motion.pieces[piece.index], { x: piece.dx, y: piece.dy }) : '';
-  return '<g class="mech-move mech-piece"' + glide + '><g transform="translate(' + piece.dx + ' ' + piece.dy + ')">' + h + '</g></g>';
+  return '<g class="mech-move mech-piece' + (glide && motion.cutting ? ' mech-parting' : '') + '"' + glide + '><g transform="translate(' + piece.dx + ' ' + piece.dy + ')">' + h + '</g></g>';
 }
 function ssSceneMarkup(model, motion) {
   var h = '', layout = model.layout;
   if (!model.cuts.length && model.length) {
     h += '<g class="mech-ruler">';
+    /* a tick hidden behind an actor resting on the strand is left out */
+    var covered = function (x) {
+      return model.actors.some(function (a) { return a.at !== null && !a.hidden && (a.state === 'bound' || a.state === 'active') && Math.abs(x - a.x) < a.w / 2 + 4; });
+    };
     model.letters.forEach(function (letter) {
-      if (letter.tick && !letter.hidden && !letter.extended) h += '<text class="mech-t-label" x="' + letter.x + '" y="' + (model.yUpper - 22) + '" text-anchor="middle">' + bioFormatCoord(letter.coord) + '</text>';
+      if (letter.tick && !letter.hidden && !letter.extended && !covered(letter.x)) h += '<text class="mech-t-label" x="' + letter.x + '" y="' + (model.yUpper - 22) + '" text-anchor="middle">' + bioFormatCoord(letter.coord) + '</text>';
     });
     h += '</g>';
   }
@@ -571,12 +600,16 @@ function ssSceneMarkup(model, motion) {
 }
 function ssActorMarkup(actor, motion) {
   var glide = motion && motion.actors[actor.id] ? mechGlideStyle(motion.actors[actor.id], actor) : '';
-  /* The active actor stands in a soft accent halo that ends at its own
-     base, so it never washes over the letters it grips; bound and binding
-     actors glow, the rest cast a contact shadow. */
-  var pool = actor.state === 'active' ?
-    '<ellipse class="mech-pool" cy="-4" rx="' + mechNum(actor.w / 2 + 9) + '" ry="' + mechNum(actor.h / 2 + 4) + '" aria-hidden="true"/>' : '';
-  var h = '<g class="mech-move mech-actor-move"' + glide + '><g transform="translate(' + actor.x + ' ' + actor.y + ')">' + pool +
+  /* The lead active actor stands in a soft accent dome of light whose flat
+     floor is the actor's own base, so it never washes over the strand it
+     grips; other active, bound and binding actors glow, the rest cast a
+     contact shadow. */
+  var pool = '';
+  if (actor.lead && actor.at !== null) {
+    var prx = mechNum(actor.w / 2 + 9), floor = mechNum(actor.h / 2 - 1), pry = mechNum(actor.h * 0.85 + 6);
+    pool = '<path class="mech-pool" d="M' + mechNum(-prx) + ',' + floor + 'A' + prx + ',' + pry + ' 0 0 1 ' + prx + ',' + floor + 'Z" aria-hidden="true"/>';
+  } else if (actor.lead) pool = '<ellipse class="mech-pool" rx="' + mechNum(actor.w / 2 + 9) + '" ry="' + mechNum(actor.h / 2 + 6) + '" aria-hidden="true"/>';
+  var h = '<g class="mech-move mech-actor-move' + (glide && motion.cutting && actor.at !== null ? ' mech-parting' : '') + '"' + glide + '><g transform="translate(' + actor.x + ' ' + actor.y + ')">' + pool +
     mechActorMarkup(actor, ' mech-st-' + actor.state);
   if (actor.state === 'scanning') h += '<text class="mech-t-label mech-scan" y="' + mechNum(-actor.h / 2 - 8) + '" text-anchor="middle">scanning →</text>';
   return h + '</g></g>';
@@ -586,7 +619,9 @@ function ssOverlayMarkup(model, motion) {
   if (model.caption) h += '<text class="mech-t-caption" x="14" y="38">' + esc(model.caption) + '</text>';
   model.sites.forEach(function (site) {
     if (site.hidden) return;
-    var y1 = model.yUpper - 18, y2 = (model.strands === 2 ? model.yLower : model.yUpper) + 18;
+    /* a site that holds part of an opened bubble grows down around it */
+    var bubble = model.unwound && model.lowerLetters.length && model.unwound.from <= site.to && model.unwound.to >= site.from ? 14 : 0;
+    var y1 = model.yUpper - 18, y2 = (model.strands === 2 ? model.yLower : model.yUpper) + 18 + bubble;
     h += '<rect class="mech-site bio-tone-' + site.tone + (site.hot ? ' hot' : '') + '" x="' + site.x1 + '" y="' + y1 + '" width="' + mechNum(site.x2 - site.x1) + '" height="' + (y2 - y1) + '" rx="6"/>';
     h += mechTagMarkup((site.x1 + site.x2) / 2, y2 + 22, site.label + ' · ' + bioFormatCoord(site.from) + '–' + bioFormatCoord(site.to), 'mech-site-tag bio-tone-' + site.tone + (site.hot ? ' hot' : ''));
   });
@@ -665,6 +700,7 @@ function ssMotion(model, prev) {
     if (event.kind === 'cut') {
       var cut = model.cuts.filter(function (c) { return c.site === event.site; })[0];
       if (!cut) return;
+      motion.cutting = true;
       var xu = mechNum(model.layout.xOf(cut.upper) + model.layout.pitch / 2), xl = mechNum(model.layout.xOf(cut.lower) + model.layout.pitch / 2), yU = model.yUpper, yL = model.yLower;
       motion.transients += '<g class="mech-transient mech-cutmark" style="animation-delay:' + delay + 'ms" aria-hidden="true">' +
         '<line x1="' + xu + '" y1="' + (yU - 20) + '" x2="' + xu + '" y2="' + (yU + 24) + '"/>' +
@@ -747,13 +783,14 @@ body.sk-blueprint .mech-frame{border-radius:0;background:linear-gradient(rgba(12
 }
 .mech-move{transition:transform .7s cubic-bezier(.2,.7,.2,1)}
 .mech-move.mech-piece{transition-timing-function:cubic-bezier(.22,1.18,.36,1)}
+.mech-move.mech-parting{transition-delay:.18s}
 .mech-gs-top{stop-color:#fff;stop-opacity:var(--mk-clay-top,.3)}
 .mech-gs-mid{stop-color:#fff;stop-opacity:0}
 .mech-gs-low{stop-color:var(--mk-clay-low,#000);stop-opacity:var(--mk-clay-low-a,.3)}
 .mech-gs-spec{stop-color:#fff;stop-opacity:var(--mk-spec,.5)}
 .mech-clay{fill:var(--mk-clay,none);stroke:none;pointer-events:none}
 .mech-clay.mech-ball{fill:var(--mk-ball,none)}
-.mech-pool{fill:color-mix(in srgb,var(--mk-acc) 12%,transparent);stroke:var(--mk-pool-line);stroke-width:1;stroke-opacity:.7}
+.mech-pool{fill:color-mix(in srgb,var(--mk-acc) 13%,transparent);stroke:none;filter:blur(2px)}
 .mech-t-label{font:700 10px 'IBM Plex Sans',sans-serif;letter-spacing:.07em;fill:var(--mk-mute);text-transform:uppercase;font-variant-numeric:tabular-nums lining-nums;paint-order:stroke;stroke:var(--mk-halo);stroke-width:3px;stroke-linejoin:round}
 .mech-t-caption{font:600 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink);paint-order:stroke;stroke:var(--mk-halo);stroke-width:3.5px;stroke-linejoin:round}
 .mech-t-tag{font:600 10.5px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
@@ -771,7 +808,7 @@ body.sk-blueprint .mech-frame{border-radius:0;background:linear-gradient(rgba(12
 body.sk-pastel .mech-actor>path:first-child{fill:color-mix(in srgb,var(--mf) 88%,#fff);stroke:color-mix(in srgb,var(--mf) 62%,#24324A)}
 body.sk-blueprint .mech-actor>path:first-child{fill:color-mix(in srgb,var(--mf) 14%,transparent);stroke:var(--mf);stroke-width:1.5}
 body.sk-blueprint .mech-clay{display:none}
-body.sk-blueprint .mech-pool{fill:none;stroke-dasharray:3 3}
+body.sk-blueprint .mech-pool{display:none}
 body.sk-blueprint .mech-t-label,body.sk-blueprint .mech-t-actor{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:11px;letter-spacing:.1em}
 body.sk-blueprint .mech-t-actor.mech-t-inside{fill:var(--mk-ink);stroke:var(--mk-halo)}
 body.sk-pastel .mech-t-actor.mech-t-inside{stroke:color-mix(in srgb,var(--mf) 88%,#fff)}
@@ -781,33 +818,44 @@ body.sk-blueprint .mech-tag rect{rx:1px}
 .mech-st-active>path:first-child{filter:var(--mk-glow-hot)}
 .mech-st-released{opacity:.8}
 .mech-scan{opacity:.85}
-.mech-t-nt{font:600 var(--mk-nt,13px) 'IBM Plex Mono',monospace;text-anchor:middle;fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 82%,var(--dtext))}
-.mech-ntbg{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 15%,var(--mk-tile,#08111F));stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 34%,transparent);stroke-width:.75;transition:opacity .4s ease,fill .4s ease}
-.mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 26%,var(--mk-tile,#08111F));stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 70%,transparent);stroke-width:1}
-.mech-bead{fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 82%,var(--dtext));stroke:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 55%,var(--mk-ink));stroke-width:1;filter:var(--mk-contact)}
+/* --mk-b is the base's tone inside a scene (the shared letter colour);
+   each skin mixes it toward its ink so letters pass AA on their tiles. */
+.mech-nt,.mech-ntbg,.mech-rung{--mk-b:var(--bio-letter,var(--mk-mute))}
+.mech-t-nt{font:600 var(--mk-nt,13px) 'IBM Plex Mono',monospace;text-anchor:middle;fill:color-mix(in srgb,var(--mk-b) 70%,var(--mk-ink))}
+.mech-ntbg{fill:color-mix(in srgb,var(--mk-b) 15%,var(--mk-tile,#08111F));stroke:none;transition:opacity .4s ease,fill .4s ease}
+.mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--mk-b) 22%,var(--mk-tile,#08111F));stroke:color-mix(in srgb,var(--mk-b) 70%,transparent);stroke-width:1}
+.mech-bead{fill:color-mix(in srgb,var(--mk-b) 82%,var(--dtext));stroke:color-mix(in srgb,var(--mk-b) 55%,var(--mk-ink));stroke-width:1;filter:var(--mk-contact)}
 .mech-bead-hi{fill:var(--mk-ball,none);pointer-events:none}
 .mech-nt.mech-hot{filter:var(--mk-glow)}
 .mech-bead.mech-hot{filter:var(--mk-glow)}
-.mech-passed{opacity:.7}
+/* Passed bases read as done, not faded: the tile desaturates and the
+   letter turns muted ink at full opacity (AA on the tile). */
+.mech-bead.mech-passed,.mech-bead-hi.mech-passed{opacity:.7}
+.mech-ntbg.mech-passed{fill:color-mix(in srgb,var(--mk-b) 6%,var(--mk-tile,#08111F))}
+.mech-t-nt.mech-passed{fill:var(--mk-mute)}
 .mech-nt{transition:opacity .4s ease}
-.mech-rail{stroke:var(--mk-line);stroke-width:5;stroke-linecap:round}
-.mech-rail-hi{stroke:#fff;stroke-opacity:calc(var(--mk-sheen,.45) * .7);stroke-width:1.3;stroke-linecap:round}
+.mech-rail{fill:none;stroke:var(--mk-line);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.mech-rail-hi{fill:none;stroke:#fff;stroke-opacity:calc(var(--mk-sheen,.45) * .7);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .mech-phos{fill:none;stroke:var(--mk-phos);stroke-linecap:round}
 .mech-rail-end{fill:var(--mk-line);stroke:var(--mk-line);stroke-width:1;stroke-linejoin:round}
-.mech-rung{stroke:color-mix(in srgb,var(--bio-letter,var(--mk-rung)) 42%,var(--mk-rung));stroke-width:2;stroke-linecap:round}
-.mech-hb{fill:none;stroke:var(--mk-hb);stroke-width:1;stroke-linecap:round;opacity:.9}
+.mech-rung{stroke:color-mix(in srgb,var(--mk-b) 42%,var(--mk-rung));stroke-width:2;stroke-linecap:round}
+.mech-hb{fill:none;stroke:var(--mk-hb);stroke-width:.9;stroke-linecap:round;stroke-opacity:.6}
 @media screen{
-body.sk-pastel .mech-t-nt{fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 50%,#24324A)}
-body.sk-pastel .mech-ntbg{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 11%,#fff);stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 30%,#fff)}
-body.sk-pastel .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 20%,#fff);stroke:color-mix(in srgb,#5263B9 72%,#fff);stroke-width:1.25}
+body.sk-pastel .mech-t-nt{fill:color-mix(in srgb,var(--mk-b) 45%,#24324A)}
+body.sk-pastel .mech-t-nt.mech-hot{fill:color-mix(in srgb,var(--mk-b) 42%,#24324A)}
+body.sk-pastel .mech-ntbg{fill:color-mix(in srgb,var(--mk-b) 10%,#fff);filter:drop-shadow(0 .6px .4px rgba(36,50,74,.10))}
+body.sk-pastel .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--mk-b) 16%,#fff);stroke:color-mix(in srgb,#5263B9 55%,#fff);stroke-width:1}
+body.sk-pastel .mech-ntbg.mech-passed{fill:color-mix(in srgb,var(--mk-b) 4%,#fff)}
 body.sk-pastel .mech-t-nt.mech-hot{filter:none}
-body.sk-pastel .mech-passed{opacity:.72}
-body.sk-pastel .mech-t-nt.mech-passed{fill:#526077}
-body.sk-pastel .mech-rung{stroke:color-mix(in srgb,var(--bio-letter,var(--mk-rung)) 40%,#C9D2E1)}
+body.sk-pastel .mech-t-nt.mech-passed{fill:#5F6C84}
+body.sk-pastel .mech-bead{fill:color-mix(in srgb,var(--mk-b) 58%,#fff);stroke:color-mix(in srgb,var(--mk-b) 80%,#24324A)}
+body.sk-pastel .mech-rung{stroke:color-mix(in srgb,var(--mk-b) 46%,#C9D2E1)}
 body.sk-blueprint .mech-rail{stroke-width:1.5;stroke-linecap:square}
 body.sk-blueprint .mech-rail-hi{display:none}
-body.sk-blueprint .mech-ntbg{fill:var(--mk-tile,#04234A);stroke:color-mix(in srgb,var(--bio-letter,#7FE3FF) 55%,transparent);rx:0}
-body.sk-blueprint .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,#7FE3FF) 24%,var(--mk-tile,#04234A));stroke:var(--bio-letter,#7FE3FF);stroke-width:1.5}
+body.sk-blueprint .mech-t-nt{fill:color-mix(in srgb,var(--mk-b) 55%,#F7FCFF)}
+body.sk-blueprint .mech-ntbg{fill:color-mix(in srgb,var(--mk-b) 18%,transparent);stroke:none;rx:0}
+body.sk-blueprint .mech-ntbg.mech-passed{fill:color-mix(in srgb,var(--mk-b) 7%,transparent)}
+body.sk-blueprint .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--mk-b) 26%,transparent);stroke:var(--mk-b);stroke-width:1.5}
 body.sk-blueprint .mech-phos{display:none}
 body.sk-blueprint .mech-rail-end{fill:none;stroke-width:1.5;stroke-linejoin:miter}
 }

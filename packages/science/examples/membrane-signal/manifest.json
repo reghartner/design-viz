@@ -1,0 +1,16 @@
+{
+  "pages": [
+    {
+      "file": "membrane-signal.html",
+      "spec": "membrane-signal.spec.json",
+      "title": "A signal crosses the membrane and the cell divides",
+      "family": "membrane-signal",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "cellscene",
+        "log"
+      ]
+    }
+  ]
+}

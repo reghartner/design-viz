@@ -227,9 +227,11 @@ function packageManifest(name, root = sourceRoot) {
   }
   return metadata;
 }
-function sitePackageSelection(root = sourceRoot) {
-  const file = path.join(root, '../workbench/site.json');
-  if (!fs.existsSync(file)) return null;
+function sitePackageSelection(root = sourceRoot, file = path.join(root, '../workbench/site.json'), required = false) {
+  if (!fs.existsSync(file)) {
+    if (required) throw new Error('Site config does not exist: ' + file);
+    return null;
+  }
   let data;
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (error) { throw new Error('Invalid site config ' + file + ': ' + error.message); }
@@ -246,8 +248,10 @@ function enabledPackages(root = sourceRoot) {
   // list. Explicit CLI preview packages remain additive to that selection.
   const configured = Object.hasOwn(process.env, 'FLOWVIEW_PACKAGE_BASE')
     ? process.env.FLOWVIEW_PACKAGE_BASE.split(',').filter(Boolean)
-    : process.env.FLOWVIEW_COMPANY_IDENTITY === 'off' ? []
-    : sitePackageSelection(root) ?? companyConfig(root)?.packages ?? [];
+    : process.env.FLOWVIEW_SITE_CONFIG
+      ? sitePackageSelection(root, path.resolve(process.env.FLOWVIEW_SITE_CONFIG), true) ?? companyConfig(root)?.packages ?? []
+      : process.env.FLOWVIEW_COMPANY_IDENTITY === 'off' ? []
+      : sitePackageSelection(root) ?? companyConfig(root)?.packages ?? [];
   const selected = process.env.FLOWVIEW_PACKAGES ? process.env.FLOWVIEW_PACKAGES.split(',').filter(Boolean) : [];
   const names = [...new Set([...configured, ...selected])].sort();
   for (const name of names) packageManifest(name, root);

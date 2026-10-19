@@ -9,6 +9,14 @@ state and never forecasts. The complete teaching page is
 (UBS Arena, Elmont, NY; two paths: **Sells out** and **Soft demand → upper
 tier repriced**).
 
+When revising a story, inspect every step's visible `note` alongside its sold,
+held and available counts. A sparse patch carries an earlier note forward;
+set `note: null` when that explanation no longer applies. Validation checks
+field shape, not whether a carried sentence still describes the current beat.
+For a map beside a data panel, keep the map wide enough to read section labels
+in the desktop preview; adjust the composed tile layout if the first draft
+shrinks the venue to an unreadable third column.
+
 ## Pick a venue from the library
 
 The quickest map is a venue from the library. One field draws a whole arena:

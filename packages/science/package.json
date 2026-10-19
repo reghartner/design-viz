@@ -7,8 +7,6 @@
     "panels/types/frames.js",
     "panels/types/reads.js",
     "panels/types/locus.js",
-    "panels/types/funnel.js",
-    "panels/types/grid.js",
     "panels/types/strandscene.js",
     "panels/types/cellscene.js",
     "panels/types/forcebody.js",
@@ -16,11 +14,9 @@
     "panels/types/wavefield.js"
   ],
   "routes": {
-    "cellscene": "cookbook/viral-copy-gate.md",
+    "cellscene": "cookbook/cell-scenes.md",
     "forcebody": "cookbook/physics-panels.md",
     "frames": "cookbook/sequence-panels.md",
-    "funnel": "cookbook/sequence-panels.md",
-    "grid": "cookbook/sequence-panels.md",
     "locus": "cookbook/sequence-panels.md",
     "reads": "cookbook/sequence-panels.md",
     "rnacopy": "cookbook/viral-copy-gate.md",

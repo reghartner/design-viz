@@ -347,7 +347,7 @@ function locusModel(panel, state, options) {
   var ideogram = ideoHeight ? {
     features: declared.map(function (feature, i) {
       return { id: feature.id, tone: feature.tone, x: (feature.from - 1) / total * 100, width: (feature.to - feature.from + 1) / total * 100,
-        highlight: features[i].highlight };
+        highlight: features[i].highlight, dim: features[i].dim };
     }),
     win: { x: (win.from - 1) / total * 100, width: win.span / total * 100 } } : null;
   return { valid: valid, length: length, unit: unit, label: typeof panel.label === 'string' ? panel.label : '', window: win, ideogram: ideogram,
@@ -403,7 +403,7 @@ function locusHTML(panel, state, options) {
   if (model.ideogram) {
     h += '<span class="locus-ideo" aria-hidden="true" style="top:' + LOCUS_IDEO_STRIP.top + 'px;height:' + LOCUS_IDEO_STRIP.height + 'px">';
     model.ideogram.features.forEach(function (feature) {
-      h += '<i class="bio-tone-' + feature.tone + (feature.highlight ? ' locus-hl' : '') + '" style="left:' + pct(feature.x) + ';width:' + pct(feature.width) + '"></i>';
+      h += '<i class="bio-tone-' + feature.tone + (feature.highlight ? ' locus-hl' : feature.dim ? ' locus-dim' : '') + '" style="left:' + pct(feature.x) + ';width:' + pct(feature.width) + '"></i>';
     });
     h += '</span><b class="locus-ideo-win' + (model.zoomed ? '' : ' locus-ideo-all') + '" aria-hidden="true" style="left:' + pct(model.ideogram.win.x + model.ideogram.win.width / 2) + ';width:' + pct(model.ideogram.win.width) +
       ';top:' + LOCUS_IDEO_WIN.top + 'px;height:' + LOCUS_IDEO_WIN.height + 'px"></b>';
@@ -437,8 +437,11 @@ function locusHTML(panel, state, options) {
   if (visibleFeatures.length) {
     h += '<ul class="locus-legend">';
     visibleFeatures.forEach(function (feature) {
-      h += '<li' + (feature.highlight ? ' class="locus-hl"' : '') + '><span class="locus-key bio-tone-' + feature.tone + '"></span>' +
-        esc(feature.label + (feature.strand ? ' ' + feature.strand : '') + ' · ' + locusFormat(feature.from, model.unit) + '–' + locusFormat(feature.to, model.unit)) + '</li>';
+      /* "gene B − 15.8–19.1 kb": a true minus sign, the unit printed once. */
+      var range = feature.from === feature.to ? locusFormat(feature.from, model.unit) :
+        locusFormat(feature.from, model.unit).replace(/ \w+$/, '') + '–' + locusFormat(feature.to, model.unit);
+      h += '<li' + (feature.highlight ? ' class="locus-hl"' : feature.dim ? ' class="locus-dim"' : '') + '><span class="locus-key bio-tone-' + feature.tone + '"></span>' +
+        esc(feature.label) + (feature.strand ? ' <span class="locus-strand">' + (feature.strand === '-' ? '−' : '+') + '</span>' : '') + ' <small>' + esc(range) + '</small></li>';
     });
     h += '</ul>';
   } else h += '<p class="locus-empty">' + (model.features.length ? 'No features inside this window.' : 'No features declared.') + '</p>';
@@ -544,13 +547,21 @@ body.sk-pastel .locus-feature:not(.locus-hl):not(.locus-dim){--lf-fill:linear-gr
   filter:drop-shadow(0 3px 4px rgba(36,50,74,.24))}
 .sk-aurora .locus-feature.locus-hl{--lf-fill:linear-gradient(180deg,#5FE3FF,#2CB5D2);--lf-edge:#5FE3FF;filter:drop-shadow(0 0 5px rgba(56,225,255,.35))}
 body.sk-pastel .locus-feature.locus-hl{--lf-fill:linear-gradient(180deg,color-mix(in srgb,#5263B9 92%,#FFFFFF),#5263B9 70%);--lf-edge:#3D4C9E;filter:drop-shadow(0 0 1.5px rgba(82,99,185,.55)) drop-shadow(0 3px 5px rgba(61,76,158,.3))}
+/* Zoomed so far that the chosen gene fills the window, a solid neon slab
+   would swamp the card: aurora draws it as an accent outline on a 30 % fill. */
+body.sk-aurora:not(.sk-pastel):not(.sk-blueprint) .locus-feature.locus-hl:is(.locus-clip-l,.locus-clip-r){--lf-fill:color-mix(in srgb,#38E1FF 30%,#0B1220);--lf-edge:#38E1FF;--lf-ink:#EAF2FF;filter:none}
 body.sk-blueprint .locus-feature.locus-hl{filter:none;--lf-fill:color-mix(in srgb,#7FE3FF 34%,#052956);--lf-edge:var(--sq-accent);--lf-ink:var(--sq-ink)}
 .locus-feature.locus-hl i{overflow:visible}
 .locus-feature.locus-dim{--lf-edge:var(--sq-line-strong,color-mix(in srgb,var(--dtext) 30%,transparent));--lf-fill:var(--sq-well,color-mix(in srgb,var(--dtext) 8%,transparent));--lf-ink:var(--sq-muted,var(--dfaint))}
+/* Idle-but-not-chosen genes keep their own hue, quietly: a pale tone fill and
+   a tone edge leaning toward the muted ink (well over 3:1 on the track). */
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-dim{--lf-fill:color-mix(in srgb,var(--bio-tone,var(--sq-muted)) 13%,var(--sq-surface));--lf-edge:color-mix(in srgb,var(--bio-tone,var(--sq-muted)) 55%,var(--sq-muted));--lf-ink:var(--sq-muted)}
+.sk-aurora .locus-feature.locus-dim{--lf-fill:color-mix(in srgb,var(--bio-tone,var(--sq-muted)) 16%,var(--sq-surface));--lf-edge:color-mix(in srgb,var(--bio-tone,var(--sq-muted)) 50%,var(--sq-line-strong))}
 :is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-dim{opacity:1}
 .locus-feature.locus-dim{opacity:.9}
 body.sk-blueprint .locus-feature,body.sk-blueprint .locus-feature::before,body.sk-blueprint .locus-feature::after{border-radius:0}
-body.sk-blueprint .locus-feature{--lf-fill:color-mix(in srgb,var(--bio-tone,#7FE3FF) 24%,var(--sq-surface));--lf-edge:var(--bio-tone,#7FE3FF);--lf-ink:var(--sq-ink);font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase}
+body.sk-blueprint .locus-feature:not(.locus-dim):not(.locus-hl){--lf-fill:color-mix(in srgb,var(--bio-tone,#7FE3FF) 24%,var(--sq-surface));--lf-edge:var(--bio-tone,#7FE3FF);--lf-ink:var(--sq-ink)}
+body.sk-blueprint .locus-feature{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase}
 /* Markers: a teardrop pin with a light core above a 1.5 px stem. */
 .locus-marker{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;font:600 10.5px/12px 'IBM Plex Sans',sans-serif;color:var(--sq-ink,var(--dink));white-space:nowrap}
 .locus-marker b{position:relative;font-weight:600;padding:0 3px;border-radius:3px;text-shadow:0 0 3px var(--sq-surface,transparent),0 0 2px var(--sq-surface,transparent)}
@@ -584,6 +595,7 @@ body.sk-blueprint .locus-arclabel{border-radius:2px}
 .locus-ideo i{position:absolute;top:1px;bottom:1px;min-width:2px}
 .locus-ideo i[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 55%,var(--sq-surface,transparent))}
 .locus-ideo i.locus-hl{background:var(--sq-accent,var(--bio-tone))}
+.locus-ideo i.locus-dim{background:color-mix(in srgb,var(--bio-tone) 30%,var(--sq-surface,transparent))}
 .locus-ideo-win{position:absolute;box-sizing:border-box;min-width:7px;transform:translateX(-50%);border:1.5px solid var(--sq-accent,var(--dink));border-radius:3px;background:var(--sq-accent-soft,transparent);transition:left .42s cubic-bezier(.2,.7,.2,1),width .42s cubic-bezier(.2,.7,.2,1)}
 .locus-ideo-all{border-width:1px;opacity:.6}
 body.sk-blueprint .locus-ideo,body.sk-blueprint .locus-ideo-win{border-radius:0}
@@ -595,6 +607,12 @@ body.sk-blueprint .locus-ideo,body.sk-blueprint .locus-ideo-win{border-radius:0}
 .locus-legend li.locus-hl{color:var(--sq-accent-ink,var(--dink));font-weight:600}
 .locus-key{flex:none;display:inline-block;width:10px;height:10px;border-radius:3px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone,currentColor) var(--sq-edge-k,70%),var(--sq-edge-mix,var(--dink)))}
 .locus-key[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) var(--sq-tint,26%),var(--sq-surface,transparent))}
+.locus-legend small{font-size:11px;color:var(--sq-muted,var(--dfaint))}
+.locus-legend li.locus-hl small{color:inherit;font-weight:500}
+.locus-strand{font:600 11px/1 'IBM Plex Mono',monospace;color:var(--sq-muted,var(--dfaint))}
+.locus-legend li.locus-hl .locus-strand{color:inherit}
+.locus-legend li.locus-dim{color:var(--sq-muted,var(--dfaint))}
+.locus-legend li.locus-dim .locus-key{background:color-mix(in srgb,var(--bio-tone) 13%,var(--sq-surface,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 55%,var(--sq-muted,var(--dtext)))}
 .locus-legend li.locus-hl .locus-key{background:var(--sq-accent,var(--bio-tone));box-shadow:0 0 0 2px var(--sq-accent-soft,transparent)}
 body.sk-blueprint .locus-key{border-radius:0}
 .locus-empty{margin:6px 0 0;font-size:11.5px;color:var(--sq-muted,var(--dfaint))}

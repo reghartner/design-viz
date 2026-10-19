@@ -1,0 +1,15 @@
+{
+  "pages": [
+    {
+      "file": "venue-map.html",
+      "spec": "venue-map.spec.json",
+      "title": "Venue map — a sell-through story",
+      "family": "examples",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "seatmap"
+      ]
+    }
+  ]
+}

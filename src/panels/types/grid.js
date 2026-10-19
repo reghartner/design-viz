@@ -312,11 +312,11 @@ PanelRegistry.define('grid', {
   authoring: {
     initialFields: true,
     template: {
-      title: 'Expression contrast', decimals: 2,
-      rows: [{ id: 'treated', label: 'Treated' }, { id: 'control', label: 'Control' }],
-      cols: [{ id: 'geneA', label: 'Gene A' }, { id: 'geneB', label: 'Gene B' }],
+      title: 'Values by group', decimals: 2,
+      rows: [{ id: 'groupA', label: 'Group A' }, { id: 'groupB', label: 'Group B' }],
+      cols: [{ id: 'period1', label: 'Period 1' }, { id: 'period2', label: 'Period 2' }],
       scale: { min: -2, max: 2, kind: 'diverging' },
-      initial: { cells: { 'treated.geneA': 1.4, 'treated.geneB': -0.6, 'control.geneA': 0.1, 'control.geneB': 0.2 } },
+      initial: { cells: { 'groupA.period1': 1.4, 'groupA.period2': -0.6, 'groupB.period1': 0.1, 'groupB.period2': 0.2 } },
     },
     setupFields: [
       ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
@@ -329,31 +329,31 @@ PanelRegistry.define('grid', {
       cols: { label: 'Columns', help: 'Declare 1–12 columns with unique ids (letters, digits, - or _; no dots).' },
       scale: { label: 'Colour scale', help: '{"min","max","kind","mid"}. Kind is sequential (default) or diverging; min/max default to the current values; mid defaults to the midpoint.' },
       decimals: { label: 'Decimals', help: 'Digits after the decimal point, 0–4. Default 2.' },
-      unit: { label: 'Unit suffix', help: 'Optional text appended to values in tooltips and the key, e.g. log2FC or %.' },
-      cells: { label: 'Cell values', help: 'An object keyed "<rowId>.<colId>", e.g. {"treated.geneA": 1.4}. Keys merge into the carried values; null forgets a cell; null for the whole field clears every value.', nullLabel: 'Clear every value' },
+      unit: { label: 'Unit suffix', help: 'Optional text appended to values in tooltips and the key, e.g. points or %.' },
+      cells: { label: 'Cell values', help: 'An object keyed "<rowId>.<colId>", e.g. {"groupA.period1": 1.4}. Keys merge into the carried values; null forgets a cell; null for the whole field clears every value.', nullLabel: 'Clear every value' },
       marks: { label: 'Significance marks', help: 'An object keyed like cells with "*", "**", "***", "ns" or "". Merges like cells.', nullLabel: 'Clear every mark' },
       highlight: { label: 'Highlight', help: '{"row","col","cell"}: outline one row, one column and/or one cell ("<rowId>.<colId>").', nullLabel: 'No highlight' },
       note: { label: 'Explanation' },
     },
     picker: {
-      order: 45, name: 'Value matrix', category: 'Science & sequencing', tagline: 'A k × k table coloured by value',
+      order: 45, name: 'Value matrix', category: 'Data & charts', tagline: 'A k × k table coloured by value',
       description: 'Compare authored numbers across two labelled axes as a small heatmap with significance marks and row, column or cell emphasis.',
     },
     example: function (sample) {
       var panel = sample.panel, state = sample.state;
-      panel.title = 'Enrichment by condition';
-      panel.unit = 'log2';
-      panel.rows = [{ id: 'early', label: 'Early' }, { id: 'mid', label: 'Mid' }, { id: 'late', label: 'Late' }];
-      panel.cols = [{ id: 'motifA', label: 'Motif A' }, { id: 'motifB', label: 'Motif B' }, { id: 'motifC', label: 'Motif C' }];
+      panel.title = 'Values over time';
+      panel.unit = 'points';
+      panel.rows = [{ id: 'first', label: 'First' }, { id: 'middle', label: 'Middle' }, { id: 'last', label: 'Last' }];
+      panel.cols = [{ id: 'a', label: 'Group A' }, { id: 'b', label: 'Group B' }, { id: 'c', label: 'Group C' }];
       panel.scale = { min: -3, max: 3, kind: 'diverging' };
       state.cells = {
-        'early.motifA': 0.4, 'early.motifB': -1.2, 'early.motifC': 2.6,
-        'mid.motifA': 1.1, 'mid.motifB': -0.3, 'mid.motifC': 1.8,
-        'late.motifA': 2.9, 'late.motifB': -2.4,
+        'first.a': 0.4, 'first.b': -1.2, 'first.c': 2.6,
+        'middle.a': 1.1, 'middle.b': -0.3, 'middle.c': 1.8,
+        'last.a': 2.9, 'last.b': -2.4,
       };
-      state.marks = { 'early.motifC': '***', 'late.motifA': '**', 'late.motifB': '*', 'mid.motifB': 'ns' };
-      state.highlight = { cell: 'late.motifA' };
-      state.note = 'Illustrative values. Late × Motif C is not yet measured.';
+      state.marks = { 'first.c': '***', 'last.a': '**', 'last.b': '*', 'middle.b': 'ns' };
+      state.highlight = { cell: 'last.a' };
+      state.note = 'Illustrative values. Last × Group C is not yet measured.';
       panel.initial = builderClone(state);
       return sample;
     },

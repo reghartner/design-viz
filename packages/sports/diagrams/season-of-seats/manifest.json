@@ -1,0 +1,28 @@
+{
+  "pages": [
+    {
+      "file": "season-of-seats.html",
+      "spec": "season-of-seats.spec.json",
+      "title": "A season of selling the seat",
+      "family": "season-of-seats",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "budget",
+        "checks",
+        "cost",
+        "deviceapp",
+        "funnel",
+        "grid",
+        "log",
+        "orbit",
+        "queue",
+        "seatmap",
+        "state",
+        "table",
+        "tiles",
+        "timeline"
+      ]
+    }
+  ]
+}

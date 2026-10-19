@@ -34,11 +34,17 @@ class OptionalPackageContextTest(unittest.TestCase):
             self.assertFalse(any(path.startswith(('packages/science/', 'packages/sports/')) for path in files))
             self.assertNotIn('tools/enabled-packages.json', files)
             contract = files['contract/authoring-contract.md']
-            for name in ('wavefield', 'forcebody', 'rnacopy', 'sequence', 'frames', 'reads', 'locus', 'funnel', 'grid', 'strandscene', 'cellscene', 'seatmap'):
+            for name in ('wavefield', 'forcebody', 'rnacopy', 'sequence', 'frames', 'reads', 'locus', 'strandscene', 'cellscene', 'seatmap'):
                 self.assertNotIn('- `' + name + '` —', contract)
+            for name in ('funnel', 'grid'):
+                self.assertIn('- `' + name + '` —', contract)
             self.assertNotIn('physics-panels.md', files['.claude/skills/hld-to-page/SKILL.md'])
             packet = packet_for('state')
             self.assertNotIn('packages/science/', packet)
+            generic_packet = packet_for('funnel')
+            self.assertIn('cookbook/data-panels.md', generic_packet)
+            self.assertNotIn('packages/science/', generic_packet)
+            self.assertNotIn('packages/sports/', generic_packet)
 
     def test_selected_package_adds_contract_routes_and_examples(self):
         with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'science'}):
@@ -46,6 +52,7 @@ class OptionalPackageContextTest(unittest.TestCase):
             self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['science'])
             for path in ('packages/science/package.json',
                          'packages/science/cookbook/physics-panels.md',
+                         'packages/science/cookbook/cell-scenes.md',
                          'packages/science/cookbook/viral-copy-gate.md',
                          'packages/science/starters/copy-gate.json',
                          'packages/science/starters/waves-and-forces.json',
@@ -68,6 +75,9 @@ class OptionalPackageContextTest(unittest.TestCase):
             packet = packet_for('rnacopy')
             self.assertIn('packages/science/cookbook/viral-copy-gate.md', packet)
             self.assertNotIn('packages/science/cookbook/physics-panels.md', packet)
+            cell_packet = packet_for('cellscene')
+            self.assertIn('packages/science/cookbook/cell-scenes.md', cell_packet)
+            self.assertNotIn('packages/science/cookbook/viral-copy-gate.md', cell_packet)
 
 
     def test_selected_sports_package_adds_venue_context_only(self):
@@ -80,11 +90,16 @@ class OptionalPackageContextTest(unittest.TestCase):
                 self.assertIn(path, files)
             self.assertFalse(any(path.startswith('packages/science/') for path in files))
             contract = files['contract/authoring-contract.md']
+            self.assertIn('- `grid` —', contract)
+            self.assertIn('- `funnel` —', contract)
             self.assertIn('- `seatmap` —', contract)
             self.assertNotIn('- `rnacopy` —', contract)
             packet = packet_for('seatmap')
             self.assertIn('packages/sports/cookbook/venue-map.md', packet)
             self.assertNotIn('packages/science/', packet)
+            data_packet = packet_for('funnel')
+            self.assertIn('cookbook/data-panels.md', data_packet)
+            self.assertNotIn('packages/science/', data_packet)
 
 
 

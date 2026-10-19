@@ -1,5 +1,4 @@
 'use strict';
-process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -24,7 +23,7 @@ const intensities = m => plain(m.rows.map(row => row.cells.map(cell => cell.inte
 test('grid template, picker example, feature label, styles and registry metadata use ordinary discovery', () => {
   const d = {nodes:{n:{}}, rows:[['n']], panels:[{...plain(C.PANEL_TEMPLATES.grid), id:'g', type:'grid'}]};
   assert.deepEqual(validate(d), {errors:[], warnings:[]});
-  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'grid' && item.category === 'Science & sequencing'));
+  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'grid' && item.category === 'Data & charts'));
   const example = C.panelPickerExample('grid');
   assert.equal(example.panel.type, 'grid');
   assert.deepEqual(validate({nodes:{n:{}}, rows:[['n']], panels:[example.panel]}), {errors:[], warnings:[]});
@@ -34,7 +33,7 @@ test('grid template, picker example, feature label, styles and registry metadata
   assert.equal(panelAssets().features['panel.grid'].since, '0.2.0');
   const css = readStyles('style.core.css');
   assert.match(css, /\.grid-cell\{/); assert.match(css, /color-mix\(in srgb,var\(--grid-high\)/); assert.match(css, /prefers-reduced-motion/);
-  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/types/grid.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../src/panels/types/grid.js'), 'utf8');
   assert.doesNotMatch(source, /\.bio-tone-[a-z]*\s*\{/); assert.doesNotMatch(source, /document\.|setTimeout|fetch\(/);
   assert.equal(C.PanelRegistry.get('grid').order, 45); assert.equal(C.panelAuthoring('grid').picker.order, 45);
   assert.deepEqual(plain(C.PanelRegistry.get('grid').layout.sectionSizing), {minWidth:240, preferredWidth:380, maxWidth:700, aspectPolicy:'content', grow:1});

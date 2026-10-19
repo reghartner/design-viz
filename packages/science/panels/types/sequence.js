@@ -233,7 +233,7 @@ function bioLegendHTML(legend) {
   var chars = legend.reduce(function (sum, mark) { return sum + String(mark.label).length + 12; }, 0);
   return '<ul class="bio-legend' + (legend.length >= 4 && chars * 6.4 > 520 ? ' bio-legend-grid' : '') + '" aria-label="Highlighted ranges">' + legend.map(function (mark) {
     return '<li class="bio-key"><i class="bio-tone-' + mark.tone + '" aria-hidden="true"></i>' + esc(mark.label) +
-      ' <small>' + bioFormatCoord(mark.from) + '–' + bioFormatCoord(mark.to) + '</small></li>';
+      ' <small>' + bioFormatCoord(mark.from) + (mark.to !== mark.from ? '–' + bioFormatCoord(mark.to) : '') + '</small></li>';
   }).join('') + '</ul>';
 }
 /* `cursor` (optional) is the cursor coordinate on this row: tick labels close
@@ -254,29 +254,49 @@ function sequenceHTML(panel, state, dx, fresh) {
   var model = sequenceModel(panel, state);
   var h = '<div class="seq-track' + (model.alphabet === 'protein' ? ' bio-protein' : '') + '" role="group" aria-label="' + esc(seqSummary(model)) + '">';
   h += '<div class="seq-head' + (model.label ? '' : ' seq-head-bare') + '">' + (model.label ? '<span class="seq-label">' + esc(model.label) + '</span>' : '') +
-    '<span class="seq-meta">' + model.alphabet.toUpperCase() + ' · ' + model.strand + ' strand' +
+    '<span class="seq-meta">' + model.alphabet.toUpperCase() + ' · ' + (model.strand === '-' ? '−' : '+') + ' strand' +
     (model.length ? ' · ' + bioFormatCoord(model.first) + '–' + bioFormatCoord(model.last) : '') + '</span></div>';
   if (!model.length) return h + '<div class="seq-empty">No sequence declared.</div></div>';
   if (model.hiddenBefore) h += '<div class="seq-more">… ' + bioFormatCoord(model.hiddenBefore) + ' more before ' + bioFormatCoord(model.from) + '</div>';
-  h += '<div class="seq-rows" style="--seq-span:' + (model.rows.length ? model.rows[0].letters.length : 1) + '">';
+  /* Printed-figure rhythm: letters fall into groups of ten by coordinate
+     (GenBank style) with a narrow gap track after each tenth, and the row's
+     last coordinate closes the line. Grouping needs every row to share one
+     gap pattern, so it applies to a single row or a wrap that is a multiple
+     of ten. --seq-at stays the letter index; --seq-g adds the gap tracks. */
+  var span0 = model.rows.length ? model.rows[0].letters : [], grouped = span0.length > 1 && (model.rows.length === 1 || model.wrap % 10 === 0);
+  var cut = function (letters, index) { return grouped && letters[index].tick && index < span0.length - 1 && index < letters.length - 1; };
+  var gapsBefore = function (letters, index) { var n = 0; for (var j = 0; j < index; j++) if (cut(letters, j)) n++; return n; };
+  var tpl = '';
+  if (grouped) {
+    var run = 0, parts = [];
+    span0.forEach(function (letter, index) { run++; if (cut(span0, index) || index === span0.length - 1) { parts.push('repeat(' + run + ',minmax(9px,1fr))'); run = 0; } });
+    tpl = parts.join(' minmax(4px,.45fr) ') + ' var(--seq-endw)';
+  }
+  h += '<div class="seq-rows' + (grouped ? ' seq-grouped' : '') + '" style="--seq-span:' + (model.rows.length ? model.rows[0].letters.length : 1) + '">';
   model.rows.forEach(function (row) {
-    h += '<div class="seq-row" style="--seq-cols:' + row.letters.length + '"><span class="seq-gutter">' + bioFormatCoord(row.from) + '</span><div class="seq-cells">' +
-      '<div class="seq-line seq-ruler" aria-hidden="true">' + seqRulerHTML(row.letters, 'seq-tick', row.cursorAt >= 0 ? model.cursor : null) + '</div>' +
-      '<div class="seq-line seq-letters">' + row.letters.map(function (letter) {
-        var k = fresh && letter.revealed && letter.index >= fresh.from && letter.index < fresh.to ? letter.index - fresh.from : -1;
-        var far = letter.revealed || model.reveal === null ? -1 : Math.min(letter.index - model.reveal, 8);
-        return '<span class="' + letter.cls + (letter.revealed ? '' : ' seq-dim') + (letter.cursor ? ' seq-at-cursor' : '') + (k >= 0 ? ' seq-new' : '') + '"' +
-          (k >= 0 ? ' style="--seq-k:' + Math.min(k, 6) + '"' : far >= 0 ? ' style="--seq-ink:' + (34 - far * 2) + '%"' : '') +
-          (letter.unknown ? ' title="Not in the ' + model.alphabet + ' alphabet"' : '') + '>' + esc(letter.ch) + '</span>';
+    var gap = function (index, extra) { return cut(row.letters, index) ? '<span class="seq-gap' + (extra || '') + '"></span>' : ''; };
+    h += '<div class="seq-row" style="--seq-cols:' + (grouped ? span0.length : row.letters.length) + (grouped ? ';--seq-tpl:' + tpl : '') + '"><span class="seq-gutter">' + bioFormatCoord(row.from) + '</span><div class="seq-cells">' +
+      '<div class="seq-line seq-ruler" aria-hidden="true">' + row.letters.map(function (letter, index) {
+        return seqRulerHTML([letter], 'seq-tick', row.cursorAt >= 0 ? model.cursor : null) + gap(index);
       }).join('') + '</div>' +
+      '<div class="seq-line seq-letters">' + row.letters.map(function (letter, index) {
+        var k = fresh && letter.revealed && letter.index >= fresh.from && letter.index < fresh.to ? letter.index - fresh.from : -1;
+        /* Unmade letters sit near the paper; only the few just past the
+           reveal edge keep a little more ink, so the growing end reads. */
+        var far = letter.revealed || model.reveal === null ? -1 : model.reveal > 0 ? Math.max(10, 38 - Math.min(letter.index - model.reveal, 6) * 5) : 14;
+        return '<span class="' + letter.cls + (letter.revealed ? '' : ' seq-dim') + (letter.cursor ? ' seq-at-cursor' : '') + (k >= 0 ? ' seq-new' : '') + '"' +
+          (k >= 0 ? ' style="--seq-k:' + Math.min(k, 6) + '"' : far >= 0 ? ' style="--seq-ink:' + far + '%"' : '') +
+          (letter.unknown ? ' title="Not in the ' + model.alphabet + ' alphabet"' : '') + '>' + esc(letter.ch) + '</span>' + gap(index);
+      }).join('') + (grouped ? '<span class="seq-endc" aria-hidden="true" style="grid-column:' + (row.letters.length + gapsBefore(row.letters, row.letters.length - 1) + 1) + '/-1">' + bioFormatCoord(row.to) + '</span>' : '') + '</div>' +
       '<div class="seq-line seq-band" aria-hidden="true">' + row.letters.map(function (letter, index) {
         var previous = row.letters[index - 1], next = row.letters[index + 1];
         return '<span class="seq-bandcell' + (letter.tone ? ' bio-tone-' + letter.tone : '') +
           (letter.tone && !(previous && previous.markId === letter.markId) ? ' seq-band-start' : '') +
-          (letter.tone && !(next && next.markId === letter.markId) ? ' seq-band-end' : '') + '"></span>';
+          (letter.tone && !(next && next.markId === letter.markId) ? ' seq-band-end' : '') + '"></span>' +
+          gap(index, letter.tone && next && next.markId === letter.markId ? ' bio-tone-' + letter.tone : '');
       }).join('') + '</div>';
     if (row.cursorAt >= 0)
-      h += '<div class="seq-line seq-cursor-line"><span class="seq-cur" style="--seq-at:' + row.cursorAt +
+      h += '<div class="seq-line seq-cursor-line"' + (grouped ? ' style="--seq-g:' + gapsBefore(row.letters, row.cursorAt) + '"' : '') + '><span class="seq-cur" style="--seq-at:' + row.cursorAt +
         (dx ? ';transform:translateX(' + dx * 100 + '%)' : '') + '"><b></b><i>' + bioFormatCoord(model.cursor) + '</i></span></div>';
     h += '</div></div>';
   });
@@ -321,7 +341,7 @@ PanelRegistry.define('sequence', {
     height: 8, fallbackHeight: 8,
   },
   /* The first block is the shared residue and tone palette. The sequence
-     panel owns these `.bio-*` rules; reads, frames, locus, funnel and grid
+     panel owns these `.bio-*` rules; reads, frames and locus
      reuse the class names and must not redefine them. Letters lean toward
      the skin's text colour through color-mix so one rule reads on light and
      dark skins. `.bio-protein` switches letters to chemistry groups. Each
@@ -423,7 +443,7 @@ body.sk-blueprint .seq-meta{border-radius:2px}
 .seq-row{display:flex;align-items:flex-start;gap:6px;min-width:0}
 .seq-gutter{flex:none;width:40px;padding-top:16px;text-align:right;font:500 10.5px/19px 'IBM Plex Mono',monospace;color:var(--sq-muted,var(--dfaint));font-variant-numeric:tabular-nums lining-nums}
 .seq-cells{position:relative;flex:1;min-width:0;max-width:calc(var(--seq-span,60) * 30px);display:flex;flex-direction:column}
-.seq-line{display:grid;grid-template-columns:repeat(var(--seq-cols),minmax(9px,1fr));position:relative;width:calc(100% * var(--seq-cols) / var(--seq-span,var(--seq-cols)))}
+.seq-line{display:grid;grid-template-columns:var(--seq-tpl,repeat(var(--seq-cols),minmax(9px,1fr)));position:relative;width:calc(100% * var(--seq-cols) / var(--seq-span,var(--seq-cols)))}
 /* Ruler: a hairline baseline with ticks centred on each letter; every fifth
    tick is taller and every tenth carries its coordinate. */
 .seq-ruler{height:16px;align-items:end}
@@ -433,22 +453,34 @@ body.sk-blueprint .seq-meta{border-radius:2px}
 .seq-tick-5::before{height:5px}
 .seq-tick-n::before{height:7px;background:var(--sq-muted,color-mix(in srgb,var(--dtext) 50%,transparent))}
 .seq-tick-n i{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font:500 10px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--sq-muted,var(--dfaint));font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+/* Groups of ten: a narrow gap track breaks the ruler's baseline between
+   tens, and the row's last coordinate sets in its own closing column. */
+.seq-grouped{--seq-endw:48px}
+.seq-grouped .seq-cells{max-width:calc(var(--seq-span,60) * 31px + 48px)}
+.seq-grouped .seq-ruler::after{right:var(--seq-endw)}
+.seq-gap{display:block;position:relative;min-width:0}
+.seq-ruler .seq-gap{align-self:end;height:1px;z-index:1;background:var(--sq-surface,transparent)}
+.seq-band .seq-gap{height:6px;box-sizing:border-box}
+.seq-band .seq-gap[class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) var(--sq-tint,30%),var(--sq-surface,transparent));border:1px solid color-mix(in srgb,var(--bio-tone) var(--sq-edge-k,100%),var(--sq-edge-mix,var(--bio-tone)));border-left-width:0;border-right-width:0}
+.seq-endc{justify-self:start;align-self:center;padding-left:8px;font:500 10.5px/19px 'IBM Plex Mono',monospace;color:var(--sq-muted,var(--dfaint));font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
 /* A tick label right under the cursor pill would collide with it. */
 .seq-tick-near i{visibility:hidden}
 .seq-letters{margin-top:0}
-.seq-letters .bio-b{display:block;overflow:hidden;font-size:14px;line-height:19px;border-radius:4px;transition:color .42s cubic-bezier(.2,.7,.2,1),opacity .42s cubic-bezier(.2,.7,.2,1),background-color .24s ease}
-/* Letters that do not exist yet: a pale ghost of their base colour that
-   fades further with distance from the reveal edge (--seq-ink, set per
-   letter), so the growing copy has a visible leading edge. */
+.seq-letters .bio-b{display:block;position:relative;overflow:hidden;font-size:14px;line-height:19px;border-radius:4px;transition:color .42s cubic-bezier(.2,.7,.2,1),opacity .42s cubic-bezier(.2,.7,.2,1),background-color .24s ease}
+/* Letters that do not exist yet sit close to the paper (about 1.5:1), each
+   on a short muted slot, so the unmade run reads as a dashed rule rather
+   than faded type. The few just past the reveal edge keep a little more ink
+   (--seq-ink, set per letter) so the growing end is visible. */
 .seq-dim{opacity:.25}
-.sk-aurora .seq-dim,body.sk-pastel .seq-dim,body.sk-blueprint .seq-dim{opacity:1;color:color-mix(in srgb,var(--bio-letter,var(--sq-muted)) var(--seq-ink,26%),var(--sq-ghost,transparent))}
+.sk-aurora .seq-dim,body.sk-pastel .seq-dim,body.sk-blueprint .seq-dim{opacity:1;color:color-mix(in srgb,var(--bio-letter,var(--sq-muted)) var(--seq-ink,14%),var(--sq-surface,transparent))}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .seq-dim::after{content:'';position:absolute;left:24%;right:24%;bottom:1px;height:1px;border-radius:1px;background:color-mix(in srgb,var(--sq-muted) 55%,var(--sq-surface))}
 .seq-at-cursor{background:var(--sq-accent-soft,color-mix(in srgb,var(--dink) 14%,transparent));box-shadow:inset 0 0 0 1px var(--sq-accent-line,transparent)}
 /* The cursor letter is the leading edge: the pill's caret drops onto an
    accent baseline under it. */
 :is(.sk-aurora,.sk-pastel,.sk-blueprint) .seq-at-cursor{box-shadow:inset 0 0 0 1px var(--sq-accent-line),inset 0 -2px 0 var(--sq-accent)}
 /* Letters made this step ink in once, from ghost to full colour with a small
    rise and an accent-soft flash, 40 ms apart (capped at 240 ms). */
-@keyframes seq-ink{from{color:color-mix(in srgb,var(--bio-letter,currentColor) 26%,var(--sq-ghost,transparent));background-color:var(--sq-accent-soft,transparent);transform:translateY(3px)}}
+@keyframes seq-ink{from{color:color-mix(in srgb,var(--bio-letter,currentColor) 18%,var(--sq-surface,transparent));background-color:var(--sq-accent-soft,transparent);transform:translateY(3px)}}
 @media (prefers-reduced-motion: no-preference){.seq-letters .seq-new{animation:seq-ink .42s cubic-bezier(.16,1,.3,1) calc(var(--seq-k,0) * 40ms) backwards}}
 /* Range bands: opaque tinted pills under the letters with a tone edge; a new
    mark that starts right after another keeps a hairline gap. */
@@ -461,7 +493,7 @@ body.sk-blueprint .seq-meta{border-radius:2px}
 /* The cursor rides the ruler: a solid "now" pill with a caret that points
    at the current letter, so it costs no extra row. */
 .seq-cursor-line{position:absolute;left:0;right:0;top:0;height:16px;pointer-events:none;z-index:1}
-.seq-cur{grid-column:calc(var(--seq-at) + 1);position:relative;display:block;height:100%;transition:transform .42s cubic-bezier(.2,.7,.2,1)}
+.seq-cur{grid-column:calc(var(--seq-at) + var(--seq-g,0) + 1);position:relative;display:block;height:100%;transition:transform .42s cubic-bezier(.2,.7,.2,1)}
 .seq-cur b{position:absolute;left:50%;bottom:-2px;width:0;height:0;transform:translateX(-50%);border:4px solid transparent;border-top:4px solid var(--sq-accent,var(--dink));border-bottom:0}
 .seq-cur i{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);min-width:14px;box-sizing:border-box;text-align:center;font:600 10px/14px 'IBM Plex Mono',monospace;font-style:normal;font-variant-numeric:tabular-nums lining-nums;color:var(--sq-on-accent,var(--dink));background:var(--sq-accent,color-mix(in srgb,var(--dink) 12%,transparent));border-radius:999px;padding:0 5px;white-space:nowrap;box-shadow:0 0 0 2px var(--sq-surface,transparent),var(--sq-raise,0 0 0 0 transparent)}
 body.sk-blueprint .seq-cur i{border-radius:2px}

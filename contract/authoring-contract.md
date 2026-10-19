@@ -1891,6 +1891,67 @@ perspectives" of one timeline). Types:
   readable at this hop (readable = every layer open). NOTE: a `layers` patch
   REPLACES the whole layers state array; unlisted layers revert to sealed.
 
+- `funnel` — stage counts for any filtering pipeline: horizontal bars, one per
+  stage, with the authored number of items that remain, the share retained
+  relative to the first known count, and the drop between consecutive known
+  stages ("−12,340 (−4.1%)"). Declare 2–12 `stages:[{id,label?,tone?}]` in
+  pipeline order; ids are unique, start with a letter or digit and use only
+  letters, digits, `-` or `_` (they key the `counts` object). `label` defaults
+  to the id; `tone` is one of the generic data-panel tones (`neutral
+  accent info warning success danger violet teal pink`) and colours that
+  bar. Optional `unit` is the item noun shown in the footer and accessible text
+  (default `items`). Starting and step state accept `counts`, `active` and
+  `note`. `counts` is an object keyed by stage id whose values are non-negative
+  safe integers or `null` (not yet known). Patches merge sparsely into the
+  carried counts: an omitted stage keeps its earlier count, a stage set to
+  `null` is forgotten, and `counts: null` forgets every stage. Unknown stage ids
+  and invalid values warn and are ignored without touching the other keys.
+  `active` is the stage id being computed (animated stripe and a "computing"
+  tag); `null` clears it. `enterOnce` may carry any of these fields for one step
+  only. Malformed or missing stages, duplicate ids, bad tones, unknown fields,
+  bad units and non-object patches warn with the exact path and never throw.
+  Unknown counts render an empty track with "—" and are skipped when measuring
+  drops, so a drop is always measured against the previous *known* stage. A
+  count larger than the previous known count is never a negative drop: the row
+  is flagged `grew` and shows a "+n (+p%) grew" badge. Bars share one scale (the
+  largest known count) and grow in with the shared bar-entrance motion when a
+  stage first becomes known; reduced-motion disables stripes and transitions.
+  `funnelModel(panel, state)` returns rows `{id,label,tone,count,known,pct,
+  dropped,droppedPct,gained,gainedPct,grew,barPct,active}` plus `total` (first
+  known count), `remaining` (last known), `retainedPct` and `unit`. Numbers are
+  authored teaching values, never computed from data files.
+- `grid` — a small value matrix (heatmap): a real `<table>` with row and column
+  headers whose cells are coloured by value, with optional significance marks
+  and row/column/cell emphasis. Declare 1–12 `rows:[{id,label?}]` and 1–12
+  `cols:[{id,label?}]`; ids are unique, dot-free, start with a letter or digit
+  and use only letters, digits, `-` or `_`, because cells are keyed
+  `"<rowId>.<colId>"`. Optional `scale:{min?,max?,mid?,kind?}`: `kind` is
+  `sequential` (default, low → high) or `diverging` (low → mid → high); `min`
+  and `max` are finite numbers with `min < max`, and either or both may be
+  omitted to use the current step's values (no numbers at all falls back to
+  0–1 without a warning); `mid` must lie strictly between `min` and `max` and
+  defaults to `(min+max)/2`. `decimals` is 0–4 (default 2); `unit` is optional
+  suffix text for tooltips and the colour key. Starting and step state accept
+  `cells`, `marks`, `highlight` and `note`. `cells` maps cell keys to finite
+  numbers or `null`; `marks` maps cell keys to `"*"`, `"**"`, `"***"`, `"ns"` or
+  `""`. Both merge sparsely into the carried objects: an omitted key keeps its
+  value, a key set to `null` is forgotten, and `cells: null` / `marks: null`
+  forget everything. Unknown keys and invalid values warn and are ignored
+  without touching other keys. `highlight` is `{row?,col?,cell?}` (declared ids
+  / a cell key, each nullable) or `null`; it outlines the matching headers and
+  cells. `enterOnce` may carry any of these fields for one step only. Malformed
+  axes, duplicate or unsafe ids, bad scales, decimals, units, unknown fields and
+  non-object patches warn with the exact path and never throw. Values outside
+  authored bounds clamp; identical values sit mid-scale; nothing renders as
+  NaN. Cell text is `toLocaleString` with the declared decimals; unknown cells
+  show "—" with an empty outline; marks render as a superscript; cells beyond
+  half intensity switch to light text. The key under the table shows the scale
+  bounds and "auto" when they came from the data. `gridModel(panel, state)`
+  returns `rows[{id,label,highlight,cells[{key,row,col,value,known,text,mark,
+  intensity (0–1, never NaN),side,depth,highlight,rowHighlight,colHighlight}]}]`,
+  `cols`, `scale {kind,min,max,mid,auto}`, `decimals`, `unit` and `count`.
+  Every number is authored; nothing is computed from data files.
+
 Patches are SPARSE — a step carries only what changed. The engine folds
 patches into complete per-step state at load time, so jumping to any step is
 always consistent. An `"enterOnce": {...}` sub-object inside a patch applies

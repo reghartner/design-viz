@@ -191,6 +191,9 @@ function spmBowl(bowl, rings, options) {
     return points.map(function (p, i) { var q = fix(p); return (i ? 'L' : 'M') + q[0] + ',' + q[1]; }).join('') + 'Z';
   }
   var fieldTrace = spmTrace(shape, -6);
+  /* The bowl's footprint: one closed outline just outside the outermost
+     ring, drawn under everything as the concourse and plinth. */
+  var base = pathOf(spmTrace(shape, 4 + budget + 5).points.filter(function (p, i) { return i % 2 === 0; }));
   var field = pathOf(fieldTrace.points.filter(function (p, i) { return i % 2 === 0; }));
   var fieldLines = '';
   if (shape.kind === 'rink') {
@@ -215,7 +218,7 @@ function spmBowl(bowl, rings, options) {
     };
   }
   return { bowl: shape.kind === 'rink' ? 'rink' : bowl, width: SPM_VIEW, height: height, mirror: mirror, rings: ringList,
-    marks: ringList[0].inner.marks, field: field, fieldLines: fieldLines, wedge: wedge, point: function (ringIndex, u, outer) {
+    marks: ringList[0].inner.marks, field: field, fieldLines: fieldLines, base: base, wedge: wedge, point: function (ringIndex, u, outer) {
       var ring = ringList[Math.max(0, Math.min(count - 1, ringIndex | 0))];
       return fix(spmTracePoint(outer ? ring.outer : ring.inner, outer ? spmMapFraction(u, ring.inner, ring.outer) : u));
     } };

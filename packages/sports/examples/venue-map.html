@@ -8309,8 +8309,60 @@ body .docview .section-viewport.explore-text-sizing .explore-player .playback-mo
 .cost-auto .cost-details{margin-top:7px;padding-top:6px}.cost-auto .cost-details summary{font-size:10px}.cost-auto .cost-detail-routes{grid-template-columns:1fr}
 }@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+.funnel{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dtext);min-width:0}
+.funnel-empty{margin:0;color:var(--dfaint)}
+.funnel-row{position:relative;display:grid;grid-template-columns:minmax(64px,30%) minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:3px 5px;border-radius:6px;border:1px solid transparent}
+.funnel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dink)}
+.funnel-track{display:block;height:12px;border-radius:6px;background:color-mix(in srgb,var(--dtext) 10%,transparent);overflow:hidden}
+.funnel-bar{display:block;height:100%;border-radius:6px;background:var(--dink);transition:width .5s ease}
+.funnel-bar.data-tone-neutral{background:#94a3b8}.funnel-bar.data-tone-accent{background:#38bdf8}
+.funnel-bar.data-tone-violet,.funnel-bar.data-tone-insert{background:#a78bfa}.funnel-bar.data-tone-danger,.funnel-bar.data-tone-mismatch{background:#f43f5e}.funnel-bar.data-tone-bad{background:#ef4444}
+.funnel-bar.data-tone-warning,.funnel-bar.data-tone-motif{background:#facc15}.funnel-bar.data-tone-teal,.funnel-bar.data-tone-primer{background:#2dd4bf}
+.funnel-bar.data-tone-pink,.funnel-bar.data-tone-cut{background:#e879f9}.funnel-bar.data-tone-info,.funnel-bar.data-tone-feature{background:#3b82f6}
+.funnel-bar.data-tone-success,.funnel-bar.data-tone-good{background:#22c55e}
+.funnel-bar.dv-bar-enter{transform-origin:left center;animation:dvbarenter .5s cubic-bezier(.4,0,.2,1)}
+.funnel-count{font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--dink)}
+.funnel-pct{font:500 10px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;color:var(--dfaint)}
+.funnel-unknown .funnel-count,.funnel-unknown .funnel-label{color:var(--dfaint)}
+.funnel-active{border-color:color-mix(in srgb,var(--dink) 45%,transparent);background:color-mix(in srgb,var(--dink) 7%,transparent)}
+.funnel-active .funnel-track{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--dink) 24%,transparent) 0 6px,transparent 6px 12px);background-size:17px 12px;animation:funnel-stripe .9s linear infinite}
+.funnel-live{position:absolute;right:52px;top:-7px;padding:0 5px;border-radius:7px;font:600 8px/13px 'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--dink);background:color-mix(in srgb,var(--dink) 14%,transparent)}
+@keyframes funnel-stripe{from{background-position:0 0}to{background-position:17px 0}}
+.funnel-delta{display:flex;justify-content:flex-end;align-items:baseline;gap:5px;padding:0 51px 0 0;font:500 10px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dfaint)}
+.funnel-delta b{font-weight:600;color:#cf5f6a}.funnel-delta i{font-style:normal;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.funnel-grew b{color:#3f9a7a}.funnel-grew i{color:#3f9a7a}
+.funnel-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);font-size:10px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.funnel-active .funnel-track{animation:none}.funnel-bar{transition:none}.funnel-bar.dv-bar-enter{animation:none}}
+@media print{.funnel-track,.funnel-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.funnel-active .funnel-track{animation:none}}
+
+
+.grid-wrap{font-size:11px;color:var(--dtext);min-width:0;overflow:auto;max-height:420px}
+.grid-wrap:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.grid-empty{margin:0;color:var(--dfaint)}
+.grid-table{--grid-low:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-mid:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-high:#2f6fd6;--grid-neg:#d4704f;border-collapse:separate;border-spacing:2px;width:100%;table-layout:fixed}
+.grid-table th{font:500 10px 'IBM Plex Mono',monospace;color:var(--dfaint);padding:3px 4px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid-table .grid-colhead{vertical-align:bottom}.grid-table .grid-rowhead{text-align:right;width:26%}
+.grid-table .grid-corner{width:26%}
+.grid-table th.grid-hl{color:var(--dink);font-weight:700}
+.grid-cell{position:relative;padding:5px 4px;text-align:center;border-radius:4px;font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dink);background:color-mix(in srgb,var(--grid-high) calc(var(--grid-d)*100%),var(--grid-mid));transition:background-color .4s ease}
+.grid-cell.grid-low{background:color-mix(in srgb,var(--grid-neg) calc(var(--grid-d)*100%),var(--grid-mid))}
+.grid-cell.grid-deep{color:#fff}
+.grid-cell.grid-unknown{background:transparent;color:var(--dfaint);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 14%,transparent)}
+.grid-mark{font-size:9px;margin-left:1px;vertical-align:top;line-height:1}.grid-mark-ns{font-weight:400;opacity:.8}
+.grid-cell.grid-hl-row,.grid-cell.grid-hl-col{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--dink) 55%,transparent)}
+.grid-cell.grid-hl-cell{box-shadow:inset 0 0 0 2px var(--dink),0 0 0 1px var(--dink)}
+.grid-key{display:flex;align-items:center;gap:6px;margin-top:6px;font:500 9px 'IBM Plex Mono',monospace;color:var(--dfaint)}
+.grid-key em{font-style:normal;letter-spacing:.5px;text-transform:uppercase;font-size:8px}
+.grid-ramp{display:inline-block;flex:0 0 72px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--grid-mid),var(--grid-high))}
+.grid-ramp-diverging{background:linear-gradient(90deg,var(--grid-neg),var(--grid-mid),var(--grid-high))}
+@media (prefers-reduced-motion:reduce){.grid-cell{transition:none}}
+@media print{.grid-cell,.grid-ramp{-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid-wrap{max-height:none;overflow:visible}}
+
+
 .seatmap{font-size:11px;color:var(--dtext);min-width:0;container-type:inline-size;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A;
-  --seatmap-r1:#18345A;--seatmap-r2:#1C5A80;--seatmap-r3:#1A7896;--seatmap-r4:#2CB5D2;--seatmap-r5:#5FE3FF;
+  --seatmap-r1:#152D4B;--seatmap-r2:#193E60;--seatmap-r3:#1B5175;--seatmap-r4:#1C6084;--seatmap-r5:#1B6C8D;--seatmap-r6:#1A7896;--seatmap-r7:#27ABC9;--seatmap-r8:#47BFDB;--seatmap-r9:#61D4ED;--seatmap-r10:#7AE9FF;--seatmap-full:#C6F6FF;
+  --seatmap-w1:#2A1E1C;--seatmap-w2:#3D271C;--seatmap-w3:#50301A;--seatmap-w4:#603818;--seatmap-w5:#6D4116;--seatmap-w6:#7A4A14;--seatmap-w7:#D9922F;--seatmap-w8:#E6A44A;--seatmap-w9:#F2B762;--seatmap-w10:#FFC978;
+  --seatmap-shine:rgba(255,255,255,.5);--seatmap-base:#0E1828;--seatmap-base-line:#1D2A40;--seatmap-base-shadow:rgba(0,0,0,.5);
   --seatmap-gutter:var(--pv-surface,#0B1220);--seatmap-lbl:#FFFFFF;--seatmap-lbl-dark:#0B1220;--seatmap-hover:#8DA2C6;
   --seatmap-sel:#EAF2FF;--seatmap-sel-ring:rgba(56,225,255,.45);--seatmap-raise:rgba(0,0,0,.6);--seatmap-unknown:#2E4466;--seatmap-unknown-fill:rgba(16,26,44,.6);
   --seatmap-hold:#FFB454;--seatmap-hold-bg:color-mix(in srgb,#FFB454 16%,#0B1220);--seatmap-hold-lbl:#EAF2FF;--seatmap-hold-halo:#0B1220;--seatmap-warn-ink:#EEC16A;
@@ -8322,7 +8374,9 @@ body .docview .section-viewport.explore-text-sizing .explore-player .playback-mo
   --seatmap-num:'Sora','IBM Plex Sans',sans-serif;--seatmap-sans:'IBM Plex Sans',sans-serif;--seatmap-lbl-font:'IBM Plex Sans',sans-serif;--seatmap-radius:999px;--seatmap-sw-radius:3px}
 .sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .sk-daylight .seatmap,.sk-pastel .seatmap,.sk-editorial .seatmap{--seatmap-label-on:#FFFFFF;
-  --seatmap-r1:#D9DFF7;--seatmap-r2:#B4C0EF;--seatmap-r3:#8796E0;--seatmap-r4:#5566C8;--seatmap-r5:#3F4FAE;
+  --seatmap-r1:#E1E6F8;--seatmap-r2:#D1D8F5;--seatmap-r3:#C1CBF2;--seatmap-r4:#B1BDEE;--seatmap-r5:#A1AEE8;--seatmap-r6:#919FE3;--seatmap-r7:#5A6ACB;--seatmap-r8:#4E5EBE;--seatmap-r9:#4352B0;--seatmap-r10:#3846A3;--seatmap-full:#27327A;
+  --seatmap-w1:#FBEDE5;--seatmap-w2:#F8E0D3;--seatmap-w3:#F6D3C1;--seatmap-w4:#F3C6AE;--seatmap-w5:#EFB89B;--seatmap-w6:#ECAA87;--seatmap-w7:#B4532E;--seatmap-w8:#A24827;--seatmap-w9:#903E1F;--seatmap-w10:#7E3418;
+  --seatmap-shine:rgba(255,255,255,.34);--seatmap-base:#F5F7FB;--seatmap-base-line:#E6EBF3;--seatmap-base-shadow:rgba(36,50,74,.10);
   --seatmap-gutter:var(--pv-surface,#FFFFFF);--seatmap-lbl:#24324A;--seatmap-hover:#5F6C84;
   --seatmap-sel:#24324A;--seatmap-sel-ring:rgba(82,99,185,.32);--seatmap-raise:rgba(36,50,74,.32);--seatmap-unknown:#C9D2E1;--seatmap-unknown-fill:#F6F8FC;
   --seatmap-hold:#B07A2A;--seatmap-hold-bg:#FDF1DC;--seatmap-hold-lbl:#24324A;--seatmap-hold-halo:#FDF1DC;--seatmap-warn-ink:#865B06;
@@ -8338,7 +8392,8 @@ body.sk-editorial .seatmap{--seatmap-gutter:#FFFDF8}
 body.sk-terminal .seatmap{--seatmap-gutter:var(--tm-ground,#0B1220)}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-paper,#FFFFFF)}
 .sk-blueprint .seatmap{--seatmap-label-on:#052956;
-  --seatmap-r1:color-mix(in srgb,#7FE3FF 10%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 20%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 32%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 66%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 90%,#052956);
+  --seatmap-r1:color-mix(in srgb,#7FE3FF 7%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 11%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 15%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 19%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 24%,#052956);--seatmap-r6:color-mix(in srgb,#7FE3FF 29%,#052956);--seatmap-r7:color-mix(in srgb,#7FE3FF 62%,#052956);--seatmap-r8:color-mix(in srgb,#7FE3FF 70%,#052956);--seatmap-r9:color-mix(in srgb,#7FE3FF 78%,#052956);--seatmap-r10:color-mix(in srgb,#7FE3FF 86%,#052956);--seatmap-full:#C9F3FF;--seatmap-w1:var(--seatmap-r1);--seatmap-w2:var(--seatmap-r2);--seatmap-w3:var(--seatmap-r3);--seatmap-w4:var(--seatmap-r4);--seatmap-w5:var(--seatmap-r5);--seatmap-w6:var(--seatmap-r6);--seatmap-w7:var(--seatmap-r7);--seatmap-w8:var(--seatmap-r8);--seatmap-w9:var(--seatmap-r9);--seatmap-w10:var(--seatmap-r10);
+  --seatmap-shine:rgba(255,255,255,.4);--seatmap-base:transparent;--seatmap-base-line:rgba(127,227,255,.35);--seatmap-base-shadow:transparent;
   --seatmap-gutter:var(--pv-surface,#052956);--seatmap-lbl:#F7FCFF;--seatmap-lbl-dark:#052956;--seatmap-hover:#7FE3FF;
   --seatmap-sel:#F7FCFF;--seatmap-sel-ring:rgba(127,227,255,.45);--seatmap-raise:rgba(0,0,0,.45);--seatmap-unknown:#4FA9C3;--seatmap-unknown-fill:transparent;
   --seatmap-hold:#FFD166;--seatmap-hold-bg:color-mix(in srgb,#FFD166 16%,#052956);--seatmap-hold-lbl:#F7FCFF;--seatmap-hold-halo:#052956;--seatmap-warn-ink:#FFD166;
@@ -8358,9 +8413,21 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-stat-pct{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:center}
 .seatmap-stat-pct>b,.seatmap-stat-pct>span{grid-column:2}
 .seatmap-gauge{grid-column:1;grid-row:1 / span 2;width:30px;height:30px;overflow:visible}
-.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r1);stroke-width:4}
-.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r4);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1)}
+.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r2);stroke-width:4}
+.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r8);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1),stroke-opacity .2s ease}
+.seatmap-gauge-zero{stroke-opacity:0}
+.seatmap-sellout .seatmap-gauge-arc{stroke:var(--seatmap-full)}
 .seatmap-svg{display:block;width:100%;height:auto;overflow:visible}
+/* Live block over hidden copies from the other steps (seatmapStack). */
+.seatmap-stack{display:grid}.seatmap-stack>*{grid-area:1 / 1;min-width:0}
+.seatmap-ghost{visibility:hidden;pointer-events:none}
+.seatmap-head{margin:0 0 3px}.seatmap-head>.seatmap-totals{margin:0;align-self:end}
+.seatmap-foot{min-width:0}
+.seatmap-base{fill:var(--seatmap-base);stroke:var(--seatmap-base);stroke-width:18;stroke-linejoin:round;filter:drop-shadow(0 6px 10px var(--seatmap-base-shadow))}
+.seatmap-base-hull{stroke-width:22}
+.sk-blueprint .seatmap-base{fill:none;stroke:var(--seatmap-base-line);stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke;filter:none}
+.seatmap-shine{pointer-events:none}
+.seatmap-shine-a{stop-color:var(--seatmap-shine);stop-opacity:1}.seatmap-shine-b{stop-color:var(--seatmap-shine);stop-opacity:0}
 /* In a fixed-size layout tile the map letterboxes into the space left by the
    totals and legend instead of overflowing the tile (the bowl's aspect is
    taller than the tile's body aspect on several pages). */
@@ -8384,6 +8451,12 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-fill{stroke:var(--seatmap-gutter);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;transition:fill .42s cubic-bezier(.2,.7,.2,1),stroke .12s ease}
 .seatmap-sec:hover .seatmap-fill{stroke:var(--seatmap-hover)}
 .seatmap-tier{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow))}
+/* A step's colour changes ripple outward from the field, ring by ring. */
+.seatmap-tier:nth-child(2) .seatmap-fill{transition-delay:60ms,0s}.seatmap-tier:nth-child(3) .seatmap-fill{transition-delay:120ms,0s}.seatmap-tier:nth-child(4) .seatmap-fill{transition-delay:180ms,0s}
+@media (prefers-reduced-motion:no-preference){
+  .seatmap-cheer .seatmap-tier{animation:seatmap-cheer .6s cubic-bezier(.2,.7,.2,1) both}
+  .seatmap-cheer .seatmap-tier:nth-child(2){animation-delay:80ms}.seatmap-cheer .seatmap-tier:nth-child(3){animation-delay:160ms}.seatmap-cheer .seatmap-tier:nth-child(4){animation-delay:240ms}}
+@keyframes seatmap-cheer{0%,100%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1)}40%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1.22)}}
 .seatmap-rows{fill:none;stroke:var(--seatmap-row,var(--seatmap-gutter));stroke-opacity:var(--seatmap-row-o);stroke-width:.75;vector-effect:non-scaling-stroke;pointer-events:none}
 .seatmap-unknown .seatmap-rows{display:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-moved .seatmap-fill{animation:seatmap-moved .7s cubic-bezier(.2,.7,.2,1)}}
@@ -8396,8 +8469,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-lbl-on{fill:var(--seatmap-label-on)}.seatmap-lbl-dark{fill:var(--seatmap-lbl-dark)}.seatmap-lbl-light{fill:#FFFFFF}
 .seatmap-held .seatmap-lbl{fill:var(--seatmap-hold-lbl);paint-order:stroke;stroke:var(--seatmap-hold-halo);stroke-width:3px;stroke-linejoin:round}
 .seatmap-lbl-tiny{display:none}
-.seatmap-ringtag{display:none;font-family:var(--seatmap-sans);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-anchor:middle;fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round;pointer-events:none}
-.seatmap-sparse .seatmap-ringtag{display:inline}
+.seatmap-sec .seatmap-lbl-halo{fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round}
 .seatmap-outline-halo{fill:none;stroke:var(--seatmap-gutter);stroke-width:6.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 3px 4px var(--seatmap-raise))}
 .seatmap-outline{fill:none;stroke:var(--seatmap-sel);stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-pulse .seatmap-outline-halo{animation:seatmap-pulse .7s cubic-bezier(.16,1,.3,1)}}
@@ -8416,18 +8488,18 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend small,.seatmap-rings small{font-size:10.5px;font-weight:600;color:var(--seatmap-muted);margin-left:4px}
 .seatmap-sw{display:inline-block;flex:none;width:10px;height:10px;border-radius:var(--seatmap-sw-radius);margin-right:6px;background:var(--seatmap-r4);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18)}
 .seatmap-sw-low{background:var(--seatmap-r1)}
-.seatmap-sw-high{background:var(--seatmap-r5)}
+.seatmap-sw-high{background:var(--seatmap-r10)}
 .seatmap-sw-hold{background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 4px);box-shadow:inset 0 0 0 1px var(--seatmap-hold)}
 .seatmap-sw-unknown{background:var(--seatmap-unknown-fill);box-shadow:none;border:1px dashed var(--seatmap-unknown);box-sizing:border-box}
 .seatmap-key{gap:6px}
-.seatmap-scale{position:relative;display:inline-block;flex:none;width:136px;height:18px}
-.seatmap-scale-plain{height:8px}
+.seatmap-scale{position:relative;display:inline-block;flex:none;width:160px;height:18px}
 .seatmap-bins{position:absolute;left:0;right:0;top:1px;height:6px;display:flex;gap:1px;border-radius:var(--seatmap-radius);overflow:hidden}
-.seatmap-scale-plain .seatmap-bins{top:0}
 .seatmap-bins>i{flex:1 1 0;box-shadow:inset 0 0 0 1px rgba(36,50,74,.06)}
 .seatmap-ticks>i{position:absolute;top:9px;font:600 10px/10px var(--seatmap-sans);font-style:normal;letter-spacing:0;color:var(--seatmap-muted);transform:translateX(-50%)}
-.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:20%}.seatmap-ticks>i:nth-child(3){left:40%}
-.seatmap-ticks>i:nth-child(4){left:60%}.seatmap-ticks>i:nth-child(5){left:80%}.seatmap-ticks>i:nth-child(6){left:auto;right:0;transform:none}
+.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:50%}.seatmap-ticks>i:nth-child(3){left:auto;right:0;transform:none}
+.seatmap-ticks-words>i{letter-spacing:.06em;text-transform:uppercase}
+.seatmap-sw-full{background:var(--seatmap-full);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.seatmap-out{display:inline-flex;align-items:center;height:16px;margin-left:7px;padding:0 7px;border-radius:var(--seatmap-radius);background:var(--seatmap-full);color:var(--seatmap-label-on);font:700 10px/1 var(--seatmap-sans);font-style:normal;letter-spacing:.08em;text-transform:uppercase}
 .seatmap-caret{position:absolute;top:-1px;width:2px;height:10px;margin-left:-1px;border-radius:1px;background:var(--seatmap-ink);box-shadow:0 0 0 1.5px var(--seatmap-gutter);transition:left .42s cubic-bezier(.2,.7,.2,1)}
 .seatmap-range{color:var(--seatmap-text)}
 .seatmap-ring-bar{display:inline-flex;flex:none;width:34px;height:6px;margin-right:7px;border-radius:var(--seatmap-radius);overflow:hidden;background:var(--seatmap-track);box-shadow:inset 0 0 0 1px var(--seatmap-track-line)}
@@ -8438,6 +8510,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend>.seatmap-zones,.seatmap-rings>.seatmap-zones{display:inline;white-space:normal}
 .seatmap-zones small{margin-left:0}
 .sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-sw,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-bins>i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.sk-blueprint .seatmap-out{background:transparent;color:#7FE3FF;box-shadow:inset 0 0 0 1px #7FE3FF;font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:10.5px;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat>span,.sk-blueprint .seatmap-mode b,.sk-blueprint .seatmap-landmark text{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat b{font-weight:700;font-size:19px;letter-spacing:0}
 .sk-blueprint .seatmap-mode b{background:transparent;box-shadow:inset 0 0 0 1px var(--seatmap-chip-ink)}
@@ -8447,8 +8520,8 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .sk-blueprint .seatmap-gauge{border-radius:50%;box-shadow:inset 0 0 0 1px #4FA9C3}
 .sk-blueprint .seatmap-tier{filter:none}
 .sk-blueprint .seatmap-unknown .seatmap-fill{stroke:var(--seatmap-unknown)}
-@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}}
-@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}.seatmap-outline-halo,.seatmap-tier{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}}
+@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}.seatmap-outline-halo,.seatmap-tier,.seatmap-base{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 
 .chime-panel{display:flex;align-items:center;gap:16px;min-width:0;padding:8px 0;color:var(--dtext);overflow-wrap:anywhere}
@@ -9280,7 +9353,7 @@ var FlowviewCompatibility = (function(){
   'use strict';
   var version = '0.2.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
-  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.seatmap":{"label":"Venue map panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
+  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.funnel":{"label":"Stage counts panel","since":"0.2.0"},"panel.grid":{"label":"Value matrix panel","since":"0.2.0"},"panel.seatmap":{"label":"Venue map panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
   var sharedIconIds = ["battery","battery-full","battery-low","battery-charging","voltage","voltage-normal","voltage-high","voltage-low","voltage-off","plug","solar","temperature","hot","cold","snowflake","alarm","armed","disarmed","triggered","wifi","wifi-off","cloud-off","signal","microphone","microphone-muted","recorded","chime","siren","detection","headset","door","motion","smoke","water","sensor","police","fire","medical","security","monitor","camera-off","person"];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
@@ -14976,6 +15049,9 @@ function spmBowl(bowl, rings, options) {
     return points.map(function (p, i) { var q = fix(p); return (i ? 'L' : 'M') + q[0] + ',' + q[1]; }).join('') + 'Z';
   }
   var fieldTrace = spmTrace(shape, -6);
+  /* The bowl's footprint: one closed outline just outside the outermost
+     ring, drawn under everything as the concourse and plinth. */
+  var base = pathOf(spmTrace(shape, 4 + budget + 5).points.filter(function (p, i) { return i % 2 === 0; }));
   var field = pathOf(fieldTrace.points.filter(function (p, i) { return i % 2 === 0; }));
   var fieldLines = '';
   if (shape.kind === 'rink') {
@@ -15000,7 +15076,7 @@ function spmBowl(bowl, rings, options) {
     };
   }
   return { bowl: shape.kind === 'rink' ? 'rink' : bowl, width: SPM_VIEW, height: height, mirror: mirror, rings: ringList,
-    marks: ringList[0].inner.marks, field: field, fieldLines: fieldLines, wedge: wedge, point: function (ringIndex, u, outer) {
+    marks: ringList[0].inner.marks, field: field, fieldLines: fieldLines, base: base, wedge: wedge, point: function (ringIndex, u, outer) {
       var ring = ringList[Math.max(0, Math.min(count - 1, ringIndex | 0))];
       return fix(spmTracePoint(outer ? ring.outer : ring.inner, outer ? spmMapFraction(u, ring.inner, ring.outer) : u));
     } };
@@ -19664,6 +19740,307 @@ PanelRegistry.extend('deviceapp', {
 `
   });
 })();
+/* ---- src/panels/types/funnel.js ---- */
+/* Stage counts: ordered stages of a filtering pipeline with the number of
+   items that remain at each one. Every count is authored; nothing is read
+   from data files. Its count and tone helpers are local to this panel. */
+var FUNNEL_DOCUMENTED_TONES = ['neutral', 'accent', 'info', 'warning', 'success', 'danger', 'violet', 'teal', 'pink'];
+/* Older stories keep their authored colours; new authoring guidance uses the
+   neutral palette above so a core-only packet has no subject vocabulary. */
+var FUNNEL_TONES = FUNNEL_DOCUMENTED_TONES.concat(['insert', 'mismatch', 'motif', 'primer', 'cut', 'feature', 'good', 'bad']);
+function funnelValidCount(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+var FUNNEL_MAX_STAGES = 12;
+/* Stage ids become keys of the authored `counts` object, so they must be
+   plain identifier-like strings (no leading underscore keeps `__proto__` out). */
+function funnelSafeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+}
+function funnelStages(panel) {
+  return panelCollectionItems(panel, 'stages', FUNNEL_MAX_STAGES).filter(function (stage) {
+    return funnelSafeId(stage.id);
+  }).map(function (stage) {
+    return {
+      id: stage.id,
+      label: typeof stage.label === 'string' && stage.label.trim() ? stage.label : stage.id,
+      tone: FUNNEL_TONES.indexOf(stage.tone) >= 0 ? stage.tone : null,
+    };
+  });
+}
+function funnelUnit(panel) {
+  return typeof panel.unit === 'string' && panel.unit.trim() ? panel.unit.trim() : 'items';
+}
+function funnelStageIds(panel) {
+  return funnelStages(panel).map(function (stage) { return stage.id; });
+}
+function funnelDeclarationWarnings(panel, path, warnings) {
+  var seen = Object.create(null), valid = 0;
+  if (!Array.isArray(panel.stages) || panel.stages.length < 2 || panel.stages.length > FUNNEL_MAX_STAGES)
+    warnings.push(path + '.stages: declare 2–' + FUNNEL_MAX_STAGES + ' stages [{id,label,tone?}] in pipeline order');
+  (Array.isArray(panel.stages) ? panel.stages : []).forEach(function (stage, i) {
+    var at = path + '.stages[' + i + ']';
+    if (i >= FUNNEL_MAX_STAGES) return;
+    if (!panelObject(stage) || typeof stage.id !== 'string' || !stage.id) {
+      warnings.push(at + '.id: needs a non-empty string — stage skipped');
+      return;
+    }
+    if (!funnelSafeId(stage.id)) {
+      warnings.push(at + '.id: use letters, digits, "-" or "_" starting with a letter or digit — stage skipped');
+      return;
+    }
+    if (seen[stage.id]) {
+      warnings.push(at + '.id: duplicate id "' + stage.id + '" — later stage skipped');
+      return;
+    }
+    seen[stage.id] = true;
+    valid++;
+    if (stage.label !== undefined && typeof stage.label !== 'string')
+      warnings.push(at + '.label: expected text — using the id');
+    if (stage.tone !== undefined && FUNNEL_TONES.indexOf(stage.tone) < 0)
+      warnings.push(at + '.tone: expected ' + FUNNEL_DOCUMENTED_TONES.join('|') + ' — using the default bar colour');
+  });
+  if (Array.isArray(panel.stages) && panel.stages.length >= 2 && valid < 2)
+    warnings.push(path + '.stages: fewer than 2 usable stages — the panel renders empty');
+  if (panel.unit !== undefined && (typeof panel.unit !== 'string' || !panel.unit.trim()))
+    warnings.push(path + '.unit: expected a non-empty item noun such as "records" — using items');
+  funnelPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function funnelCountWarnings(counts, path, ids, warnings) {
+  if (counts === null) return;
+  if (!panelObject(counts)) {
+    warnings.push(path + ': expected an object keyed by stage id (or null to clear every count) — ignored');
+    return;
+  }
+  Object.keys(counts).forEach(function (id) {
+    var at = path + '.' + id, value = counts[id];
+    if (ids.indexOf(id) < 0) warnings.push(at + ': unknown stage id — ignored');
+    else if (value !== null && !funnelValidCount(value))
+      warnings.push(at + ': expected a non-negative whole number or null — ignored');
+  });
+}
+function funnelPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, panel, warnings) {
+    var ids = funnelStageIds(panel);
+    Object.keys(state).forEach(function (key) {
+      var value = state[key], at = path + '.' + key;
+      if (key === 'enterOnce') return;
+      if (key === 'counts') funnelCountWarnings(value, at, ids, warnings);
+      else if (key === 'active') {
+        if (value !== null && (typeof value !== 'string' || ids.indexOf(value) < 0))
+          warnings.push(at + ': expected a declared stage id or null — ignored');
+      } else if (key === 'note') {
+        if (value !== null && typeof value !== 'string') warnings.push(at + ': expected text or null — ignored');
+      } else warnings.push(at + ': unknown field — ignored');
+    });
+  });
+}
+/* Pure sparse merge. `patch === null` clears everything; a key set to null
+   clears that stage; unknown or invalid entries are skipped. Never mutates. */
+function funnelMergeCounts(base, patch, ids) {
+  var out = {};
+  if (patch === null) return out;
+  Object.keys(panelObject(base) ? base : {}).forEach(function (id) { out[id] = base[id]; });
+  if (!panelObject(patch)) return out;
+  ids.forEach(function (id) {
+    if (!panelOwn(patch, id)) return;
+    var value = patch[id];
+    if (value === null) delete out[id];
+    else if (funnelValidCount(value)) out[id] = value;
+  });
+  return out;
+}
+function funnelCleanState(raw, ids, allowOnce) {
+  var out = {};
+  if (!panelObject(raw)) return out;
+  if (panelOwn(raw, 'active') && (raw.active === null || (typeof raw.active === 'string' && ids.indexOf(raw.active) >= 0)))
+    out.active = raw.active;
+  if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = funnelCleanState(raw.enterOnce, ids, false);
+  return out;
+}
+function funnelFold(panel, steps) {
+  var ids = funnelStageIds(panel);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return funnelCleanState(raw, ids, once); });
+  var carried = funnelMergeCounts({}, panelObject(panel.initial) && panelOwn(panel.initial, 'counts') ? panel.initial.counts : undefined, ids);
+  steps.forEach(function (step, i) {
+    var source = stepPanelPatch(step), patch = source && panelOwn(source, panel.id) ? source[panel.id] : null;
+    if (!panelObject(patch)) patch = {};
+    if (panelOwn(patch, 'counts')) carried = funnelMergeCounts(carried, patch.counts, ids);
+    var once = panelObject(patch.enterOnce) && panelOwn(patch.enterOnce, 'counts') ? patch.enterOnce : null;
+    states[i].counts = once ? funnelMergeCounts(carried, once.counts, ids) : carried;
+  });
+  if (!steps.length) states[0].counts = carried;
+  return states;
+}
+function funnelFormat(value) {
+  return funnelValidCount(value) ? value.toLocaleString('en-US') : '—';
+}
+function funnelPct(value) {
+  return isFiniteNum(value) ? value.toFixed(1) + '%' : '';
+}
+/* Rows carry retained share (of the first known count), the change versus
+   the previous known stage, and a `grew` flag instead of a negative drop. */
+function funnelModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var stages = funnelStages(panel), counts = panelObject(state.counts) ? state.counts : {};
+  var active = typeof state.active === 'string' ? state.active : null;
+  var first = null, prev = null, max = 0, last = null;
+  var rows = stages.map(function (stage) {
+    var raw = panelOwn(counts, stage.id) ? counts[stage.id] : null;
+    var count = funnelValidCount(raw) ? raw : null, known = count !== null;
+    var row = {
+      id: stage.id, label: stage.label, tone: stage.tone, count: count, known: known, active: stage.id === active,
+      pct: null, dropped: null, droppedPct: null, gained: null, gainedPct: null, grew: false, barPct: 0,
+    };
+    if (known) {
+      if (first === null) first = count;
+      row.pct = first > 0 ? count / first * 100 : (count === 0 ? 100 : null);
+      if (prev !== null) {
+        if (count > prev) {
+          row.grew = true;
+          row.gained = count - prev;
+          row.gainedPct = prev > 0 ? row.gained / prev * 100 : null;
+        } else {
+          row.dropped = prev - count;
+          row.droppedPct = prev > 0 ? row.dropped / prev * 100 : (row.dropped === 0 ? 0 : null);
+        }
+      }
+      prev = count;
+      last = count;
+      max = Math.max(max, count);
+    }
+    return row;
+  });
+  rows.forEach(function (row) {
+    if (row.known) row.barPct = max > 0 ? row.count / max * 100 : 0;
+    if (!isFiniteNum(row.barPct)) row.barPct = 0;
+    if (!isFiniteNum(row.pct)) row.pct = null;
+    if (!isFiniteNum(row.droppedPct)) row.droppedPct = null;
+    if (!isFiniteNum(row.gainedPct)) row.gainedPct = null;
+  });
+  var retained = first !== null && last !== null ? (first > 0 ? last / first * 100 : (last === 0 ? 100 : null)) : null;
+  return {
+    rows: rows, unit: funnelUnit(panel), total: first, remaining: last,
+    retainedPct: isFiniteNum(retained) ? retained : null, active: active, known: rows.filter(function (row) { return row.known; }).length,
+  };
+}
+function funnelHTML(panel, state, model) {
+  model = model || funnelModel(panel, state);
+  var unit = esc(model.unit);
+  var h = '<div class="funnel" role="list" aria-label="' + esc('Stage counts in ' + model.unit) + '">';
+  if (!model.rows.length) h += '<p class="funnel-empty">Declare 2–' + FUNNEL_MAX_STAGES + ' stages to show counts.</p>';
+  model.rows.forEach(function (row, i) {
+    if (i > 0 && row.known) {
+      if (row.grew)
+        h += '<div class="funnel-delta funnel-grew" aria-hidden="true"><b>+' + funnelFormat(row.gained) + '</b>' +
+          (row.gainedPct !== null ? '<span>(+' + funnelPct(row.gainedPct) + ')</span>' : '') + '<i>grew</i></div>';
+      else if (row.dropped !== null)
+        h += '<div class="funnel-delta" aria-hidden="true"><b>−' + funnelFormat(row.dropped) + '</b>' +
+          (row.droppedPct !== null ? '<span>(−' + funnelPct(row.droppedPct) + ')</span>' : '') + '</div>';
+    }
+    var text = row.label + ': ' + (row.known ? funnelFormat(row.count) + ' ' + model.unit +
+      (row.pct !== null ? ', ' + funnelPct(row.pct) + ' retained' : '') +
+      (row.grew ? ', grew by ' + funnelFormat(row.gained) : row.dropped !== null ? ', dropped ' + funnelFormat(row.dropped) : '') :
+      'count not yet known') + (row.active ? '. Computing' : '');
+    h += '<div class="funnel-row' + (row.active ? ' funnel-active' : '') + (row.known ? '' : ' funnel-unknown') + (row.grew ? ' funnel-row-grew' : '') +
+      '" role="listitem" aria-label="' + esc(text) + '">' +
+      '<span class="funnel-label" title="' + esc(row.label) + '">' + esc(row.label) + '</span>' +
+      '<span class="funnel-track">' + (row.known ? '<span class="funnel-bar' + (row.tone ? ' data-tone-' + row.tone : '') +
+        '" style="width:' + row.barPct.toFixed(3) + '%"></span>' : '') + '</span>' +
+      '<span class="funnel-count">' + (row.known ? funnelFormat(row.count) : '—') + '</span>' +
+      '<span class="funnel-pct">' + (row.pct !== null ? funnelPct(row.pct) : (row.known ? '' : '—')) + '</span>' +
+      (row.active ? '<span class="funnel-live">computing</span>' : '') + '</div>';
+  });
+  if (model.rows.length)
+    h += '<div class="funnel-foot"><span>' + (model.total !== null ? funnelFormat(model.total) + ' ' + unit + ' in' : 'No counts yet') + '</span><span>' +
+      (model.remaining !== null && model.known > 1 ? funnelFormat(model.remaining) + ' remain' + (model.retainedPct !== null ? ' · ' + funnelPct(model.retainedPct) : '') : '') + '</span></div>';
+  return softwarePanelShell(h + '</div>', state || {});
+}
+PanelRegistry.define('funnel', {
+  label: 'Stage counts', since: '0.2.0', order: 44,
+  validateDeclaration: funnelDeclarationWarnings, validatePatch: funnelPatchWarnings, fold: funnelFold,
+  render: function (host, panel, state) {
+    /* Bars whose count became known since the previous render grow in. The
+       previous known set is presentation history only, never folded state. */
+    var model = funnelModel(panel, state), known = model.rows.map(function (row) { return row.known; });
+    var before = host._funnelKnown || null;
+    var entrants = before ? known.map(function (on, i) { return on && !before[i]; }) : null;
+    host._funnelKnown = known;
+    return { html: funnelHTML(panel, state, model), enterBars: { rows: '.funnel-row', bar: '.funnel-bar', entrants: entrants } };
+  },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 240, preferredWidth: 360, maxWidth: 600, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.funnel{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dtext);min-width:0}
+.funnel-empty{margin:0;color:var(--dfaint)}
+.funnel-row{position:relative;display:grid;grid-template-columns:minmax(64px,30%) minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:3px 5px;border-radius:6px;border:1px solid transparent}
+.funnel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dink)}
+.funnel-track{display:block;height:12px;border-radius:6px;background:color-mix(in srgb,var(--dtext) 10%,transparent);overflow:hidden}
+.funnel-bar{display:block;height:100%;border-radius:6px;background:var(--dink);transition:width .5s ease}
+.funnel-bar.data-tone-neutral{background:#94a3b8}.funnel-bar.data-tone-accent{background:#38bdf8}
+.funnel-bar.data-tone-violet,.funnel-bar.data-tone-insert{background:#a78bfa}.funnel-bar.data-tone-danger,.funnel-bar.data-tone-mismatch{background:#f43f5e}.funnel-bar.data-tone-bad{background:#ef4444}
+.funnel-bar.data-tone-warning,.funnel-bar.data-tone-motif{background:#facc15}.funnel-bar.data-tone-teal,.funnel-bar.data-tone-primer{background:#2dd4bf}
+.funnel-bar.data-tone-pink,.funnel-bar.data-tone-cut{background:#e879f9}.funnel-bar.data-tone-info,.funnel-bar.data-tone-feature{background:#3b82f6}
+.funnel-bar.data-tone-success,.funnel-bar.data-tone-good{background:#22c55e}
+.funnel-bar.dv-bar-enter{transform-origin:left center;animation:dvbarenter .5s cubic-bezier(.4,0,.2,1)}
+.funnel-count{font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--dink)}
+.funnel-pct{font:500 10px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;color:var(--dfaint)}
+.funnel-unknown .funnel-count,.funnel-unknown .funnel-label{color:var(--dfaint)}
+.funnel-active{border-color:color-mix(in srgb,var(--dink) 45%,transparent);background:color-mix(in srgb,var(--dink) 7%,transparent)}
+.funnel-active .funnel-track{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--dink) 24%,transparent) 0 6px,transparent 6px 12px);background-size:17px 12px;animation:funnel-stripe .9s linear infinite}
+.funnel-live{position:absolute;right:52px;top:-7px;padding:0 5px;border-radius:7px;font:600 8px/13px 'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--dink);background:color-mix(in srgb,var(--dink) 14%,transparent)}
+@keyframes funnel-stripe{from{background-position:0 0}to{background-position:17px 0}}
+.funnel-delta{display:flex;justify-content:flex-end;align-items:baseline;gap:5px;padding:0 51px 0 0;font:500 10px/1.2 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dfaint)}
+.funnel-delta b{font-weight:600;color:#cf5f6a}.funnel-delta i{font-style:normal;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.funnel-grew b{color:#3f9a7a}.funnel-grew i{color:#3f9a7a}
+.funnel-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);font-size:10px;color:var(--dfaint)}
+@media (prefers-reduced-motion:reduce){.funnel-active .funnel-track{animation:none}.funnel-bar{transition:none}.funnel-bar.dv-bar-enter{animation:none}}
+@media print{.funnel-track,.funnel-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.funnel-active .funnel-track{animation:none}}
+`,
+  authoring: {
+    initialFields: true,
+    template: {
+      title: 'Processing stages', unit: 'items',
+      stages: [{ id: 'intake', label: 'Received' }, { id: 'review', label: 'Reviewed' }, { id: 'complete', label: 'Completed' }],
+      initial: { counts: { intake: 12000 } },
+    },
+    setupFields: [
+      ['unit', 'text'],
+      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'tone', kind: 'enum', options: FUNNEL_DOCUMENTED_TONES }] }],
+      ['initial', 'json'],
+    ],
+    patchFields: [['counts', 'json', { nullable: true }], ['active', 'text'], ['note', 'text']],
+    expandPatchFields: function (panel) {
+      return [['counts', 'json', { nullable: true }], ['active', 'enum', funnelStageIds(panel)], ['note', 'text']];
+    },
+    fieldMeta: {
+      unit: { label: 'Item noun', help: 'What is being counted, e.g. records, requests, seats. Default items.' },
+      stages: { label: 'Stages', help: 'Declare 2–12 stages in pipeline order with unique ids. Optional tone colours that stage’s bar.' },
+      counts: { label: 'Counts by stage', help: 'An object keyed by stage id, e.g. {"review": 9800}. Keys merge into the carried counts; a key set to null forgets that stage; null clears every count.', nullLabel: 'Clear every count' },
+      active: { label: 'Stage being computed', help: 'Shows an animated stripe on this stage while the story explains it.', nullLabel: 'No stage active' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 44, name: 'Stage counts', category: 'Data & charts', tagline: 'How many reach each stage',
+      description: 'Show the items that remain after each filtering stage of a pipeline, with the drop between stages, so readers see where data is lost.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.unit = 'items';
+      panel.stages = [
+        { id: 'intake', label: 'Received' }, { id: 'review', label: 'Reviewed' },
+        { id: 'ready', label: 'Ready' }, { id: 'delivered', label: 'Delivered', tone: 'accent' },
+        { id: 'complete', label: 'Completed', tone: 'success' },
+      ];
+      state.counts = { intake: 12000, review: 11364, ready: 11319, delivered: 10486 };
+      state.active = 'complete';
+      state.note = 'Illustrative counts. The last stage is still in progress.';
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
 /* ---- src/panels/types/gauge.js ---- */
 /* gauge panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 PanelViews.register('gauge', function (host, panel, state, skin, states, stepIdx, animate) {
@@ -19786,6 +20163,368 @@ PanelRegistry.extend('gauge', {
 });
 
 PanelRegistry.extend('gauge', {layout: {sectionSizing: { minWidth: 160, preferredWidth: 200, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+/* ---- src/panels/types/grid.js ---- */
+/* Value matrix: a small labelled table of authored numbers coloured by value,
+   with optional significance marks and row/column/cell emphasis. Nothing is
+   computed from data files; every number, mark and scale bound is authored. */
+var GRID_MAX_AXIS = 12;
+var GRID_MARKS = ['*', '**', '***', 'ns', ''];
+/* Row and column ids form cell keys "<row>.<col>", so they carry no dots and
+   start with a letter or digit (which also keeps `__proto__` out). */
+function gridSafeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+}
+function gridAxis(panel, key) {
+  return panelCollectionItems(panel, key, GRID_MAX_AXIS).filter(function (item) {
+    return gridSafeId(item.id);
+  }).map(function (item) {
+    return { id: item.id, label: typeof item.label === 'string' && item.label.trim() ? item.label : item.id };
+  });
+}
+function gridKeys(panel) {
+  var keys = [];
+  gridAxis(panel, 'rows').forEach(function (row) {
+    gridAxis(panel, 'cols').forEach(function (col) { keys.push(row.id + '.' + col.id); });
+  });
+  return keys;
+}
+function gridDecimals(panel) {
+  return Number.isInteger(panel.decimals) && panel.decimals >= 0 && panel.decimals <= 4 ? panel.decimals : 2;
+}
+function gridUnit(panel) {
+  return typeof panel.unit === 'string' ? panel.unit.trim() : '';
+}
+function gridAxisWarnings(panel, path, warnings, key) {
+  var seen = Object.create(null), valid = 0;
+  if (!Array.isArray(panel[key]) || !panel[key].length || panel[key].length > GRID_MAX_AXIS)
+    warnings.push(path + '.' + key + ': declare 1–' + GRID_MAX_AXIS + ' entries [{id,label}] with unique ids');
+  (Array.isArray(panel[key]) ? panel[key] : []).forEach(function (item, i) {
+    var at = path + '.' + key + '[' + i + ']';
+    if (i >= GRID_MAX_AXIS) return;
+    if (!panelObject(item) || typeof item.id !== 'string' || !item.id) {
+      warnings.push(at + '.id: needs a non-empty string — entry skipped');
+      return;
+    }
+    if (!gridSafeId(item.id)) {
+      warnings.push(at + '.id: use letters, digits, "-" or "_" starting with a letter or digit (no dots) — entry skipped');
+      return;
+    }
+    if (seen[item.id]) {
+      warnings.push(at + '.id: duplicate id "' + item.id + '" — later entry skipped');
+      return;
+    }
+    seen[item.id] = true;
+    valid++;
+    if (item.label !== undefined && typeof item.label !== 'string') warnings.push(at + '.label: expected text — using the id');
+  });
+  if (Array.isArray(panel[key]) && panel[key].length && !valid)
+    warnings.push(path + '.' + key + ': no usable entries — the panel renders empty');
+}
+function gridDeclarationWarnings(panel, path, warnings) {
+  gridAxisWarnings(panel, path, warnings, 'rows');
+  gridAxisWarnings(panel, path, warnings, 'cols');
+  if (panel.scale !== undefined) {
+    var scale = panel.scale, sp = path + '.scale';
+    if (!panelObject(scale)) warnings.push(sp + ': expected {min?,max?,mid?,kind?} — using an automatic scale');
+    else {
+      ['min', 'max', 'mid'].forEach(function (key) {
+        if (scale[key] !== undefined && !isFiniteNum(scale[key]))
+          warnings.push(sp + '.' + key + ': expected a finite number — ignored');
+      });
+      if (isFiniteNum(scale.min) && isFiniteNum(scale.max) && !(scale.min < scale.max))
+        warnings.push(sp + ': min must be less than max — using an automatic scale');
+      if (scale.kind !== undefined && scale.kind !== 'sequential' && scale.kind !== 'diverging')
+        warnings.push(sp + '.kind: expected sequential or diverging — using sequential');
+      if (isFiniteNum(scale.mid) && isFiniteNum(scale.min) && isFiniteNum(scale.max) && !(scale.mid > scale.min && scale.mid < scale.max))
+        warnings.push(sp + '.mid: must lie strictly between min and max — using the midpoint');
+      Object.keys(scale).forEach(function (key) {
+        if (['min', 'max', 'mid', 'kind'].indexOf(key) < 0) warnings.push(sp + '.' + key + ': unknown scale field — ignored');
+      });
+    }
+  }
+  if (panel.decimals !== undefined && gridDecimals(panel) !== panel.decimals)
+    warnings.push(path + '.decimals: expected a whole number 0–4 — using 2');
+  if (panel.unit !== undefined && typeof panel.unit !== 'string')
+    warnings.push(path + '.unit: expected text — ignored');
+  gridPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function gridKeyedWarnings(value, path, keys, warnings, what, validValue) {
+  if (value === null) return;
+  if (!panelObject(value)) {
+    warnings.push(path + ': expected an object keyed "<rowId>.<colId>" (or null to clear every ' + what + ') — ignored');
+    return;
+  }
+  Object.keys(value).forEach(function (key) {
+    var at = path + '.' + key;
+    if (keys.indexOf(key) < 0) warnings.push(at + ': unknown cell key — ignored');
+    else if (value[key] !== null && !validValue(value[key]))
+      warnings.push(at + ': expected ' + (what === 'value' ? 'a finite number' : 'one of "*", "**", "***", "ns" or ""') + ' or null — ignored');
+  });
+}
+function gridHighlightWarnings(value, path, panel, warnings) {
+  if (value === null) return;
+  if (!panelObject(value)) {
+    warnings.push(path + ': expected {row?,col?,cell?} or null — ignored');
+    return;
+  }
+  var rows = gridAxis(panel, 'rows').map(function (row) { return row.id; }),
+    cols = gridAxis(panel, 'cols').map(function (col) { return col.id; }), keys = gridKeys(panel);
+  Object.keys(value).forEach(function (key) {
+    var at = path + '.' + key, v = value[key];
+    if (key === 'row') { if (v !== null && rows.indexOf(v) < 0) warnings.push(at + ': unknown row id — ignored'); }
+    else if (key === 'col') { if (v !== null && cols.indexOf(v) < 0) warnings.push(at + ': unknown column id — ignored'); }
+    else if (key === 'cell') { if (v !== null && keys.indexOf(v) < 0) warnings.push(at + ': unknown cell key — ignored'); }
+    else warnings.push(at + ': unknown highlight field — ignored');
+  });
+}
+function gridPatchWarnings(state, path, panel, warnings) {
+  softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, panel, warnings) {
+    var keys = gridKeys(panel);
+    Object.keys(state).forEach(function (key) {
+      var value = state[key], at = path + '.' + key;
+      if (key === 'enterOnce') return;
+      if (key === 'cells') gridKeyedWarnings(value, at, keys, warnings, 'value', isFiniteNum);
+      else if (key === 'marks') gridKeyedWarnings(value, at, keys, warnings, 'mark', function (v) { return GRID_MARKS.indexOf(v) >= 0; });
+      else if (key === 'highlight') gridHighlightWarnings(value, at, panel, warnings);
+      else if (key === 'note') { if (value !== null && typeof value !== 'string') warnings.push(at + ': expected text or null — ignored'); }
+      else warnings.push(at + ': unknown field — ignored');
+    });
+  });
+}
+/* Pure sparse merge shared by `cells` and `marks`: null clears everything,
+   a null entry forgets one key, invalid or unknown entries are skipped. */
+function gridMergeKeyed(base, patch, keys, validValue) {
+  var out = {};
+  if (patch === null) return out;
+  Object.keys(panelObject(base) ? base : {}).forEach(function (key) { out[key] = base[key]; });
+  if (!panelObject(patch)) return out;
+  keys.forEach(function (key) {
+    if (!panelOwn(patch, key)) return;
+    var value = patch[key];
+    if (value === null) delete out[key];
+    else if (validValue(value)) out[key] = value;
+  });
+  return out;
+}
+function gridMark(value) { return GRID_MARKS.indexOf(value) >= 0; }
+function gridCleanHighlight(raw, panel) {
+  if (raw === null) return null;
+  if (!panelObject(raw)) return undefined;
+  var out = {}, rows = gridAxis(panel, 'rows').map(function (row) { return row.id; }),
+    cols = gridAxis(panel, 'cols').map(function (col) { return col.id; }), keys = gridKeys(panel);
+  if (panelOwn(raw, 'row') && (raw.row === null || rows.indexOf(raw.row) >= 0)) out.row = raw.row;
+  if (panelOwn(raw, 'col') && (raw.col === null || cols.indexOf(raw.col) >= 0)) out.col = raw.col;
+  if (panelOwn(raw, 'cell') && (raw.cell === null || keys.indexOf(raw.cell) >= 0)) out.cell = raw.cell;
+  return out;
+}
+function gridCleanState(raw, panel, allowOnce) {
+  var out = {};
+  if (!panelObject(raw)) return out;
+  if (panelOwn(raw, 'highlight')) {
+    var highlight = gridCleanHighlight(raw.highlight, panel);
+    if (highlight !== undefined) out.highlight = highlight;
+  }
+  if (panelOwn(raw, 'note') && (raw.note === null || typeof raw.note === 'string')) out.note = raw.note;
+  if (allowOnce && panelObject(raw.enterOnce)) out.enterOnce = gridCleanState(raw.enterOnce, panel, false);
+  return out;
+}
+function gridFold(panel, steps) {
+  var keys = gridKeys(panel);
+  var states = foldSanitizedPanelStates(panel, steps, function (raw, once) { return gridCleanState(raw, panel, once); });
+  var initial = panelObject(panel.initial) ? panel.initial : {};
+  var cells = gridMergeKeyed({}, panelOwn(initial, 'cells') ? initial.cells : undefined, keys, isFiniteNum);
+  var marks = gridMergeKeyed({}, panelOwn(initial, 'marks') ? initial.marks : undefined, keys, gridMark);
+  function attach(state, carriedCells, carriedMarks, once) {
+    state.cells = once && panelOwn(once, 'cells') ? gridMergeKeyed(carriedCells, once.cells, keys, isFiniteNum) : carriedCells;
+    state.marks = once && panelOwn(once, 'marks') ? gridMergeKeyed(carriedMarks, once.marks, keys, gridMark) : carriedMarks;
+  }
+  steps.forEach(function (step, i) {
+    var source = stepPanelPatch(step), patch = source && panelOwn(source, panel.id) ? source[panel.id] : null;
+    if (!panelObject(patch)) patch = {};
+    if (panelOwn(patch, 'cells')) cells = gridMergeKeyed(cells, patch.cells, keys, isFiniteNum);
+    if (panelOwn(patch, 'marks')) marks = gridMergeKeyed(marks, patch.marks, keys, gridMark);
+    attach(states[i], cells, marks, panelObject(patch.enterOnce) ? patch.enterOnce : null);
+  });
+  if (!steps.length) attach(states[0], cells, marks, null);
+  return states;
+}
+/* Resolves the colour scale for the current cells. Authored bounds win;
+   missing bounds come from the data, and no numbers at all means 0–1. */
+function gridScale(panel, values) {
+  var scale = panelObject(panel.scale) ? panel.scale : {};
+  var kind = scale.kind === 'diverging' ? 'diverging' : 'sequential';
+  var hasMin = isFiniteNum(scale.min), hasMax = isFiniteNum(scale.max);
+  if (hasMin && hasMax && !(scale.min < scale.max)) hasMin = hasMax = false;
+  var dataMin = values.length ? Math.min.apply(null, values) : null, dataMax = values.length ? Math.max.apply(null, values) : null;
+  var min = hasMin ? scale.min : dataMin !== null ? (hasMax ? Math.min(dataMin, scale.max) : dataMin) : (hasMax ? Math.min(0, scale.max) : 0);
+  var max = hasMax ? scale.max : dataMax !== null ? Math.max(dataMax, min) : Math.max(1, min);
+  if (!isFiniteNum(min) || !isFiniteNum(max)) { min = 0; max = 1; }
+  var mid = isFiniteNum(scale.mid) && scale.mid > min && scale.mid < max ? scale.mid : (min + max) / 2;
+  return { kind: kind, min: min, max: max, mid: mid, auto: !(hasMin && hasMax) };
+}
+function gridIntensity(value, scale) {
+  var t;
+  if (scale.kind === 'diverging') {
+    if (value <= scale.mid) t = scale.mid > scale.min ? 0.5 * (value - scale.min) / (scale.mid - scale.min) : 0.5;
+    else t = scale.max > scale.mid ? 0.5 + 0.5 * (value - scale.mid) / (scale.max - scale.mid) : 0.5;
+  } else t = scale.max > scale.min ? (value - scale.min) / (scale.max - scale.min) : 0.5;
+  return isFiniteNum(t) ? clamp(t, 0, 1) : 0.5;
+}
+function gridFormat(value, decimals) {
+  return isFiniteNum(value) ? value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '—';
+}
+/* Each cell carries its value, display text, mark, 0–1 intensity, the shade
+   side/depth used for colouring and its highlight flags. Intensity is never NaN. */
+function gridModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var rows = gridAxis(panel, 'rows'), cols = gridAxis(panel, 'cols');
+  var cells = panelObject(state.cells) ? state.cells : {}, marks = panelObject(state.marks) ? state.marks : {};
+  var highlight = panelObject(state.highlight) ? state.highlight : {};
+  var decimals = gridDecimals(panel), unit = gridUnit(panel), values = [];
+  rows.forEach(function (row) {
+    cols.forEach(function (col) {
+      var v = panelOwn(cells, row.id + '.' + col.id) ? cells[row.id + '.' + col.id] : null;
+      if (isFiniteNum(v)) values.push(v);
+    });
+  });
+  var scale = gridScale(panel, values);
+  var table = rows.map(function (row) {
+    var rowHighlight = highlight.row === row.id;
+    return {
+      id: row.id, label: row.label, highlight: rowHighlight,
+      cells: cols.map(function (col) {
+        var key = row.id + '.' + col.id, raw = panelOwn(cells, key) ? cells[key] : null;
+        var value = isFiniteNum(raw) ? raw : null, known = value !== null;
+        var intensity = known ? gridIntensity(value, scale) : 0;
+        var side = known && scale.kind === 'diverging' && intensity < 0.5 ? 'low' : 'high';
+        var depth = known ? (scale.kind === 'diverging' ? Math.abs(intensity - 0.5) * 2 : intensity) : 0;
+        var mark = panelOwn(marks, key) && gridMark(marks[key]) ? marks[key] : '';
+        return {
+          key: key, row: row.id, col: col.id, value: value, known: known, text: gridFormat(value, decimals), mark: mark,
+          intensity: known ? intensity : 0, side: side, depth: isFiniteNum(depth) ? clamp(depth, 0, 1) : 0,
+          highlight: highlight.cell === key, rowHighlight: rowHighlight, colHighlight: highlight.col === col.id,
+        };
+      }),
+    };
+  });
+  return {
+    rows: table, cols: cols.map(function (col) { return { id: col.id, label: col.label, highlight: highlight.col === col.id }; }),
+    scale: scale, decimals: decimals, unit: unit, count: values.length,
+  };
+}
+function gridHTML(panel, state) {
+  var model = gridModel(panel, state), unit = model.unit ? ' ' + model.unit : '';
+  var h = '<div class="grid-wrap panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Value matrix') + '">';
+  if (!model.rows.length || !model.cols.length) h += '<p class="grid-empty">Declare 1–' + GRID_MAX_AXIS + ' rows and columns to show values.</p>';
+  else {
+    h += '<table class="grid-table grid-' + model.scale.kind + '" aria-label="' + esc((panel.title || 'Value matrix') + ': ' +
+      model.rows.length + ' rows by ' + model.cols.length + ' columns, ' + model.scale.kind + ' scale ' +
+      gridFormat(model.scale.min, model.decimals) + ' to ' + gridFormat(model.scale.max, model.decimals) + unit) + '">';
+    h += '<thead><tr><th scope="col" class="grid-corner"></th>';
+    model.cols.forEach(function (col) {
+      h += '<th scope="col" class="grid-colhead' + (col.highlight ? ' grid-hl' : '') + '" title="' + esc(col.label) + '">' + esc(col.label) + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    model.rows.forEach(function (row) {
+      h += '<tr class="grid-row' + (row.highlight ? ' grid-rowhl' : '') + '"><th scope="row" class="grid-rowhead' + (row.highlight ? ' grid-hl' : '') +
+        '" title="' + esc(row.label) + '">' + esc(row.label) + '</th>';
+      row.cells.forEach(function (cell, c) {
+        var classes = 'grid-cell grid-' + cell.side + (cell.known ? '' : ' grid-unknown') + (cell.depth > 0.55 ? ' grid-deep' : '') +
+          (cell.highlight ? ' grid-hl-cell' : '') + (cell.rowHighlight ? ' grid-hl-row' : '') + (cell.colHighlight ? ' grid-hl-col' : '');
+        var title = row.label + ' × ' + model.cols[c].label + ': ' + (cell.known ? cell.text + unit : 'no value') +
+          (cell.mark ? ' (' + cell.mark + ')' : '');
+        h += '<td class="' + classes + '" style="--grid-d:' + cell.depth.toFixed(3) + '" title="' + esc(title) + '">' +
+          '<span class="grid-value">' + esc(cell.text) + '</span>' +
+          (cell.mark ? '<sup class="grid-mark' + (cell.mark === 'ns' ? ' grid-mark-ns' : '') + '">' + esc(cell.mark) + '</sup>' : '') + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div class="grid-key" aria-hidden="true"><span>' + esc(gridFormat(model.scale.min, model.decimals) + unit) + '</span>' +
+      '<span class="grid-ramp grid-ramp-' + model.scale.kind + '"></span><span>' + esc(gridFormat(model.scale.max, model.decimals) + unit) + '</span>' +
+      (model.scale.auto ? '<em>auto</em>' : '') + '</div>';
+  }
+  return softwarePanelShell(h + '</div>', state || {});
+}
+PanelRegistry.define('grid', {
+  label: 'Value matrix', since: '0.2.0', order: 45,
+  validateDeclaration: gridDeclarationWarnings, validatePatch: gridPatchWarnings, fold: gridFold,
+  render: function (host, panel, state) { return { html: gridHTML(panel, state) }; },
+  presentation: { ambientInitial: true },
+  layout: { sectionSizing: { minWidth: 240, preferredWidth: 380, maxWidth: 700, aspectPolicy: 'content', grow: 1 } },
+  styles: String.raw`
+.grid-wrap{font-size:11px;color:var(--dtext);min-width:0;overflow:auto;max-height:420px}
+.grid-wrap:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.grid-empty{margin:0;color:var(--dfaint)}
+.grid-table{--grid-low:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-mid:color-mix(in srgb,var(--dtext) 7%,transparent);--grid-high:#2f6fd6;--grid-neg:#d4704f;border-collapse:separate;border-spacing:2px;width:100%;table-layout:fixed}
+.grid-table th{font:500 10px 'IBM Plex Mono',monospace;color:var(--dfaint);padding:3px 4px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid-table .grid-colhead{vertical-align:bottom}.grid-table .grid-rowhead{text-align:right;width:26%}
+.grid-table .grid-corner{width:26%}
+.grid-table th.grid-hl{color:var(--dink);font-weight:700}
+.grid-cell{position:relative;padding:5px 4px;text-align:center;border-radius:4px;font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:var(--dink);background:color-mix(in srgb,var(--grid-high) calc(var(--grid-d)*100%),var(--grid-mid));transition:background-color .4s ease}
+.grid-cell.grid-low{background:color-mix(in srgb,var(--grid-neg) calc(var(--grid-d)*100%),var(--grid-mid))}
+.grid-cell.grid-deep{color:#fff}
+.grid-cell.grid-unknown{background:transparent;color:var(--dfaint);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dtext) 14%,transparent)}
+.grid-mark{font-size:9px;margin-left:1px;vertical-align:top;line-height:1}.grid-mark-ns{font-weight:400;opacity:.8}
+.grid-cell.grid-hl-row,.grid-cell.grid-hl-col{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--dink) 55%,transparent)}
+.grid-cell.grid-hl-cell{box-shadow:inset 0 0 0 2px var(--dink),0 0 0 1px var(--dink)}
+.grid-key{display:flex;align-items:center;gap:6px;margin-top:6px;font:500 9px 'IBM Plex Mono',monospace;color:var(--dfaint)}
+.grid-key em{font-style:normal;letter-spacing:.5px;text-transform:uppercase;font-size:8px}
+.grid-ramp{display:inline-block;flex:0 0 72px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--grid-mid),var(--grid-high))}
+.grid-ramp-diverging{background:linear-gradient(90deg,var(--grid-neg),var(--grid-mid),var(--grid-high))}
+@media (prefers-reduced-motion:reduce){.grid-cell{transition:none}}
+@media print{.grid-cell,.grid-ramp{-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid-wrap{max-height:none;overflow:visible}}
+`,
+  authoring: {
+    initialFields: true,
+    template: {
+      title: 'Values by group', decimals: 2,
+      rows: [{ id: 'groupA', label: 'Group A' }, { id: 'groupB', label: 'Group B' }],
+      cols: [{ id: 'period1', label: 'Period 1' }, { id: 'period2', label: 'Period 2' }],
+      scale: { min: -2, max: 2, kind: 'diverging' },
+      initial: { cells: { 'groupA.period1': 1.4, 'groupA.period2': -0.6, 'groupB.period1': 0.1, 'groupB.period2': 0.2 } },
+    },
+    setupFields: [
+      ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['cols', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['scale', 'json'], ['decimals', 'num', { min: 0, max: 4 }], ['unit', 'text'], ['initial', 'json'],
+    ],
+    patchFields: [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'json', { nullable: true }], ['note', 'text']],
+    fieldMeta: {
+      rows: { label: 'Rows', help: 'Declare 1–12 rows with unique ids (letters, digits, - or _; no dots).' },
+      cols: { label: 'Columns', help: 'Declare 1–12 columns with unique ids (letters, digits, - or _; no dots).' },
+      scale: { label: 'Colour scale', help: '{"min","max","kind","mid"}. Kind is sequential (default) or diverging; min/max default to the current values; mid defaults to the midpoint.' },
+      decimals: { label: 'Decimals', help: 'Digits after the decimal point, 0–4. Default 2.' },
+      unit: { label: 'Unit suffix', help: 'Optional text appended to values in tooltips and the key, e.g. points or %.' },
+      cells: { label: 'Cell values', help: 'An object keyed "<rowId>.<colId>", e.g. {"groupA.period1": 1.4}. Keys merge into the carried values; null forgets a cell; null for the whole field clears every value.', nullLabel: 'Clear every value' },
+      marks: { label: 'Significance marks', help: 'An object keyed like cells with "*", "**", "***", "ns" or "". Merges like cells.', nullLabel: 'Clear every mark' },
+      highlight: { label: 'Highlight', help: '{"row","col","cell"}: outline one row, one column and/or one cell ("<rowId>.<colId>").', nullLabel: 'No highlight' },
+      note: { label: 'Explanation' },
+    },
+    picker: {
+      order: 45, name: 'Value matrix', category: 'Data & charts', tagline: 'A k × k table coloured by value',
+      description: 'Compare authored numbers across two labelled axes as a small heatmap with significance marks and row, column or cell emphasis.',
+    },
+    example: function (sample) {
+      var panel = sample.panel, state = sample.state;
+      panel.title = 'Values over time';
+      panel.unit = 'points';
+      panel.rows = [{ id: 'first', label: 'First' }, { id: 'middle', label: 'Middle' }, { id: 'last', label: 'Last' }];
+      panel.cols = [{ id: 'a', label: 'Group A' }, { id: 'b', label: 'Group B' }, { id: 'c', label: 'Group C' }];
+      panel.scale = { min: -3, max: 3, kind: 'diverging' };
+      state.cells = {
+        'first.a': 0.4, 'first.b': -1.2, 'first.c': 2.6,
+        'middle.a': 1.1, 'middle.b': -0.3, 'middle.c': 1.8,
+        'last.a': 2.9, 'last.b': -2.4,
+      };
+      state.marks = { 'first.c': '***', 'last.a': '**', 'last.b': '*', 'middle.b': 'ns' };
+      state.highlight = { cell: 'last.a' };
+      state.note = 'Illustrative values. Last × Group C is not yet measured.';
+      panel.initial = builderClone(state);
+      return sample;
+    },
+  },
+});
 /* ---- src/panels/types/homemap.js ---- */
 /* homemap validation and pure state helpers. */
 var HOMEMAP_STATES = {
@@ -31876,15 +32615,57 @@ function seatmapFold(panel, steps) {
 function seatmapPathGeometry(d) {
   var parsed = spmParsePath(d, { range: [0, SPM_VIEW] });
   var box = parsed.error ? null : spmPathBBox(parsed.commands);
-  if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0 };
-  return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height };
+  if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0, points: [] };
+  return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height, points: spmPathPoints(parsed.commands) };
 }
-/* Label size from the wedge: up to 24 units, hidden below 9 (the tooltip
+/* The span of a closed polygon along the horizontal (vertical when `v`)
+   line through (x, y) that contains that point: [lo, hi], or null. */
+function seatmapChord(poly, x, y, v) {
+  var hits = [], n = poly.length, i;
+  for (i = 0; i < n; i++) {
+    var a = poly[i], b = poly[(i + 1) % n], a0 = v ? a[0] : a[1], b0 = v ? b[0] : b[1], at = v ? x : y;
+    if ((a0 <= at && b0 > at) || (b0 <= at && a0 > at)) {
+      var f = (at - a0) / (b0 - a0);
+      hits.push(v ? a[1] + (b[1] - a[1]) * f : a[0] + (b[0] - a[0]) * f);
+    }
+  }
+  hits.sort(function (p, q) { return p - q; });
+  var c = v ? y : x;
+  for (i = 0; i + 1 < hits.length; i += 2) if (hits[i] <= c && hits[i + 1] >= c) return [hits[i], hits[i + 1]];
+  return null;
+}
+/* The largest font (viewBox units) at which the label's lines sit inside
+   the section: every horizontal chord across the cap band clears the text
+   with a small margin, and the band clears the section vertically. Also
+   returns the chord centre at the label line, so a label sits in the middle
+   of a trapezoid rather than of its bounding box. */
+function seatmapLabelFit(lines, poly, x, y) {
+  if (!poly || poly.length < 3) return { fit: 0, x: x };
+  var chars = Math.max.apply(null, lines.map(function (l) { return Math.max(1, l.length); }));
+  var mid = seatmapChord(poly, x, y, false);
+  if (!mid) return { fit: 0, x: x };
+  var cx = (mid[0] + mid[1]) / 2, vert = seatmapChord(poly, cx, y, true);
+  if (!vert) return { fit: 0, x: x };
+  var band = lines.length > 1 ? [-0.92, 0.85] : [-0.37, 0.35];
+  function ok(f) {
+    if (y + band[0] * f < vert[0] + 1.5 || y + band[1] * f > vert[1] - 1.5) return false;
+    var need = chars * 0.62 * f + 3;
+    for (var k = 0; k <= 4; k++) {
+      var c = seatmapChord(poly, cx, y + (band[0] + (band[1] - band[0]) * k / 4) * f, false);
+      if (!c || Math.min(cx - c[0], c[1] - cx) * 2 < need) return false;
+    }
+    return true;
+  }
+  var lo = 0, hi = 40;
+  for (var it = 0; it < 9; it++) { var m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+  return { fit: Math.floor(lo * 2) / 2, x: spmRound(cx) };
+}
+/* Label size from the wedge: up to 22 units, hidden below 9 (the tooltip
    still carries the id). A short id with a trailing letter (201A) stacks the
    letter on a second line when that renders larger. Returns {font, lines}. */
 function seatmapLabelFont(label, geom) {
   function fit(text, cap) {
-    return Math.min(24, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
+    return Math.min(22, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
   }
   var single = fit(label, geom.arc * 0.34), stacked = /^(\d{1,4})([A-Za-z])$/.exec(label);
   if (stacked && single < 17) {
@@ -31896,12 +32677,37 @@ function seatmapLabelFont(label, geom) {
 /* Per-section fill intensity for the mode, totals, legend entries and the
    highlight set. Prices and revenue are "where price known": a section without
    a price contributes nothing and is listed as unpriced. */
+/* Section shapes and label sizes depend only on the declaration, so they
+   are computed once per declaration and shared by every step's model. */
+var SEATMAP_SHAPES = [];
+function seatmapShapes(panel, geometry, rings, decl) {
+  var key = JSON.stringify([geometry, seatmapBowl(panel), seatmapMirror(panel), seatmapStartRegion(panel), seatmapRingSlots(panel), rings.length,
+    decl.map(function (s) { return [s.id, s.label, s.ring, s.slot, s.span, s.path, s.kind]; }), geometry === 'paths' ? [seatmapViewBox(panel), panel.field] : 0]);
+  for (var i = 0; i < SEATMAP_SHAPES.length; i++) if (SEATMAP_SHAPES[i].key === key) return SEATMAP_SHAPES[i];
+  var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
+  var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null, list = [];
+  decl.forEach(function (s) {
+    var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
+    /* The natural label size never crosses the section's own edge; `fit` is
+       the largest size that still fits, which the page uses to lift a label
+       to the 10 px floor when the map is drawn small. */
+    var lf = seatmapLabelFont(s.label, geom), poly = bowl ? (geom.innerPoints || []).concat(geom.outerPoints || []) : geom.points;
+    var fit = seatmapLabelFit(lf.lines, poly, geom.x, geom.y), font = lf.font ? Math.min(lf.font, fit.fit) : 0;
+    if (!fit.fit) { fit.fit = lf.font; fit.x = geom.x; font = lf.font; }
+    if (!font && fit.fit >= 9) font = 9;
+    if (font < 6) font = 0;
+    list.push({ d: geom.d, x: font ? fit.x : geom.x, y: geom.y, font: font, fit: fit.fit, lines: lf.lines, range: bowl ? placement[s.id] : null, rows: bowl ? seatmapRowLines(geom) : '', points: bowl ? null : geom.points });
+  });
+  var entry = { key: key, bowl: bowl, list: list };
+  SEATMAP_SHAPES.unshift(entry);
+  if (SEATMAP_SHAPES.length > 8) SEATMAP_SHAPES.pop();
+  return entry;
+}
 function seatmapModel(panel, state) {
   panel = seatmapResolve(panel);
   state = panelObject(state) ? state : {};
   var geometry = seatmapGeometry(panel), rings = seatmapRings(panel), tiers = seatmapTiers(panel), decl = seatmapSections(panel);
-  var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
-  var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null;
+  var shapes = seatmapShapes(panel, geometry, rings, decl), bowl = shapes.bowl;
   var view = bowl ? { width: bowl.width, height: bowl.height } : seatmapViewBox(panel);
   var fieldRect = bowl ? null : seatmapFieldRect(panel), fieldShape = fieldRect ? seatmapFieldShape(fieldRect) : null;
   var field = bowl ? bowl.field : fieldShape ? fieldShape.field : null, fieldLines = bowl ? bowl.fieldLines : fieldShape ? fieldShape.fieldLines : '';
@@ -31915,7 +32721,7 @@ function seatmapModel(panel, state) {
     if (typeof id === 'string' && id in capacities && highlight.indexOf(id) < 0 && highlight.length < SEATMAP_MAX_HIGHLIGHT) highlight.push(id);
   });
   var maxPrice = 0, maxRevenue = 0, zones = {}, zoneOrder = [];
-  var sections = decl.map(function (s) {
+  var sections = decl.map(function (s, si) {
     /* Maps may carry ids and counts from an earlier declaration: ids absent
        here are simply not drawn and counts clamp to this capacity. */
     var soldN = seatmapCount(sold[s.id]) ? Math.min(sold[s.id], s.capacity) : 0;
@@ -31932,13 +32738,13 @@ function seatmapModel(panel, state) {
     if (p !== null) maxPrice = Math.max(maxPrice, p);
     if (revenue !== null) maxRevenue = Math.max(maxRevenue, revenue);
     if (s.zone) { if (!panelOwn(zones, s.zone)) { zones[s.zone] = 0; zoneOrder.push(s.zone); } zones[s.zone]++; }
-    var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
+    var g = shapes.list[si];
     return {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
       sold: soldN, held: hold, price: p, revenue: revenue, revenueOverflow: p !== null && revenue === null, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
-      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
-      kind: s.kind, range: bowl ? placement[s.id] : null, rows: bowl ? seatmapRowLines(geom) : '',
+      d: g.d, x: g.x, y: g.y, font: g.font, fit: g.fit, lines: g.lines, intensity: 0, known: true,
+      kind: s.kind, range: g.range, rows: g.rows, points: g.points,
     };
   });
   var tierIndex = {};
@@ -31952,9 +32758,11 @@ function seatmapModel(panel, state) {
     if (!isFiniteNum(s.intensity)) s.intensity = 0;
     s.intensity = Math.max(0, Math.min(1, s.intensity));
     s.color = mode === 'tier' && s.tier ? (s.tier.color || seatmapTierPalette(tierIndex[s.tier.id])) : null;
-    /* Label colour: accent fills switch at a threshold per skin; tier fills
+    /* A section with every seat sold gets its own, deepest stop in sold mode. */
+    s.full = mode === 'sold' && s.capacity > 0 && s.sold >= s.capacity;
+    /* Label colour: ramp fills switch at one bin in every skin; tier fills
        use the tier colour's own luminance. */
-    s.labelTone = s.color ? seatmapTierTone(s.color) : (seatmapRampBin(s.intensity) >= SEATMAP_LABEL_BIN && s.known ? 'on' : '');
+    s.labelTone = s.color ? seatmapTierTone(s.color) : ((s.full || seatmapRampBin(s.intensity) >= SEATMAP_LABEL_BIN) && s.known ? 'on' : '');
   });
   var totals = { sold: 0, capacity: 0, held: 0, revenue: 0, priced: 0, pricedSold: 0 };
   var ringTotals = rings.map(function (ring) { return { id: ring.id, label: ring.label, sold: 0, capacity: 0, held: 0, sections: 0 }; });
@@ -31985,26 +32793,12 @@ function seatmapModel(panel, state) {
     box: fieldBox, spots: seatmapRinkSpots(fieldBox),
     r: bowl ? fieldBox.height / 2 : Math.min(fieldBox.height * 28 / 85, fieldBox.width / 2, fieldBox.height / 2),
   } : null;
-  /* Ring names for a map drawn too small for its section labels: one per
-     ring, at the top of that ring nearest the centre line (on an authored
-     chart, the centre of that ring's topmost section). */
-  var midX = bowl ? SEATMAP_CENTRE[0] : view.width / 2;
-  var ringTags = ringTotals.map(function (ring, ri) {
-    if (!ring.sections) return null;
-    var best = null;
-    function consider(tx, ty) {
-      var score = ty + Math.abs(tx - midX) * 0.01;
-      if (!best || score < best.score) best = { x: tx, y: ty, score: score };
-    }
-    if (bowl) for (var k = 0; k < 240; k++) {
-      var a = bowl.point(ri, k / 240, false), b = bowl.point(ri, k / 240, true);
-      consider((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
-    } else sections.forEach(function (s) { if (s.ring === ri) consider(s.x, s.y); });
-    return best ? { label: ring.label, x: spmRound(best.x), y: spmRound(best.y) } : null;
-  }).filter(Boolean);
+  /* The footprint under the sections: the generated bowl's own outline, or
+     the convex hull of an authored chart's sections. */
+  var base = bowl ? bowl.base : seatmapHull(sections.reduce(function (all, s) { return all.concat(s.points || []); }, []));
   return {
     geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: field, fieldLines: fieldLines, mode: mode, currency: currency,
-    fieldBox: fieldBox, ringTags: ringTags,
+    fieldBox: fieldBox, base: base, sellout: totals.capacity > 0 && totals.sold >= totals.capacity,
     sections: sections, rings: ringTotals, tiers: tierCounts, zones: zoneOrder.map(function (z) { return { zone: z, sections: zones[z] }; }),
     landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2], rink),
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
@@ -32032,17 +32826,22 @@ function seatmapTierTone(hex) {
   var l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   return (l + 0.05) / 0.0566 >= 1.05 / (l + 0.05) ? 'dark' : 'light';
 }
-/* The sell-through ramp: five classed bins on the skin stops
-   (--seatmap-r1..r5), 0–20, 20–40, 40–60, 60–80 and 80–100 %. Labels are ink
-   on r1–r3 and inverse on r4–r5, so every label keeps AA contrast on its own
-   fill, and the legend's five swatches read exactly as the map does. */
-var SEATMAP_RAMP_BINS = 5, SEATMAP_LABEL_BIN = 4;
+/* The ramps: ten classed bins of 10 % on the skin stops. Shares of capacity
+   (sold, held) use the cool ramp --seatmap-r1..r10; price and revenue use the
+   warm ramp --seatmap-w1..w10, so a mode switch reads at a glance. A sold-out
+   section takes --seatmap-full. Labels are ink on bins 1–6 and inverse from
+   bin 7 (60 %), and each skin's stops are chosen so both keep AA contrast;
+   the ramp steps across the mid-tones where neither label colour would. */
+var SEATMAP_RAMP_BINS = 10, SEATMAP_LABEL_BIN = 7;
 function seatmapRampBin(t) {
   t = isFiniteNum(t) ? Math.max(0, Math.min(1, t)) : 0;
   return Math.min(SEATMAP_RAMP_BINS, 1 + Math.floor(t * SEATMAP_RAMP_BINS + 1e-9));
 }
-function seatmapRampFill(t) {
-  return 'var(--seatmap-r' + seatmapRampBin(t) + ')';
+function seatmapRampFill(t, warm) {
+  return 'var(--seatmap-' + (warm ? 'w' : 'r') + seatmapRampBin(t) + ')';
+}
+function seatmapWarm(mode) {
+  return mode === 'price' || mode === 'revenue';
 }
 /* Seat-row texture for a generated wedge: evenly spaced arcs between the
    inner and outer edge, drawn as one faint path above the fill. */
@@ -32059,6 +32858,17 @@ function seatmapRowLines(geom) {
     }).join('');
   }
   return d;
+}
+/* Convex hull (monotone chain) of points as a closed path, or ''. */
+function seatmapHull(pts) {
+  pts = pts.filter(function (p) { return isFiniteNum(p[0]) && isFiniteNum(p[1]); }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+  if (pts.length < 3) return '';
+  function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+  var lower = [], upper = [], i;
+  for (i = 0; i < pts.length; i++) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop(); lower.push(pts[i]); }
+  for (i = pts.length - 1; i >= 0; i--) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop(); upper.push(pts[i]); }
+  var hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+  return hull.length >= 3 ? hull.map(function (p, k) { return (k ? 'L' : 'M') + spmRound(p[0]) + ',' + spmRound(p[1]); }).join('') + 'Z' : '';
 }
 /* Bounding box of an M/L polyline path (the traced bowl field). */
 function seatmapPointsBox(d) {
@@ -32141,36 +32951,39 @@ function seatmapAria(model) {
   return text + '.';
 }
 function seatmapSectionMarkup(s, model, hid) {
-  var fill = s.color ? s.color : s.known ? seatmapRampFill(s.intensity) : 'var(--seatmap-unknown-fill)';
+  var fill = s.color ? s.color : s.full ? 'var(--seatmap-full)' : s.known ? seatmapRampFill(s.intensity, seatmapWarm(model.mode)) : 'var(--seatmap-unknown-fill)';
   var opacity = 1;
-  var cls = 'seatmap-sec' + (s.highlighted ? ' seatmap-hi' : '') + (s.known ? '' : ' seatmap-unknown') + (s.held ? ' seatmap-held' : '');
+  var cls = 'seatmap-sec' + (s.highlighted ? ' seatmap-hi' : '') + (s.known ? '' : ' seatmap-unknown') + (s.held ? ' seatmap-held' : '') + (s.full ? ' seatmap-full' : '') + (s.color ? ' seatmap-tiered' : '');
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
+  if (s.full) h += '<path class="seatmap-shine" d="' + s.d + '" fill="url(#' + hid + '-g)"/>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
   if (s.rows) h += '<path class="seatmap-rows" d="' + s.rows + '"/>';
   if (s.font) {
-    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '">';
+    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '" data-fit="' + s.fit + '">';
     if (s.lines.length > 1) h += esc(s.lines[0]) + '<tspan x="' + s.x + '" dy="1.05em">' + esc(s.lines[1]) + '</tspan>'; else h += esc(s.lines[0]);
     h += '</text>';
   }
   return h + '</g>';
 }
-/* The ramp key: five stepped swatches. Shares of capacity (sold, held) get
-   0–100 % ticks and, for sold, a marker at the overall sell-through; price and
-   revenue are relative to the top section and keep the words low and high. */
+/* The ramp key: ten stepped swatches on one fixed-size scale for every
+   mode, so the legend keeps its height when the mode changes. Shares of
+   capacity (sold, held) get 0 / 50 / 100 % ticks and, for sold, a caret at
+   the overall sell-through; price and revenue are relative to the top section
+   and put the words low and high where the ticks go. */
 function seatmapScale(model) {
-  var bins = '', share = model.mode === 'sold' || model.mode === 'held';
-  for (var i = 1; i <= SEATMAP_RAMP_BINS; i++) bins += '<i style="background:var(--seatmap-r' + i + ')"></i>';
-  var h = '<span class="seatmap-key">' + (share ? '' : 'low') + '<span class="seatmap-scale' + (share ? '' : ' seatmap-scale-plain') + '" aria-hidden="true"><span class="seatmap-bins">' + bins + '</span>';
-  if (share) h += '<span class="seatmap-ticks"><i>0%</i><i>20</i><i>40</i><i>60</i><i>80</i><i>100</i></span>';
+  var bins = '', share = model.mode === 'sold' || model.mode === 'held', warm = seatmapWarm(model.mode);
+  for (var i = 1; i <= SEATMAP_RAMP_BINS; i++) bins += '<i style="background:var(--seatmap-' + (warm ? 'w' : 'r') + i + ')"></i>';
+  var h = '<span class="seatmap-key"><span class="seatmap-scale" aria-hidden="true"><span class="seatmap-bins">' + bins + '</span>';
+  h += share ? '<span class="seatmap-ticks"><i>0%</i><i>50</i><i>100%</i></span>' : '<span class="seatmap-ticks seatmap-ticks-words"><i>low</i><i></i><i>high</i></span>';
   if (model.mode === 'sold' && model.totals.capacity) h += '<span class="seatmap-caret" style="left:' + spmRound(Math.max(0, Math.min(100, model.totals.pct))) + '%"></span>';
-  return h + '</span>' + (share ? '' : 'high') + '</span>';
+  return h + '</span></span>';
 }
 /* Per-ring mini bar: sold, then held, against capacity. The sold segment
    takes the ramp colour only when the map itself shows sell-through. */
 function seatmapRingBar(ring, mode) {
   var cap = ring.capacity || 0, sold = cap ? Math.min(1, ring.sold / cap) : 0, held = cap ? Math.min(1 - sold, ring.held / cap) : 0;
-  var colour = mode === 'sold' ? seatmapRampFill(ring.pct / 100) : 'var(--seatmap-neutral)';
+  var colour = mode === 'sold' ? (cap && ring.sold >= cap ? 'var(--seatmap-full)' : seatmapRampFill(ring.pct / 100)) : 'var(--seatmap-neutral)';
   return '<i class="seatmap-ring-bar" aria-hidden="true"><i class="seatmap-ring-sold" style="width:' + spmRound(sold * 100) + '%;background:' + colour + '"></i>' +
     (held > 0 ? '<i class="seatmap-ring-held" style="width:' + spmRound(held * 100) + '%"></i>' : '') + '</i>';
 }
@@ -32183,6 +32996,10 @@ function seatmapLegend(model) {
   });
   else {
     h += seatmapScale(model);
+    if (mode === 'sold') {
+      var full = model.sections.filter(function (s) { return s.full; }).length;
+      h += '<span class="seatmap-full-key"><i class="seatmap-sw seatmap-sw-full"></i>sold out <small>' + full + '</small></span>';
+    }
     if (mode === 'price' && model.priceRange) h += '<span class="seatmap-range">' + esc(spmMoney(model.priceRange.min, cur)) + ' – ' + esc(spmMoney(model.priceRange.max, cur)) + '</span>';
   }
   if (model.hasHolds) h += '<span><i class="seatmap-sw seatmap-sw-hold"></i>held block</span>';
@@ -32190,7 +33007,8 @@ function seatmapLegend(model) {
   h += '</div><div class="seatmap-rings">';
   model.rings.forEach(function (ring) {
     if (!ring.sections) return;
-    h += '<span class="seatmap-ring">' + seatmapRingBar(ring, mode) + '<b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + '</span>';
+    var out = ring.capacity > 0 && ring.sold >= ring.capacity;
+    h += '<span class="seatmap-ring' + (out ? ' seatmap-ring-out' : '') + '">' + seatmapRingBar(ring, mode) + '<b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + (out ? '<em class="seatmap-out">sold out</em>' : '') + '</span>';
   });
   if (model.zones.length) h += '<span class="seatmap-zones">' + model.zones.map(function (z) { return esc(z.zone) + ' <small>' + z.sections + '</small>'; }).join(' · ') + '</span>';
   return h + '</div>';
@@ -32204,24 +33022,51 @@ function seatmapTotals(model) {
   return '<div class="seatmap-totals">' +
     '<div class="seatmap-stat"><b>' + seatmapInt(t.sold) + '<small> / ' + seatmapInt(t.capacity) + '</small></b><span>sold / capacity</span></div>' +
     '<div class="seatmap-stat seatmap-stat-pct"><svg class="seatmap-gauge" viewBox="0 0 32 32" aria-hidden="true"><circle class="seatmap-gauge-track" cx="16" cy="16" r="12.5"/>' +
-    '<circle class="seatmap-gauge-arc" cx="16" cy="16" r="12.5" pathLength="100" transform="rotate(-90 16 16)" style="stroke-dasharray:' + spmRound(pct) + ' 100"/></svg>' +
+    '<circle class="seatmap-gauge-arc' + (pct > 0 ? '' : ' seatmap-gauge-zero') + '" cx="16" cy="16" r="12.5" pathLength="100" transform="rotate(-90 16 16)" style="stroke-dasharray:' + spmRound(pct) + ' 100"/></svg>' +
     '<b>' + Math.round(t.pct) + '<small>%</small></b><span>sell-through</span></div>' +
     '<div class="seatmap-stat' + (t.held ? ' seatmap-stat-warn' : '') + '"><b>' + seatmapInt(t.held) + '</b><span>held</span></div>' +
     '<div class="seatmap-stat"><b>' + revenueHTML + '</b><span>revenue' + (t.revenueKnown && !t.allPriced ? ' · where price known' : '') + '</span></div></div>';
 }
-function seatmapHTML(panel, state, model, hid, pulse) {
+/* Stacks the live block over hidden copies of the same block at every other
+   step, so the block is always as tall as its tallest step and the map never
+   resizes as the legend or totals change. */
+function seatmapStack(cls, live, ghosts) {
+  if (!ghosts || !ghosts.length) return live;
+  return '<div class="seatmap-stack ' + cls + '">' + live + ghosts.map(function (g) {
+    return g.replace(/^<div class="/, '<div aria-hidden="true" class="seatmap-ghost ');
+  }).join('') + '</div>';
+}
+function seatmapFoot(model) {
+  return '<div class="seatmap-foot">' + seatmapLegend(model) + '</div>';
+}
+/* Every distinct totals strip and legend across the panel's steps. */
+function seatmapReserve(panel, states) {
+  var heads = [], foots = [];
+  (Array.isArray(states) ? states : []).concat(panel && panel.initial ? [panel.initial] : []).forEach(function (st) {
+    var m = seatmapModel(panel, st), head = m.showTotals ? seatmapTotals(m) : '', foot = seatmapFoot(m);
+    if (head && heads.indexOf(head) < 0) heads.push(head);
+    if (foots.indexOf(foot) < 0) foots.push(foot);
+  });
+  return { heads: heads.length > 1 ? heads : [], foots: foots.length > 1 ? foots : [] };
+}
+function seatmapHTML(panel, state, model, hid, pulse, reserve) {
   panel = seatmapResolve(panel);
   model = model || seatmapModel(panel, state);
   hid = hid || 'spm-static';
-  var h = '<div class="seatmap seatmap-mode-' + model.mode + (pulse ? ' seatmap-pulse' : '') + '">';
-  if (model.showTotals) h += seatmapTotals(model);
+  reserve = reserve || { heads: [], foots: [] };
+  var h = '<div class="seatmap seatmap-mode-' + model.mode + (model.sellout ? ' seatmap-sellout' : '') + (pulse ? ' seatmap-pulse' : '') + '">';
+  if (model.showTotals) h += seatmapStack('seatmap-head', seatmapTotals(model), reserve.heads);
   h += '<svg class="seatmap-svg" viewBox="0 0 ' + model.view.width + ' ' + model.view.height + '" role="img" aria-label="' + esc(seatmapAria(model)) + '">' +
     '<defs><pattern id="' + hid + '" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
     '<rect width="10" height="10" class="seatmap-hatch-bg"/><rect width="3.5" height="10" class="seatmap-hatch-bar"/></pattern>' +
+    '<linearGradient id="' + hid + '-g" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" class="seatmap-shine-a"/><stop offset="0.55" class="seatmap-shine-b"/></linearGradient>' +
     (model.field ? '<clipPath id="' + hid + '-f"><use href="#' + hid + '-fp"/></clipPath>' +
-      '<radialGradient id="' + hid + '-s" cx="0.5" cy="0.38" r="0.7"><stop offset="0" class="seatmap-sheen-a"/><stop offset="1" class="seatmap-sheen-b"/></radialGradient>' : '') +
+      '<radialGradient id="' + hid + '-s" cx="0.5" cy="0.5" r="0.62"><stop offset="0" class="seatmap-sheen-a"/><stop offset="1" class="seatmap-sheen-b"/></radialGradient>' : '') +
     '</defs>';
   if (!model.complete) h += '<text class="seatmap-empty" x="' + model.view.width / 2 + '" y="' + model.view.height / 2 + '">Declare ' + SEATMAP_MIN_SECTIONS + '–' + SEATMAP_MAX_SECTIONS + ' sections to draw the map.</text>';
+  /* The footprint stays inside the viewBox so it never reaches the totals. */
+  if (model.complete && model.base) h += '<clipPath id="' + hid + '-v"><rect width="' + model.view.width + '" height="' + model.view.height + '"/></clipPath>' +
+    '<g clip-path="url(#' + hid + '-v)"><path class="seatmap-base' + (model.geometry === 'paths' ? ' seatmap-base-hull' : '') + '" d="' + model.base + '"/></g>';
   if (model.field) {
     var marks = seatmapFieldMarks(model, hid);
     h += '<path class="seatmap-field" d="' + model.field + '" id="' + hid + '-fp"/>' + marks.under;
@@ -32246,12 +33091,7 @@ function seatmapHTML(panel, state, model, hid, pulse) {
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g>';
-  if (model.ringTags.length) {
-    h += '<g class="seatmap-ringtags" aria-hidden="true">';
-    model.ringTags.forEach(function (tag) { h += '<text class="seatmap-ringtag" x="' + tag.x + '" y="' + tag.y + '" dy="0.35em" font-size="28">' + esc(tag.label) + '</text>'; });
-    h += '</g>';
-  }
-  h += '</svg>' + seatmapLegend(model) + '</div>';
+  h += '</svg>' + seatmapStack('seatmap-foot-stack', seatmapFoot(model), reserve.foots) + '</div>';
   return softwarePanelShell(h, state || {});
 }
 /* In-place update so section fills transition between steps instead of being
@@ -32280,9 +33120,12 @@ function seatmapPatch(host, model, html, hid) {
     fill.setAttribute('fill-opacity', nextFill.getAttribute('fill-opacity'));
     var title = fill.querySelector('title'), nextTitle = nextFill.querySelector('title');
     if (title && nextTitle) title.textContent = nextTitle.textContent;
+    var shine = g.querySelector('.seatmap-shine'), nextShine = next.querySelector('.seatmap-shine');
+    if (shine && !nextShine) g.removeChild(shine);
+    else if (!shine && nextShine) g.insertBefore(nextShine, fill.nextSibling);
     var hold = g.querySelector('.seatmap-hold'), nextHold = next.querySelector('.seatmap-hold');
     if (hold && !nextHold) { g.removeChild(hold); if (moved[moved.length - 1] !== g) moved.push(g); }
-    else if (!hold && nextHold) g.insertBefore(nextHold, fill.nextSibling);
+    else if (!hold && nextHold) g.insertBefore(nextHold, (g.querySelector('.seatmap-shine') || fill).nextSibling);
     var lbl = g.querySelector('.seatmap-lbl'), nextLbl = next.querySelector('.seatmap-lbl');
     if (lbl && nextLbl) lbl.setAttribute('class', nextLbl.getAttribute('class'));
     else if (lbl && !nextLbl) g.removeChild(lbl);
@@ -32297,7 +33140,9 @@ function seatmapPatch(host, model, html, hid) {
     void svg.getBoundingClientRect();
     moved.forEach(function (g) { g.setAttribute('class', g.getAttribute('class') + ' seatmap-moved'); });
   }
-  wrapper.setAttribute('class', nextWrapper.getAttribute('class'));
+  /* Filling the last seat in the house sends one sheen around the bowl. */
+  var wasOut = / seatmap-sellout/.test(wrapper.getAttribute('class') || ''), isOut = / seatmap-sellout/.test(nextWrapper.getAttribute('class') || '');
+  wrapper.setAttribute('class', nextWrapper.getAttribute('class') + (isOut && !wasOut ? ' seatmap-cheer' : ''));
   /* Totals and legend morph in place when their shape is unchanged, so the
      gauge arc and the scale marker ease instead of jumping. */
   var children = Array.prototype.slice.call(wrapper.childNodes).filter(function (c) { return c !== svg; });
@@ -32338,53 +33183,110 @@ function seatmapMorph(a, b) {
   for (i = 0; i < ak.length; i++) if (!seatmapMorph(ak[i], bk[i])) a.replaceChild(bk[i], ak[i]);
   return true;
 }
-/* After the map is in the page: a section label that would render below
-   10 px is hidden (its <title> keeps the id), landmark pills scale up to a
-   10.5 px label, and when most labels are hidden the ring names appear at
-   10 px or more instead. Runs again whenever the panel is resized. */
+/* After the map is in the page, nothing renders below 10 px and nothing
+   authored is dropped:
+   - a section label smaller than 10 px is lifted to 10 px when the section
+     still holds it (`data-fit`); one that cannot fit is hidden (its <title>
+     keeps the id), except on a highlighted, held or tier-coloured section,
+     where it sits on a surface-coloured halo instead;
+   - each landmark pill grows toward a 10.5 px label until it would come
+     within 8 px of another pill. Two pills that cannot both reach 10 px side
+     by side tighten to the 10 px floor (5 px apart); if they still meet they
+     spread apart along their board while both stay over the field (or
+     within 12 % of its width past either end), and only
+     failing that the later one moves to the opposite long board.
+   Runs again whenever the panel is resized. */
 function seatmapFit(host) {
   if (!host || typeof host.querySelector !== 'function') return;
   var svg = host.querySelector('.seatmap-svg'), vb = svg && svg.viewBox && svg.viewBox.baseVal;
   if (!vb || !(vb.width > 0) || typeof svg.getBoundingClientRect !== 'function') return;
   var width = svg.getBoundingClientRect().width;
   if (!(width > 0)) return;
-  var scale = width / vb.width, min = 10 / scale, i;
-  var labels = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-lbl')), tiny = 0;
-  labels.forEach(function (l) {
-    var small = (parseFloat(l.getAttribute('font-size')) || 0) < min;
-    if (small) tiny++;
-    l.classList.toggle('seatmap-lbl-tiny', small);
+  var scale = width / vb.width, min = 10 / scale;
+  Array.prototype.forEach.call(svg.querySelectorAll('.seatmap-lbl'), function (l) {
+    if (l._spmFont === undefined) l._spmFont = parseFloat(l.getAttribute('font-size')) || 0;
+    var base = l._spmFont, fit = parseFloat(l.getAttribute('data-fit')) || base, g = l.parentNode;
+    var keep = !!(g && g.classList && (g.classList.contains('seatmap-hi') || g.classList.contains('seatmap-held') || g.classList.contains('seatmap-tiered')));
+    var size = base, tiny = false, halo = false;
+    if (base < min) {
+      size = min;
+      if (fit < min - 0.01) { if (keep) halo = true; else tiny = true; }
+    }
+    l.setAttribute('font-size', spmRound(size));
+    l.classList.toggle('seatmap-lbl-tiny', tiny);
+    l.classList.toggle('seatmap-lbl-halo', halo);
+    if (halo) l.setAttribute('stroke-width', spmRound(3 / scale)); else l.removeAttribute('stroke-width');
   });
-  var sparse = labels.length > 0 && tiny * 2 > labels.length, tags = svg.querySelectorAll('.seatmap-ringtag');
-  svg.classList.toggle('seatmap-sparse', sparse);
-  var tagFont = spmRound(11 / scale);
-  for (i = 0; i < tags.length; i++) {
-    var tag = tags[i], tx = +tag.getAttribute('x'), ty = +tag.getAttribute('y'), halfW = (tag.textContent.length * 0.66 * tagFont) / 2 + 4 / scale;
-    tag.setAttribute('font-size', tagFont);
-    tag.setAttribute('stroke-width', spmRound(3.5 / scale));
-    if (sparse) labels.forEach(function (l) {
-      var lf = parseFloat(l.getAttribute('font-size')) || 0, lw = (l.textContent.length * 0.62 * lf) / 2;
-      if (Math.abs(+l.getAttribute('x') - tx) < halfW + lw && Math.abs(+l.getAttribute('y') - ty) < (tagFont + lf) / 2 + 2 / scale) l.classList.add('seatmap-lbl-tiny');
-    });
-  }
-  /* Landmark pills grow toward a 10.5 px label, but never into each other;
-     a pill whose label still cannot reach 10 px is left out. */
+  seatmapFitLandmarks(svg, scale);
+}
+function seatmapFitLandmarks(svg, scale) {
+  var field = svg.querySelector('.seatmap-field'), fb = null;
+  try { fb = field && typeof field.getBBox === 'function' ? field.getBBox() : null; } catch (e) { fb = null; }
   var marks = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-landmark')).map(function (g) {
     var rect = g.querySelector('rect'), text = g.querySelector('text');
-    return rect && text ? { g: g, x: +text.getAttribute('x'), y: +text.getAttribute('y'), w: +rect.getAttribute('width'), h: +rect.getAttribute('height') } : null;
+    if (!rect || !text) return null;
+    if (!g._spmLm) {
+      var w = +rect.getAttribute('width'), len = Math.max(1, text.textContent.length), measured = 0;
+      try { measured = typeof text.getComputedTextLength === 'function' ? text.getComputedTextLength() : 0; } catch (e) { measured = 0; }
+      /* Glyph advance per em at the authored 14 units, without the .08em tracking. */
+      var glyph = measured > 0 ? (measured / 14 - len * 0.08) / len : (w - 20) / 14 / len - 0.08;
+      g._spmLm = { x: +text.getAttribute('x'), y: +text.getAttribute('y'), w: w, h: +rect.getAttribute('height'), len: len, glyph: Math.max(0.45, glyph) };
+    }
+    return { g: g, rect: rect, text: text, o: g._spmLm, x: g._spmLm.x, y: g._spmLm.y };
   }).filter(Boolean);
-  var k = Math.max(1, 10.5 / (14 * scale));
-  marks.forEach(function (a, ai) {
+  var gap = 8 / scale, want = Math.max(14, 10.5 / scale), floor = Math.max(14, 10 / scale);
+  function size(m, f, tight) {
+    m.f = f; m.tight = !!tight; m.track = tight ? 0.04 : 0.08;
+    var pad = tight ? Math.min(f * 0.68, 6 / scale) : f * 0.68;
+    m.w = m.o.len * (m.o.glyph + m.track) * f + 2 * pad; m.h = f * (tight ? 1.6 : 1.8);
+  }
+  function clash(a, b) {
+    var g = a.tight && b.tight ? gap * 0.625 : gap;
+    return Math.abs(a.x - b.x) < (a.w + b.w) / 2 + g - 0.01 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + g - 0.01;
+  }
+  /* The common size at which two pills just clear each other. */
+  function clear(a, b) {
+    var kx = (Math.abs(a.x - b.x) - gap) / ((a.w / a.f + b.w / b.f) / 2), ky = (Math.abs(a.y - b.y) - gap) / ((a.h / a.f + b.h / b.f) / 2);
+    return Math.max(kx, ky) * 0.995;
+  }
+  marks.forEach(function (m) { size(m, want, false); });
+  for (var pass = 0; pass < 3; pass++) marks.forEach(function (a, ai) {
     marks.slice(ai + 1).forEach(function (b) {
-      k = Math.min(k, Math.max(Math.abs(a.x - b.x) / ((a.w + b.w) / 2), Math.abs(a.y - b.y) / ((a.h + b.h) / 2)));
+      if (!clash(a, b)) return;
+      var f = Math.max(floor, Math.min(a.f, b.f, clear(a, b)));
+      size(a, Math.min(a.f, f), false); size(b, Math.min(b.f, f), false);
     });
   });
-  k = Math.max(1, k);
-  var showMarks = 14 * scale * k >= 9.95;
+  marks.forEach(function (a, ai) {
+    marks.slice(ai + 1).forEach(function (b) {
+      if (!clash(a, b)) return;
+      size(a, floor, true); size(b, floor, true);
+      if (!clash(a, b)) return;
+      /* Side by side on one board: spread them apart along the board while
+         both stay over the field. */
+      if (fb && fb.width && Math.abs(a.y - b.y) < (a.h + b.h) / 2) {
+        var left = a.x <= b.x ? a : b, right = left === a ? b : a, mid = (left.x + right.x) / 2;
+        var need = (left.w + right.w) / 2 + gap * 0.625, lx = mid - need / 2, rx = mid + need / 2;
+        var shift = Math.max(0, fb.x - (lx - left.w / 2)) - Math.max(0, rx + right.w / 2 - (fb.x + fb.width));
+        if (shift > 0 && rx + right.w / 2 + shift > fb.x + fb.width) shift = 0;
+        if (shift < 0 && lx - left.w / 2 + shift < fb.x) shift = 0;
+        lx += shift; rx += shift;
+        var over = fb.width * 0.12;
+        if (lx - left.w / 2 >= fb.x - over && rx + right.w / 2 <= fb.x + fb.width + over) { left.x = lx; right.x = rx; return; }
+      }
+      /* Otherwise the later pill moves onto the other long board, mirrored
+         about the field. */
+      var cy = fb && fb.height ? fb.y + fb.height / 2 : svg.viewBox.baseVal.height / 2;
+      var y = 2 * cy - b.y;
+      if (Math.abs(y - b.y) > b.h) b.y = y; else b.y = a.y + (a.h + b.h) / 2 + gap;
+    });
+  });
   marks.forEach(function (m) {
-    m.g.classList.toggle('seatmap-landmark-tiny', !showMarks);
-    if (k > 1.01) m.g.setAttribute('transform', 'translate(' + m.x + ' ' + m.y + ') scale(' + spmRound(k * 100) / 100 + ') translate(' + -m.x + ' ' + -m.y + ')');
-    else m.g.removeAttribute('transform');
+    m.rect.setAttribute('x', spmRound(m.x - m.w / 2)); m.rect.setAttribute('y', spmRound(m.y - m.h / 2));
+    m.rect.setAttribute('width', spmRound(m.w)); m.rect.setAttribute('height', spmRound(m.h)); m.rect.setAttribute('rx', spmRound(m.h / 2));
+    m.text.setAttribute('x', spmRound(m.x)); m.text.setAttribute('y', spmRound(m.y));
+    m.text.style.fontSize = spmRound(m.f) + 'px'; m.text.style.letterSpacing = m.track + 'em';
+    m.g.removeAttribute('transform');
   });
 }
 function seatmapObserve(host) {
@@ -32603,7 +33505,13 @@ PanelRegistry.define('seatmap', {
     var key = model.highlight.join('|');
     var pulse = !!animate && host._spmHi !== undefined && host._spmHi !== key && model.highlight.length > 0;
     host._spmHi = key;
-    var html = seatmapHTML(panel, state, model, hid, pulse);
+    /* Hidden copies of every step's totals and legend keep the map one size
+       on every step; built once per folded history. */
+    if (host._spmStates !== states || host._spmPanel !== panel.id + ':' + model.geometryKey) {
+      host._spmStates = states; host._spmPanel = panel.id + ':' + model.geometryKey;
+      host._spmReserve = seatmapReserve(panel, states);
+    }
+    var html = seatmapHTML(panel, state, model, hid, pulse, host._spmReserve);
     var patchable = !!animate && host._spmGeom === model.geometryKey;
     host._spmGeom = model.geometryKey;
     return {
@@ -32619,7 +33527,9 @@ PanelRegistry.define('seatmap', {
   },
   styles: String.raw`
 .seatmap{font-size:11px;color:var(--dtext);min-width:0;container-type:inline-size;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A;
-  --seatmap-r1:#18345A;--seatmap-r2:#1C5A80;--seatmap-r3:#1A7896;--seatmap-r4:#2CB5D2;--seatmap-r5:#5FE3FF;
+  --seatmap-r1:#152D4B;--seatmap-r2:#193E60;--seatmap-r3:#1B5175;--seatmap-r4:#1C6084;--seatmap-r5:#1B6C8D;--seatmap-r6:#1A7896;--seatmap-r7:#27ABC9;--seatmap-r8:#47BFDB;--seatmap-r9:#61D4ED;--seatmap-r10:#7AE9FF;--seatmap-full:#C6F6FF;
+  --seatmap-w1:#2A1E1C;--seatmap-w2:#3D271C;--seatmap-w3:#50301A;--seatmap-w4:#603818;--seatmap-w5:#6D4116;--seatmap-w6:#7A4A14;--seatmap-w7:#D9922F;--seatmap-w8:#E6A44A;--seatmap-w9:#F2B762;--seatmap-w10:#FFC978;
+  --seatmap-shine:rgba(255,255,255,.5);--seatmap-base:#0E1828;--seatmap-base-line:#1D2A40;--seatmap-base-shadow:rgba(0,0,0,.5);
   --seatmap-gutter:var(--pv-surface,#0B1220);--seatmap-lbl:#FFFFFF;--seatmap-lbl-dark:#0B1220;--seatmap-hover:#8DA2C6;
   --seatmap-sel:#EAF2FF;--seatmap-sel-ring:rgba(56,225,255,.45);--seatmap-raise:rgba(0,0,0,.6);--seatmap-unknown:#2E4466;--seatmap-unknown-fill:rgba(16,26,44,.6);
   --seatmap-hold:#FFB454;--seatmap-hold-bg:color-mix(in srgb,#FFB454 16%,#0B1220);--seatmap-hold-lbl:#EAF2FF;--seatmap-hold-halo:#0B1220;--seatmap-warn-ink:#EEC16A;
@@ -32631,7 +33541,9 @@ PanelRegistry.define('seatmap', {
   --seatmap-num:'Sora','IBM Plex Sans',sans-serif;--seatmap-sans:'IBM Plex Sans',sans-serif;--seatmap-lbl-font:'IBM Plex Sans',sans-serif;--seatmap-radius:999px;--seatmap-sw-radius:3px}
 .sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .sk-daylight .seatmap,.sk-pastel .seatmap,.sk-editorial .seatmap{--seatmap-label-on:#FFFFFF;
-  --seatmap-r1:#D9DFF7;--seatmap-r2:#B4C0EF;--seatmap-r3:#8796E0;--seatmap-r4:#5566C8;--seatmap-r5:#3F4FAE;
+  --seatmap-r1:#E1E6F8;--seatmap-r2:#D1D8F5;--seatmap-r3:#C1CBF2;--seatmap-r4:#B1BDEE;--seatmap-r5:#A1AEE8;--seatmap-r6:#919FE3;--seatmap-r7:#5A6ACB;--seatmap-r8:#4E5EBE;--seatmap-r9:#4352B0;--seatmap-r10:#3846A3;--seatmap-full:#27327A;
+  --seatmap-w1:#FBEDE5;--seatmap-w2:#F8E0D3;--seatmap-w3:#F6D3C1;--seatmap-w4:#F3C6AE;--seatmap-w5:#EFB89B;--seatmap-w6:#ECAA87;--seatmap-w7:#B4532E;--seatmap-w8:#A24827;--seatmap-w9:#903E1F;--seatmap-w10:#7E3418;
+  --seatmap-shine:rgba(255,255,255,.34);--seatmap-base:#F5F7FB;--seatmap-base-line:#E6EBF3;--seatmap-base-shadow:rgba(36,50,74,.10);
   --seatmap-gutter:var(--pv-surface,#FFFFFF);--seatmap-lbl:#24324A;--seatmap-hover:#5F6C84;
   --seatmap-sel:#24324A;--seatmap-sel-ring:rgba(82,99,185,.32);--seatmap-raise:rgba(36,50,74,.32);--seatmap-unknown:#C9D2E1;--seatmap-unknown-fill:#F6F8FC;
   --seatmap-hold:#B07A2A;--seatmap-hold-bg:#FDF1DC;--seatmap-hold-lbl:#24324A;--seatmap-hold-halo:#FDF1DC;--seatmap-warn-ink:#865B06;
@@ -32647,7 +33559,8 @@ body.sk-editorial .seatmap{--seatmap-gutter:#FFFDF8}
 body.sk-terminal .seatmap{--seatmap-gutter:var(--tm-ground,#0B1220)}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-paper,#FFFFFF)}
 .sk-blueprint .seatmap{--seatmap-label-on:#052956;
-  --seatmap-r1:color-mix(in srgb,#7FE3FF 10%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 20%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 32%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 66%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 90%,#052956);
+  --seatmap-r1:color-mix(in srgb,#7FE3FF 7%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 11%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 15%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 19%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 24%,#052956);--seatmap-r6:color-mix(in srgb,#7FE3FF 29%,#052956);--seatmap-r7:color-mix(in srgb,#7FE3FF 62%,#052956);--seatmap-r8:color-mix(in srgb,#7FE3FF 70%,#052956);--seatmap-r9:color-mix(in srgb,#7FE3FF 78%,#052956);--seatmap-r10:color-mix(in srgb,#7FE3FF 86%,#052956);--seatmap-full:#C9F3FF;--seatmap-w1:var(--seatmap-r1);--seatmap-w2:var(--seatmap-r2);--seatmap-w3:var(--seatmap-r3);--seatmap-w4:var(--seatmap-r4);--seatmap-w5:var(--seatmap-r5);--seatmap-w6:var(--seatmap-r6);--seatmap-w7:var(--seatmap-r7);--seatmap-w8:var(--seatmap-r8);--seatmap-w9:var(--seatmap-r9);--seatmap-w10:var(--seatmap-r10);
+  --seatmap-shine:rgba(255,255,255,.4);--seatmap-base:transparent;--seatmap-base-line:rgba(127,227,255,.35);--seatmap-base-shadow:transparent;
   --seatmap-gutter:var(--pv-surface,#052956);--seatmap-lbl:#F7FCFF;--seatmap-lbl-dark:#052956;--seatmap-hover:#7FE3FF;
   --seatmap-sel:#F7FCFF;--seatmap-sel-ring:rgba(127,227,255,.45);--seatmap-raise:rgba(0,0,0,.45);--seatmap-unknown:#4FA9C3;--seatmap-unknown-fill:transparent;
   --seatmap-hold:#FFD166;--seatmap-hold-bg:color-mix(in srgb,#FFD166 16%,#052956);--seatmap-hold-lbl:#F7FCFF;--seatmap-hold-halo:#052956;--seatmap-warn-ink:#FFD166;
@@ -32667,9 +33580,21 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-stat-pct{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:center}
 .seatmap-stat-pct>b,.seatmap-stat-pct>span{grid-column:2}
 .seatmap-gauge{grid-column:1;grid-row:1 / span 2;width:30px;height:30px;overflow:visible}
-.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r1);stroke-width:4}
-.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r4);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1)}
+.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r2);stroke-width:4}
+.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r8);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1),stroke-opacity .2s ease}
+.seatmap-gauge-zero{stroke-opacity:0}
+.seatmap-sellout .seatmap-gauge-arc{stroke:var(--seatmap-full)}
 .seatmap-svg{display:block;width:100%;height:auto;overflow:visible}
+/* Live block over hidden copies from the other steps (seatmapStack). */
+.seatmap-stack{display:grid}.seatmap-stack>*{grid-area:1 / 1;min-width:0}
+.seatmap-ghost{visibility:hidden;pointer-events:none}
+.seatmap-head{margin:0 0 3px}.seatmap-head>.seatmap-totals{margin:0;align-self:end}
+.seatmap-foot{min-width:0}
+.seatmap-base{fill:var(--seatmap-base);stroke:var(--seatmap-base);stroke-width:18;stroke-linejoin:round;filter:drop-shadow(0 6px 10px var(--seatmap-base-shadow))}
+.seatmap-base-hull{stroke-width:22}
+.sk-blueprint .seatmap-base{fill:none;stroke:var(--seatmap-base-line);stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke;filter:none}
+.seatmap-shine{pointer-events:none}
+.seatmap-shine-a{stop-color:var(--seatmap-shine);stop-opacity:1}.seatmap-shine-b{stop-color:var(--seatmap-shine);stop-opacity:0}
 /* In a fixed-size layout tile the map letterboxes into the space left by the
    totals and legend instead of overflowing the tile (the bowl's aspect is
    taller than the tile's body aspect on several pages). */
@@ -32693,6 +33618,12 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-fill{stroke:var(--seatmap-gutter);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;transition:fill .42s cubic-bezier(.2,.7,.2,1),stroke .12s ease}
 .seatmap-sec:hover .seatmap-fill{stroke:var(--seatmap-hover)}
 .seatmap-tier{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow))}
+/* A step's colour changes ripple outward from the field, ring by ring. */
+.seatmap-tier:nth-child(2) .seatmap-fill{transition-delay:60ms,0s}.seatmap-tier:nth-child(3) .seatmap-fill{transition-delay:120ms,0s}.seatmap-tier:nth-child(4) .seatmap-fill{transition-delay:180ms,0s}
+@media (prefers-reduced-motion:no-preference){
+  .seatmap-cheer .seatmap-tier{animation:seatmap-cheer .6s cubic-bezier(.2,.7,.2,1) both}
+  .seatmap-cheer .seatmap-tier:nth-child(2){animation-delay:80ms}.seatmap-cheer .seatmap-tier:nth-child(3){animation-delay:160ms}.seatmap-cheer .seatmap-tier:nth-child(4){animation-delay:240ms}}
+@keyframes seatmap-cheer{0%,100%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1)}40%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1.22)}}
 .seatmap-rows{fill:none;stroke:var(--seatmap-row,var(--seatmap-gutter));stroke-opacity:var(--seatmap-row-o);stroke-width:.75;vector-effect:non-scaling-stroke;pointer-events:none}
 .seatmap-unknown .seatmap-rows{display:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-moved .seatmap-fill{animation:seatmap-moved .7s cubic-bezier(.2,.7,.2,1)}}
@@ -32705,8 +33636,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-lbl-on{fill:var(--seatmap-label-on)}.seatmap-lbl-dark{fill:var(--seatmap-lbl-dark)}.seatmap-lbl-light{fill:#FFFFFF}
 .seatmap-held .seatmap-lbl{fill:var(--seatmap-hold-lbl);paint-order:stroke;stroke:var(--seatmap-hold-halo);stroke-width:3px;stroke-linejoin:round}
 .seatmap-lbl-tiny{display:none}
-.seatmap-ringtag{display:none;font-family:var(--seatmap-sans);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-anchor:middle;fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round;pointer-events:none}
-.seatmap-sparse .seatmap-ringtag{display:inline}
+.seatmap-sec .seatmap-lbl-halo{fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round}
 .seatmap-outline-halo{fill:none;stroke:var(--seatmap-gutter);stroke-width:6.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 3px 4px var(--seatmap-raise))}
 .seatmap-outline{fill:none;stroke:var(--seatmap-sel);stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-pulse .seatmap-outline-halo{animation:seatmap-pulse .7s cubic-bezier(.16,1,.3,1)}}
@@ -32725,18 +33655,18 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend small,.seatmap-rings small{font-size:10.5px;font-weight:600;color:var(--seatmap-muted);margin-left:4px}
 .seatmap-sw{display:inline-block;flex:none;width:10px;height:10px;border-radius:var(--seatmap-sw-radius);margin-right:6px;background:var(--seatmap-r4);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18)}
 .seatmap-sw-low{background:var(--seatmap-r1)}
-.seatmap-sw-high{background:var(--seatmap-r5)}
+.seatmap-sw-high{background:var(--seatmap-r10)}
 .seatmap-sw-hold{background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 4px);box-shadow:inset 0 0 0 1px var(--seatmap-hold)}
 .seatmap-sw-unknown{background:var(--seatmap-unknown-fill);box-shadow:none;border:1px dashed var(--seatmap-unknown);box-sizing:border-box}
 .seatmap-key{gap:6px}
-.seatmap-scale{position:relative;display:inline-block;flex:none;width:136px;height:18px}
-.seatmap-scale-plain{height:8px}
+.seatmap-scale{position:relative;display:inline-block;flex:none;width:160px;height:18px}
 .seatmap-bins{position:absolute;left:0;right:0;top:1px;height:6px;display:flex;gap:1px;border-radius:var(--seatmap-radius);overflow:hidden}
-.seatmap-scale-plain .seatmap-bins{top:0}
 .seatmap-bins>i{flex:1 1 0;box-shadow:inset 0 0 0 1px rgba(36,50,74,.06)}
 .seatmap-ticks>i{position:absolute;top:9px;font:600 10px/10px var(--seatmap-sans);font-style:normal;letter-spacing:0;color:var(--seatmap-muted);transform:translateX(-50%)}
-.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:20%}.seatmap-ticks>i:nth-child(3){left:40%}
-.seatmap-ticks>i:nth-child(4){left:60%}.seatmap-ticks>i:nth-child(5){left:80%}.seatmap-ticks>i:nth-child(6){left:auto;right:0;transform:none}
+.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:50%}.seatmap-ticks>i:nth-child(3){left:auto;right:0;transform:none}
+.seatmap-ticks-words>i{letter-spacing:.06em;text-transform:uppercase}
+.seatmap-sw-full{background:var(--seatmap-full);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.seatmap-out{display:inline-flex;align-items:center;height:16px;margin-left:7px;padding:0 7px;border-radius:var(--seatmap-radius);background:var(--seatmap-full);color:var(--seatmap-label-on);font:700 10px/1 var(--seatmap-sans);font-style:normal;letter-spacing:.08em;text-transform:uppercase}
 .seatmap-caret{position:absolute;top:-1px;width:2px;height:10px;margin-left:-1px;border-radius:1px;background:var(--seatmap-ink);box-shadow:0 0 0 1.5px var(--seatmap-gutter);transition:left .42s cubic-bezier(.2,.7,.2,1)}
 .seatmap-range{color:var(--seatmap-text)}
 .seatmap-ring-bar{display:inline-flex;flex:none;width:34px;height:6px;margin-right:7px;border-radius:var(--seatmap-radius);overflow:hidden;background:var(--seatmap-track);box-shadow:inset 0 0 0 1px var(--seatmap-track-line)}
@@ -32747,6 +33677,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend>.seatmap-zones,.seatmap-rings>.seatmap-zones{display:inline;white-space:normal}
 .seatmap-zones small{margin-left:0}
 .sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-sw,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-bins>i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.sk-blueprint .seatmap-out{background:transparent;color:#7FE3FF;box-shadow:inset 0 0 0 1px #7FE3FF;font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:10.5px;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat>span,.sk-blueprint .seatmap-mode b,.sk-blueprint .seatmap-landmark text{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat b{font-weight:700;font-size:19px;letter-spacing:0}
 .sk-blueprint .seatmap-mode b{background:transparent;box-shadow:inset 0 0 0 1px var(--seatmap-chip-ink)}
@@ -32756,8 +33687,8 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .sk-blueprint .seatmap-gauge{border-radius:50%;box-shadow:inset 0 0 0 1px #4FA9C3}
 .sk-blueprint .seatmap-tier{filter:none}
 .sk-blueprint .seatmap-unknown .seatmap-fill{stroke:var(--seatmap-unknown)}
-@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}}
-@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}.seatmap-outline-halo,.seatmap-tier{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}}
+@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}.seatmap-outline-halo,.seatmap-tier,.seatmap-base{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `,
   authoring: {
     initialFields: true,

@@ -403,15 +403,57 @@ function seatmapFold(panel, steps) {
 function seatmapPathGeometry(d) {
   var parsed = spmParsePath(d, { range: [0, SPM_VIEW] });
   var box = parsed.error ? null : spmPathBBox(parsed.commands);
-  if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0 };
-  return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height };
+  if (!box) return { d: 'M0,0Z', x: 0, y: 0, arc: 0, depth: 0, points: [] };
+  return { d: spmPathText(parsed.commands), x: spmRound(box.x + box.width / 2), y: spmRound(box.y + box.height / 2), arc: box.width, depth: box.height, points: spmPathPoints(parsed.commands) };
 }
-/* Label size from the wedge: up to 24 units, hidden below 9 (the tooltip
+/* The span of a closed polygon along the horizontal (vertical when `v`)
+   line through (x, y) that contains that point: [lo, hi], or null. */
+function seatmapChord(poly, x, y, v) {
+  var hits = [], n = poly.length, i;
+  for (i = 0; i < n; i++) {
+    var a = poly[i], b = poly[(i + 1) % n], a0 = v ? a[0] : a[1], b0 = v ? b[0] : b[1], at = v ? x : y;
+    if ((a0 <= at && b0 > at) || (b0 <= at && a0 > at)) {
+      var f = (at - a0) / (b0 - a0);
+      hits.push(v ? a[1] + (b[1] - a[1]) * f : a[0] + (b[0] - a[0]) * f);
+    }
+  }
+  hits.sort(function (p, q) { return p - q; });
+  var c = v ? y : x;
+  for (i = 0; i + 1 < hits.length; i += 2) if (hits[i] <= c && hits[i + 1] >= c) return [hits[i], hits[i + 1]];
+  return null;
+}
+/* The largest font (viewBox units) at which the label's lines sit inside
+   the section: every horizontal chord across the cap band clears the text
+   with a small margin, and the band clears the section vertically. Also
+   returns the chord centre at the label line, so a label sits in the middle
+   of a trapezoid rather than of its bounding box. */
+function seatmapLabelFit(lines, poly, x, y) {
+  if (!poly || poly.length < 3) return { fit: 0, x: x };
+  var chars = Math.max.apply(null, lines.map(function (l) { return Math.max(1, l.length); }));
+  var mid = seatmapChord(poly, x, y, false);
+  if (!mid) return { fit: 0, x: x };
+  var cx = (mid[0] + mid[1]) / 2, vert = seatmapChord(poly, cx, y, true);
+  if (!vert) return { fit: 0, x: x };
+  var band = lines.length > 1 ? [-0.92, 0.85] : [-0.37, 0.35];
+  function ok(f) {
+    if (y + band[0] * f < vert[0] + 1.5 || y + band[1] * f > vert[1] - 1.5) return false;
+    var need = chars * 0.62 * f + 3;
+    for (var k = 0; k <= 4; k++) {
+      var c = seatmapChord(poly, cx, y + (band[0] + (band[1] - band[0]) * k / 4) * f, false);
+      if (!c || Math.min(cx - c[0], c[1] - cx) * 2 < need) return false;
+    }
+    return true;
+  }
+  var lo = 0, hi = 40;
+  for (var it = 0; it < 9; it++) { var m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+  return { fit: Math.floor(lo * 2) / 2, x: spmRound(cx) };
+}
+/* Label size from the wedge: up to 22 units, hidden below 9 (the tooltip
    still carries the id). A short id with a trailing letter (201A) stacks the
    letter on a second line when that renders larger. Returns {font, lines}. */
 function seatmapLabelFont(label, geom) {
   function fit(text, cap) {
-    return Math.min(24, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
+    return Math.min(22, cap, geom.depth * 0.45, (geom.arc * 0.96) / (Math.max(1, text.length) * 0.62));
   }
   var single = fit(label, geom.arc * 0.34), stacked = /^(\d{1,4})([A-Za-z])$/.exec(label);
   if (stacked && single < 17) {
@@ -423,12 +465,37 @@ function seatmapLabelFont(label, geom) {
 /* Per-section fill intensity for the mode, totals, legend entries and the
    highlight set. Prices and revenue are "where price known": a section without
    a price contributes nothing and is listed as unpriced. */
+/* Section shapes and label sizes depend only on the declaration, so they
+   are computed once per declaration and shared by every step's model. */
+var SEATMAP_SHAPES = [];
+function seatmapShapes(panel, geometry, rings, decl) {
+  var key = JSON.stringify([geometry, seatmapBowl(panel), seatmapMirror(panel), seatmapStartRegion(panel), seatmapRingSlots(panel), rings.length,
+    decl.map(function (s) { return [s.id, s.label, s.ring, s.slot, s.span, s.path, s.kind]; }), geometry === 'paths' ? [seatmapViewBox(panel), panel.field] : 0]);
+  for (var i = 0; i < SEATMAP_SHAPES.length; i++) if (SEATMAP_SHAPES[i].key === key) return SEATMAP_SHAPES[i];
+  var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
+  var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null, list = [];
+  decl.forEach(function (s) {
+    var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
+    /* The natural label size never crosses the section's own edge; `fit` is
+       the largest size that still fits, which the page uses to lift a label
+       to the 10 px floor when the map is drawn small. */
+    var lf = seatmapLabelFont(s.label, geom), poly = bowl ? (geom.innerPoints || []).concat(geom.outerPoints || []) : geom.points;
+    var fit = seatmapLabelFit(lf.lines, poly, geom.x, geom.y), font = lf.font ? Math.min(lf.font, fit.fit) : 0;
+    if (!fit.fit) { fit.fit = lf.font; fit.x = geom.x; font = lf.font; }
+    if (!font && fit.fit >= 9) font = 9;
+    if (font < 6) font = 0;
+    list.push({ d: geom.d, x: font ? fit.x : geom.x, y: geom.y, font: font, fit: fit.fit, lines: lf.lines, range: bowl ? placement[s.id] : null, rows: bowl ? seatmapRowLines(geom) : '', points: bowl ? null : geom.points });
+  });
+  var entry = { key: key, bowl: bowl, list: list };
+  SEATMAP_SHAPES.unshift(entry);
+  if (SEATMAP_SHAPES.length > 8) SEATMAP_SHAPES.pop();
+  return entry;
+}
 function seatmapModel(panel, state) {
   panel = seatmapResolve(panel);
   state = panelObject(state) ? state : {};
   var geometry = seatmapGeometry(panel), rings = seatmapRings(panel), tiers = seatmapTiers(panel), decl = seatmapSections(panel);
-  var bowl = geometry === 'bowl' ? spmBowl(seatmapBowl(panel), rings, { mirror: seatmapMirror(panel) }) : null;
-  var placement = bowl ? seatmapPlacement(panel, decl, bowl) : null;
+  var shapes = seatmapShapes(panel, geometry, rings, decl), bowl = shapes.bowl;
   var view = bowl ? { width: bowl.width, height: bowl.height } : seatmapViewBox(panel);
   var fieldRect = bowl ? null : seatmapFieldRect(panel), fieldShape = fieldRect ? seatmapFieldShape(fieldRect) : null;
   var field = bowl ? bowl.field : fieldShape ? fieldShape.field : null, fieldLines = bowl ? bowl.fieldLines : fieldShape ? fieldShape.fieldLines : '';
@@ -442,7 +509,7 @@ function seatmapModel(panel, state) {
     if (typeof id === 'string' && id in capacities && highlight.indexOf(id) < 0 && highlight.length < SEATMAP_MAX_HIGHLIGHT) highlight.push(id);
   });
   var maxPrice = 0, maxRevenue = 0, zones = {}, zoneOrder = [];
-  var sections = decl.map(function (s) {
+  var sections = decl.map(function (s, si) {
     /* Maps may carry ids and counts from an earlier declaration: ids absent
        here are simply not drawn and counts clamp to this capacity. */
     var soldN = seatmapCount(sold[s.id]) ? Math.min(sold[s.id], s.capacity) : 0;
@@ -459,13 +526,13 @@ function seatmapModel(panel, state) {
     if (p !== null) maxPrice = Math.max(maxPrice, p);
     if (revenue !== null) maxRevenue = Math.max(maxRevenue, revenue);
     if (s.zone) { if (!panelOwn(zones, s.zone)) { zones[s.zone] = 0; zoneOrder.push(s.zone); } zones[s.zone]++; }
-    var geom = bowl ? bowl.wedge(s.ring, placement[s.id][0], placement[s.id][1]) : seatmapPathGeometry(s.path);
+    var g = shapes.list[si];
     return {
       id: s.id, label: s.label, ring: s.ring, ringId: s.ringId, ringLabel: rings[s.ring].label, zone: s.zone, capacity: s.capacity,
       sold: soldN, held: hold, price: p, revenue: revenue, revenueOverflow: p !== null && revenue === null, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
-      d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
-      kind: s.kind, range: bowl ? placement[s.id] : null, rows: bowl ? seatmapRowLines(geom) : '',
+      d: g.d, x: g.x, y: g.y, font: g.font, fit: g.fit, lines: g.lines, intensity: 0, known: true,
+      kind: s.kind, range: g.range, rows: g.rows, points: g.points,
     };
   });
   var tierIndex = {};
@@ -479,9 +546,11 @@ function seatmapModel(panel, state) {
     if (!isFiniteNum(s.intensity)) s.intensity = 0;
     s.intensity = Math.max(0, Math.min(1, s.intensity));
     s.color = mode === 'tier' && s.tier ? (s.tier.color || seatmapTierPalette(tierIndex[s.tier.id])) : null;
-    /* Label colour: accent fills switch at a threshold per skin; tier fills
+    /* A section with every seat sold gets its own, deepest stop in sold mode. */
+    s.full = mode === 'sold' && s.capacity > 0 && s.sold >= s.capacity;
+    /* Label colour: ramp fills switch at one bin in every skin; tier fills
        use the tier colour's own luminance. */
-    s.labelTone = s.color ? seatmapTierTone(s.color) : (seatmapRampBin(s.intensity) >= SEATMAP_LABEL_BIN && s.known ? 'on' : '');
+    s.labelTone = s.color ? seatmapTierTone(s.color) : ((s.full || seatmapRampBin(s.intensity) >= SEATMAP_LABEL_BIN) && s.known ? 'on' : '');
   });
   var totals = { sold: 0, capacity: 0, held: 0, revenue: 0, priced: 0, pricedSold: 0 };
   var ringTotals = rings.map(function (ring) { return { id: ring.id, label: ring.label, sold: 0, capacity: 0, held: 0, sections: 0 }; });
@@ -512,26 +581,12 @@ function seatmapModel(panel, state) {
     box: fieldBox, spots: seatmapRinkSpots(fieldBox),
     r: bowl ? fieldBox.height / 2 : Math.min(fieldBox.height * 28 / 85, fieldBox.width / 2, fieldBox.height / 2),
   } : null;
-  /* Ring names for a map drawn too small for its section labels: one per
-     ring, at the top of that ring nearest the centre line (on an authored
-     chart, the centre of that ring's topmost section). */
-  var midX = bowl ? SEATMAP_CENTRE[0] : view.width / 2;
-  var ringTags = ringTotals.map(function (ring, ri) {
-    if (!ring.sections) return null;
-    var best = null;
-    function consider(tx, ty) {
-      var score = ty + Math.abs(tx - midX) * 0.01;
-      if (!best || score < best.score) best = { x: tx, y: ty, score: score };
-    }
-    if (bowl) for (var k = 0; k < 240; k++) {
-      var a = bowl.point(ri, k / 240, false), b = bowl.point(ri, k / 240, true);
-      consider((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
-    } else sections.forEach(function (s) { if (s.ring === ri) consider(s.x, s.y); });
-    return best ? { label: ring.label, x: spmRound(best.x), y: spmRound(best.y) } : null;
-  }).filter(Boolean);
+  /* The footprint under the sections: the generated bowl's own outline, or
+     the convex hull of an authored chart's sections. */
+  var base = bowl ? bowl.base : seatmapHull(sections.reduce(function (all, s) { return all.concat(s.points || []); }, []));
   return {
     geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: field, fieldLines: fieldLines, mode: mode, currency: currency,
-    fieldBox: fieldBox, ringTags: ringTags,
+    fieldBox: fieldBox, base: base, sellout: totals.capacity > 0 && totals.sold >= totals.capacity,
     sections: sections, rings: ringTotals, tiers: tierCounts, zones: zoneOrder.map(function (z) { return { zone: z, sections: zones[z] }; }),
     landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2], rink),
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
@@ -559,17 +614,22 @@ function seatmapTierTone(hex) {
   var l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   return (l + 0.05) / 0.0566 >= 1.05 / (l + 0.05) ? 'dark' : 'light';
 }
-/* The sell-through ramp: five classed bins on the skin stops
-   (--seatmap-r1..r5), 0–20, 20–40, 40–60, 60–80 and 80–100 %. Labels are ink
-   on r1–r3 and inverse on r4–r5, so every label keeps AA contrast on its own
-   fill, and the legend's five swatches read exactly as the map does. */
-var SEATMAP_RAMP_BINS = 5, SEATMAP_LABEL_BIN = 4;
+/* The ramps: ten classed bins of 10 % on the skin stops. Shares of capacity
+   (sold, held) use the cool ramp --seatmap-r1..r10; price and revenue use the
+   warm ramp --seatmap-w1..w10, so a mode switch reads at a glance. A sold-out
+   section takes --seatmap-full. Labels are ink on bins 1–6 and inverse from
+   bin 7 (60 %), and each skin's stops are chosen so both keep AA contrast;
+   the ramp steps across the mid-tones where neither label colour would. */
+var SEATMAP_RAMP_BINS = 10, SEATMAP_LABEL_BIN = 7;
 function seatmapRampBin(t) {
   t = isFiniteNum(t) ? Math.max(0, Math.min(1, t)) : 0;
   return Math.min(SEATMAP_RAMP_BINS, 1 + Math.floor(t * SEATMAP_RAMP_BINS + 1e-9));
 }
-function seatmapRampFill(t) {
-  return 'var(--seatmap-r' + seatmapRampBin(t) + ')';
+function seatmapRampFill(t, warm) {
+  return 'var(--seatmap-' + (warm ? 'w' : 'r') + seatmapRampBin(t) + ')';
+}
+function seatmapWarm(mode) {
+  return mode === 'price' || mode === 'revenue';
 }
 /* Seat-row texture for a generated wedge: evenly spaced arcs between the
    inner and outer edge, drawn as one faint path above the fill. */
@@ -586,6 +646,17 @@ function seatmapRowLines(geom) {
     }).join('');
   }
   return d;
+}
+/* Convex hull (monotone chain) of points as a closed path, or ''. */
+function seatmapHull(pts) {
+  pts = pts.filter(function (p) { return isFiniteNum(p[0]) && isFiniteNum(p[1]); }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+  if (pts.length < 3) return '';
+  function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+  var lower = [], upper = [], i;
+  for (i = 0; i < pts.length; i++) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop(); lower.push(pts[i]); }
+  for (i = pts.length - 1; i >= 0; i--) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop(); upper.push(pts[i]); }
+  var hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+  return hull.length >= 3 ? hull.map(function (p, k) { return (k ? 'L' : 'M') + spmRound(p[0]) + ',' + spmRound(p[1]); }).join('') + 'Z' : '';
 }
 /* Bounding box of an M/L polyline path (the traced bowl field). */
 function seatmapPointsBox(d) {
@@ -668,36 +739,39 @@ function seatmapAria(model) {
   return text + '.';
 }
 function seatmapSectionMarkup(s, model, hid) {
-  var fill = s.color ? s.color : s.known ? seatmapRampFill(s.intensity) : 'var(--seatmap-unknown-fill)';
+  var fill = s.color ? s.color : s.full ? 'var(--seatmap-full)' : s.known ? seatmapRampFill(s.intensity, seatmapWarm(model.mode)) : 'var(--seatmap-unknown-fill)';
   var opacity = 1;
-  var cls = 'seatmap-sec' + (s.highlighted ? ' seatmap-hi' : '') + (s.known ? '' : ' seatmap-unknown') + (s.held ? ' seatmap-held' : '');
+  var cls = 'seatmap-sec' + (s.highlighted ? ' seatmap-hi' : '') + (s.known ? '' : ' seatmap-unknown') + (s.held ? ' seatmap-held' : '') + (s.full ? ' seatmap-full' : '') + (s.color ? ' seatmap-tiered' : '');
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
+  if (s.full) h += '<path class="seatmap-shine" d="' + s.d + '" fill="url(#' + hid + '-g)"/>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
   if (s.rows) h += '<path class="seatmap-rows" d="' + s.rows + '"/>';
   if (s.font) {
-    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '">';
+    h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '" data-fit="' + s.fit + '">';
     if (s.lines.length > 1) h += esc(s.lines[0]) + '<tspan x="' + s.x + '" dy="1.05em">' + esc(s.lines[1]) + '</tspan>'; else h += esc(s.lines[0]);
     h += '</text>';
   }
   return h + '</g>';
 }
-/* The ramp key: five stepped swatches. Shares of capacity (sold, held) get
-   0–100 % ticks and, for sold, a marker at the overall sell-through; price and
-   revenue are relative to the top section and keep the words low and high. */
+/* The ramp key: ten stepped swatches on one fixed-size scale for every
+   mode, so the legend keeps its height when the mode changes. Shares of
+   capacity (sold, held) get 0 / 50 / 100 % ticks and, for sold, a caret at
+   the overall sell-through; price and revenue are relative to the top section
+   and put the words low and high where the ticks go. */
 function seatmapScale(model) {
-  var bins = '', share = model.mode === 'sold' || model.mode === 'held';
-  for (var i = 1; i <= SEATMAP_RAMP_BINS; i++) bins += '<i style="background:var(--seatmap-r' + i + ')"></i>';
-  var h = '<span class="seatmap-key">' + (share ? '' : 'low') + '<span class="seatmap-scale' + (share ? '' : ' seatmap-scale-plain') + '" aria-hidden="true"><span class="seatmap-bins">' + bins + '</span>';
-  if (share) h += '<span class="seatmap-ticks"><i>0%</i><i>20</i><i>40</i><i>60</i><i>80</i><i>100</i></span>';
+  var bins = '', share = model.mode === 'sold' || model.mode === 'held', warm = seatmapWarm(model.mode);
+  for (var i = 1; i <= SEATMAP_RAMP_BINS; i++) bins += '<i style="background:var(--seatmap-' + (warm ? 'w' : 'r') + i + ')"></i>';
+  var h = '<span class="seatmap-key"><span class="seatmap-scale" aria-hidden="true"><span class="seatmap-bins">' + bins + '</span>';
+  h += share ? '<span class="seatmap-ticks"><i>0%</i><i>50</i><i>100%</i></span>' : '<span class="seatmap-ticks seatmap-ticks-words"><i>low</i><i></i><i>high</i></span>';
   if (model.mode === 'sold' && model.totals.capacity) h += '<span class="seatmap-caret" style="left:' + spmRound(Math.max(0, Math.min(100, model.totals.pct))) + '%"></span>';
-  return h + '</span>' + (share ? '' : 'high') + '</span>';
+  return h + '</span></span>';
 }
 /* Per-ring mini bar: sold, then held, against capacity. The sold segment
    takes the ramp colour only when the map itself shows sell-through. */
 function seatmapRingBar(ring, mode) {
   var cap = ring.capacity || 0, sold = cap ? Math.min(1, ring.sold / cap) : 0, held = cap ? Math.min(1 - sold, ring.held / cap) : 0;
-  var colour = mode === 'sold' ? seatmapRampFill(ring.pct / 100) : 'var(--seatmap-neutral)';
+  var colour = mode === 'sold' ? (cap && ring.sold >= cap ? 'var(--seatmap-full)' : seatmapRampFill(ring.pct / 100)) : 'var(--seatmap-neutral)';
   return '<i class="seatmap-ring-bar" aria-hidden="true"><i class="seatmap-ring-sold" style="width:' + spmRound(sold * 100) + '%;background:' + colour + '"></i>' +
     (held > 0 ? '<i class="seatmap-ring-held" style="width:' + spmRound(held * 100) + '%"></i>' : '') + '</i>';
 }
@@ -710,6 +784,10 @@ function seatmapLegend(model) {
   });
   else {
     h += seatmapScale(model);
+    if (mode === 'sold') {
+      var full = model.sections.filter(function (s) { return s.full; }).length;
+      h += '<span class="seatmap-full-key"><i class="seatmap-sw seatmap-sw-full"></i>sold out <small>' + full + '</small></span>';
+    }
     if (mode === 'price' && model.priceRange) h += '<span class="seatmap-range">' + esc(spmMoney(model.priceRange.min, cur)) + ' – ' + esc(spmMoney(model.priceRange.max, cur)) + '</span>';
   }
   if (model.hasHolds) h += '<span><i class="seatmap-sw seatmap-sw-hold"></i>held block</span>';
@@ -717,7 +795,8 @@ function seatmapLegend(model) {
   h += '</div><div class="seatmap-rings">';
   model.rings.forEach(function (ring) {
     if (!ring.sections) return;
-    h += '<span class="seatmap-ring">' + seatmapRingBar(ring, mode) + '<b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + '</span>';
+    var out = ring.capacity > 0 && ring.sold >= ring.capacity;
+    h += '<span class="seatmap-ring' + (out ? ' seatmap-ring-out' : '') + '">' + seatmapRingBar(ring, mode) + '<b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + (out ? '<em class="seatmap-out">sold out</em>' : '') + '</span>';
   });
   if (model.zones.length) h += '<span class="seatmap-zones">' + model.zones.map(function (z) { return esc(z.zone) + ' <small>' + z.sections + '</small>'; }).join(' · ') + '</span>';
   return h + '</div>';
@@ -731,24 +810,51 @@ function seatmapTotals(model) {
   return '<div class="seatmap-totals">' +
     '<div class="seatmap-stat"><b>' + seatmapInt(t.sold) + '<small> / ' + seatmapInt(t.capacity) + '</small></b><span>sold / capacity</span></div>' +
     '<div class="seatmap-stat seatmap-stat-pct"><svg class="seatmap-gauge" viewBox="0 0 32 32" aria-hidden="true"><circle class="seatmap-gauge-track" cx="16" cy="16" r="12.5"/>' +
-    '<circle class="seatmap-gauge-arc" cx="16" cy="16" r="12.5" pathLength="100" transform="rotate(-90 16 16)" style="stroke-dasharray:' + spmRound(pct) + ' 100"/></svg>' +
+    '<circle class="seatmap-gauge-arc' + (pct > 0 ? '' : ' seatmap-gauge-zero') + '" cx="16" cy="16" r="12.5" pathLength="100" transform="rotate(-90 16 16)" style="stroke-dasharray:' + spmRound(pct) + ' 100"/></svg>' +
     '<b>' + Math.round(t.pct) + '<small>%</small></b><span>sell-through</span></div>' +
     '<div class="seatmap-stat' + (t.held ? ' seatmap-stat-warn' : '') + '"><b>' + seatmapInt(t.held) + '</b><span>held</span></div>' +
     '<div class="seatmap-stat"><b>' + revenueHTML + '</b><span>revenue' + (t.revenueKnown && !t.allPriced ? ' · where price known' : '') + '</span></div></div>';
 }
-function seatmapHTML(panel, state, model, hid, pulse) {
+/* Stacks the live block over hidden copies of the same block at every other
+   step, so the block is always as tall as its tallest step and the map never
+   resizes as the legend or totals change. */
+function seatmapStack(cls, live, ghosts) {
+  if (!ghosts || !ghosts.length) return live;
+  return '<div class="seatmap-stack ' + cls + '">' + live + ghosts.map(function (g) {
+    return g.replace(/^<div class="/, '<div aria-hidden="true" class="seatmap-ghost ');
+  }).join('') + '</div>';
+}
+function seatmapFoot(model) {
+  return '<div class="seatmap-foot">' + seatmapLegend(model) + '</div>';
+}
+/* Every distinct totals strip and legend across the panel's steps. */
+function seatmapReserve(panel, states) {
+  var heads = [], foots = [];
+  (Array.isArray(states) ? states : []).concat(panel && panel.initial ? [panel.initial] : []).forEach(function (st) {
+    var m = seatmapModel(panel, st), head = m.showTotals ? seatmapTotals(m) : '', foot = seatmapFoot(m);
+    if (head && heads.indexOf(head) < 0) heads.push(head);
+    if (foots.indexOf(foot) < 0) foots.push(foot);
+  });
+  return { heads: heads.length > 1 ? heads : [], foots: foots.length > 1 ? foots : [] };
+}
+function seatmapHTML(panel, state, model, hid, pulse, reserve) {
   panel = seatmapResolve(panel);
   model = model || seatmapModel(panel, state);
   hid = hid || 'spm-static';
-  var h = '<div class="seatmap seatmap-mode-' + model.mode + (pulse ? ' seatmap-pulse' : '') + '">';
-  if (model.showTotals) h += seatmapTotals(model);
+  reserve = reserve || { heads: [], foots: [] };
+  var h = '<div class="seatmap seatmap-mode-' + model.mode + (model.sellout ? ' seatmap-sellout' : '') + (pulse ? ' seatmap-pulse' : '') + '">';
+  if (model.showTotals) h += seatmapStack('seatmap-head', seatmapTotals(model), reserve.heads);
   h += '<svg class="seatmap-svg" viewBox="0 0 ' + model.view.width + ' ' + model.view.height + '" role="img" aria-label="' + esc(seatmapAria(model)) + '">' +
     '<defs><pattern id="' + hid + '" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
     '<rect width="10" height="10" class="seatmap-hatch-bg"/><rect width="3.5" height="10" class="seatmap-hatch-bar"/></pattern>' +
+    '<linearGradient id="' + hid + '-g" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" class="seatmap-shine-a"/><stop offset="0.55" class="seatmap-shine-b"/></linearGradient>' +
     (model.field ? '<clipPath id="' + hid + '-f"><use href="#' + hid + '-fp"/></clipPath>' +
-      '<radialGradient id="' + hid + '-s" cx="0.5" cy="0.38" r="0.7"><stop offset="0" class="seatmap-sheen-a"/><stop offset="1" class="seatmap-sheen-b"/></radialGradient>' : '') +
+      '<radialGradient id="' + hid + '-s" cx="0.5" cy="0.5" r="0.62"><stop offset="0" class="seatmap-sheen-a"/><stop offset="1" class="seatmap-sheen-b"/></radialGradient>' : '') +
     '</defs>';
   if (!model.complete) h += '<text class="seatmap-empty" x="' + model.view.width / 2 + '" y="' + model.view.height / 2 + '">Declare ' + SEATMAP_MIN_SECTIONS + '–' + SEATMAP_MAX_SECTIONS + ' sections to draw the map.</text>';
+  /* The footprint stays inside the viewBox so it never reaches the totals. */
+  if (model.complete && model.base) h += '<clipPath id="' + hid + '-v"><rect width="' + model.view.width + '" height="' + model.view.height + '"/></clipPath>' +
+    '<g clip-path="url(#' + hid + '-v)"><path class="seatmap-base' + (model.geometry === 'paths' ? ' seatmap-base-hull' : '') + '" d="' + model.base + '"/></g>';
   if (model.field) {
     var marks = seatmapFieldMarks(model, hid);
     h += '<path class="seatmap-field" d="' + model.field + '" id="' + hid + '-fp"/>' + marks.under;
@@ -773,12 +879,7 @@ function seatmapHTML(panel, state, model, hid, pulse) {
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g>';
-  if (model.ringTags.length) {
-    h += '<g class="seatmap-ringtags" aria-hidden="true">';
-    model.ringTags.forEach(function (tag) { h += '<text class="seatmap-ringtag" x="' + tag.x + '" y="' + tag.y + '" dy="0.35em" font-size="28">' + esc(tag.label) + '</text>'; });
-    h += '</g>';
-  }
-  h += '</svg>' + seatmapLegend(model) + '</div>';
+  h += '</svg>' + seatmapStack('seatmap-foot-stack', seatmapFoot(model), reserve.foots) + '</div>';
   return softwarePanelShell(h, state || {});
 }
 /* In-place update so section fills transition between steps instead of being
@@ -807,9 +908,12 @@ function seatmapPatch(host, model, html, hid) {
     fill.setAttribute('fill-opacity', nextFill.getAttribute('fill-opacity'));
     var title = fill.querySelector('title'), nextTitle = nextFill.querySelector('title');
     if (title && nextTitle) title.textContent = nextTitle.textContent;
+    var shine = g.querySelector('.seatmap-shine'), nextShine = next.querySelector('.seatmap-shine');
+    if (shine && !nextShine) g.removeChild(shine);
+    else if (!shine && nextShine) g.insertBefore(nextShine, fill.nextSibling);
     var hold = g.querySelector('.seatmap-hold'), nextHold = next.querySelector('.seatmap-hold');
     if (hold && !nextHold) { g.removeChild(hold); if (moved[moved.length - 1] !== g) moved.push(g); }
-    else if (!hold && nextHold) g.insertBefore(nextHold, fill.nextSibling);
+    else if (!hold && nextHold) g.insertBefore(nextHold, (g.querySelector('.seatmap-shine') || fill).nextSibling);
     var lbl = g.querySelector('.seatmap-lbl'), nextLbl = next.querySelector('.seatmap-lbl');
     if (lbl && nextLbl) lbl.setAttribute('class', nextLbl.getAttribute('class'));
     else if (lbl && !nextLbl) g.removeChild(lbl);
@@ -824,7 +928,9 @@ function seatmapPatch(host, model, html, hid) {
     void svg.getBoundingClientRect();
     moved.forEach(function (g) { g.setAttribute('class', g.getAttribute('class') + ' seatmap-moved'); });
   }
-  wrapper.setAttribute('class', nextWrapper.getAttribute('class'));
+  /* Filling the last seat in the house sends one sheen around the bowl. */
+  var wasOut = / seatmap-sellout/.test(wrapper.getAttribute('class') || ''), isOut = / seatmap-sellout/.test(nextWrapper.getAttribute('class') || '');
+  wrapper.setAttribute('class', nextWrapper.getAttribute('class') + (isOut && !wasOut ? ' seatmap-cheer' : ''));
   /* Totals and legend morph in place when their shape is unchanged, so the
      gauge arc and the scale marker ease instead of jumping. */
   var children = Array.prototype.slice.call(wrapper.childNodes).filter(function (c) { return c !== svg; });
@@ -865,53 +971,110 @@ function seatmapMorph(a, b) {
   for (i = 0; i < ak.length; i++) if (!seatmapMorph(ak[i], bk[i])) a.replaceChild(bk[i], ak[i]);
   return true;
 }
-/* After the map is in the page: a section label that would render below
-   10 px is hidden (its <title> keeps the id), landmark pills scale up to a
-   10.5 px label, and when most labels are hidden the ring names appear at
-   10 px or more instead. Runs again whenever the panel is resized. */
+/* After the map is in the page, nothing renders below 10 px and nothing
+   authored is dropped:
+   - a section label smaller than 10 px is lifted to 10 px when the section
+     still holds it (`data-fit`); one that cannot fit is hidden (its <title>
+     keeps the id), except on a highlighted, held or tier-coloured section,
+     where it sits on a surface-coloured halo instead;
+   - each landmark pill grows toward a 10.5 px label until it would come
+     within 8 px of another pill. Two pills that cannot both reach 10 px side
+     by side tighten to the 10 px floor (5 px apart); if they still meet they
+     spread apart along their board while both stay over the field (or
+     within 12 % of its width past either end), and only
+     failing that the later one moves to the opposite long board.
+   Runs again whenever the panel is resized. */
 function seatmapFit(host) {
   if (!host || typeof host.querySelector !== 'function') return;
   var svg = host.querySelector('.seatmap-svg'), vb = svg && svg.viewBox && svg.viewBox.baseVal;
   if (!vb || !(vb.width > 0) || typeof svg.getBoundingClientRect !== 'function') return;
   var width = svg.getBoundingClientRect().width;
   if (!(width > 0)) return;
-  var scale = width / vb.width, min = 10 / scale, i;
-  var labels = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-lbl')), tiny = 0;
-  labels.forEach(function (l) {
-    var small = (parseFloat(l.getAttribute('font-size')) || 0) < min;
-    if (small) tiny++;
-    l.classList.toggle('seatmap-lbl-tiny', small);
+  var scale = width / vb.width, min = 10 / scale;
+  Array.prototype.forEach.call(svg.querySelectorAll('.seatmap-lbl'), function (l) {
+    if (l._spmFont === undefined) l._spmFont = parseFloat(l.getAttribute('font-size')) || 0;
+    var base = l._spmFont, fit = parseFloat(l.getAttribute('data-fit')) || base, g = l.parentNode;
+    var keep = !!(g && g.classList && (g.classList.contains('seatmap-hi') || g.classList.contains('seatmap-held') || g.classList.contains('seatmap-tiered')));
+    var size = base, tiny = false, halo = false;
+    if (base < min) {
+      size = min;
+      if (fit < min - 0.01) { if (keep) halo = true; else tiny = true; }
+    }
+    l.setAttribute('font-size', spmRound(size));
+    l.classList.toggle('seatmap-lbl-tiny', tiny);
+    l.classList.toggle('seatmap-lbl-halo', halo);
+    if (halo) l.setAttribute('stroke-width', spmRound(3 / scale)); else l.removeAttribute('stroke-width');
   });
-  var sparse = labels.length > 0 && tiny * 2 > labels.length, tags = svg.querySelectorAll('.seatmap-ringtag');
-  svg.classList.toggle('seatmap-sparse', sparse);
-  var tagFont = spmRound(11 / scale);
-  for (i = 0; i < tags.length; i++) {
-    var tag = tags[i], tx = +tag.getAttribute('x'), ty = +tag.getAttribute('y'), halfW = (tag.textContent.length * 0.66 * tagFont) / 2 + 4 / scale;
-    tag.setAttribute('font-size', tagFont);
-    tag.setAttribute('stroke-width', spmRound(3.5 / scale));
-    if (sparse) labels.forEach(function (l) {
-      var lf = parseFloat(l.getAttribute('font-size')) || 0, lw = (l.textContent.length * 0.62 * lf) / 2;
-      if (Math.abs(+l.getAttribute('x') - tx) < halfW + lw && Math.abs(+l.getAttribute('y') - ty) < (tagFont + lf) / 2 + 2 / scale) l.classList.add('seatmap-lbl-tiny');
-    });
-  }
-  /* Landmark pills grow toward a 10.5 px label, but never into each other;
-     a pill whose label still cannot reach 10 px is left out. */
+  seatmapFitLandmarks(svg, scale);
+}
+function seatmapFitLandmarks(svg, scale) {
+  var field = svg.querySelector('.seatmap-field'), fb = null;
+  try { fb = field && typeof field.getBBox === 'function' ? field.getBBox() : null; } catch (e) { fb = null; }
   var marks = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-landmark')).map(function (g) {
     var rect = g.querySelector('rect'), text = g.querySelector('text');
-    return rect && text ? { g: g, x: +text.getAttribute('x'), y: +text.getAttribute('y'), w: +rect.getAttribute('width'), h: +rect.getAttribute('height') } : null;
+    if (!rect || !text) return null;
+    if (!g._spmLm) {
+      var w = +rect.getAttribute('width'), len = Math.max(1, text.textContent.length), measured = 0;
+      try { measured = typeof text.getComputedTextLength === 'function' ? text.getComputedTextLength() : 0; } catch (e) { measured = 0; }
+      /* Glyph advance per em at the authored 14 units, without the .08em tracking. */
+      var glyph = measured > 0 ? (measured / 14 - len * 0.08) / len : (w - 20) / 14 / len - 0.08;
+      g._spmLm = { x: +text.getAttribute('x'), y: +text.getAttribute('y'), w: w, h: +rect.getAttribute('height'), len: len, glyph: Math.max(0.45, glyph) };
+    }
+    return { g: g, rect: rect, text: text, o: g._spmLm, x: g._spmLm.x, y: g._spmLm.y };
   }).filter(Boolean);
-  var k = Math.max(1, 10.5 / (14 * scale));
-  marks.forEach(function (a, ai) {
+  var gap = 8 / scale, want = Math.max(14, 10.5 / scale), floor = Math.max(14, 10 / scale);
+  function size(m, f, tight) {
+    m.f = f; m.tight = !!tight; m.track = tight ? 0.04 : 0.08;
+    var pad = tight ? Math.min(f * 0.68, 6 / scale) : f * 0.68;
+    m.w = m.o.len * (m.o.glyph + m.track) * f + 2 * pad; m.h = f * (tight ? 1.6 : 1.8);
+  }
+  function clash(a, b) {
+    var g = a.tight && b.tight ? gap * 0.625 : gap;
+    return Math.abs(a.x - b.x) < (a.w + b.w) / 2 + g - 0.01 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + g - 0.01;
+  }
+  /* The common size at which two pills just clear each other. */
+  function clear(a, b) {
+    var kx = (Math.abs(a.x - b.x) - gap) / ((a.w / a.f + b.w / b.f) / 2), ky = (Math.abs(a.y - b.y) - gap) / ((a.h / a.f + b.h / b.f) / 2);
+    return Math.max(kx, ky) * 0.995;
+  }
+  marks.forEach(function (m) { size(m, want, false); });
+  for (var pass = 0; pass < 3; pass++) marks.forEach(function (a, ai) {
     marks.slice(ai + 1).forEach(function (b) {
-      k = Math.min(k, Math.max(Math.abs(a.x - b.x) / ((a.w + b.w) / 2), Math.abs(a.y - b.y) / ((a.h + b.h) / 2)));
+      if (!clash(a, b)) return;
+      var f = Math.max(floor, Math.min(a.f, b.f, clear(a, b)));
+      size(a, Math.min(a.f, f), false); size(b, Math.min(b.f, f), false);
     });
   });
-  k = Math.max(1, k);
-  var showMarks = 14 * scale * k >= 9.95;
+  marks.forEach(function (a, ai) {
+    marks.slice(ai + 1).forEach(function (b) {
+      if (!clash(a, b)) return;
+      size(a, floor, true); size(b, floor, true);
+      if (!clash(a, b)) return;
+      /* Side by side on one board: spread them apart along the board while
+         both stay over the field. */
+      if (fb && fb.width && Math.abs(a.y - b.y) < (a.h + b.h) / 2) {
+        var left = a.x <= b.x ? a : b, right = left === a ? b : a, mid = (left.x + right.x) / 2;
+        var need = (left.w + right.w) / 2 + gap * 0.625, lx = mid - need / 2, rx = mid + need / 2;
+        var shift = Math.max(0, fb.x - (lx - left.w / 2)) - Math.max(0, rx + right.w / 2 - (fb.x + fb.width));
+        if (shift > 0 && rx + right.w / 2 + shift > fb.x + fb.width) shift = 0;
+        if (shift < 0 && lx - left.w / 2 + shift < fb.x) shift = 0;
+        lx += shift; rx += shift;
+        var over = fb.width * 0.12;
+        if (lx - left.w / 2 >= fb.x - over && rx + right.w / 2 <= fb.x + fb.width + over) { left.x = lx; right.x = rx; return; }
+      }
+      /* Otherwise the later pill moves onto the other long board, mirrored
+         about the field. */
+      var cy = fb && fb.height ? fb.y + fb.height / 2 : svg.viewBox.baseVal.height / 2;
+      var y = 2 * cy - b.y;
+      if (Math.abs(y - b.y) > b.h) b.y = y; else b.y = a.y + (a.h + b.h) / 2 + gap;
+    });
+  });
   marks.forEach(function (m) {
-    m.g.classList.toggle('seatmap-landmark-tiny', !showMarks);
-    if (k > 1.01) m.g.setAttribute('transform', 'translate(' + m.x + ' ' + m.y + ') scale(' + spmRound(k * 100) / 100 + ') translate(' + -m.x + ' ' + -m.y + ')');
-    else m.g.removeAttribute('transform');
+    m.rect.setAttribute('x', spmRound(m.x - m.w / 2)); m.rect.setAttribute('y', spmRound(m.y - m.h / 2));
+    m.rect.setAttribute('width', spmRound(m.w)); m.rect.setAttribute('height', spmRound(m.h)); m.rect.setAttribute('rx', spmRound(m.h / 2));
+    m.text.setAttribute('x', spmRound(m.x)); m.text.setAttribute('y', spmRound(m.y));
+    m.text.style.fontSize = spmRound(m.f) + 'px'; m.text.style.letterSpacing = m.track + 'em';
+    m.g.removeAttribute('transform');
   });
 }
 function seatmapObserve(host) {
@@ -1130,7 +1293,13 @@ PanelRegistry.define('seatmap', {
     var key = model.highlight.join('|');
     var pulse = !!animate && host._spmHi !== undefined && host._spmHi !== key && model.highlight.length > 0;
     host._spmHi = key;
-    var html = seatmapHTML(panel, state, model, hid, pulse);
+    /* Hidden copies of every step's totals and legend keep the map one size
+       on every step; built once per folded history. */
+    if (host._spmStates !== states || host._spmPanel !== panel.id + ':' + model.geometryKey) {
+      host._spmStates = states; host._spmPanel = panel.id + ':' + model.geometryKey;
+      host._spmReserve = seatmapReserve(panel, states);
+    }
+    var html = seatmapHTML(panel, state, model, hid, pulse, host._spmReserve);
     var patchable = !!animate && host._spmGeom === model.geometryKey;
     host._spmGeom = model.geometryKey;
     return {
@@ -1146,7 +1315,9 @@ PanelRegistry.define('seatmap', {
   },
   styles: String.raw`
 .seatmap{font-size:11px;color:var(--dtext);min-width:0;container-type:inline-size;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A;
-  --seatmap-r1:#18345A;--seatmap-r2:#1C5A80;--seatmap-r3:#1A7896;--seatmap-r4:#2CB5D2;--seatmap-r5:#5FE3FF;
+  --seatmap-r1:#152D4B;--seatmap-r2:#193E60;--seatmap-r3:#1B5175;--seatmap-r4:#1C6084;--seatmap-r5:#1B6C8D;--seatmap-r6:#1A7896;--seatmap-r7:#27ABC9;--seatmap-r8:#47BFDB;--seatmap-r9:#61D4ED;--seatmap-r10:#7AE9FF;--seatmap-full:#C6F6FF;
+  --seatmap-w1:#2A1E1C;--seatmap-w2:#3D271C;--seatmap-w3:#50301A;--seatmap-w4:#603818;--seatmap-w5:#6D4116;--seatmap-w6:#7A4A14;--seatmap-w7:#D9922F;--seatmap-w8:#E6A44A;--seatmap-w9:#F2B762;--seatmap-w10:#FFC978;
+  --seatmap-shine:rgba(255,255,255,.5);--seatmap-base:#0E1828;--seatmap-base-line:#1D2A40;--seatmap-base-shadow:rgba(0,0,0,.5);
   --seatmap-gutter:var(--pv-surface,#0B1220);--seatmap-lbl:#FFFFFF;--seatmap-lbl-dark:#0B1220;--seatmap-hover:#8DA2C6;
   --seatmap-sel:#EAF2FF;--seatmap-sel-ring:rgba(56,225,255,.45);--seatmap-raise:rgba(0,0,0,.6);--seatmap-unknown:#2E4466;--seatmap-unknown-fill:rgba(16,26,44,.6);
   --seatmap-hold:#FFB454;--seatmap-hold-bg:color-mix(in srgb,#FFB454 16%,#0B1220);--seatmap-hold-lbl:#EAF2FF;--seatmap-hold-halo:#0B1220;--seatmap-warn-ink:#EEC16A;
@@ -1158,7 +1329,9 @@ PanelRegistry.define('seatmap', {
   --seatmap-num:'Sora','IBM Plex Sans',sans-serif;--seatmap-sans:'IBM Plex Sans',sans-serif;--seatmap-lbl-font:'IBM Plex Sans',sans-serif;--seatmap-radius:999px;--seatmap-sw-radius:3px}
 .sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .sk-daylight .seatmap,.sk-pastel .seatmap,.sk-editorial .seatmap{--seatmap-label-on:#FFFFFF;
-  --seatmap-r1:#D9DFF7;--seatmap-r2:#B4C0EF;--seatmap-r3:#8796E0;--seatmap-r4:#5566C8;--seatmap-r5:#3F4FAE;
+  --seatmap-r1:#E1E6F8;--seatmap-r2:#D1D8F5;--seatmap-r3:#C1CBF2;--seatmap-r4:#B1BDEE;--seatmap-r5:#A1AEE8;--seatmap-r6:#919FE3;--seatmap-r7:#5A6ACB;--seatmap-r8:#4E5EBE;--seatmap-r9:#4352B0;--seatmap-r10:#3846A3;--seatmap-full:#27327A;
+  --seatmap-w1:#FBEDE5;--seatmap-w2:#F8E0D3;--seatmap-w3:#F6D3C1;--seatmap-w4:#F3C6AE;--seatmap-w5:#EFB89B;--seatmap-w6:#ECAA87;--seatmap-w7:#B4532E;--seatmap-w8:#A24827;--seatmap-w9:#903E1F;--seatmap-w10:#7E3418;
+  --seatmap-shine:rgba(255,255,255,.34);--seatmap-base:#F5F7FB;--seatmap-base-line:#E6EBF3;--seatmap-base-shadow:rgba(36,50,74,.10);
   --seatmap-gutter:var(--pv-surface,#FFFFFF);--seatmap-lbl:#24324A;--seatmap-hover:#5F6C84;
   --seatmap-sel:#24324A;--seatmap-sel-ring:rgba(82,99,185,.32);--seatmap-raise:rgba(36,50,74,.32);--seatmap-unknown:#C9D2E1;--seatmap-unknown-fill:#F6F8FC;
   --seatmap-hold:#B07A2A;--seatmap-hold-bg:#FDF1DC;--seatmap-hold-lbl:#24324A;--seatmap-hold-halo:#FDF1DC;--seatmap-warn-ink:#865B06;
@@ -1174,7 +1347,8 @@ body.sk-editorial .seatmap{--seatmap-gutter:#FFFDF8}
 body.sk-terminal .seatmap{--seatmap-gutter:var(--tm-ground,#0B1220)}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-paper,#FFFFFF)}
 .sk-blueprint .seatmap{--seatmap-label-on:#052956;
-  --seatmap-r1:color-mix(in srgb,#7FE3FF 10%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 20%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 32%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 66%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 90%,#052956);
+  --seatmap-r1:color-mix(in srgb,#7FE3FF 7%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 11%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 15%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 19%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 24%,#052956);--seatmap-r6:color-mix(in srgb,#7FE3FF 29%,#052956);--seatmap-r7:color-mix(in srgb,#7FE3FF 62%,#052956);--seatmap-r8:color-mix(in srgb,#7FE3FF 70%,#052956);--seatmap-r9:color-mix(in srgb,#7FE3FF 78%,#052956);--seatmap-r10:color-mix(in srgb,#7FE3FF 86%,#052956);--seatmap-full:#C9F3FF;--seatmap-w1:var(--seatmap-r1);--seatmap-w2:var(--seatmap-r2);--seatmap-w3:var(--seatmap-r3);--seatmap-w4:var(--seatmap-r4);--seatmap-w5:var(--seatmap-r5);--seatmap-w6:var(--seatmap-r6);--seatmap-w7:var(--seatmap-r7);--seatmap-w8:var(--seatmap-r8);--seatmap-w9:var(--seatmap-r9);--seatmap-w10:var(--seatmap-r10);
+  --seatmap-shine:rgba(255,255,255,.4);--seatmap-base:transparent;--seatmap-base-line:rgba(127,227,255,.35);--seatmap-base-shadow:transparent;
   --seatmap-gutter:var(--pv-surface,#052956);--seatmap-lbl:#F7FCFF;--seatmap-lbl-dark:#052956;--seatmap-hover:#7FE3FF;
   --seatmap-sel:#F7FCFF;--seatmap-sel-ring:rgba(127,227,255,.45);--seatmap-raise:rgba(0,0,0,.45);--seatmap-unknown:#4FA9C3;--seatmap-unknown-fill:transparent;
   --seatmap-hold:#FFD166;--seatmap-hold-bg:color-mix(in srgb,#FFD166 16%,#052956);--seatmap-hold-lbl:#F7FCFF;--seatmap-hold-halo:#052956;--seatmap-warn-ink:#FFD166;
@@ -1194,9 +1368,21 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-stat-pct{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:center}
 .seatmap-stat-pct>b,.seatmap-stat-pct>span{grid-column:2}
 .seatmap-gauge{grid-column:1;grid-row:1 / span 2;width:30px;height:30px;overflow:visible}
-.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r1);stroke-width:4}
-.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r4);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1)}
+.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r2);stroke-width:4}
+.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r8);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1),stroke-opacity .2s ease}
+.seatmap-gauge-zero{stroke-opacity:0}
+.seatmap-sellout .seatmap-gauge-arc{stroke:var(--seatmap-full)}
 .seatmap-svg{display:block;width:100%;height:auto;overflow:visible}
+/* Live block over hidden copies from the other steps (seatmapStack). */
+.seatmap-stack{display:grid}.seatmap-stack>*{grid-area:1 / 1;min-width:0}
+.seatmap-ghost{visibility:hidden;pointer-events:none}
+.seatmap-head{margin:0 0 3px}.seatmap-head>.seatmap-totals{margin:0;align-self:end}
+.seatmap-foot{min-width:0}
+.seatmap-base{fill:var(--seatmap-base);stroke:var(--seatmap-base);stroke-width:18;stroke-linejoin:round;filter:drop-shadow(0 6px 10px var(--seatmap-base-shadow))}
+.seatmap-base-hull{stroke-width:22}
+.sk-blueprint .seatmap-base{fill:none;stroke:var(--seatmap-base-line);stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke;filter:none}
+.seatmap-shine{pointer-events:none}
+.seatmap-shine-a{stop-color:var(--seatmap-shine);stop-opacity:1}.seatmap-shine-b{stop-color:var(--seatmap-shine);stop-opacity:0}
 /* In a fixed-size layout tile the map letterboxes into the space left by the
    totals and legend instead of overflowing the tile (the bowl's aspect is
    taller than the tile's body aspect on several pages). */
@@ -1220,6 +1406,12 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-fill{stroke:var(--seatmap-gutter);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;transition:fill .42s cubic-bezier(.2,.7,.2,1),stroke .12s ease}
 .seatmap-sec:hover .seatmap-fill{stroke:var(--seatmap-hover)}
 .seatmap-tier{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow))}
+/* A step's colour changes ripple outward from the field, ring by ring. */
+.seatmap-tier:nth-child(2) .seatmap-fill{transition-delay:60ms,0s}.seatmap-tier:nth-child(3) .seatmap-fill{transition-delay:120ms,0s}.seatmap-tier:nth-child(4) .seatmap-fill{transition-delay:180ms,0s}
+@media (prefers-reduced-motion:no-preference){
+  .seatmap-cheer .seatmap-tier{animation:seatmap-cheer .6s cubic-bezier(.2,.7,.2,1) both}
+  .seatmap-cheer .seatmap-tier:nth-child(2){animation-delay:80ms}.seatmap-cheer .seatmap-tier:nth-child(3){animation-delay:160ms}.seatmap-cheer .seatmap-tier:nth-child(4){animation-delay:240ms}}
+@keyframes seatmap-cheer{0%,100%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1)}40%{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow)) brightness(1.22)}}
 .seatmap-rows{fill:none;stroke:var(--seatmap-row,var(--seatmap-gutter));stroke-opacity:var(--seatmap-row-o);stroke-width:.75;vector-effect:non-scaling-stroke;pointer-events:none}
 .seatmap-unknown .seatmap-rows{display:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-moved .seatmap-fill{animation:seatmap-moved .7s cubic-bezier(.2,.7,.2,1)}}
@@ -1232,8 +1424,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-lbl-on{fill:var(--seatmap-label-on)}.seatmap-lbl-dark{fill:var(--seatmap-lbl-dark)}.seatmap-lbl-light{fill:#FFFFFF}
 .seatmap-held .seatmap-lbl{fill:var(--seatmap-hold-lbl);paint-order:stroke;stroke:var(--seatmap-hold-halo);stroke-width:3px;stroke-linejoin:round}
 .seatmap-lbl-tiny{display:none}
-.seatmap-ringtag{display:none;font-family:var(--seatmap-sans);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-anchor:middle;fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round;pointer-events:none}
-.seatmap-sparse .seatmap-ringtag{display:inline}
+.seatmap-sec .seatmap-lbl-halo{fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round}
 .seatmap-outline-halo{fill:none;stroke:var(--seatmap-gutter);stroke-width:6.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 3px 4px var(--seatmap-raise))}
 .seatmap-outline{fill:none;stroke:var(--seatmap-sel);stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-pulse .seatmap-outline-halo{animation:seatmap-pulse .7s cubic-bezier(.16,1,.3,1)}}
@@ -1252,18 +1443,18 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend small,.seatmap-rings small{font-size:10.5px;font-weight:600;color:var(--seatmap-muted);margin-left:4px}
 .seatmap-sw{display:inline-block;flex:none;width:10px;height:10px;border-radius:var(--seatmap-sw-radius);margin-right:6px;background:var(--seatmap-r4);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18)}
 .seatmap-sw-low{background:var(--seatmap-r1)}
-.seatmap-sw-high{background:var(--seatmap-r5)}
+.seatmap-sw-high{background:var(--seatmap-r10)}
 .seatmap-sw-hold{background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 4px);box-shadow:inset 0 0 0 1px var(--seatmap-hold)}
 .seatmap-sw-unknown{background:var(--seatmap-unknown-fill);box-shadow:none;border:1px dashed var(--seatmap-unknown);box-sizing:border-box}
 .seatmap-key{gap:6px}
-.seatmap-scale{position:relative;display:inline-block;flex:none;width:136px;height:18px}
-.seatmap-scale-plain{height:8px}
+.seatmap-scale{position:relative;display:inline-block;flex:none;width:160px;height:18px}
 .seatmap-bins{position:absolute;left:0;right:0;top:1px;height:6px;display:flex;gap:1px;border-radius:var(--seatmap-radius);overflow:hidden}
-.seatmap-scale-plain .seatmap-bins{top:0}
 .seatmap-bins>i{flex:1 1 0;box-shadow:inset 0 0 0 1px rgba(36,50,74,.06)}
 .seatmap-ticks>i{position:absolute;top:9px;font:600 10px/10px var(--seatmap-sans);font-style:normal;letter-spacing:0;color:var(--seatmap-muted);transform:translateX(-50%)}
-.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:20%}.seatmap-ticks>i:nth-child(3){left:40%}
-.seatmap-ticks>i:nth-child(4){left:60%}.seatmap-ticks>i:nth-child(5){left:80%}.seatmap-ticks>i:nth-child(6){left:auto;right:0;transform:none}
+.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:50%}.seatmap-ticks>i:nth-child(3){left:auto;right:0;transform:none}
+.seatmap-ticks-words>i{letter-spacing:.06em;text-transform:uppercase}
+.seatmap-sw-full{background:var(--seatmap-full);box-shadow:inset 0 0 0 1px rgba(36,50,74,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.seatmap-out{display:inline-flex;align-items:center;height:16px;margin-left:7px;padding:0 7px;border-radius:var(--seatmap-radius);background:var(--seatmap-full);color:var(--seatmap-label-on);font:700 10px/1 var(--seatmap-sans);font-style:normal;letter-spacing:.08em;text-transform:uppercase}
 .seatmap-caret{position:absolute;top:-1px;width:2px;height:10px;margin-left:-1px;border-radius:1px;background:var(--seatmap-ink);box-shadow:0 0 0 1.5px var(--seatmap-gutter);transition:left .42s cubic-bezier(.2,.7,.2,1)}
 .seatmap-range{color:var(--seatmap-text)}
 .seatmap-ring-bar{display:inline-flex;flex:none;width:34px;height:6px;margin-right:7px;border-radius:var(--seatmap-radius);overflow:hidden;background:var(--seatmap-track);box-shadow:inset 0 0 0 1px var(--seatmap-track-line)}
@@ -1274,6 +1465,7 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-legend>.seatmap-zones,.seatmap-rings>.seatmap-zones{display:inline;white-space:normal}
 .seatmap-zones small{margin-left:0}
 .sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-sw,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-bins>i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.sk-blueprint .seatmap-out{background:transparent;color:#7FE3FF;box-shadow:inset 0 0 0 1px #7FE3FF;font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:10.5px;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat>span,.sk-blueprint .seatmap-mode b,.sk-blueprint .seatmap-landmark text{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat b{font-weight:700;font-size:19px;letter-spacing:0}
 .sk-blueprint .seatmap-mode b{background:transparent;box-shadow:inset 0 0 0 1px var(--seatmap-chip-ink)}
@@ -1283,8 +1475,8 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .sk-blueprint .seatmap-gauge{border-radius:50%;box-shadow:inset 0 0 0 1px #4FA9C3}
 .sk-blueprint .seatmap-tier{filter:none}
 .sk-blueprint .seatmap-unknown .seatmap-fill{stroke:var(--seatmap-unknown)}
-@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}}
-@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}.seatmap-outline-halo,.seatmap-tier{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}}
+@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill,.seatmap-cheer .seatmap-tier{animation:none}.seatmap-outline-halo,.seatmap-tier,.seatmap-base{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `,
   authoring: {
     initialFields: true,

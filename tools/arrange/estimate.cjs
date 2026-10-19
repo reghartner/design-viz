@@ -107,6 +107,14 @@ function panelSize(p,s,width,layout={}){
  case 'cost':h=430+rows(p.components||p.items||p.metrics||p.options)+lines(p.assumptions,inner,12)*18;break;
  case 'budget':h=170+rows(p.categories||p.items||p.components);break;
  case 'timeline':h=80+rows(p.events||s.events||p.items);break;
+ case 'funnel':{
+  // Each stage includes a bar and may include a separate drop/growth line.
+  // The footer must remain visible in a composed teaching panel.
+  h=52+Math.min(12,(p.stages||[]).length)*46;break;}
+ case 'grid':{
+  // The native value matrix caps its inner scroll region at 420px.
+  const complete=54+Math.min(12,(p.rows||[]).length)*34;
+  h=Math.min(420,complete);scroll=complete>420;break;}
  case 'waterfall':h=70+rows(p.rows||p.spans||p.items||s.items);break;
  case 'replicas':h=85+Math.min(480,(p.replicas||[]).reduce((n,r)=>n+155+lines(s.replicas?.[r.id]?.series,inner,11)*17,0));break;
  case 'tiles':h=Math.ceil((p.tiles||p.items||[]).length/Math.max(1,Math.floor(inner/130)))*85;break;

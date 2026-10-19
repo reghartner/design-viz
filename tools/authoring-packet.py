@@ -9,6 +9,7 @@ metadata to stderr. Selections union with inference; they never narrow a spec.
 import argparse
 import hashlib
 import json
+import os
 import posixpath
 import re
 import subprocess
@@ -224,6 +225,8 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     routes.update(path for feature in features for path in ROUTES.get(feature, []))
     # The maintained route table gives examples without embedding the cookbook.
     routes.add('cookbook/README.md')
+    if panels & {'grid', 'funnel'}:
+        routes.add('cookbook/data-panels.md')
     for package in enabled_packages(ROOT):
         manifest = json.loads((ROOT / 'packages' / package / 'package.json').read_text())
         for panel in panels:
@@ -254,9 +257,15 @@ def main():
     parser.add_argument('--feature', choices=sorted(FEATURES), action='append', default=[])
     parser.add_argument('--mode', choices=['new', 'edit'], default='new')
     parser.add_argument('--spec', type=Path)
+    parser.add_argument('--config', type=Path, help='site config for package selection in a source checkout')
     parser.add_argument('--out', type=Path)
     args = parser.parse_args()
     try:
+        if args.config:
+            if not (ROOT / 'tools/source-loader.cjs').is_file():
+                raise ValueError('--config is available only in a source checkout; this kit has a fixed package selection')
+            os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
+            os.environ['FLOWVIEW_SITE_CONFIG'] = str(args.config.resolve())
         if args.out and args.spec and args.out.resolve() in (args.spec.resolve(),):
             raise ValueError('Output must not overwrite the input spec')
         document, metadata = generate(args.panel, args.feature, args.mode, json.loads(args.spec.read_text()) if args.spec else None)

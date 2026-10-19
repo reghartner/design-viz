@@ -28,8 +28,16 @@ unselected packages are absent from the generated outputs and authoring context.
 An optional `"packages"` list in `workbench/site.json` (or the file passed with
 `--config`) overrides the company list for that site. Use `[]` for a core-only
 site; omit the field to inherit the company list. `--package NAME` adds a
-package to the effective selection for a local preview.
+package to the effective selection for a local preview. Generic `grid` and
+`funnel` panels remain in the core catalog. Selecting sports alone never pulls
+in science panels, examples or biology guidance.
 For a local preview, use `python3 tools/build.py --package science --package sports`.
+When authoring against an external site config, pass the same file to the
+repository tools: `node tools/validate.js --config path/to/site.json story.json`
+and `python3 tools/authoring-packet.py --config path/to/site.json --panel cellscene`.
+Use `python3 tools/widget_doc.py --config path/to/site.json cellscene` for a
+single panel's contract under that same selection.
+The downloaded offline kit already carries the selected package context.
 Each package has its own manifest, panel contracts, examples, and recipes under
 `packages/<name>/`. See the [science guide](../packages/science/README.md) and
 [sports guide](../packages/sports/README.md).

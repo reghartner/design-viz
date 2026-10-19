@@ -103,3 +103,27 @@ test('optional science package is absent by default and registered only after ex
   assert.notEqual(unknown.status,0);
   assert.match(unknown.stderr,/Cannot read package unknown/);
 });
+
+test('generic grid and funnel remain core while domain packages stay optional',()=>{
+  const cli=(args,selected='')=>execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),...args],{
+    encoding:'utf8',maxBuffer:32*1024*1024,
+    env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:selected}
+  });
+  const cases=[
+    {selection:'',packages:[],domain:[]},
+    {selection:'science',packages:['science'],domain:['science']},
+    {selection:'sports',packages:['sports'],domain:['sports']},
+    {selection:'science,sports',packages:['science','sports'],domain:['science','sports']},
+  ];
+  for(const {selection,packages,domain} of cases){
+    assert.deepEqual(JSON.parse(cli(['--packages'],selection)),packages,selection);
+    const files=JSON.parse(cli(['--files','validator.js'],selection));
+    const assets=JSON.parse(cli(['--assets'],selection));
+    for(const type of ['funnel','grid']){
+      assert.equal(files.filter(file=>file==='panels/types/'+type+'.js').length,1,selection+' '+type);
+      assert.equal(Object.hasOwn(assets.features,'panel.'+type),true,selection+' '+type);
+    }
+    assert.equal(files.some(file=>file.startsWith('@package/science/')),domain.includes('science'),selection);
+    assert.equal(files.some(file=>file.startsWith('@package/sports/')),domain.includes('sports'),selection);
+  }
+});

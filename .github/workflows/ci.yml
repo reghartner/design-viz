@@ -70,7 +70,7 @@ jobs:
       - name: Verify opt-in science stories and starter filter on desktop
         env:
           FLOWVIEW_PACKAGES: science
-        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs science-story-controls.spec.mjs sequence-panels.spec.mjs welcome-navigation.spec.mjs --grep 'keeps controls in view|sequencing walkthrough drives|Start new project filters'
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs science-story-controls.spec.mjs sequence-panels.spec.mjs welcome-navigation.spec.mjs showcase-desktop.spec.mjs --grep 'keeps controls in view|sequencing walkthrough drives|Start new project filters|science showcase'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -103,7 +103,7 @@ jobs:
       - name: Verify opt-in venue story controls on desktop
         env:
           FLOWVIEW_PACKAGES: sports
-        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs sports-step-rail.spec.mjs
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs sports-step-rail.spec.mjs showcase-desktop.spec.mjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

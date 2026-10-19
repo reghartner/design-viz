@@ -555,6 +555,32 @@ function cellsceneModel(panel, state) {
     } else { var a = anchor(v.from); x = a.x; y = a.y; }
     return { id: id, from: v.from, x: mechNum(x), y: mechNum(y), r: mechNum(r), items: v.items.slice() };
   });
+  /* ---- presentation geometry (pure decoration; it carries no meaning) ----
+     Membrane distance: signed distance of a point from the whole cell's
+     membrane (+ outside) and the outward normal there; null once divided. */
+  var mem = cell && !divided ? function (x, y) {
+    var ux = (x - cell.x) / cell.rx, uy = (y - cell.y) / cell.ry, rho = Math.sqrt(ux * ux + uy * uy);
+    if (rho < 1e-6) return { dist: -Math.min(cell.rx, cell.ry), nx: 0, ny: -1 };
+    var r = Math.sqrt((x - cell.x) * (x - cell.x) + (y - cell.y) * (y - cell.y));
+    var gx = (x - cell.x) / (cell.rx * cell.rx), gy = (y - cell.y) / (cell.ry * cell.ry), gl = Math.sqrt(gx * gx + gy * gy) || 1;
+    return { dist: r * (1 - 1 / rho), nx: gx / gl, ny: gy / gl };
+  } : null;
+  /* One accent owns "now": the pool and full glow go to the last-declared
+     visible active item; other active and bound items keep an outline. */
+  var lead = null;
+  items.forEach(function (it) { it.lead = false; if (it.visible && it.state === 'active') lead = it; });
+  if (lead) lead.lead = true;
+  /* A membrane protein (a single, non-round protein-like item resting on
+     or in the membrane) gets a transmembrane barrel through the bilayer and
+     a small inner domain, so pumps and channels visibly span it. */
+  items.forEach(function (it) {
+    it.span = null;
+    if (!mem || !it.visible || it.cluster || it.shape === 'dot' || it.shape === 'spiky' || it.shape === 'lobes' || ['protein', 'enzyme', 'cap', 'polymerase'].indexOf(it.role) < 0) return;
+    var mi = mem(it.x, it.y);
+    if (mi.dist < -4 || mi.dist - it.h / 2 > 8 || mi.dist > 40) return;
+    var len = mechNum(Math.max(mi.dist + 12, it.h / 2 + 7)), bw = mechNum(Math.min(Math.max(it.w * 0.56, 7), 24));
+    it.span = { len: len, w: bw, angle: mechNum((Math.atan2(-mi.ny, -mi.nx) * 180) / Math.PI - 90), nx: mechNum(-mi.nx * 1000) / 1000, ny: mechNum(-mi.ny * 1000) / 1000 };
+  });
   var zoom = null, zc = typeof state.zoom === 'string' ? byId[state.zoom] : null;
   if (zc && zc.kind !== 'outside') {
     var bx, by, bw, bh;
@@ -579,6 +605,88 @@ function cellsceneModel(panel, state) {
     var p = mechXY(l.at);
     return p ? { x: p.x, y: p.y, text: l.text } : null;
   }).filter(Boolean);
+  /* Label placement (pure presentation): each label keeps its usual spot
+     unless that spot overlaps a body, another label, a callout or the
+     bilayer; then it tries the next candidate, else keeps the first. A
+     label is anchored at a body edge (`ex`, `ey`, scene units) plus a gap
+     (`gx`, `gy`) that counter-scales with the text, so labels hug their
+     items when the camera zooms. Boxes are estimates: 10 px caps, about 7
+     units a character, with a margin. */
+  var taken = [{ x1: 0, y1: 0, x2: MECH_SCENE.w, y2: 41 }];
+  labels.forEach(function (l) { var w = l.text.length * 6.4 + 14; taken.push({ x1: l.x - w / 2, y1: l.y - 10, x2: l.x + w / 2, y2: l.y + 9 }); });
+  comps.forEach(function (c) {
+    var g = geom[c.id];
+    if ((c.kind === 'organelle' || c.kind === 'vesicle' || c.kind === 'nucleus') && !(divided && c.kind === 'nucleus'))
+      taken.push({ x1: g.x - g.rx, y1: g.y - g.ry, x2: g.x + g.rx, y2: g.y + g.ry, comp: c.id });
+  });
+  items.forEach(function (it) {
+    if (!it.visible) return;
+    var hw = it.cluster ? it.reach : it.w / 2, hh = it.cluster ? it.reach * 0.82 : it.h / 2;
+    taken.push({ x1: it.x - hw, y1: it.y - hh, x2: it.x + hw, y2: it.y + hh, item: it.id });
+  });
+  function textBox(x, y, text, anchorMode) {
+    var w = String(text || '').length * 7 + 4, x1 = anchorMode === 'start' ? x - 2 : anchorMode === 'end' ? x - w + 2 : x - w / 2;
+    return { x1: x1, y1: y - 11, x2: x1 + w, y2: y + 4 };
+  }
+  function hits(box, skip) {
+    return taken.filter(function (t) { return (!skip || (t.item !== skip && t.comp !== skip)) && box.x1 < t.x2 && box.x2 > t.x1 && box.y1 < t.y2 && box.y2 > t.y1; }).length;
+  }
+  /* How badly a box sits on the bilayer: sample points inside its band,
+     plus one when the box straddles it. */
+  function onMembrane(box) {
+    if (!mem) return 0;
+    var pts = [[box.x1, box.y1], [box.x2, box.y1], [box.x1, box.y2], [box.x2, box.y2], [(box.x1 + box.x2) / 2, box.y1], [(box.x1 + box.x2) / 2, box.y2]];
+    var inside = 0, near = 0;
+    for (var i = 0; i < pts.length; i++) { var d = mem(pts[i][0], pts[i][1]).dist; if (Math.abs(d) < 6) near++; if (d < 0) inside++; }
+    return near + (inside > 0 && inside < pts.length ? 1 : 0);
+  }
+  function cost(box, skip) { return hits(box, skip) * 3 + onMembrane(box) * 4; }
+  /* The first candidate with the lowest cost (a free spot costs 0). */
+  function best(cands, boxOf, skip) {
+    var pick = cands[0], low = Infinity;
+    cands.forEach(function (c) { var k = cost(boxOf(c), skip); if (k < low) { low = k; pick = c; } });
+    return pick;
+  }
+  /* Steps a label point inward (toward the cell centre) until its box
+     clears the bilayer; the original point when that never happens. */
+  function inward(x, y, text) {
+    if (!mem) return { x: x, y: y };
+    for (var k = 0, px = x, py = y; k < 6; k++) {
+      if (!onMembrane(textBox(px, py, text))) return { x: mechNum(px), y: mechNum(py) };
+      var mi = mem(px, py); px -= mi.nx * 7; py -= mi.ny * 7;
+    }
+    return { x: x, y: y };
+  }
+  var compLabels = Object.create(null);
+  function placeComp(c, cands) {
+    var pick = best(cands, function (pt) { return textBox(pt.x, pt.y, c.label); }, c.id);
+    compLabels[c.id] = { x: mechNum(pick.x), y: mechNum(pick.y) };
+    taken.push(textBox(pick.x, pick.y, c.label));
+  }
+  comps.forEach(function (c) {
+    var g = geom[c.id];
+    if (c.kind === 'cell' && !divided) placeComp(c, [{ x: c.x, y: c.y - c.ry + 28 }, { x: c.x, y: c.y - c.ry + 21 }, { x: c.x, y: c.y + c.ry - 20 }]);
+    else if (c.kind === 'region' && !divided) placeComp(c, [inward(g.x, g.y - 26, c.label)]);
+    else if (c.kind === 'nucleus' && !divided) placeComp(c, [{ x: g.x, y: g.y + g.rx + 16 }, { x: g.x, y: g.y - g.rx - 8 }, { x: g.x, y: g.y + g.rx - 12 }]);
+    else if (c.kind === 'organelle' || c.kind === 'vesicle') placeComp(c, [{ x: g.x, y: g.y + g.ry + 14 }, { x: g.x, y: g.y - g.ry - 8 }, inward(g.x, g.y + g.ry + 14, c.label)]);
+  });
+  items.forEach(function (it) {
+    var hh = it.cluster ? it.reach * 0.82 : it.h / 2;
+    it.lab = { ex: 0, ey: it.reach, gx: 0, gy: 13 };
+    if (!it.visible || !it.label) return;
+    var cands = [];
+    if (it.span) cands.push({ ex: mechNum(it.span.nx * it.span.len), ey: mechNum(it.span.ny * it.span.len), gx: mechNum(it.span.nx * 14), gy: mechNum(it.span.ny * 14 + 3.5) });
+    var hw = it.cluster ? it.reach : it.w / 2;
+    cands.push({ ex: 0, ey: it.reach, gx: 0, gy: 13 }, { ex: 0, ey: mechNum(-hh), gx: 0, gy: -7 },
+      { ex: mechNum(hw), ey: 0, gx: 6, gy: 3.5, a: 'start' }, { ex: mechNum(-hw), ey: 0, gx: -6, gy: 3.5, a: 'end' });
+    it.lab = best(cands, function (c) { return textBox(it.x + c.ex + c.gx, it.y + c.ey + c.gy, it.label, c.a); }, it.id);
+    taken.push(textBox(it.x + it.lab.ex + it.lab.gx, it.y + it.lab.ey + it.lab.gy, it.label, it.lab.a));
+  });
+  vesicleList.forEach(function (v) {
+    var cands = [{ ex: 0, ey: -v.r, gx: 0, gy: -5, a: 'middle' }, { ex: -v.r, ey: 0, gx: -6, gy: 3.5, a: 'end' }, { ex: v.r, ey: 0, gx: 6, gy: 3.5, a: 'start' }, { ex: 0, ey: v.r, gx: 0, gy: 14, a: 'middle' }];
+    v.lab = best(cands, function (c) { return textBox(v.x + c.ex + c.gx, v.y + c.ey + c.gy, 'vesicle', c.a); });
+    taken.push(textBox(v.x + v.lab.ex + v.lab.gx, v.y + v.lab.ey + v.lab.gy, 'vesicle', v.lab.a));
+  });
   function boundaryFor(id, point) {
     var c = byId[id], hops = 0;
     while (c && hops++ < CELLSCENE_MAX_COMPARTMENTS) {
@@ -607,7 +715,7 @@ function cellsceneModel(panel, state) {
     } else if (ev.kind === 'fuse') {
       var fused = (Array.isArray(ev.items) ? ev.items : []).map(function (id) { return itemById[id]; }).filter(Boolean);
       var centre = fused.length ? fused[0] : anchor(ev.with), f = boundaryFor(ev.with, centre);
-      transients.push({ kind: 'cross', x: f.x, y: f.y, delay: 250 });
+      transients.push({ kind: 'cross', x: f.x, y: f.y, delay: 250, vesicle: ev.vesicle });
     } else if (ev.kind === 'divide' && divided) { hasDivide = true; transients.push({ kind: 'divide', x: cell.x, y: cell.y }); }
   });
   var legend = items.filter(function (it) { return decl.legendMode !== 'visible' || it.visible; }).map(function (it) {
@@ -624,7 +732,7 @@ function cellsceneModel(panel, state) {
   return {
     scene: MECH_SCENE, title: decl.label || 'cell scene', caption: mechText(state.caption, 90), compartments: comps, geom: geom, cell: cell, nucleus: nucleus,
     divided: divided, daughters: daughters, items: items, vesicles: vesicleList, zoom: zoom, highlight: highlight, labels: labels, readableLabels: decl.labelMode === 'readable',
-    transients: transients, legend: legend, aria: aria, hasDivide: hasDivide, uid: mechUid(panel),
+    transients: transients, legend: legend, aria: aria, hasDivide: hasDivide, uid: mechUid(panel), compLabels: compLabels,
   };
 }
 
@@ -638,16 +746,29 @@ function cellsceneLabelText(x, y, text, anchorMode) {
   if (!text) return '';
   return cellsceneFit(x, y, '<text class="mech-t-label" x="0" y="0" text-anchor="' + (anchorMode || 'middle') + '" aria-hidden="true">' + esc(text) + '</text>');
 }
+/* A label anchored at a body edge (scene units) with a gap that scales
+   with the text, so it hugs its body under zoom. */
+function cellsceneLabelAt(lab, text, anchorMode) {
+  if (!text) return '';
+  return cellsceneFit(lab.ex, lab.ey, '<text class="mech-t-label" x="' + mechNum(lab.gx) + '" y="' + mechNum(lab.gy) + '" text-anchor="' + (anchorMode || 'middle') + '" aria-hidden="true">' + esc(text) + '</text>');
+}
 function cellsceneMoveGroup(cls, id, x, y, inner, style) {
   return '<g class="mech-move ' + cls + '" data-id="' + esc(id) + '"' + (style || '') + '><g transform="translate(' + mechNum(x) + ' ' + mechNum(y) + ')">' + inner + '</g></g>';
 }
 function cellsceneItemBody(it, labelPosition) {
   var role = MECH_ROLES[it.role], h = '';
-  /* An active or bound item stands in a soft accent pool that keeps its
-     size under zoom-out, so the state reads even when the scene is small. */
-  if (it.state === 'active' || it.state === 'bound')
-    h += '<ellipse class="cellscene-pool cellscene-pool-' + it.state + '" rx="' + mechNum(it.reach + 5) + '" ry="' + mechNum((it.cluster ? it.reach * 0.82 : it.h / 2) + 5) + '" aria-hidden="true"/>';
+  /* The lead active item stands in a soft accent pool, so "now" reads even
+     when the scene is small; no other item gets one. */
+  if (it.lead)
+    h += '<ellipse class="cellscene-pool cellscene-pool-active" rx="' + mechNum(it.reach + 6) + '" ry="' + mechNum((it.cluster ? it.reach * 0.82 : it.h / 2) + 6) + '" aria-hidden="true"/>';
   h += '<g class="cellscene-body" style="--mf:' + role.fill + ';--me:' + role.edge + '">';
+  /* A membrane protein's transmembrane barrel and inner domain sit behind
+     its body, pointing into the cell. */
+  if (it.span) {
+    /* a clamp's barrel starts at its open mouth, leaving the ring clear */
+    var sp = it.span, r = mechNum(sp.w / 2), y0 = it.shape === 'clamp' ? mechNum(it.h / 2 - 6) : 0, d = 'M' + mechNum(-r) + ',' + y0 + 'V' + mechNum(sp.len - r) + 'A' + r + ',' + r + ' 0 0 0 ' + r + ',' + mechNum(sp.len - r) + 'V' + y0 + 'Z';
+    h += '<g class="cellscene-span" transform="rotate(' + sp.angle + ')" aria-hidden="true"><path class="cellscene-barrel" d="' + d + '"/>' + cellsceneClay(d, true) + '</g>';
+  }
   if (it.cluster) {
     it.cluster.forEach(function (o) {
       h += '<circle class="cellscene-dot" cx="' + o.dx + '" cy="' + o.dy + '" r="' + it.dotR + '" fill="' + role.fill + '" stroke="' + role.edge + '"/>' +
@@ -656,7 +777,9 @@ function cellsceneItemBody(it, labelPosition) {
     if (it.count > 30) h += cellsceneFit(0, -it.reach - 12, mechTagMarkup(0, 0, '×' + it.count, 'cellscene-count'));
   } else h += mechActorMarkup({ role: it.role, shape: it.shape, size: it.size, label: '' });
   h += '</g>';
-  if (it.label) h += cellsceneLabelText(labelPosition ? labelPosition.x : 0, labelPosition ? labelPosition.y : it.reach + 13, it.label);
+  if (it.label) h += labelPosition
+    ? cellsceneLabelText(labelPosition.x, labelPosition.y, it.label)
+    : cellsceneLabelAt(it.lab || { ex: 0, ey: it.reach, gx: 0, gy: 13 }, it.label, it.lab && it.lab.a);
   return h;
 }
 /* Readable labels can be wider than the items they describe. Keep their
@@ -706,7 +829,7 @@ function cellsceneNucleusArt(r, gap, busy) {
   [[-0.55, 0.3, 0.05, 0.62, 0.48, 0.28], [0.1, -0.58, 0.55, -0.12, 0.3, 0.42], [-0.62, -0.18, -0.2, 0.1, -0.38, 0.5]].forEach(function (q) {
     chrom += 'M' + f(q[0] * r) + ',' + f(q[1] * r) + ' Q' + f(q[2] * r) + ',' + f(q[3] * r) + ' ' + f(q[4] * r) + ',' + f(q[5] * r);
   });
-  return '<circle class="cellscene-nuc" r="' + f(r) + '"/><circle class="cellscene-nuc-env" r="' + f(r - gap) + '"/>' +
+  return '<circle class="cellscene-nuc" r="' + f(r) + '"/>' + cellsceneClay(cellsceneEllipseD(r, r)) + '<circle class="cellscene-nuc-env" r="' + f(r - gap) + '"/>' +
     (r > 14 ? (busy ? '' : '<path class="cellscene-chromatin" d="' + chrom + '" aria-hidden="true"/>') + '<path class="cellscene-pores" d="' + pores + '" aria-hidden="true"/>' +
       (busy ? '' : '<circle class="cellscene-nucleolus" cx="' + f(-r * 0.46) + '" cy="' + f(r * 0.4) + '" r="' + f(r * 0.17) + '"/>') : '');
 }
@@ -715,7 +838,7 @@ function cellsceneNucleusArt(r, gap, busy) {
 function cellsceneOrganelleArt(label, rx, ry) {
   var name = String(label || '').toLowerCase(), f = mechNum;
   if (rx < 12 || ry < 10) return null;
-  function tube(d, cls) { return '<path class="cellscene-tube-edge ' + cls + '" d="' + d + '"/><path class="cellscene-tube ' + cls + '" d="' + d + '"/>'; }
+  function tube(d, cls) { return '<path class="cellscene-tube-edge ' + cls + '" d="' + d + '"/><path class="cellscene-tube ' + cls + '" d="' + d + '"/><path class="cellscene-tube-clay ' + cls + '" d="' + d + '"/>'; }
   if (/golgi/.test(name)) {
     var gd = '', ends = '', n = 4;
     for (var i = 0; i < n; i++) {
@@ -776,6 +899,23 @@ function cellsceneOrganelleArt(label, rx, ry) {
   }
   return null;
 }
+/* A membrane as a phospholipid bilayer around one outline `d` (the
+   bilayer's mid-line): head beads on both faces, a core band and fine
+   paired tails. Every stroke is zoom-compensated in CSS, so the bilayer
+   keeps its drawn thickness when the camera zooms. */
+function cellsceneBilayer(fillD, midD) {
+  return '<path class="cellscene-cell" d="' + fillD + '"/><path class="cellscene-cell-rim" d="' + midD + '"/>' +
+    '<path class="cellscene-cell-in" d="' + midD + '"/><path class="cellscene-cell-tails" d="' + midD + '" aria-hidden="true"/>';
+}
+/* The shared soft-clay overlay (round "ball" light unless `flat`), tagged
+   so cellscene can tune its strength per part. */
+function cellsceneClay(d, flat) {
+  return '<path class="mech-clay' + (flat ? '' : ' mech-ball') + ' cellscene-clay" d="' + d + '" aria-hidden="true"/>';
+}
+function cellsceneEllipseD(rx, ry) {
+  var f = mechNum;
+  return 'M' + f(-rx) + ',0A' + f(rx) + ',' + f(ry) + ' 0 1,0 ' + f(rx) + ',0A' + f(rx) + ',' + f(ry) + ' 0 1,0 ' + f(-rx) + ',0Z';
+}
 /* Builds the scene once per render. `motion` adds glide styles, crossing
    keyframe variables and transients; the baseline omits them. */
 function cellsceneParts(model, prev, motion) {
@@ -791,12 +931,14 @@ function cellsceneParts(model, prev, motion) {
         byDaughter.forEach(function (d) {
           var from = motion && prev ? (prev.daughters && prev.daughters[d.index]) || prev.cell : null;
           scene += cellsceneMoveGroup('cellscene-daughter', 'daughter:' + d.index, d.x, d.y,
-            '<ellipse class="cellscene-cell" rx="' + d.rx + '" ry="' + d.ry + '"/><ellipse class="cellscene-cell-rim" rx="' + mechNum(Math.max(1, d.rx - 3)) + '" ry="' + mechNum(Math.max(1, d.ry - 3)) + '"/>' + '<ellipse class="cellscene-cell-in" rx="' + mechNum(Math.max(1, d.rx - 6)) + '" ry="' + mechNum(Math.max(1, d.ry - 6)) + '"/>' + cellsceneLabelText(0, d.ry + 16, 'daughter ' + d.index), mechGlideStyle(from, d));
+            cellsceneBilayer(cellsceneEllipseD(d.rx, d.ry), cellsceneEllipseD(Math.max(1, d.rx - 3), Math.max(1, d.ry - 3))) + cellsceneLabelText(0, d.ry + 16, 'daughter ' + d.index), mechGlideStyle(from, d));
         });
-      } else scene += '<path class="cellscene-cell" d="' + mechCellOutline(c.x, c.y, c.rx, c.ry, 0) + '"/>' +
-        '<path class="cellscene-cell-rim" d="' + mechCellOutline(c.x, c.y, Math.max(1, c.rx - 3), Math.max(1, c.ry - 3), 0) + '"/>' +
-        '<path class="cellscene-cell-in" d="' + mechCellOutline(c.x, c.y, Math.max(1, c.rx - 6), Math.max(1, c.ry - 6), 0) + '"/>' +
-        cellsceneLabelText(c.x, c.y - c.ry + 18, c.label);
+      } else scene += cellsceneBilayer(mechCellOutline(c.x, c.y, c.rx, c.ry, 0), mechCellOutline(c.x, c.y, Math.max(1, c.rx - 3), Math.max(1, c.ry - 3), 0)) +
+        (function (ly) {
+          /* anchored at the membrane's top or bottom so it stays put under zoom */
+          var edge = ly < c.y ? c.y - c.ry : c.y + c.ry;
+          return cellsceneLabelAt({ ex: c.x, ey: edge, gx: 0, gy: mechNum(ly - edge) }, c.label);
+        })(m.compLabels[c.id] ? m.compLabels[c.id].y : c.y - c.ry + 28);
       return;
     }
     if (c.kind === 'nucleus') {
@@ -807,15 +949,17 @@ function cellsceneParts(model, prev, motion) {
             cellsceneNucleusArt(n.r, 5, nucleusBusy(d.index)), mechGlideStyle(from, n));
         });
       } else scene += cellsceneMoveGroup('cellscene-nucleus', 'nucleus', g.x, g.y,
-        cellsceneNucleusArt(g.rx, 6, nucleusBusy(null)) + cellsceneLabelText(0, g.rx + 16, c.label), '');
+        cellsceneNucleusArt(g.rx, 6, nucleusBusy(null)) + cellsceneLabelText(m.compLabels[c.id] ? mechNum(m.compLabels[c.id].x - g.x) : 0, m.compLabels[c.id] ? mechNum(m.compLabels[c.id].y - g.y) : g.rx + 16, c.label), '');
       return;
     }
-    if (c.kind === 'region') { if (!m.divided) scene += cellsceneLabelText(g.x, g.y - 26, c.label); return; }
+    if (c.kind === 'region') { if (!m.divided) { var rl = m.compLabels[c.id] || { x: g.x, y: g.y - 26 }; scene += cellsceneLabelText(rl.x, rl.y, c.label); } return; }
     var from = motion && prev && prev.comps ? prev.comps[c.id] : null;
     var art = c.kind === 'organelle' ? cellsceneOrganelleArt(c.label, g.rx, g.ry) : null;
     scene += cellsceneMoveGroup('cellscene-comp' + (art ? ' cellscene-org-' + art.kind : ''), c.id, g.x, g.y,
       '<ellipse class="' + (c.kind === 'vesicle' ? 'cellscene-ves' : 'cellscene-org') + '" rx="' + g.rx + '" ry="' + g.ry + '"/>' +
-      (art ? art.markup : c.kind === 'organelle' && g.rx > 10 && g.ry > 10 ? '<ellipse class="cellscene-org-in" rx="' + mechNum(g.rx * 0.68) + '" ry="' + mechNum(g.ry * 0.62) + '"/>' : '') + cellsceneLabelText(0, g.ry + 14, c.label), mechGlideStyle(from, g));
+      (c.kind === 'organelle' && (!art || art.kind === 'mito' || art.kind === 'chloro') ? cellsceneClay(cellsceneEllipseD(g.rx, g.ry)) : '') +
+      (art ? art.markup : c.kind === 'organelle' && g.rx > 10 && g.ry > 10 ? '<ellipse class="cellscene-org-in" rx="' + mechNum(g.rx * 0.68) + '" ry="' + mechNum(g.ry * 0.62) + '"/>' : '') +
+      cellsceneLabelText(m.compLabels[c.id] ? mechNum(m.compLabels[c.id].x - g.x) : 0, m.compLabels[c.id] ? mechNum(m.compLabels[c.id].y - g.y) : g.ry + 14, c.label), mechGlideStyle(from, g));
   });
   /* Highlight sits above compartment fills but below item shapes and names.
      Keep it separate from the scene identity so highlight-only steps patch. */
@@ -827,28 +971,37 @@ function cellsceneParts(model, prev, motion) {
   m.vesicles.forEach(function (v) {
     var from = motion && prev && prev.vesicles ? prev.vesicles[v.id] : null, fresh = motion && (!prev || !prev.vesicles || !prev.vesicles[v.id]);
     scene += cellsceneMoveGroup('cellscene-vesicle' + (fresh ? ' cellscene-appear' : ''), 'vesicle:' + v.id, v.x, v.y,
-      '<circle class="cellscene-ves" r="' + v.r + '"/>' + cellsceneLabelText(0, -v.r - 7, 'vesicle'), mechGlideStyle(from, v));
+      '<circle class="cellscene-ves-ko" r="' + mechNum(v.r + 1.5) + '" aria-hidden="true"/><circle class="cellscene-ves" r="' + v.r + '"/>' + cellsceneClay(cellsceneEllipseD(v.r, v.r)) +
+      cellsceneLabelAt(v.lab || { ex: 0, ey: -v.r, gx: 0, gy: -7 }, 'vesicle', v.lab ? v.lab.a : 'middle'), mechGlideStyle(from, v));
   });
   var crossing = Object.create(null);
   m.transients.forEach(function (t) { if (t.kind === 'cross' && t.item) crossing[t.item] = t; });
-  var itemLabelPositions = cellsceneItemLabelPositions(m);
+  var itemLabelPositions = m.readableLabels ? cellsceneItemLabelPositions(m) : null;
   m.items.forEach(function (it) {
     if (!it.visible) return;
-    var from = motion && prev && prev.items ? prev.items[it.id] : null, cls = 'cellscene-item cellscene-role-' + it.role + ' cellscene-st-' + it.state, style = '';
+    var from = motion && prev && prev.items ? prev.items[it.id] : null, cls = 'cellscene-item cellscene-role-' + it.role + ' cellscene-st-' + it.state + (it.lead ? ' cellscene-lead' : ''), style = '';
     if (motion && crossing[it.id]) {
       var c = crossing[it.id], start = from || c;
       cls += ' cellscene-crossing';
       style = ' style="--cs-x0:' + mechNum(start.x - it.x) + 'px;--cs-y0:' + mechNum(start.y - it.y) + 'px;--cs-x1:' + mechNum(c.x - it.x) + 'px;--cs-y1:' + mechNum(c.y - it.y) + 'px"';
     } else style = mechGlideStyle(from, it);
     if (motion && !from && !crossing[it.id] && prev) cls += ' cellscene-appear';
-    scene += cellsceneMoveGroup(cls, it.id, it.x, it.y, cellsceneItemBody(it, itemLabelPositions[it.id]), style);
+    scene += cellsceneMoveGroup(cls, it.id, it.x, it.y, cellsceneItemBody(it, itemLabelPositions && itemLabelPositions[it.id]), style);
   });
   if (motion) m.transients.forEach(function (t) {
     if (t.kind === 'divide') {
       var c = m.cell;
-      scene += '<g class="mech-transient cellscene-parent" aria-hidden="true"><path class="cellscene-cell" d="' + mechCellOutline(c.x, c.y, c.rx, c.ry, 0) + '">' +
-        '<animate attributeName="d" dur="1.1s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" values="' + mechCellOutline(c.x, c.y, c.rx, c.ry, 0) + ';' + mechCellOutline(c.x, c.y, c.rx, c.ry, 1) + '"/></path></g>';
-    } else scene += mechRipple(t.x, t.y, t.kind, t.delay);
+      var midFrom = mechCellOutline(c.x, c.y, Math.max(1, c.rx - 3), Math.max(1, c.ry - 3), 0), midTo = mechCellOutline(c.x, c.y, Math.max(1, c.rx - 3), Math.max(1, c.ry - 3), 1);
+      var morph = function (cls, a, b) { return '<path class="' + cls + '" d="' + a + '"><animate attributeName="d" dur="1.1s" fill="freeze" calcMode="spline" keySplines="0.4 0 0.2 1" values="' + a + ';' + b + '"/></path>'; };
+      scene += '<g class="mech-transient cellscene-parent" aria-hidden="true">' + morph('cellscene-cell', mechCellOutline(c.x, c.y, c.rx, c.ry, 0), mechCellOutline(c.x, c.y, c.rx, c.ry, 1)) +
+        morph('cellscene-cell-rim', midFrom, midTo) + morph('cellscene-cell-in', midFrom, midTo) + '</g>';
+    } else {
+      /* a fusing vesicle glides onto the membrane and flattens into it */
+      var was = t.vesicle && prev && prev.vesicles ? prev.vesicles[t.vesicle] : null;
+      if (was && isFiniteNum(was.r)) scene += '<g class="mech-transient cellscene-fusing" style="--fx0:' + mechNum(was.x - t.x) + 'px;--fy0:' + mechNum(was.y - t.y) + 'px" aria-hidden="true">' +
+        '<circle class="cellscene-ves" cx="' + mechNum(t.x) + '" cy="' + mechNum(t.y) + '" r="' + was.r + '"/></g>';
+      scene += mechRipple(t.x, t.y, t.kind, t.delay);
+    }
   });
   var overlay = '';
   m.labels.forEach(function (l) { overlay += cellsceneFit(l.x, l.y, mechTagMarkup(0, 0, l.text, 'cellscene-callout')); });
@@ -869,9 +1022,9 @@ function cellsceneParts(model, prev, motion) {
 function cellsceneAssemble(parts, model, state) {
   var grid = '';
   for (var gx = 20; gx < MECH_SCENE.w; gx += 40) grid += '<line class="cellscene-grid" x1="' + gx + '" y1="0" x2="' + gx + '" y2="' + MECH_SCENE.h + '"/>';
-  var svg = '<svg class="mech-frame cellscene-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '" style="' + mechDefsStyle(model.uid) + '">' +
+  var svg = '<div class="cellscene-stage"><svg class="mech-frame cellscene-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '" style="' + mechDefsStyle(model.uid) + '">' +
     mechDefsMarkup(model.uid) + grid + '<g class="cellscene-view" style="' + parts.viewStyle + '"><g class="cellscene-scene">' + parts.scene + '</g><g class="cellscene-overlay">' + parts.overlay + '</g></g>' +
-    '<g class="cellscene-hud">' + parts.hud + '</g></svg>';
+    '<g class="cellscene-hud">' + parts.hud + '</g></svg></div>';
   return '<div class="swpanel cellscene' + (model.readableLabels ? ' cellscene-readable' : '') + '">' + svg + '<div class="cellscene-foot">' + cellsceneFoot(parts, model, state) + '</div></div>';
 }
 function cellsceneFoot(parts, model, state) {
@@ -895,7 +1048,7 @@ function cellsceneRender(host, panel, state, skin, states, stepIdx, animate) {
   });
   var next = { items: {}, vesicles: {}, comps: {}, states: {}, cell: model.cell ? { x: model.cell.x, y: model.cell.y } : null, nucleus: null, daughters: null, nuclei: null };
   model.items.forEach(function (it) { if (it.visible) next.items[it.id] = { x: it.x, y: it.y }; });
-  model.vesicles.forEach(function (v) { next.vesicles[v.id] = { x: v.x, y: v.y }; });
+  model.vesicles.forEach(function (v) { next.vesicles[v.id] = { x: v.x, y: v.y, r: v.r }; });
   model.compartments.forEach(function (c) { if (c.kind !== 'cell' && c.kind !== 'outside') next.comps[c.id] = { x: model.geom[c.id].x, y: model.geom[c.id].y }; });
   if (model.nucleus && !model.divided) next.nucleus = { x: model.geom[model.nucleus.id].x, y: model.geom[model.nucleus.id].y };
   if (model.divided) {
@@ -961,22 +1114,39 @@ PanelRegistry.define('cellscene', {
   styles: String.raw`
 .cellscene{min-width:0}
 .cellscene-grid{display:none}
+/* The stage wrapper is a size container (the svg is percentage-sized, so
+   containment changes no layout): narrow panels counter-scale scene text
+   so labels stay at 10 px or more when the viewBox shrinks. */
+.cellscene-stage{container-type:inline-size}
+@container (max-width:520px){.cellscene-frame{--cs-ts:1.1}}
+@container (max-width:470px){.cellscene-frame{--cs-ts:1.2}}
+@container (max-width:430px){.cellscene-frame{--cs-ts:1.31}}
+@container (max-width:395px){.cellscene-frame{--cs-ts:1.42}}
+@container (max-width:365px){.cellscene-frame{--cs-ts:1.54}}
+@container (max-width:340px){.cellscene-frame{--cs-ts:1.66}}
 .cellscene-view{transform-box:view-box;transform-origin:0 0;transition:transform .7s cubic-bezier(.2,.7,.2,1)}
-.cellscene-fit{transform:scale(calc(1 / var(--cs-zoom,1)))}
-.cellscene-org-in,.cellscene-nuc,.cellscene-nuc-env,.cellscene-ves,.cellscene-org,.cellscene-hl,.cellscene-pool,.cellscene-chromatin,.cellscene-org-inner,.cellscene-lamella,.cellscene-granum,.cellscene-granule,.cellscene-bleb{vector-effect:non-scaling-stroke}
-.cellscene-frame{--cs-cyto:rgba(92,184,255,.075);--cs-cyto-c:rgba(92,184,255,.03);--cs-cyto-m:rgba(92,184,255,.07);--cs-cyto-e:rgba(92,184,255,.16);--cs-mem:#7C93BC;--cs-mem-in:#6F86B0;--cs-tail:rgba(124,147,188,.2);--cs-mem-glow:drop-shadow(0 0 10px rgba(92,184,255,.16));--cs-nuc:rgba(127,155,208,.17);--cs-nuc-line:#8EA6DA;--cs-nucleolus:rgba(127,155,208,.42);--cs-chromatin:rgba(141,162,198,.3);--cs-org:rgba(110,143,199,.2);--cs-org-line:#7F9FD6;--cs-ves:rgba(138,160,194,.12);--cs-ves-line:#9AB0D2;--cs-hl:#38E1FF;--cs-pool:rgba(56,225,255,.09);--cs-pool-line:rgba(56,225,255,.42);--cs-s2:#3FD0C2;--cs-s3:#FFB454;--cs-s4:#FF7A9A;--cs-s5:#B79CFF;--cs-ribo:#7ED9A0;--cs-org-fill:22%;--cs-org-base:transparent}
+.cellscene-fit{transform:scale(calc(var(--cs-ts,1) / var(--cs-zoom,1)))}
+.cellscene-org-in,.cellscene-nuc,.cellscene-nuc-env,.cellscene-ves,.cellscene-ves-ko,.cellscene-org,.cellscene-hl,.cellscene-pool,.cellscene-chromatin,.cellscene-org-inner,.cellscene-lamella,.cellscene-granum,.cellscene-granule,.cellscene-bleb,.cellscene-barrel{vector-effect:non-scaling-stroke}
+.cellscene-frame{--cs-cyto:rgba(92,184,255,.075);--cs-cyto-c:rgba(92,184,255,.03);--cs-cyto-m:rgba(92,184,255,.07);--cs-cyto-e:rgba(92,184,255,.16);--cs-mem:#7C93BC;--cs-mem-in:#6F86B0;--cs-tail:rgba(124,147,188,.2);--cs-mem-glow:drop-shadow(0 0 10px rgba(92,184,255,.16));--cs-nuc:rgba(127,155,208,.17);--cs-nuc-line:#8EA6DA;--cs-nucleolus:rgba(127,155,208,.42);--cs-chromatin:rgba(141,162,198,.3);--cs-org:rgba(110,143,199,.2);--cs-org-line:#7F9FD6;--cs-ves:rgba(138,160,194,.12);--cs-ves-line:#9AB0D2;--cs-hl:#38E1FF;--cs-pool:rgba(56,225,255,.09);--cs-pool-line:rgba(56,225,255,.42);--cs-s2:#3FD0C2;--cs-s3:#FFB454;--cs-s4:#FF7A9A;--cs-s5:#B79CFF;--cs-ribo:#7ED9A0;--cs-org-fill:22%;--cs-org-base:transparent;--cs-head:color-mix(in srgb,#FF7A9A 56%,#0E1A2E);--cs-core:color-mix(in srgb,#FF7A9A 10%,#0B1220);--cs-tailc:color-mix(in srgb,#FF7A9A 30%,#0B1220);--cs-ves-solid:#111C30}
 @media screen{
-body.sk-pastel .cellscene-frame,.sk-daylight .cellscene-frame,body.sk-editorial .cellscene-frame{--cs-cyto:#F7F9FE;--cs-cyto-c:#FFFFFF;--cs-cyto-m:#F7F9FE;--cs-cyto-e:#ECF0F8;--cs-mem:#8C9DBC;--cs-mem-in:#93A4C2;--cs-tail:#E1E7F1;--cs-mem-glow:drop-shadow(0 2px 3px rgba(36,50,74,.10)) drop-shadow(0 10px 18px rgba(36,50,74,.07));--cs-nuc:#EEF1FB;--cs-nuc-line:#8E9FD6;--cs-nucleolus:#C9D0F1;--cs-chromatin:rgba(142,159,214,.45);--cs-org:#EAF0F9;--cs-org-line:#93A8CF;--cs-ves:rgba(82,99,185,.05);--cs-ves-line:#8C9BB5;--cs-hl:#5263B9;--cs-pool:rgba(82,99,185,.10);--cs-pool-line:rgba(82,99,185,.42);--cs-s2:#2FA39A;--cs-s3:#E09A3E;--cs-s4:#D9617E;--cs-s5:#8F6FE0;--cs-ribo:#4FB57A;--cs-org-fill:13%;--cs-org-base:#fff}
+body.sk-pastel .cellscene-frame,.sk-daylight .cellscene-frame,body.sk-editorial .cellscene-frame{--cs-cyto:#F7F9FE;--cs-cyto-c:#FFFFFF;--cs-cyto-m:#F5F8FC;--cs-cyto-e:#E4EBF7;--cs-head:color-mix(in srgb,#E9A07C 82%,#D3714A);--cs-core:#FBEDE5;--cs-tailc:#F4CDB8;--cs-ves-solid:color-mix(in srgb,#8C9BB5 9%,#fff);--cs-mem:#8C9DBC;--cs-mem-in:#93A4C2;--cs-tail:#E1E7F1;--cs-mem-glow:drop-shadow(0 2px 3px rgba(36,50,74,.10)) drop-shadow(0 10px 18px rgba(36,50,74,.07));--cs-nuc:#EEF1FB;--cs-nuc-line:#8E9FD6;--cs-nucleolus:#C9D0F1;--cs-chromatin:rgba(142,159,214,.45);--cs-org:#EAF0F9;--cs-org-line:#93A8CF;--cs-ves:rgba(82,99,185,.05);--cs-ves-line:#8C9BB5;--cs-hl:#5263B9;--cs-pool:rgba(82,99,185,.10);--cs-pool-line:rgba(82,99,185,.42);--cs-s2:#2FA39A;--cs-s3:#E09A3E;--cs-s4:#D9617E;--cs-s5:#8F6FE0;--cs-ribo:#4FB57A;--cs-org-fill:15%;--cs-org-base:#fff}
 body.sk-pastel .cellscene-frame.cellscene-frame,.sk-daylight .cellscene-frame.cellscene-frame{--mk-halo:#F7F9FE}
-body.sk-blueprint .cellscene-frame{--cs-cyto:rgba(127,227,255,.05);--cs-cyto-c:rgba(127,227,255,.02);--cs-cyto-m:rgba(127,227,255,.04);--cs-cyto-e:rgba(127,227,255,.09);--cs-mem:#7FE3FF;--cs-mem-in:#7FE3FF;--cs-tail:rgba(127,227,255,.14);--cs-mem-glow:none;--cs-nuc:rgba(127,227,255,.08);--cs-nuc-line:#7FE3FF;--cs-nucleolus:rgba(127,227,255,.22);--cs-chromatin:rgba(127,227,255,.3);--cs-org:rgba(127,227,255,.07);--cs-org-line:#7FE3FF;--cs-ves:transparent;--cs-ves-line:#94BCD5;--cs-hl:#FFD166;--cs-pool:transparent;--cs-pool-line:rgba(127,227,255,.75);--cs-s2:#7FE3FF;--cs-s3:#7FE3FF;--cs-s4:#7FE3FF;--cs-s5:#7FE3FF;--cs-ribo:#7FE3FF;--cs-org-fill:10%;--cs-org-base:transparent}
+body.sk-blueprint .cellscene-frame{--cs-cyto:rgba(127,227,255,.05);--cs-cyto-c:rgba(127,227,255,.02);--cs-cyto-m:rgba(127,227,255,.04);--cs-cyto-e:rgba(127,227,255,.09);--cs-mem:#7FE3FF;--cs-mem-in:#7FE3FF;--cs-tail:rgba(127,227,255,.14);--cs-mem-glow:none;--cs-nuc:rgba(127,227,255,.08);--cs-nuc-line:#7FE3FF;--cs-nucleolus:rgba(127,227,255,.22);--cs-chromatin:rgba(127,227,255,.3);--cs-org:rgba(127,227,255,.07);--cs-org-line:#7FE3FF;--cs-ves:transparent;--cs-ves-line:#94BCD5;--cs-hl:#FFD166;--cs-pool:transparent;--cs-pool-line:rgba(127,227,255,.75);--cs-s2:#7FE3FF;--cs-s3:#7FE3FF;--cs-s4:#7FE3FF;--cs-s5:#7FE3FF;--cs-ribo:#7FE3FF;--cs-org-fill:10%;--cs-org-base:transparent;--cs-head:#7FE3FF;--cs-core:#04234A;--cs-tailc:transparent;--cs-ves-solid:#04234A}
 }
 .cellscene-fit>text{stroke-width:2.5px}
 .cellscene-gs-c{stop-color:var(--cs-cyto-c)}
 .cellscene-gs-m{stop-color:var(--cs-cyto-m)}
 .cellscene-gs-e{stop-color:var(--cs-cyto-e)}
-.cellscene-cell{fill:var(--mk-cytofill,var(--cs-cyto));stroke:var(--cs-mem);stroke-width:3.2;stroke-dasharray:0 4.6;stroke-linecap:round;stroke-linejoin:round;filter:var(--cs-mem-glow)}
-.cellscene-cell-rim{fill:none;stroke:var(--cs-tail);stroke-width:3.6;stroke-linejoin:round}
-.cellscene-cell-in{fill:none;stroke:var(--cs-mem-in);stroke-width:3;stroke-dasharray:0 4.4;stroke-linecap:round}
+/* The bilayer: head beads on both faces (a wide dashed stroke), a core
+   band over its middle and paired fine tails; all zoom-compensated. */
+.cellscene-cell{fill:var(--mk-cytofill,var(--cs-cyto));stroke:none;filter:var(--cs-mem-glow)}
+.cellscene-cell-rim{fill:none;stroke:var(--cs-head);stroke-width:calc(10px / var(--cs-zoom,1));stroke-dasharray:calc(2.3px / var(--cs-zoom,1)) calc(1.3px / var(--cs-zoom,1));stroke-linejoin:round}
+.cellscene-cell-in{fill:none;stroke:var(--cs-core);stroke-width:calc(5px / var(--cs-zoom,1));stroke-linejoin:round}
+.cellscene-cell-tails{fill:none;stroke:var(--cs-tailc);stroke-width:calc(4.2px / var(--cs-zoom,1));stroke-dasharray:calc(.7px / var(--cs-zoom,1)) calc(1.1px / var(--cs-zoom,1))}
+.cellscene-nucleus .cellscene-clay{opacity:.6}
+.cellscene-comp .cellscene-clay{opacity:.85}
+.cellscene-barrel{fill:color-mix(in srgb,var(--mf) 80%,var(--mk-halo));stroke:color-mix(in srgb,var(--me) 70%,var(--mf));stroke-width:1.1;stroke-linejoin:round}
+.cellscene-span{filter:var(--mk-contact)}
 .cellscene-org-in{fill:none;stroke:var(--cs-org-line);stroke-width:1;opacity:.45}
 .cellscene-nuc{fill:var(--cs-nuc);stroke:var(--cs-nuc-line);stroke-width:1.75}
 .cellscene-nuc-env{fill:none;stroke:var(--cs-nuc-line);stroke-width:1.25;opacity:.8}
@@ -984,6 +1154,8 @@ body.sk-blueprint .cellscene-frame{--cs-cyto:rgba(127,227,255,.05);--cs-cyto-c:r
 .cellscene-nucleolus{fill:var(--cs-nucleolus);stroke:color-mix(in srgb,var(--cs-nuc-line) 60%,transparent);stroke-width:1}
 .cellscene-chromatin{fill:none;stroke:var(--cs-chromatin);stroke-width:1.2;stroke-linecap:round}
 .cellscene-ves{fill:var(--cs-ves);stroke:var(--cs-ves-line);stroke-width:1.5;stroke-dasharray:3 3;stroke-linecap:round}
+.cellscene-vesicle .cellscene-ves{fill:var(--cs-ves-solid)}
+.cellscene-ves-ko{fill:none;stroke:var(--mk-halo);stroke-width:3.5}
 .cellscene-org{fill:var(--cs-org);stroke:var(--cs-org-line);stroke-width:1.5}
 .cellscene-comp{--oc:var(--cs-org-line)}
 .cellscene-org-golgi{--oc:var(--cs-s3)}
@@ -992,13 +1164,15 @@ body.sk-blueprint .cellscene-frame{--cs-cyto:rgba(127,227,255,.05);--cs-cyto-c:r
 .cellscene-org-chloro{--oc:var(--cs-s2)}
 .cellscene-org-glyco{--oc:var(--cs-s3)}
 .cellscene-org-golgi>g>.cellscene-org,.cellscene-org-er>g>.cellscene-org,.cellscene-org-glyco>g>.cellscene-org{fill:color-mix(in srgb,var(--oc) 6%,transparent);stroke:color-mix(in srgb,var(--oc) 22%,transparent);stroke-width:1;stroke-dasharray:2 4;stroke-linecap:round}
-.cellscene-org-mito>g>.cellscene-org,.cellscene-org-chloro>g>.cellscene-org{fill:color-mix(in srgb,var(--oc) var(--cs-org-fill),var(--cs-org-base));stroke:var(--oc);stroke-width:1.75}
+.cellscene-org-mito>g>.cellscene-org,.cellscene-org-chloro>g>.cellscene-org{fill:color-mix(in srgb,var(--oc) var(--cs-org-fill),var(--cs-org-base));stroke:var(--oc);stroke-width:1.75;filter:var(--mk-contact)}
 .cellscene-org-inner{fill:color-mix(in srgb,var(--oc) 7%,transparent);stroke:color-mix(in srgb,var(--oc) 60%,transparent);stroke-width:1}
 .cellscene-tube-edge{fill:none;stroke:color-mix(in srgb,var(--oc) 82%,#24324A);stroke-linecap:round;stroke-linejoin:round}
-.cellscene-tube{fill:none;stroke:color-mix(in srgb,var(--oc) 26%,var(--cs-org-base,#fff));stroke-linecap:round;stroke-linejoin:round}
-.cellscene-cis.cellscene-tube-edge{stroke-width:6.4}.cellscene-cis.cellscene-tube{stroke-width:3.8}
-.cellscene-er.cellscene-tube-edge{stroke-width:5.6}.cellscene-er.cellscene-tube{stroke-width:3.2}
-.cellscene-cristae.cellscene-tube-edge{stroke-width:4.6}.cellscene-cristae.cellscene-tube{stroke-width:2.2}
+.cellscene-tube{fill:none;stroke:color-mix(in srgb,var(--oc) 34%,var(--cs-org-base,#fff));stroke-linecap:round;stroke-linejoin:round}
+.cellscene-tube-clay{fill:none;stroke:var(--mk-clay,none);stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.cellscene-tube-edge{filter:var(--mk-contact)}
+.cellscene-cis.cellscene-tube-edge{stroke-width:6.4}.cellscene-cis:is(.cellscene-tube,.cellscene-tube-clay){stroke-width:3.8}
+.cellscene-er.cellscene-tube-edge{stroke-width:5.6}.cellscene-er:is(.cellscene-tube,.cellscene-tube-clay){stroke-width:3.2}
+.cellscene-cristae.cellscene-tube-edge{stroke-width:4.6}.cellscene-cristae:is(.cellscene-tube,.cellscene-tube-clay){stroke-width:2.2}
 .cellscene-ribo-dots{fill:none;stroke:var(--cs-ribo);stroke-width:2.8;stroke-linecap:round}
 .cellscene-bleb{fill:color-mix(in srgb,var(--oc) 26%,var(--cs-org-base,#fff));stroke:color-mix(in srgb,var(--oc) 82%,#24324A);stroke-width:1.1}
 .cellscene-lamella{fill:none;stroke:color-mix(in srgb,var(--oc) 55%,transparent);stroke-width:1.2;stroke-linecap:round}
@@ -1018,8 +1192,11 @@ body.sk-aurora:not(.sk-pastel):not(.sk-blueprint) .cellscene-granum{stroke:var(-
 body.sk-blueprint .cellscene-tube{stroke:#04234A}
 body.sk-blueprint .cellscene-tube-edge,body.sk-blueprint .cellscene-bleb,body.sk-blueprint .cellscene-granule,body.sk-blueprint .cellscene-granum{stroke:#7FE3FF}
 body.sk-blueprint .cellscene-bleb,body.sk-blueprint .cellscene-granule,body.sk-blueprint .cellscene-granum{fill:rgba(127,227,255,.14)}
-body.sk-blueprint .cellscene-cell{stroke-dasharray:none;stroke-width:1.5}
-body.sk-blueprint .cellscene-cell-in{stroke-dasharray:none;stroke-width:1;opacity:.6}
+body.sk-blueprint .cellscene-cell-rim{stroke-dasharray:none;stroke-width:calc(7px / var(--cs-zoom,1))}
+body.sk-blueprint .cellscene-cell-in{stroke-width:calc(4.2px / var(--cs-zoom,1))}
+body.sk-blueprint .cellscene-cell-tails,body.sk-blueprint .cellscene-tube-clay,body.sk-blueprint .cellscene-span .cellscene-clay{display:none}
+body.sk-blueprint .cellscene-barrel{fill:color-mix(in srgb,var(--mf) 14%,#04234A);stroke:var(--mf);stroke-width:1.5}
+body.sk-pastel .cellscene-barrel{fill:color-mix(in srgb,var(--mf) 80%,#fff);stroke:color-mix(in srgb,var(--mf) 62%,#24324A)}
 body.sk-pastel .cellscene-dot{fill:color-mix(in srgb,var(--mf) 88%,#fff);stroke:color-mix(in srgb,var(--mf) 62%,#24324A)}
 body.sk-blueprint .cellscene-dot{fill:color-mix(in srgb,var(--mf) 35%,transparent);stroke:var(--mf);filter:none}
 body.sk-blueprint .cellscene-dot-hi{display:none}
@@ -1028,26 +1205,31 @@ body.sk-pastel .cellscene-sw-membrane{background:#FBFCFF;box-shadow:inset 0 0 0 
 body.sk-pastel .cellscene-sw-nucleus{background:#EEF1FB;box-shadow:inset 0 0 0 1.5px #8E9FD6}
 body.sk-blueprint .cellscene-sw-membrane,body.sk-blueprint .cellscene-sw-nucleus{background:rgba(127,227,255,.1);box-shadow:inset 0 0 0 1.5px #7FE3FF}
 body.sk-pastel .cellscene-hl{stroke-width:2.5;stroke-dasharray:8 5;fill:color-mix(in srgb,#5263B9 5%,transparent);filter:drop-shadow(0 0 8px rgba(82,99,185,.35))}
-body.sk-pastel .cellscene-st-active .cellscene-body,body.sk-pastel .cellscene-st-bound .cellscene-body{filter:drop-shadow(0 0 1px #5263B9) drop-shadow(0 0 1px #5263B9) drop-shadow(0 0 9px rgba(82,99,185,.5))}
+body.sk-pastel .cellscene-st-active .cellscene-body,body.sk-pastel .cellscene-st-bound .cellscene-body{filter:drop-shadow(0 0 .6px #5263B9) drop-shadow(0 0 .6px #5263B9)}
+body.sk-pastel .cellscene-lead .cellscene-body{filter:drop-shadow(0 0 .8px #5263B9) drop-shadow(0 0 .8px #5263B9) drop-shadow(0 0 9px rgba(82,99,185,.5))}
 body.sk-blueprint .cellscene-pool{stroke-dasharray:3 3}
 }
 .cellscene-sw-membrane{background:rgba(92,184,255,.12);box-shadow:inset 0 0 0 1.5px #7C93BC}
 .cellscene-sw-nucleus{background:rgba(127,155,208,.22);box-shadow:inset 0 0 0 1.5px #8EA6DA}
 .cellscene-item{transform-box:fill-box;transform-origin:center}
-.cellscene-st-bound .cellscene-body,.cellscene-st-active .cellscene-body{filter:var(--mk-glow)}
+.cellscene-st-bound .cellscene-body,.cellscene-st-active .cellscene-body{filter:drop-shadow(0 0 1px color-mix(in srgb,var(--mk-acc) 85%,transparent))}
+.cellscene-lead .cellscene-body{filter:var(--mk-glow-hot)}
 .cellscene-st-released .cellscene-body{opacity:.8}
-.cellscene-t-cap{font:600 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink,var(--dtext));paint-order:stroke;stroke:var(--mk-halo,transparent);stroke-width:3.5px;stroke-linejoin:round}
+.cellscene-t-cap{transform-box:view-box;transform-origin:14px 37px;transform:translateY(calc((var(--cs-ts,1) - 1) * 13px)) scale(var(--cs-ts,1));font:600 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink,var(--dtext));paint-order:stroke;stroke:var(--mk-halo,transparent);stroke-width:3.5px;stroke-linejoin:round}
 .cellscene-readable .cellscene-fit > text{font-size:18px;letter-spacing:0}
 .cellscene-caption{margin:8px 0 4px;font-size:13px;line-height:1.4;color:var(--dtext)}
 .cellscene-foot{min-width:0}
 .cellscene-crossing{animation:cellsceneCross 1.25s cubic-bezier(.2,.7,.2,1) both}
 @keyframes cellsceneCross{0%{transform:translate(var(--cs-x0),var(--cs-y0)) scale(1)}40%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(1)}50%,60%{transform:translate(var(--cs-x1),var(--cs-y1)) scale(.65)}100%{transform:translate(0,0) scale(1)}}
-.cellscene-appear{animation:cellsceneAppear .5s cubic-bezier(.16,1,.3,1) both}
-@keyframes cellsceneAppear{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}
+.cellscene-appear{animation:cellsceneAppear .56s cubic-bezier(.16,1,.3,1) both}
+@keyframes cellsceneAppear{0%{opacity:0;transform:scale(.6)}55%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
 .cellscene-vesicle{transform-box:fill-box;transform-origin:center}
+.cellscene-fusing{transform-box:fill-box;transform-origin:center;pointer-events:none;animation:cellsceneFuse .9s cubic-bezier(.2,.7,.2,1) both}
+.cellscene-fusing .cellscene-ves{fill:var(--cs-ves-solid)}
+@keyframes cellsceneFuse{0%{transform:translate(var(--fx0),var(--fy0)) scale(1);opacity:1}55%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(0,0) scale(1.5,.12);opacity:0}}
 .cellscene-parent{animation:cellsceneParentFade 1.25s ease-in both;pointer-events:none}
 @keyframes cellsceneParentFade{0%,55%{opacity:1}100%{opacity:0}}
-@media (prefers-reduced-motion:reduce){.cellscene-view{transition:none}.cellscene-crossing,.cellscene-appear,.cellscene-parent{animation:none}}
+@media (prefers-reduced-motion:reduce){.cellscene-view{transition:none}.cellscene-crossing,.cellscene-appear,.cellscene-parent,.cellscene-fusing{animation:none}}
 @media print{.cellscene-parent{display:none}.cellscene-cell,.cellscene-nuc,.cellscene-ves,.cellscene-org{print-color-adjust:exact}}
 `,
   authoring: {

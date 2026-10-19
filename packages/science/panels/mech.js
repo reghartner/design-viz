@@ -149,7 +149,7 @@ function mechDefsMarkup(uid) {
   return '<defs aria-hidden="true">' +
     '<linearGradient id="' + uid + '-clay" x1="0" y1="0" x2="0" y2="1"><stop class="mech-gs-top" offset="0"/><stop class="mech-gs-mid" offset=".48"/><stop class="mech-gs-low" offset="1"/></linearGradient>' +
     '<radialGradient id="' + uid + '-ball" cx=".38" cy=".32" r=".72" fx=".34" fy=".26"><stop class="mech-gs-spec" offset="0"/><stop class="mech-gs-mid" offset=".5"/><stop class="mech-gs-low" offset="1"/></radialGradient>' +
-    '<radialGradient id="' + uid + '-cyto" cx=".5" cy=".42" r=".62"><stop class="cellscene-gs-c" offset="0"/><stop class="cellscene-gs-m" offset=".72"/><stop class="cellscene-gs-e" offset="1"/></radialGradient>' +
+    '<radialGradient id="' + uid + '-cyto" cx=".5" cy=".46" r=".55" fx=".5" fy=".34"><stop class="cellscene-gs-c" offset="0"/><stop class="cellscene-gs-m" offset=".7"/><stop class="cellscene-gs-e" offset="1"/></radialGradient>' +
     '</defs>';
 }
 function mechDefsStyle(uid) {

@@ -306,6 +306,7 @@ def main() -> int:
                         help='include an optional content package; repeat for multiple packages (adds to company/site selection)')
     args = parser.parse_args()
     os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
+    os.environ.pop('FLOWVIEW_SITE_CONFIG', None)
     if args.no_config:
         # Every loader subprocess (and the kit's arrangement tool) inherits this.
         os.environ['FLOWVIEW_COMPANY_IDENTITY'] = 'off'

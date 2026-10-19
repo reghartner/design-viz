@@ -1,7 +1,8 @@
 # Sequence-teaching panels
 
-Six generic panels for teaching pages about sequences, sequencing runs and
-molecular biology. Every letter, position and count is authored in the spec;
+Four science-specific panels plus two generic core data panels for teaching
+pages about sequences, sequencing runs and molecular biology. Every letter,
+position and count is authored in the spec;
 the panels never read data files or compute results. Use them for classroom
 stories, lab-meeting explanations and onboarding pages, and label fictional
 sequences and counts as illustrative.
@@ -28,7 +29,8 @@ Field references: `python3 tools/widget_doc.py sequence frames reads locus funne
   at position 2,401 keeps genome numbering in every label.
 - **Tones** name the meaning of an emphasis, not a colour: `insert`,
   `mismatch`, `motif`, `primer`, `cut`, `feature`, `good`, `bad`, `accent`,
-  `neutral`. The same tone looks the same in every panel and every skin.
+  `neutral`. The science sequence panels share a skin-aware tone palette;
+  the generic core `funnel` provides its own palette for those named tones.
 - **Sparse state.** `marks`, `reads`, `inserts`, `markers` and `arcs` are full
   snapshots (an array replaces the previous one; `[]` clears). `counts` on
   `funnel`, and `cells` and `marks` on `grid`, merge key by key; a `null`

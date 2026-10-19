@@ -1,5 +1,5 @@
 /* Shared pure helpers for the sequence-teaching panels (sequence, reads,
-   frames, locus, funnel, grid). Alphabets, coordinates, ranges, tones and the
+   frames, locus). Alphabets, coordinates, ranges, tones and the
    standard genetic code live here once; each panel owns its own rendering,
    state rules and styles. Nothing here touches the DOM or mutates its input. */
 

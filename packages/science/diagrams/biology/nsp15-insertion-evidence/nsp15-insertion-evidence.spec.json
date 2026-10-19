@@ -53,6 +53,9 @@
               "type": "nspstory",
               "title": "THE GREEN CLUE · follow the reporter trait",
               "scene": "reporter",
+              "ambient": true,
+              "ambientIntensity": "medium",
+              "ambientTempo": "slow",
               "initial": {
                 "phase": 0
               }
@@ -159,65 +162,20 @@
               "kind": "int"
             }
           ],
-          "panels": [
-            {
-              "id": "founders",
-              "type": "nspstory",
+        "panels": [
+          {
+            "id": "founders",
+            "type": "nspstory",
               "title": "FROM A MIXTURE TO A TRACEABLE LINEAGE",
               "scene": "dilution",
+              "ambient": true,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
               "initial": {
-                "phase": 0
-              }
-            },
-            {
-              "id": "why",
-              "type": "table",
-              "title": "WHAT THE GREEN WELL DOES AND DOES NOT TELL YOU",
-              "columns": [
-                {
-                  "id": "a",
-                  "label": "Question"
-                },
-                {
-                  "id": "b",
-                  "label": "Interpretation"
-                }
-              ],
-              "initial": {
-                "rows": [
-                  {
-                    "id": "0",
-                    "cells": {
-                      "a": "Many founders",
-                      "b": "A positive well can contain a mixture."
-                    }
-                  },
-                  {
-                    "id": "1",
-                    "cells": {
-                      "a": "One founder",
-                      "b": "The recovered lineage can be followed."
-                    }
-                  },
-                  {
-                    "id": "2",
-                    "cells": {
-                      "a": "Zero founders",
-                      "b": "There is no lineage to recover."
-                    }
-                  },
-                  {
-                    "id": "3",
-                    "cells": {
-                      "a": "Confirmation",
-                      "b": "Follow the positive phenotype and check its sequence."
-                    }
-                  }
-                ],
-                "note": "A positive result alone does not prove one founder. Fig. 1b and Results 87–104 describe repeated isolation and subsequent sequence analysis."
-              }
+              "phase": 0
             }
-          ],
+          }
+        ],
           "steps": [
             {
               "id": "mixture",
@@ -274,14 +232,7 @@
                 "panel": "founders",
                 "x": 0,
                 "y": 4,
-                "w": 16,
-                "h": 11
-              },
-              {
-                "panel": "why",
-                "x": 16,
-                "y": 4,
-                "w": 8,
+                "w": 24,
                 "h": 11
               },
               {
@@ -353,168 +304,65 @@
             }
           ],
           "panels": [
-            {
-              "id": "ladder",
-              "type": "tiles",
-              "title": "THE EVIDENCE LADDER · one question at a time",
-              "tiles": [
-                {
-                  "id": "reads",
-                  "label": "1 · Read the RNA"
-                },
-                {
-                  "id": "calls",
-                  "label": "2 · Find added material"
-                },
-                {
-                  "id": "map",
-                  "label": "3 · Match a source"
-                },
-                {
-                  "id": "rates",
-                  "label": "4 · Compare event rates"
-                },
-                {
-                  "id": "infer",
-                  "label": "5 · Test the explanation"
-                }
-              ],
-              "states": [
-                "NEXT",
-                "READING",
-                "DONE"
-              ],
-              "colors": {
-                "NEXT": "#8794a0",
-                "READING": "#19865b",
-                "DONE": "#547b89"
+          {
+            "id": "ladder",
+            "type": "table",
+            "title": "FIVE QUESTIONS · read the evidence in order",
+            "columns": [
+              {
+                "id": "step",
+                "label": "Step"
               },
-              "initial": {
-                "reads": {
-                  "state": "READING",
-                  "sub": "Sampled sequence"
-                },
-                "calls": {
-                  "state": "READING",
-                  "sub": "Candidate insertion"
-                },
-                "map": {
-                  "state": "NEXT",
-                  "sub": "Where did it match?"
-                },
-                "rates": {
-                  "state": "NEXT",
-                  "sub": "Normalize by viral reads"
-                },
-                "infer": {
-                  "state": "NEXT",
-                  "sub": "Controls + activity"
-                }
+              {
+                "id": "question",
+                "label": "Ask"
               }
-            },
+            ],
+            "initial": {
+              "rows": [
+                {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+              ]
+            }
+          },
             {
               "id": "analysis",
               "type": "table",
-              "title": "KEEP THE EVIDENCE LAYERS SEPARATE",
+            "title": "OBSERVATION ≠ INTERPRETATION",
               "columns": [
                 {
                   "id": "a",
-                  "label": "Question"
+                "label": "Layer"
                 },
                 {
                   "id": "b",
-                  "label": "Interpretation"
+                "label": "What it supports"
                 }
               ],
               "initial": {
                 "rows": [
-                  {
-                    "id": "0",
-                    "cells": {
-                      "a": "Reads → calls",
-                      "b": "Detect candidate insertions in mapped reads."
-                    }
-                  },
-                  {
-                    "id": "1",
-                    "cells": {
-                      "a": "Calls → origins",
-                      "b": "Ask where the insert matches and where it sits."
-                    }
-                  },
-                  {
-                    "id": "2",
-                    "cells": {
-                      "a": "Classes → rates",
-                      "b": "Compare events per million viral reads."
-                    }
-                  },
-                  {
-                    "id": "3",
-                    "cells": {
-                      "a": "Rates → model",
-                      "b": "Use activity contrasts and artifact controls."
-                    }
-                  }
-                ],
-                "note": "Conceptual reading guide to the preprint’s analysis. Source matches and activity contrasts inform an interpretation; they do not directly record molecular transfer."
-              }
+                {"id": "observe", "cells": {"a": "Observation", "b": "Reads, matches, classes and reported rates."}},
+                {"id": "interpret", "cells": {"a": "Interpretation", "b": "Origin and mechanism are inferred, not directly observed."}}
+              ]
             }
+          }
           ],
           "steps": [
             {
               "id": "read-call",
               "text": "Sequencing produces reads; analysis identifies candidate insertions. This is broader than the GFP screen because a candidate does not have to restore that reporter. Technical artifacts remain possible. [Results 105–125]",
               "panels": {
-                "analysis": {
-                  "rows": [
-                    {
-                      "id": "0",
-                      "cells": {
-                        "a": "Reads → calls",
-                        "b": "Detect candidate insertions in mapped reads."
-                      },
-                      "status": "changed"
-                    },
-                    {
-                      "id": "1",
-                      "cells": {
-                        "a": "Calls → origins",
-                        "b": "Ask where the insert matches and where it sits."
-                      }
-                    },
-                    {
-                      "id": "2",
-                      "cells": {
-                        "a": "Classes → rates",
-                        "b": "Compare events per million viral reads."
-                      }
-                    },
-                    {
-                      "id": "3",
-                      "cells": {
-                        "a": "Rates → model",
-                        "b": "Use activity contrasts and artifact controls."
-                      }
-                    }
-                  ]
-                },
                 "ladder": {
-                  "reads": {
-                    "state": "DONE"
-                  },
-                  "calls": {
-                    "state": "READING"
-                  },
-                  "map": {
-                    "state": "NEXT"
-                  },
-                  "rates": {
-                    "state": "NEXT"
-                  },
-                  "infer": {
-                    "state": "NEXT"
-                  }
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}, "status": "changed"},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
                 }
               },
               "nodes": [
@@ -526,55 +374,14 @@
               "id": "classify",
               "text": "Match an insert to a possible donor region and locate its recipient. The relationship defines classes such as tandem and distal. Longer matches reduce chance assignment; matching does not directly observe transfer. [Results 126–160]",
               "panels": {
-                "analysis": {
-                  "rows": [
-                    {
-                      "id": "0",
-                      "cells": {
-                        "a": "Reads → calls",
-                        "b": "Detect candidate insertions in mapped reads."
-                      }
-                    },
-                    {
-                      "id": "1",
-                      "cells": {
-                        "a": "Calls → origins",
-                        "b": "Ask where the insert matches and where it sits."
-                      },
-                      "status": "changed"
-                    },
-                    {
-                      "id": "2",
-                      "cells": {
-                        "a": "Classes → rates",
-                        "b": "Compare events per million viral reads."
-                      }
-                    },
-                    {
-                      "id": "3",
-                      "cells": {
-                        "a": "Rates → model",
-                        "b": "Use activity contrasts and artifact controls."
-                      }
-                    }
-                  ]
-                },
                 "ladder": {
-                  "reads": {
-                    "state": "DONE"
-                  },
-                  "calls": {
-                    "state": "DONE"
-                  },
-                  "map": {
-                    "state": "READING"
-                  },
-                  "rates": {
-                    "state": "NEXT"
-                  },
-                  "infer": {
-                    "state": "NEXT"
-                  }
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}, "status": "changed"},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
                 }
               },
               "nodes": [
@@ -585,55 +392,14 @@
               "id": "normalize",
               "text": "Divide event counts by the corresponding number of virus-derived reads to compare datasets in cpm. Keep the length/mapping subset and dataset identity visible. [Fig. 2; Fig. 3]",
               "panels": {
-                "analysis": {
-                  "rows": [
-                    {
-                      "id": "0",
-                      "cells": {
-                        "a": "Reads → calls",
-                        "b": "Detect candidate insertions in mapped reads."
-                      }
-                    },
-                    {
-                      "id": "1",
-                      "cells": {
-                        "a": "Calls → origins",
-                        "b": "Ask where the insert matches and where it sits."
-                      }
-                    },
-                    {
-                      "id": "2",
-                      "cells": {
-                        "a": "Classes → rates",
-                        "b": "Compare events per million viral reads."
-                      },
-                      "status": "changed"
-                    },
-                    {
-                      "id": "3",
-                      "cells": {
-                        "a": "Rates → model",
-                        "b": "Use activity contrasts and artifact controls."
-                      }
-                    }
-                  ]
-                },
                 "ladder": {
-                  "reads": {
-                    "state": "DONE"
-                  },
-                  "calls": {
-                    "state": "DONE"
-                  },
-                  "map": {
-                    "state": "DONE"
-                  },
-                  "rates": {
-                    "state": "READING"
-                  },
-                  "infer": {
-                    "state": "NEXT"
-                  }
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}, "status": "changed"},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
                 }
               },
               "nodes": [
@@ -644,55 +410,14 @@
               "id": "interpret",
               "text": "Then ask which class changes with NSP15 activity and which controls challenge an artifact explanation. A mechanism is inferred from these comparisons; it is not supplied by a read alignment alone. [Discussion]",
               "panels": {
-                "analysis": {
-                  "rows": [
-                    {
-                      "id": "0",
-                      "cells": {
-                        "a": "Reads → calls",
-                        "b": "Detect candidate insertions in mapped reads."
-                      }
-                    },
-                    {
-                      "id": "1",
-                      "cells": {
-                        "a": "Calls → origins",
-                        "b": "Ask where the insert matches and where it sits."
-                      }
-                    },
-                    {
-                      "id": "2",
-                      "cells": {
-                        "a": "Classes → rates",
-                        "b": "Compare events per million viral reads."
-                      }
-                    },
-                    {
-                      "id": "3",
-                      "cells": {
-                        "a": "Rates → model",
-                        "b": "Use activity contrasts and artifact controls."
-                      },
-                      "status": "changed"
-                    }
-                  ]
-                },
                 "ladder": {
-                  "reads": {
-                    "state": "DONE"
-                  },
-                  "calls": {
-                    "state": "DONE"
-                  },
-                  "map": {
-                    "state": "DONE"
-                  },
-                  "rates": {
-                    "state": "DONE"
-                  },
-                  "infer": {
-                    "state": "READING"
-                  }
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}, "status": "changed"}
+                  ]
                 }
               },
               "nodes": [
@@ -718,18 +443,18 @@
                 "hidden": true
               },
               {
-                "panel": "analysis",
-                "x": 14,
-                "y": 4,
-                "w": 10,
-                "h": 11
-              },
-              {
                 "panel": "ladder",
                 "x": 0,
                 "y": 4,
-                "w": 14,
-                "h": 11
+                "w": 24,
+                "h": 7
+              },
+              {
+                "panel": "analysis",
+                "x": 0,
+                "y": 11,
+                "w": 24,
+                "h": 4
               }
             ]
           },
@@ -811,6 +536,9 @@
               "type": "nspstory",
               "title": "ACTIVITY CONTRAST · published rates, shared scale",
               "scene": "evidence",
+              "ambient": false,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
               "initial": {
                 "phase": 0
               }
@@ -852,15 +580,15 @@
             {
               "id": "denominator",
               "type": "table",
-              "title": "WHAT WAS COUNTED",
+              "title": "SOURCE COUNTS",
               "columns": [
                 {
                   "id": "what",
-                  "label": "Evidence"
+                  "label": "Group"
                 },
                 {
                   "id": "value",
-                  "label": "Reading"
+                  "label": "Events / reads"
                 }
               ],
               "initial": {
@@ -869,18 +597,18 @@
                     "id": "0",
                     "cells": {
                       "what": "WT",
-                      "value": "21,894 events / ~640 million viral reads"
+                      "value": "21,894 / ~640M"
                     }
                   },
                   {
                     "id": "1",
                     "cells": {
                       "what": "Inactive",
-                      "value": "2,925 events / ~420 million viral reads"
+                      "value": "2,925 / ~420M"
                     }
                   }
                 ],
-                "note": "Results, lines 110–122. Read totals are rounded; use the paper’s reported cpm, not a recomputation."
+                "note": "Rounded virus-derived read totals; use reported cpm. Results 110–122."
               }
             }
           ],
@@ -891,7 +619,7 @@
               "panels": {
                 "comparison": {
                   "phase": 0,
-                  "caption": "cpm counts unique insertion events per million virus-derived reads. Bar movement compares two datasets; it is not change over time."
+                  "caption": "cpm counts unique insertion events per million virus-derived reads. Bars keep their published values; emphasis guides comparison, not change over time."
                 }
               },
               "nodes": []
@@ -949,21 +677,21 @@
                 "panel": "comparison",
                 "x": 0,
                 "y": 4,
-                "w": 16,
+                "w": 17,
                 "h": 11
               },
               {
                 "panel": "sizes",
-                "x": 16,
+                "x": 17,
                 "y": 4,
-                "w": 8,
+                "w": 7,
                 "h": 5
               },
               {
                 "panel": "denominator",
-                "x": 16,
+                "x": 17,
                 "y": 9,
-                "w": 8,
+                "w": 7,
                 "h": 6
               },
               {
@@ -1016,6 +744,9 @@
               "type": "nspstory",
               "title": "SOURCE → INSERTION · evidence and proposed interpretation",
               "scene": "origin",
+              "ambient": true,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
               "initial": {
                 "phase": 0
               }
@@ -1028,15 +759,15 @@
               "stages": [
                 {
                   "id": "all",
-                  "label": "All detected ≥2 nt"
+                "label": "All ≥2 nt"
                 },
                 {
                   "id": "long",
-                  "label": "Length ≥11 nt"
+                "label": "≥11 nt"
                 },
                 {
                   "id": "mapped",
-                  "label": "Likely viral origin",
+                "label": "Mapped to virus",
                   "tone": "teal"
                 }
               ],

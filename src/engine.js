@@ -2645,7 +2645,8 @@ function createBoardNavigation(board, group, legend, changed){
     // The SVG clips at its viewBox, so the framed box never extends past it.
     function axis(start,size,full,length,available,legacy){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
-      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.max(available,extent);
+      // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
+      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
       return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
     }
     var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),

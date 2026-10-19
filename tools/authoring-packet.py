@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
-from company_overlay import company_agent_context, enabled_packages, contract_text
+from company_overlay import company_agent_context, company_theme, enabled_packages, contract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -190,6 +190,9 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         text = normalize_links(text, path)
         parts.append('<!-- Source: ' + path + (' # ' + heading if heading else '') + ' -->\n' + text)
         provenance.append({'path': path, 'section': heading, 'sha256': hashlib.sha256(loaded[path].encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
+    theme = company_theme(ROOT)
+    if theme.get('guidance'):
+        add('company/' + theme['guidance'])
     add(WORKFLOW, 'Scoped exceptions and handoff')
     add(WORKFLOW, 'The rules that matter most')
     if mode == 'new':

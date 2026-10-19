@@ -44,6 +44,36 @@ Each enabled package contributes its manifest, panel contracts, examples,
 recipes, and guide under `packages/<name>/`; its guide is
 `packages/<name>/README.md`. Unselected package files are absent from the kit.
 
+## Build-time themes
+
+An optional `theme` field in `company/company.json` selects a JSON manifest
+relative to that file. Themes are independent of package selection and are
+disabled by `--no-config`. A company without this field keeps the core skins.
+The manifest may declare:
+
+- `skins`: unique new `{name, layers}` records; layers name existing core skins.
+- `runtime` and `workbench`: trusted local JavaScript modules. Runtime modules
+  register definitions without accessing the DOM at load time. Workbench modules
+  can supply `createCompanyLibraryDecoration(home)` with `home()`,
+  `reader(entry)` and `card(entry, title)` callbacks, scoped to that library.
+- `styles`: `core` and `workbench` CSS files, appended after shared/panel styles.
+- `assets`: named local PNG/JPEG/WebP files, embedded where a module uses
+  `/* @theme-asset:name */ ""`. No runtime asset fetch is required.
+- `guidance`: a Markdown file included in the selected authoring contract,
+  packet and portable kit.
+- `kitFiles`: repository-relative Markdown/JSON globs for curated resources.
+
+All module, style, image and guidance paths resolve from the manifest within
+`company/`. The sports venue renderer optionally calls a theme's
+`CompanyVenueDecoration.field(panel, model)` and
+`landmarkClass(panel, landmark)` definitions; absent a theme it renders normally.
+Keep team names, CSS, artwork and selection logic in the company theme.
+
+Package manifests may optionally declare `kitFiles`, an explicit list of local
+Markdown/JSON files. Omitting it preserves the package's complete text bundle.
+This lets a general-purpose package ship focused guidance while a company theme
+selects additional story material. Extracted kits keep their fixed selection.
+
 ## Panels and helper modules
 
 - `company/panels/types/<type>.js` — one complete panel definition, written

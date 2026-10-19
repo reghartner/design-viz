@@ -3,12 +3,14 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import os
 import re
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -133,7 +135,10 @@ class AuthoringPacketTests(unittest.TestCase):
         # Preset node styles (#610) add one `style` field bullet: at most 384 bytes.
         budgets = {'new': 78_744 + 1_024 + 512 + 384, 'edit': 67_458 + 1_024 + 512 + 384}
         for mode, maximum in budgets.items():
-            text, _ = packet.generate([], [], mode=mode)
+            # This upstream-size baseline excludes optional company guidance.
+            with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': '',
+                                         'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_SITE_CONFIG': ''}):
+                text, _ = packet.generate([], [], mode=mode)
             self.assertLessEqual(len(text.encode()), maximum)
 
     def test_edge_json_contracts_infer_the_wire_contract_reference(self):

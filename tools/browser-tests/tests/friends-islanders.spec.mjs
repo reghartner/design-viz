@@ -1,4 +1,4 @@
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation} from '../helpers/test.mjs';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
@@ -120,6 +120,24 @@ test('science reader has no Islanders marks even with the shared theme',async({p
   await expect(page.locator('#canon-reader .doc-sec').first()).toBeVisible();
   await expect(page.locator('.islanders-site-mark')).toBeHidden();
   await expect(page.locator('#canon-reader .seatmap-islanders-logo')).toHaveCount(0);
+});
+
+test('marketing tabs retain their panels and the desktop editor retains the selected theme',async({page,server},testInfo)=>{
+  await page.goto(server.origin+shell+'?diagram=islanders-marketing&theme=islanders');
+  const reader=page.locator('#canon-reader');
+  await expect(reader).toHaveClass(/\bsk-islanders\b/);
+  await expect(reader.locator('.reader-tree-tab')).toHaveCount(3);
+  for(const [index,label] of ['Member campaign','Group night','Fan event RSVP'].entries()){
+    await chooseNavigation(reader.locator('.explore-navigation'),'Tab',label);
+    await expect(reader.locator('.doc-sec:visible .pt-appscreens')).toHaveCount(2);
+    await expect(reader.locator('.doc-sec:visible .pt-appscreens img').first()).toBeVisible();
+    await capture(page,testInfo,'islanders-marketing-tab-'+(index+1)+'-desktop');
+  }
+  await page.locator('#canon-reader-edit').click();
+  await expect(page.locator('#docview')).toHaveClass(/\bsk-islanders\b/);
+  await expect(page.locator('#sk-islanders')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.islanders-site-mark')).toBeHidden();
+  await capture(page,testInfo,'islanders-marketing-editor-desktop');
 });
 
 test('offline sports HTML retains its crest across steps and mode changes at desktop width',async({page,context,server},testInfo)=>{

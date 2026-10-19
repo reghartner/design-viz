@@ -92,8 +92,8 @@ append them under "Company contract additions". See
   requiring a string.
 - `skin` — optional page default. One of `"aurora"` (dark),
   `"daylight"` (light, print-friendly), `"editorial"`, `"terminal"`,
-  `"pastel"` (default), `"blueprint"`, `"rose"`, `"lavender"`, `"lilac"` (Opus Lilac),
-  or `"islanders"` (blue, orange, ice). Standalone precedence: valid `?theme=`,
+  `"pastel"` (default), `"blueprint"`, `"rose"`, `"lavender"`, or `"lilac"` (Opus Lilac).
+  Standalone precedence: valid `?theme=`,
   valid `dv_skin` cookie, this field, then `"pastel"`. Workbench uses query,
   cookie, then Pastel; document defaults are an explicit choice.
   `window.dvSetSkin(name)` switches live without changing the cookie and updates

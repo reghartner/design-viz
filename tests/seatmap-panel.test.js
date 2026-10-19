@@ -15,26 +15,6 @@ const validate = d => plain(C.validate(C.normalize(d)));
 const near = (a,b) => assert.ok(Math.abs(a-b)<1e-7, `${a} ≈ ${b}`);
 const HOSTILE = '<img src=x onerror=bad()>';
 
-test('official Islanders crest is embedded, centered on UBS ice, and absent from generic maps', () => {
-  for (const variant of ['light','dark']) {
-    const bytes = fs.readFileSync(path.join(__dirname,'../packages/sports/assets/islanders/primary-'+variant+'.png'));
-    assert.equal(C.IslandersBrand[variant], 'data:image/png;base64,'+bytes.toString('base64'));
-    assert.ok(bytes.length < 80*1024);
-  }
-  const p = {id:'home',type:'seatmap',venue:'ubs-arena'};
-  const model = C.seatmapModel(p,{}), html = C.seatmapHTML(p,{});
-  const mark = /<image class="seatmap-islanders-logo" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/.exec(html);
-  assert.ok(mark);assert.equal(mark[3],mark[4]);
-  assert.ok(Math.abs(+mark[1]+(+mark[3]/2)-(model.fieldBox.x+model.fieldBox.width/2))<0.1);
-  assert.ok(Math.abs(+mark[2]+(+mark[4]/2)-(model.fieldBox.y+model.fieldBox.height/2))<0.1);
-  assert.match(html,/preserveAspectRatio="xMidYMid meet" href="data:image\/png;base64,/);
-  assert.doesNotMatch(C.seatmapHTML({...panel(),bowl:'rink'},{}),/seatmap-islanders-logo/);
-  assert.doesNotMatch(C.seatmapHTML({...panel(),venue:'unknown'},{}),/seatmap-islanders-logo/);
-  assert.match(readStyles('style.core.css'),/\.seatmap-islanders-logo\{display:none/);
-  assert.match(readStyles('style.core.css'),/\.sk-islanders \.seatmap-islanders-logo\{display:inline/);
-  assert.equal(C.IslandersBrand.story('copy-gate'),false);
-  assert.equal(C.IslandersBrand.story('season-of-seats'),true);
-});
 
 function panel() {
   return {

@@ -1,7 +1,6 @@
 {
   "name": "sports",
   "sourceFiles": [
-    "panels/islanders-brand.js",
     "panels/sports.js",
     "panels/venue-library.js",
     "panels/venues/ubs-arena.js",
@@ -13,5 +12,6 @@
   "routes": {
     "seatmap": "cookbook/venue-map.md"
   },
-  "templates": []
+  "templates": [],
+  "kitFiles": ["README.md", "contract.md", "package.json", "cookbook/venue-map.md", "examples/manifest.json", "examples/venue-map.spec.json", "examples/arena-sections.sections.json"]
 }

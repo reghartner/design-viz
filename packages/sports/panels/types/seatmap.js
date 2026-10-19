@@ -860,14 +860,7 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
     h += '<path class="seatmap-field" d="' + model.field + '" id="' + hid + '-fp"/>' + marks.under;
     if (model.fieldLines) h += '<path class="seatmap-field-line" d="' + model.fieldLines + '"/>';
     h += marks.over;
-    /* Only the Islanders' home rink carries the official crest. CSS owns the
-       theme gate so live skin changes also update in-place patched panels.
-       The source is trusted bundled PNG data, never an authored URL or SVG. */
-    if (panel.venue === 'ubs-arena' && model.fieldBox && typeof IslandersBrand !== 'undefined') {
-      var b = model.fieldBox, size = spmRound(Math.min(b.width / 200, b.height / 85) * 25);
-      h += '<image class="seatmap-islanders-logo" x="' + spmRound(b.x + (b.width - size) / 2) + '" y="' + spmRound(b.y + (b.height - size) / 2) +
-        '" width="' + size + '" height="' + size + '" preserveAspectRatio="xMidYMid meet" href="' + IslandersBrand.light + '" aria-hidden="true"/>';
-    }
+    if (typeof CompanyVenueDecoration !== 'undefined') h += CompanyVenueDecoration.field(panel, model);
   }
   /* One group per ring, inner first, so each level casts a soft shadow and
      reads as a tier stepping up from the field. */
@@ -883,8 +876,8 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
   model.sections.forEach(function (s) { if (s.highlighted) h += '<path class="seatmap-outline-halo" d="' + s.d + '"/><path class="seatmap-outline" d="' + s.d + '"/>'; });
   h += '</g><g class="seatmap-landmarks">';
   model.landmarks.forEach(function (mark) {
-    var iceLabel = panel.venue === 'ubs-arena' && mark.label.toLowerCase() === 'ice';
-    h += '<g class="seatmap-landmark' + (iceLabel ? ' seatmap-islanders-ice-label' : '') + '"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
+    var decorationClass = typeof CompanyVenueDecoration !== 'undefined' ? CompanyVenueDecoration.landmarkClass(panel, mark) : '';
+    h += '<g class="seatmap-landmark' + decorationClass + '"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g>';
@@ -1351,14 +1344,6 @@ PanelRegistry.define('seatmap', {
   --seatmap-neutral:#7D899C;--seatmap-track:#EEF1F5;--seatmap-track-line:#C9D2E1;--seatmap-glow:#5263B9;--seatmap-tier-shadow:rgba(36,50,74,.16);--seatmap-board-shadow:rgba(36,50,74,.08);--seatmap-row-o:.3;
   --seatmap-num:'IBM Plex Sans',sans-serif}
 .sk-pastel .seatmap{--seatmap-num:'Plus Jakarta Sans',sans-serif;--seatmap-sans:'Source Sans 3','IBM Plex Sans',sans-serif}
-body.sk-islanders .seatmap{--seatmap-accent:#003087;--seatmap-gutter:#FFFFFF;--seatmap-label-on:#FFFFFF;
-  --seatmap-r1:#E5EFF9;--seatmap-r2:#D0E2F3;--seatmap-r3:#B4CEE9;--seatmap-r4:#94B7DD;--seatmap-r5:#739DCF;--seatmap-r6:#5283BF;--seatmap-r7:#3866AC;--seatmap-r8:#23529C;--seatmap-r9:#10418F;--seatmap-r10:#003087;--seatmap-full:#071E42;
-  --seatmap-w1:#FFF1E8;--seatmap-w2:#FFE1CF;--seatmap-w3:#FFCCAF;--seatmap-w4:#FFB58C;--seatmap-w5:#FF9B68;--seatmap-w6:#FC824A;--seatmap-w7:#E96220;--seatmap-w8:#D84D0D;--seatmap-w9:#B83B00;--seatmap-w10:#942F00;
-  --seatmap-base:#EDF5FA;--seatmap-base-line:#C8D9E8;--seatmap-lbl:#071E42;--seatmap-lbl-dark:#071E42;--seatmap-hover:#003087;
-  --seatmap-sel:#FC4C02;--seatmap-sel-ring:#FC4C0240;--seatmap-hold:#B33A00;--seatmap-hold-bg:#FFF0E6;--seatmap-hold-lbl:#713000;--seatmap-hold-halo:#FFF0E6;
-  --seatmap-ice:#F5FBFF;--seatmap-board:#8DAECD;--seatmap-red:#FC4C0270;--seatmap-blue:#00308765;--seatmap-crease:#00308714;
-  --seatmap-ink:#071E42;--seatmap-text:#294561;--seatmap-muted:#536A80;--seatmap-chip-bg:#003087;--seatmap-chip-ink:#FFFFFF;--seatmap-well:#EDF5FA;--seatmap-well-line:#C8D9E8;--seatmap-glow:#FC4C02;
-  --seatmap-lm-bg:#FFFFFF;--seatmap-lm-line:#B3C8DF;--seatmap-lm-text:#003087;--seatmap-radius:5px;--seatmap-num:'Sora','IBM Plex Sans',sans-serif;}
 /* Gutters take the card colour of skins whose card is not the token surface. */
 body.sk-editorial .seatmap{--seatmap-gutter:#FFFDF8}
 body.sk-terminal .seatmap{--seatmap-gutter:var(--tm-ground,#0B1220)}
@@ -1416,13 +1401,6 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-rink-crease{fill:var(--seatmap-crease);stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-rink-circle{fill:none;stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-rink-dot{fill:var(--seatmap-red)}.seatmap-rink-centre{fill:var(--seatmap-blue)}
-.seatmap-islanders-logo{display:none;pointer-events:none}
-.sk-islanders .seatmap-islanders-logo{display:inline}
-.sk-islanders .seatmap-islanders-ice-label{display:none}
-/* Library previews are immutable snapshots shared across themes. Their card
-   carries the live theme mark, so do not bake one into the thumbnail pixels. */
-.sk-islanders .thumbnail-ready .seatmap-islanders-logo{display:none}
-.sk-islanders .thumbnail-ready .seatmap-islanders-ice-label{display:inline}
 .seatmap-turf{fill:var(--seatmap-turf)}
 .seatmap-pitch-line,.seatmap-court-line,.seatmap-court-key{fill:none;stroke:var(--seatmap-turf-line);stroke-width:1.25;vector-effect:non-scaling-stroke}
 .seatmap-pitch-spot{fill:var(--seatmap-turf-line)}

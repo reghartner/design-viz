@@ -12,7 +12,7 @@ var CONTRACT = [
   '{',
   '  "page": {',
   '    "title": "<page title>",',
-  '    "skin": "pastel",                      // pastel (default)|aurora|blueprint|terminal|rose|lavender|lilac|islanders',
+  '    "skin": "pastel",                      // pastel (default)|aurora|blueprint|terminal|rose|lavender|lilac',
   '    "protocols": {                         // optional: add new edge kinds',
   '      "<kind>": {"label": "<legend label>", "color": "#RRGGBB"}',
   '    },',

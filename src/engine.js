@@ -54,12 +54,16 @@ function resolveSkin(cookieText, specSkin, search){
 }
 
 function skinBase(name){
+  var custom = COMPANY_SKINS.find(function(skin){return skin.name === name;});
+  if(custom)return custom.layers[0];
   return name === 'daylight' ? 'daylight' : 'aurora';
 }
 
 function skinClasses(name){
+  var custom = COMPANY_SKINS.find(function(skin){return skin.name === name;});
+  if(custom)return custom.layers.concat([name]).map(function(layer){return 'sk-' + layer;});
   var base = skinBase(name);
-  return base === name ? ['sk-' + base] : ['sk-' + base].concat(['rose','lavender','lilac','islanders'].indexOf(name)>=0?['sk-pastel']:[]).concat(['sk-' + name]);
+  return base === name ? ['sk-' + base] : ['sk-' + base].concat(['rose','lavender','lilac'].indexOf(name)>=0?['sk-pastel']:[]).concat(['sk-' + name]);
 }
 
 function applySkinClasses(body, view, name){

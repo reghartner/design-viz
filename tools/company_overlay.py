@@ -22,6 +22,7 @@ CONTRACT = 'contract/authoring-contract.md'
 CONTRACT_ADDITIONS = '## Company contract additions'
 AGENT_CONTEXT = 'tools/company-agent-context.json'
 ENABLED_PACKAGES = 'tools/enabled-packages.json'
+COMPANY_THEME = 'tools/company-theme.json'
 # Upstream examples join the offline kit by carrying this marker; each line is a
 # file glob, matched in the marker's folder and below, where the nearest marker
 # above a file decides. Company example folders always join: files with no
@@ -71,6 +72,21 @@ def enabled_packages(root):
     return json.loads(exported.read_text()) if exported.is_file() else []
 
 
+def company_theme(root):
+    """Selected theme resources, or the fixed context in an extracted kit."""
+    root = Path(root)
+    if os.environ.get('FLOWVIEW_COMPANY_IDENTITY') == 'off':
+        return {}
+    loader = root / 'tools/source-loader.cjs'
+    if loader.is_file():
+        result = subprocess.run(['node', str(loader), '--theme'], capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(result.stderr.strip())
+        return json.loads(result.stdout) or {}
+    exported = root / COMPANY_THEME
+    return json.loads(exported.read_text()) if exported.is_file() else {}
+
+
 def contract_fragments(root):
     """[(repository-relative path, text)] in file-name order."""
     directory = company_dir(root) / 'contract'
@@ -107,6 +123,10 @@ def contract_text(root):
     root = Path(root)
     text = (root / CONTRACT).read_text()
     fragments = contract_fragments(root)
+    theme = company_theme(root)
+    if (root / 'tools/source-loader.cjs').is_file() and theme.get('guidance'):
+        path = 'company/' + theme['guidance']
+        fragments.append((path, (root / path).read_text()))
     # The extracted kit already contains the assembled contract; append only
     # while reading source in a checkout.
     packages = enabled_packages(root) if (root / 'tools/source-loader.cjs').is_file() else []
@@ -115,7 +135,7 @@ def contract_text(root):
     parts = [text.rstrip('\n')]
     if fragments:
         parts += ['', CONTRACT_ADDITIONS, '',
-                  'These sections come from the company overlay (`company/contract/`). '
+                  'These sections come from company contract fragments and the selected company theme. '
                   'They extend this contract for this fork and follow its rules.']
         for path, fragment in fragments:
             parts += ['', '<!-- ' + path + ' -->', _relink(fragment, path, CONTRACT).strip('\n')]

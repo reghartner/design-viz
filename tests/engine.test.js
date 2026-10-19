@@ -677,8 +677,8 @@ test('all supported skin tokens validate; an unknown skin uses the Pastel warnin
   const mk = skin => C.normalize({page: {skin,
     blocks: [{diagram: {nodes: {a: {}}, rows: [['a']]}}]}});
   assert.deepStrictEqual(Array.from(C.SKIN_NAMES),
-    ['aurora', 'daylight', 'editorial', 'terminal', 'pastel', 'blueprint', 'rose', 'lavender', 'lilac', 'islanders']);
-  assert.deepStrictEqual(Array.from(C.SELECTABLE_SKINS),['aurora','pastel','blueprint','terminal','rose','lavender','lilac','islanders']);
+    ['aurora', 'daylight', 'editorial', 'terminal', 'pastel', 'blueprint', 'rose', 'lavender', 'lilac'].concat(Array.from(C.COMPANY_SKINS,skin=>skin.name)));
+  assert.deepStrictEqual(Array.from(C.SELECTABLE_SKINS),['aurora','pastel','blueprint','terminal','rose','lavender','lilac'].concat(Array.from(C.COMPANY_SKINS,skin=>skin.name)));
   assert.strictEqual(C.skinLabel('lilac'),'Opus Lilac');
   for (const skin of C.SKIN_NAMES){
     assert.strictEqual(C.validate(mk(skin)).warnings.filter(w => w.includes('page.skin')).length, 0, skin);
@@ -694,16 +694,16 @@ test('resolveSkin gives a plain dv_skin cookie precedence over the spec default'
 });
 
 test('shared query theme wins over cookie and document defaults regardless of parameter order',()=>{
-  for(const search of ['?theme=islanders&diagram=season-of-seats','?diagram=season-of-seats&theme=islanders','?theme=%69slanders'])
-    assert.strictEqual(C.resolveSkin('dv_skin=terminal','daylight',search),'islanders');
-  for(const search of ['?theme=unknown','?theme=%E0%A4%A','?theme=','?theme=ISLANDERS'])
+  for(const search of ['?theme=lavender&diagram=season-of-seats','?diagram=season-of-seats&theme=lavender','?theme=%6cavender'])
+    assert.strictEqual(C.resolveSkin('dv_skin=terminal','daylight',search),'lavender');
+  for(const search of ['?theme=unknown','?theme=%E0%A4%A','?theme=','?theme=LAVENDER'])
     assert.strictEqual(C.resolveSkin('dv_skin=terminal','daylight',search),'terminal');
-  assert.deepStrictEqual(Array.from(C.skinClasses('islanders')),['sk-aurora','sk-pastel','sk-islanders']);
+  assert.deepStrictEqual(Array.from(C.skinClasses('lavender')),['sk-aurora','sk-pastel','sk-lavender']);
 });
 
 test('live choices update only existing valid shared theme preferences and preserve navigation state',()=>{
   const state={screen:'reader'},calls=[];
-  const win={location:{href:'https://example.test/view?diagram=season-of-seats&theme=islanders#d=group-holds'},history:{state,replaceState(...args){calls.push(args);}}};
+  const win={location:{href:'https://example.test/view?diagram=season-of-seats&theme=lavender#d=group-holds'},history:{state,replaceState(...args){calls.push(args);}}};
   C.updateThemeURL(win,'rose');
   assert.deepStrictEqual(calls,[[state,'','/view?diagram=season-of-seats&theme=rose#d=group-holds']]);
   C.updateThemeURL(win,'unknown');assert.strictEqual(calls.length,1);
@@ -739,9 +739,9 @@ test('applySkinClasses layers overlays on Aurora, writes no build/skin label and
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), ['host-shell', 'sk-aurora', 'sk-editorial']);
   assert.deepStrictEqual(Array.from(view.classList.values).sort(), ['docview', 'sk-aurora', 'sk-editorial']);
   assert.strictEqual(label.textContent, '');
-  assert.strictEqual(C.applySkinClasses(body, view, 'islanders'),true);
-  assert.deepStrictEqual(Array.from(body.classList.values).sort(),['host-shell','sk-aurora','sk-islanders','sk-pastel']);
-  assert.deepStrictEqual(Array.from(view.classList.values).sort(),['docview','sk-aurora','sk-islanders','sk-pastel']);
+  assert.strictEqual(C.applySkinClasses(body, view, 'lavender'),true);
+  assert.deepStrictEqual(Array.from(body.classList.values).sort(),['host-shell','sk-aurora','sk-lavender','sk-pastel']);
+  assert.deepStrictEqual(Array.from(view.classList.values).sort(),['docview','sk-aurora','sk-lavender','sk-pastel']);
   const before = Array.from(body.classList.values).sort();
   assert.strictEqual(C.applySkinClasses(body, view, 'sepia'), false);
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), before);
@@ -2138,9 +2138,9 @@ test('host-owned deep links bind current-state copies without changing host rout
 });
 
 test('canonical current-position and section copies follow live theme changes',()=>{
-  let theme='islanders';
-  const h=deepLinkHarness(undefined,{history:false,linkBase:'https://host.example.test/view?diagram=demo&theme=islanders',theme:()=>theme});
-  assert.strictEqual(h.channel.currentURL(),'https://host.example.test/view?diagram=demo&theme=islanders#t=overview');
+  let theme='lavender';
+  const h=deepLinkHarness(undefined,{history:false,linkBase:'https://host.example.test/view?diagram=demo&theme=lavender',theme:()=>theme});
+  assert.strictEqual(h.channel.currentURL(),'https://host.example.test/view?diagram=demo&theme=lavender#t=overview');
   theme='rose';h.button.listeners.click();
   assert.strictEqual(h.copied[0],'https://host.example.test/view?diagram=demo&theme=rose#t=overview');
   theme='invalid';assert.strictEqual(h.channel.currentURL(),'https://host.example.test/view?diagram=demo#t=overview');

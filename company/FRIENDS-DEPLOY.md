@@ -37,6 +37,10 @@ and retain all 14 chapters and 173 steps. The numbered library titles establish
 the reading order; their READMEs link the previous and next arcs. The original
 `season-of-seats` URL remains the first arc. Authoring is desktop-only.
 
+The company config explicitly selects `themes/islanders/theme.json`. That
+overlay owns the extra skin, CSS, logos and authoring guidance. Sports alone
+does not enable it; `--no-config` omits the overlay and its kit resources.
+
 Share `?theme=islanders` for an Islanders-themed welcome/library, or
 `?diagram=islanders-marketing&theme=islanders` for the three-tab marketing document. A valid query theme
 wins over the saved cookie and document default on initial load. Theme selectors

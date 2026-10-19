@@ -28,6 +28,37 @@ def packet_for(panel):
 
 
 class OptionalPackageContextTest(unittest.TestCase):
+    def test_theme_guidance_and_resources_follow_company_selection_including_portable_packet(self):
+        for packages in ('', 'sports'):
+            with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': packages,
+                                         'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_SITE_CONFIG': ''}):
+                files = kit_files()
+                self.assertNotIn('tools/company-theme.json', files)
+                self.assertFalse(any(path.startswith('company/themes/') for path in files))
+                self.assertFalse(any(path.startswith('packages/sports/diagrams/') for path in files))
+                for name, content in files.items():
+                    self.assertNotIn('islanders', content.lower(), name)
+                self.assertNotIn('islanders', packet_for('seatmap' if packages else 'state').lower())
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': '', 'FLOWVIEW_PACKAGES': '',
+                                     'FLOWVIEW_PACKAGE_BASE': 'sports', 'FLOWVIEW_SITE_CONFIG': ''}):
+            files = kit_files()
+            guidance = 'company/themes/islanders/authoring.md'
+            self.assertIn(guidance, files)
+            self.assertIn('Friends appearance', files['contract/authoring-contract.md'])
+            self.assertIn('packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json', files)
+            self.assertIn('Friends appearance', packet_for('seatmap'))
+            with tempfile.TemporaryDirectory() as directory:
+                kit = Path(directory)
+                for name, content in files.items():
+                    destination = kit / name
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_text(content)
+                packet = subprocess.check_output(['python3', str(kit / 'tools/authoring-packet.py'),
+                                                   '--panel', 'seatmap', '--mode', 'edit'],
+                                                  text=True, stderr=subprocess.DEVNULL)
+                self.assertIn('Friends appearance', packet)
+                self.assertEqual(packet.count('## Friends appearance'), 1)
+
     def test_default_agent_kit_and_packet_exclude_optional_material(self):
         with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': ''}):
             files = kit_files()

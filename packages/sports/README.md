@@ -3,8 +3,8 @@
 This package contains the `seatmap` venue panel, the UBS Arena library entry,
 seating-chart import support, the venue-map recipe, and a complete example.
 It is omitted from the default viewer, workbench, validator, gallery, and
-offline authoring kit. Season of seats also uses the generic core `grid` and
-`funnel` panels without loading science or biology content.
+offline authoring kit. The generic core `grid` and `funnel` panels are available
+without loading this package.
 
 Enable it for a company build in `company/company.json`:
 
@@ -26,8 +26,5 @@ import a seating chart. Company venues go in `company/panels/venues/` and are
 loaded only when this package is enabled. Authoring and editing these
 documents is desktop only.
 
-The [Season of seats](diagrams/season-of-seats/README.md) is a four-diagram,
-14-chapter, 173-step teaching story that uses the venue map throughout the ticketing
-season: Create demand, Sell the inventory, Serve and learn from game night, and
-Build the next season. It includes the authored specs and a shared source review. Public facts are
-cited in the story; operational flows and uncited figures are illustrative.
+Company themes can add branding and curated stories independently of this package.
+Its portable authoring kit includes the generic venue recipe and example.

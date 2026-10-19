@@ -40,10 +40,9 @@ and `python3 tools/authoring-packet.py --config path/to/site.json --panel cellsc
 Use `python3 tools/widget_doc.py --config path/to/site.json cellscene` for a
 single panel's contract under that same selection.
 The downloaded offline kit already carries the selected package context.
-Each package has its own manifest, panel contracts, examples, and recipes under
-`packages/<name>/`. See the [science guide](../packages/science/README.md),
-[physics guide](../packages/physics/README.md), and
-[sports guide](../packages/sports/README.md).
+Each enabled package contributes its manifest, panel contracts, examples,
+recipes, and guide under `packages/<name>/`; its guide is
+`packages/<name>/README.md`. Unselected package files are absent from the kit.
 
 ## Panels and helper modules
 
@@ -56,8 +55,8 @@ Each package has its own manifest, panel contracts, examples, and recipes under
   (`src/panels/shared.js` and the other `src/panels/*.js` files) and before
   every panel type, in file-name order.
 - `company/panels/venues/<id>.js` — venue library entries for the optional
-  sports package. These load only when `sports` is enabled. See the
-  [sports guide](../packages/sports/README.md).
+  sports package. These load only when `sports` is enabled. Its guide is
+  `packages/sports/README.md` when that package is selected.
 
 `src/source-bundles.json` lists these directories as optional globs
 (`@company/panels/*.js`, `@company/panels/venues/*.js`,

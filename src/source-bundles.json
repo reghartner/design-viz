@@ -4,6 +4,7 @@
     "panels/registry.js",
     "icons/library.js",
     "validator.js",
+    "@theme/runtime",
     "core/navigation.js",
     "core/document.js",
     "core/contracts.js",
@@ -49,6 +50,7 @@
     "viewer/handoffs.js",
     "viewer/shortcuts.js"
   ],
+  "library.workbench.js": ["@theme/workbench", "library.workbench.js"],
   "builder.workbench.js": [
     "workbench/source-edit.js",
     "workbench/targets.js",

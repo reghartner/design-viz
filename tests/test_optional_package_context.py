@@ -28,6 +28,18 @@ def packet_for(panel):
 
 
 class OptionalPackageContextTest(unittest.TestCase):
+    def test_core_and_sports_kits_exclude_company_theme_guidance_and_resources(self):
+        for packages in ('', 'sports'):
+            with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': packages,
+                                         'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_SITE_CONFIG': ''}):
+                files = kit_files()
+                self.assertFalse('tools/company-theme.json' in files, 'Unexpected theme metadata in generic kit')
+                self.assertFalse(any(path.startswith('company/themes/') for path in files))
+                self.assertFalse(any(path.startswith('packages/sports/diagrams/') for path in files))
+                for name, content in files.items():
+                    self.assertFalse('islanders' in content.lower(), f'Unexpected Islanders content in {name}')
+                self.assertNotIn('islanders', packet_for('seatmap' if packages else 'state').lower())
+
     def test_default_agent_kit_and_packet_exclude_optional_material(self):
         with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': ''}):
             files = kit_files()

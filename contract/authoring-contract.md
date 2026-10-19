@@ -92,10 +92,13 @@ append them under "Company contract additions". See
   requiring a string.
 - `skin` — optional page default. One of `"aurora"` (dark),
   `"daylight"` (light, print-friendly), `"editorial"`, `"terminal"`,
-  `"pastel"` (default), or `"blueprint"`. On load, a valid `dv_skin` cookie overrides
-  this field; otherwise this field wins; otherwise the page uses `"pastel"`.
-  A consuming site can then switch live with `window.dvSetSkin(name)`; it does
-  not change the cookie. Omit `skin` unless the request says otherwise.
+  `"pastel"` (default), `"blueprint"`, `"rose"`, `"lavender"`, or `"lilac"` (Opus Lilac).
+  Standalone precedence: valid `?theme=`,
+  valid `dv_skin` cookie, this field, then `"pastel"`. Workbench uses query,
+  cookie, then Pastel; document defaults are an explicit choice.
+  `window.dvSetSkin(name)` switches live without changing the cookie and updates
+  an existing valid `theme` query for reloads/shared links. Invalid query values
+  are ignored. Omit `skin` unless requested.
 - `protocols` — optional; only needed to ADD edge kinds beyond the built-ins
   (see "Edge kinds"). `color` is one hex string, or
   `{"aurora": "#..", "daylight": "#.."}` for per-skin colors.

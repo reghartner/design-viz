@@ -12,5 +12,6 @@
   "routes": {
     "seatmap": "cookbook/venue-map.md"
   },
-  "templates": []
+  "templates": [],
+  "kitFiles": ["README.md", "contract.md", "package.json", "cookbook/venue-map.md", "examples/manifest.json", "examples/venue-map.spec.json", "examples/arena-sections.sections.json"]
 }

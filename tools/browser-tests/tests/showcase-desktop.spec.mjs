@@ -11,7 +11,8 @@ const allSteps=process.env.FLOWVIEW_SHOWCASE_SAMPLE!=='1';
 const showcases=[
   {name:'science showcase',package:'science',spec:'packages/science/diagrams/biology/cell-journey/biology-teaching.spec.json',sections:13},
   {name:'virology story',package:'science',spec:'packages/science/diagrams/biology/copy-gate/copy-gate.spec.json',sections:4},
-  {name:'sports showcase',package:'sports',spec:'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json',sections:14},
+  ...[['season-of-seats',4],['sell-the-inventory',4],['serve-game-night',4],['build-next-season',2]]
+    .map(([id,sections])=>({name:'sports showcase '+id,package:'sports',spec:`packages/sports/diagrams/${id}/${id}.spec.json`,sections})),
 ];
 const screenshotSections={
   'science showcase':new Set(['replication-fork','translation-codons','membrane-pump','nerve-impulse','sequencing-run']),
@@ -160,7 +161,7 @@ for(const showcase of showcases){
             }
             }
           }
-          if(process.env.FLOWVIEW_SCREENSHOT_DIR&&screenshotSections[showcase.name].has(section.id)){
+          if(process.env.FLOWVIEW_SCREENSHOT_DIR&&(screenshotSections[showcase.name]||screenshotSections['sports showcase']).has(section.id)){
             await mkdir(process.env.FLOWVIEW_SCREENSHOT_DIR,{recursive:true});
             await page.locator('#section-'+section.id).screenshot({
               path:path.join(process.env.FLOWVIEW_SCREENSHOT_DIR,

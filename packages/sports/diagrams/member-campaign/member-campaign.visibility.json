@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "expectations": [
+    {"section":"member-campaign","view":"flow","path":"member","step":"email","panel":"destination","visible":true},
+    {"section":"member-campaign","view":"flow","path":"member","step":"cms","panel":"record","visible":true},
+    {"section":"member-campaign","view":"flow","path":"signin","step":"signin","panel":"destination","visible":true},
+    {"section":"member-campaign","view":"flow","path":"ended","step":"expired","panel":"destination","visible":true},
+    {"section":"member-campaign","view":"flow","path":"ended","step":"paused","panel":"record","visible":true}
+  ]
+}

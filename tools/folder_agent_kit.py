@@ -6,9 +6,9 @@ import json
 import subprocess
 from pathlib import Path
 try:
-    from company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, company_agent_context, enabled_packages, contract_text, kit_examples
+    from company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples
 except ModuleNotFoundError:
-    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, company_agent_context, enabled_packages, contract_text, kit_examples
+    from tools.company_overlay import CONTRACT, AGENT_CONTEXT, ENABLED_PACKAGES, COMPANY_THEME, company_theme, company_agent_context, enabled_packages, contract_text, kit_examples
 
 
 def folder_agent_kit(root, runtime):
@@ -18,6 +18,22 @@ def folder_agent_kit(root, runtime):
     if context:
         files[AGENT_CONTEXT] = json.dumps(context, sort_keys=True) + '\n'
     packages = enabled_packages(root)
+    theme = company_theme(root)
+    if theme:
+        # Portable tools need only the guidance path, not build inputs.
+        files[COMPANY_THEME] = json.dumps({'guidance': theme.get('guidance')}) + '\n'
+        if theme.get('guidance'):
+            name = 'company/' + theme['guidance']
+            files[name] = (root / name).read_text()
+        for pattern in theme.get('kitFiles', []):
+            matches = sorted(root.glob(pattern))
+            if not matches:
+                raise ValueError('Theme kitFiles pattern matches no files: ' + pattern)
+            for path in matches:
+                if path.is_file():
+                    if not path.resolve().is_relative_to(root.resolve()):
+                        raise ValueError('Theme kit file escapes repository: ' + str(path))
+                    files[path.relative_to(root).as_posix()] = path.read_text()
     if packages:
         files[ENABLED_PACKAGES] = json.dumps(packages) + '\n'
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
@@ -30,6 +46,14 @@ def folder_agent_kit(root, runtime):
                     files[relative.as_posix()] = path.read_text()
     for name in packages:
         directory = root / 'packages' / name
+        manifest = json.loads((directory / 'package.json').read_text())
+        if 'kitFiles' in manifest:
+            for relative in manifest['kitFiles']:
+                path = directory / relative
+                if not path.is_file() or not path.resolve().is_relative_to(directory.resolve()):
+                    raise ValueError('Invalid package kit file: ' + relative)
+                files[path.relative_to(root).as_posix()] = path.read_text()
+            continue
         for pattern in ('*.md', '*.json'):
             for path in sorted(directory.rglob(pattern)):
                 if path.is_file():

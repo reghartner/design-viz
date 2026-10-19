@@ -26,7 +26,7 @@ process.stdout.write(JSON.stringify({packages:loader.enabledPackages(), types, r
 function run(selection, files = []) {
   const result = spawnSync(process.execPath, ['-e', probe, ...files], {
     cwd: root, encoding:'utf8', maxBuffer:16*1024*1024,
-    env:{...process.env, FLOWVIEW_COMPANY_IDENTITY:'off', FLOWVIEW_PACKAGES:selection},
+    env:{...process.env, FLOWVIEW_COMPANY_IDENTITY:'off', FLOWVIEW_PACKAGES:selection, FLOWVIEW_PACKAGE_BASE:'', FLOWVIEW_SITE_CONFIG:''},
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return JSON.parse(result.stdout);
@@ -38,14 +38,17 @@ test('default core retains generic panels and excludes domain panels', () => {
   assert.deepEqual(result.types, ['grid','funnel']);
 });
 
-test('sports alone validates the full season story without science sources or unknown panel types', () => {
-  const story = 'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json';
-  assert.ok(fs.existsSync(path.join(root, story)));
-  const result = run('sports', [story]);
+const themeFallback = 'page.skin: unknown skin "islanders" — using "pastel" (valid: aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac)';
+
+test('sports alone validates all four season arcs with only the expected company-skin fallback', () => {
+  const stories=['season-of-seats','sell-the-inventory','serve-game-night','build-next-season'].map(id=>`packages/sports/diagrams/${id}/${id}.spec.json`);
+  const result = run('sports', stories);
   assert.deepEqual(result.packages, ['sports']);
   assert.deepEqual(result.types, ['grid','funnel','seatmap']);
-  assert.deepEqual(result.reports[0].errors, []);
-  assert.deepEqual(result.reports[0].warnings, []);
+  for(const report of result.reports){assert.deepEqual(report.errors, [], report.file);assert.deepEqual(report.warnings, [themeFallback], report.file);}
+  const generic = run('sports', ['packages/sports/examples/venue-map.spec.json']);
+  assert.deepEqual(generic.reports[0].errors, []);
+  assert.deepEqual(generic.reports[0].warnings, []);
 });
 
 test('science alone uses core generic panels and validates the sequencing starter', () => {
@@ -74,7 +77,7 @@ test('combined selection retains one core definition of each generic panel and v
   assert.deepEqual(result.types, ['grid','funnel','seatmap','sequence']);
   for (const report of result.reports) {
     assert.deepEqual(report.errors, [], report.file);
-    assert.deepEqual(report.warnings, [], report.file);
+    assert.deepEqual(report.warnings, report.file.startsWith('packages/sports/') ? [themeFallback] : [], report.file);
   }
 });
 
@@ -86,6 +89,9 @@ test('published standalone stories contain only their selected package runtime',
     ['packages/science/examples/membrane-signal/membrane-signal.html', 'science', ['sports','physics']],
     ['packages/science/examples/strand-cut/strand-cut.html', 'science', ['sports','physics']],
     ['packages/sports/diagrams/season-of-seats/season-of-seats.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/sell-the-inventory/sell-the-inventory.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/serve-game-night/serve-game-night.html', 'sports', ['science','physics']],
+    ['packages/sports/diagrams/build-next-season/build-next-season.html', 'sports', ['science','physics']],
     ['packages/sports/examples/venue-map.html', 'sports', ['science','physics']],
   ];
   for (const [file, selected, excluded] of exports) {

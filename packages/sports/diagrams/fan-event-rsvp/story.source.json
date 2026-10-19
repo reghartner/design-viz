@@ -1,0 +1,308 @@
+{
+  "page": {
+    "title": "One invite. Three honest outcomes.",
+    "subtitle": "A sponsored fan-event journey that keeps capacity, registration and permission separate.",
+    "skin": "islanders",
+    "brand": false,
+    "contract": "1",
+    "protocols": {
+      "campaign": {
+        "label": "Proposed marketing handoff",
+        "color": "#00539b"
+      }
+    },
+    "sections": [
+      {
+        "id": "fan-event-rsvp",
+        "heading": "From fan invitation to the right confirmation",
+        "text": "Proposed journey, not the Islanders’ deployed stack. Official team imagery; illustrative campaign, records and integrations. Focused app mockups, not account screenshots. A/B mark source-to-screen matches. Clock is illustrative staging.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "storyTime": {
+            "start": "2026-10-19T09:41",
+            "span": "1m",
+            "clock": "12h",
+            "date": "none"
+          },
+          "nodes": {
+            "email": {
+              "title": "Salesforce",
+              "sub": "Follow-up",
+              "icon": "speaker",
+              "link": "https://trailhead.salesforce.com/content/learn/modules/journey-builder-campaigns/build-a-journey-campaign"
+            },
+            "content": {
+              "title": "Contentful",
+              "sub": "Copy + CTA",
+              "icon": "db",
+              "link": "https://www.contentful.com/help/content-and-entries/entry-editor/"
+            },
+            "site": {
+              "title": "Event site",
+              "sub": "Event page",
+              "icon": "person"
+            },
+            "registration": {
+              "title": "Eventbrite",
+              "sub": "Registration",
+              "icon": "package",
+              "link": "https://www.eventbrite.co.uk/help/en-us/articles/811539/how-to-set-up-an-event-waitlist/"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "floats": [
+            {
+              "id": "email",
+              "side": "below"
+            },
+            {
+              "id": "content",
+              "side": "below"
+            },
+            {
+              "id": "site",
+              "side": "below"
+            },
+            {
+              "id": "registration",
+              "side": "below"
+            }
+          ],
+          "edges": [
+            {
+              "from": "email",
+              "to": "site",
+              "label": "Click link",
+              "kind": "campaign"
+            },
+            {
+              "from": "content",
+              "to": "site",
+              "label": "Content",
+              "kind": "campaign"
+            },
+            {
+              "from": "site",
+              "to": "registration",
+              "label": "RSVP",
+              "kind": "campaign"
+            },
+            {
+              "from": "registration",
+              "to": "email",
+              "label": "Status + opt-in",
+              "kind": "campaign"
+            }
+          ],
+          "steps": [
+            {
+              "id": "promo",
+              "text": "**Show the invitation.** A proposed fan-social campaign uses official Islanders imagery with an explicitly fictional partner. The email’s Reserve my place button leads to event details—not directly to a confirmed reservation.",
+              "nodes": [
+                "email"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "promo"
+                },
+                "record": {
+                  "screen": "promo"
+                }
+              }
+            },
+            {
+              "id": "details",
+              "text": "**Open the event details.** The fan sees the proposed creative, partner placement and RSVP action. No real date, venue or event is being advertised; this is a walkthrough for reviewing the journey.",
+              "edge": "email->site",
+              "panels": {
+                "destination": {
+                  "screen": "details"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "content",
+              "text": "**Match the creative to its source.** A is the event headline; B is the RSVP button. Contentful’s proposed custom fields line up with the phone, including the example partner credit.",
+              "edge": "content->site",
+              "panels": {
+                "destination": {
+                  "screen": "linked"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "form",
+              "text": "**Make permission a separate choice.** On the available-capacity path, the fan chooses the optional sponsor checkbox. The Eventbrite-style order form is a focused mockup; custom questions can be optional.",
+              "edge": "site->registration",
+              "panels": {
+                "destination": {
+                  "screen": "form-yes"
+                },
+                "record": {
+                  "screen": "form"
+                }
+              }
+            },
+            {
+              "id": "reserved",
+              "text": "**Confirm only a completed registration.** In this simulated outcome the RSVP succeeded. The organizer record shows Registered and sponsor opt-in Yes as separate values. A click on the invitation did not establish either fact.",
+              "nodes": [
+                "registration"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "reserved-yes"
+                },
+                "record": {
+                  "screen": "registered-yes"
+                }
+              }
+            },
+            {
+              "id": "followup",
+              "text": "**Use the confirmed facts.** The proposed integration passes registration and the separate opt-in answer to Marketing Cloud. The fan receives the reservation message; the sponsor audience includes only explicit opt-ins. No sponsor message is sent in this story.",
+              "edge": "registration->email",
+              "panels": {
+                "destination": {
+                  "screen": "email-yes"
+                },
+                "record": {
+                  "screen": "followup-yes"
+                }
+              }
+            },
+            {
+              "id": "form-no",
+              "text": "**Leave sponsor opt-in unchecked.** The same optional question stays unanswered/No. The fan can still finish the RSVP. Declining partner marketing must not change the availability or reservation decision in this proposed journey.",
+              "edge": "site->registration",
+              "panels": {
+                "destination": {
+                  "screen": "form-no"
+                },
+                "record": {
+                  "screen": "form"
+                }
+              }
+            },
+            {
+              "id": "reserved-no",
+              "text": "**The place is still reserved.** This simulated registration is successful with sponsor opt-in No. Compare the two fields; the fan’s confirmation must not imply that a sponsor subscription was required.",
+              "nodes": [
+                "registration"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "reserved-no"
+                },
+                "record": {
+                  "screen": "registered-no"
+                }
+              }
+            },
+            {
+              "id": "followup-no",
+              "text": "**Send the event message, not sponsor marketing.** The proposed integration carries Registered plus opt-in No. The reservation confirmation still goes out; the fan is excluded from the proposed sponsor audience.",
+              "edge": "registration->email",
+              "panels": {
+                "destination": {
+                  "screen": "email-no"
+                },
+                "record": {
+                  "screen": "followup-no"
+                }
+              }
+            },
+            {
+              "id": "full",
+              "text": "**Capacity changes the action.** Eventbrite supports a waitlist when the configured ticket type or event is full. The fan now sees Join waitlist, not Reserve my place. No place is held at this step.",
+              "edge": "site->registration",
+              "panels": {
+                "destination": {
+                  "screen": "full"
+                },
+                "record": {
+                  "screen": "capacity"
+                }
+              }
+            },
+            {
+              "id": "waitlist",
+              "text": "**A waitlist is not a ticket.** The simulated fan joins the waitlist and sees an honest acknowledgement. Sponsor permission is not collected on this path; no automatic ticket release or reservation is shown.",
+              "nodes": [
+                "registration"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "waitlisted"
+                },
+                "record": {
+                  "screen": "waitlist"
+                }
+              }
+            },
+            {
+              "id": "waitlist-followup",
+              "text": "**Keep follow-up consistent.** The proposed integration carries Waitlisted, not Registered, with sponsor permission Not collected. The fan receives a waitlist message and is excluded from the proposed sponsor audience.",
+              "edge": "registration->email",
+              "panels": {
+                "destination": {
+                  "screen": "email-waitlist"
+                },
+                "record": {
+                  "screen": "followup-waitlist"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "reserved",
+              "label": "Reserved + opt-in",
+              "steps": [
+                "promo",
+                "details",
+                "content",
+                "form",
+                "reserved",
+                "followup"
+              ]
+            },
+            {
+              "id": "nooptin",
+              "label": "Reserved, no opt-in",
+              "steps": [
+                "promo",
+                "details",
+                "content",
+                "form-no",
+                "reserved-no",
+                "followup-no"
+              ]
+            },
+            {
+              "id": "full",
+              "label": "Event is full",
+              "steps": [
+                "promo",
+                "details",
+                "content",
+                "full",
+                "waitlist",
+                "waitlist-followup"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -3,25 +3,31 @@
     {
       "file": "season-of-seats.html",
       "spec": "season-of-seats.spec.json",
-      "title": "A season of selling the seat",
+      "title": "1 · Create demand",
       "family": "season-of-seats",
-      "description": "",
-      "tags": [],
+      "description": "Schaefer momentum, the schedule drop, bobblehead production and group holds at UBS Arena. Public facts cited; operational flows and uncited figures are illustrative.",
+      "tags": [
+        "sports",
+        "marketing",
+        "sports-marketing",
+        "ticketing",
+        "islanders",
+        "promotions",
+        "giveaways",
+        "group-sales",
+        "pricing",
+        "crm",
+        "sponsorship",
+        "renewals"
+      ],
       "widgets": [
         "budget",
         "checks",
-        "cost",
-        "deviceapp",
-        "funnel",
         "grid",
         "log",
-        "orbit",
-        "queue",
         "seatmap",
-        "state",
         "table",
-        "tiles",
-        "timeline"
+        "tiles"
       ]
     }
   ]

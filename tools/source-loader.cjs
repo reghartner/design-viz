@@ -115,11 +115,16 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'packages', 'backstage', 'site'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'packages', 'backstage', 'site', 'theme'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
   const config = {companyName:null, repository:null, revision:null, brand:null, package:{}, packages:[]};
+  if (raw.theme != null) {
+    if (typeof raw.theme !== 'string' || path.isAbsolute(raw.theme) || !inside(company, path.resolve(company, raw.theme)) || !raw.theme.endsWith('.json'))
+      throw companyError(file, 'theme must be a relative JSON manifest inside company/');
+    config.theme = raw.theme;
+  }
   if (raw.packages != null) {
     if (!Array.isArray(raw.packages) || raw.packages.some(name => typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)) ||
         new Set(raw.packages).size !== raw.packages.length)
@@ -169,6 +174,46 @@ function companyConfig(root = sourceRoot) {
 // Only public authoring context travels into prompts and the offline kit.
 function companyAgentContext(config = companyConfig()) {
   return Object.assign({}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
+}
+/* A company theme is a build-time overlay, independent of optional panels.
+   Paths are explicit and local; deployed outputs never load the manifest. */
+function companyTheme(root = sourceRoot) {
+  const config = companyConfig(root);
+  if (!config || !config.theme) return null;
+  const company = companyDir(root), file = path.join(company, config.theme);
+  let raw;
+  try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (error) { throw companyError(file, error.message); }
+  const allowed = ['skins', 'runtime', 'workbench', 'styles', 'assets', 'guidance', 'kitFiles'];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !allowed.includes(key)))
+    throw companyError(file, 'expected a theme object with ' + allowed.join(', '));
+  const local = (value, suffix) => {
+    if (typeof value !== 'string' || path.isAbsolute(value) || !inside(company, path.resolve(path.dirname(file), value)) ||
+        (suffix && !value.endsWith(suffix)) || !fs.existsSync(path.resolve(path.dirname(file), value)) ||
+        !fs.statSync(path.resolve(path.dirname(file), value)).isFile() || !inside(fs.realpathSync(company), fs.realpathSync(path.resolve(path.dirname(file), value))))
+      throw companyError(file, 'invalid theme file: ' + value);
+    return path.relative(company, path.resolve(path.dirname(file), value)).split(path.sep).join('/');
+  };
+  const coreSkins = ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac'];
+  if (!Array.isArray(raw.skins) || raw.skins.some(skin => !skin || Object.keys(skin).some(key => !['name','layers'].includes(key)) ||
+      typeof skin.name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(skin.name) || coreSkins.includes(skin.name) ||
+      !Array.isArray(skin.layers) || !skin.layers.length || skin.layers.some(name => !coreSkins.includes(name)) ||
+      new Set(skin.layers).size !== skin.layers.length) || new Set(raw.skins.map(skin => skin.name)).size !== raw.skins.length)
+    throw companyError(file, 'skins must have unique new names and existing core layers');
+  const theme = {skins:raw.skins, styles:{}, assets:{}, kitFiles:[]};
+  for (const key of ['runtime','workbench','guidance']) if (raw[key] != null) theme[key] = local(raw[key], key === 'guidance' ? '.md' : '.js');
+  for (const key of ['styles','assets']) {
+    if (raw[key] != null && (!raw[key] || typeof raw[key] !== 'object' || Array.isArray(raw[key]))) throw companyError(file, key + ' must be an object');
+    for (const [name, value] of Object.entries(raw[key] || {})) {
+      if ((key === 'styles' && !['core','workbench'].includes(name)) || !/^[a-z][a-z0-9-]*$/.test(name)) throw companyError(file, 'invalid ' + key + ' key: ' + name);
+      theme[key][name] = local(value, key === 'styles' ? '.css' : null);
+    }
+  }
+  if (raw.kitFiles != null && (!Array.isArray(raw.kitFiles) || raw.kitFiles.some(value => typeof value !== 'string' ||
+      path.isAbsolute(value) || !inside(path.dirname(root), path.resolve(path.dirname(root), value)) || !/\.(md|json)$/.test(value))))
+    throw companyError(file, 'kitFiles must list repository-local Markdown or JSON paths');
+  theme.kitFiles = raw.kitFiles || [];
+  return theme;
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,
@@ -225,6 +270,9 @@ function packageManifest(name, root = sourceRoot) {
         typeof template.source !== 'string' || !/^starters\/[a-z][a-z0-9-]*\.json$/.test(template.source))
       throw new Error('Invalid package template in ' + file);
   }
+  if (metadata.kitFiles != null && (!Array.isArray(metadata.kitFiles) || metadata.kitFiles.some(value =>
+      typeof value !== 'string' || path.isAbsolute(value) || !inside(packageDir(root, name), path.resolve(packageDir(root, name), value)) || !/\.(md|json)$/.test(value))))
+    throw new Error('Invalid package kitFiles: ' + file);
   return metadata;
 }
 function sitePackageSelection(root = sourceRoot, file = path.join(root, '../workbench/site.json'), required = false) {
@@ -262,6 +310,10 @@ function sourceFiles(name, root = sourceRoot) {
   const config = manifest(root), entries = Object.hasOwn(config, name) ? config[name] : [name];
   if (!Array.isArray(entries)) throw new Error('Not a logical source bundle: ' + name);
   return entries.flatMap((entry) => {
+    if (entry === '@theme/runtime' || entry === '@theme/workbench') {
+      const theme = companyTheme(root), key = entry.slice('@theme/'.length);
+      return theme && theme[key] ? [COMPANY_PREFIX + theme[key]] : [];
+    }
     // Fork venue entries extend the optional sports registry and must not run
     // in builds that omit that registry.
     if (entry === '@company/panels/venues/*.js' && !enabledPackages(root).includes('sports')) return [];
@@ -301,6 +353,14 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
       source = source.replace('/* @auto-arrange-worker */ ""', () => JSON.stringify(worker).replace(/</g, '\\u003c'));
     }
     if (substitute) source = companyText(source, file, company);
+    if (file === 'validator.js') source = source.replace('/* @company-skins */ []', () => JSON.stringify(companyTheme(root)?.skins || []));
+    if (file.startsWith(COMPANY_PREFIX) && substitute) {
+      const theme = companyTheme(root);
+      source = source.replace(/\/\* @theme-asset:([a-z][a-z0-9-]*) \*\/ ""/g, (_, name) => {
+        if (!theme || !theme.assets[name]) throw companyError(file, 'unknown theme asset: ' + name);
+        return JSON.stringify(imageDataUri(path.join(companyDir(root), theme.assets[name]), name, file, companyDir(root)));
+      });
+    }
     if (file === 'workbench/agent-chat.js' && substitute)
       source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
     if (file === 'core/document-links.js' && substitute) source = source.replace('/* @company-site-base */ null', () => JSON.stringify(company && company.site ? company.site.baseUrl : null).replace(/</g, '\\u003c'));
@@ -394,6 +454,8 @@ function readStyles(name, root = sourceRoot) {
   if (shared) source += '\n' + shared;
   const assets = panelAssets(root);
   const entries = name === 'style.workbench.css' ? assets.editorStyles : assets.styles;
+  const theme = companyTheme(root), themeStyle = theme && theme.styles[key];
+  if (themeStyle) entries.push({css:fs.readFileSync(path.join(companyDir(root), themeStyle), 'utf8'), order:1000000});
   if (source.includes('/* @panel-style-order:')) {
     const segments = source.split(/\/\* @panel-style-order:(\d+) \*\//);
     if (segments[0].trim()) entries.push({ css: segments[0], order: 0 });
@@ -447,13 +509,14 @@ function entrypointAssets(name, root = sourceRoot) {
   }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
-module.exports = { companyDir, companyConfig, companyAgentContext, packageManifest, sitePackageSelection, enabledPackages, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
+module.exports = { companyDir, companyConfig, companyAgentContext, companyTheme, packageManifest, sitePackageSelection, enabledPackages, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
   panelAssets, readStyles, fontAssets, fontCss, entrypointAssets };
 if (require.main === module) {
   const [mode, ...names] = process.argv.slice(2);
   if (mode === '--assets') process.stdout.write(JSON.stringify(panelAssets()));
   else if (mode === '--packages' && !names.length) process.stdout.write(JSON.stringify(enabledPackages()));
   else if (mode === '--company' && !names.length) process.stdout.write(JSON.stringify(companyConfig()));
+  else if (mode === '--theme' && !names.length) process.stdout.write(JSON.stringify(companyTheme()));
   else if (mode === '--agent-context' && !names.length) process.stdout.write(JSON.stringify(companyAgentContext()));
   else if (mode === '--styles' && names.length === 1) process.stdout.write(readStyles(names[0]));
   else if (mode === '--sources' && names.length) process.stdout.write(composeSources(names));

@@ -16,7 +16,26 @@ function diagramHasDelta(d){
 }
 
 /* ---------------- host-driven skin interface ---------------- */
-function resolveSkin(cookieText, specSkin){
+function querySkin(search){
+  try {
+    var candidate=new URL('https://flowview.invalid/'+(search || '')).searchParams.get('theme');
+    return SKIN_NAMES.indexOf(candidate)>=0?candidate:null;
+  } catch(ex){return null;}
+}
+/* A shared theme is a URL preference, not a cookie write. Explicit live
+   choices update that preference so reload and copied links agree. */
+function updateThemeURL(win,name){
+  if(SKIN_NAMES.indexOf(name)<0)return;
+  try {
+    var url=new URL(win.location.href);
+    if(!querySkin(url.search))return;
+    url.searchParams.set('theme',name);
+    win.history.replaceState(win.history.state,'',url.pathname+url.search+url.hash);
+  } catch(ex){/* Sandboxed hosts may deny history access. */}
+}
+function resolveSkin(cookieText, specSkin, search){
+  var shared=querySkin(search);
+  if(shared)return shared;
   var cookieSkin = null;
   if (typeof cookieText === 'string'){
     cookieText.split(';').some(function(part){
@@ -35,10 +54,14 @@ function resolveSkin(cookieText, specSkin){
 }
 
 function skinBase(name){
+  var custom = COMPANY_SKINS.find(function(skin){return skin.name === name;});
+  if(custom)return custom.layers[0];
   return name === 'daylight' ? 'daylight' : 'aurora';
 }
 
 function skinClasses(name){
+  var custom = COMPANY_SKINS.find(function(skin){return skin.name === name;});
+  if(custom)return custom.layers.concat([name]).map(function(layer){return 'sk-' + layer;});
   var base = skinBase(name);
   return base === name ? ['sk-' + base] : ['sk-' + base].concat(['rose','lavender','lilac'].indexOf(name)>=0?['sk-pastel']:[]).concat(['sk-' + name]);
 }
@@ -3757,7 +3780,18 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     write();
   }
   function fullURL(hash){
-    if (linkBase !== null) return composeLinkURL(linkBase, hash);
+    if (linkBase !== null){
+      var baseURL=composeLinkURL(linkBase,hash);
+      // A site's canonical document address stays fixed while its live theme
+      // can change. Read that cosmetic preference when each link is copied.
+      if(typeof options.theme==='function'){
+        var sharedURL=new URL(baseURL),theme=options.theme();
+        if(SKIN_NAMES.indexOf(theme)>=0)sharedURL.searchParams.set('theme',theme);
+        else sharedURL.searchParams.delete('theme');
+        return sharedURL.href;
+      }
+      return baseURL;
+    }
     var href = String(win.location.href || '');
     var base = href ? href.split('#')[0] : (win.location.pathname + win.location.search);
     return base + withPreserved(hash);

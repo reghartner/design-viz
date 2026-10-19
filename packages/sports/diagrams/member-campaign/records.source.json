@@ -1,0 +1,12 @@
+{
+  "email": {"fields":[["Email owner","Salesforce Marketing Cloud"],["Email CTA","Explore member guest tickets"],["Campaign link","/members/bring-your-people"]],"note":"Illustrative stack. Contentful and Salesforce are example vendor choices."},
+  "member": {"fields":[["Landing route","/members/bring-your-people"],["Audience","Verified season ticket member"],["Landing CTA","View guest-ticket options"]],"note":"The website verifies membership. The email URL alone grants no ticket access."},
+  "cms": {"fields":[["Campaign eyebrow","Your people. Our Island."],["Landing CTA","View guest-ticket options"],["Ticket offer reference","MEMBER-GUEST-DEMO"]],"note":"Custom illustrative Contentful model; the website applies eligibility rules."},
+  "tickets": {"fields":[["Ticketing owner","Ticketmaster Account Manager"],["Offer passed","MEMBER-GUEST-DEMO"],["Purchase status","Not purchased - link opened only"]],"note":"Illustrative handoff; no live inventory or prices are presented."},
+  "followup": {"fields":[["Trigger","Confirmed purchase - simulated"],["Salesforce reminder","Suppressed after confirmed purchase"],["Campaign match","ISLES-GUEST-DEMO"]],"note":"Requires an agreed ticketing-to-marketing integration. A click is not a purchase."},
+  "signin": {"fields":[["Member eligibility","Not yet verified"],["Return after sign-in","/members/bring-your-people"],["Ticket access","Withheld until verification"]],"note":"No credentials are collected by this walkthrough."},
+  "verified": {"fields":[["Member eligibility","Verified - simulated"],["Return destination","Original member campaign"],["Landing CTA","View guest-ticket options"]],"note":"Ticketmaster still enforces its own eligibility rules."},
+  "expired": {"fields":[["Original email URL","/members/bring-your-people"],["Campaign state","Ended"],["Fallback CTA","See regular ticket options"]],"note":"Old emails remain clickable after a campaign ends."},
+  "paused": {"fields":[["Fallback headline","This offer's over. Your next night isn't."],["Landing CTA","See regular ticket options"],["Ticket offer reference","Not passed - offer expired"]],"note":"Published fallback content keeps an old campaign link useful."},
+  "general": {"fields":[["Ticket destination","Regular ticket options"],["Member offer passed","None"],["Purchase status","Not purchased - link opened only"]],"note":"No promotional price or member benefit carries into this fallback."}
+}

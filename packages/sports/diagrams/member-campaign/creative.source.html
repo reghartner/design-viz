@@ -1,0 +1,71 @@
+<div id="isles-campaign-preview">
+<style>
+#isles-campaign-preview{--navy:#052f59;--blue:#00539b;--orange:#f47d30;--ink:#172d43;--line:#dce3e9;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#edf1f5;line-height:1.4;color-scheme:light}
+#isles-campaign-preview *{box-sizing:border-box}#isles-campaign-preview button{font:inherit;cursor:pointer}#isles-campaign-preview button:focus-visible{outline:3px solid #199bec;outline-offset:3px}#isles-campaign-preview .scenario{display:flex;gap:10px;padding:12px}#isles-campaign-preview .stage{display:flex;gap:25px;padding:15px}#isles-campaign-preview .email,#isles-campaign-preview .destination{position:relative;width:390px;height:710px;flex:none;background:#fff;overflow:hidden}
+#isles-campaign-preview p,#isles-campaign-preview h2,#isles-campaign-preview h3{margin:0}#isles-campaign-preview .mailnav{height:39px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;color:#0074d6;font-size:17px;background:#f7f8fa;border-bottom:1px solid var(--line)}
+#isles-campaign-preview .mailmeta{padding:12px 20px 13px;border-bottom:1px solid var(--line)}#isles-campaign-preview .mailmeta strong{display:block;font-size:21px;line-height:1.2;letter-spacing:-.4px;margin-bottom:8px}#isles-campaign-preview .sender{display:flex;align-items:center;gap:8px;font-size:14px;color:#68798b}#isles-campaign-preview .sender img{width:27px;height:27px;object-fit:contain}#isles-campaign-preview .sender b{font-size:15px;color:#263e56}
+#isles-campaign-preview .art{height:246px;position:relative;background:var(--navy);color:white;isolation:isolate;overflow:hidden}#isles-campaign-preview .hero-photo{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 48%}#isles-campaign-preview .art:after,#isles-campaign-preview .pagehero:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,32,62,0) 10%,rgba(0,26,55,.24) 35%,rgba(0,26,55,.96) 100%);z-index:0}#isles-campaign-preview .hero-copy{position:absolute;bottom:20px;left:22px;right:22px;z-index:1}#isles-campaign-preview .eyebrow{font-size:13px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;margin-bottom:10px}#isles-campaign-preview .art h2{font-family:Impact,'Arial Narrow',Arial,sans-serif;font-size:43px;font-weight:400;line-height:1;letter-spacing:.2px;text-transform:uppercase}#isles-campaign-preview .art em{font-style:normal;color:#ff9b4d}
+#isles-campaign-preview .mailbody{padding:20px 22px 12px}#isles-campaign-preview .mailbody h3{font-size:22px;letter-spacing:-.5px;margin-bottom:8px}#isles-campaign-preview .mailbody p{font-size:18px;color:#536479;line-height:1.4;margin-bottom:16px}#isles-campaign-preview .cta{display:block;width:100%;border:0;border-radius:3px;background:var(--orange);color:#112d48;padding:15px 10px;font-size:18px;font-weight:700;line-height:1.25;text-align:center}
+#isles-campaign-preview .linklabel{display:block;font-size:12px;color:#617389;margin-top:9px;overflow-wrap:anywhere}#isles-campaign-preview .mailfoot{padding:8px 22px;color:#738196;font-size:12px}
+#isles-campaign-preview .address{height:34px;padding:8px 12px;font-size:12px;text-align:center;background:#f4f6f8;border-bottom:1px solid #e2e7ed;color:#52667b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#isles-campaign-preview .siteheader{height:58px;display:flex;align-items:center;gap:10px;background:white;padding:8px 20px;color:var(--blue);font-size:16px;font-weight:800;letter-spacing:.5px;border-bottom:1px solid #e2e7ed}#isles-campaign-preview .siteheader img{width:42px;height:42px;object-fit:contain}#isles-campaign-preview .siteheader small{margin-left:auto;font-size:12px;font-weight:400;color:#65768a;letter-spacing:0}
+#isles-campaign-preview .pagehero{height:254px;background:var(--navy);position:relative;color:#fff;isolation:isolate}#isles-campaign-preview .pagehero h2{font-size:35px;font-weight:800;line-height:1.05;letter-spacing:-1.2px;max-width:335px}#isles-campaign-preview .pagehero .eyebrow{color:#e6f0fa;font-size:12px;margin-bottom:10px}#isles-campaign-preview .pagehero.compact{height:188px}#isles-campaign-preview .pagehero.compact h2{font-size:31px}
+#isles-campaign-preview .pagebody{padding:20px 22px}#isles-campaign-preview .pagebody h3{font-size:24px;line-height:1.15;letter-spacing:-.6px;margin:10px 0}#isles-campaign-preview .pagebody p{font-size:18px;color:#536479;margin:0 0 18px;line-height:1.45}#isles-campaign-preview .status{font-size:13px;display:inline-flex;align-items:center;gap:6px;color:#277353;font-weight:700}#isles-campaign-preview .status:before{content:"";height:6px;width:6px;background:#369766;border-radius:100%}
+#isles-campaign-preview .note{font-size:14px!important;color:#6c7e92!important;margin:11px 0 0!important;line-height:1.4!important}#isles-campaign-preview .signinbox{border:1px solid #d6e2ec;background:#f4f8fc;padding:15px;margin:16px 0;border-radius:5px}#isles-campaign-preview .signinbox b{font-size:17px;display:block;margin-bottom:5px}#isles-campaign-preview .signinbox span{font-size:16px;color:#597088;display:block}
+#isles-campaign-preview .tmbar{height:47px;background:#026cdf;color:white;display:flex;align-items:center;gap:14px;padding:0 20px;font-size:24px;font-style:italic;font-weight:700}#isles-campaign-preview .tmbar small{font-style:normal;font-size:10px;letter-spacing:.8px;font-weight:400}
+#isles-campaign-preview .ticket-photo{width:100%;height:142px;object-fit:cover;display:block}#isles-campaign-preview .official-banner{display:block;width:100%;height:auto}#isles-campaign-preview .ticketstub{padding:18px;margin:20px 0;border:1px solid #d9e2ec;border-left:4px solid var(--blue);border-radius:4px;background:#f6f9fc}#isles-campaign-preview .ticketstub b{font-size:20px;display:block;margin-bottom:7px}#isles-campaign-preview .ticketstub span{display:block;font-size:16px;color:#607389;line-height:1.5}#isles-campaign-preview .plain{border:0;background:none;padding:0;color:var(--blue);font-size:16px;text-decoration:underline}
+#isles-campaign-preview .footnote{font-size:12px;color:#758397;margin-top:15px}#isles-campaign-preview .home-indicator{position:absolute;bottom:8px;width:120px;height:4px;left:135px;border-radius:5px;background:#172b40}
+</style>
+<div class="scenario"><button data-path="member">Recognized member</button><button data-path="signin">Needs sign-in</button><button data-path="ended">Offer has ended</button></div>
+<div class="stage">
+<article class="email" id="isles-email">
+ <div class="mailnav"><span>‹ Inbox</span><span>•••</span></div>
+ <div class="mailmeta"><strong>Your next Isles night?<br>Bring your people.</strong><div class="sender"><img src="__ISLANDERS_LOGO__" alt="Islanders"><span><b>New York Islanders</b><br>To: Season ticket member</span></div></div>
+ <div class="art"><img class="hero-photo" src="__CROWD_PHOTO__" alt="Islanders fans waving orange towels at UBS Arena"><div class="hero-copy"><div class="eyebrow">Member guest access</div><h2>Your people.<br><em>Our Island.</em></h2></div></div>
+ <div class="mailbody"><h3>Some nights are better shared.</h3><p>Bring your favorite people into the blue and orange.</p><button class="cta" data-action="open">Explore member guest tickets →</button><span class="linklabel">islanders.example/members/bring-your-people<br>?utm_source=member-email</span></div>
+ <div class="mailfoot">Illustrative offer · Official Islanders imagery</div><div class="home-indicator"></div>
+</article>
+<div class="destination" id="isles-destination" aria-live="polite"></div>
+</div>
+<template id="isles-member">
+ <div class="address">islanders.example / members / bring-your-people</div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">ISLANDERS<small>Member access</small></div>
+ <div class="pagehero"><img class="hero-photo" src="__CROWD_PHOTO__" alt="Islanders fans at UBS Arena"><div class="hero-copy"><div class="eyebrow">Your people. Our Island.</div><h2>Bring them into<br>the blue &amp; orange.</h2></div></div>
+ <div class="pagebody"><span class="status">Member verified · demo</span><h3>Make it an Islanders night.</h3><p>Explore guest-ticket options for season ticket members.</p><button class="cta" data-action="ticketing">View guest-ticket options →</button><p class="note">Continue to Ticketmaster Account Manager.<br>Availability and eligibility checked there.</p><div class="footnote">Illustrative offer · Official Islanders imagery</div></div><div class="home-indicator"></div>
+</template>
+<template id="isles-signin">
+ <div class="address">islanders.example / members / sign-in</div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">ISLANDERS<small>Member access</small></div>
+ <div class="pagehero compact"><img class="hero-photo" src="__CROWD_PHOTO__" alt="Fans at UBS Arena"><div class="hero-copy"><h2>Your member access<br>starts here.</h2></div></div>
+ <div class="pagebody"><h3>Let’s find your membership.</h3><p>Sign in to return to the guest-ticket offer.</p><div class="signinbox"><b>We’ll keep your place.</b><span>After verification, return to “Bring your people.”</span></div><button class="cta" data-action="verify">Simulate member sign-in →</button><p class="note">Preview only. No credentials collected.</p></div><div class="home-indicator"></div>
+</template>
+<template id="isles-expired">
+ <div class="address">islanders.example / members / bring-your-people</div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">ISLANDERS<small>Member access</small></div>
+ <div class="pagehero"><img class="hero-photo" src="__CROWD_PHOTO__" alt="Fans at UBS Arena"><div class="hero-copy"><div class="eyebrow">Still part of the Island</div><h2>This offer’s over.<br>Your next night isn’t.</h2></div></div>
+ <div class="pagebody"><h3>Let’s find your next Isles night.</h3><p>This member guest offer has ended. You can still explore regular tickets.</p><button class="cta" data-action="general">See regular ticket options →</button><p class="note">The expired member offer no longer applies.</p><div class="footnote">Illustrative offer · Official Islanders imagery</div></div><div class="home-indicator"></div>
+</template>
+<template id="isles-ticketing">
+ <div class="address">Ticketmaster · illustrative handoff</div><div class="tmbar">ticketmaster<small>ACCOUNT MANAGER</small></div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">NEW YORK ISLANDERS</div>
+ <img class="ticket-photo" src="__CROWD_PHOTO__" alt="Fans at UBS Arena">
+ <div class="pagebody"><span class="status">Member offer context · example</span><h3>Bring your people.</h3><div class="ticketstub"><b>Member guest-ticket options</b><span>Offer: MEMBER-GUEST-DEMO<br>Campaign: ISLES-GUEST-DEMO</span></div><p>Eligibility, available games and seats are confirmed in ticketing.</p><p class="note">Concept handoff only. No live inventory,<br>prices or checkout.</p><div style="margin-top:18px"><button class="plain" data-action="open">Return to campaign</button></div></div><div class="home-indicator"></div>
+</template>
+<template id="isles-general">
+ <div class="address">Ticketmaster · regular tickets concept</div><div class="tmbar">ticketmaster<small>ACCOUNT MANAGER</small></div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">NEW YORK ISLANDERS</div><img class="official-banner" src="__MEMBERSHIP_BANNER__" alt="Official Islanders marketing banner: The Tide Is Rising">
+ <div class="pagebody"><h3>Find your next Islanders night.</h3><p>Explore regular ticket options.</p><div class="ticketstub"><b>Regular tickets</b><span>No expired member offer attached.<br>Campaign referral retained.</span></div><p class="note">Illustrative handoff. No live ticket inventory.</p><div style="margin-top:22px"><button class="plain" data-action="open">Return to campaign</button></div><div class="footnote">Banner from the Islanders’ membership site</div></div><div class="home-indicator"></div>
+</template>
+<template id="isles-confirmation">
+ <div class="address">Ticketmaster · confirmation concept</div><div class="tmbar">ticketmaster<small>ACCOUNT MANAGER</small></div>
+ <div class="siteheader"><img src="__ISLANDERS_LOGO__" alt="Islanders">NEW YORK ISLANDERS</div><img class="ticket-photo" style="height:205px;object-position:center 40%" src="__MEMBERS_PHOTO__" alt="Official Islanders membership community photo">
+ <div class="pagebody"><span class="status">Simulated purchase confirmed</span><h3>You’re bringing your people.</h3><p>See you in the blue and orange.</p><div class="ticketstub"><b>Member guest-ticket order</b><span>Illustrative confirmation only.<br>No real payment or reservation.</span></div><p class="note">Tickets and order details would be available in Account Manager.</p></div><div class="home-indicator"></div>
+</template>
+<script>
+(()=>{const root=document.getElementById('isles-campaign-preview'),dest=root.querySelector('#isles-destination');let path='member';
+function render(screen){dest.replaceChildren(root.querySelector('#isles-'+screen).content.cloneNode(true));}
+root.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;if(button.dataset.path){path=button.dataset.path;render(path==='ended'?'expired':path);}else if(button.dataset.action){const a=button.dataset.action;render(a==='open'?(path==='ended'?'expired':path):a==='verify'?'member':a);}});
+render('member');
+})();
+</script>
+</div>

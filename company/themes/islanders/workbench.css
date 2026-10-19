@@ -1,0 +1,30 @@
+/* Shared Islanders shell: welcome, library, reader and desktop authoring. */
+body.sk-aurora.sk-islanders{--bg:#EDF5FA;--ink:#071E42;--sub:#536A80;--line:#C8D9E8;--accent:#003087;--accent-ink:#FFFFFF;--card:#FFFFFF;--codebg:#EDF5FA;--codeink:#294561;--welcome-ink:#071E42;--welcome-sub:#536A80;}
+body.sk-islanders .workbench-header{background:#071E42;border-bottom:3px solid #FC4C02;color:#FFFFFF;}
+body.sk-islanders .workbench-header :is(.workbench-brand,#workbench-editor-title,#canon-reader-title){color:#FFFFFF;}
+body.sk-islanders .workbench-reader-title{border-color:#365575;}
+body.sk-islanders .welcome{--welcome-ink:#071E42;--welcome-sub:#536A80;--welcome-line:#C8D9E8;--welcome-purple:#003087;color:#071E42;}
+body.sk-islanders.welcome-active{background:radial-gradient(ellipse at 0% 0%,#DCEAF8,transparent 60%),#F4F8FC;}
+body.sk-islanders .workbench-header :is(.workbench-brand-detail,.workbench-header-links a,.workbench-header-links button){color:#D3E4F5;}
+body.sk-islanders .workbench-mark{color:#FC4C02;}
+/* Royal blue disappears against the dark Ink preset; use the team's orange
+   for its editor selection/membership marks, leaving semantic tones intact. */
+body.sk-islanders .docview g.node.ns-ink{--accent:#FC4C02;}
+.islanders-site-mark,.islanders-card-mark{display:none;object-fit:contain;flex:none;}
+body.sk-islanders .islanders-site-mark:not(.islanders-mark-suppressed){display:block;width:46px;height:46px;padding-left:14px;margin-right:auto;border-left:1px solid #365575;}
+body.sk-islanders .islanders-card-mark{display:block;width:42px;height:42px;float:right;margin:0 0 6px 12px;}
+body.sk-islanders.canon-reader-active .islanders-site-mark{width:36px;height:36px;padding-left:12px;}
+body:not(.welcome-active):not(.canon-reader-active) .islanders-site-mark{display:none!important;}
+body.sk-islanders .welcome-button-primary{background:#003087;color:#FFFFFF;border-color:#003087;}
+body.sk-islanders :is(.welcome-action,.welcome-library-entry,.library-controls,.canon-recent-link){background:#F5F9FC;border-color:#C8D9E8;color:#003087;}
+body.sk-islanders :is(.welcome-kicker,.welcome-back,.library-active-filters button,.library-recent-heading button){color:#003087;}
+body.sk-islanders .library-heading{border-bottom:3px solid #003087;padding-bottom:20px;position:relative;}
+body.sk-islanders .library-heading:after{content:'';position:absolute;bottom:-3px;left:0;width:76px;height:3px;background:#FC4C02;}
+body.sk-islanders .canon-library-card{border-color:#C8D9E8;border-top:4px solid #003087;box-shadow:0 4px 16px #0030870A;color:#071E42;}
+body.sk-islanders .canon-library-card:hover{border-color:#003087;border-top-color:#FC4C02;box-shadow:0 6px 20px #00308716;}
+body.sk-islanders .canon-library-preview{background:#EDF5FA;border-color:#C8D9E8;}
+body.sk-islanders :is(.canon-library-tag,.canon-library-service,.canon-library-badge){background:#EDF5FA;border-color:#C8D9E8;color:#003087;}
+body.sk-islanders :is(.canon-library-tag,.canon-library-service)[aria-pressed=true]{background:#003087;color:#FFFFFF;}
+body.sk-islanders .library-presentation{background:#E4EEF8;border-color:#C8D9E8;}
+body.sk-islanders .library-presentation button[aria-pressed=true]{background:#003087;color:#FFFFFF;}
+body.sk-islanders .canon-reader-toolbar .welcome-back{background:#EDF5FA;color:#003087;border-color:#B3C8DF;}

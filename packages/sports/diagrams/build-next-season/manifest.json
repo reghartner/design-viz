@@ -1,0 +1,32 @@
+{
+  "pages": [
+    {
+      "file": "build-next-season.html",
+      "spec": "build-next-season.spec.json",
+      "title": "4 · Build the next season",
+      "family": "season-of-seats",
+      "description": "Turn a friend’s first game into membership, then follow the clinch-or-fade renewal fork. Public facts cited; operational flows and uncited figures are illustrative.",
+      "tags": [
+        "sports",
+        "marketing",
+        "sports-marketing",
+        "ticketing",
+        "islanders",
+        "promotions",
+        "giveaways",
+        "group-sales",
+        "pricing",
+        "crm",
+        "sponsorship",
+        "renewals"
+      ],
+      "widgets": [
+        "cost",
+        "funnel",
+        "seatmap",
+        "state",
+        "table"
+      ]
+    }
+  ]
+}

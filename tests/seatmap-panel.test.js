@@ -15,6 +15,7 @@ const validate = d => plain(C.validate(C.normalize(d)));
 const near = (a,b) => assert.ok(Math.abs(a-b)<1e-7, `${a} ≈ ${b}`);
 const HOSTILE = '<img src=x onerror=bad()>';
 
+
 function panel() {
   return {
     id:'map', type:'seatmap', title:'Venue map', bowl:'oval', ringSlots:8, currency:'USD',

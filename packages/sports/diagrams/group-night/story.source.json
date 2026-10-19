@@ -1,0 +1,254 @@
+{
+  "page": {
+    "title": "Bring the whole crew.",
+    "subtitle": "Turn a group-night promotion into the right ticket path or a useful sales conversation.",
+    "skin": "islanders",
+    "brand": false,
+    "contract": "1",
+    "protocols": {
+      "campaign": {
+        "label": "Proposed marketing handoff",
+        "color": "#00539b"
+      }
+    },
+    "sections": [
+      {
+        "id": "group-night",
+        "heading": "From group invitation to useful sales handoff",
+        "text": "Proposed journey, not the Islanders’ deployed stack. Official team imagery; illustrative campaign, records and integrations. Focused app mockups, not account screenshots. A/B mark source-to-screen matches. Clock is illustrative staging.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "storyTime": {
+            "start": "2026-10-19T09:41",
+            "span": "1m",
+            "clock": "12h",
+            "date": "none"
+          },
+          "nodes": {
+            "email": {
+              "title": "Salesforce",
+              "sub": "Email",
+              "icon": "speaker",
+              "link": "https://trailhead.salesforce.com/content/learn/modules/content-builder-features/create-and-edit-your-content"
+            },
+            "content": {
+              "title": "Contentful",
+              "sub": "Copy + CTA",
+              "icon": "db",
+              "link": "https://www.contentful.com/help/content-and-entries/entry-editor/"
+            },
+            "site": {
+              "title": "Group site",
+              "sub": "Choose a path",
+              "icon": "person",
+              "link": "https://www.nhl.com/islanders/tickets/group-tickets"
+            },
+            "sales": {
+              "title": "Salesforce",
+              "sub": "Sales Cloud",
+              "icon": "person",
+              "link": "https://trailhead.salesforce.com/content/learn/modules/lead-record-step-by-step/work-with-a-lead-record"
+            },
+            "tickets": {
+              "title": "Ticketmaster",
+              "sub": "Ticket options",
+              "icon": "package",
+              "link": "https://www.nhl.com/islanders/tickets/group-tickets"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "floats": [
+            {
+              "id": "email",
+              "side": "below"
+            },
+            {
+              "id": "content",
+              "side": "below"
+            },
+            {
+              "id": "site",
+              "side": "below"
+            },
+            {
+              "id": "sales",
+              "side": "below"
+            },
+            {
+              "id": "tickets",
+              "side": "below"
+            }
+          ],
+          "edges": [
+            {
+              "from": "email",
+              "to": "site",
+              "label": "Click link",
+              "kind": "campaign"
+            },
+            {
+              "from": "content",
+              "to": "site",
+              "label": "Page content",
+              "kind": "campaign"
+            },
+            {
+              "from": "site",
+              "to": "sales",
+              "label": "Inquiry",
+              "kind": "campaign"
+            },
+            {
+              "from": "site",
+              "to": "tickets",
+              "label": "Tickets",
+              "kind": "campaign"
+            }
+          ],
+          "steps": [
+            {
+              "id": "promo",
+              "text": "**Start with the invitation.** The fan sees the group-night email; Content Builder shows the same creative, button and campaign destination. This is a proposed campaign, not a live offer.",
+              "nodes": [
+                "email"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "promo"
+                },
+                "record": {
+                  "screen": "promo"
+                }
+              }
+            },
+            {
+              "id": "landing",
+              "text": "**Follow the promise.** Plan your group night opens this campaign landing page—not a generic homepage. The two choices let the organizer ask for planning help or explore ticket options.",
+              "edge": "email->site",
+              "panels": {
+                "destination": {
+                  "screen": "landing"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "content",
+              "text": "**Check the source against the screen.** Contentful holds the same official group photo and A headline shown on the phone. B is the planning CTA. These custom fields and their website mapping are proposed.",
+              "edge": "content->site",
+              "panels": {
+                "destination": {
+                  "screen": "linked"
+                },
+                "record": {
+                  "screen": "content"
+                }
+              }
+            },
+            {
+              "id": "inquiry",
+              "text": "**Ask for useful context.** The example organizer requests planning help for 24 people and hospitality. This is still a form, not a lead or a booking. Routing follows the request type, not an invented group-size threshold.",
+              "nodes": [
+                "site"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "form"
+                },
+                "record": {
+                  "screen": "routing"
+                }
+              }
+            },
+            {
+              "id": "handoff",
+              "text": "**Submit the planning request.** In this proposed handoff, Sales Cloud receives the campaign, group size and preferences. Compare the phone acknowledgement with the lead record: inquiry received does not mean seats reserved.",
+              "edge": "site->sales",
+              "panels": {
+                "destination": {
+                  "screen": "received"
+                },
+                "record": {
+                  "screen": "lead"
+                }
+              }
+            },
+            {
+              "id": "next",
+              "text": "**Give sales a useful next action.** The lead is still open and not contacted. The proposed task is to discuss hospitality and game preferences; no quote, reservation or response deadline is implied.",
+              "nodes": [
+                "sales"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "received"
+                },
+                "record": {
+                  "screen": "task"
+                }
+              }
+            },
+            {
+              "id": "choice",
+              "text": "**Take the other path.** This fan chooses Tickets only. The proposed campaign route does not create a planning inquiry just because someone clicked a link.",
+              "nodes": [
+                "site"
+              ],
+              "panels": {
+                "destination": {
+                  "screen": "choice"
+                },
+                "record": {
+                  "screen": "routing"
+                }
+              }
+            },
+            {
+              "id": "options",
+              "text": "**Hand off to ticketing.** A configured Ticketmaster destination would own availability and checkout. This preview stops at the handoff: no group discount, inventory, payment or purchase is simulated.",
+              "edge": "site->tickets",
+              "panels": {
+                "destination": {
+                  "screen": "ticketing"
+                },
+                "record": {
+                  "screen": "ticketroute"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "help",
+              "label": "Planning help",
+              "steps": [
+                "promo",
+                "landing",
+                "content",
+                "inquiry",
+                "handoff",
+                "next"
+              ]
+            },
+            {
+              "id": "tickets",
+              "label": "Tickets only",
+              "steps": [
+                "promo",
+                "landing",
+                "content",
+                "choice",
+                "options"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

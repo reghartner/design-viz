@@ -288,7 +288,10 @@ class BuildTests(unittest.TestCase):
         self.assertIn('/* ---- src/welcome.workbench.js ---- */', text)
 
     def test_science_templates_require_explicit_package_selection(self):
-        default = json.loads(build.workbench_templates())
+        # Match the --no-config build above, not this fork's package defaults.
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off',
+                                     'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_PACKAGES': ''}):
+            default = json.loads(build.workbench_templates())
         self.assertFalse(any(item['name'] in ('Waves & forces', 'From viral RNA copying to sequencing evidence') for item in default))
         self.assertNotIn('panel.wavefield', self.texts['flowspec.html'])
         self.assertNotIn('panel.rnacopy', self.texts['flowspec.html'])

@@ -860,6 +860,7 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
     h += '<path class="seatmap-field" d="' + model.field + '" id="' + hid + '-fp"/>' + marks.under;
     if (model.fieldLines) h += '<path class="seatmap-field-line" d="' + model.fieldLines + '"/>';
     h += marks.over;
+    if (typeof CompanyVenueDecoration !== 'undefined') h += CompanyVenueDecoration.field(panel, model);
   }
   /* One group per ring, inner first, so each level casts a soft shadow and
      reads as a tier stepping up from the field. */
@@ -875,7 +876,8 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
   model.sections.forEach(function (s) { if (s.highlighted) h += '<path class="seatmap-outline-halo" d="' + s.d + '"/><path class="seatmap-outline" d="' + s.d + '"/>'; });
   h += '</g><g class="seatmap-landmarks">';
   model.landmarks.forEach(function (mark) {
-    h += '<g class="seatmap-landmark"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
+    var decorationClass = typeof CompanyVenueDecoration !== 'undefined' ? CompanyVenueDecoration.landmarkClass(panel, mark) : '';
+    h += '<g class="seatmap-landmark' + decorationClass + '"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g>';

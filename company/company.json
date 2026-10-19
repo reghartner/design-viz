@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "companyName": "Flowview for Friends",
+  "packages": ["science", "sports"],
+  "theme": "themes/islanders/theme.json"
+}

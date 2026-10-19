@@ -39,7 +39,7 @@ const fakeHost = () => {
     querySelector(selector){ return host.parts[selector] || null; }, querySelectorAll(){ return []; },
     get innerHTML(){ return host.html; },
     set innerHTML(value){ host.writes++; host.html = value;
-      host.parts = {'.cellscene-frame':el(), '.cellscene-view':el(), '.cellscene-overlay':el(), '.cellscene-hud':el(), '.cellscene-foot':el()};
+      host.parts = {'.cellscene-frame':el(), '.cellscene-view':el(), '.cellscene-highlight':el(), '.cellscene-overlay':el(), '.cellscene-hud':el(), '.cellscene-foot':el()};
       const view = /class="cellscene-view" style="([^"]*)"/.exec(value); host.parts['.cellscene-view'].attrs.style = view ? view[1] : '';
     }};
   return host;
@@ -272,6 +272,26 @@ test('readable label mode enlarges scene labels and moves the caption into the f
   C.renderPanelBody(host, {...p, labelMode:'readable'}, states[0], 'aurora', states, 0, false);
   assert.match(host.html, /cellscene-caption/);
 });
+test('readable adjacent item labels separate and clear nearby shapes', () => {
+  const p = panel();
+  p.items = [
+    {id:'rna',role:'cargo',shape:'pill',label:'+RNA',start:{in:'cyt',x:200,y:125}},
+    {id:'polymerase',role:'polymerase',shape:'clamp',label:'Polymerase',start:{in:'cyt',x:280,y:125}},
+    {id:'copy',role:'particle',shape:'wedge',label:'New RNA',start:{in:'cyt',x:313,y:190}},
+  ];
+  const standard = C.cellsceneModel(p, {}), readable = C.cellsceneModel({...p,labelMode:'readable'}, {});
+  const standardPositions = C.cellsceneItemLabelPositions(standard), readablePositions = C.cellsceneItemLabelPositions(readable);
+  same(standardPositions.polymerase, {x:0,y:standard.items[1].reach + 13}, 'compact labels keep their existing placement');
+  const rna = readablePositions.rna, polymerase = readablePositions.polymerase;
+  assert.equal(rna.x, 0);
+  assert.ok(polymerase.x > 0, 'the longer neighboring label moves sideways');
+  const rnaRight = readable.items[0].x + rna.x + 4 * 18 * .62 / 2;
+  const polymeraseLeft = readable.items[1].x + polymerase.x - 10 * 18 * .62 / 2;
+  assert.ok(polymeraseLeft - rnaRight >= 7.9, 'the two readable labels have a visible gap');
+  assert.ok(polymerase.y >= readable.items[1].h / 2 + 18 + 4, 'the label clears its own shape');
+  assert.ok(readable.items[1].y + polymerase.y < readable.items[2].y - readable.items[2].h / 2, 'the label clears the RNA pool shape below');
+  same(polymerase, C.cellsceneItemLabelPositions(readable).polymerase, 'the settled geometry is deterministic');
+});
 test('render emits settled markup with glide styles, one crossing transient per enter, and nothing when not animating', () => {
   const p = panel(), states = folded(diagram(story())), host = {};
   const first = render()(host, p, states[0], null, states, 0, true);
@@ -337,6 +357,22 @@ test('a zoom or caption change alone takes the patch path and keeps the scene su
   C.renderPanelBody(host, p, states[2], 'aurora', states, 2, true);
   assert.equal(host.writes, 2, 'a moved item rebuilds the scene');
   assert.match(host.html, /data-id="p" style="transform:translate\(-15px,0px\)"/);
+});
+test('highlight renders behind item names and patches without rebuilding them', () => {
+  const p = panel(), highlighted = C.cellsceneHTML(p, {highlight:'cyt'});
+  const cell = highlighted.indexOf('class="cellscene-cell"');
+  const layer = highlighted.indexOf('<g class="cellscene-highlight">');
+  const ellipse = highlighted.indexOf('<ellipse class="cellscene-hl"');
+  const item = highlighted.indexOf('class="mech-move cellscene-item');
+  assert.ok(cell < layer && layer < ellipse && ellipse < item, 'the accent sits above the cell fill and below item labels');
+  const host = fakeHost(), rest = folded(diagram([]))[0];
+  C.renderPanelBody(host, p, rest, 'aurora', [rest], 0, false);
+  C.renderPanelBody(host, p, {...rest,highlight:'cyt'}, 'aurora', [rest], 0, false);
+  assert.equal(host.writes, 1, 'a highlight-only change retains the item subtree');
+  assert.match(host.parts['.cellscene-highlight'].innerHTML, /cellscene-hl/);
+  C.renderPanelBody(host, p, rest, 'aurora', [rest], 0, false);
+  assert.equal(host.writes, 1);
+  assert.equal(host.parts['.cellscene-highlight'].innerHTML, '');
 });
 test('hostile strings are escaped everywhere and never become attributes', () => {
   const p = panel();

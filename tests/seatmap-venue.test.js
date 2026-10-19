@@ -2,7 +2,7 @@
 process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 /* Seatmap venue library: registry lookup, declaration precedence, unknown ids,
    fork-added venues, the importer's venue output, the paths rink outline and
-   proof that existing inline declarations render byte-identically. */
+   proof that existing inline declarations render consistently. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -221,10 +221,10 @@ test('paths geometry draws an optional rink outline with centre and blue lines; 
   assert.notEqual(a.geometryKey, b.geometryKey);
 });
 
-test('existing inline declarations render byte-identically to main, and the venue example equals its inline expansion', () => {
+test('existing inline declarations match the renderer baseline, and the venue example equals its inline expansion', () => {
   const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/seatmap-inline-example.spec.json'), 'utf8'));
   const golden = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/seatmap-inline-example.renders.json'), 'utf8'));
-  assert.deepEqual(seatmapRenders(C, fixture).map(r => r.sha256), golden, 'the pre-venue example (inline bowl) renders exactly as on main');
+  assert.deepEqual(seatmapRenders(C, fixture).map(r => r.sha256), golden, 'the inline bowl example matches the renderer baseline');
   const spec = JSON.parse(fs.readFileSync(EXAMPLE, 'utf8'));
   const panel = examplePanel(spec);
   assert.equal(panel.venue, 'ubs-arena');

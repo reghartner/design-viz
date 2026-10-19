@@ -228,7 +228,10 @@ function seqSummary(model) {
 /* Legend markup shared by the sequence-teaching panels (`.bio-legend`). */
 function bioLegendHTML(legend) {
   if (!legend.length) return '';
-  return '<ul class="bio-legend" aria-label="Highlighted ranges">' + legend.map(function (mark) {
+  /* Four or more long entries settle into two aligned columns (authored order,
+     row by row) instead of a ragged wrap; short legends stay one flowing row. */
+  var chars = legend.reduce(function (sum, mark) { return sum + String(mark.label).length + 12; }, 0);
+  return '<ul class="bio-legend' + (legend.length >= 4 && chars * 6.4 > 520 ? ' bio-legend-grid' : '') + '" aria-label="Highlighted ranges">' + legend.map(function (mark) {
     return '<li class="bio-key"><i class="bio-tone-' + mark.tone + '" aria-hidden="true"></i>' + esc(mark.label) +
       ' <small>' + bioFormatCoord(mark.from) + '–' + bioFormatCoord(mark.to) + '</small></li>';
   }).join('') + '</ul>';
@@ -261,8 +264,9 @@ function sequenceHTML(panel, state, dx, fresh) {
       '<div class="seq-line seq-ruler" aria-hidden="true">' + seqRulerHTML(row.letters, 'seq-tick', row.cursorAt >= 0 ? model.cursor : null) + '</div>' +
       '<div class="seq-line seq-letters">' + row.letters.map(function (letter) {
         var k = fresh && letter.revealed && letter.index >= fresh.from && letter.index < fresh.to ? letter.index - fresh.from : -1;
+        var far = letter.revealed || model.reveal === null ? -1 : Math.min(letter.index - model.reveal, 8);
         return '<span class="' + letter.cls + (letter.revealed ? '' : ' seq-dim') + (letter.cursor ? ' seq-at-cursor' : '') + (k >= 0 ? ' seq-new' : '') + '"' +
-          (k >= 0 ? ' style="--seq-k:' + Math.min(k, 6) + '"' : '') +
+          (k >= 0 ? ' style="--seq-k:' + Math.min(k, 6) + '"' : far >= 0 ? ' style="--seq-ink:' + (34 - far * 2) + '%"' : '') +
           (letter.unknown ? ' title="Not in the ' + model.alphabet + ' alphabet"' : '') + '>' + esc(letter.ch) + '</span>';
       }).join('') + '</div>' +
       '<div class="seq-line seq-band" aria-hidden="true">' + row.letters.map(function (letter, index) {
@@ -338,7 +342,10 @@ PanelRegistry.define('sequence', {
 .bio-tone-motif{--bio-tone:#facc15}.bio-tone-primer{--bio-tone:#2dd4bf}.bio-tone-cut{--bio-tone:#e879f9}.bio-tone-feature{--bio-tone:#3b82f6}
 .bio-tone-good{--bio-tone:#22c55e}.bio-tone-bad{--bio-tone:#ef4444}
 [class*="bio-tone-"]{background:color-mix(in srgb,var(--bio-tone) 30%,transparent);border-color:var(--bio-tone)}
-/* Skin palettes for the sequence family. Pastel, aurora and blueprint get
+/* Skin palettes for the sequence family. Every skin override skips letters
+   and tones inside a mech scene (.mech-box): that stage keeps its own bright
+   palette until the mech family re-lights it. The guard sits in :where() so
+   it adds no specificity. Pastel, aurora and blueprint get
    their own residue letters, tones and a small --sq-* token set that the
    reads and locus panels read too (each with a fallback for other skins).
    Pastel carries sk-aurora as well, so its block must out-rank the aurora
@@ -349,47 +356,53 @@ PanelRegistry.define('sequence', {
   --sq-ink:#EAF2FF;--sq-text:#B9C7DD;--sq-muted:#8DA2C6;--sq-line:#22324A;--sq-line-strong:#2E4466;
   --sq-well:#101A2C;--sq-well-line:#1D2A40;--sq-surface:#0B1220;--sq-ghost:#2E4466;
   --sq-accent:#38E1FF;--sq-accent-ink:#8AE8FF;--sq-accent-soft:rgba(56,225,255,.12);--sq-accent-line:rgba(56,225,255,.45);--sq-on-accent:#06202A;
-  --sq-raise:0 4px 12px -6px rgba(0,0,0,.7);--sq-lift:0 1px 3px rgba(0,0,0,.55);--sq-edge-mix:#EAF2FF;--sq-edge-k:88%;--sq-tint:30%;--sq-soft:30%;--sq-r:999px}
-.sk-aurora .bio-b-a{--bio-letter:#4ADE80}.sk-aurora .bio-b-c{--bio-letter:#60A5FA}.sk-aurora .bio-b-g{--bio-letter:#FBBF24}.sk-aurora :is(.bio-b-t,.bio-b-u){--bio-letter:#F87171}
-.sk-aurora .bio-b-n,.sk-aurora .bio-b-x{--bio-letter:#8DA2C6}.sk-aurora .bio-b-stop{--bio-letter:#F87171}
-.sk-aurora .bio-protein :is(.bio-b-a,.bio-b-v,.bio-b-l,.bio-b-i,.bio-b-m,.bio-b-f,.bio-b-w){--bio-letter:#FBBF24}
-.sk-aurora .bio-protein :is(.bio-b-s,.bio-b-t,.bio-b-n,.bio-b-q,.bio-b-y){--bio-letter:#4ADE80}
-.sk-aurora .bio-protein :is(.bio-b-k,.bio-b-r,.bio-b-h){--bio-letter:#60A5FA}
-.sk-aurora .bio-protein :is(.bio-b-d,.bio-b-e){--bio-letter:#F87171}
-.sk-aurora .bio-protein :is(.bio-b-g,.bio-b-p,.bio-b-c){--bio-letter:#B79CFF}
-.sk-aurora .bio-protein .bio-b-x{--bio-letter:#8DA2C6}
-.sk-aurora .bio-b{color:var(--bio-letter)}
+  --sq-raise:0 4px 12px -6px rgba(0,0,0,.7);--sq-lift:0 1px 3px rgba(0,0,0,.55);--sq-edge-mix:#EAF2FF;--sq-edge-k:88%;--sq-tint:38%;--sq-soft:30%;--sq-r:999px}
+.sk-aurora .bio-b-a:where(:not(.mech-box *)){--bio-letter:#4ADE80}.sk-aurora .bio-b-c:where(:not(.mech-box *)){--bio-letter:#60A5FA}.sk-aurora .bio-b-g:where(:not(.mech-box *)){--bio-letter:#FBBF24}.sk-aurora :is(.bio-b-t,.bio-b-u):where(:not(.mech-box *)){--bio-letter:#F87171}
+.sk-aurora .bio-b-n:where(:not(.mech-box *)),.sk-aurora .bio-b-x:where(:not(.mech-box *)){--bio-letter:#8DA2C6}.sk-aurora .bio-b-stop:where(:not(.mech-box *)){--bio-letter:#F87171}
+.sk-aurora .bio-protein :is(.bio-b-a,.bio-b-v,.bio-b-l,.bio-b-i,.bio-b-m,.bio-b-f,.bio-b-w):where(:not(.mech-box *)){--bio-letter:#FBBF24}
+.sk-aurora .bio-protein :is(.bio-b-s,.bio-b-t,.bio-b-n,.bio-b-q,.bio-b-y):where(:not(.mech-box *)){--bio-letter:#4ADE80}
+.sk-aurora .bio-protein :is(.bio-b-k,.bio-b-r,.bio-b-h):where(:not(.mech-box *)){--bio-letter:#60A5FA}
+.sk-aurora .bio-protein :is(.bio-b-d,.bio-b-e):where(:not(.mech-box *)){--bio-letter:#F87171}
+.sk-aurora .bio-protein :is(.bio-b-g,.bio-b-p,.bio-b-c):where(:not(.mech-box *)){--bio-letter:#B79CFF}
+.sk-aurora .bio-protein .bio-b-x:where(:not(.mech-box *)){--bio-letter:#8DA2C6}
+.sk-aurora .bio-b:where(:not(.mech-box *)){color:var(--bio-letter)}
+/* Aurora primers move off teal to periwinkle so they never read as the green
+   "good" pieces they prime. */
+.sk-aurora .bio-tone-primer:where(:not(.mech-box *)){--bio-tone:#7C8CFF}
 body.sk-pastel :is(.seq-track,.reads-panel,.locus-panel,.bio-legend,.frm-key){
   --sq-ink:#24324A;--sq-text:#526077;--sq-muted:#5F6C84;--sq-line:#E3E9F2;--sq-line-strong:#C9D2E1;
   --sq-well:#F6F8FC;--sq-well-line:#E6EBF3;--sq-surface:#FFFFFF;--sq-ghost:#C9D2E1;
   --sq-accent:#5263B9;--sq-accent-ink:#3D4C9E;--sq-accent-soft:#EEF0FB;--sq-accent-line:#C9CFF0;--sq-on-accent:#FFFFFF;
   --sq-raise:0 4px 12px -6px rgba(36,50,74,.25);--sq-lift:0 1px 2px rgba(36,50,74,.2);--sq-edge-mix:#24324A;--sq-edge-k:85%;--sq-tint:34%;--sq-soft:30%;--sq-r:999px}
-body.sk-pastel .bio-b-a{--bio-letter:#17784E}body.sk-pastel .bio-b-c{--bio-letter:#2A64C2}body.sk-pastel .bio-b-g{--bio-letter:#935A06}body.sk-pastel :is(.bio-b-t,.bio-b-u){--bio-letter:#BE3446}
-body.sk-pastel .bio-b-n,body.sk-pastel .bio-b-x{--bio-letter:#5F6C84}body.sk-pastel .bio-b-stop{--bio-letter:#BE3446}
-body.sk-pastel .bio-protein :is(.bio-b-a,.bio-b-v,.bio-b-l,.bio-b-i,.bio-b-m,.bio-b-f,.bio-b-w){--bio-letter:#935A06}
-body.sk-pastel .bio-protein :is(.bio-b-s,.bio-b-t,.bio-b-n,.bio-b-q,.bio-b-y){--bio-letter:#17784E}
-body.sk-pastel .bio-protein :is(.bio-b-k,.bio-b-r,.bio-b-h){--bio-letter:#2A64C2}
-body.sk-pastel .bio-protein :is(.bio-b-d,.bio-b-e){--bio-letter:#BE3446}
-body.sk-pastel .bio-protein :is(.bio-b-g,.bio-b-p,.bio-b-c){--bio-letter:#7A55C9}
-body.sk-pastel .bio-protein .bio-b-x{--bio-letter:#5F6C84}
+body.sk-pastel .bio-b-a:where(:not(.mech-box *)){--bio-letter:#17784E}body.sk-pastel .bio-b-c:where(:not(.mech-box *)){--bio-letter:#2A64C2}body.sk-pastel .bio-b-g:where(:not(.mech-box *)){--bio-letter:#935A06}body.sk-pastel :is(.bio-b-t,.bio-b-u):where(:not(.mech-box *)){--bio-letter:#BE3446}
+body.sk-pastel .bio-b-n:where(:not(.mech-box *)),body.sk-pastel .bio-b-x:where(:not(.mech-box *)){--bio-letter:#5F6C84}body.sk-pastel .bio-b-stop:where(:not(.mech-box *)){--bio-letter:#BE3446}
+body.sk-pastel .bio-protein :is(.bio-b-a,.bio-b-v,.bio-b-l,.bio-b-i,.bio-b-m,.bio-b-f,.bio-b-w):where(:not(.mech-box *)){--bio-letter:#935A06}
+body.sk-pastel .bio-protein :is(.bio-b-s,.bio-b-t,.bio-b-n,.bio-b-q,.bio-b-y):where(:not(.mech-box *)){--bio-letter:#17784E}
+body.sk-pastel .bio-protein :is(.bio-b-k,.bio-b-r,.bio-b-h):where(:not(.mech-box *)){--bio-letter:#2A64C2}
+body.sk-pastel .bio-protein :is(.bio-b-d,.bio-b-e):where(:not(.mech-box *)){--bio-letter:#BE3446}
+body.sk-pastel .bio-protein :is(.bio-b-g,.bio-b-p,.bio-b-c):where(:not(.mech-box *)){--bio-letter:#7A55C9}
+body.sk-pastel .bio-protein .bio-b-x:where(:not(.mech-box *)){--bio-letter:#5F6C84}
 /* Pastel tones sit far apart on the wheel: accent indigo, primer sky, feature
    teal, good green, insert violet, cut magenta, motif amber, mismatch red. */
-body.sk-pastel .bio-tone-neutral{--bio-tone:#8A97AD}body.sk-pastel .bio-tone-accent{--bio-tone:#5263B9}body.sk-pastel .bio-tone-insert{--bio-tone:#7A55C9}
-body.sk-pastel .bio-tone-mismatch{--bio-tone:#C93C4E}body.sk-pastel .bio-tone-motif{--bio-tone:#B07A12}body.sk-pastel .bio-tone-primer{--bio-tone:#3C93D9}
-body.sk-pastel .bio-tone-cut{--bio-tone:#A642B8}body.sk-pastel .bio-tone-feature{--bio-tone:#1F8A93}body.sk-pastel .bio-tone-good{--bio-tone:#2E8A5C}body.sk-pastel .bio-tone-bad{--bio-tone:#C93C4E}
-body.sk-pastel .bio-b{color:var(--bio-letter)}
+body.sk-pastel .bio-tone-neutral:where(:not(.mech-box *)){--bio-tone:#8A97AD}body.sk-pastel .bio-tone-accent:where(:not(.mech-box *)){--bio-tone:#5263B9}body.sk-pastel .bio-tone-insert:where(:not(.mech-box *)){--bio-tone:#7A55C9}
+body.sk-pastel .bio-tone-mismatch:where(:not(.mech-box *)){--bio-tone:#C93C4E}body.sk-pastel .bio-tone-motif:where(:not(.mech-box *)){--bio-tone:#B07A12}body.sk-pastel .bio-tone-primer:where(:not(.mech-box *)){--bio-tone:#3C93D9}
+body.sk-pastel .bio-tone-cut:where(:not(.mech-box *)){--bio-tone:#A642B8}body.sk-pastel .bio-tone-feature:where(:not(.mech-box *)){--bio-tone:#1F8A93}body.sk-pastel .bio-tone-good:where(:not(.mech-box *)){--bio-tone:#2E8A5C}body.sk-pastel .bio-tone-bad:where(:not(.mech-box *)){--bio-tone:#C93C4E}
+body.sk-pastel .bio-b:where(:not(.mech-box *)){color:var(--bio-letter)}
 body.sk-blueprint :is(.seq-track,.reads-panel,.locus-panel,.bio-legend,.frm-key){
   --sq-ink:#F7FCFF;--sq-text:#D5E9F7;--sq-muted:#94BCD5;--sq-line:rgba(79,169,195,.45);--sq-line-strong:#4FA9C3;
   --sq-well:#062E61;--sq-well-line:rgba(79,169,195,.55);--sq-surface:#052956;--sq-ghost:rgba(148,188,213,.42);
   --sq-accent:#7FE3FF;--sq-accent-ink:#7FE3FF;--sq-accent-soft:rgba(127,227,255,.14);--sq-accent-line:rgba(127,227,255,.6);--sq-on-accent:#052956;
   --sq-raise:0 0 0 0 transparent;--sq-lift:0 0 0 0 transparent;--sq-edge-mix:#F7FCFF;--sq-edge-k:100%;--sq-tint:26%;--sq-soft:24%;--sq-r:1px}
-body.sk-blueprint .bio-tone-good{--bio-tone:#47F590}body.sk-blueprint .bio-tone-bad,body.sk-blueprint .bio-tone-mismatch{--bio-tone:#FF8A93}body.sk-blueprint .bio-tone-motif{--bio-tone:#FFD166}
-body.sk-blueprint .bio-tone-accent{--bio-tone:#7FE3FF}
+body.sk-blueprint .bio-tone-good:where(:not(.mech-box *)){--bio-tone:#47F590}body.sk-blueprint .bio-tone-bad:where(:not(.mech-box *)),body.sk-blueprint .bio-tone-mismatch:where(:not(.mech-box *)){--bio-tone:#FF8A93}body.sk-blueprint .bio-tone-motif:where(:not(.mech-box *)){--bio-tone:#FFD166}
+body.sk-blueprint .bio-tone-accent:where(:not(.mech-box *)){--bio-tone:#7FE3FF}
 }
 /* Legend chips: opaque tints (tone mixed into the card surface, never alpha)
    so a pale swatch keeps its hue, with an edge leaning toward the ink. */
 .bio-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0 0;padding:0;font-size:11.5px;line-height:15px;color:var(--sq-text,var(--dtext))}
+.bio-legend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,max-content));gap:4px 16px;font-size:11px}
+.bio-legend-grid .bio-key small{font-size:10.5px;white-space:nowrap}
 .bio-key{display:inline-flex;align-items:center;gap:6px}
+.bio-legend-grid .bio-key{display:flex;min-width:0}
 .bio-key i{flex:none;display:inline-block;width:10px;height:10px;border-radius:3px;border:0;background:color-mix(in srgb,var(--bio-tone,currentColor) var(--sq-tint,30%),var(--sq-surface,transparent));
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone,currentColor) var(--sq-edge-k,70%),var(--sq-edge-mix,var(--dink)))}
 body.sk-blueprint .bio-key i{border-radius:0}
@@ -424,10 +437,15 @@ body.sk-blueprint .seq-meta{border-radius:2px}
 .seq-tick-near i{visibility:hidden}
 .seq-letters{margin-top:0}
 .seq-letters .bio-b{display:block;overflow:hidden;font-size:14px;line-height:19px;border-radius:4px;transition:color .42s cubic-bezier(.2,.7,.2,1),opacity .42s cubic-bezier(.2,.7,.2,1),background-color .24s ease}
-/* Letters that do not exist yet: a pale ghost of their base colour. */
+/* Letters that do not exist yet: a pale ghost of their base colour that
+   fades further with distance from the reveal edge (--seq-ink, set per
+   letter), so the growing copy has a visible leading edge. */
 .seq-dim{opacity:.25}
-.sk-aurora .seq-dim,body.sk-pastel .seq-dim,body.sk-blueprint .seq-dim{opacity:1;color:color-mix(in srgb,var(--bio-letter,var(--sq-muted)) 26%,var(--sq-ghost,transparent))}
+.sk-aurora .seq-dim,body.sk-pastel .seq-dim,body.sk-blueprint .seq-dim{opacity:1;color:color-mix(in srgb,var(--bio-letter,var(--sq-muted)) var(--seq-ink,26%),var(--sq-ghost,transparent))}
 .seq-at-cursor{background:var(--sq-accent-soft,color-mix(in srgb,var(--dink) 14%,transparent));box-shadow:inset 0 0 0 1px var(--sq-accent-line,transparent)}
+/* The cursor letter is the leading edge: the pill's caret drops onto an
+   accent baseline under it. */
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .seq-at-cursor{box-shadow:inset 0 0 0 1px var(--sq-accent-line),inset 0 -2px 0 var(--sq-accent)}
 /* Letters made this step ink in once, from ghost to full colour with a small
    rise and an accent-soft flash, 40 ms apart (capped at 240 ms). */
 @keyframes seq-ink{from{color:color-mix(in srgb,var(--bio-letter,currentColor) 26%,var(--sq-ghost,transparent));background-color:var(--sq-accent-soft,transparent);transform:translateY(3px)}}
@@ -471,7 +489,7 @@ body.sk-blueprint .seq-cur i{border-radius:2px}
       strand: { label: 'Strand', help: 'Shown as a label only; the sequence is never recomputed.' },
       wrap: { label: 'Letters per row', help: '20–120, default 60.' },
       marks: { label: 'Highlighted ranges', help: 'Full snapshot of up to 24 {id,from,to,tone?,label?} ranges. Later marks draw on top; labelled marks appear in the legend.', nullLabel: 'No marks' },
-      cursor: { label: 'Cursor position', help: 'One coordinate shown as a pill on the ruler, pointing to its letter.', nullLabel: 'Hide cursor' },
+      cursor: { label: 'Cursor position', help: 'One coordinate drawn as a bracket under the letter.', nullLabel: 'Hide cursor' },
       window: { label: 'Zoom window', help: '{from,to}: only these coordinates render, with a “… n more” cue at each end.', nullLabel: 'Show all' },
       reveal: { label: 'Revealed letters', help: 'Letters beyond this count render dimmed, for “read this far” stories.', nullLabel: 'Reveal all' },
       note: { label: 'Explanation' },

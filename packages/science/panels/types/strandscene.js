@@ -468,7 +468,7 @@ function strandsceneModel(panel, state) {
     yUpper: yU, yLower: yL, midY: midY, letters: letters, lowerLetters: lowerLetters, rungs: rungs, sites: siteViews, actors: actors, labels: labels,
     events: events, camera: camera, highlight: typeof state.highlight === 'string' ? state.highlight : null, legend: legend, title: title,
     caption: mechText(state.caption, SS_MAX_CAPTION), note: typeof state.note === 'string' ? state.note : '', aria: aria.join('; ') + '.',
-    fontSize: mechNum(Math.min(13, layout.pitch * 0.7)),
+    fontSize: mechNum(Math.min(13, layout.pitch * 0.7)), uid: mechUid(eff),
   };
 }
 
@@ -479,10 +479,9 @@ function ssLetterMarkup(letter, model, delay) {
   if (model.beads) return '<circle class="' + cls + ' mech-bead" cx="' + letter.x + '" cy="' + letter.y + '" r="5.5"' + style + '/>' +
     '<circle class="mech-bead-hi' + (letter.passed ? ' mech-passed' : '') + (delay != null ? ' mech-appear' : '') + '" cx="' + mechNum(letter.x - 1.7) + '" cy="' + mechNum(letter.y - 1.9) + '" r="1.7"' + style + '/>';
   /* A base block: a soft tile in the letter's tone that hangs off the
-     backbone (above the letter on the upper strand, below on the lower). */
-  /* Unwound lower letters hang just below their backbone instead of
-     straddling it. */
-  var tw = mechNum(Math.max(4, model.layout.pitch * 0.82)), up = letter.strand === 'upper', ly = letter.open ? letter.y + 8 : letter.y, ty = mechNum(up ? ly - 11 : ly - 9);
+     backbone (above the letter on the upper strand, below on the lower);
+     an unwound lower letter's tile is centred on the letter. */
+  var tw = mechNum(Math.max(4, model.layout.pitch * 0.82)), up = letter.strand === 'upper', ly = letter.y, ty = mechNum(up ? ly - 11 : letter.open ? ly - 10 : ly - 9);
   return '<rect class="mech-ntbg ' + cls.replace('mech-nt ', '') + '" x="' + mechNum(letter.x - tw / 2) + '" y="' + ty + '" width="' + tw + '" height="20" rx="' + mechNum(Math.min(4, tw / 3)) + '"' + style + '/>' +
     '<text class="mech-t-nt ' + cls + '" x="' + letter.x + '" y="' + mechNum(ly + 5) + '"' + style + '>' + esc(letter.ch) + '</text>';
 }
@@ -491,13 +490,27 @@ function ssPieceMarkup(model, piece, motion) {
   var rungs = model.rungs.filter(function (r) { return r.piece === piece.index; }), yU = model.yUpper, yL = model.yLower, h = '';
   var appear = motion && motion.appear, half = model.layout.pitch / 2;
   /* Rails span the piece's visible letters; a true piece end gets the
-     rounded 12-unit tail, a camera edge only half a letter pitch. */
-  function rail(all, y) {
+     rounded 12-unit tail, a camera edge only half a letter pitch. The rail
+     is a sugar-phosphate ribbon: a lit tube with a phosphate bead between
+     neighbouring bases and, at its 3′ side, a small arrowhead that shows
+     the strand's 5′→3′ direction (rightward above, leftward below). */
+  function rail(all, y, threeOnLeft) {
     var shown = all.filter(function (l) { return !l.hidden; });
     if (!shown.length) return '';
-    var x1 = shown[0].x - (shown[0] === all[0] ? 12 : half), x2 = shown[shown.length - 1].x + (shown[shown.length - 1] === all[all.length - 1] ? 12 : half);
-    return '<line class="mech-rail" x1="' + mechNum(x1) + '" y1="' + y + '" x2="' + mechNum(x2) + '" y2="' + y + '"/>' +
-      '<line class="mech-rail-hi" x1="' + mechNum(x1 + 2) + '" y1="' + mechNum(y - 0.9) + '" x2="' + mechNum(x2 - 2) + '" y2="' + mechNum(y - 0.9) + '"/>';
+    var leftEnd = shown[0] === all[0], rightEnd = shown[shown.length - 1] === all[all.length - 1];
+    var x1 = shown[0].x - (leftEnd ? 12 : half), x2 = shown[shown.length - 1].x + (rightEnd ? 12 : half);
+    var out = '<line class="mech-rail" x1="' + mechNum(x1) + '" y1="' + y + '" x2="' + mechNum(x2) + '" y2="' + y + '"/>' +
+      '<line class="mech-rail-hi" x1="' + mechNum(x1 + 2) + '" y1="' + mechNum(y - 1.2) + '" x2="' + mechNum(x2 - 2) + '" y2="' + mechNum(y - 1.2) + '"/>';
+    if (half >= 5) {
+      var beads = '', r = mechNum(Math.min(1.7, half * 0.18));
+      for (var i = 0; i < shown.length - 1; i++) if (shown[i + 1].coord === shown[i].coord + 1) beads += 'M' + mechNum(shown[i].x + half) + ',' + y + 'h0';
+      if (beads) out += '<path class="mech-phos" d="' + beads + '" stroke-width="' + mechNum(r * 2) + '"/>';
+    }
+    if (!model.beads && model.alphabet !== 'protein') {
+      var tip = threeOnLeft ? x1 - 5 : x2 + 5, base = threeOnLeft ? x1 + 1.5 : x2 - 1.5;
+      out += '<path class="mech-rail-end" d="M' + mechNum(base) + ',' + mechNum(y - 4.6) + 'L' + mechNum(tip) + ',' + y + 'L' + mechNum(base) + ',' + mechNum(y + 4.6) + 'Z"/>';
+    }
+    return out;
   }
   if (upper.length) {
     h += rail(upper, yU - 12);
@@ -510,19 +523,27 @@ function ssPieceMarkup(model, piece, motion) {
   if (lower.length) {
     var pairIn = appear && appear.pair;
     h += '<g class="mech-lower' + (pairIn ? ' mech-appear' : '') + '">';
-    h += rail(lower, yL + 12);
+    h += rail(lower, yL + 12, true);
     lower.forEach(function (letter) {
       if (letter.hidden) return;
       var delay = appear && letter.extended && appear.lower && letter.coord > appear.lower ? (letter.coord - appear.lower - 1) * 120 : null;
       h += ssLetterMarkup(letter, model, delay);
     });
-    /* Each half-rung takes the tone of the base it grows from. */
-    var toneOf = function (list, coord) { var hit = null; list.forEach(function (l) { if (l.coord === coord) hit = l; }); return hit ? hit.cls + ' ' : ''; };
+    /* Each half-rung takes the tone of the base it grows from; between the
+       two halves the hydrogen bonds are drawn as fine ticks, two for A·T
+       (A·U) and three for G·C, so the pairing rule is visible. */
+    var letterAt = function (list, coord) { var hit = null; list.forEach(function (l) { if (l.coord === coord) hit = l; }); return hit; };
+    var toneOf = function (list, coord) { var hit = letterAt(list, coord); return hit ? hit.cls + ' ' : ''; };
+    var gap = mechNum(Math.min(2.6, model.layout.pitch * 0.15)), hbTop = yU + 15.5, hbBottom = (yL - 13) - 0.5;
     rungs.forEach(function (rung, i) {
       if (rung.x < model.layout.xOf(model.layout.from) - 1 || rung.x > model.layout.xOf(model.layout.to) + 1) return;
       var style = pairIn ? ' style="animation-delay:' + Math.min(i * 40, 600) + 'ms"' : '';
-      h += '<line class="' + toneOf(upper, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yU + 10) + '" x2="' + rung.x + '" y2="' + (yU + 20) + '"' + style + '/>' +
-        '<line class="' + toneOf(lower, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yL - 18) + '" x2="' + rung.x + '" y2="' + (yL - 8) + '"' + style + '/>';
+      var a = letterAt(upper, rung.coord), b = letterAt(lower, rung.coord), pair = a && b ? (a.ch + b.ch).toUpperCase() : '';
+      var bonds = pair === 'GC' || pair === 'CG' ? 3 : 2, hb = '';
+      for (var k = 0; k < bonds; k++) { var bx = mechNum(rung.x + (k - (bonds - 1) / 2) * gap); hb += 'M' + bx + ',' + hbTop + 'V' + hbBottom; }
+      h += '<line class="' + toneOf(upper, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yU + 10) + '" x2="' + rung.x + '" y2="' + (yU + 15) + '"' + style + '/>' +
+        '<path class="mech-hb' + (pairIn ? ' mech-appear' : '') + '" d="' + hb + '"' + style + '/>' +
+        '<line class="' + toneOf(lower, rung.coord) + 'mech-rung' + (pairIn ? ' mech-appear' : '') + '" x1="' + rung.x + '" y1="' + (yL - 13) + '" x2="' + rung.x + '" y2="' + (yL - 8) + '"' + style + '/>';
     });
     h += '</g>';
   }
@@ -550,7 +571,12 @@ function ssSceneMarkup(model, motion) {
 }
 function ssActorMarkup(actor, motion) {
   var glide = motion && motion.actors[actor.id] ? mechGlideStyle(motion.actors[actor.id], actor) : '';
-  var h = '<g class="mech-move mech-actor-move"' + glide + '><g transform="translate(' + actor.x + ' ' + actor.y + ')">' +
+  /* The active actor stands in a soft accent halo that ends at its own
+     base, so it never washes over the letters it grips; bound and binding
+     actors glow, the rest cast a contact shadow. */
+  var pool = actor.state === 'active' ?
+    '<ellipse class="mech-pool" cy="-4" rx="' + mechNum(actor.w / 2 + 9) + '" ry="' + mechNum(actor.h / 2 + 4) + '" aria-hidden="true"/>' : '';
+  var h = '<g class="mech-move mech-actor-move"' + glide + '><g transform="translate(' + actor.x + ' ' + actor.y + ')">' + pool +
     mechActorMarkup(actor, ' mech-st-' + actor.state);
   if (actor.state === 'scanning') h += '<text class="mech-t-label mech-scan" y="' + mechNum(-actor.h / 2 - 8) + '" text-anchor="middle">scanning →</text>';
   return h + '</g></g>';
@@ -566,17 +592,35 @@ function ssOverlayMarkup(model, motion) {
   });
   model.labels.forEach(function (label, i) {
     if (label.hidden) return;
-    var fresh = motion && motion.labels && motion.labels.indexOf(label.text) < 0;
-    h += '<g' + (fresh ? ' class="mech-appear" style="animation-delay:' + (500 + i * 120) + 'ms"' : '') + '>' + mechTagMarkup(label.x, label.y, label.text, 'mech-callout') + '</g>';
+    var fresh = motion && motion.labels && motion.labels.indexOf(label.text) < 0, end = ssEndCap(model, label);
+    h += '<g' + (fresh ? ' class="mech-appear" style="animation-delay:' + (500 + i * 120) + 'ms"' : '') + '>' +
+      (end ? mechTagMarkup(end.x, label.y, label.text, 'mech-callout mech-endcap') : mechTagMarkup(label.x, label.y, label.text, 'mech-callout')) + '</g>';
   });
   return h;
+}
+/* A short free tag (a 5′ or 3′ end mark) placed on a strand row beside its
+   end: it keeps its authored row but steps outward, if needed, so it clears
+   the end base tile and the rail's direction arrow. Null for any other tag. */
+function ssEndCap(model, label) {
+  if (label.at !== null || label.text.length > 3) return null;
+  var row = model.letters.concat(model.lowerLetters).filter(function (l) {
+    var p = model.pieces[l.piece] || { dx: 0, dy: 0 };
+    return !l.hidden && Math.abs(l.y + p.dy - label.y) <= 14;
+  });
+  if (!row.length) return null;
+  var xs = row.map(function (l) { return l.x + (model.pieces[l.piece] || { dx: 0 }).dx; });
+  var lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs), w = label.text.length * 6.4 + 14;
+  var clear = 20; /* the 12-unit rail tail, the 5-unit arrow and a gap */
+  if (label.x < lo) return { x: mechNum(Math.min(label.x, lo - clear - w / 2)) };
+  if (label.x > hi) return { x: mechNum(Math.max(label.x, hi + clear + w / 2)) };
+  return null;
 }
 function ssAsideMarkup(model) {
   return mechLegendHTML(model.legend) + (model.note ? '<div class="swnote">' + esc(model.note) + '</div>' : '');
 }
 function ssFrameHTML(model, motion) {
-  return '<div class="swpanel mech-box"><svg class="mech-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '" style="--mk-nt:' + model.fontSize + 'px">' +
-    '<g class="mech-scene">' + ssSceneMarkup(model, motion) + '</g><g class="mech-overlay">' + ssOverlayMarkup(model, motion) + '</g></svg>' +
+  return '<div class="swpanel mech-box"><svg class="mech-frame" viewBox="0 0 ' + MECH_SCENE.w + ' ' + MECH_SCENE.h + '" role="img" aria-label="' + esc(model.aria) + '" style="--mk-nt:' + model.fontSize + 'px;' + mechDefsStyle(model.uid) + '">' +
+    mechDefsMarkup(model.uid) + '<g class="mech-scene">' + ssSceneMarkup(model, motion) + '</g><g class="mech-overlay">' + ssOverlayMarkup(model, motion) + '</g></svg>' +
     '<div class="mech-aside">' + ssAsideMarkup(model) + '</div></div>';
 }
 /* Settled markup with no motion, for tests and tooling. */
@@ -695,27 +739,39 @@ PanelRegistry.define('strandscene', {
      actor edges darken there with color-mix. Letters reuse `.bio-b-*`. */
   styles: String.raw`
 .mech-box{min-width:0}
-.mech-frame{display:block;width:100%;height:auto;border-radius:10px;background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 0 0/24px 24px,radial-gradient(120% 90% at 50% 38%,#0E1A2E 0%,#0A1424 42%,#070E19 78%,#060B13 100%);box-shadow:inset 0 0 0 1px #1D2A40,inset 0 1px 0 rgba(255,255,255,.04);--mk-ink:#EAF2FF;--mk-mute:#8DA2C6;--mk-line:#4A6188;--mk-rung:#2E4466;--mk-tagbg:#101A2C;--mk-tagline:#2E4466;--mk-grid:rgba(141,162,198,.11);--mk-halo:#08111F;--mk-acc:#38E1FF;--mk-bad:#F87171;--mk-warn:#FFB454;--mk-sheen:.42;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.55));--mk-glow:drop-shadow(0 0 1px rgba(56,225,255,.9)) drop-shadow(0 0 7px rgba(56,225,255,.5));--mk-glow-hot:drop-shadow(0 0 1px rgba(56,225,255,1)) drop-shadow(0 0 10px rgba(56,225,255,.62));--mk-lift:drop-shadow(0 3px 6px rgba(0,0,0,.45))}
-.sk-daylight .mech-frame,body.sk-editorial .mech-frame{background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 0 0/24px 24px,#F4F6FA;box-shadow:inset 0 0 0 1px #E3E9F2;--mk-ink:#0B1220;--mk-mute:#5E6B82;--mk-line:#7B8CA6;--mk-rung:#B8C2D4;--mk-tagbg:#FFFFFF;--mk-tagline:#C8D0DD;--mk-grid:rgba(11,18,32,.07);--mk-halo:#F4F6FA;--mk-acc:#3D4C9E;--mk-bad:#C93C4E;--mk-warn:#B07A12;--mk-sheen:.55;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(36,50,74,.18));--mk-glow:drop-shadow(0 0 .5px #3D4C9E) drop-shadow(0 0 6px rgba(61,76,158,.4));--mk-glow-hot:drop-shadow(0 0 .5px #3D4C9E) drop-shadow(0 0 8px rgba(61,76,158,.5));--mk-lift:drop-shadow(0 3px 5px rgba(36,50,74,.12))}
+.mech-frame{display:block;width:100%;height:auto;border-radius:10px;background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 0 0/24px 24px,radial-gradient(120% 90% at 50% 38%,#0E1A2E 0%,#0A1424 42%,#070E19 78%,#060B13 100%);box-shadow:inset 0 0 0 1px #1D2A40,inset 0 1px 0 rgba(255,255,255,.04);--mk-ink:#EAF2FF;--mk-mute:#8DA2C6;--mk-line:#4A6188;--mk-rung:#2E4466;--mk-tagbg:#101A2C;--mk-tagline:#2E4466;--mk-grid:rgba(141,162,198,.11);--mk-halo:#08111F;--mk-acc:#38E1FF;--mk-bad:#F87171;--mk-warn:#FFB454;--mk-sheen:.42;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.55));--mk-glow:drop-shadow(0 0 1px rgba(56,225,255,.9)) drop-shadow(0 0 7px rgba(56,225,255,.5));--mk-glow-hot:drop-shadow(0 0 1px rgba(56,225,255,1)) drop-shadow(0 0 10px rgba(56,225,255,.62));--mk-lift:drop-shadow(0 3px 6px rgba(0,0,0,.45));--mk-pool:rgba(56,225,255,.08);--mk-pool-line:rgba(56,225,255,.38);--mk-phos:#8DA2C6;--mk-hb:#5E7396;--mk-tile:#08111F;--mk-clay-top:.28;--mk-clay-low:#000;--mk-clay-low-a:.34;--mk-spec:.55}
+.sk-daylight .mech-frame,body.sk-editorial .mech-frame{background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 0 0/24px 24px,#F4F6FA;box-shadow:inset 0 0 0 1px #E3E9F2;--mk-ink:#0B1220;--mk-mute:#5E6B82;--mk-line:#7B8CA6;--mk-rung:#B8C2D4;--mk-tagbg:#FFFFFF;--mk-tagline:#C8D0DD;--mk-grid:rgba(11,18,32,.07);--mk-halo:#F4F6FA;--mk-acc:#3D4C9E;--mk-bad:#C93C4E;--mk-warn:#B07A12;--mk-sheen:.55;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(36,50,74,.18));--mk-glow:drop-shadow(0 0 .5px #3D4C9E) drop-shadow(0 0 6px rgba(61,76,158,.4));--mk-glow-hot:drop-shadow(0 0 .5px #3D4C9E) drop-shadow(0 0 8px rgba(61,76,158,.5));--mk-lift:drop-shadow(0 3px 5px rgba(36,50,74,.12));--mk-pool:rgba(61,76,158,.07);--mk-pool-line:#C9CFF0;--mk-phos:#E3E9F2;--mk-hb:#8C9BB5;--mk-tile:#F4F6FA;--mk-clay-top:.6;--mk-clay-low:#24324A;--mk-clay-low-a:.16;--mk-spec:.85}
 @media screen{
-body.sk-pastel .mech-frame{border-radius:12px;background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 12px 12px/24px 24px,radial-gradient(120% 90% at 50% 40%,#F9FAFE 0%,#F3F6FB 40%,#EEF2F9 70%,#E6ECF5 100%);box-shadow:inset 0 0 0 1px #E3E9F2,inset 0 1px 0 #fff,inset 0 -24px 40px -30px rgba(82,99,185,.10);--mk-ink:#24324A;--mk-mute:#5F6C84;--mk-line:#8C9BB5;--mk-rung:#C9D2E1;--mk-tagbg:#FFFFFF;--mk-tagline:#C9D2E1;--mk-grid:rgba(36,50,74,.085);--mk-halo:#F2F5FA;--mk-acc:#5263B9;--mk-bad:#D36370;--mk-warn:#D19A4D;--mk-sheen:.62;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(36,50,74,.2));--mk-glow:drop-shadow(0 0 .6px #5263B9) drop-shadow(0 0 6px rgba(82,99,185,.42));--mk-glow-hot:drop-shadow(0 0 .8px #5263B9) drop-shadow(0 0 9px rgba(82,99,185,.5));--mk-lift:drop-shadow(0 4px 6px rgba(36,50,74,.10))}
-body.sk-blueprint .mech-frame{border-radius:0;background:linear-gradient(rgba(127,227,255,.08) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(90deg,rgba(127,227,255,.08) 1px,transparent 1px) 0 0/24px 24px,#04234A;box-shadow:inset 0 0 0 1px rgba(127,227,255,.35);--mk-ink:#F7FCFF;--mk-mute:#94BCD5;--mk-line:#7FE3FF;--mk-rung:#4FA9C3;--mk-tagbg:#052956;--mk-tagline:#4FA9C3;--mk-halo:#04234A;--mk-acc:#7FE3FF;--mk-bad:#FF8A93;--mk-warn:#FFD166;--mk-sheen:0;--mk-contact:none;--mk-glow:drop-shadow(0 0 4px rgba(127,227,255,.7));--mk-glow-hot:drop-shadow(0 0 6px rgba(127,227,255,.85));--mk-lift:none}
+body.sk-pastel .mech-frame{border-radius:12px;background:radial-gradient(circle,var(--mk-grid) 1px,transparent 1.35px) 12px 12px/24px 24px,radial-gradient(120% 90% at 50% 40%,#F9FAFE 0%,#F3F6FB 40%,#EEF2F9 70%,#E6ECF5 100%);box-shadow:inset 0 0 0 1px #E3E9F2,inset 0 1px 0 #fff,inset 0 -24px 40px -30px rgba(82,99,185,.10);--mk-ink:#24324A;--mk-mute:#5F6C84;--mk-line:#8C9BB5;--mk-rung:#C9D2E1;--mk-tagbg:#FFFFFF;--mk-tagline:#C9D2E1;--mk-grid:rgba(36,50,74,.085);--mk-halo:#F2F5FA;--mk-acc:#5263B9;--mk-bad:#D36370;--mk-warn:#D19A4D;--mk-sheen:.62;--mk-contact:drop-shadow(0 1.5px 1.5px rgba(36,50,74,.2));--mk-glow:drop-shadow(0 0 .6px #5263B9) drop-shadow(0 0 6px rgba(82,99,185,.42));--mk-glow-hot:drop-shadow(0 0 .8px #5263B9) drop-shadow(0 0 9px rgba(82,99,185,.5));--mk-lift:drop-shadow(0 4px 6px rgba(36,50,74,.10));--mk-pool:rgba(82,99,185,.09);--mk-pool-line:#C9CFF0;--mk-phos:#E3E9F2;--mk-hb:#8C9BB5;--mk-tile:#F3F6FB;--mk-clay-top:.62;--mk-clay-low:#24324A;--mk-clay-low-a:.17;--mk-spec:.88}
+body.sk-blueprint .mech-frame{border-radius:0;background:linear-gradient(rgba(127,227,255,.08) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(90deg,rgba(127,227,255,.08) 1px,transparent 1px) 0 0/24px 24px,#04234A;box-shadow:inset 0 0 0 1px rgba(127,227,255,.35);--mk-ink:#F7FCFF;--mk-mute:#94BCD5;--mk-line:#7FE3FF;--mk-rung:#4FA9C3;--mk-tagbg:#052956;--mk-tagline:#4FA9C3;--mk-halo:#04234A;--mk-acc:#7FE3FF;--mk-bad:#FF8A93;--mk-warn:#FFD166;--mk-sheen:0;--mk-contact:none;--mk-glow:drop-shadow(0 0 4px rgba(127,227,255,.7));--mk-glow-hot:drop-shadow(0 0 6px rgba(127,227,255,.85));--mk-lift:none;--mk-pool:rgba(127,227,255,.07);--mk-pool-line:rgba(127,227,255,.7);--mk-phos:#04234A;--mk-hb:#4FA9C3;--mk-tile:#04234A;--mk-clay-top:0;--mk-clay-low-a:0;--mk-spec:0}
 }
 .mech-move{transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.mech-move.mech-piece{transition-timing-function:cubic-bezier(.22,1.18,.36,1)}
+.mech-gs-top{stop-color:#fff;stop-opacity:var(--mk-clay-top,.3)}
+.mech-gs-mid{stop-color:#fff;stop-opacity:0}
+.mech-gs-low{stop-color:var(--mk-clay-low,#000);stop-opacity:var(--mk-clay-low-a,.3)}
+.mech-gs-spec{stop-color:#fff;stop-opacity:var(--mk-spec,.5)}
+.mech-clay{fill:var(--mk-clay,none);stroke:none;pointer-events:none}
+.mech-clay.mech-ball{fill:var(--mk-ball,none)}
+.mech-pool{fill:color-mix(in srgb,var(--mk-acc) 12%,transparent);stroke:var(--mk-pool-line);stroke-width:1;stroke-opacity:.7}
 .mech-t-label{font:700 10px 'IBM Plex Sans',sans-serif;letter-spacing:.07em;fill:var(--mk-mute);text-transform:uppercase;font-variant-numeric:tabular-nums lining-nums;paint-order:stroke;stroke:var(--mk-halo);stroke-width:3px;stroke-linejoin:round}
 .mech-t-caption{font:600 12px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink);paint-order:stroke;stroke:var(--mk-halo);stroke-width:3.5px;stroke-linejoin:round}
 .mech-t-tag{font:600 10.5px 'IBM Plex Sans',sans-serif;fill:var(--mk-ink)}
 .mech-tag rect{fill:var(--mk-tagbg);stroke:var(--mk-tagline);stroke-width:1;filter:var(--mk-lift)}
 .mech-tag.mech-site-tag rect,.mech-tag.mech-callout rect{fill:color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 12%,var(--mk-tagbg));stroke:color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 75%,var(--mk-tagbg))}
 .mech-tag.hot rect{stroke-width:1.8;stroke:var(--bio-tone,var(--mk-acc))}
+.mech-tag.mech-endcap rect{fill:var(--mk-tagbg);stroke:var(--mk-line);stroke-width:1.25}
+.mech-tag.mech-endcap .mech-t-tag{font-family:'IBM Plex Mono',monospace;font-weight:600}
 .mech-t-actor{font:700 10px 'IBM Plex Sans',sans-serif;letter-spacing:.06em;fill:var(--mk-ink);text-anchor:middle;text-transform:uppercase;paint-order:stroke;stroke:var(--mk-halo);stroke-width:3px;stroke-linejoin:round}
 .mech-t-actor.mech-t-inside{fill:var(--mi);stroke:var(--mf);stroke-width:2.5px}
 .mech-actor>path:first-child{fill:var(--mf);stroke:color-mix(in srgb,var(--me) 55%,var(--mf));stroke-width:1.25;stroke-linejoin:round;filter:var(--mk-contact);transition:filter .24s ease}
-.mech-sheen{fill:none;stroke:#fff;stroke-opacity:var(--mk-sheen,.45);stroke-linecap:round;pointer-events:none}
+.mech-t-actor.mech-t-side{text-anchor:start}
 .sk-daylight .mech-actor>path:first-child,body.sk-editorial .mech-actor>path:first-child{stroke:color-mix(in srgb,var(--mf) 62%,#24324A)}
 @media screen{
 body.sk-pastel .mech-actor>path:first-child{fill:color-mix(in srgb,var(--mf) 88%,#fff);stroke:color-mix(in srgb,var(--mf) 62%,#24324A)}
-body.sk-blueprint .mech-actor>path:first-child{fill:color-mix(in srgb,var(--mf) 24%,transparent);stroke:color-mix(in srgb,var(--mf) 70%,#fff);stroke-width:1.5}
+body.sk-blueprint .mech-actor>path:first-child{fill:color-mix(in srgb,var(--mf) 14%,transparent);stroke:var(--mf);stroke-width:1.5}
+body.sk-blueprint .mech-clay{display:none}
+body.sk-blueprint .mech-pool{fill:none;stroke-dasharray:3 3}
 body.sk-blueprint .mech-t-label,body.sk-blueprint .mech-t-actor{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;font-size:11px;letter-spacing:.1em}
 body.sk-blueprint .mech-t-actor.mech-t-inside{fill:var(--mk-ink);stroke:var(--mk-halo)}
 body.sk-pastel .mech-t-actor.mech-t-inside{stroke:color-mix(in srgb,var(--mf) 88%,#fff)}
@@ -726,27 +782,34 @@ body.sk-blueprint .mech-tag rect{rx:1px}
 .mech-st-released{opacity:.8}
 .mech-scan{opacity:.85}
 .mech-t-nt{font:600 var(--mk-nt,13px) 'IBM Plex Mono',monospace;text-anchor:middle;fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 82%,var(--dtext))}
-.mech-ntbg{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 15%,transparent);stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 34%,transparent);stroke-width:.75;transition:opacity .4s ease,fill .4s ease}
-.mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 26%,transparent);stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 70%,transparent);stroke-width:1}
+.mech-ntbg{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 15%,var(--mk-tile,#08111F));stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 34%,transparent);stroke-width:.75;transition:opacity .4s ease,fill .4s ease}
+.mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 26%,var(--mk-tile,#08111F));stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 70%,transparent);stroke-width:1}
 .mech-bead{fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 82%,var(--dtext));stroke:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 55%,var(--mk-ink));stroke-width:1;filter:var(--mk-contact)}
-.mech-bead-hi{fill:#fff;opacity:var(--mk-sheen,.45);pointer-events:none}
+.mech-bead-hi{fill:var(--mk-ball,none);pointer-events:none}
 .mech-nt.mech-hot{filter:var(--mk-glow)}
 .mech-bead.mech-hot{filter:var(--mk-glow)}
 .mech-passed{opacity:.7}
 .mech-nt{transition:opacity .4s ease}
-.mech-rail{stroke:var(--mk-line);stroke-width:4.5;stroke-linecap:round}
-.mech-rail-hi{stroke:#fff;stroke-opacity:calc(var(--mk-sheen,.45) * .55);stroke-width:1.2;stroke-linecap:round}
+.mech-rail{stroke:var(--mk-line);stroke-width:5;stroke-linecap:round}
+.mech-rail-hi{stroke:#fff;stroke-opacity:calc(var(--mk-sheen,.45) * .7);stroke-width:1.3;stroke-linecap:round}
+.mech-phos{fill:none;stroke:var(--mk-phos);stroke-linecap:round}
+.mech-rail-end{fill:var(--mk-line);stroke:var(--mk-line);stroke-width:1;stroke-linejoin:round}
 .mech-rung{stroke:color-mix(in srgb,var(--bio-letter,var(--mk-rung)) 42%,var(--mk-rung));stroke-width:2;stroke-linecap:round}
+.mech-hb{fill:none;stroke:var(--mk-hb);stroke-width:1;stroke-linecap:round;opacity:.9}
 @media screen{
 body.sk-pastel .mech-t-nt{fill:color-mix(in srgb,var(--bio-letter,var(--dfaint)) 50%,#24324A)}
 body.sk-pastel .mech-ntbg{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 11%,#fff);stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 30%,#fff)}
-body.sk-pastel .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 20%,#fff);stroke:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 62%,#fff)}
+body.sk-pastel .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,var(--mk-mute)) 20%,#fff);stroke:color-mix(in srgb,#5263B9 72%,#fff);stroke-width:1.25}
+body.sk-pastel .mech-t-nt.mech-hot{filter:none}
 body.sk-pastel .mech-passed{opacity:.72}
 body.sk-pastel .mech-t-nt.mech-passed{fill:#526077}
 body.sk-pastel .mech-rung{stroke:color-mix(in srgb,var(--bio-letter,var(--mk-rung)) 40%,#C9D2E1)}
 body.sk-blueprint .mech-rail{stroke-width:1.5;stroke-linecap:square}
 body.sk-blueprint .mech-rail-hi{display:none}
-body.sk-blueprint .mech-ntbg{fill:transparent;stroke:color-mix(in srgb,var(--bio-letter,#7FE3FF) 55%,transparent);rx:0}
+body.sk-blueprint .mech-ntbg{fill:var(--mk-tile,#04234A);stroke:color-mix(in srgb,var(--bio-letter,#7FE3FF) 55%,transparent);rx:0}
+body.sk-blueprint .mech-ntbg.mech-hot{fill:color-mix(in srgb,var(--bio-letter,#7FE3FF) 24%,var(--mk-tile,#04234A));stroke:var(--bio-letter,#7FE3FF);stroke-width:1.5}
+body.sk-blueprint .mech-phos{display:none}
+body.sk-blueprint .mech-rail-end{fill:none;stroke-width:1.5;stroke-linejoin:miter}
 }
 .mech-site{fill:color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 7%,transparent);stroke:color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 80%,transparent);stroke-width:1.25;stroke-dasharray:4 3;stroke-linecap:round;transition:fill .4s ease}
 .mech-site.hot{fill:color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 15%,transparent);stroke:var(--bio-tone,var(--mk-acc));stroke-width:2;stroke-dasharray:none;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--bio-tone,var(--mk-acc)) 35%,transparent))}
@@ -755,17 +818,19 @@ body.sk-blueprint .mech-ntbg{fill:transparent;stroke:color-mix(in srgb,var(--bio
 .mech-ripple.k-cut circle,.mech-ripple.k-flash circle{stroke:var(--mk-bad)}
 .mech-ripple.k-signal circle{stroke:var(--mk-warn)}
 .mech-ripple .mech-rip-fill{fill:color-mix(in srgb,var(--mk-bad) 32%,transparent);stroke:none;animation:mechFlash .42s ease-out both}
+.mech-spark{fill:none;stroke:var(--mk-bad);stroke-width:1.75;stroke-linecap:round;transform-box:view-box;transform-origin:var(--mx) var(--my);animation:mechSpark .65s cubic-bezier(.16,1,.3,1) both;animation-delay:inherit}
 .mech-cutmark line{stroke:var(--mk-bad);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:3 3;animation:mechFlash 1.2s ease-out both;animation-delay:inherit}
 .mech-appear{animation:mechAppear .5s cubic-bezier(.16,1,.3,1) both}
 @keyframes mechRipple{0%{transform:scale(1);opacity:1}100%{transform:scale(5);opacity:0}}
 @keyframes mechFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
 @keyframes mechAppear{0%{opacity:0}100%{opacity:1}}
+@keyframes mechSpark{0%{transform:scale(.45);opacity:0}22%{opacity:1}100%{transform:scale(1.45);opacity:0}}
 .mech-aside{min-width:0}
 .mech-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;padding:0;font-size:12px;color:var(--dtext)}
 .mech-chip{display:inline-flex;align-items:center;gap:6px;min-height:20px}
 .mech-chip.dv-chip-pulse{animation:dvchippulse .58s ease-out}
 .mech-sw{display:inline-block;flex:none;width:10px;height:10px;border-radius:3px;background:linear-gradient(180deg,color-mix(in srgb,var(--mf) 72%,#fff),var(--mf) 70%);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--me) 75%,var(--mf))}
-.mech-legend .mech-sw-dashed{background:color-mix(in srgb,var(--me) 10%,transparent);border:1px dashed var(--me);box-shadow:none;box-sizing:border-box}
+.mech-legend .mech-sw.mech-sw-dashed{width:12px;height:10px;border-radius:1px;box-shadow:none;background:linear-gradient(90deg,var(--me) 0 3.5px,transparent 3.5px 4.75px,var(--me) 4.75px 7.25px,transparent 7.25px 8.5px,var(--me) 8.5px) top/100% 1.5px no-repeat,linear-gradient(90deg,var(--me) 0 3.5px,transparent 3.5px 4.75px,var(--me) 4.75px 7.25px,transparent 7.25px 8.5px,var(--me) 8.5px) bottom/100% 1.5px no-repeat,linear-gradient(180deg,var(--me) 0 3.5px,transparent 3.5px 6.5px,var(--me) 6.5px) left/1.5px 100% no-repeat,linear-gradient(180deg,var(--me) 0 3.5px,transparent 3.5px 6.5px,var(--me) 6.5px) right/1.5px 100% no-repeat,color-mix(in srgb,var(--me) 12%,transparent)}
 .mech-st{font:500 11px 'IBM Plex Sans',sans-serif;color:#8DA2C6;font-variant-numeric:tabular-nums}
 .mech-st.hot{color:#8AE8FF;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .mech-st.hot::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}

@@ -256,6 +256,39 @@ function locusStateWarnings(state, path, panel, warnings) {
 function locusPatchWarnings(state, path, panel, warnings) {
   softwarePanelPatchWarnings(state, path, panel, warnings, locusStateWarnings);
 }
+/* Marker labels centre on their pins. Each label is sized roughly (6.4 px a
+   character at 10.5 px, plus its pill) on a narrow 320 px map. Neighbours
+   that would touch hang apart: the left label ends at its pin and the right
+   one starts at its pin. A label that still has no room rises one tier when
+   the arc band above is free. Pins near an edge hang their label inward. */
+var LOCUS_MARK_MAP_PX = 320;
+var LOCUS_MARK_GAP_PX = 6;
+function locusMarkerExtent(marker) {
+  var w = String(marker.label).length * 6.4 + 10, x = marker.x / 100 * LOCUS_MARK_MAP_PX;
+  if (marker.anchor === 'end') return [x - w + 6, x + 6];
+  if (marker.anchor === 'start') return [x - 6, x - 6 + w];
+  return [x - w / 2, x + w / 2];
+}
+function locusMarkerLayout(markers, canRise) {
+  var shown = markers.filter(function (marker) { return marker.visible; }).sort(function (a, b) { return a.x - b.x; });
+  var touch = function (a, b) { return !!a && locusMarkerExtent(a)[1] + LOCUS_MARK_GAP_PX > locusMarkerExtent(b)[0]; };
+  markers.forEach(function (marker) { marker.anchor = 'middle'; marker.tier = 0; });
+  shown.forEach(function (marker) {
+    var half = (String(marker.label).length * 3.2 + 5) / LOCUS_MARK_MAP_PX * 100;
+    if (marker.x < half) marker.anchor = 'start';
+    else if (marker.x > 100 - half) marker.anchor = 'end';
+  });
+  var last = [null, null], before = null;
+  shown.forEach(function (marker) {
+    var prev = last[0];
+    if (touch(prev, marker)) {
+      if (prev.anchor === 'middle') { prev.anchor = 'end'; if (touch(before, prev)) prev.anchor = 'middle'; }
+      if (marker.anchor === 'middle') marker.anchor = 'start';
+      if (touch(prev, marker) && canRise && !touch(last[1], marker)) marker.tier = 1;
+    }
+    if (marker.tier) last[1] = marker; else { before = prev; last[0] = marker; }
+  });
+}
 /* Pure presentation model: everything the renderer draws, in window percent
    (x, width) and pixel geometry, with visibility and clipping decided here. */
 function locusModel(panel, state, options) {
@@ -289,6 +322,7 @@ function locusModel(panel, state, options) {
     markers.push({ id: marker.id, at: marker.at, label: typeof marker.label === 'string' && marker.label ? marker.label : marker.id,
       tone: bioTone(marker.tone, 'accent'), visible: marker.at >= win.from && marker.at <= win.to, x: locusX(marker.at, win) });
   });
+  locusMarkerLayout(markers, arcHeight > LOCUS_ARC_H_COMPACT);
   var arcIds = Object.create(null), arcs = [];
   (Array.isArray(state.arcs) ? state.arcs : []).slice(0, LOCUS_MAX_ARCS).forEach(function (arc) {
     if (!panelObject(arc) || typeof arc.id !== 'string' || !arc.id || arcIds[arc.id] || !bioPosition(arc.from) || !bioPosition(arc.to) ||
@@ -386,7 +420,7 @@ function locusHTML(panel, state, options) {
   });
   model.markers.forEach(function (marker) {
     if (!marker.visible) return;
-    h += '<span class="locus-marker" style="left:' + pct(marker.x) + ';top:' + g.markerTop + 'px" title="' + esc(marker.label + ' at ' + locusFormat(marker.at, model.unit)) + '">' +
+    h += '<span class="locus-marker' + (marker.anchor !== 'middle' ? ' locus-mk-' + marker.anchor : '') + (marker.tier ? ' locus-mk-up' : '') + '" style="left:' + pct(marker.x) + ';top:' + g.markerTop + 'px" title="' + esc(marker.label + ' at ' + locusFormat(marker.at, model.unit)) + '">' +
       '<b>' + esc(marker.label) + '</b><span class="locus-marker-dot bio-tone-' + marker.tone + '"></span></span>';
   });
   model.arcs.forEach(function (arc) {
@@ -476,33 +510,40 @@ body.sk-blueprint .locus-meta{border-radius:2px}
 .locus-plus::before,.locus-plus::after{border-radius:4px 0 0 4px}
 .locus-minus::before,.locus-minus::after{border-radius:0 4px 4px 0}
 .locus-feature::after{border-radius:3px}.locus-plus::after{border-radius:3px 0 0 3px}.locus-minus::after{border-radius:0 3px 3px 0}
-/* A feature that runs past the window edge has no end there: the bar stops
-   square 9 px short of the edge and two shrinking fragments carry it out of
-   frame (a cartographer's "continues"), so no chevron claims the gene stops. */
+/* A feature that runs past the window edge has no end there: the bar runs
+   square to the frame and fades out over its last 18 px (a cartographer's
+   "continues"), so no chevron claims the gene stops. */
 .locus-clip-r.locus-plus,.locus-clip-l.locus-minus{--lf-shape:none}
 .locus-clip-r::before,.locus-clip-r::after{border-top-right-radius:0!important;border-bottom-right-radius:0!important}
 .locus-clip-l::before,.locus-clip-l::after{border-top-left-radius:0!important;border-bottom-left-radius:0!important}
-.locus-clip-r::before{right:9px}.locus-clip-l::before{left:9px}
-:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-clip-r::after{right:10px}
-:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-clip-l::after{left:10px}
-.locus-layer .locus-feature.locus-clip-r{--lf-cue:linear-gradient(90deg,transparent 0 2px,var(--lf-edge) 2px 5px,transparent 5px 7px,color-mix(in srgb,var(--lf-edge) 55%,transparent) 7px 9px);
-  background:var(--lf-cue) right center/9px 100% no-repeat}
-.locus-layer .locus-feature.locus-clip-l{--lf-cue-l:linear-gradient(270deg,transparent 0 2px,var(--lf-edge) 2px 5px,transparent 5px 7px,color-mix(in srgb,var(--lf-edge) 55%,transparent) 7px 9px);
-  background:var(--lf-cue-l) left center/9px 100% no-repeat}
-.locus-layer .locus-feature.locus-clip-l.locus-clip-r{background:var(--lf-cue-l) left center/9px 100% no-repeat,var(--lf-cue) right center/9px 100% no-repeat}
+.locus-layer .locus-feature.locus-clip-r{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
+.locus-layer .locus-feature.locus-clip-l{-webkit-mask-image:linear-gradient(270deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(270deg,#000 calc(100% - 18px),transparent)}
+.locus-layer .locus-feature.locus-clip-l.locus-clip-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 18px,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
 .locus-plus{padding-right:9px}
-.locus-clip-r{padding-right:14px}.locus-clip-l{padding-left:14px}
+.locus-clip-r{padding-right:14px}.locus-clip-l{padding-left:18px}
 .locus-feature i{position:relative;z-index:1;font-style:normal;overflow:hidden;text-overflow:ellipsis}
 .locus-plus i::after{content:' ›'}.locus-minus i::before{content:'‹ '}
 /* The chevron end already shows the strand (and the title names it), so the
    text arrows step aside where the shaped bars render. */
-:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature:not(.locus-clip-r) i::after,:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature:not(.locus-clip-l) i::before{content:none}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature i::after,:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature i::before{content:none}
+/* Strand chevrons (IGV-style): faint › or ‹ marks every 24 px inside the bar
+   in the tone's edge ink, drawn with two short gradient strokes per tile, so
+   clipped and whole genes show their strand the same way. The label sits on
+   its own patch of fill so no chevron runs through the text. */
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature{--lf-chevc:color-mix(in srgb,var(--lf-edge) 58%,transparent);--lf-chev:linear-gradient(transparent,transparent)}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-plus{--lf-chev:linear-gradient(45deg,transparent 2.1px,var(--lf-chevc) 2.1px 3.5px,transparent 3.5px) 8px 4px/24px 4px repeat-x,linear-gradient(135deg,transparent 2.1px,var(--lf-chevc) 2.1px 3.5px,transparent 3.5px) 8px 8px/24px 4px repeat-x}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-minus{--lf-chev:linear-gradient(135deg,transparent 2.1px,var(--lf-chevc) 2.1px 3.5px,transparent 3.5px) 8px 4px/24px 4px repeat-x,linear-gradient(45deg,transparent 2.1px,var(--lf-chevc) 2.1px 3.5px,transparent 3.5px) 8px 8px/24px 4px repeat-x}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature::after{background:var(--lf-chev),var(--lf-fill)}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature.locus-hl{--lf-chevc:color-mix(in srgb,var(--lf-ink) 48%,transparent)}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-feature i{display:block;height:14px;line-height:14px;margin:0 -3px 0 -4px;padding:0 3px 0 4px;background:var(--lf-fill)}
+/* Pastel idle genes are lit from above, like clay. */
+body.sk-pastel .locus-feature:not(.locus-hl):not(.locus-dim){--lf-fill:linear-gradient(180deg,color-mix(in srgb,var(--bio-tone,#5263B9) 12%,#FFFFFF),color-mix(in srgb,var(--bio-tone,#5263B9) 27%,#FFFFFF))}
 .locus-narrow i{display:none}
 /* The highlighted feature is the one solid, raised thing on the map. */
 .locus-feature.locus-hl{z-index:2;--lf-edge:var(--sq-accent-ink,var(--dink));--lf-fill:var(--sq-accent,color-mix(in srgb,var(--dink) 30%,transparent));--lf-ink:var(--sq-on-accent,var(--dink));
   filter:drop-shadow(0 3px 4px rgba(36,50,74,.24))}
 .sk-aurora .locus-feature.locus-hl{--lf-fill:linear-gradient(180deg,#5FE3FF,#2CB5D2);--lf-edge:#5FE3FF;filter:drop-shadow(0 0 5px rgba(56,225,255,.35))}
-body.sk-pastel .locus-feature.locus-hl{--lf-fill:linear-gradient(180deg,color-mix(in srgb,#5263B9 92%,#FFFFFF),#5263B9 70%);--lf-edge:#3D4C9E;filter:drop-shadow(0 3px 4px rgba(36,50,74,.24))}
+body.sk-pastel .locus-feature.locus-hl{--lf-fill:linear-gradient(180deg,color-mix(in srgb,#5263B9 92%,#FFFFFF),#5263B9 70%);--lf-edge:#3D4C9E;filter:drop-shadow(0 0 1.5px rgba(82,99,185,.55)) drop-shadow(0 3px 5px rgba(61,76,158,.3))}
 body.sk-blueprint .locus-feature.locus-hl{filter:none;--lf-fill:color-mix(in srgb,#7FE3FF 34%,#052956);--lf-edge:var(--sq-accent);--lf-ink:var(--sq-ink)}
 .locus-feature.locus-hl i{overflow:visible}
 .locus-feature.locus-dim{--lf-edge:var(--sq-line-strong,color-mix(in srgb,var(--dtext) 30%,transparent));--lf-fill:var(--sq-well,color-mix(in srgb,var(--dtext) 8%,transparent));--lf-ink:var(--sq-muted,var(--dfaint))}
@@ -512,7 +553,18 @@ body.sk-blueprint .locus-feature,body.sk-blueprint .locus-feature::before,body.s
 body.sk-blueprint .locus-feature{--lf-fill:color-mix(in srgb,var(--bio-tone,#7FE3FF) 24%,var(--sq-surface));--lf-edge:var(--bio-tone,#7FE3FF);--lf-ink:var(--sq-ink);font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase}
 /* Markers: a teardrop pin with a light core above a 1.5 px stem. */
 .locus-marker{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;font:600 10.5px/12px 'IBM Plex Sans',sans-serif;color:var(--sq-ink,var(--dink));white-space:nowrap}
-.locus-marker b{font-weight:600;padding:0 3px;border-radius:3px;text-shadow:0 0 3px var(--sq-surface,transparent),0 0 2px var(--sq-surface,transparent)}
+.locus-marker b{position:relative;font-weight:600;padding:0 3px;border-radius:3px;text-shadow:0 0 3px var(--sq-surface,transparent),0 0 2px var(--sq-surface,transparent)}
+/* In the shaped skins a label is a solid surface pill, so zoom guides and
+   pin stems never run through its text. Crowded neighbours hang apart
+   (anchor end / start) and a last resort rises one tier on a hairline. */
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .locus-marker b{padding:0 4px;border-radius:999px;background:var(--sq-surface);text-shadow:none}
+body.sk-blueprint .locus-marker b{border-radius:0}
+.locus-mk-end b{transform:translateX(calc(-50% + 6px))}
+.locus-mk-start b{transform:translateX(calc(50% - 6px))}
+.locus-mk-up b{translate:0 -12px}
+.locus-mk-up b::after{content:'';position:absolute;top:100%;left:50%;width:1px;height:12px;background:var(--sq-line-strong,currentColor)}
+.locus-mk-up.locus-mk-end b::after{left:auto;right:6px}
+.locus-mk-up.locus-mk-start b::after{left:6px}
 .locus-marker-dot{width:8px;height:8px;border-radius:50%;border:1px solid color-mix(in srgb,var(--dtext) 40%,transparent)}
 .sk-aurora .locus-marker-dot,body.sk-pastel .locus-marker-dot,body.sk-blueprint .locus-marker-dot{box-sizing:border-box;width:10px;height:10px;margin-top:1px;border:0;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
   background:radial-gradient(circle at 50% 50%,var(--sq-surface) 0 1.6px,transparent 2.1px),var(--bio-tone,var(--sq-accent));

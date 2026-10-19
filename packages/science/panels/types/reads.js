@@ -260,7 +260,14 @@ function readsCellHTML(cell, model) {
   if (cell.kind === 'gap') text = '-';
   else if (cell.kind === 'match' && !model.showMatches) text = '.';
   else { text = cell.ch; classes += ' ' + bioLetterClass(cell.unknown ? '?' : cell.ch); }
-  if (cell.kind === 'mismatch') classes += ' bio-tone-mismatch';
+  if (cell.kind === 'mismatch') {
+    classes += ' bio-tone-mismatch';
+    /* A mismatch supported by one read at depth 3+ is drawn faint;
+       one shared by two or more reads stays solid. This reflects support,
+       not base-call quality. */
+    var at = cell.coord - model.start, tally = model.alleles[at];
+    if (tally && model.depth[at] >= 3 && tally[String(cell.ch).toUpperCase()] === 1) classes += ' reads-low-support';
+  }
   if (cell.kind === 'clip') title += ' (soft clip, outside the reference)';
   if (cell.insert) title += ' · insertion after this base: ' + cell.insert;
   return '<span class="' + classes + '" style="--c:' + cell.col + '" title="' + esc(title) + '">' + esc(text) +
@@ -314,7 +321,7 @@ function readsHTML(panel, state) {
         split = readsAlleleHTML(model, i, model.marks.some(function (mark) { return cell.coord >= mark.from && cell.coord <= mark.to; }));
       h += '<span class="reads-dcell' + (split ? ' reads-dsplit' : '') + '" style="--c:' + cell.col + '" title="' + esc('depth ' + value + ' at ' + bioFormatCoord(cell.coord)) + '"><i style="height:' + pct + '%">' + split + '</i></span>';
     });
-    h += readsDepthLineHTML(model) + '</span></div>';
+    h += readsDepthLineHTML(model) + (model.maxDepth ? '<span class="reads-dscale" aria-hidden="true">' + model.maxDepth + '×</span>' : '') + '</span></div>';
   }
   h += '<div class="reads-row reads-ruler" aria-hidden="true"><span class="reads-name"></span><span class="reads-cells">';
   model.ruler.forEach(function (tick) { h += '<span class="reads-tick" style="--c:' + tick.col + '">' + esc(tick.label) + '</span>'; });
@@ -435,7 +442,10 @@ body.sk-blueprint .reads-mismatch[class*="bio-tone-"]{background:color-mix(in sr
 .reads-dcell{position:relative;z-index:0;display:flex;align-items:flex-end;width:var(--reads-cell);height:22px;padding:0 2px;box-sizing:border-box}
 .reads-dcell i{display:block;width:100%;min-height:1px;border-radius:1px 1px 0 0;background:color-mix(in srgb,var(--dink) 38%,transparent)}
 .sk-aurora .reads-dcell,body.sk-pastel .reads-dcell,body.sk-blueprint .reads-dcell{padding:0}
-.sk-aurora .reads-dcell i,body.sk-pastel .reads-dcell i{border-radius:0;background:linear-gradient(180deg,color-mix(in srgb,var(--sq-muted) 44%,var(--sq-surface)),color-mix(in srgb,var(--sq-muted) 16%,var(--sq-surface)))}
+/* Coverage area on the sequential ramp (seq-3 at the top to seq-1 at the
+   base) under an accent step line. */
+.sk-aurora .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#1A7896,#18345A) left bottom/100% 22px no-repeat}
+body.sk-pastel .reads-dcell i{border-radius:0;background:linear-gradient(180deg,#8796E0,#D9DFF7) left bottom/100% 22px no-repeat}
 body.sk-blueprint .reads-dcell i{border-radius:0;background:rgba(127,227,255,.22)}
 /* Allele split at a marked site: base-coloured segments, reference letter at
    the bottom, so a heterozygous column reads as G 3 / A 2 at a glance. */
@@ -445,7 +455,13 @@ body.sk-blueprint .reads-dcell i{border-radius:0;background:rgba(127,227,255,.22
 body.sk-blueprint .reads-dsplit b{border-radius:0;background:color-mix(in srgb,var(--bio-letter,#7FE3FF) 55%,var(--sq-surface));box-shadow:inset 0 0 0 1px var(--bio-letter,#7FE3FF)}
 .reads-dline{display:none}
 .sk-aurora .reads-dline,body.sk-pastel .reads-dline,body.sk-blueprint .reads-dline{display:block;position:relative;z-index:2;grid-column:calc(var(--c) + 1)/span var(--w);align-self:end;width:100%;height:22px;overflow:visible;pointer-events:none}
-.reads-dline path{fill:none;stroke:var(--sq-muted,currentColor);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.reads-dline path{fill:none;stroke:var(--sq-accent,var(--sq-muted,currentColor));stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+/* The peak depth as a quiet scale tag (IGV's data range). */
+.reads-dscale{display:none}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-dscale{display:block;grid-row:1;grid-column:1;position:relative;z-index:3;align-self:start;justify-self:start;margin-top:-1px;padding:0 4px;border-radius:999px;font:600 10px/12px 'IBM Plex Mono',monospace;color:var(--sq-muted);background:color-mix(in srgb,var(--sq-well) 82%,transparent);font-variant-numeric:tabular-nums lining-nums;pointer-events:none;white-space:nowrap}
+body.sk-blueprint .reads-dscale{border-radius:0}
+.reads-mismatch.reads-low-support{opacity:.62}
+:is(.sk-aurora,.sk-pastel,.sk-blueprint) .reads-mismatch.reads-low-support[class*="bio-tone-"]{opacity:1;color:color-mix(in srgb,var(--bio-letter,currentColor) 62%,var(--sq-surface));background:color-mix(in srgb,var(--bio-tone) 7%,var(--sq-surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bio-tone) 42%,var(--sq-surface))}
 body.sk-blueprint .reads-dline path{stroke:var(--sq-accent);stroke-linecap:square;stroke-linejoin:miter}
 .reads-ruler .reads-cells,.reads-ruler .reads-name{height:16px}
 .reads-ruler .reads-cells{grid-template-rows:16px}
@@ -453,7 +469,9 @@ body.sk-blueprint .reads-dline path{stroke:var(--sq-accent);stroke-linecap:squar
 .reads-ref .reads-cell{font-weight:600;color:var(--sq-ink,var(--dink))}
 .sk-aurora .reads-ref .reads-cell,body.sk-pastel .reads-ref .reads-cell,body.sk-blueprint .reads-ref .reads-cell{color:var(--sq-ink)}
 /* The reference keeps ink letters with a thin base-coloured key under each. */
-.sk-aurora .reads-ref .reads-cell::after,body.sk-pastel .reads-ref .reads-cell::after{content:'';position:absolute;left:3px;right:3px;bottom:-2px;height:2px;border-radius:1px;background:var(--bio-letter,transparent);opacity:.9}
+/* Printed-figure band: each reference base sits on a 10 % tile of its own
+   colour whose bottom edge is the base-coloured key. */
+.sk-aurora .reads-ref .reads-cell,body.sk-pastel .reads-ref .reads-cell{border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--bio-letter,transparent) 10%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--bio-letter,transparent) 85%,transparent);width:calc(var(--reads-cell) - 2px);justify-self:center}
 .reads-marks .reads-cells,.reads-marks .reads-name{height:10px}
 .reads-marks .reads-cells{grid-template-rows:6px}
 .reads-band{grid-column:calc(var(--c) + 1)/span var(--w);height:6px;box-sizing:border-box;border-radius:var(--sq-r,3px)}

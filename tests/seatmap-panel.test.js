@@ -353,11 +353,14 @@ test('all authored text is escaped; the markup carries titles, aria totals, hatc
   assert.match(html, /<pattern id="spm-static"/);
   assert.match(html, /class="seatmap-hold" d="M[\d.,L]+Z" fill="url\(#spm-static\)"/);
   assert.match(html, /class="seatmap-sec seatmap-hi" data-sec="101"/);
-  /* Fills walk the skin ramp (--seatmap-r1..r5): 60% sits halfway between r2 and r3; from 80% the ramp turns dark and labels invert. */
-  assert.match(html, /fill="color-mix\(in oklab, var\(--seatmap-r3\) 50%, var\(--seatmap-r2\)\)" fill-opacity="1.000"/);
-  assert.doesNotMatch(html, /class="seatmap-lbl seatmap-lbl-on"/);
-  assert.match(C.seatmapHTML(p, {sold:{101:90}}), /fill="color-mix\(in oklab, var\(--seatmap-r5\) 50%, var\(--seatmap-r4\)\)" fill-opacity="1.000"><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-on"/);
-  assert.match(C.seatmapHTML(p, {mode:'tier'}), /fill="#D7A34F"[^>]*><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-dark"/);
+  /* Fills take one of five classed skin bins (--seatmap-r1..r5, 20% each): ink labels on r1-r3, inverse labels from 60% (r4, r5). */
+  const ROWS = '(?:<path class="seatmap-rows" d="[^"]+"\\/>)?';
+  assert.match(html, /fill="var\(--seatmap-r4\)" fill-opacity="1.000"/);
+  assert.match(html, new RegExp('fill="var\\(--seatmap-r4\\)" fill-opacity="1.000"><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-on"'));
+  assert.doesNotMatch(C.seatmapHTML(p, {sold:{101:30}}), /class="seatmap-lbl seatmap-lbl-on"/);
+  assert.match(C.seatmapHTML(p, {sold:{101:30}}), /data-sec="101"><path class="seatmap-fill" d="[^"]+" fill="var\(--seatmap-r2\)"/);
+  assert.match(C.seatmapHTML(p, {sold:{101:90}}), new RegExp('fill="var\\(--seatmap-r5\\)" fill-opacity="1.000"><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-on"'));
+  assert.match(C.seatmapHTML(p, {mode:'tier'}), new RegExp('fill="#D7A34F"[^>]*><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-dark"'));
   assert.match(html, /class="seatmap-outline"/);
   assert.match(html, /seatmap-stat-warn/);
   assert.match(html, /class="swnote">&lt;img/);

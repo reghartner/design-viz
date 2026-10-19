@@ -133,9 +133,19 @@ function seatmapPlacement(panel, sections, bowl) {
   });
   return out;
 }
+/* The four end-zone face-off circles of a rink field box (200 × 85 ft). */
+function seatmapRinkSpots(b) {
+  var ft = b.width / 200, fv = b.height / 85, f = Math.min(ft, fv), cy = b.y + b.height / 2, out = [];
+  [b.x + 31 * ft, b.x + b.width - 31 * ft].forEach(function (fx) {
+    [-1, 1].forEach(function (sy) { out.push({ x: fx, y: cy + sy * 22 * fv, r: 15 * f }); });
+  });
+  return out;
+}
 /* Landmarks are authored points; a pill that would sit on a section label
-   at the default size slides toward the field centre until it is clear. */
-function seatmapPlaceLandmarks(landmarks, sections, centre) {
+   at the default size slides toward the field centre until it is clear. On a
+   rink, a pill inside the boards that would cover an end-zone face-off circle
+   moves onto the nearer long board (a bench box) when that spot is clear. */
+function seatmapPlaceLandmarks(landmarks, sections, centre, rink) {
   function box(x, y, w, h) { return { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 }; }
   function hits(a, b) { return a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0; }
   var labels = sections.filter(function (s) { return s.font; }).map(function (s) {
@@ -148,6 +158,17 @@ function seatmapPlaceLandmarks(landmarks, sections, centre) {
       if (!labels.some(function (label) { return hits(label, pill); })) break;
       var dx = centre[0] - x, dy = centre[1] - y, dist = Math.hypot(dx, dy) || 1;
       x += (dx / dist) * 10; y += (dy / dist) * 10; moved++;
+    }
+    if (rink) {
+      var b = rink.box, here = box(x, y, width, height);
+      var inside = x > b.x && x < b.x + b.width && y > b.y && y < b.y + b.height;
+      var onSpot = rink.spots.some(function (c) { return here.x0 < c.x + c.r && here.x1 > c.x - c.r && here.y0 < c.y + c.r && here.y1 > c.y - c.r; });
+      if (inside && onSpot) {
+        var lo = b.x + rink.r + width / 2, hi = b.x + b.width - rink.r - width / 2;
+        var bx = lo <= hi ? Math.max(lo, Math.min(hi, x)) : b.x + b.width / 2, by = y < b.y + b.height / 2 ? b.y : b.y + b.height;
+        var bench = box(bx, by, width, height);
+        if (!labels.some(function (label) { return hits(label, bench); })) { x = bx; y = by; moved++; }
+      }
     }
     return { id: mark.id, label: mark.label, x: spmRound(x), y: spmRound(y), width: width, height: height, nudged: moved > 0 };
   });
@@ -444,7 +465,7 @@ function seatmapModel(panel, state) {
       sold: soldN, held: hold, price: p, revenue: revenue, revenueOverflow: p !== null && revenue === null, tier: tier, tierId: tierId,
       pct: spmPercent(soldN, s.capacity), highlighted: highlight.indexOf(s.id) >= 0,
       d: geom.d, x: geom.x, y: geom.y, font: seatmapLabelFont(s.label, geom).font, lines: seatmapLabelFont(s.label, geom).lines, intensity: 0, known: true,
-      kind: s.kind, range: bowl ? placement[s.id] : null,
+      kind: s.kind, range: bowl ? placement[s.id] : null, rows: bowl ? seatmapRowLines(geom) : '',
     };
   });
   var tierIndex = {};
@@ -460,7 +481,7 @@ function seatmapModel(panel, state) {
     s.color = mode === 'tier' && s.tier ? (s.tier.color || seatmapTierPalette(tierIndex[s.tier.id])) : null;
     /* Label colour: accent fills switch at a threshold per skin; tier fills
        use the tier colour's own luminance. */
-    s.labelTone = s.color ? seatmapTierTone(s.color) : (s.intensity >= SEATMAP_RAMP_SPLIT && s.known ? 'on' : '');
+    s.labelTone = s.color ? seatmapTierTone(s.color) : (seatmapRampBin(s.intensity) >= SEATMAP_LABEL_BIN && s.known ? 'on' : '');
   });
   var totals = { sold: 0, capacity: 0, held: 0, revenue: 0, priced: 0, pricedSold: 0 };
   var ringTotals = rings.map(function (ring) { return { id: ring.id, label: ring.label, sold: 0, capacity: 0, held: 0, sections: 0 }; });
@@ -486,11 +507,33 @@ function seatmapModel(panel, state) {
     return { id: tier.id, label: tier.label, color: tier.color || seatmapTierPalette(i), sections: sections.filter(function (s) { return s.tierId === tier.id; }).length };
   });
   var prices = sections.filter(function (s) { return s.price !== null; }).map(function (s) { return s.price; });
+  var fieldBox = field ? (fieldRect || seatmapPointsBox(field)) : null;
+  var rink = fieldBox && (bowl ? bowl.bowl === 'rink' : !!fieldRect) ? {
+    box: fieldBox, spots: seatmapRinkSpots(fieldBox),
+    r: bowl ? fieldBox.height / 2 : Math.min(fieldBox.height * 28 / 85, fieldBox.width / 2, fieldBox.height / 2),
+  } : null;
+  /* Ring names for a map drawn too small for its section labels: one per
+     ring, at the top of that ring nearest the centre line (on an authored
+     chart, the centre of that ring's topmost section). */
+  var midX = bowl ? SEATMAP_CENTRE[0] : view.width / 2;
+  var ringTags = ringTotals.map(function (ring, ri) {
+    if (!ring.sections) return null;
+    var best = null;
+    function consider(tx, ty) {
+      var score = ty + Math.abs(tx - midX) * 0.01;
+      if (!best || score < best.score) best = { x: tx, y: ty, score: score };
+    }
+    if (bowl) for (var k = 0; k < 240; k++) {
+      var a = bowl.point(ri, k / 240, false), b = bowl.point(ri, k / 240, true);
+      consider((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    } else sections.forEach(function (s) { if (s.ring === ri) consider(s.x, s.y); });
+    return best ? { label: ring.label, x: spmRound(best.x), y: spmRound(best.y) } : null;
+  }).filter(Boolean);
   return {
     geometry: geometry, bowl: bowl ? bowl.bowl : null, view: view, field: field, fieldLines: fieldLines, mode: mode, currency: currency,
-    fieldBox: field ? (fieldRect || seatmapPointsBox(field)) : null,
+    fieldBox: fieldBox, ringTags: ringTags,
     sections: sections, rings: ringTotals, tiers: tierCounts, zones: zoneOrder.map(function (z) { return { zone: z, sections: zones[z] }; }),
-    landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2]),
+    landmarks: seatmapPlaceLandmarks(seatmapLandmarks(panel), sections, bowl ? SEATMAP_CENTRE : [view.width / 2, view.height / 2], rink),
     highlight: highlight, totals: totals, showTotals: panel.showTotals !== false,
     priceRange: prices.length ? { min: Math.min.apply(null, prices), max: Math.max.apply(null, prices) } : null,
     complete: sections.length >= SEATMAP_MIN_SECTIONS, hasHolds: totals.held > 0,
@@ -498,7 +541,7 @@ function seatmapModel(panel, state) {
        data, label text and lines, landmarks and tier definitions. */
     geometryKey: spmHash(geometry + ':' + view.width + 'x' + view.height + ':' + sections.map(function (s) {
       return s.id + '@' + s.x + ',' + s.y + '|' + s.d + '|' + s.lines.join('/') + '|' + s.font;
-    }).join(',') + ';' + JSON.stringify(seatmapLandmarks(panel)) + ';' + JSON.stringify(tiers) + ';' + (field || '') + (fieldLines && !bowl ? '|' + fieldLines : '')),
+    }).join(',') + ';' + JSON.stringify(seatmapLandmarks(panel)) + ';' + JSON.stringify(tiers) + ';' + JSON.stringify(rings) + ';' + (field || '') + (fieldLines && !bowl ? '|' + fieldLines : '')),
   };
 }
 /* Default tier colours: the categorical series s1..s6, then two quiet extras. */
@@ -516,20 +559,33 @@ function seatmapTierTone(hex) {
   var l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   return (l + 0.05) / 0.0566 >= 1.05 / (l + 0.05) ? 'dark' : 'light';
 }
-/* The sell-through ramp: five skin stops (--seatmap-r1..r5). Below the label
-   split the fill walks r1→r3 (ink labels); from the split it walks r4→r5
-   (inverse labels), so every label keeps AA contrast on its own fill. The
-   split sits high so the common 30–80% range gets most of the ramp and the
-   darkest fills mean nearly gone. */
-var SEATMAP_RAMP_SPLIT = 0.8;
-function seatmapRampFill(t) {
+/* The sell-through ramp: five classed bins on the skin stops
+   (--seatmap-r1..r5), 0–20, 20–40, 40–60, 60–80 and 80–100 %. Labels are ink
+   on r1–r3 and inverse on r4–r5, so every label keeps AA contrast on its own
+   fill, and the legend's five swatches read exactly as the map does. */
+var SEATMAP_RAMP_BINS = 5, SEATMAP_LABEL_BIN = 4;
+function seatmapRampBin(t) {
   t = isFiniteNum(t) ? Math.max(0, Math.min(1, t)) : 0;
-  var stops, u;
-  if (t < SEATMAP_RAMP_SPLIT) { stops = [1, 2, 3]; u = (t / SEATMAP_RAMP_SPLIT) * 2; }
-  else { stops = [4, 5]; u = (t - SEATMAP_RAMP_SPLIT) / (1 - SEATMAP_RAMP_SPLIT); }
-  var i = Math.min(stops.length - 2, Math.floor(u)), pct = Math.round((u - i) * 1000) / 10;
-  var a = 'var(--seatmap-r' + stops[i] + ')', b = 'var(--seatmap-r' + stops[i + 1] + ')';
-  return pct <= 0 ? a : pct >= 100 ? b : 'color-mix(in oklab, ' + b + ' ' + pct + '%, ' + a + ')';
+  return Math.min(SEATMAP_RAMP_BINS, 1 + Math.floor(t * SEATMAP_RAMP_BINS + 1e-9));
+}
+function seatmapRampFill(t) {
+  return 'var(--seatmap-r' + seatmapRampBin(t) + ')';
+}
+/* Seat-row texture for a generated wedge: evenly spaced arcs between the
+   inner and outer edge, drawn as one faint path above the fill. */
+function seatmapRowLines(geom) {
+  var inner = geom.innerPoints, outer = geom.outerPoints;
+  if (!inner || !outer || inner.length !== outer.length || inner.length < 2) return '';
+  outer = outer.slice().reverse();
+  var bands = Math.max(3, Math.min(6, Math.round(geom.depth / 20))), d = '';
+  for (var k = 1; k < bands; k++) {
+    var f = k / bands;
+    d += inner.map(function (p, i) {
+      var q = outer[i];
+      return (i ? 'L' : 'M') + spmRound(p[0] + (q[0] - p[0]) * f) + ',' + spmRound(p[1] + (q[1] - p[1]) * f);
+    }).join('');
+  }
+  return d;
 }
 /* Bounding box of an M/L polyline path (the traced bowl field). */
 function seatmapPointsBox(d) {
@@ -552,7 +608,8 @@ function seatmapFieldMarks(model, hid) {
   function circle(cls, px, py, rad) { return '<circle class="' + cls + '" cx="' + r(px) + '" cy="' + r(py) + '" r="' + r(rad) + '"/>'; }
   function line(cls, x0, y0, x1, y1) { return '<path class="' + cls + '" d="M' + r(x0) + ',' + r(y0) + 'L' + r(x1) + ',' + r(y1) + '"/>'; }
   function rect(cls, px, py, rw, rh) { return '<rect class="' + cls + '" x="' + r(px) + '" y="' + r(py) + '" width="' + r(rw) + '" height="' + r(rh) + '"/>'; }
-  var under = '<g class="seatmap-marks"' + clip + '>' + rect('seatmap-sheen', x, y, w, ht).replace('/>', ' fill="url(#' + hid + '-s)"/>'), over = '';
+  var under = '<g class="seatmap-marks"' + clip + '>' + rect('seatmap-sheen', x, y, w, ht).replace('/>', ' fill="url(#' + hid + '-s)"/>') +
+    '<use class="seatmap-board-in" href="#' + hid + '-fp"/>', over = '';
   if (kind === 'rink') {
     var ft = w / 200, fv = ht / 85, f = Math.min(ft, fv);
     [[x + 11 * ft, 1], [x + w - 11 * ft, 0]].forEach(function (g) {
@@ -560,9 +617,10 @@ function seatmapFieldMarks(model, hid) {
       under += '<path class="seatmap-rink-crease" d="M' + r(g[0]) + ',' + r(cy - 6 * f) + 'A' + r(6 * f) + ',' + r(6 * f) + ' 0 0 ' + g[1] + ' ' + r(g[0]) + ',' + r(cy + 6 * f) + 'Z"/>';
     });
     under += circle('seatmap-rink-circle', cx, cy, 15 * f);
-    [x + 31 * ft, x + w - 31 * ft].forEach(function (fx) {
-      [-1, 1].forEach(function (sy) { under += circle('seatmap-rink-circle', fx, cy + sy * 22 * fv, 15 * f) + circle('seatmap-rink-dot', fx, cy + sy * 22 * fv, 1.2 * f); });
-    });
+    seatmapRinkSpots(b).forEach(function (c) { under += circle('seatmap-rink-circle', c.x, c.y, c.r) + circle('seatmap-rink-dot', c.x, c.y, 1.2 * f); });
+    /* A generated bowl draws only the centre line as a field line; its blue
+       lines sit 75 ft from each end board, as on an authored rink. */
+    if (model.geometry === 'bowl') [x + 75 * ft, x + w - 75 * ft].forEach(function (bx) { under += line('seatmap-rink-blue', bx, y, bx, y + ht); });
     [x + 80 * ft, x + w - 80 * ft].forEach(function (fx) {
       [-1, 1].forEach(function (sy) { under += circle('seatmap-rink-dot', fx, cy + sy * 22 * fv, 1.2 * f); });
     });
@@ -616,12 +674,32 @@ function seatmapSectionMarkup(s, model, hid) {
   var h = '<g class="' + cls + '" data-sec="' + esc(s.id) + '">' +
     '<path class="seatmap-fill" d="' + s.d + '" fill="' + fill + '" fill-opacity="' + opacity.toFixed(3) + '"><title>' + esc(seatmapSectionTitle(s, model)) + '</title></path>';
   if (s.held) h += '<path class="seatmap-hold" d="' + s.d + '" fill="url(#' + hid + ')"/>';
+  if (s.rows) h += '<path class="seatmap-rows" d="' + s.rows + '"/>';
   if (s.font) {
     h += '<text class="seatmap-lbl' + (s.labelTone ? ' seatmap-lbl-' + s.labelTone : '') + '" x="' + s.x + '" y="' + s.y + '" font-size="' + s.font + '" dy="' + (s.lines.length > 1 ? '-0.2em' : '0.35em') + '">';
     if (s.lines.length > 1) h += esc(s.lines[0]) + '<tspan x="' + s.x + '" dy="1.05em">' + esc(s.lines[1]) + '</tspan>'; else h += esc(s.lines[0]);
     h += '</text>';
   }
   return h + '</g>';
+}
+/* The ramp key: five stepped swatches. Shares of capacity (sold, held) get
+   0–100 % ticks and, for sold, a marker at the overall sell-through; price and
+   revenue are relative to the top section and keep the words low and high. */
+function seatmapScale(model) {
+  var bins = '', share = model.mode === 'sold' || model.mode === 'held';
+  for (var i = 1; i <= SEATMAP_RAMP_BINS; i++) bins += '<i style="background:var(--seatmap-r' + i + ')"></i>';
+  var h = '<span class="seatmap-key">' + (share ? '' : 'low') + '<span class="seatmap-scale' + (share ? '' : ' seatmap-scale-plain') + '" aria-hidden="true"><span class="seatmap-bins">' + bins + '</span>';
+  if (share) h += '<span class="seatmap-ticks"><i>0%</i><i>20</i><i>40</i><i>60</i><i>80</i><i>100</i></span>';
+  if (model.mode === 'sold' && model.totals.capacity) h += '<span class="seatmap-caret" style="left:' + spmRound(Math.max(0, Math.min(100, model.totals.pct))) + '%"></span>';
+  return h + '</span>' + (share ? '' : 'high') + '</span>';
+}
+/* Per-ring mini bar: sold, then held, against capacity. The sold segment
+   takes the ramp colour only when the map itself shows sell-through. */
+function seatmapRingBar(ring, mode) {
+  var cap = ring.capacity || 0, sold = cap ? Math.min(1, ring.sold / cap) : 0, held = cap ? Math.min(1 - sold, ring.held / cap) : 0;
+  var colour = mode === 'sold' ? seatmapRampFill(ring.pct / 100) : 'var(--seatmap-neutral)';
+  return '<i class="seatmap-ring-bar" aria-hidden="true"><i class="seatmap-ring-sold" style="width:' + spmRound(sold * 100) + '%;background:' + colour + '"></i>' +
+    (held > 0 ? '<i class="seatmap-ring-held" style="width:' + spmRound(held * 100) + '%"></i>' : '') + '</i>';
 }
 function seatmapLegend(model) {
   var h = '<div class="seatmap-legend">', mode = model.mode, cur = model.currency;
@@ -631,7 +709,7 @@ function seatmapLegend(model) {
     h += '<span><i class="seatmap-sw" style="background:' + tier.color + '"></i>' + esc(tier.label) + ' <small>' + tier.sections + '</small></span>';
   });
   else {
-    h += '<span class="seatmap-key">low<i class="seatmap-ramp" aria-hidden="true"></i>high</span>';
+    h += seatmapScale(model);
     if (mode === 'price' && model.priceRange) h += '<span class="seatmap-range">' + esc(spmMoney(model.priceRange.min, cur)) + ' – ' + esc(spmMoney(model.priceRange.max, cur)) + '</span>';
   }
   if (model.hasHolds) h += '<span><i class="seatmap-sw seatmap-sw-hold"></i>held block</span>';
@@ -639,7 +717,7 @@ function seatmapLegend(model) {
   h += '</div><div class="seatmap-rings">';
   model.rings.forEach(function (ring) {
     if (!ring.sections) return;
-    h += '<span class="seatmap-ring"><i class="seatmap-ring-dot" style="background:' + seatmapRampFill(ring.pct / 100) + '" aria-hidden="true"></i><b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + '</span>';
+    h += '<span class="seatmap-ring">' + seatmapRingBar(ring, mode) + '<b>' + esc(ring.label) + '</b> ' + seatmapInt(ring.sold) + ' / ' + seatmapInt(ring.capacity) + ' · ' + Math.round(ring.pct) + '%' + (ring.held ? ' · ' + seatmapInt(ring.held) + ' held' : '') + '</span>';
   });
   if (model.zones.length) h += '<span class="seatmap-zones">' + model.zones.map(function (z) { return esc(z.zone) + ' <small>' + z.sections + '</small>'; }).join(' · ') + '</span>';
   return h + '</div>';
@@ -652,7 +730,9 @@ function seatmapTotals(model) {
   var pct = Math.max(0, Math.min(100, t.pct || 0));
   return '<div class="seatmap-totals">' +
     '<div class="seatmap-stat"><b>' + seatmapInt(t.sold) + '<small> / ' + seatmapInt(t.capacity) + '</small></b><span>sold / capacity</span></div>' +
-    '<div class="seatmap-stat seatmap-stat-pct"><b>' + Math.round(t.pct) + '<small>%</small><i class="seatmap-meter" aria-hidden="true"><i style="width:' + spmRound(pct) + '%;background:' + seatmapRampFill(pct / 100) + '"></i></i></b><span>sell-through</span></div>' +
+    '<div class="seatmap-stat seatmap-stat-pct"><svg class="seatmap-gauge" viewBox="0 0 32 32" aria-hidden="true"><circle class="seatmap-gauge-track" cx="16" cy="16" r="12.5"/>' +
+    '<circle class="seatmap-gauge-arc" cx="16" cy="16" r="12.5" pathLength="100" transform="rotate(-90 16 16)" style="stroke-dasharray:' + spmRound(pct) + ' 100"/></svg>' +
+    '<b>' + Math.round(t.pct) + '<small>%</small></b><span>sell-through</span></div>' +
     '<div class="seatmap-stat' + (t.held ? ' seatmap-stat-warn' : '') + '"><b>' + seatmapInt(t.held) + '</b><span>held</span></div>' +
     '<div class="seatmap-stat"><b>' + revenueHTML + '</b><span>revenue' + (t.revenueKnown && !t.allPriced ? ' · where price known' : '') + '</span></div></div>';
 }
@@ -675,8 +755,16 @@ function seatmapHTML(panel, state, model, hid, pulse) {
     if (model.fieldLines) h += '<path class="seatmap-field-line" d="' + model.fieldLines + '"/>';
     h += marks.over;
   }
+  /* One group per ring, inner first, so each level casts a soft shadow and
+     reads as a tier stepping up from the field. */
   h += '<g class="seatmap-sections">';
-  model.sections.forEach(function (s) { h += seatmapSectionMarkup(s, model, hid); });
+  model.rings.forEach(function (ring, ri) {
+    var inRing = model.sections.filter(function (s) { return s.ring === ri; });
+    if (!inRing.length) return;
+    h += '<g class="seatmap-tier">';
+    inRing.forEach(function (s) { h += seatmapSectionMarkup(s, model, hid); });
+    h += '</g>';
+  });
   h += '</g><g class="seatmap-outlines">';
   model.sections.forEach(function (s) { if (s.highlighted) h += '<path class="seatmap-outline-halo" d="' + s.d + '"/><path class="seatmap-outline" d="' + s.d + '"/>'; });
   h += '</g><g class="seatmap-landmarks">';
@@ -684,7 +772,13 @@ function seatmapHTML(panel, state, model, hid, pulse) {
     h += '<g class="seatmap-landmark"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
-  h += '</g></svg>' + seatmapLegend(model) + '</div>';
+  h += '</g>';
+  if (model.ringTags.length) {
+    h += '<g class="seatmap-ringtags" aria-hidden="true">';
+    model.ringTags.forEach(function (tag) { h += '<text class="seatmap-ringtag" x="' + tag.x + '" y="' + tag.y + '" dy="0.35em" font-size="28">' + esc(tag.label) + '</text>'; });
+    h += '</g>';
+  }
+  h += '</svg>' + seatmapLegend(model) + '</div>';
   return softwarePanelShell(h, state || {});
 }
 /* In-place update so section fills transition between steps instead of being
@@ -698,7 +792,8 @@ function seatmapPatch(host, model, html, hid) {
   probe.innerHTML = html;
   var nextShell = probe.querySelector('.swpanel'), nextWrapper = probe.querySelector('.seatmap'), nextSvg = probe.querySelector('.seatmap-svg');
   if (!nextShell || !nextWrapper || !nextSvg) return false;
-  var groups = {}, old = svg.querySelectorAll('g.seatmap-sec');
+  var groups = {}, old = svg.querySelectorAll('g.seatmap-sec'), moved = [];
+  var sameMode = (wrapper.getAttribute('class') || '').replace(/ seatmap-pulse/, '') === (nextWrapper.getAttribute('class') || '').replace(/ seatmap-pulse/, '');
   for (var i = 0; i < old.length; i++) groups[old[i].getAttribute('data-sec')] = old[i];
   var fresh = nextSvg.querySelectorAll('g.seatmap-sec');
   if (fresh.length !== old.length) return false;
@@ -707,12 +802,13 @@ function seatmapPatch(host, model, html, hid) {
     if (!g) return false;
     g.setAttribute('class', next.getAttribute('class'));
     var fill = g.querySelector('.seatmap-fill'), nextFill = next.querySelector('.seatmap-fill');
+    if (fill.getAttribute('fill') !== nextFill.getAttribute('fill')) moved.push(g);
     fill.setAttribute('fill', nextFill.getAttribute('fill'));
     fill.setAttribute('fill-opacity', nextFill.getAttribute('fill-opacity'));
     var title = fill.querySelector('title'), nextTitle = nextFill.querySelector('title');
     if (title && nextTitle) title.textContent = nextTitle.textContent;
     var hold = g.querySelector('.seatmap-hold'), nextHold = next.querySelector('.seatmap-hold');
-    if (hold && !nextHold) g.removeChild(hold);
+    if (hold && !nextHold) { g.removeChild(hold); if (moved[moved.length - 1] !== g) moved.push(g); }
     else if (!hold && nextHold) g.insertBefore(nextHold, fill.nextSibling);
     var lbl = g.querySelector('.seatmap-lbl'), nextLbl = next.querySelector('.seatmap-lbl');
     if (lbl && nextLbl) lbl.setAttribute('class', nextLbl.getAttribute('class'));
@@ -722,18 +818,106 @@ function seatmapPatch(host, model, html, hid) {
   svg.setAttribute('aria-label', nextSvg.getAttribute('aria-label'));
   var outlines = svg.querySelector('.seatmap-outlines'), nextOutlines = nextSvg.querySelector('.seatmap-outlines');
   if (outlines && nextOutlines) svg.replaceChild(nextOutlines, outlines);
+  /* A few sections changing class on this step glow once; a whole-map
+     change (a new mode, a first fill) does not. */
+  if (moved.length && sameMode && moved.length <= Math.max(2, fresh.length * 0.4)) {
+    void svg.getBoundingClientRect();
+    moved.forEach(function (g) { g.setAttribute('class', g.getAttribute('class') + ' seatmap-moved'); });
+  }
   wrapper.setAttribute('class', nextWrapper.getAttribute('class'));
-  var children = Array.prototype.slice.call(wrapper.childNodes);
-  children.forEach(function (child) { if (child !== svg) wrapper.removeChild(child); });
-  var before = true;
-  Array.prototype.slice.call(nextWrapper.childNodes).forEach(function (child) {
-    if (child === nextSvg) { before = false; return; }
-    if (before) wrapper.insertBefore(child, svg); else wrapper.appendChild(child);
-  });
+  /* Totals and legend morph in place when their shape is unchanged, so the
+     gauge arc and the scale marker ease instead of jumping. */
+  var children = Array.prototype.slice.call(wrapper.childNodes).filter(function (c) { return c !== svg; });
+  var nextChildren = Array.prototype.slice.call(nextWrapper.childNodes);
+  var nextOthers = nextChildren.filter(function (c) { return c !== nextSvg; });
+  var oldBefore = Array.prototype.slice.call(wrapper.childNodes).indexOf(svg), newBefore = nextChildren.indexOf(nextSvg);
+  if (children.length === nextOthers.length && oldBefore === newBefore) {
+    children.forEach(function (child, k) { if (!seatmapMorph(child, nextOthers[k])) wrapper.replaceChild(nextOthers[k], child); });
+  } else {
+    children.forEach(function (child) { wrapper.removeChild(child); });
+    var before = true;
+    nextChildren.forEach(function (child) {
+      if (child === nextSvg) { before = false; return; }
+      if (before) wrapper.insertBefore(child, svg); else wrapper.appendChild(child);
+    });
+  }
   var note = shell.querySelector('.swnote'), nextNote = nextShell.querySelector('.swnote');
   if (note) shell.removeChild(note);
   if (nextNote) shell.appendChild(nextNote);
   return true;
+}
+/* Copies b's attributes, text and children onto a where the node shapes
+   match, so CSS transitions on a's attributes run. Returns false when a and
+   b are different kinds of node and a must be replaced. */
+function seatmapMorph(a, b) {
+  if (a.nodeType !== b.nodeType || a.nodeName !== b.nodeName) return false;
+  if (a.nodeType === 3) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return true; }
+  if (a.nodeType !== 1) return false;
+  var i;
+  for (i = a.attributes.length - 1; i >= 0; i--) if (!b.hasAttribute(a.attributes[i].name)) a.removeAttribute(a.attributes[i].name);
+  for (i = 0; i < b.attributes.length; i++) if (a.getAttribute(b.attributes[i].name) !== b.attributes[i].value) a.setAttribute(b.attributes[i].name, b.attributes[i].value);
+  var ak = Array.prototype.slice.call(a.childNodes), bk = Array.prototype.slice.call(b.childNodes);
+  if (ak.length !== bk.length) {
+    ak.forEach(function (c) { a.removeChild(c); });
+    bk.forEach(function (c) { a.appendChild(c); });
+    return true;
+  }
+  for (i = 0; i < ak.length; i++) if (!seatmapMorph(ak[i], bk[i])) a.replaceChild(bk[i], ak[i]);
+  return true;
+}
+/* After the map is in the page: a section label that would render below
+   10 px is hidden (its <title> keeps the id), landmark pills scale up to a
+   10.5 px label, and when most labels are hidden the ring names appear at
+   10 px or more instead. Runs again whenever the panel is resized. */
+function seatmapFit(host) {
+  if (!host || typeof host.querySelector !== 'function') return;
+  var svg = host.querySelector('.seatmap-svg'), vb = svg && svg.viewBox && svg.viewBox.baseVal;
+  if (!vb || !(vb.width > 0) || typeof svg.getBoundingClientRect !== 'function') return;
+  var width = svg.getBoundingClientRect().width;
+  if (!(width > 0)) return;
+  var scale = width / vb.width, min = 10 / scale, i;
+  var labels = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-lbl')), tiny = 0;
+  labels.forEach(function (l) {
+    var small = (parseFloat(l.getAttribute('font-size')) || 0) < min;
+    if (small) tiny++;
+    l.classList.toggle('seatmap-lbl-tiny', small);
+  });
+  var sparse = labels.length > 0 && tiny * 2 > labels.length, tags = svg.querySelectorAll('.seatmap-ringtag');
+  svg.classList.toggle('seatmap-sparse', sparse);
+  var tagFont = spmRound(11 / scale);
+  for (i = 0; i < tags.length; i++) {
+    var tag = tags[i], tx = +tag.getAttribute('x'), ty = +tag.getAttribute('y'), halfW = (tag.textContent.length * 0.66 * tagFont) / 2 + 4 / scale;
+    tag.setAttribute('font-size', tagFont);
+    tag.setAttribute('stroke-width', spmRound(3.5 / scale));
+    if (sparse) labels.forEach(function (l) {
+      var lf = parseFloat(l.getAttribute('font-size')) || 0, lw = (l.textContent.length * 0.62 * lf) / 2;
+      if (Math.abs(+l.getAttribute('x') - tx) < halfW + lw && Math.abs(+l.getAttribute('y') - ty) < (tagFont + lf) / 2 + 2 / scale) l.classList.add('seatmap-lbl-tiny');
+    });
+  }
+  /* Landmark pills grow toward a 10.5 px label, but never into each other;
+     a pill whose label still cannot reach 10 px is left out. */
+  var marks = Array.prototype.slice.call(svg.querySelectorAll('.seatmap-landmark')).map(function (g) {
+    var rect = g.querySelector('rect'), text = g.querySelector('text');
+    return rect && text ? { g: g, x: +text.getAttribute('x'), y: +text.getAttribute('y'), w: +rect.getAttribute('width'), h: +rect.getAttribute('height') } : null;
+  }).filter(Boolean);
+  var k = Math.max(1, 10.5 / (14 * scale));
+  marks.forEach(function (a, ai) {
+    marks.slice(ai + 1).forEach(function (b) {
+      k = Math.min(k, Math.max(Math.abs(a.x - b.x) / ((a.w + b.w) / 2), Math.abs(a.y - b.y) / ((a.h + b.h) / 2)));
+    });
+  });
+  k = Math.max(1, k);
+  var showMarks = 14 * scale * k >= 9.95;
+  marks.forEach(function (m) {
+    m.g.classList.toggle('seatmap-landmark-tiny', !showMarks);
+    if (k > 1.01) m.g.setAttribute('transform', 'translate(' + m.x + ' ' + m.y + ') scale(' + spmRound(k * 100) / 100 + ') translate(' + -m.x + ' ' + -m.y + ')');
+    else m.g.removeAttribute('transform');
+  });
+}
+function seatmapObserve(host) {
+  if (host._spmFit || typeof ResizeObserver !== 'function' || !host.nodeType) return;
+  host._spmFit = new ResizeObserver(function () { seatmapFit(host); });
+  host._spmFit.observe(host);
 }
 function seatmapTemplateSections() {
   var zones = ['end', 'corner', 'sideline', 'corner', 'end', 'corner', 'sideline', 'corner'], out = [];
@@ -949,7 +1133,10 @@ PanelRegistry.define('seatmap', {
     var html = seatmapHTML(panel, state, model, hid, pulse);
     var patchable = !!animate && host._spmGeom === model.geometryKey;
     host._spmGeom = model.geometryKey;
-    return { html: html, patch: patchable ? function () { return seatmapPatch(host, model, html, hid); } : null };
+    return {
+      html: html, patch: patchable ? function () { return seatmapPatch(host, model, html, hid); } : null,
+      mounted: function () { seatmapFit(host); seatmapObserve(host); },
+    };
   },
   presentation: { ambientInitial: true },
   layout: {
@@ -958,15 +1145,16 @@ PanelRegistry.define('seatmap', {
     large: true, height: 16, fallbackHeight: 16,
   },
   styles: String.raw`
-.seatmap{font-size:11px;color:var(--dtext);min-width:0;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A;
+.seatmap{font-size:11px;color:var(--dtext);min-width:0;container-type:inline-size;--seatmap-accent:#38E1FF;--seatmap-label-on:#06202A;
   --seatmap-r1:#18345A;--seatmap-r2:#1C5A80;--seatmap-r3:#1A7896;--seatmap-r4:#2CB5D2;--seatmap-r5:#5FE3FF;
   --seatmap-gutter:var(--pv-surface,#0B1220);--seatmap-lbl:#FFFFFF;--seatmap-lbl-dark:#0B1220;--seatmap-hover:#8DA2C6;
   --seatmap-sel:#EAF2FF;--seatmap-sel-ring:rgba(56,225,255,.45);--seatmap-raise:rgba(0,0,0,.6);--seatmap-unknown:#2E4466;--seatmap-unknown-fill:rgba(16,26,44,.6);
-  --seatmap-hold:#FFB454;--seatmap-hold-bg:rgba(255,180,84,.16);--seatmap-hold-lbl:#EAF2FF;--seatmap-hold-halo:#0B1220;--seatmap-warn-ink:#EEC16A;
+  --seatmap-hold:#FFB454;--seatmap-hold-bg:color-mix(in srgb,#FFB454 16%,#0B1220);--seatmap-hold-lbl:#EAF2FF;--seatmap-hold-halo:#0B1220;--seatmap-warn-ink:#EEC16A;
   --seatmap-ice:#101A2C;--seatmap-sheen:rgba(56,225,255,.07);--seatmap-board:#2E4466;--seatmap-red:rgba(248,113,113,.62);--seatmap-blue:rgba(96,165,250,.62);--seatmap-crease:rgba(96,165,250,.16);
   --seatmap-turf:rgba(74,222,128,.07);--seatmap-turf-line:rgba(74,222,128,.42);--seatmap-court:rgba(255,180,84,.07);--seatmap-court-line:rgba(255,180,84,.45);
   --seatmap-lm-bg:#101A2C;--seatmap-lm-line:#2E4466;--seatmap-lm-text:#B9C7DD;
   --seatmap-ink:#EAF2FF;--seatmap-text:#B9C7DD;--seatmap-muted:#8DA2C6;--seatmap-chip-bg:rgba(56,225,255,.12);--seatmap-chip-ink:#8AE8FF;--seatmap-well:#101A2C;--seatmap-well-line:#1D2A40;
+  --seatmap-neutral:#6F84A8;--seatmap-track:#101A2C;--seatmap-track-line:#2E4466;--seatmap-glow:rgba(56,225,255,.75);--seatmap-tier-shadow:rgba(0,0,0,.55);--seatmap-board-shadow:rgba(0,0,0,.35);--seatmap-row:var(--seatmap-gutter);--seatmap-row-o:.32;
   --seatmap-num:'Sora','IBM Plex Sans',sans-serif;--seatmap-sans:'IBM Plex Sans',sans-serif;--seatmap-lbl-font:'IBM Plex Sans',sans-serif;--seatmap-radius:999px;--seatmap-sw-radius:3px}
 .sk-daylight .seatmap{--seatmap-accent:#4956C9;--seatmap-label-on:#FFFFFF}
 .sk-daylight .seatmap,.sk-pastel .seatmap,.sk-editorial .seatmap{--seatmap-label-on:#FFFFFF;
@@ -978,6 +1166,7 @@ PanelRegistry.define('seatmap', {
   --seatmap-turf:rgba(46,138,92,.06);--seatmap-turf-line:rgba(46,138,92,.38);--seatmap-court:rgba(209,154,77,.10);--seatmap-court-line:rgba(176,122,42,.55);
   --seatmap-lm-bg:#EEF1F5;--seatmap-lm-line:#C9D2E1;--seatmap-lm-text:#5F6C84;
   --seatmap-ink:#24324A;--seatmap-text:#526077;--seatmap-muted:#5F6C84;--seatmap-chip-bg:#EEF0FB;--seatmap-chip-ink:#3D4C9E;--seatmap-well:#F6F8FC;--seatmap-well-line:#E6EBF3;
+  --seatmap-neutral:#7D899C;--seatmap-track:#EEF1F5;--seatmap-track-line:#C9D2E1;--seatmap-glow:#5263B9;--seatmap-tier-shadow:rgba(36,50,74,.16);--seatmap-board-shadow:rgba(36,50,74,.08);--seatmap-row-o:.3;
   --seatmap-num:'IBM Plex Sans',sans-serif}
 .sk-pastel .seatmap{--seatmap-num:'Plus Jakarta Sans',sans-serif;--seatmap-sans:'Source Sans 3','IBM Plex Sans',sans-serif}
 /* Gutters take the card colour of skins whose card is not the token surface. */
@@ -985,14 +1174,15 @@ body.sk-editorial .seatmap{--seatmap-gutter:#FFFDF8}
 body.sk-terminal .seatmap{--seatmap-gutter:var(--tm-ground,#0B1220)}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-paper,#FFFFFF)}
 .sk-blueprint .seatmap{--seatmap-label-on:#052956;
-  --seatmap-r1:color-mix(in srgb,#7FE3FF 16%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 28%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 40%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 68%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 88%,#052956);
+  --seatmap-r1:color-mix(in srgb,#7FE3FF 10%,#052956);--seatmap-r2:color-mix(in srgb,#7FE3FF 20%,#052956);--seatmap-r3:color-mix(in srgb,#7FE3FF 32%,#052956);--seatmap-r4:color-mix(in srgb,#7FE3FF 66%,#052956);--seatmap-r5:color-mix(in srgb,#7FE3FF 90%,#052956);
   --seatmap-gutter:var(--pv-surface,#052956);--seatmap-lbl:#F7FCFF;--seatmap-lbl-dark:#052956;--seatmap-hover:#7FE3FF;
   --seatmap-sel:#F7FCFF;--seatmap-sel-ring:rgba(127,227,255,.45);--seatmap-raise:rgba(0,0,0,.45);--seatmap-unknown:#4FA9C3;--seatmap-unknown-fill:transparent;
-  --seatmap-hold:#FFD166;--seatmap-hold-bg:rgba(255,209,102,.16);--seatmap-hold-lbl:#F7FCFF;--seatmap-hold-halo:#052956;--seatmap-warn-ink:#FFD166;
+  --seatmap-hold:#FFD166;--seatmap-hold-bg:color-mix(in srgb,#FFD166 16%,#052956);--seatmap-hold-lbl:#F7FCFF;--seatmap-hold-halo:#052956;--seatmap-warn-ink:#FFD166;
   --seatmap-ice:rgba(127,227,255,.05);--seatmap-sheen:rgba(127,227,255,.06);--seatmap-board:#4FA9C3;--seatmap-red:rgba(255,138,147,.8);--seatmap-blue:rgba(127,227,255,.75);--seatmap-crease:rgba(127,227,255,.14);
   --seatmap-turf:rgba(71,245,144,.05);--seatmap-turf-line:rgba(71,245,144,.5);--seatmap-court:rgba(255,209,102,.05);--seatmap-court-line:rgba(255,209,102,.55);
   --seatmap-lm-bg:#062E61;--seatmap-lm-line:#4FA9C3;--seatmap-lm-text:#D5E9F7;
   --seatmap-ink:#F7FCFF;--seatmap-text:#D5E9F7;--seatmap-muted:#94BCD5;--seatmap-chip-bg:rgba(127,227,255,.14);--seatmap-chip-ink:#7FE3FF;--seatmap-well:#062E61;--seatmap-well-line:#4FA9C3;
+  --seatmap-neutral:#94BCD5;--seatmap-track:transparent;--seatmap-track-line:#4FA9C3;--seatmap-glow:#7FE3FF;--seatmap-tier-shadow:transparent;--seatmap-board-shadow:rgba(127,227,255,.10);--seatmap-row:#7FE3FF;--seatmap-row-o:.16;
   --seatmap-num:'Barlow Condensed','IBM Plex Sans',sans-serif;--seatmap-lbl-font:'Barlow Condensed','IBM Plex Sans',sans-serif;--seatmap-radius:2px;--seatmap-sw-radius:0}
 .seatmap-totals{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 22px;margin:0 0 3px}
 .seatmap-stat{min-width:0}
@@ -1001,8 +1191,11 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-stat>span{display:block;margin-top:2px;font:700 10px/1.2 var(--seatmap-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--seatmap-muted)}
 .seatmap-stat-warn b{color:var(--seatmap-warn-ink)}
 .seatmap-stat-warn>span::before{content:"";display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:-1px;border-radius:2px;background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 4px);box-shadow:inset 0 0 0 1px var(--seatmap-hold)}
-.seatmap-meter{position:relative;align-self:center;display:inline-block;width:40px;height:6px;margin-left:8px;border-radius:var(--seatmap-radius);background:var(--seatmap-r1);overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--seatmap-r1) 70%,var(--seatmap-ink) 12%)}
-.seatmap-meter>i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;transition:width .42s cubic-bezier(.2,.7,.2,1)}
+.seatmap-stat-pct{display:grid;grid-template-columns:auto auto;column-gap:8px;align-items:center}
+.seatmap-stat-pct>b,.seatmap-stat-pct>span{grid-column:2}
+.seatmap-gauge{grid-column:1;grid-row:1 / span 2;width:30px;height:30px;overflow:visible}
+.seatmap-gauge-track{fill:none;stroke:var(--seatmap-r1);stroke-width:4}
+.seatmap-gauge-arc{fill:none;stroke:var(--seatmap-r4);stroke-width:4;stroke-linecap:round;transition:stroke-dasharray .42s cubic-bezier(.2,.7,.2,1)}
 .seatmap-svg{display:block;width:100%;height:auto;overflow:visible}
 /* In a fixed-size layout tile the map letterboxes into the space left by the
    totals and legend instead of overflowing the tile (the bowl's aspect is
@@ -1013,7 +1206,8 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .section-layout-tile>.pwidget.pt-seatmap .seatmap>.seatmap-svg{flex:0 1 auto;min-height:120px}
 .seatmap-field{fill:var(--seatmap-ice);stroke:var(--seatmap-board);stroke-width:1.5;vector-effect:non-scaling-stroke}
 .seatmap-sheen-a{stop-color:var(--seatmap-sheen);stop-opacity:.95}.seatmap-sheen-b{stop-color:var(--seatmap-sheen);stop-opacity:0}
-.seatmap-field-line{fill:none;stroke:var(--seatmap-blue);stroke-width:2.5;vector-effect:non-scaling-stroke}
+.seatmap-board-in{fill:none;stroke:var(--seatmap-board-shadow);stroke-width:6;vector-effect:non-scaling-stroke}
+.seatmap-field-line,.seatmap-rink-blue{fill:none;stroke:var(--seatmap-blue);stroke-width:2.5;vector-effect:non-scaling-stroke}
 .seatmap-rink-red{fill:none;stroke:var(--seatmap-red);stroke-width:2.5;vector-effect:non-scaling-stroke}
 .seatmap-rink-goal{fill:none;stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-rink-crease{fill:var(--seatmap-crease);stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
@@ -1025,18 +1219,26 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-court-line,.seatmap-court-key{stroke:var(--seatmap-court-line)}.seatmap-court-key{fill:var(--seatmap-court)}
 .seatmap-fill{stroke:var(--seatmap-gutter);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;transition:fill .42s cubic-bezier(.2,.7,.2,1),stroke .12s ease}
 .seatmap-sec:hover .seatmap-fill{stroke:var(--seatmap-hover)}
+.seatmap-tier{filter:drop-shadow(0 1px 1.5px var(--seatmap-tier-shadow))}
+.seatmap-rows{fill:none;stroke:var(--seatmap-row,var(--seatmap-gutter));stroke-opacity:var(--seatmap-row-o);stroke-width:.75;vector-effect:non-scaling-stroke;pointer-events:none}
+.seatmap-unknown .seatmap-rows{display:none}
+@media (prefers-reduced-motion:no-preference){.seatmap-moved .seatmap-fill{animation:seatmap-moved .7s cubic-bezier(.2,.7,.2,1)}}
+@keyframes seatmap-moved{0%,25%{stroke:var(--seatmap-glow);stroke-width:3.5}100%{stroke:var(--seatmap-gutter);stroke-width:1.5}}
 .seatmap-unknown .seatmap-fill{stroke:var(--seatmap-unknown);stroke-width:1;stroke-dasharray:4 3}
 .seatmap-unknown .seatmap-lbl{fill:var(--seatmap-text)}
 .seatmap-hold{pointer-events:none}
 .seatmap-hatch-bg{fill:var(--seatmap-hold-bg)}.seatmap-hatch-bar{fill:var(--seatmap-hold);fill-opacity:.85}
 .seatmap-lbl{font-family:var(--seatmap-lbl-font);font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums lining-nums;text-anchor:middle;fill:var(--seatmap-lbl);pointer-events:none;transition:fill .24s ease}
 .seatmap-lbl-on{fill:var(--seatmap-label-on)}.seatmap-lbl-dark{fill:var(--seatmap-lbl-dark)}.seatmap-lbl-light{fill:#FFFFFF}
-.seatmap-held .seatmap-lbl{fill:var(--seatmap-hold-lbl);paint-order:stroke;stroke:var(--seatmap-hold-halo);stroke-width:4px;stroke-linejoin:round}
-.seatmap-outline-halo{fill:none;stroke:var(--seatmap-gutter);stroke-width:4.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 3px 4px var(--seatmap-raise))}
+.seatmap-held .seatmap-lbl{fill:var(--seatmap-hold-lbl);paint-order:stroke;stroke:var(--seatmap-hold-halo);stroke-width:3px;stroke-linejoin:round}
+.seatmap-lbl-tiny{display:none}
+.seatmap-ringtag{display:none;font-family:var(--seatmap-sans);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-anchor:middle;fill:var(--seatmap-ink);paint-order:stroke;stroke:var(--seatmap-gutter);stroke-linejoin:round;pointer-events:none}
+.seatmap-sparse .seatmap-ringtag{display:inline}
+.seatmap-outline-halo{fill:none;stroke:var(--seatmap-gutter);stroke-width:6.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 3px 4px var(--seatmap-raise))}
 .seatmap-outline{fill:none;stroke:var(--seatmap-sel);stroke-width:2.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.seatmap-pulse .seatmap-outline-halo{animation:seatmap-pulse .7s cubic-bezier(.16,1,.3,1)}}
-@keyframes seatmap-pulse{0%{stroke:var(--seatmap-sel-ring);stroke-width:4.5}45%{stroke:var(--seatmap-sel-ring);stroke-width:16}100%{stroke:var(--seatmap-gutter);stroke-width:4.5}}
-.seatmap-landmark{pointer-events:none}
+@keyframes seatmap-pulse{0%{stroke:var(--seatmap-sel-ring);stroke-width:6.5}45%{stroke:var(--seatmap-sel-ring);stroke-width:16}100%{stroke:var(--seatmap-gutter);stroke-width:6.5}}
+.seatmap-landmark{pointer-events:none}.seatmap-landmark-tiny{display:none}
 .seatmap-landmark rect{fill:var(--seatmap-lm-bg);stroke:var(--seatmap-lm-line);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-landmark text{font:700 14px var(--seatmap-lbl-font);fill:var(--seatmap-lm-text);text-anchor:middle;letter-spacing:.08em;text-transform:uppercase}
 .seatmap-empty{font:500 24px var(--seatmap-sans);fill:var(--seatmap-muted);text-anchor:middle}
@@ -1054,19 +1256,35 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-sw-hold{background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 4px);box-shadow:inset 0 0 0 1px var(--seatmap-hold)}
 .seatmap-sw-unknown{background:var(--seatmap-unknown-fill);box-shadow:none;border:1px dashed var(--seatmap-unknown);box-sizing:border-box}
 .seatmap-key{gap:6px}
-.seatmap-ramp{display:inline-block;width:72px;height:8px;border-radius:var(--seatmap-radius);background:linear-gradient(90deg,var(--seatmap-r1),var(--seatmap-r2) 40%,var(--seatmap-r3) 79.8%,var(--seatmap-r4) 80.2%,var(--seatmap-r5));box-shadow:inset 0 0 0 1px rgba(36,50,74,.12)}
+.seatmap-scale{position:relative;display:inline-block;flex:none;width:136px;height:18px}
+.seatmap-scale-plain{height:8px}
+.seatmap-bins{position:absolute;left:0;right:0;top:1px;height:6px;display:flex;gap:1px;border-radius:var(--seatmap-radius);overflow:hidden}
+.seatmap-scale-plain .seatmap-bins{top:0}
+.seatmap-bins>i{flex:1 1 0;box-shadow:inset 0 0 0 1px rgba(36,50,74,.06)}
+.seatmap-ticks>i{position:absolute;top:9px;font:600 10px/10px var(--seatmap-sans);font-style:normal;letter-spacing:0;color:var(--seatmap-muted);transform:translateX(-50%)}
+.seatmap-ticks>i:nth-child(1){left:0;transform:none}.seatmap-ticks>i:nth-child(2){left:20%}.seatmap-ticks>i:nth-child(3){left:40%}
+.seatmap-ticks>i:nth-child(4){left:60%}.seatmap-ticks>i:nth-child(5){left:80%}.seatmap-ticks>i:nth-child(6){left:auto;right:0;transform:none}
+.seatmap-caret{position:absolute;top:-1px;width:2px;height:10px;margin-left:-1px;border-radius:1px;background:var(--seatmap-ink);box-shadow:0 0 0 1.5px var(--seatmap-gutter);transition:left .42s cubic-bezier(.2,.7,.2,1)}
 .seatmap-range{color:var(--seatmap-text)}
-.seatmap-ring-dot{display:inline-block;flex:none;width:8px;height:8px;margin-right:6px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(36,50,74,.18)}
+.seatmap-ring-bar{display:inline-flex;flex:none;width:34px;height:6px;margin-right:7px;border-radius:var(--seatmap-radius);overflow:hidden;background:var(--seatmap-track);box-shadow:inset 0 0 0 1px var(--seatmap-track-line)}
+.seatmap-ring-bar>i{display:block;height:100%;transition:width .42s cubic-bezier(.2,.7,.2,1)}
+/* A narrow card keeps the map large: the gauge and ring bars give way. */
+@container (max-width:480px){.seatmap-gauge,.seatmap-ring-bar{display:none}.seatmap-stat-pct{display:block}}
+.seatmap-ring-held{background:repeating-linear-gradient(45deg,var(--seatmap-hold) 0 1.5px,var(--seatmap-hold-bg) 1.5px 3.5px)}
 .seatmap-legend>.seatmap-zones,.seatmap-rings>.seatmap-zones{display:inline;white-space:normal}
 .seatmap-zones small{margin-left:0}
-.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-sw,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-ramp,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-ring-dot{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-sw,.sk-aurora:not(.sk-pastel):not(.sk-editorial) .seatmap-bins>i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .sk-blueprint .seatmap-stat>span,.sk-blueprint .seatmap-mode b,.sk-blueprint .seatmap-landmark text{font-family:'Barlow Condensed','IBM Plex Sans',sans-serif;letter-spacing:.12em}
 .sk-blueprint .seatmap-stat b{font-weight:700;font-size:19px;letter-spacing:0}
 .sk-blueprint .seatmap-mode b{background:transparent;box-shadow:inset 0 0 0 1px var(--seatmap-chip-ink)}
-.sk-blueprint .seatmap-fill{stroke:color-mix(in srgb,#7FE3FF 45%,#052956);stroke-width:1}
+.sk-blueprint .seatmap-fill{stroke:rgba(127,227,255,.7);stroke-width:1.25}
+.sk-blueprint .seatmap-gauge-arc{stroke:#7FE3FF;stroke-linecap:butt}
+.sk-blueprint .seatmap-gauge-track{stroke:none}
+.sk-blueprint .seatmap-gauge{border-radius:50%;box-shadow:inset 0 0 0 1px #4FA9C3}
+.sk-blueprint .seatmap-tier{filter:none}
 .sk-blueprint .seatmap-unknown .seatmap-fill{stroke:var(--seatmap-unknown)}
-@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-meter>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo{animation:none}}
-@media print{.seatmap-fill,.seatmap-lbl,.seatmap-meter>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo{animation:none}.seatmap-outline-halo{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}}
+@media print{.seatmap-fill,.seatmap-lbl,.seatmap-gauge-arc,.seatmap-caret,.seatmap-ring-bar>i{transition:none}.seatmap-pulse .seatmap-outline,.seatmap-pulse .seatmap-outline-halo,.seatmap-moved .seatmap-fill{animation:none}.seatmap-outline-halo,.seatmap-tier{filter:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `,
   authoring: {
     initialFields: true,

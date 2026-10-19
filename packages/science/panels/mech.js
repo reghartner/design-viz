@@ -130,27 +130,34 @@ var MECH_SHAPES = {
       ' V' + f(-b + r) + ' Q' + f(-a) + ',' + f(-b) + ' ' + f(-a + r) + ',' + f(-b) + ' Z';
   },
 };
-/* Soft-clay top light: one short open arc (or line) per shape, drawn inside
-   the silhouette near its upper-left as a white specular streak, `(w, h) →
-   {d, sw}` centred on 0,0. Pure decoration; it carries no meaning. */
-function mechArc(cx, cy, rx, ry, from, to) {
-  var f = mechNum, a = (from * Math.PI) / 180, b = (to * Math.PI) / 180;
-  return 'M' + f(cx + rx * Math.cos(a)) + ',' + f(cy + ry * Math.sin(a)) + ' A' + f(rx) + ',' + f(ry) + ' 0 0,1 ' + f(cx + rx * Math.cos(b)) + ',' + f(cy + ry * Math.sin(b));
+/* Soft-clay shading: every mechanism SVG carries one small `<defs>` with a
+   top-lit linear "clay" overlay (white at the top, clear through the middle,
+   a faint ink shade at the bottom) and a radial "ball" overlay for round
+   shapes. Actors repeat their silhouette with the overlay on top of the role
+   fill, so one gradient serves every role and each skin retunes the stops in
+   CSS. The ids are derived from the declaration, so markup is deterministic;
+   the svg root names them through `--mk-clay` / `--mk-ball` and a missing
+   reference simply paints nothing. Pure decoration; it carries no meaning. */
+function mechUid(panel) {
+  var text = '';
+  try { text = JSON.stringify(panel) || ''; } catch (e) { text = ''; }
+  var h = 5381;
+  for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return 'mk' + (h >>> 0).toString(36);
 }
-var MECH_SHEEN = {
-  blob: function (w, h) { return { d: mechArc(0, -h * 0.06, w * 0.37, h * 0.3, 198, 262), sw: h * 0.09 }; },
-  clamp: function (w, h) { var t = Math.min(w, h) * 0.3; return { d: mechArc(0, 0, w / 2 - t / 2, h / 2 - t / 2, 196, 252), sw: t * 0.32 }; },
-  lobes: function (w, h) { return { d: mechArc(0, -h * 0.28, w * 0.25, h * 0.15, 200, 262) + ' ' + mechArc(0, h * 0.2, w * 0.36, h * 0.19, 202, 250), sw: h * 0.07 }; },
-  wedge: function (w, h) { var f = mechNum; return { d: 'M' + f(-w / 2 + h * 0.3) + ',' + f(-h * 0.24) + ' L' + f(w * 0.12) + ',' + f(-h * 0.24), sw: h * 0.16 }; },
-  cap: function (w, h) { return { d: mechArc(0, h * 0.5, w * 0.36, h * 0.72, 206, 262), sw: h * 0.16 }; },
-  dot: function (w, h) { return { d: mechArc(0, 0, w * 0.3, h * 0.3, 196, 262), sw: h * 0.13 }; },
-  pill: function (w, h) { var f = mechNum, r = h / 2; return { d: 'M' + f(-w / 2 + r * 0.42) + ',' + f(-r * 0.02) + ' Q' + f(-w / 2 + r * 0.5) + ',' + f(-r * 0.56) + ' ' + f(-w / 2 + r * 1.15) + ',' + f(-r * 0.58) + ' L' + f(-w / 2 + r * 1.15 + w * 0.22) + ',' + f(-r * 0.58), sw: h * 0.13 }; },
-  spiky: function (w, h) { return { d: mechArc(0, 0, w * 0.24, h * 0.24, 196, 262), sw: h * 0.09 }; },
-  box: function (w, h) { var f = mechNum, y = -h / 2 + Math.max(2.4, h * 0.2); return { d: 'M' + f(-w / 2 + 3) + ',' + f(y + h * 0.18) + ' Q' + f(-w / 2 + 3) + ',' + f(y) + ' ' + f(-w / 2 + 6) + ',' + f(y) + ' L' + f(w * 0.1) + ',' + f(y), sw: h * 0.12 }; },
-};
-function mechSheenMarkup(shape, w, h) {
-  var sheen = (MECH_SHEEN[shape] || MECH_SHEEN.box)(w, h);
-  return '<path class="mech-sheen" d="' + sheen.d + '" stroke-width="' + mechNum(clamp(sheen.sw, 1.2, 4.5)) + '"/>';
+function mechDefsMarkup(uid) {
+  return '<defs aria-hidden="true">' +
+    '<linearGradient id="' + uid + '-clay" x1="0" y1="0" x2="0" y2="1"><stop class="mech-gs-top" offset="0"/><stop class="mech-gs-mid" offset=".48"/><stop class="mech-gs-low" offset="1"/></linearGradient>' +
+    '<radialGradient id="' + uid + '-ball" cx=".38" cy=".32" r=".72" fx=".34" fy=".26"><stop class="mech-gs-spec" offset="0"/><stop class="mech-gs-mid" offset=".5"/><stop class="mech-gs-low" offset="1"/></radialGradient>' +
+    '<radialGradient id="' + uid + '-cyto" cx=".5" cy=".42" r=".62"><stop class="cellscene-gs-c" offset="0"/><stop class="cellscene-gs-m" offset=".72"/><stop class="cellscene-gs-e" offset="1"/></radialGradient>' +
+    '</defs>';
+}
+function mechDefsStyle(uid) {
+  return '--mk-clay:url(#' + uid + '-clay);--mk-ball:url(#' + uid + '-ball);--mk-cytofill:url(#' + uid + '-cyto)';
+}
+var MECH_BALL_SHAPES = ['dot', 'spiky'];
+function mechClayMarkup(shape, d) {
+  return '<path class="mech-clay' + (MECH_BALL_SHAPES.indexOf(shape) >= 0 ? ' mech-ball' : '') + '" d="' + d + '" aria-hidden="true"/>';
 }
 /* Base width and height of each shape at size m; sizes scale both. */
 var MECH_SHAPE_SIZE = {
@@ -193,6 +200,15 @@ function mechGlideStyle(prev, now) {
   if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) return '';
   return ' style="transform:translate(' + mechNum(dx) + 'px,' + mechNum(dy) + 'px)"';
 }
+/* Eight short rays around a point: the spark of a cut. */
+function mechSparkPath(cx, cy) {
+  var d = '';
+  for (var i = 0; i < 8; i++) {
+    var a = (i * Math.PI) / 4 + Math.PI / 8, r1 = i % 2 ? 8 : 7, r2 = i % 2 ? 13 : 16;
+    d += 'M' + mechNum(cx + r1 * Math.cos(a)) + ',' + mechNum(cy + r1 * Math.sin(a)) + 'L' + mechNum(cx + r2 * Math.cos(a)) + ',' + mechNum(cy + r2 * Math.sin(a));
+  }
+  return d;
+}
 /* One-shot ripple markup at a scene point. Removed by the shared lifecycle on
    seek or reduced motion; callers emit it only when animating. `delay` is in
    milliseconds (multiples of 250 keep in-step sequencing bounded). */
@@ -201,6 +217,7 @@ function mechRipple(x, y, kind, delay) {
   var cx = mechNum(x), cy = mechNum(y);
   return '<g class="mech-transient mech-ripple k-' + k + '" style="--mx:' + cx + 'px;--my:' + cy + 'px;animation-delay:' + ms + 'ms" aria-hidden="true">' +
     (k === 'flash' || k === 'cut' ? '<circle class="mech-rip-fill" cx="' + cx + '" cy="' + cy + '" r="14"/>' : '') +
+    (k === 'cut' ? '<path class="mech-spark" d="' + mechSparkPath(cx, cy) + '"/>' : '') +
     '<circle class="mech-rip-a" cx="' + cx + '" cy="' + cy + '" r="12"/><circle class="mech-rip-b" cx="' + cx + '" cy="' + cy + '" r="7"/></g>';
 }
 /* One actor or item shape: a `<g>` with the role fill and edge as custom
@@ -208,12 +225,15 @@ function mechRipple(x, y, kind, delay) {
    scene's aria-label narrates). `attrs` is extra escaped markup for the group. */
 function mechActorMarkup(actor, attrs) {
   var role = MECH_ROLES[mechRole(actor.role)], shape = mechShape(actor.shape, actor.role), box = mechShapeBox(shape, actor.size);
-  var label = mechText(actor.label, 16);
-  var textY = shape === 'blob' ? -box.h * 0.1 : shape === 'clamp' ? -box.h * 0.62 : shape === 'wedge' || shape === 'cap' ? -box.h * 0.5 - 4 : shape === 'dot' || shape === 'spiky' ? box.h * 0.5 + 11 : 3.5;
-  var inside = shape === 'blob' || shape === 'box' || shape === 'pill' || shape === 'lobes';
+  var label = mechText(actor.label, 16), d = MECH_SHAPES[shape](box.w, box.h);
+  /* The ribosome's waist is narrower than its name, so its label sits beside
+     the large lobe, clear of the strand above and the site tags below. */
+  var side = shape === 'lobes';
+  var textY = shape === 'blob' ? -box.h * 0.1 : shape === 'clamp' ? -box.h * 0.62 : shape === 'wedge' || shape === 'cap' ? -box.h * 0.5 - 4 : shape === 'dot' || shape === 'spiky' ? box.h * 0.5 + 11 : side ? box.h * 0.2 + 3.5 : 3.5;
+  var inside = shape === 'blob' || shape === 'box' || shape === 'pill';
   return '<g class="mech-actor mech-shape-' + shape + (attrs || '') + '" style="--mf:' + role.fill + ';--me:' + role.edge + ';--mi:' + role.ink + '">' +
-    '<path d="' + MECH_SHAPES[shape](box.w, box.h) + '"' + (role.dashed ? ' stroke-dasharray="3 3"' : '') + '/>' + mechSheenMarkup(shape, box.w, box.h) +
-    (label ? '<text class="mech-t-actor' + (inside ? ' mech-t-inside' : '') + '" y="' + mechNum(textY) + '" aria-hidden="true">' + esc(label) + '</text>' : '') +
+    '<path d="' + d + '"' + (role.dashed ? ' stroke-dasharray="3 3"' : '') + '/>' + (role.dashed ? '' : mechClayMarkup(shape, d)) +
+    (label ? '<text class="mech-t-actor' + (inside ? ' mech-t-inside' : side ? ' mech-t-side' : '') + '"' + (side ? ' x="' + mechNum(box.w / 2 + 5) + '"' : '') + ' y="' + mechNum(textY) + '" aria-hidden="true">' + esc(label) + '</text>' : '') +
     '</g>';
 }
 /* A tag: short text on a rounded rect centred at x,y (Plex Sans 10.5 px). */

@@ -241,3 +241,19 @@ test('marked depth bars split by aligned letter counts without gaps or clipped o
   assert.equal((C.readsHTML(p, state).match(/reads-dsplit/g) || []).length, 1);
   assert.doesNotMatch(C.readsHTML(p, {...state,showDepth:false}), /reads-dsplit|reads-dline/);
 });
+
+
+test('singleton mismatch emphasis follows support counts without changing read classification or depth', () => {
+  const p = {id:'r',type:'reads',reference:'A'};
+  const state = {reads:[{id:'a',at:1,seq:'A'},{id:'b',at:1,seq:'A'},{id:'c',at:1,seq:'T'}]};
+  const m = C.readsModel(p,state), single = C.readsCellHTML(m.rows[2].cells[0],m);
+  assert.match(single, /reads-low-support/);
+  assert.match(single, /title="1: mismatch"/);
+  assert.equal(m.rows[2].cells[0].kind, 'mismatch');
+  assert.equal(m.depth[0], 3);
+  assert.match(C.readsHTML(p,state), /class="reads-dscale" aria-hidden="true">3×/);
+  const supported = C.readsModel(p,{reads:[...state.reads,{id:'d',at:1,seq:'T'}]});
+  assert.doesNotMatch(C.readsCellHTML(supported.rows[2].cells[0],supported), /reads-low-support/);
+  const shallow = C.readsModel(p,{reads:[state.reads[0],state.reads[2]]});
+  assert.doesNotMatch(C.readsCellHTML(shallow.rows[1].cells[0],shallow), /reads-low-support/);
+});

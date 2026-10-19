@@ -252,3 +252,25 @@ test('locus reserves zoom overview and arc space across a story while compacting
   assert.equal(C.locusHasZoom({...p,initial:states[1]},[]), true);
   assert.equal(C.locusHasArcs({...p,initial:states[1]},[]), true);
 });
+
+
+test('marker labels anchor inward and only use a second tier when vertical room is reserved', () => {
+  const p = {id:'g',type:'locus',length:10000};
+  const state = {markers:[
+    {id:'left',at:1,label:'Left edge'},
+    {id:'a',at:5000,label:'First marker'},
+    {id:'b',at:5001,label:'Second marker'},
+    {id:'right',at:10000,label:'Right edge'},
+  ]};
+  const original = JSON.stringify(state);
+  const roomy = C.locusModel(p,state).markers;
+  assert.equal(roomy[0].anchor, 'start');
+  assert.equal(roomy[3].anchor, 'end');
+  assert.equal(roomy[1].anchor, 'end');
+  assert.equal(roomy[2].anchor, 'start');
+  assert.equal(roomy[2].tier, 1);
+  const compact = C.locusModel(p,state,{compactArcs:true}).markers;
+  assert.ok(compact.every(marker=>marker.tier===0));
+  assert.deepEqual(plain(roomy.map(marker=>marker.at)), [1,5000,5001,10000]);
+  assert.equal(JSON.stringify(state), original, 'presentation does not rewrite authored markers');
+});

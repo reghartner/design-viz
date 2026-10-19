@@ -1,0 +1,838 @@
+{
+  "page": {
+    "title": "At the copy gate: one genome, two outcomes",
+    "subtitle": "A conceptual journey through an enveloped positive-sense RNA virus in a eukaryotic cell",
+    "skin": "aurora",
+    "sections": [
+      {
+        "id": "journey",
+        "heading": "01 / Follow the genome",
+        "accent": "cyan",
+        "text": [
+          "Choose a path and follow its seven beats. Both reach one completed +RNA copy before the fork. Compare continued synthesis with a hypothetical interruption; counts and extents are symbolic, with no timescale."
+        ],
+        "diagram": {
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "arrival": {
+              "title": "01 Arrival",
+              "sub": "genome inside a particle",
+              "tint": "dev"
+            },
+            "entry": {
+              "title": "02 Entry",
+              "sub": "RNA becomes accessible",
+              "tint": "dev"
+            },
+            "translation": {
+              "title": "03 Translation",
+              "sub": "proteins become available",
+              "tint": "data"
+            },
+            "gate": {
+              "title": "04 Copy gate",
+              "sub": "one copy before the fork",
+              "tint": "cmd"
+            },
+            "new": {
+              "title": "05 New RNA",
+              "sub": "further genome supply",
+              "tint": "mqtt"
+            },
+            "assembly": {
+              "title": "06 Assembly",
+              "sub": "RNA + proteins meet",
+              "tint": "mqtt"
+            },
+            "release": {
+              "title": "07 Release",
+              "sub": "particles leave the cell",
+              "tint": "mqtt"
+            },
+            "interrupt": {
+              "title": "05 Interruption",
+              "sub": "further synthesis stops",
+              "tint": "auth"
+            },
+            "limited": {
+              "title": "06 Limited assembly",
+              "sub": "uses the pre-fork copy",
+              "tint": "auth"
+            },
+            "residual": {
+              "title": "07 Limited release",
+              "sub": "a smaller symbolic outcome",
+              "tint": "auth"
+            }
+          },
+          "rows": [
+            [
+              "arrival",
+              "entry",
+              "translation",
+              "gate"
+            ],
+            [
+              "new",
+              "assembly",
+              "release"
+            ],
+            [
+              "interrupt",
+              "limited",
+              "residual"
+            ]
+          ],
+          "edges": [
+            {
+              "to": "entry",
+              "kind": "int",
+              "from": "arrival"
+            },
+            {
+              "to": "translation",
+              "kind": "int",
+              "from": "entry"
+            },
+            {
+              "to": "gate",
+              "kind": "int",
+              "from": "translation"
+            },
+            {
+              "to": "new",
+              "kind": "int",
+              "from": "gate"
+            },
+            {
+              "to": "assembly",
+              "kind": "int",
+              "from": "new"
+            },
+            {
+              "to": "release",
+              "kind": "int",
+              "from": "assembly"
+            },
+            {
+              "to": "interrupt",
+              "kind": "int",
+              "from": "gate"
+            },
+            {
+              "to": "limited",
+              "kind": "int",
+              "from": "interrupt"
+            },
+            {
+              "to": "residual",
+              "kind": "int",
+              "from": "limited"
+            }
+          ],
+          "panels": [
+            {
+              "id": "cellview",
+              "type": "cellscene",
+              "title": "CELL CONTEXT · a fixed view",
+              "label": "Illustrative eukaryotic cell",
+              "compartments": [
+                {
+                  "id": "outside",
+                  "kind": "outside",
+                  "label": "Outside the cell",
+                  "x": 72,
+                  "y": 105
+                },
+                {
+                  "id": "cell",
+                  "kind": "cell",
+                  "label": "Cell membrane",
+                  "x": 306,
+                  "y": 162,
+                  "rx": 170,
+                  "ry": 110
+                },
+                {
+                  "id": "cyt",
+                  "kind": "region",
+                  "parent": "cell",
+                  "label": "Cytoplasm",
+                  "x": 390,
+                  "y": 166,
+                  "rx": 65,
+                  "ry": 55
+                }
+              ],
+              "items": [
+                {
+                  "id": "incoming",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Incoming virion",
+                  "size": "m",
+                  "start": {
+                    "x": 72,
+                    "y": 105,
+                    "count": 1,
+                    "state": "free",
+                    "in": "outside"
+                  }
+                },
+                {
+                  "id": "genome",
+                  "role": "cargo",
+                  "shape": "pill",
+                  "label": "+RNA",
+                  "size": "m",
+                  "start": {
+                    "x": 200,
+                    "y": 125,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "ribosome",
+                  "role": "ribosome",
+                  "shape": "lobes",
+                  "label": "Host ribosome",
+                  "size": "m",
+                  "start": {
+                    "x": 246,
+                    "y": 177,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "enzyme",
+                  "role": "polymerase",
+                  "shape": "clamp",
+                  "label": "Polymerase",
+                  "size": "m",
+                  "start": {
+                    "x": 280,
+                    "y": 125,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "protein",
+                  "role": "protein",
+                  "shape": "box",
+                  "label": "Protein pool",
+                  "size": "m",
+                  "start": {
+                    "x": 220,
+                    "y": 215,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "copies",
+                  "role": "particle",
+                  "shape": "wedge",
+                  "label": "New RNA pool",
+                  "size": "m",
+                  "start": {
+                    "x": 313,
+                    "y": 190,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "assembled",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Assembled",
+                  "size": "m",
+                  "start": {
+                    "x": 398,
+                    "y": 228,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "released",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Released",
+                  "size": "m",
+                  "start": {
+                    "x": 507,
+                    "y": 238,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                }
+              ],
+              "initial": {
+                "zoom": null,
+                "caption": "An arriving particle carries RNA. The modeled copying pathway is cytoplasmic.",
+                "note": "Pill: incoming RNA · wedge: new RNA pool · spiky: assembly pool or outside particle."
+              },
+              "legendMode": "visible",
+              "labelMode": "readable"
+            },
+            {
+              "id": "copyview",
+              "type": "rnacopy",
+              "title": "RNA COPYING · the close-up",
+              "label": "Incoming +RNA → complementary intermediate → new +RNA",
+              "initial": {
+                "status": "ready",
+                "position": 0.2,
+                "progress": 0,
+                "copies": 0,
+                "caption": "The polymerase site is ready; no complementary intermediate or completed copy is shown yet.",
+                "note": "The site, copy tray and pathway bridge are separate teaching views. Sequence, cofactors and membrane organization are omitted."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "arrival",
+              "nodes": [
+                "arrival"
+              ],
+              "text": "The arriving enveloped particle carries the starting genome. Being outside the cell gives it no access to the host translation machinery.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "incoming": {
+                      "x": 95,
+                      "y": 112,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 75,
+                        "y": 67
+                      },
+                      "text": "RNA is still packaged"
+                    }
+                  ],
+                  "caption": "Arrival supplies a starting genome, still enclosed in a particle."
+                }
+              }
+            },
+            {
+              "id": "entry",
+              "nodes": [
+                "entry"
+              ],
+              "text": "Entry and uncoating make the positive-sense RNA accessible in the cytoplasm. That accessibility allows the host ribosome to read it.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "incoming": {
+                      "state": "hidden",
+                      "count": 0
+                    },
+                    "genome": {
+                      "count": 1,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 222,
+                        "y": 91
+                      },
+                      "text": "Accessible incoming RNA"
+                    }
+                  ],
+                  "caption": "Uncoating makes the incoming RNA accessible to host machinery."
+                }
+              },
+              "edge": "arrival->entry"
+            },
+            {
+              "id": "translation",
+              "nodes": [
+                "translation"
+              ],
+              "text": "Host translation reads the incoming RNA to make viral proteins, including the machinery needed for copying. Protein production alone does not multiply the genome.",
+              "panels": {
+                "cellview": {
+                  "items": {
+                    "ribosome": {
+                      "count": 1,
+                      "state": "active"
+                    },
+                    "enzyme": {
+                      "count": 1,
+                      "state": "free"
+                    },
+                    "protein": {
+                      "count": 1,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 73
+                      },
+                      "text": "Translation supplies machinery"
+                    }
+                  ],
+                  "caption": "A ribosome supplies protein and polymerase pools without copying RNA."
+                }
+              },
+              "edge": "entry->translation"
+            },
+            {
+              "id": "gate",
+              "nodes": [
+                "gate"
+              ],
+              "text": "Copying through a complementary RNA intermediate has supplied one symbolic new +RNA genome. A further intermediate is now underway. Both paths share the completed pre-fork copy; the hypothetical interruption affects further synthesis.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "ribosome": {
+                      "state": "hidden",
+                      "count": 0
+                    },
+                    "genome": {
+                      "x": 200,
+                      "y": 125
+                    },
+                    "enzyme": {
+                      "x": 280,
+                      "y": 125,
+                      "state": "active"
+                    },
+                    "copies": {
+                      "count": 1,
+                      "state": "free",
+                      "label": "New RNA ×1"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 245,
+                        "y": 281
+                      },
+                      "text": "Shared · one completed new RNA"
+                    }
+                  ],
+                  "caption": "One completed new RNA is available before the paths diverge."
+                },
+                "copyview": {
+                  "status": "copying",
+                  "position": 0.4,
+                  "progress": 0.3,
+                  "copies": 1,
+                  "caption": "One completed +RNA token sits in the tray. The dashed strand at the polymerase site is a separate complementary intermediate in progress.",
+                  "note": "The bridge shows the two copying rounds. Intermediate extent and completed-copy count are independent authored states, not a rate or yield."
+                }
+              },
+              "edge": "translation->gate"
+            },
+            {
+              "id": "new-rna",
+              "nodes": [
+                "new"
+              ],
+              "text": "Further RNA synthesis expands the symbolic completed-genome pool from one to four. These genomes provide material that this model assumes can join viral proteins during assembly.",
+              "panels": {
+                "cellview": {
+                  "items": {
+                    "copies": {
+                      "count": 1,
+                      "state": "free",
+                      "label": "New RNA ×4"
+                    },
+                    "enzyme": {
+                      "x": 280,
+                      "y": 125
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 74
+                      },
+                      "text": "New genomes become available"
+                    }
+                  ],
+                  "caption": "The labeled wedge now represents a larger completed RNA pool."
+                },
+                "copyview": {
+                  "status": "complete",
+                  "position": 0.8,
+                  "progress": 1,
+                  "copies": 4,
+                  "caption": "Four separate +RNA tokens show the authored completed-copy count. The site shows a complementary intermediate at its authored full extent.",
+                  "note": "The site and tray summarize different copying rounds. Neither the token count nor strand extent predicts kinetics, yield or efficacy."
+                }
+              },
+              "edge": "gate->new"
+            },
+            {
+              "id": "assembly",
+              "nodes": [
+                "assembly"
+              ],
+              "text": "The model assumes some completed new genomes can be packaged with viral proteins. Packaging and envelope acquisition are grouped here; their coupling to replication varies among viruses.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cell",
+                  "items": {
+                    "copies": {
+                      "count": 1,
+                      "label": "New RNA ×1"
+                    },
+                    "protein": {
+                      "count": 1
+                    },
+                    "assembled": {
+                      "count": 1,
+                      "state": "bound",
+                      "label": "Assembly pool"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 386,
+                        "y": 274
+                      },
+                      "text": "Packaging is a separate stage"
+                    }
+                  ],
+                  "caption": "The model assigns new RNA to assembly; one symbolic copy remains."
+                },
+                "copyview": {
+                  "caption": "The tray retains four cumulative completed-copy tokens. The cell assigns three symbolic copies to its assembly pool and leaves one free.",
+                  "note": "The intermediate remains a separate authored state. Packaging and later release are illustrative assumptions; real coupling varies."
+                }
+              },
+              "edge": "new->assembly"
+            },
+            {
+              "id": "release",
+              "nodes": [
+                "release"
+              ],
+              "text": "Assembled particles leave the modeled cell. The outside particles are an outcome of prior copying and assembly, rather than RNA strands becoming infectious on their own.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "assembled": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 166,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released B"
+                    },
+                    "released": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 238,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released C"
+                    },
+                    "incoming": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 95,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released A"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 305,
+                        "y": 279
+                      },
+                      "text": "Baseline · three particle symbols"
+                    }
+                  ],
+                  "caption": "Three separate outside symbols show the baseline release outcome."
+                }
+              },
+              "edge": "assembly->release"
+            },
+            {
+              "id": "interrupted",
+              "nodes": [
+                "interrupt"
+              ],
+              "text": "Suppose further synthesis is interrupted at the shared gate. The dashed complementary intermediate stays incomplete, while the completed pre-fork +RNA copy remains available in the tray.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "enzyme": {
+                      "state": "bound"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 74
+                      },
+                      "text": "Further synthesis interrupted"
+                    }
+                  ],
+                  "caption": "Further synthesis stops; the completed pre-fork RNA copy remains."
+                },
+                "copyview": {
+                  "status": "interrupted",
+                  "position": 0.4,
+                  "progress": 0.3,
+                  "copies": 1,
+                  "caption": "The stop square marks interrupted synthesis. The dashed intermediate remains incomplete; the separate tray retains the completed pre-fork +RNA token.",
+                  "note": "An interruption preserves both authored states. Later packaging and release are illustrative assumptions, with no efficacy estimate."
+                }
+              },
+              "edge": "gate->interrupt",
+              "tone": {
+                "interrupt": "warn"
+              }
+            },
+            {
+              "id": "limited-assembly",
+              "nodes": [
+                "limited"
+              ],
+              "text": "For this illustration, assume the one completed new RNA copy made before the fork can be packaged with existing viral proteins. That assumption permits one symbolic particle; real replication–assembly coupling varies.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cell",
+                  "items": {
+                    "protein": {
+                      "count": 1
+                    },
+                    "assembled": {
+                      "count": 1,
+                      "state": "bound",
+                      "label": "One assembly"
+                    },
+                    "copies": {
+                      "count": 0,
+                      "state": "hidden"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 379,
+                        "y": 274
+                      },
+                      "text": "Pre-fork copy → assumed packaging"
+                    }
+                  ],
+                  "caption": "Assumed packaging uses the completed pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "The tray retains one cumulative completed-copy token. In the cell, that pre-fork copy is assigned to a particle; the incomplete intermediate persists at the stopped site.",
+                  "note": "The incoming genome remains in place. Packaging and release are illustrative assumptions; real coupling varies."
+                }
+              },
+              "edge": "interrupt->limited",
+              "tone": {
+                "limited": "warn"
+              }
+            },
+            {
+              "id": "limited-release",
+              "nodes": [
+                "residual"
+              ],
+              "text": "Under the model’s packaging and release assumptions, that pre-fork copy supports one symbolic outside particle. This authored outcome is not a yield prediction, efficacy estimate or guarantee about real viruses.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "assembled": {
+                      "count": 0,
+                      "state": "hidden"
+                    },
+                    "released": {
+                      "count": 1,
+                      "state": "released",
+                      "in": "outside"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 305,
+                        "y": 279
+                      },
+                      "text": "Hypothesis · one particle symbol"
+                    }
+                  ],
+                  "caption": "Assumed release of a particle derived from the pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "One cumulative completed-copy token remains in the tray; the incomplete intermediate remains at the stopped site. The cell shows the assumed release of one particle.",
+                  "note": "These are independent authored symbols, not measured output, efficacy or a guarantee about real viruses."
+                }
+              },
+              "edge": "limited->residual",
+              "tone": {
+                "residual": "warn"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "baseline",
+              "label": "Baseline · copying continues",
+              "color": "#38bdb1",
+              "steps": [
+                "arrival",
+                "entry",
+                "translation",
+                "gate",
+                "new-rna",
+                "assembly",
+                "release"
+              ]
+            },
+            {
+              "id": "interruption",
+              "label": "Hypothesis · copying interrupted",
+              "color": "#db8c68",
+              "steps": [
+                "arrival",
+                "entry",
+                "translation",
+                "gate",
+                "interrupted",
+                "limited-assembly",
+                "limited-release"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 7
+              },
+              {
+                "panel": "cellview",
+                "x": 0,
+                "y": 7,
+                "w": 10,
+                "h": 14
+              },
+              {
+                "panel": "copyview",
+                "x": 10,
+                "y": 7,
+                "w": 14,
+                "h": 16
+              },
+              {
+                "x": 0,
+                "y": 23,
+                "w": 24,
+                "h": 18
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "read-model",
+        "heading": "02 / Read the model, not a result",
+        "accent": "violet",
+        "text": [
+          "The important dependency is genome supply → assembly → release. Translation separately makes proteins from RNA. The copying schematic is incoming +RNA → complementary RNA intermediate → new +RNA; each arrow compresses machinery and intermediate steps.",
+          "At the shared gate, one separate tray token is a completed new +RNA genome. The dashed strand at the active site is a further complementary intermediate. Interruption preserves the completed token and leaves that intermediate incomplete. The cell wedge is a labeled pool symbol."
+        ],
+        "bullets": [
+          "Incoming RNA: a pill labeled +RNA in the cell and a solid input strand in the close-up. Complementary intermediate: a dashed strand at the polymerase site. Completed new +RNA: separate tray tokens and a labeled wedge pool in the cell. Labeled spiky marks distinguish assembly from outside particles; a stop square identifies interrupted synthesis.",
+          "This illustrative copying pathway takes place in the cytoplasm of a eukaryotic cell. Other organelles are omitted to focus the dependency; cell dimensions and membrane positions carry no anatomical scale.",
+          "The alternate path assumes the completed pre-fork copy can be packaged and released with existing proteins. Real replication–assembly coupling varies. Three versus one outside particles are drawing choices, not measured yield, efficacy or a claim about every virus.",
+          "Checkpoint: explain why protein production can continue without guaranteeing a supply of new complete genomes. Then identify which downstream stages the hypothetical interruption can constrain."
+        ]
+      },
+      {
+        "id": "evidence",
+        "heading": "03 / Source and claim-limit ledger",
+        "accent": "green",
+        "text": [
+          "These primary studies support selected mechanistic ideas. The generic enveloped lifecycle and alternate outcome are a teaching synthesis, not a reproduction of either study."
+        ],
+        "contract": {
+          "title": "Evidence → permitted claim → boundary",
+          "fields": [
+            {
+              "k": "Translation / replication",
+              "v": "Gamarnik & Andino · Genes & Development 12, 2293–2304 (1998)",
+              "g": "Supports distinguishing genome translation from RNA replication and a transition between those uses. Studied a specific non-enveloped virus; does not validate the envelope, entry route or universal timing in this composite.",
+              "link": "https://genesdev.cshlp.org/content/12/15/2293.full"
+            },
+            {
+              "k": "RNA synthesis",
+              "v": "Wang et al. · Cell 182, 417–428.e13 (2020)",
+              "g": "Structural work supports a polymerase engaging RNA during synthesis. This cartoon omits sequence, polarity detail, cofactors and measured kinetics; it does not depict the named virus studied in that paper.",
+              "link": "https://www.sciencedirect.com/science/article/pii/S0092867420306292"
+            },
+            {
+              "k": "Accessible primary text",
+              "v": "Wang et al. · full article archive",
+              "g": "Accessible primary-source copy used to verify the polymerase claim. The hypothetical interruption here is not the intervention tested by that study.",
+              "link": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7242921/"
+            },
+            {
+              "k": "Authored hypothesis",
+              "v": "Interrupt further synthesis → stop additional genome supply",
+              "g": "One completed new RNA exists before the fork. The alternate assumes that copy can be packaged and released with existing proteins; the cited studies do not establish this generic output. Real replication–assembly coupling varies. Counts are neither yield nor efficacy estimates."
+            },
+            {
+              "k": "Abstraction",
+              "v": "One cell · symbolic genome supply · one branch point",
+              "g": "The pathway bridge names the complementary intermediate but compresses its copying rounds. The drawing omits molecular detail, compartment organization, competing processes, host responses and real timescales. Entry, packaging and release routes differ across viruses."
+            }
+          ]
+        },
+        "bullets": [
+          "Rank 1 · Copy-gate comparison (chosen): keeps both paths identical until one defined dependency changes; strongest for separating translation from genome copying.",
+          "Rank 2 · Entry-gate comparison: easier to show at the membrane, but removes the shared intracellular history and teaches a different dependency.",
+          "Rank 3 · Assembly-gate comparison: makes residual RNA visible, but requires more structural detail and shifts attention away from RNA synthesis."
+        ]
+      }
+    ]
+  }
+}

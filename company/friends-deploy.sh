@@ -66,16 +66,16 @@ if sorted(selected) != ["science", "sports"]:
 python3 tools/build.py --no-catalog
 node tools/canon/library.mjs --registry canon.json --out workbench/diagrams.json --thumbnails
 
-# The generated index must point only to the four reviewed Friends documents.
+# The generated index must point only to the six reviewed Friends documents.
 # This also catches a stale or accidentally empty canon.json before replacing
 # a previously prepared site.
 python3 - "$ROOT/workbench/diagrams.json" <<'PY'
 import json, pathlib, sys
 index = json.loads(pathlib.Path(sys.argv[1]).read_text())
-expected = {'venue-map', 'sequencing-walkthrough', 'biology-teaching', 'season-of-seats'}
+expected = {'venue-map', 'sequencing-walkthrough', 'biology-teaching', 'season-of-seats', 'waves-and-forces', 'copy-gate'}
 entries = index.get('diagrams', [])
 ids = {entry.get('id') for entry in entries}
-if len(entries) != 4 or ids != expected:
+if len(entries) != 6 or ids != expected:
     raise SystemExit(f'Friends library must contain exactly {sorted(expected)}; got {sorted(ids)}')
 for entry in entries:
     expected_url = f'../diagrams/friends/{entry["id"]}/{entry["id"]}.spec.json'
@@ -102,7 +102,7 @@ for entry in json.loads(index_file.read_text())['diagrams']:
     shutil.copy2(source, destination)
 PY
 cp template/flowview.html "$STAGE/template/"
-for slug in venue-map sequencing-walkthrough biology-teaching season-of-seats; do
+for slug in venue-map sequencing-walkthrough biology-teaching season-of-seats waves-and-forces copy-gate; do
   mkdir -p "$STAGE/diagrams/friends/$slug"
   cp "diagrams/friends/$slug/$slug.spec.json" "$STAGE/diagrams/friends/$slug/"
 done
@@ -110,7 +110,7 @@ python3 - "$STAGE" <<'PY'
 import json, pathlib, sys
 stage = pathlib.Path(sys.argv[1])
 starters = []
-for slug in ('venue-map', 'sequencing-walkthrough', 'biology-teaching', 'season-of-seats'):
+for slug in ('venue-map', 'sequencing-walkthrough', 'biology-teaching', 'season-of-seats', 'waves-and-forces', 'copy-gate'):
     spec = json.loads((stage / 'diagrams/friends' / slug / (slug + '.spec.json')).read_text())
     starters.append({'name': spec['page']['title'],
                      'desc': spec['page'].get('description') or 'Friends library story',

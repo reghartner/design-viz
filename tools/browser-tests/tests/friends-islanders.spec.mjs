@@ -128,24 +128,62 @@ test('standalone reader honors shared theme over cookie, source and embed, then 
   await expect(page.locator('#docview')).toHaveClass(/\bsk-terminal\b/);
 });
 
-test('Friends NSP15 opens all eight tabs without Islanders marks',async({page,server},testInfo)=>{
-  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence&theme=islanders');
-  await expect(page.locator('#canon-reader .doc-sec').first()).toBeVisible();
-  await expect(page.locator('.islanders-site-mark')).toBeHidden();
-  await expect(page.locator('#canon-reader .seatmap-islanders-logo')).toHaveCount(0);
+async function readableText(locator){
+  const colors=await locator.evaluateAll(nodes=>nodes.filter(el=>el.getClientRects().length).map(el=>{
+    const rgba=value=>{const channels=value.match(/[\d.]+/g).map(Number);return [...channels.slice(0,3),channels[3]??1];};
+    const over=(front,back)=>front.slice(0,3).map((channel,i)=>channel*front[3]+back[i]*(1-front[3]));
+    const layers=[];
+    for(let node=el;node;node=node.parentElement){
+      const css=getComputedStyle(node),color=rgba(css.backgroundColor);
+      if(css.backgroundImage!=='none')throw Error('Contrast audit needs a solid background: '+node.className);
+      if(Number(css.opacity)!==1)throw Error('Contrast audit must wait for opaque text: '+node.className);
+      layers.push(color);if(color[3]===1)break;
+    }
+    let background=[255,255,255];for(const layer of layers.reverse())background=over(layer,background);
+    const color=getComputedStyle(el).color,foreground=over(rgba(color),background);
+    const luminance=rgb=>rgb.map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;})
+      .reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
+    const a=luminance(foreground),b=luminance(background);
+    return {text:el.textContent.trim().slice(0,100),className:el.className,color,background,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+  }));
+  expect(colors.length).toBeGreaterThan(0);
+  for(const entry of colors)expect(entry.ratio,JSON.stringify(entry)).toBeGreaterThanOrEqual(4.5);
+  return colors;
+}
+
+test('Friends NSP15 opens all eight tabs with readable dark-section text in both themes',async({page,server},testInfo)=>{
+  test.setTimeout(90000);
   const reader=page.locator('#canon-reader');
-  await expect(reader.locator('.reader-tree-tab')).toHaveCount(8);
   const spec=await (await page.request.get(server.origin+'/diagrams/friends/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json')).json();
-  for(const [index,tab] of spec.page.blocks[0].tabs.entries()){
-    await chooseNavigation(reader.locator('.explore-navigation'),'Tab',tab.label);
-    await expect(reader.locator('#section-'+tab.sections[0].id)).toBeVisible();
-    await capture(page,testInfo,'friends-nsp15-tab-'+(index+1)+'-desktop');
+  const results=[];
+  for(const theme of ['default','islanders']){
+    await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence'+(theme==='default'?'':'&theme=islanders'));
+    await expect(reader.locator('.doc-sec').first()).toBeVisible();
+    await expect(reader).toHaveClass(new RegExp('\\bsk-'+(theme==='default'?spec.page.skin:theme)+'\\b'));
+    await expect(page.locator('.islanders-site-mark')).toBeHidden();
+    await expect(reader.locator('.seatmap-islanders-logo')).toHaveCount(0);
+    await expect(reader.locator('.reader-tree-tab')).toHaveCount(8);
+    for(const [index,tab] of spec.page.blocks[0].tabs.entries()){
+      await chooseNavigation(reader.locator('.explore-navigation'),'Tab',tab.label);
+      const section=reader.locator('#section-'+tab.sections[0].id),toggle=section.locator(':scope > .sec-heading-row .prosetoggle');
+      await expect(section).toBeVisible();
+      await expect(section).toHaveCSS('background-color','rgb(11, 25, 35)');
+      if(await toggle.getAttribute('aria-expanded')==='true')await toggle.click();
+      await expect(section.locator(':scope > .sec-teaser')).toBeVisible();
+      const collapsed=await readableText(section.locator(':scope > .sec-heading-row .sec-h, :scope > .sec-teaser .teasertext, :scope > .sec-teaser .teasermore'));
+      await capture(page,testInfo,'friends-nsp15-'+theme+'-tab-'+(index+1)+'-desktop');
+      await toggle.click();
+      await expect(section.locator(':scope > .sec-prose')).toBeVisible();
+      await expect(section.locator(':scope > .sec-prose')).toHaveCSS('opacity','1');
+      const expanded=await readableText(section.locator(':scope > .sec-prose .sec-text, :scope > .sec-prose .sec-bullets li, :scope > .sec-prose a'));
+      // The authored source ledger has links on its own table surface; include
+      // those actual rendered links without changing the approved prose/spec.
+      const links=await section.locator('a:visible').count()?await readableText(section.locator('a:visible')):[];
+      results.push({theme,tab:tab.label,collapsed,expanded,links});
+      if(index===1)await capture(page,testInfo,'friends-nsp15-'+theme+'-expanded-prose-desktop');
+    }
   }
-  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence');
-  await expect(reader.locator('.doc-sec:visible').first()).toBeVisible();
-  await expect(reader).toHaveClass(new RegExp('\\bsk-'+spec.page.skin+'\\b'));
-  await chooseNavigation(reader.locator('.explore-navigation'),'Tab',spec.page.blocks[0].tabs[1].label);
-  await capture(page,testInfo,'friends-nsp15-default-theme-desktop');
+  await testInfo.attach('nsp15-rendered-text-contrast',{body:JSON.stringify(results,null,2),contentType:'application/json'});
 });
 
 test('marketing tabs retain their panels and the desktop editor retains the selected theme',async({page,server},testInfo)=>{

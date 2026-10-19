@@ -390,6 +390,16 @@ PanelRegistry.define('nspstory', {
 .docview:has(#section-green-reporter) .stepline .stepid{display:none}
 @media screen{.docview:has(#section-green-reporter){padding-top:12px;padding-bottom:20px}.docview:has(#section-green-reporter) .doc-title{font:500 23px/1.2 Georgia,serif}.docview:has(#section-green-reporter) .doc-sec{margin-top:10px;padding:10px 12px 12px;background:#0b1923;border-color:#254350}.docview:has(#section-green-reporter) .sec-eyebrow{font-size:9px;margin:0}.docview:has(#section-green-reporter) .sec-h{font-size:16px;margin:0 0 3px}.docview:has(#section-green-reporter) .sec-teaser{margin-bottom:4px}.docview:has(#section-green-reporter) .section-layout-grid{margin-top:6px}}
 .nspstory-dock{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;background:#030b14;flex:none;border-top:1px solid #193b49}
+/* Pair the lesson's fixed dark section surface with its own intro text.
+   Keep panel, transport, floating prose-window and print palettes unchanged. */
+@media screen{
+ .docview:has(#section-green-reporter) .doc-sec>.sec-heading-row .sec-h,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-teaser .teasertext,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose,
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose :is(.sec-text,.sec-bullets,strong,b){color:#dceef4}
+ .docview:has(#section-green-reporter) .doc-sec>.sec-teaser .teasermore{color:#a7bdc8}
+ .docview:has(#section-green-reporter) .doc-sec>.sec-prose a{color:#8ce8cd}
+}
 .nspstory-dock .nspstory-controls{position:relative;right:auto;bottom:auto;flex:1;flex-wrap:wrap;justify-content:flex-end;border:0;box-shadow:none;padding:0;background:transparent;gap:5px}
 .nspstory-dock .nspstory-disclosure{position:relative;left:auto;bottom:auto;width:auto;flex:none}
 .nspstory-dock .nspstory-choice button{padding:7px 4px}.nspstory-dock .nspstory-choice>span{font-size:8px}

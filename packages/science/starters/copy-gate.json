@@ -1242,6 +1242,15 @@
           "Checkpoint: state one observation, one supported interpretation, and one claim these displays cannot justify."
         ]
       }
+    ],
+    "description": "A conceptual positive-sense RNA copy gate followed by an illustrative, strand-aware RNA-seq reading exercise. Source limits separate RNA detection from claims of active replication or infectivity.",
+    "tags": [
+      "biology",
+      "virology",
+      "rna-seq",
+      "sequencing",
+      "positive-sense-rna",
+      "teaching"
     ]
   }
 }

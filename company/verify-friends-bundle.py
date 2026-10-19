@@ -86,6 +86,12 @@ def main(stage):
                           ("kit runtime", kit["tools/canon/generated-runtime.cjs"])]:
         require(source_names(text) == SELECTED,
                 f"{surface} has missing or unselected package panel source")
+        for variant in ("light", "dark"):
+            image = (ROOT / f"packages/sports/assets/islanders/primary-{variant}.png").read_bytes()
+            uri = "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+            require(uri in text, f"{surface} omits the embedded official Islanders {variant} logo")
+        require("/* @islanders-primary-" not in text,
+                f"{surface} contains an unexpanded Islanders asset placeholder")
 
     # Built-in science starters are serialized into the same HTML that is
     # staged for upload. Sports has no built-in starter; its reviewed stories

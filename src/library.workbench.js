@@ -282,6 +282,8 @@ async function refreshTopologyRepository(context){
 }
 
 function initWorkbenchLibrary(opts){
+  var islandersMark=typeof IslandersBrand!=='undefined'?IslandersBrand.image('dark','islanders-site-mark'):null;
+  if(islandersMark)document.getElementById('workbench-home').after(islandersMark);
   var grid=document.getElementById('welcome-library-grid'),status=document.getElementById('welcome-library-status');
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
@@ -292,10 +294,12 @@ function initWorkbenchLibrary(opts){
   var specRequests=new Map(),headerObserver=null;
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
+    if(islandersMark)islandersMark.classList.remove('islanders-mark-suppressed');
     if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
     headerTitle.hidden=true;title.removeAttribute('title');
   }
   function showHeader(){
+    if(islandersMark)islandersMark.classList.toggle('islanders-mark-suppressed',!current || !IslandersBrand.story(current.id));
     title.title=title.textContent;headerTitle.append(title,toolbar);headerTitle.hidden=false;
   }
   function retireViewer(){
@@ -485,6 +489,9 @@ function initWorkbenchLibrary(opts){
       var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
       var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
       var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);
+      if(typeof IslandersBrand!=='undefined' && IslandersBrand.story(entry.id)){
+        var crest=IslandersBrand.image('light','islanders-card-mark');crest.alt='';crest.setAttribute('aria-hidden','true');name.prepend(crest);
+      }
       if(entry.description){var description=document.createElement('span');description.className='canon-library-description';description.textContent=entry.description;open.append(description);}
       var metadata=document.createElement('div');metadata.className='canon-library-metadata';
       var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=libraryTeamName(entry.canon.owner);owner.title=entry.canon.owner || entry.id;

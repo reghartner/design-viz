@@ -1742,6 +1742,11 @@ body.sk-islanders .workbench-mark{color:#FC4C02;}
 /* Royal blue disappears against the dark Ink preset; use the team's orange
    for its editor selection/membership marks, leaving semantic tones intact. */
 body.sk-islanders .docview g.node.ns-ink{--accent:#FC4C02;}
+.islanders-site-mark,.islanders-card-mark{display:none;object-fit:contain;flex:none;}
+body.sk-islanders .islanders-site-mark:not(.islanders-mark-suppressed){display:block;width:46px;height:46px;padding-left:14px;margin-right:auto;border-left:1px solid #365575;}
+body.sk-islanders .islanders-card-mark{display:block;width:42px;height:42px;float:right;margin:0 0 6px 12px;}
+body.sk-islanders.canon-reader-active .islanders-site-mark{width:36px;height:36px;padding-left:12px;}
+body:not(.welcome-active):not(.canon-reader-active) .islanders-site-mark{display:none!important;}
 body.sk-islanders .welcome-button-primary{background:#003087;color:#FFFFFF;border-color:#003087;}
 body.sk-islanders :is(.welcome-action,.welcome-library-entry,.library-controls,.canon-recent-link){background:#F5F9FC;border-color:#C8D9E8;color:#003087;}
 body.sk-islanders :is(.welcome-kicker,.welcome-back,.library-active-filters button,.library-recent-heading button){color:#003087;}

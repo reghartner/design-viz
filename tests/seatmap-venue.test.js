@@ -232,6 +232,10 @@ test('existing inline declarations match the renderer baseline, and the venue ex
   const expanded = JSON.parse(JSON.stringify(spec));
   Object.assign(examplePanel(expanded), plain(C.SeatmapVenues.get('ubs-arena').seatmap));
   delete examplePanel(expanded).venue;
+  assert.deepEqual(plain(C.seatmapModel(panel, {})), plain(C.seatmapModel(examplePanel(expanded), {})), 'anonymous and named geometry remain identical');
+  // A named home venue now also carries theme-gated official artwork. Preserve
+  // its identity when comparing full markup against explicitly expanded data.
+  examplePanel(expanded).venue = panel.venue;
   assert.deepEqual(seatmapRenders(C, spec), seatmapRenders(C, expanded));
   assert.equal(seatmapRenders(C, spec).length, 15);
   assert.deepEqual(validate(spec), {errors: [], warnings: []});

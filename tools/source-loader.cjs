@@ -301,6 +301,14 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
       source = source.replace('/* @auto-arrange-worker */ ""', () => JSON.stringify(worker).replace(/</g, '\\u003c'));
     }
     if (substitute) source = companyText(source, file, company);
+    if (file === '@package/sports/panels/islanders-brand.js' && substitute) {
+      const assets = path.join(packageDir(root, 'sports'), 'assets/islanders');
+      for (const variant of ['light', 'dark']) {
+        const name = 'primary-' + variant + '.png';
+        const uri = imageDataUri(path.join(assets, name), name, file, assets);
+        source = source.replace('/* @islanders-primary-' + variant + ' */ ""', () => JSON.stringify(uri));
+      }
+    }
     if (file === 'workbench/agent-chat.js' && substitute)
       source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
     if (file === 'core/document-links.js' && substitute) source = source.replace('/* @company-site-base */ null', () => JSON.stringify(company && company.site ? company.site.baseUrl : null).replace(/</g, '\\u003c'));

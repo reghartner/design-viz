@@ -1,6 +1,7 @@
 {
   "name": "sports",
   "sourceFiles": [
+    "panels/islanders-brand.js",
     "panels/sports.js",
     "panels/venue-library.js",
     "panels/venues/ubs-arena.js",

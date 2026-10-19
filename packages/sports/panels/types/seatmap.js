@@ -860,6 +860,14 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
     h += '<path class="seatmap-field" d="' + model.field + '" id="' + hid + '-fp"/>' + marks.under;
     if (model.fieldLines) h += '<path class="seatmap-field-line" d="' + model.fieldLines + '"/>';
     h += marks.over;
+    /* Only the Islanders' home rink carries the official crest. CSS owns the
+       theme gate so live skin changes also update in-place patched panels.
+       The source is trusted bundled PNG data, never an authored URL or SVG. */
+    if (panel.venue === 'ubs-arena' && model.fieldBox && typeof IslandersBrand !== 'undefined') {
+      var b = model.fieldBox, size = spmRound(Math.min(b.width / 200, b.height / 85) * 25);
+      h += '<image class="seatmap-islanders-logo" x="' + spmRound(b.x + (b.width - size) / 2) + '" y="' + spmRound(b.y + (b.height - size) / 2) +
+        '" width="' + size + '" height="' + size + '" preserveAspectRatio="xMidYMid meet" href="' + IslandersBrand.light + '" aria-hidden="true"/>';
+    }
   }
   /* One group per ring, inner first, so each level casts a soft shadow and
      reads as a tier stepping up from the field. */
@@ -875,7 +883,8 @@ function seatmapHTML(panel, state, model, hid, pulse, reserve) {
   model.sections.forEach(function (s) { if (s.highlighted) h += '<path class="seatmap-outline-halo" d="' + s.d + '"/><path class="seatmap-outline" d="' + s.d + '"/>'; });
   h += '</g><g class="seatmap-landmarks">';
   model.landmarks.forEach(function (mark) {
-    h += '<g class="seatmap-landmark"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
+    var iceLabel = panel.venue === 'ubs-arena' && mark.label.toLowerCase() === 'ice';
+    h += '<g class="seatmap-landmark' + (iceLabel ? ' seatmap-islanders-ice-label' : '') + '"><rect x="' + spmRound(mark.x - mark.width / 2) + '" y="' + spmRound(mark.y - mark.height / 2) + '" width="' + mark.width + '" height="' + mark.height + '" rx="13"/>' +
       '<text x="' + mark.x + '" y="' + mark.y + '" dy="0.35em">' + esc(mark.label) + '</text></g>';
   });
   h += '</g>';
@@ -1407,6 +1416,13 @@ body:is(.sk-rose,.sk-lavender,.sk-lilac) .seatmap{--seatmap-gutter:var(--fl-pape
 .seatmap-rink-crease{fill:var(--seatmap-crease);stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-rink-circle{fill:none;stroke:var(--seatmap-red);stroke-width:1;vector-effect:non-scaling-stroke}
 .seatmap-rink-dot{fill:var(--seatmap-red)}.seatmap-rink-centre{fill:var(--seatmap-blue)}
+.seatmap-islanders-logo{display:none;pointer-events:none}
+.sk-islanders .seatmap-islanders-logo{display:inline}
+.sk-islanders .seatmap-islanders-ice-label{display:none}
+/* Library previews are immutable snapshots shared across themes. Their card
+   carries the live theme mark, so do not bake one into the thumbnail pixels. */
+.sk-islanders .thumbnail-ready .seatmap-islanders-logo{display:none}
+.sk-islanders .thumbnail-ready .seatmap-islanders-ice-label{display:inline}
 .seatmap-turf{fill:var(--seatmap-turf)}
 .seatmap-pitch-line,.seatmap-court-line,.seatmap-court-key{fill:none;stroke:var(--seatmap-turf-line);stroke-width:1.25;vector-effect:non-scaling-stroke}
 .seatmap-pitch-spot{fill:var(--seatmap-turf-line)}

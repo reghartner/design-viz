@@ -1,0 +1,28 @@
+{
+  "pages": [
+    {
+      "file": "nsp15-insertion-evidence.html",
+      "spec": "nsp15-insertion-evidence.spec.json",
+      "title": "The insertion signature of NSP15",
+      "family": "nsp15-insertion-evidence",
+      "description": "Animated guide to Bianco et al.’s NSP15 preprint: GFP lineages, limiting dilution, inferred RNA origins, and distal insertion evidence.",
+      "tags": [
+        "science",
+        "biology",
+        "virology",
+        "nsp15",
+        "preprint",
+        "evidence",
+        "animated",
+        "rna",
+        "gfp"
+      ],
+      "widgets": [
+        "funnel",
+        "grid",
+        "nspstory",
+        "table"
+      ]
+    }
+  ]
+}

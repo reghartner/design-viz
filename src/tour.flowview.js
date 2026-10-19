@@ -930,6 +930,10 @@ function wireTour(ctl, view, win, config, options){
     });});
   }
   function planDefaultTour(){
+    if(ctl.withPanelActivationSuspended)return ctl.withPanelActivationSuspended(probeDefaultTour);
+    return probeDefaultTour();
+  }
+  function probeDefaultTour(){
     var preferred=null;
     var steps=config.steps.map(function(step){
       if((step.kind || 'spot')!=='spot')return step;

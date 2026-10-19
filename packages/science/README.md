@@ -1,9 +1,9 @@
 # Optional science package
 
-This package contains biology teaching panels: `rnacopy`, four sequence
+This package contains biology teaching panels: `rnacopy`, `nspstory`, four sequence
 panels (`sequence`, `frames`, `reads`, `locus`), and the `strandscene` and
 `cellscene` mechanism panels. Its stories also use the generic core `funnel`
-and `grid` panels. It contains one built-in RNA-copying starter, other
+and `grid` panels. It contains built-in RNA-copying and NSP15-evidence starters, other
 editable source examples, recipes, and panel
 contracts. The default build excludes the science-specific material from the
 viewer, workbench templates, example gallery, and offline authoring kit.
@@ -28,6 +28,9 @@ Use the [general cell-scene recipe](cookbook/cell-scenes.md),
 [copy-gate recipe](cookbook/viral-copy-gate.md), or
 [sequence recipe](cookbook/sequence-panels.md) for complete stories and panel
 selection. Authoring and editing these documents is desktop only.
+
+The [NSP15 story recipe](cookbook/nsp15-story.md) describes four SVG lessons for
+the Bianco et al. preprint, with decorative motion and complete print stills.
 
 The [cell journey](diagrams/biology/cell-journey/README.md) is a longer desktop
 biology showcase: 13 lessons covering replication through sequencing, with a

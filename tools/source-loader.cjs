@@ -347,6 +347,23 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (seen.has(file)) throw new Error('Duplicate physical source: ' + file);
     seen.add(file);
     let source = fs.readFileSync(sourcePath(root, file), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
+    if (substitute && file.startsWith(PACKAGE_PREFIX)) {
+      const marker = /\/\* @panel-asset:([^*]+) \*\/ ''/g;
+      source = source.replace(marker, (match, relative) => {
+        if (!/^\.\.\/assets\/[a-z][a-z0-9-]*\.(?:png|jpe?g|webp)$/.test(relative))
+          throw new Error('Invalid panel asset marker in ' + file + ': ' + relative);
+        const packageName = file.slice(PACKAGE_PREFIX.length).split('/')[0];
+        const packageRoot = packageDir(root, packageName);
+        const asset = path.resolve(path.dirname(sourcePath(root, file)), relative);
+        if (!inside(packageRoot, asset) || !fs.existsSync(asset)) throw new Error('Panel asset not found: ' + relative);
+        const bytes = fs.readFileSync(asset);
+        if (bytes.length > IMAGE_MAX_BYTES) throw new Error('Panel asset must be at most 512 KiB: ' + relative);
+        const extension = path.extname(asset).toLowerCase();
+        const kind = extension === '.png' ? 'png' : extension === '.webp' ? 'webp' : 'jpeg';
+        return JSON.stringify('data:image/' + kind + ';base64,' + bytes.toString('base64'));
+      });
+      if (source.includes('/* @panel-asset:')) throw new Error('Invalid panel asset marker in ' + file);
+    }
     if (file === 'workbench/auto-arrange.js' && substitute) {
       const files = manifest(root).assets.autoArrangeWorker;
       const worker = files.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');

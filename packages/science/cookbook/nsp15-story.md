@@ -10,19 +10,32 @@ successive steps. `caption` accepts text or null; `enterOnce` supports the
 same state fields. Sparse patches carry state and path/seek behavior uses
 the ordinary panel fold. Invalid phases warn and retain the prior state.
 
+In the example, rich conceptual scenes are titled **Illustrative** and sit
+beside compact **Evidence** or **Evidence / limits** panels. Keep raw counts,
+source notes, assay selection, and confirmation caveats in those factual
+panels; do not turn them into atmospheric artwork or repeat the whole step
+narrative there.
+
 Decorative atmosphere is an explicit setup choice: `ambient` enables it,
 `ambientIntensity` accepts `quiet | medium | lively`, and `ambientTempo`
-accepts `slow | normal | fast`. These settings change only background drift;
-they never move evidence bars or replay a teaching beat. Reduced motion and
-print suppress the drift regardless of the authored setting.
+accepts `slow | normal | fast`. These settings visibly change only decorative
+background rings, particles, and field drift; they never move evidence bars,
+well outcomes, or the proposed source-to-recipient transit, and never replay a
+teaching beat. Reduced motion and print suppress the drift regardless of the
+authored setting.
 
 - Reporter: arrival → rare GFP restoration → newly infected descendants →
   sequence check. Cells fluoresce; the virus particle does not.
-- Dilution: mixed positive culture → illustrative one/multiple/zero founders →
-  follow and sequence-check → reporter selection boundary. Shapes represent
-  lineages. The scene supplies no protocol, probability, or guarantee of purity.
-- Origin: tandem → distal match → inferred origin → proposed fragment transfer.
-  The moving fragment is explicitly proposed; incorporation is unresolved.
+- Dilution: dense mixed culture → one finite fan into nine illustrative wells →
+  candidate follow and sequence-check → reporter selection boundary. Every
+  well is labeled empty, mixed, or candidate; shapes represent lineages. A
+  single-looking candidate is not proof. The scene supplies no protocol,
+  counts, probability, or guarantee of purity.
+- Origin: matching source + recipient insertion → distal relationship → inferred
+  origin → proposed fragment transit. Solid marks carry the observed sequence
+  relationship; the source boundary is conceptual, the connector is dashed,
+  and the amber `PROPOSED / NOT OBSERVED` badge remains visible. The one moving
+  fragment is explicitly illustrative; incorporation is unresolved.
 - Evidence: all → distal → tandem → median size. Bars use the published
   HCoV-OC43 rounded cpm on one linear scale. Every bar keeps its published
   width and label at every animation sample; only the current comparison

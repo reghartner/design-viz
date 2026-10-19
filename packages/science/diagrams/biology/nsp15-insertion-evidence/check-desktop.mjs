@@ -37,20 +37,25 @@ try {
      const screen=scene.locator('.nspstory-screen-frame');
      assert.equal(await scene.getAttribute('data-phase'),String(step),`${section.id}: visual phase must follow forward/back seek`);
      const atmosphere={
-      'green-reporter':['on','medium','slow'],'limiting-dilution':['on','quiet','slow'],
-      'origin-map':['on','quiet','slow'],'class-signature':['off','quiet','slow']
+      'green-reporter':['on','medium','slow'],'limiting-dilution':['on','medium','slow'],
+      'origin-map':['on','medium','slow'],'class-signature':['off','medium','slow']
      }[section.id];
      if(atmosphere)assert.deepEqual(await scene.evaluate(el=>[el.dataset.ambient,el.dataset.ambientIntensity,el.dataset.ambientTempo]),atmosphere,`${section.id}: authored ambient settings must reach rendering`);
      const animations=await scene.evaluate(el=>el.getAnimations({subtree:true}).map(a=>a.animationName));
+     if(atmosphere&&atmosphere[0]==='on'){
+      const presentation=await scene.evaluate(el=>{const ambient=el.querySelector('.nspstory-ambient');return {opacity:getComputedStyle(ambient).opacity,durations:el.getAnimations({subtree:true}).filter(a=>a.animationName==='nspAmbientDrift').map(a=>a.effect.getTiming().duration).sort((a,b)=>a-b)};});
+      assert.equal(presentation.opacity,'0.3',`${section.id}: medium intensity must visibly reach the ambient layer`);
+      if(reducedMotion==='no-preference')assert.deepEqual([...new Set(presentation.durations)],[14000,18000],`${section.id}: slow tempo must drive ambient timing`);
+     }
      if(reducedMotion==='reduce')assert.deepEqual(animations,[],'Reduced motion must be still');
      if(reducedMotion==='no-preference'){
       const ambient=animations.filter(name=>name==='nspAmbientDrift');
       const teaching=animations.filter(name=>name!=='nspAmbientDrift');
-      const ambientCount={'green-reporter':3,'limiting-dilution':3,'origin-map':2,'class-signature':0}[section.id];
+      const ambientCount={'green-reporter':4,'limiting-dilution':5,'origin-map':4,'class-signature':0}[section.id];
       if(ambientCount!==undefined)assert.equal(ambient.length,ambientCount,`${section.id}: decorative ambient layer must stay separate from the teaching beat`);
       const expected={
        'green-reporter':[['nspArrive'],['nspSwitch'],['nspDescendant','nspDescendant'],[]],
-       'limiting-dilution':[[],['nspSeparate','nspSeparate','nspSeparate'],['nspReveal'],['nspReveal']],
+       'limiting-dilution':[[],Array(9).fill('nspDisperse'),['nspReveal'],['nspReveal']],
        'class-signature':[['nspRowFocus','nspEmphasis'],['nspRowFocus','nspEmphasis','nspReveal'],['nspRowFocus','nspEmphasis','nspReveal'],[]],
        'origin-map':[[],[],[],['nspProposal','nspFragment']]
       }[section.id];
@@ -63,6 +68,7 @@ try {
       if(reducedMotion==='no-preference')await scene.evaluate(el=>el.getAnimations({subtree:true}).filter(a=>a.animationName==='nspAmbientDrift').forEach(a=>{a.pause();a.currentTime=4500;}));
       await page.screenshot({path:path.join(output,`${viewport.width}-ambient-${reducedMotion==='reduce'?'reduced':'normal'}.png`)});
      }
+     if(section.id==='limiting-dilution'&&step===2)await page.screenshot({path:path.join(output,`${viewport.width}-wells-${reducedMotion==='reduce'?'reduced':'normal'}.png`)});
      // Fixed values must agree with labels at the start, middle and end of the
      // emphasis animation. No bar may interpolate from another observation.
      if(reducedMotion==='no-preference'&&section.id==='class-signature'&&step===1){
@@ -86,11 +92,24 @@ try {
      }
      await scene.evaluate(el=>el.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect.getComputedTiming().endTime)).forEach(a=>a.finish()));
      if(section.id==='green-reporter')assert.equal(await screen.locator('.nspstory-green').count(),step===0?0:step===1?1:3,'Cell signal and descendants must reset');
-     if(section.id==='limiting-dilution')assert.equal(await screen.locator('.nspstory-separate').count(),step===1?3:0,'Founder distribution runs only in phase 1');
+     if(section.id==='limiting-dilution'){
+      const wells=await screen.locator('.nspstory-well').evaluateAll(els=>els.map(el=>({well:el.dataset.well,state:el.dataset.state,label:el.querySelector('.nspstory-welllabel')?.textContent.trim()})));
+      assert.deepEqual(wells,[
+       {well:'1',state:'candidate',label:'candidate'},{well:'2',state:'empty',label:'empty'},{well:'3',state:'mixed',label:'mixed'},
+       {well:'4',state:'mixed',label:'mixed'},{well:'5',state:'candidate',label:'candidate'},{well:'6',state:'empty',label:'empty'},
+       {well:'7',state:'empty',label:'empty'},{well:'8',state:'mixed',label:'mixed'},{well:'9',state:'candidate',label:'candidate'}
+      ],'All nine illustrative wells need a readable state marker and matching label');
+      assert.equal(await screen.locator('.nspstory-disperse').count(),step===1?9:0,'The nine lineage markers disperse only in phase 1');
+      assert(!(await screen.textContent()).match(/\bWell [A-I]\b|probability of|per well/i),'Well scene must not imply named samples or quantitative outcomes');
+     }
      if(section.id==='origin-map'){
-      assert((await screen.textContent()).includes(step===0?'Tandem · nearby':'Distal · separated'),'Wrong donor/recipient arc');
+      const originText=await screen.textContent();
+      for(const label of ['MATCHING SOURCE','RECIPIENT / INSERTION','PROPOSED / NOT OBSERVED','inferred boundary / unexpected patch','dashed = inferred source link'])assert(originText.includes(label),`${section.id}: missing ${label}`);
+      assert.equal(await screen.locator('.nspstory-source').count(),1,'Observed matching source must remain static');
+      assert.equal(await screen.locator('.nspstory-insert').count(),1,'Observed recipient insertion must remain static');
+      assert.equal(await screen.locator('.nspstory-match').count(),1,'Dashed source inference must remain visible');
       assert.equal(await screen.locator('.nspstory-fragment').count(),step===3?1:0,'Proposed fragment appears only in model step');
-      if(step===3)assert((await screen.textContent()).includes('PROPOSED / NOT OBSERVED'));
+      if(step===3)assert(originText.includes('incorporation unresolved'));
      }
      if(section.id==='class-signature'){
       const widths=await screen.locator('[data-rate]').evaluateAll(els=>els.map(e=>e.getBBox().width));
@@ -104,6 +123,11 @@ try {
     if(section.id==='analysis-ladder'){
      const guide=await root.locator('.pwidget').filter({hasText:'FIVE QUESTIONS'}).innerText();
      for(const label of ['1 · Read','2 · Find','3 · Match','4 · Compare','5 · Interpret'])assert(guide.includes(label),`${label} must remain visible`);
+    }
+    if(['green-reporter','limiting-dilution','origin-map'].includes(section.id)){
+     const titles=await root.locator('.pwidget>.ptitle').allTextContents();
+     assert(titles.some(title=>title.startsWith('ILLUSTRATIVE ·')),`${section.id}: conceptual layer heading missing`);
+     assert(titles.some(title=>title.startsWith('EVIDENCE')),`${section.id}: adjacent evidence/limits heading missing`);
     }
     const geometry=await root.evaluate(el=>{
      const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
@@ -145,8 +169,14 @@ try {
   assert.equal(await scene.locator('.nspstory-print-frame').evaluate(el=>getComputedStyle(el).display),'block',`${id}: deterministic summary must print`);
   assert.equal(await scene.locator('.nspstory-print-frame').evaluate(el=>getComputedStyle(el).filter),'none',`${id}: print uses direct grayscale colors`);
   if(id==='green-reporter')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('8/18 green isolates'));
-  if(id==='limiting-dilution')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('Sequence confirms the selected lineage'));
-  if(id==='origin-map')assert((await scene.locator('.nspstory-print-frame').textContent()).includes('incorporation happens is unresolved'));
+  if(id==='limiting-dilution'){
+   assert.equal(await scene.locator('.nspstory-print-frame .nspstory-well').count(),9,'Print keeps all nine well outcomes');
+   assert((await scene.locator('.nspstory-print-frame').textContent()).includes('Candidate, not proof'));
+  }
+  if(id==='origin-map'){
+   const printText=await scene.locator('.nspstory-print-frame').textContent();
+   for(const label of ['MATCHING SOURCE','RECIPIENT / INSERTION','PROPOSED / NOT OBSERVED','incorporation unresolved'])assert(printText.includes(label),`Print origin summary missing ${label}`);
+  }
   if(id==='class-signature'){
    const widths=await scene.locator('.nspstory-print-frame [data-rate]').evaluateAll(els=>els.map(e=>e.getBBox().width));
    [33.9,6.93,16.7,.2,.98,.99].forEach((v,i)=>assert(Math.abs(widths[i]-v*11.4)<.05,'Print bars keep all published values'));

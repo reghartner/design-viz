@@ -4,7 +4,8 @@
 // | row | fixture | assertion (scoped to the board) | rejects |
 // | zoomed, cards fit width: no horizontal scroll | 4 floated cards, graphFrame 800x420, + until SVG > board | board scrollWidth<=clientWidth+1 and its Scroll group hidden | scroll extent from viewBox width (main) |
 // | zoomed, cards fit height: no vertical scroll | same zoom | board scrollHeight<=clientHeight+1 | cropping width only |
-// "Drawn content" = cards ([data-dv-node]), edges ([data-dv-edge]) and edge labels (svg>text).
+// "Drawn content" = cards ([data-dv-node]), edges ([data-dv-edge]), edge labels (svg>text) and
+// arrowhead markers (a markerWidth x stroke-width box at each marked path end).
 // | all drawn content visible when it fits | same zoom | every drawn element's rect inside the board's visible area | cropping without centering; clipping edges/labels |
 // | zoomed past the content: extent is content + padding, both axes | + until content > 1.4x board width and > 1.2x visible height | scroll extent per axis < content + 20% of SVG size and < 90% of SVG size | viewBox-wide extent; cropping one axis only |
 // | all four ends reachable without clipping | Scroll arrows left/right; mouse wheel up/down | leftmost/rightmost/top/bottom drawn element inside the visible area | crop that clips content edges, labels or markers |
@@ -93,9 +94,22 @@ const zoomGeometry=board=>board.evaluate(el=>{
   const r=el.getBoundingClientRect(),d=el.offsetWidth?r.width/el.offsetWidth:1,legend=el.querySelector('.lg')?.getBoundingClientRect();
   const svgEl=el.querySelector('.boardcanvas>svg'),svg=svgEl.getBoundingClientRect(),cards=[...svgEl.querySelectorAll('[data-dv-node]')].map(n=>n.getBoundingClientRect());
   const ink=[...svgEl.querySelectorAll('[data-dv-node],[data-dv-edge],:scope>text')].map(n=>n.getBoundingClientRect()).filter(c=>c.width||c.height);
+  // Marker geometry is not part of a path's bounding box; add each arrowhead.
+  let markers=0;
+  for(const path of svgEl.querySelectorAll('path')){
+    if(path.closest('defs,marker'))continue;
+    const style=getComputedStyle(path),m=path.getScreenCTM();if(!m || !path.getTotalLength())continue;
+    for(const [prop,at] of [['markerStart',0],['markerEnd',path.getTotalLength()]]){
+      if(!style[prop] || style[prop]==='none')continue;
+      const id=style[prop].match(/#([^"')]+)/)?.[1],marker=id && svgEl.querySelector('marker#'+CSS.escape(id));if(!marker)continue;
+      const p=path.getPointAtLength(at),x=m.a*p.x+m.c*p.y+m.e,y=m.b*p.x+m.d*p.y+m.f;
+      const size=Math.max(marker.markerWidth.baseVal.value,marker.markerHeight.baseVal.value)*(parseFloat(style.strokeWidth)||1)*Math.hypot(m.a,m.b);
+      ink.push({left:x-size,right:x+size,top:y-size,bottom:y+size});markers++;
+    }
+  }
   const left=r.left+el.clientLeft*d,top=Math.max(r.top+el.clientTop*d,legend?legend.bottom:0);
   return {visible:{left,right:left+el.clientWidth*d,top,bottom:r.top+(el.clientTop+el.clientHeight)*d},
-    cw:el.clientWidth,sw:el.scrollWidth,ch:el.clientHeight,sh:el.scrollHeight,d,svgW:svg.width,svgH:svg.height,count:cards.length,inkCount:ink.length,
+    cw:el.clientWidth,sw:el.scrollWidth,ch:el.clientHeight,sh:el.scrollHeight,d,svgW:svg.width,svgH:svg.height,count:cards.length,inkCount:ink.length,markers,
     ink:ink.map(c=>({left:c.left,right:c.right,top:c.top,bottom:c.bottom})),
     union:{left:Math.min(...ink.map(c=>c.left)),right:Math.max(...ink.map(c=>c.right)),top:Math.min(...ink.map(c=>c.top)),bottom:Math.max(...ink.map(c=>c.bottom))}};
 });
@@ -111,8 +125,8 @@ for(const surface of ['standalone','workbench'])test(surface+' diagram zoom scro
   const zoomIn=board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}),pan=board.getByRole('group',{name:'Horizontal diagram scroll'});
   let g=await zoomGeometry(board);
   // The fixture must leave wide empty frame margins around its drawn content
-  // (four cards, three edges, three labels).
-  expect(g.count).toBe(4);expect(g.inkCount).toBeGreaterThanOrEqual(10);expect(g.union.right-g.union.left).toBeLessThan(g.svgW*.65);expect(g.union.bottom-g.union.top).toBeLessThan(g.svgW*420/800*.6);
+  // (four cards, three edges, three labels, three arrowheads).
+  expect(g.count).toBe(4);expect(g.markers).toBeGreaterThanOrEqual(3);expect(g.inkCount).toBeGreaterThanOrEqual(13);expect(g.union.right-g.union.left).toBeLessThan(g.svgW*.65);expect(g.union.bottom-g.union.top).toBeLessThan(g.svgW*420/800*.6);
   for(let i=0;i<12 && g.svgW<=g.cw*g.d+2;i++){await zoomIn.click();g=await zoomGeometry(board);}
   // Contrasting precondition: the SVG frame is now wider than the board while
   // the cards (plus a margin for labels and markers) still fit inside it.

@@ -291,6 +291,9 @@ PanelRegistry.define('cost', {
 .cost-tradeoff{font-size:10px;margin:9px 0 0}.cost-assumptions{margin-top:13px;font-size:10px;color:var(--dfaint)}.cost-assumptions b{color:var(--dtext)}.cost-assumptions p{margin:3px 0 0}.cost-note{font-size:11px;margin:10px 0 0}
 @container(max-width:420px){.cost-routes{column-gap:8px}.cost-route{padding:12px 3px 8px}.cost-route h4{font-size:12px}.cost-total{font-size:18px}.cost-stack,.cost-gap{left:10%;width:80%}.cost-segment{font-size:11px}.cost-gap{font-size:11px}.cost-delta{gap:8px;padding:12px}.cost-delta strong{font-size:19px}.cost-delta-icon{font-size:32px}.cost-detail-routes{grid-template-columns:1fr}}
 @media print{.docview .section-layout-tile>.pt-cost{scrollbar-gutter:auto;scrollbar-width:auto}.pt-cost{background:#fff!important;--dink:#172033;--dtext:#334155;--dfaint:#526175}.pt-cost .ptitle{color:#334155!important}.cost-routes,.cost-delta{break-inside:avoid}.cost-panel{container-type:normal}.cost-segment,.cost-node-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.cost-basis strong{font-variant-numeric:tabular-nums;letter-spacing:-.7px}.cost-route{background:color-mix(in srgb,var(--dtext) 3%,transparent);border-color:color-mix(in srgb,var(--dtext) 12%,transparent)}.cost-components li{padding:8px 0}.cost-routes{gap:10px}.cost-basis{margin-bottom:14px}
 ` + costCompactStyles('.cost-compact') +
     '/* The thin stable gutter preserves the original 520px outer breakpoint. */@container(max-width:510px){' + costCompactStyles('.cost-auto') + '}' +
     '@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}',

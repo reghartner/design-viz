@@ -899,6 +899,9 @@ PanelRegistry.define('seatmap', {
 .seatmap-zones{flex-basis:100%}
 @media (prefers-reduced-motion:reduce){.seatmap-fill,.seatmap-lbl{transition:none}.seatmap-pulse .seatmap-outline{animation:none}}
 @media print{.seatmap-fill,.seatmap-lbl{transition:none}.seatmap-pulse .seatmap-outline{animation:none}.seatmap-svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.seatmap-totals{padding:9px 0 12px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);gap:8px 20px}.seatmap-stat b{font-size:19px;letter-spacing:-.5px}.seatmap-field{fill:color-mix(in srgb,var(--dtext) 4%,transparent)}.seatmap-outline{stroke-width:3}
 `,
   authoring: {
     initialFields: true,

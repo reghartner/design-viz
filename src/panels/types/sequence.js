@@ -357,6 +357,9 @@ PanelRegistry.define('sequence', {
 .seq-cur i{position:absolute;left:50%;top:7px;transform:translateX(-50%);font:600 9.5px/1.2 'IBM Plex Mono',monospace;font-style:normal;color:var(--dink);background:color-mix(in srgb,var(--dink) 12%,transparent);border-radius:3px;padding:0 3px;white-space:nowrap}
 @media (prefers-reduced-motion: reduce){.seq-cur,.seq-letters .bio-b{transition:none}}
 @media print{.bio-b,[class*="bio-tone-"],.seq-cur i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.seq-rows{overflow:visible}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.seq-head{padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 15%,transparent)}.pt-sequence .bio-b{border-radius:3px}.pt-sequence .bio-legend{padding-top:6px;gap:7px 14px}.pt-sequence .bio-key i{height:10px}
 `,
   authoring: {
     initialFields: true,

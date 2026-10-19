@@ -838,6 +838,9 @@ PanelRegistry.define('cellscene', {
 @keyframes cellsceneParentFade{0%,55%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.cellscene-view{transition:none}.cellscene-crossing,.cellscene-appear,.cellscene-parent{animation:none}}
 @media print{.cellscene-parent{display:none}.cellscene-cell,.cellscene-nuc,.cellscene-ves,.cellscene-org{print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.cellscene-cell{fill:color-mix(in srgb,var(--dtext) 6%,transparent);stroke-width:2}.cellscene-nuc{fill:color-mix(in srgb,#7F9BD0 16%,transparent)}.cellscene-t-cap{font-weight:600}.cellscene-body{filter:drop-shadow(0 2px 3px color-mix(in srgb,var(--mf) 35%,transparent))}
 `,
   authoring: {
     initialFields: true,

@@ -160,6 +160,10 @@ PanelRegistry.extend('buffer', {
 
 PanelRegistry.extend('buffer', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-buffer .bfrow{gap:4px}.pt-buffer .bfcell{height:24px;box-shadow:inset 0 1px 0 #ffffff22}.pt-buffer .bfhead{margin-bottom:4px}.pt-buffer .bfmark{font-size:9px}
+`},
     {
       order: 959,
       css: String.raw`.bfhead{display:flex; gap:3px; height:11px;}
@@ -464,3 +468,5 @@ PanelRegistry.extend('buffer', { editorStyles: String.raw`
 .buffer-cell-control{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:5px;min-width:0;font:10px 'IBM Plex Mono',monospace;}
 .buffer-cell-control>span{text-align:right;color:var(--muted);}
 ` });
+
+PanelRegistry.extend('buffer', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 180, preferredWidth: 280, maxWidth: 600, aspectPolicy: 'content', grow: 1 }}});

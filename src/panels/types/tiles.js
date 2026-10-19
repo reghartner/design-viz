@@ -101,6 +101,10 @@ PanelRegistry.extend('tiles', {
 
 PanelRegistry.extend('tiles', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-tiles .tlgrid{grid-template-columns:repeat(auto-fit,minmax(min(105px,100%),1fr));gap:9px}.pt-tiles .tltile{padding:11px;gap:7px}.pt-tiles .tllabel{font-size:11px}.pt-tiles .tlstate{padding:3px 7px}.pt-tiles .tlsub{height:auto;min-height:12px;white-space:normal;line-height:1.4}
+`},
     {
       order: 910,
       css: String.raw`.tlgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(88px, 1fr)); gap:7px;}
@@ -275,3 +279,5 @@ PanelRegistry.extend('tiles', {
     },
   },
 });
+
+PanelRegistry.extend('tiles', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 180, preferredWidth: 300, maxWidth: 600, aspectPolicy: 'content', grow: 1 }}});

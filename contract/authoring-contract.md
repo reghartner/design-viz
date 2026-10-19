@@ -1620,7 +1620,9 @@ perspectives" of one timeline). Types:
   `initial`, step patches and `enterOnce`, and records `minVersion:"0.2.0"` with
   `media.screen-playing`, `media.screen-scene-override` (any per-state `scene`,
   including `null` or an older clip) and `media.scene-raccoon-at-night` (also
-  for Security monitoring). A 0.1.0 viewer shows an upgrade notice listing them.
+  for Security monitoring). The driveway, garage and side-gate scenes also record
+  `media.residential-clips`, with the same 0.2.0 minimum. A viewer missing these
+  capabilities shows an upgrade notice listing them.
   `unavailable` hides the scene and shows a crossed-camera symbol with
   “Camera unavailable” and the authored `reason` text. For example:
   `{"mode":"unavailable","reason":"Protective shutdown · too hot"}`.
@@ -1630,9 +1632,15 @@ perspectives" of one timeline). Types:
   a recovery event or notification. Legacy `off` still shows STANDBY.
   `active` shows the scene with plain white **ACTIVE** text, without a colored
   badge or recording dot: the camera is on, but is not livestreaming or recording.
-  Use `live` for livestreaming and `rec` for recording. Stock
-  scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
+  Use `live` for livestreaming and `rec` for recording.
+  `driveway-arrival` shows a vehicle pulling into a residential driveway;
+  `garage-opening` raises a sectional garage door; `side-gate` opens a garden
+  gate. Each is a finite one-shot event with a readable still for reduced motion
+  and print. `scenePlayback:"waiting"` holds its pre-event setting without
+  changing recording, spotlight, siren, or audio.
+  Stock scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
   `doorbell-runners`, `package-drop`, `kitchen-fire`, `raccoon-at-night`,
+  `driveway-arrival`, `garage-opening`, `side-gate`,
   `static-noise`. `rec` shows a blinking REC dot; `save` shows the banner;
   `playing` shows PLAYING. All stock scenes use full-color
   artwork under every skin; `static-noise` uses a color test pattern with

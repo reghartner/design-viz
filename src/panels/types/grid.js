@@ -308,6 +308,9 @@ PanelRegistry.define('grid', {
 .grid-ramp-diverging{background:linear-gradient(90deg,var(--grid-neg),var(--grid-mid),var(--grid-high))}
 @media (prefers-reduced-motion:reduce){.grid-cell{transition:none}}
 @media print{.grid-cell,.grid-ramp{-webkit-print-color-adjust:exact;print-color-adjust:exact}.grid-wrap{max-height:none;overflow:visible}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.grid-table{border-spacing:4px}.grid-cell{padding:9px 5px;border-radius:6px}.grid-table th{color:var(--dtext);padding:6px 4px}.grid-key{gap:8px;margin-top:10px;flex-wrap:wrap}.grid-wrap{scrollbar-width:thin}
 `,
   authoring: {
     initialFields: true,

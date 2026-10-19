@@ -447,3 +447,23 @@ test('Standard chapters remain usable before and after canvas step controls acti
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
  await expect(page.locator('#src')).toHaveValue(original);
 });
+
+test('panel minimum widths fit undersized saved canvas objects without editing the document',async({page,server})=>{
+ const raw=fixture(),saved=raw.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels;
+ saved.find(p=>p.panel==='clip').w=96;
+ const d=raw.page.sections[0].diagram;d.panels.push({id:'draw',type:'gauge',title:'Power draw',unit:'mA',max:400,initial:{value:248}});
+ d.layouts[1].sectionLayout.default.push({panel:'draw',x:0,y:52,w:4,h:8});saved.push({panel:'draw',x:900,y:600,w:300,h:900});
+ await open(page,server,raw,'workbench');
+ const before=await source(page);expect(JSON.parse(before).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip').w).toBe(96);
+ await fit(page,'workbench');
+ const minimumWidth=await clip(page).evaluate(el=>{const svg=el.closest('.explore-stage').querySelector('.boardcanvas>svg'),scale=svg.getBoundingClientRect().width/svg.viewBox.baseVal.width;return el.getBoundingClientRect().width/scale;});
+ expect(minimumWidth).toBeGreaterThanOrEqual(239);
+ expect(await source(page)).toBe(before);
+ const gauge=page.locator('[data-explore-panel=draw]');expect((await compactMetrics(gauge)).gap).toBeLessThanOrEqual(2);
+ expect(await gauge.locator('.pwidget').evaluate(el=>el.scrollHeight)).toBeLessThan(200);
+ expect(JSON.parse(before).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='draw').h).toBe(900);
+ await selectCanvas(clip(page));await clip(page).locator('.explore-window-resize').press('ArrowRight');
+ const edited=JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip');
+ expect(edited.w).toBeGreaterThanOrEqual(240);
+ expect(await source(page)).not.toBe(before);
+});

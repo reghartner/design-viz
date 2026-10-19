@@ -150,6 +150,10 @@ PanelRegistry.extend('signal', {
 
 PanelRegistry.extend('signal', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-signal .sgrows{gap:0}.pt-signal .sgrow{padding:10px 0;border-bottom:1px solid color-mix(in srgb,var(--dtext) 12%,transparent);flex-wrap:wrap;row-gap:6px}.pt-signal .sgrow:last-child{border-bottom:0}.pt-signal .sgbars{gap:3px}.pt-signal .sglabel{flex:1;min-width:50px}.pt-signal .sgtag{min-width:42px;font-size:9px}
+`},
     {
       order: 925,
       css: String.raw`.sgrows{display:flex; flex-direction:column; gap:7px;}
@@ -447,4 +451,4 @@ PanelRegistry.extend('signal', {
   },
 });
 
-PanelRegistry.extend('signal', {layout: {sectionSizing: { minWidth: 190, preferredWidth: 240, maxWidth: 450, aspectPolicy: 'content', grow: 1 }}});
+PanelRegistry.extend('signal', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 190, preferredWidth: 240, maxWidth: 450, aspectPolicy: 'content', grow: 1 }}});

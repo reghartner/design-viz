@@ -241,7 +241,7 @@
   PanelRegistry.define('data-contract', {
     label:'Data contract', since:'0.1.0', order:23.5,
     itemCollection:{key:'fields',max:MAX_FIELDS},
-    layout:{large:true,height:12,supporting:false,attachControls:true},
+    layout:{sectionSizing: { minWidth: 300, preferredWidth: 540, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },large:true,height:12,supporting:false,attachControls:true},
     validateDeclaration:function (panel, path, warnings, errors, diagram) {
       if (panel.fieldWidth != null && width(panel.fieldWidth, null) === null) warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using 180');
       if (Array.isArray(panel.columns) && !panel.columns.length) { /* A field-only contract is valid. */ }
@@ -318,7 +318,10 @@
 .dcontract-reason{display:block;margin-top:5px;font:500 10px/1.4 'IBM Plex Sans',sans-serif;}
 .dcontract-missing,.dcontract-empty{color:var(--dfaint);}
 .dcontract-caption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
-@media print{.dcontract-scroll{max-height:none;overflow:visible}.dcontract-highlight>*{print-color-adjust:exact}}`,
+@media print{.dcontract-scroll{max-height:none;overflow:visible}.dcontract-highlight>*{print-color-adjust:exact}}
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.dcontract-table thead th{color:var(--dtext);background:color-mix(in srgb,var(--dtext) 7%,transparent)}.dcontract-table tbody tr:not(.dcontract-highlight):nth-child(even){background:color-mix(in srgb,var(--dtext) 3%,transparent)}.dcontract-reason{padding-top:4px;line-height:1.5}.dcontract-scroll{border-radius:10px;scrollbar-width:thin}
+`,
     editorStyles:'.dcontract-highlights{display:grid;gap:8px;}.dcontract-color-controls{display:flex;gap:6px;min-width:0;}.dcontract-color-controls input[type=color]{flex:none;width:38px;padding:3px;}'
   });
 })();

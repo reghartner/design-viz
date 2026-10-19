@@ -7,6 +7,9 @@ var SCENE_NAMES = [
   'package-drop',
   'kitchen-fire',
   'raccoon-at-night',
+  'driveway-arrival',
+  'garage-opening',
+  'side-gate',
   'static-noise',
 ];
 /* `playing` is recorded-clip playback (a PLAYING chip). It is unrelated to
@@ -106,6 +109,8 @@ function porchSceneBackdrop(night) {
     '<path d="M0 164H320M53 150L38 180M273 150L289 180" stroke="' +
     (night ? '#7D8593' : '#E6CBA3') +
     '" opacity=".6"/>' +
+    '<path d="M0 29H320V38H0Z" fill="#142C3A" opacity=".18"/><path d="M0 29L18 38V150H0ZM320 29L307 38V150H320Z" fill="#142C3A" opacity=".12"/>' +
+    '<path d="M22 109H94L108 150H21Z" fill="#142C3A" opacity=".10"/><path d="M111 29H209V155H111" fill="#142C3A" opacity=".16"/>' +
     '<rect x="25" y="52" width="64" height="53" rx="2" fill="' +
     (night ? '#E9AB60' : '#6BB9DA') +
     '" stroke="#E9D8BC" stroke-width="3"/>' +
@@ -119,6 +124,8 @@ function porchSceneBackdrop(night) {
     (night ? '#36959C' : '#40ACAA') +
     '" stroke="#72C6BA"/>' +
     '<circle cx="188" cy="94" r="3" fill="#FFD07B"/>' +
+    '<path d="M131 43H189V48H131Z" fill="#D3F2DD" opacity=".18"/><path d="M127 140H193" stroke="#163D4E" opacity=".35"/>' +
+    '<rect x="240" y="73" width="22" height="10" rx="2" fill="#263F4B"/><path d="M246 76V80M250 76H254L250 80H254" fill="none" stroke="#E8DFC8" stroke-width="1"/>' +
     '<path d="M121 157H201L208 170H114Z" fill="#65544B"/>' +
     (night
       ? '<path d="M224 61L192 150H260Z" fill="#FFD384" opacity=".12"/><ellipse cx="225" cy="152" rx="42" ry="6" fill="#FFCC80" opacity=".13"/>'
@@ -180,6 +187,14 @@ function doorbellRunScene(pair) {
     '<path d="M42 134L38 93M43 112L54 101" fill="none" stroke="#8C7755" stroke-width="4"/>' +
     '<g fill="#408A5A"><ellipse cx="36" cy="88" rx="20" ry="16"/><ellipse cx="52" cy="98" rx="17" ry="13"/>' +
     '<ellipse cx="279" cy="117" rx="25" ry="14"/><ellipse cx="290" cy="104" rx="20" ry="16"/></g>' +
+    '<path d="M20 111Q51 105 77 119L128 147L87 151Z" fill="#294E48" opacity=".16"/>' +
+    '<path d="M270 128L238 138L277 158L302 150Z" fill="#294E48" opacity=".15"/>' +
+    '<path d="M104 147L151 98M219 147L186 98" stroke="#F6E6C7" stroke-width="3"/>' +
+    '<path d="M24 65V86M34 64V84M44 63V82M283 63V83M293 64V85" stroke="#D0D3B2" stroke-width="2"/>' +
+    '<path d="M22 70L48 68M280 68L297 71" stroke="#D0D3B2" stroke-width="2"/>' +
+    '<path d="M70 139H90L87 154H74Z" fill="#9A7257"/><path d="M78 139V127M82 139V123" stroke="#55805C" stroke-width="2"/>' +
+    '<g fill="#C7B6D1"><circle cx="78" cy="127" r="3"/><circle cx="83" cy="123" r="3"/></g>' +
+    '<path d="M49 61H119M211 63H276" stroke="#273F57" stroke-width="2" opacity=".35"/>' +
     runner(false) +
     (pair ? runner(true) : '') +
     /* Door-frame edges and bowed porch roof suggest the wide doorbell lens. */
@@ -199,6 +214,11 @@ function raccoonNightScene() {
   return (
     '<svg viewBox="0 0 320 180" class="scene scene-raccoon" aria-hidden="true">' +
     porchSceneBackdrop(true) +
+    '<path d="M29 106H88L119 151H20Z" fill="#FFD99D" opacity=".08"/>' +
+    '<path d="M19 149H42L39 166H22Z" fill="#3E5968" stroke="#819C9F" stroke-width="1"/>' +
+    '<path d="M20 153Q9 150 13 142Q17 138 23 143M42 151L51 145L53 147L43 159" fill="none" stroke="#819C9F" stroke-width="2"/>' +
+    '<path d="M74 153V146H82V160H70Q65 160 67 155ZM85 151V144H93V158H81Q78 157 80 153Z" fill="#8A866A" stroke="#B0AA84" stroke-width=".7"/>' +
+    '<path d="M115 161H204M118 164H206M123 167H209" stroke="#B1A08A" stroke-width=".7" opacity=".45"/>' +
     '<g class="raccoon"><ellipse cx="0" cy="1" rx="27" ry="3.5" fill="#0D1729" opacity=".4"/>' +
     '<g stroke-linecap="round"><path class="raccoon-leg raccoon-leg-back" d="M-12-7V0M15-7V0" stroke="#1E2128" stroke-width="5"/>' +
     '<g class="raccoon-tail" fill="none" stroke-width="9"><path d="' + tail + '" stroke="#A2A6AF"/>' +
@@ -218,6 +238,9 @@ function raccoonNightScene() {
   );
 }
 var SCENE_LABELS = {
+  'driveway-arrival': 'Vehicle arrives in driveway',
+  'garage-opening': 'Garage door opens',
+  'side-gate': 'Side gate opens',
   'person-at-door-night': 'Visitor at night',
   'person-through-door': 'Person walking through a door',
   'doorbell-run-away': 'Doorbell: person running away',
@@ -227,7 +250,67 @@ var SCENE_LABELS = {
   'raccoon-at-night': 'Raccoon on the porch at night',
   'static-noise': 'Static noise',
 };
+/* Architectural stock clips use local SVG coordinates and no resource IDs.
+   Their still poses remain legible in previews, print and reduced motion. */
+function drivewayScene(garage) {
+  return '<svg viewBox="0 0 320 180" class="scene scene-driveway" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#D7E7EC"/>' +
+    '<path d="M0 32Q30 10 60 34T135 28T210 30T320 20V96H0Z" fill="#9DB7AE"/>' +
+    '<path d="M0 55Q30 35 65 55T130 53T210 50T320 45V110H0Z" fill="#6D9384"/>' +
+    '<path d="M0 118L100 95H270L320 126V180H0Z" fill="#A9B5B7"/>' +
+    '<path d="M0 157L113 105M178 103L213 180M280 103L320 142M42 139H307" stroke="#CFD7D5" stroke-width="1.2"/>' +
+    '<path d="M64 46L176 13L295 47V110H64Z" fill="#E4DCC9"/>' +
+    '<path d="M51 47L176 9L308 46L301 55L176 20L58 56Z" fill="#475C64"/>' +
+    '<path d="M72 56H286V112H72Z" fill="#D0C7B3"/>' +
+    '<path d="M72 64H286M72 76H286M72 88H286M72 100H286" stroke="#B8AF9F" stroke-width=".7"/>' +
+    '<rect x="112" y="52" width="135" height="62" rx="2" fill="#F5F0DE"/>' +
+    '<rect x="117" y="57" width="125" height="56" fill="#283D43"/>' +
+    '<path d="M118 58H241V68H130V113H118Z" fill="#172C34"/>' +
+    '<rect x="213" y="76" width="20" height="32" fill="#627D7A"/><path d="M216 83H230M216 96H230" stroke="#8FA19A"/>' +
+    '<path d="M134 107L151 89L171 107M140 107H168" fill="none" stroke="#B99871" stroke-width="3"/>' +
+    '<g class="garage-shutter' + (garage ? ' garage-moving' : '') + '"><path d="M117 57H242V113H117Z" fill="#819698"/>' +
+    '<path d="M117 65H242M117 76H242M117 87H242M117 98H242M117 109H242" stroke="#B3C3C1" stroke-width="1.5"/>' +
+    '<path d="M124 60H145V70H124ZM151 60H172V70H151ZM178 60H199V70H178ZM205 60H235V70H205Z" fill="#3B565E"/>' +
+    '<path d="M172 104H187" stroke="#3D5358" stroke-width="2"/></g>' +
+    '<path d="M113 52H247V115H112" fill="none" stroke="#F0EAD8" stroke-width="4"/>' +
+    '<path d="M115 116H245L252 122H108Z" fill="#7E8F8F"/>' +
+    '<rect x="87" y="65" width="9" height="20" rx="2" fill="#3A515A"/><path d="M90 69V80" stroke="#FFE3A3" stroke-width="3"/>' +
+    '<rect x="261" y="65" width="9" height="20" rx="2" fill="#3A515A"/><path d="M264 69V80" stroke="#FFE3A3" stroke-width="3"/>' +
+    '<path d="M0 126L58 108L91 113L25 156H0Z" fill="#70927C"/><path d="M277 119L320 130V180L296 153Z" fill="#78967B"/>' +
+    '<g fill="#567B67"><ellipse cx="28" cy="112" rx="21" ry="13"/><ellipse cx="49" cy="109" rx="15" ry="17"/><ellipse cx="309" cy="118" rx="17" ry="11"/></g>' +
+    (garage ? '<rect x="260" y="94" width="7" height="12" rx="2" fill="#364F57"/><circle class="garage-sensor" cx="263.5" cy="98" r="1.5" fill="#99E6CC"/>' :
+    '<g class="driveway-car"><ellipse cx="161" cy="150" rx="60" ry="8" fill="#344D56" opacity=".22"/>' +
+    '<path d="M104 133L116 122L128 102Q158 96 186 103L204 122L213 132V146H104Z" fill="#3F7185"/>' +
+    '<path d="M132 105Q157 101 181 106L193 122H120Z" fill="#B7D4D6"/><path d="M156 104V121" stroke="#3F7185" stroke-width="3"/>' +
+    '<path d="M105 132Q157 122 212 132L209 143H108Z" fill="#6795A0"/>' +
+    '<path d="M112 133H131L133 138H112ZM184 133H204V138H183Z" fill="#FFF0C3"/>' +
+    '<path d="M140 136H177V143H140Z" fill="#2B4855"/><path d="M150 140H168V145H150Z" fill="#E1E9E3"/>' +
+    '<path d="M109 142V151H121V145M194 144V151H206V142" stroke="#263D47" stroke-width="5" stroke-linejoin="round"/>' +
+    '<path d="M107 123L101 125M208 123L215 125" stroke="#3F7185" stroke-width="4" stroke-linecap="round"/></g>') +
+    '<path d="M0 174Q60 162 111 180H0Z" fill="#526E60" opacity=".65"/></svg>';
+}
+function sideGateScene() {
+  return '<svg viewBox="0 0 320 180" class="scene scene-gate" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#C8DEE4"/><path d="M0 26Q39 8 78 31T167 24T260 27T320 20V116H0Z" fill="#789A89"/>' +
+    '<path d="M0 120H320V180H0Z" fill="#8FA68A"/><path d="M117 118H199L236 180H78Z" fill="#D4C9B4"/>' +
+    '<path d="M109 134H210M96 157H222M153 120L149 180" stroke="#B5AA94" stroke-width="1.2"/>' +
+    '<path d="M0 54L24 42V143H0ZM25 42L48 52V139H25ZM49 52L72 43V136H49ZM73 43L96 53V133H73ZM220 53L244 43V134H220ZM245 43L268 52V139H245ZM269 52L292 42V142H269ZM293 42L320 53V145H293Z" fill="#A8987A" stroke="#D4C3A2"/>' +
+    '<path d="M0 74H105M215 74H320M0 119H105M215 119H320" stroke="#7A806C" stroke-width="5"/>' +
+    '<path d="M104 43V137M216 43V137" stroke="#E1D4B9" stroke-width="9"/>' +
+    '<g class="side-gate-leaf"><path d="M109 54Q160 41 211 54V132H109Z" fill="#718A81" stroke="#486A65" stroke-width="2"/>' +
+    '<path d="M121 54V131M137 51V131M153 49V131M169 49V131M185 51V131M201 54V131" stroke="#A3B3A1" stroke-width="2"/>' +
+    '<path d="M113 62L206 122M113 122L206 62" stroke="#486A65" stroke-width="5"/><path d="M197 91V103" stroke="#E4D8B7" stroke-width="3"/></g>' +
+    '<rect x="101" y="80" width="8" height="17" rx="2" fill="#E7EBDF"/><rect x="110" y="82" width="5" height="12" rx="1" fill="#E7EBDF"/>' +
+    '<g fill="#527B67"><ellipse cx="27" cy="143" rx="30" ry="15"/><ellipse cx="284" cy="148" rx="31" ry="18"/></g>' +
+    '<g fill="#90AC85"><ellipse cx="8" cy="131" rx="17" ry="10"/><ellipse cx="303" cy="134" rx="18" ry="11"/></g>' +
+    '<path d="M45 149L52 126M48 140L39 133M272 157L267 134" stroke="#A9BC8C" stroke-width="3"/>' +
+    '<ellipse cx="159" cy="169" rx="60" ry="5" fill="#82907D" opacity=".15"/></svg>';
+}
+
 var SCENES = {
+  'driveway-arrival': drivewayScene(false),
+  'garage-opening': drivewayScene(true),
+  'side-gate': sideGateScene(),
   'doorbell-run-away': doorbellRunScene(false),
   'doorbell-runners': doorbellRunScene(true),
   'raccoon-at-night': raccoonNightScene(),
@@ -273,6 +356,9 @@ var SCENES = {
     '<rect width="320" height="180" fill="#E7BEA6"/>' +
     '<path d="M0 150H320V180H0Z" fill="#BE9A77"/>' +
     '<path d="M0 160H320M0 177H320M64 150L40 180M140 150L132 180M230 150L242 180" stroke="#E4CFAB" stroke-opacity=".35"/>' +
+    '<path d="M0 8H320V17H0Z" fill="#C8A48C"/><path d="M0 17H320V22H0Z" fill="#F5DBC0"/>' +
+    '<path d="M0 42H320M0 68H320M0 94H320M0 120H320" stroke="#B28D79" stroke-width=".7" opacity=".4"/>' +
+    '<path d="M24 110H107L134 150H16Z" fill="#8D8171" opacity=".16"/><path d="M162 22H262V155H162Z" fill="#9A8269" opacity=".3"/>' +
     '<rect x="28" y="40" width="74" height="66" rx="3" fill="#77BBDD" stroke="#F4DDC0" stroke-width="3"/>' +
     '<path d="M65 40V106M28 73H102" stroke="#EEDBC0" stroke-width="3"/>' +
     '<path d="M34 47H58L34 69ZM72 80H95L72 100Z" fill="#E0F9FF" opacity=".14"/>' +
@@ -284,6 +370,8 @@ var SCENES = {
     '<path class="entry-light" d="M174 152H250L282 180H139Z" fill="#FFDB9E" opacity=".22"/>' +
     '<rect x="270" y="58" width="9" height="23" rx="4" fill="#F3E8D5"/>' +
     '<circle cx="274.5" cy="65" r="2" fill="#31A99F"/>' +
+    '<rect x="118" y="77" width="29" height="24" rx="3" fill="#556D72"/><path d="M122 82H143M125 95H139" stroke="#A6BBB6" stroke-width="1.5"/>' +
+    '<path d="M172 152H253L263 161H164Z" fill="#A58B6F"/><path d="M166 161H262" stroke="#ECD9B5" stroke-width="1.5"/>' +
     '<ellipse cx="294" cy="152" rx="16" ry="4" fill="#10282E"/>' +
     '<path d="M286 137H303L300 153H289Z" fill="#D57D54"/>' +
     '<path d="M294 140V111M294 126Q275 127 282 114Q294 113 294 126M294 119Q306 120 310 105Q296 103 294 119" fill="#4C9B60" stroke="#77C87A" stroke-width="2"/>' +
@@ -313,6 +401,13 @@ var SCENES = {
     '<rect x="23" y="33" width="84" height="62" rx="2" fill="#6FBCDF" stroke="#FFF0D4" stroke-width="3"/>' +
     '<path d="M65 33V95M23 63H107" stroke="#F7E8CD" stroke-width="3"/>' +
     '<path d="M30 41H57L30 58ZM72 70H99L72 88Z" fill="#E4F9FF" opacity=".15"/>' +
+    '<path d="M112 67H308V104H112Z" fill="#E4DBC8"/>' +
+    '<path d="M112 78H308M112 91H308M130 67V78M160 67V78M190 67V78M220 67V78M250 67V78M280 67V78M145 78V91M175 78V91M205 78V91M235 78V91M265 78V91M295 78V91M130 91V104M160 91V104M190 91V104M220 91V104M250 91V104M280 91V104" stroke="#C4C4B8" stroke-width=".7"/>' +
+    '<rect x="120" y="31" width="64" height="36" rx="2" fill="#DED3BB" stroke="#B5AA94"/>' +
+    '<path d="M152 32V66M146 46V54M158 46V54" stroke="#9D9D8D" stroke-width="1.5"/>' +
+    '<path d="M217 15H252V39L271 57H199L217 39Z" fill="#8D9C9C"/><path d="M199 57H271V63H199Z" fill="#50656B"/>' +
+    '<path d="M218 16V38L206 54" stroke="#BDC9C3" stroke-width="2" fill="none"/>' +
+    '<path d="M45 103H59L57 91H47Z" fill="#AE7758"/><path d="M51 92V77M52 87Q40 85 43 79Q52 79 52 87M53 83Q63 81 61 74Q53 76 53 83" fill="#659069" stroke="#659069" stroke-width="1.5"/>' +
     '<rect x="16" y="110" width="292" height="40" rx="2" fill="#287A91"/>' +
     '<path d="M24 116H87V144H24ZM96 116H163V144H96ZM172 117H197V144H172Z" fill="#429BB0" stroke="#78C7CE"/>' +
     '<path d="M74 122H79M150 122H155M185 122H190" stroke="#E6C27A" stroke-width="2" stroke-linecap="round"/>' +
@@ -498,6 +593,24 @@ PanelRegistry.extend('screen', {
 
 PanelRegistry.extend('screen', {
   styles: [
+    {order:2301,css:String.raw`.garage-moving{transform-box:fill-box;transform-origin:top;transform:scaleY(.2)}
+.side-gate-leaf{transform-origin:109px 54px;transform:skewY(-8deg) scaleX(.35)}
+.driveway-car{transform-origin:160px 145px}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .garage-moving{animation:garageopen 5s ease-in-out forwards}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .driveway-car{animation:drivewayarrive 5.5s ease-out forwards}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .side-gate-leaf{animation:sidegateopen 5s ease-in-out forwards}
+@keyframes garageopen{0%,15%{transform:scaleY(1)}85%,100%{transform:scaleY(.2)}}
+@keyframes drivewayarrive{0%{transform:translate(105px,56px) scale(1.45)}100%{transform:none}}
+@keyframes sidegateopen{0%,15%{transform:none}80%,100%{transform:skewY(-8deg) scaleX(.35)}}
+.screenbox.scene-waiting .driveway-car{visibility:hidden}
+.screenbox.scene-waiting .garage-moving,.screenbox.scene-waiting .side-gate-leaf{transform:none}
+@media(prefers-reduced-motion:reduce){.screenbox .scene *{animation:none!important}}
+@media print{.screenbox .scene *{animation:none!important}.screenbox{box-shadow:none;print-color-adjust:exact}}
+`},
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.screenbox{border-radius:12px;box-shadow:0 2px 7px #00000018}.screenbox .scene{filter:saturate(.82)}.screenbox .activechip,.screenbox .recchip,.screenbox .playchip{border-radius:5px;letter-spacing:.08em}.screen-effects{gap:5px}.screen-effects>span{padding:4px 7px}.screenbox .scene-entry,.screenbox .scene-fire{filter:saturate(.78) contrast(1.03)}
+`},
     {
       order: 490,
       css: String.raw`.screen-devices{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}

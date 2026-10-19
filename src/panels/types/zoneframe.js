@@ -60,6 +60,12 @@ PanelViews.register('zoneframe', function (host, panel, state, skin, states, ste
     '<rect width="320" height="180" fill="#0A0F14"/><rect y="150" width="320" height="30" fill="#131A21"/>';
   h +=
     '<rect x="118" y="28" width="84" height="124" rx="3" fill="#10161D" stroke="#26313C" stroke-width="2"/>';
+  h += '<g class="zarchitecture" fill="none" stroke="currentColor" stroke-width="1">' +
+    '<path d="M0 42H320M0 66H320M0 90H320M0 114H320M0 138H320" opacity=".3"/>' +
+    '<path d="M24 48H89V103H24ZM56 48V103M24 76H89M126 37H194V80H126ZM126 106H194V143H126Z"/>' +
+    '<path d="M116 155H205L216 172H105ZM0 164H320M46 150L28 180M275 150L292 180" opacity=".6"/>' +
+    '<path d="M224 49H234V69H224ZM287 136H307L303 153H291ZM296 136V109M296 124Q281 120 287 113M296 118Q311 115 306 106"/>' +
+    '<circle cx="188" cy="95" r="2"/></g>';
   zm.forEach(function (z) {
     var pts = z.points
       .map(function (p) {
@@ -109,13 +115,17 @@ PanelRegistry.extend('zoneframe', {
   order: 8,
   label: 'Zone frame',
   since: '0.1.0',
-  layout: {
+  layout: {sectionSizing: { minWidth: 240, preferredWidth: 340, maxWidth: 600, aspectPolicy: 'fixed', grow: 0, bodyAspect: 320 / 180, contentSelector: '.zframe' },
     canvasSizing: { mode: 'fixed-aspect', aspect: 320 / 180, resizeAxis: 'width' },
   },
 });
 
 PanelRegistry.extend('zoneframe', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.zarchitecture{color:#91A6C1;opacity:.25}.pt-zoneframe .zfbox{border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent);border-radius:12px}.pt-zoneframe .zlbl{font-size:10px;paint-order:stroke;stroke:#10202f;stroke-width:2px;stroke-linejoin:round;fill:#e3edf6}.pt-zoneframe .zone{stroke-linejoin:round}.pt-zoneframe .zsubject{filter:drop-shadow(0 1px 2px #0006)}
+`},
     {
       order: 633,
       css: String.raw`.zfbox{border-radius:8px; overflow:hidden;}

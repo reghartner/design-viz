@@ -211,6 +211,9 @@ PanelRegistry.define('frames', {
 .frm-key{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:10.5px}
 @media (prefers-reduced-motion: reduce){.frm-codon{transition:none}}
 @media print{.frm-scroll{overflow:visible}.frm-codon{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.frm-head{padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 15%,transparent)}.frm-grid{row-gap:6px}.frm-gutter{color:var(--dtext)}.frm-scroll{scrollbar-width:thin}
 `,
   authoring: {
     initialFields: true,

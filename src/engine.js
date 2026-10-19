@@ -2803,7 +2803,11 @@ function createBoardSizeControl(board, legend, label){
     var scrollable = board.scrollWidth > board.clientWidth + 1;
     if (scrollable && !wasScrollable && !board.classList.contains('explore-board')) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
-    pan.hidden = !scrollable; syncPan();
+    // The Scroll row changes the legend height, which zoom framing measures.
+    var panChanged = pan.hidden === scrollable;
+    pan.hidden = !scrollable;
+    if (panChanged && navigation) navigation.frame();
+    syncPan();
     wasScrollable = scrollable;
     if(navigation)navigation.refresh();
   }

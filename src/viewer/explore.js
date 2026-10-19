@@ -342,8 +342,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     stage.style.height=(workbenchCanvas || readerCanvas)?window.innerHeight+'px':Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
   }
   function minimum(w){
-    /* Portrait screens can become much narrower than charts and maps. */
-    return w===playerWindow?(workbenchCanvas && bounds().w<1000?240:300):w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
+    if(w===playerWindow)return workbenchCanvas && bounds().w<1000?240:300;
+    if(w.prose)return 220;
+    /* The panel owns its readable native width. This constrains presentation
+       and resize gestures; merely opening a saved view never writes geometry. */
+    var sizing=panelCapability(w.panel.type,'sectionSizing',null),width=sizing && sizing.minWidth;
+    return Number.isFinite(width) && width>0?width:128;
   }
   function savedOverlayGeometry(layout){
     return !!(layout && (layout.controls && layout.controls.w || layout.prose && layout.prose.w || layout.panels && layout.panels.length));

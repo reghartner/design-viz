@@ -314,6 +314,10 @@ PanelRegistry.extend('inflight', {
 
 PanelRegistry.extend('inflight', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-inflight .ifrow{min-height:32px}.pt-inflight .ifaxis{margin-bottom:7px}.pt-inflight .iflabel{font-size:10px}.pt-inflight .iftrack{height:24px;background:color-mix(in srgb,var(--dtext) 5%,transparent)}.pt-inflight .ifbar{top:4px;height:16px;line-height:16px;font-size:9px}
+`},
     {
       order: 345,
       css: String.raw`.ifbox{font:500 9.5px 'IBM Plex Mono',monospace;}
@@ -454,3 +458,5 @@ PanelRegistry.extend('inflight', {
     },
   },
 });
+
+PanelRegistry.extend('inflight', {layout: {sectionSizing: { minWidth: 260, preferredWidth: 400, maxWidth: 800, aspectPolicy: 'content', grow: 1 }}});

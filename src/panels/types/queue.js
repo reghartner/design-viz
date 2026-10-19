@@ -115,6 +115,10 @@ PanelRegistry.extend('queue', {
 
 PanelRegistry.extend('queue', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-queue .qslot{min-height:46px;background:color-mix(in srgb,var(--dtext) 3%,transparent)}.pt-queue .qmsg{padding:7px 11px;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}.pt-queue .qempty{opacity:.7}.pt-queue .qarr{opacity:.6}
+`},
     {
       order: 1019,
       css: String.raw`.qtrack{display:flex; align-items:center; gap:8px;}

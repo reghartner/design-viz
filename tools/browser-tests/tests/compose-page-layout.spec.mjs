@@ -68,11 +68,11 @@ for(const width of [800,1200,1440,1920])test('native fit at explicit isolated ho
   const camera=o.panels.find(p=>p.id==='camera');expect(camera.overflowY,'camera '+JSON.stringify(state)).toBeLessThanOrEqual(4);
   expect(camera.nestedOverflow).toHaveLength(0);
   expect(o.panels.find(p=>p.id==='app').nativeContent.width).toBeCloseTo(330,0);
-  const phone=o.panels.find(p=>p.id==='phone');expect(phone.nativeContent.width).toBeCloseTo(178,0);
+  const phone=o.panels.find(p=>p.id==='phone');expect(phone.nativeContent.width).toBeCloseTo(220,0);
   expect(phone.nestedOverflow.some(p=>p.class==='phonetext')).toBe(true);
  }
  const limits=result.diagnostics[0].panels.find(p=>p.id==='phone').nativeLimits;
- expect(limits.contentWidth).toBe(178);expect(limits.notificationTextLines).toBe(2);
+ expect(limits.contentWidth).toBe(220);expect(limits.notificationTextLines).toBe(2);
  expect(result.diagnostics[0].panels.find(p=>p.id==='app').nativeLimits.maxContentWidth).toBe(330);
  // Check footer and prose text rectangles themselves, including clipping by
  // ancestors, not merely the outer widget's scrollHeight.
@@ -164,7 +164,7 @@ for(const width of [800,1200,1440,1920])test('composition retains native device-
  expect(estimate.estimatedLogicalWidth).toBe(330);
  for(const actual of observations){
   expect(actual.cards).toBe(4);expect(actual.logicalWidth).toBeGreaterThanOrEqual(330*.99);expect(actual.logicalWidth).toBeLessThanOrEqual(330.5); // Full document has 110px inset; estimator models 80px.
-  expect(actual.legacyPhoneWidth/actual.hostScale).toBeCloseTo(178,0);
+  expect(actual.legacyPhoneWidth/actual.hostScale).toBeCloseTo(220,0);
   expect(actual.metadataFontPx/actual.hostScale).toBeCloseTo(9,1);expect(actual.detailFontPx/actual.hostScale).toBeCloseTo(11,1);
   expect(actual.screenOverflow).toBeGreaterThan(0); // No claim that width removes native scrolling.
   if(width>=1200){expect(Math.abs(actual.frameWidth-estimate.estimatedRenderedWidth)).toBeLessThan(2);expect(actual.metadataFontPx).toBeCloseTo(estimate.estimatedFontPx.metadata,1);}

@@ -257,6 +257,10 @@ PanelRegistry.extend('replicas', {
 
 PanelRegistry.extend('replicas', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.rep-reference{padding:11px 12px;background:color-mix(in srgb,var(--dtext) 5%,transparent);border-color:color-mix(in srgb,var(--dtext) 20%,transparent);border-radius:9px}.rep-head{flex-wrap:wrap}.rep-row{padding:8px 4px}.rep-value{font-size:13px}.rep-track{margin-top:9px;margin-bottom:9px}
+`},
     {
       order: 239,
       css: String.raw`.replicas-view{color:var(--dtext);font:11px/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;}
@@ -344,3 +348,5 @@ PanelRegistry.extend('replicas', {
     },
   },
 });
+
+PanelRegistry.extend('replicas', {layout: {sectionSizing: {minWidth:280,preferredWidth:360,maxWidth:700,aspectPolicy:'content',grow:1}}});

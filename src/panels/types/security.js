@@ -286,6 +286,9 @@
 .sk-terminal .secmon-hero,.sk-terminal .secmon-assessment,.sk-terminal .secmon-metrics,.sk-blueprint .secmon-hero,.sk-blueprint .secmon-assessment,.sk-blueprint .secmon-metrics{border-radius:3px;}
 @media(prefers-reduced-motion:reduce){.secmon *{animation:none!important;transition:none!important;}}
 @media print{.secmon{--secmon-accent:#333!important;--secmon-good:#333!important;--secmon-warn:#333!important;--secmon-bad:#333!important;color:#222;}.secmon *{animation:none!important;transition:none!important;box-shadow:none!important;}.secmon-hero,.secmon-assessment{background:#fff;border:1px solid #999;}.secmon-stage{print-color-adjust:exact;break-inside:avoid;}.secmon-sensor{break-inside:avoid;}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.secmon-hero{border-radius:12px}.secmon-stage{border-radius:12px}.secmon-workstation{aspect-ratio:1.7}.secmon-monitor{left:22%;width:75%;top:6%}.secmon-stage-top{padding-bottom:7px}.secmon-sensor{background:color-mix(in srgb,var(--dtext) 3%,transparent)}
 `
   });
 })();

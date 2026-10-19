@@ -254,6 +254,9 @@ PanelRegistry.define('funnel', {
 .funnel-foot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);font-size:10px;color:var(--dfaint)}
 @media (prefers-reduced-motion:reduce){.funnel-active .funnel-track{animation:none}.funnel-bar{transition:none}.funnel-bar.dv-bar-enter{animation:none}}
 @media print{.funnel-track,.funnel-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}.funnel-active .funnel-track{animation:none}}
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.funnel-label{font-weight:600}.funnel-row{padding-top:5px;padding-bottom:5px}.funnel-bar{border-radius:5px}.funnel-count{font-variant-numeric:tabular-nums}.funnel-panel{line-height:1.5}
 `,
   authoring: {
     initialFields: true,

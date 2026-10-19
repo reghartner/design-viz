@@ -353,6 +353,10 @@ PanelRegistry.extend('thermo', {
 
 PanelRegistry.extend('thermo', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-thermo .thval{font-size:26px;letter-spacing:-1px;font-variant-numeric:tabular-nums}.pt-thermo .thhead{margin-bottom:12px}.pt-thermo .thzone{letter-spacing:.03em;border-radius:99px}
+`},
     {
       order: 686,
       css: String.raw`.thhead{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px;}
@@ -577,3 +581,5 @@ PanelRegistry.extend('thermo', {
     },
   },
 });
+
+PanelRegistry.extend('thermo', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 190, preferredWidth: 280, maxWidth: 500, aspectPolicy: 'content', grow: 1 }}});

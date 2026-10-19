@@ -275,6 +275,10 @@ PanelRegistry.extend('battery', {
 
 PanelRegistry.extend('battery', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-battery .btval{font-size:26px;letter-spacing:-1px;font-variant-numeric:tabular-nums}.pt-battery .bthead{flex-wrap:wrap;gap:6px;margin-bottom:12px}.pt-battery .btzone{letter-spacing:.03em;border-radius:99px}
+`},
     {
       order: 758,
       css: String.raw`.bthead{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px;}
@@ -533,4 +537,4 @@ PanelRegistry.extend('battery', {
   },
 });
 
-PanelRegistry.extend('battery', {layout: {sectionSizing: { minWidth: 155, preferredWidth: 195, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});
+PanelRegistry.extend('battery', {layout: {canvasSizing: {mode:'content-fit',maxHeight:480,resizeAxis:'width'}, sectionSizing: { minWidth: 155, preferredWidth: 195, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

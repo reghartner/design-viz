@@ -92,7 +92,7 @@ reported separately from its estimated full content height. Camera estimates
 include the video aspect ratio and separate audio direction, status, caption,
 source and reason rows. Phone notification cards keep their native three-card
 and two-line limits; allocating a larger tile cannot reveal clamped text or
-enlarge the fixed 178px frame. Device-app portraits fit both body dimensions up
+enlarge the 220px native frame. Device-app portraits fit both body dimensions up
 to a native 330px cap. Automatic composition reserves that native content width
 plus estimated panel padding, using a panel-owned composition hint. Manual small
 tiles remain supported. This can make the page taller or move neighboring tiles;

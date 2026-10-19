@@ -630,6 +630,10 @@ PanelRegistry.extend('deviceapp', {
 
 PanelRegistry.extend('deviceapp', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.da-phone{border-color:#59697e;box-shadow:0 calc(10 * var(--da-px)) calc(22 * var(--da-px)) #15263820,inset 0 0 0 calc(1 * var(--da-px)) #ffffffa8}.da-appbar{letter-spacing:-.15px}.da-field{border-radius:calc(12 * var(--da-px));box-shadow:0 calc(2 * var(--da-px)) calc(6 * var(--da-px)) #1e365308}.da-field-top{line-height:1.5}.da-source{border-radius:10px}.deviceapp{row-gap:12px}
+`},
     { order: 375, css: String.raw`.pt-deviceapp{container-type:inline-size;}` },
     {
       order: 377,

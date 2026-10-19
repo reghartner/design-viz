@@ -903,6 +903,10 @@ PanelRegistry.extend('timeline', {
 
 PanelRegistry.extend('timeline', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-timeline .tltick,.pt-timeline .tlevlab,.pt-timeline .tllane{font-size:9px}.pt-timeline .tlrowline{opacity:.2}.pt-timeline .tlaxis{stroke-width:1.2}.pt-timeline .tlnow{stroke-width:2}.pt-timeline .tlsvg{overflow:visible}
+`},
     {
       order: 561,
       css: String.raw`.tlsvg{width:100%; display:block;}
@@ -1052,3 +1056,5 @@ PanelRegistry.extend('timeline', {
     },
   },
 });
+
+PanelRegistry.extend('timeline', {layout: {sectionSizing: { minWidth: 300, preferredWidth: 460, maxWidth: 900, aspectPolicy: 'content', grow: 1 }}});

@@ -74,6 +74,10 @@ PanelRegistry.extend('xray', {
 
 PanelRegistry.extend('xray', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-xray .xlayer{padding:10px 11px 12px;border-radius:10px}.pt-xray .xholder{font-size:10px}.pt-xray .xfoot{padding-top:9px;border-top:1px solid color-mix(in srgb,var(--dtext) 16%,transparent)}
+`},
     {
       order: 989,
       css: String.raw`.xlayer{border-radius:9px; padding:7px 9px 9px;}
@@ -364,3 +368,5 @@ PanelRegistry.extend('xray', {
     },
   },
 });
+
+PanelRegistry.extend('xray', {layout: {sectionSizing: { minWidth: 240, preferredWidth: 340, maxWidth: 600, aspectPolicy: 'content', grow: 1 }}});

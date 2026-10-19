@@ -166,7 +166,7 @@ test('compact canvas policies follow content, captions, long chips and themed bo
  d.steps[1].panels.home.cam={state:'detect',audio:{connection:'connected',microphone:'listening',output:'speech',text:'Please leave the package beside the blue door.',source:'Resident'}};
  await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);await fit(page,'reader');
  const initialHome=await compactMetrics(home(page)),initialClip=await compactMetrics(clip(page)),longState=await compactMetrics(outcome(page));
- expect(initialHome.width).toBe(140);expect(initialHome.gap).toBeLessThanOrEqual(2);expect(initialClip.outer).toBeLessThan(280);expect(initialClip.gap).toBeLessThanOrEqual(2);expect(longState.outer).toBe(320);expect(longState.overflow).toBeGreaterThan(0);expect(longState.scrollable).toBe(true);
+ expect(initialHome.width).toBe(230);expect(initialHome.gap).toBeLessThanOrEqual(2);expect(initialClip.outer).toBeLessThan(280);expect(initialClip.gap).toBeLessThanOrEqual(2);expect(longState.outer).toBe(320);expect(longState.overflow).toBeGreaterThan(0);expect(longState.scrollable).toBe(true);
  expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(.25);
  await page.screenshot({path:'/tmp/explore-compact-before-caption.png'});await info.attach('compact home and capped long state before caption',{body:await page.screenshot(),contentType:'image/png'});
  await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(home(page).locator('.hmaudio-captions')).toBeVisible();
@@ -271,7 +271,8 @@ for(const host of ['reader','workbench','backstage','inline'])test(host+': mixed
   const nextEmpty=await emptyCanvasPoint(page);await page.mouse.click(nextEmpty.x,nextEmpty.y);await expectCanvasChrome(notes,false);
   if(host==='workbench'){await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();}
   const floating=await clip(page).boundingBox(),player=await page.locator('.explore-player').boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
-  expect(floating.width).toBeCloseTo(stage.width*.22*.8,0);
+  // The native 240px camera minimum scales with floating panel content.
+  expect(floating.width).toBeCloseTo(Math.max(stage.width*.22,240)*.8,0);
   for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-canvas-objects .explore-window:visible').all()]){
    const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.y).toBeGreaterThanOrEqual(stage.y-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height+2);expect(overlaps(r,floating)).toBe(false);expect(overlaps(r,player)).toBe(false);
   }
@@ -446,4 +447,24 @@ test('Standard chapters remain usable before and after canvas step controls acti
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
  await expect(page.locator('#src')).toHaveValue(original);
+});
+
+test('panel minimum widths fit undersized saved canvas objects without editing the document',async({page,server})=>{
+ const raw=fixture(),saved=raw.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels;
+ saved.find(p=>p.panel==='clip').w=96;
+ const d=raw.page.sections[0].diagram;d.panels.push({id:'draw',type:'gauge',title:'Power draw',unit:'mA',max:400,initial:{value:248}});
+ d.layouts[1].sectionLayout.default.push({panel:'draw',x:0,y:52,w:4,h:8});saved.push({panel:'draw',x:900,y:600,w:300,h:900});
+ await open(page,server,raw,'workbench');
+ const before=await source(page);expect(JSON.parse(before).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip').w).toBe(96);
+ await fit(page,'workbench');
+ const minimumWidth=await clip(page).evaluate(el=>{const svg=el.closest('.explore-stage').querySelector('.boardcanvas>svg'),scale=svg.getBoundingClientRect().width/svg.viewBox.baseVal.width;return el.getBoundingClientRect().width/scale;});
+ expect(minimumWidth).toBeGreaterThanOrEqual(239);
+ expect(await source(page)).toBe(before);
+ const gauge=page.locator('[data-explore-panel=draw]');expect((await compactMetrics(gauge)).gap).toBeLessThanOrEqual(2);
+ expect(await gauge.locator('.pwidget').evaluate(el=>el.scrollHeight)).toBeLessThan(200);
+ expect(JSON.parse(before).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='draw').h).toBe(900);
+ await selectCanvas(clip(page));await clip(page).locator('.explore-window-resize').press('ArrowRight');
+ const edited=JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip');
+ expect(edited.w).toBeGreaterThanOrEqual(240);
+ expect(await source(page)).not.toBe(before);
 });

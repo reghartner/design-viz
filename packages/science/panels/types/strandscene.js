@@ -893,6 +893,8 @@ body.sk-blueprint .mech-st.hot{color:#7FE3FF}
 .mech-box .swnote{margin-top:8px}
 @media (prefers-reduced-motion: reduce){.mech-move,.mech-nt,.mech-ntbg,.mech-site,.mech-actor>path{transition:none}.mech-transient{display:none}.mech-appear{animation:none}}
 @media print{.mech-transient{display:none}.mech-frame,.mech-sw,.mech-site,.mech-ntbg{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.mech-grid{opacity:.6}
 `,
   authoring: {
     initialFields: true,

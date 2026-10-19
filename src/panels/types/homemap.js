@@ -1144,6 +1144,10 @@ PanelRegistry.extend('homemap', {
 
 PanelRegistry.extend('homemap', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.hmroom{stroke-width:1.3;fill:color-mix(in srgb,var(--hm-room-color) 10%,var(--hm-surface))}.hmroomlabel{font-size:6.2px;letter-spacing:.25px;opacity:1}.hmframe{border-radius:12px}.hmroomwall{stroke-width:1.6}.hmaudio-captions{gap:8px;padding-top:10px}
+`},
     {
       order: 63,
       css: String.raw`.docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
@@ -1776,6 +1780,15 @@ PanelRegistry.extend('homemap', {
       ['initial', 'json'],
     ],
     patchFields: [['signals', 'jsonArr']],
+    example: function(sample){
+      sample.panel.rooms=[{label:'Living room',x:30,y:30,w:130,h:80},{label:'Kitchen',x:160,y:30,w:130,h:80},{label:'Entry',x:95,y:110,w:130,h:65}];
+      sample.panel.devices[0].x=40;sample.panel.devices[0].y=42;
+      sample.panel.devices[1].x=278;sample.panel.devices[1].y=45;
+      sample.panel.devices[3].label='Kitchen temp';sample.panel.devices[3].x=235;sample.panel.devices[3].y=82;
+      sample.panel.devices[4].x=128;sample.panel.devices[4].y=82;
+      sample.state={cam1:'rec',cam2:'scan',door:'open',attic:'ok',hub:'rx',walker:{x:160,y:142},signals:[{from:'cam1',to:'hub'}]};
+      sample.panel.initial=builderClone(sample.state);return sample;
+    },
     picker: {
       order: 14,
       name: 'Home map',

@@ -1,3 +1,15 @@
+// Contract matrix for "zoom scrolls only over drawn content" (issue #669;
+// Chuck's ruling 2026-10-19: option 1, content-bounded scrolling while zoomed,
+// Fit diagram unchanged; coverage extends this file on both surfaces).
+// | row | fixture | assertion (scoped to the board) | rejects |
+// | zoomed, cards fit width: no horizontal scroll | 4 floated cards, graphFrame 800x420, + until SVG > board | board scrollWidth<=clientWidth+1 and its Scroll group hidden | scroll extent from viewBox width (main) |
+// | zoomed, cards fit height: no vertical scroll | same zoom | board scrollHeight<=clientHeight+1 | cropping width only |
+// "Drawn content" = cards ([data-dv-node]), edges ([data-dv-edge]), edge labels (svg>text) and
+// arrowhead markers (a markerWidth x stroke-width box at each marked path end).
+// | all drawn content visible when it fits | same zoom | every drawn element's rect inside the board's visible area | cropping without centering; clipping edges/labels |
+// | zoomed past the content: extent is content + padding, both axes | + until content > 1.4x board width and > 1.2x visible height | scroll extent per axis < content + 20% of SVG size and < 90% of SVG size | viewBox-wide extent; cropping one axis only |
+// | all four ends reachable without clipping | Scroll arrows left/right; mouse wheel up/down | leftmost/rightmost/top/bottom drawn element inside the visible area | crop that clips content edges, labels or markers |
+// | zoom readout and anchoring unchanged | existing test above | SVG width x1.25 per + | (existing assertions) |
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -70,6 +82,86 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   await page.screenshot({path:testInfo.outputPath('regular-navigation.png'),fullPage:true});
 });
 
+function marginSpec(){
+  const nodes={a:{title:'Member site'},b:{title:'Contentful'},c:{title:'Salesforce'},d:{title:'Ticketmaster'}};
+  const floats=[['a',215,130],['b',535,130],['c',215,280],['d',535,280]].map(([id,x,y])=>({id,side:'below',x,y}));
+  return {page:{title:'Margin zoom',sections:[{heading:'Small',diagram:{nodes,rows:[[]],floats,graphFrame:{x:0,y:0,w:800,h:420},
+    edges:[{from:'b',to:'a',label:'content'},{from:'c',to:'a',label:'click'},{from:'d',to:'c',label:'buy'}],view:'step',autoplay:false}}]}};
+}
+// Screen-pixel geometry of one board: its visible area below the sticky
+// legend, its scroll extent, the SVG and the union of its cards.
+const zoomGeometry=board=>board.evaluate(el=>{
+  const r=el.getBoundingClientRect(),d=el.offsetWidth?r.width/el.offsetWidth:1,legend=el.querySelector('.lg')?.getBoundingClientRect();
+  const svgEl=el.querySelector('.boardcanvas>svg'),svg=svgEl.getBoundingClientRect(),cards=[...svgEl.querySelectorAll('[data-dv-node]')].map(n=>n.getBoundingClientRect());
+  const ink=[...svgEl.querySelectorAll('[data-dv-node],[data-dv-edge],:scope>text')].map(n=>n.getBoundingClientRect()).filter(c=>c.width||c.height);
+  // Marker geometry is not part of a path's bounding box; add each arrowhead.
+  let markers=0;
+  for(const path of svgEl.querySelectorAll('path')){
+    if(path.closest('defs,marker'))continue;
+    const style=getComputedStyle(path),m=path.getScreenCTM();if(!m || !path.getTotalLength())continue;
+    for(const [prop,at] of [['markerStart',0],['markerEnd',path.getTotalLength()]]){
+      if(!style[prop] || style[prop]==='none')continue;
+      const id=style[prop].match(/#([^"')]+)/)?.[1],marker=id && svgEl.querySelector('marker#'+CSS.escape(id));if(!marker)continue;
+      const p=path.getPointAtLength(at),x=m.a*p.x+m.c*p.y+m.e,y=m.b*p.x+m.d*p.y+m.f;
+      const size=Math.max(marker.markerWidth.baseVal.value,marker.markerHeight.baseVal.value)*(parseFloat(style.strokeWidth)||1)*Math.hypot(m.a,m.b);
+      ink.push({left:x-size,right:x+size,top:y-size,bottom:y+size});markers++;
+    }
+  }
+  const left=r.left+el.clientLeft*d,top=Math.max(r.top+el.clientTop*d,legend?legend.bottom:0);
+  return {visible:{left,right:left+el.clientWidth*d,top,bottom:r.top+(el.clientTop+el.clientHeight)*d},
+    cw:el.clientWidth,sw:el.scrollWidth,ch:el.clientHeight,sh:el.scrollHeight,d,svgW:svg.width,svgH:svg.height,count:cards.length,inkCount:ink.length,markers,
+    ink:ink.map(c=>({left:c.left,right:c.right,top:c.top,bottom:c.bottom})),
+    union:{left:Math.min(...ink.map(c=>c.left)),right:Math.max(...ink.map(c=>c.right)),top:Math.min(...ink.map(c=>c.top)),bottom:Math.max(...ink.map(c=>c.bottom))}};
+});
+const inside=(c,v)=>c.left>=v.left-1 && c.right<=v.right+1 && c.top>=v.top-1 && c.bottom<=v.bottom+1;
+for(const surface of ['standalone','workbench'])test(surface+' diagram zoom scrolls only over drawn content, not empty frame margin',async({page,server})=>{
+  const text=JSON.stringify(marginSpec());await page.setViewportSize({width:1000,height:1000});
+  if(surface==='standalone'){
+    const input=path.join(server.root,'margin-zoom.json');await writeFile(input,text);
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'margin-zoom.html')]);
+    await page.goto(server.origin+'/margin-zoom.html');
+  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
+  const board=page.locator('.board');await expect(board).toBeVisible();
+  const zoomIn=board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}),pan=board.getByRole('group',{name:'Horizontal diagram scroll'});
+  let g=await zoomGeometry(board);
+  // The fixture must leave wide empty frame margins around its drawn content
+  // (four cards, three edges, three labels, three arrowheads).
+  expect(g.count).toBe(4);expect(g.markers).toBeGreaterThanOrEqual(3);expect(g.inkCount).toBeGreaterThanOrEqual(13);expect(g.union.right-g.union.left).toBeLessThan(g.svgW*.65);expect(g.union.bottom-g.union.top).toBeLessThan(g.svgW*420/800*.6);
+  for(let i=0;i<12 && g.svgW<=g.cw*g.d+2;i++){await zoomIn.click();g=await zoomGeometry(board);}
+  // Contrasting precondition: the SVG frame is now wider than the board while
+  // the cards (plus a margin for labels and markers) still fit inside it.
+  expect(g.svgW).toBeGreaterThan(g.cw*g.d+2);
+  expect(g.union.right-g.union.left+60).toBeLessThan(g.cw*g.d);
+  expect(g.union.bottom-g.union.top+60).toBeLessThan(g.visible.bottom-g.visible.top);
+  expect(g.sw).toBeLessThanOrEqual(g.cw+1);
+  expect(g.sh).toBeLessThanOrEqual(g.ch+1);
+  await expect(pan).toBeHidden();
+  for(const item of g.ink)expect(inside(item,g.visible)).toBe(true);
+  const visibleH=x=>x.visible.bottom-x.visible.top;
+  for(let i=0;i<12 && (g.union.right-g.union.left<=g.cw*g.d*1.4 || g.union.bottom-g.union.top<=visibleH(g)*1.2);i++){await zoomIn.click();g=await zoomGeometry(board);}
+  expect(g.union.right-g.union.left).toBeGreaterThan(g.cw*g.d*1.4);
+  expect(g.union.bottom-g.union.top).toBeGreaterThan(visibleH(g)*1.2);
+  await expect(pan).toBeVisible();
+  const extentX=g.sw*g.d,inkWidth=g.union.right-g.union.left;
+  expect(extentX).toBeGreaterThanOrEqual(inkWidth);
+  expect(extentX).toBeLessThan(inkWidth+g.svgW*.2);
+  expect(extentX).toBeLessThan(g.svgW*.9);
+  // Vertical extent: the scrolled area below the sticky legend.
+  const extentY=g.sh*g.d-(g.visible.top-(g.visible.bottom-g.ch*g.d)),inkHeight=g.union.bottom-g.union.top;
+  expect(extentY).toBeGreaterThanOrEqual(inkHeight);
+  expect(extentY).toBeLessThan(inkHeight+g.svgH*.2);
+  expect(extentY).toBeLessThan(g.svgH*.9);
+  const left=pan.getByRole('button',{name:'Scroll diagram left'}),right=pan.getByRole('button',{name:'Scroll diagram right'});
+  for(let i=0;i<20 && await left.isEnabled();i++)await left.click();
+  g=await zoomGeometry(board);expect(g.union.left).toBeGreaterThanOrEqual(g.visible.left-1);
+  for(let i=0;i<20 && await right.isEnabled();i++)await right.click();
+  g=await zoomGeometry(board);expect(g.union.right).toBeLessThanOrEqual(g.visible.right+1);
+  const spot=await background(board);await page.mouse.move(spot.x,spot.y);
+  for(let i=0;i<10;i++)await page.mouse.wheel(0,-400);
+  await expect.poll(async()=>{const x=await zoomGeometry(board);return x.union.top-x.visible.top;}).toBeGreaterThanOrEqual(-1);
+  for(let i=0;i<10;i++)await page.mouse.wheel(0,400);
+  await expect.poll(async()=>{const x=await zoomGeometry(board);return x.visible.bottom-x.union.bottom;}).toBeGreaterThanOrEqual(-1);
+});
 for(const surface of ['standalone','workbench'])test(surface+' keeps regular navigation separate from Explore camera',async({page,server})=>{
   const raw=spec(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}},

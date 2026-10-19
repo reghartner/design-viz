@@ -2630,8 +2630,33 @@ function createBoardNavigation(board, group, legend, changed){
     refresh();
   }
   function scale(factor){zoom(ratio()*factor);}
+  var FRAMED=['--board-canvas-width','--board-canvas-height','--board-offset-x','--board-offset-y'];
+  function unframe(){board.classList.remove('board-content-framed');FRAMED.forEach(function(name){board.style.removeProperty(name);});}
+  /* A zoomed board scrolls over the drawn graph and its gutter, not the empty
+     viewBox frame around it. Each axis keeps its unframed position (centered
+     across, top-aligned down) unless that would push drawn content out of view.
+     A borrowed (Explore) or unmeasurable board keeps its last framing, so a
+     suspended camera restores into the geometry it was saved in. */
+  function frame(){
+    var svg=graph();if(!svg || !board.classList.contains('board-zoomed'))return unframe();
+    if(!enabled() || !board.clientWidth)return;
+    var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
+    if(!ink || !scale)return unframe();
+    // The SVG clips at its viewBox, so the framed box never extends past it.
+    function axis(start,size,full,length,available,legacy){
+      var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
+      // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
+      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
+      return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
+    }
+    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
+        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;});
+    board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
+    board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
+    board.classList.add('board-content-framed');
+  }
   function reset(){
-    cancel();board.classList.remove('board-zoomed');
+    cancel();board.classList.remove('board-zoomed');unframe();
     board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
     if(paused){paused.width='';paused.height='';}
   }
@@ -2721,7 +2746,7 @@ function createBoardNavigation(board, group, legend, changed){
     board.scrollTop+=(rect.top-frame.top)/display+(extent.y-origin.y+extent.h/2)*scale-(legend.offsetHeight+insets.top+height/2);
     refresh();
   }
-  return {refresh:refresh,reset:reset,fitSelection:fitSelection,
+  return {refresh:refresh,reset:reset,frame:frame,fitSelection:fitSelection,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
@@ -2777,10 +2802,15 @@ function createBoardSizeControl(board, legend, label){
   board.addEventListener('scroll', syncPan, {passive:true});
   function syncOverflow(){
     if (destroyed || !board.clientWidth) return;
+    if (navigation) navigation.frame();
     var scrollable = board.scrollWidth > board.clientWidth + 1;
     if (scrollable && !wasScrollable && !board.classList.contains('explore-board')) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
-    pan.hidden = !scrollable; syncPan();
+    // The Scroll row changes the legend height, which zoom framing measures.
+    var panChanged = pan.hidden === scrollable;
+    pan.hidden = !scrollable;
+    if (panChanged && navigation) navigation.frame();
+    syncPan();
     wasScrollable = scrollable;
     if(navigation)navigation.refresh();
   }

@@ -1,8 +1,8 @@
 'use strict';
-process.env.FLOWVIEW_PACKAGES=[...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean),'sports'])].join(',');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const {entrypoint}=require('../tools/source-loader.cjs');
-const root=path.resolve(__dirname,'..');
+const {cli}=require('./theme-fixture.cjs');
+const root=path.resolve(__dirname,'../..');
+const entrypoint=name=>JSON.parse(cli(['--entrypoint',name], 'science,sports'));
 const arcs=[
   ['season-of-seats',['schaefer-effect','schedule-drop','bobblehead-clock','group-holds'],45],
   ['sell-the-inventory',['on-sale-day','pace-and-member-floor','heritage-night-link','first-10000-vs-everyone'],45],

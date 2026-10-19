@@ -1,0 +1,1698 @@
+{
+  "page": {
+    "title": "The insertion signature of NSP15",
+    "subtitle": "Reading Bianco et al. · an evidence journey across two coronaviruses",
+    "description": "Animated guide to Bianco et al.’s NSP15 preprint: a rare GFP lineage, limiting-dilution intuition, inferred RNA origins, and the selective loss of distal insertions.",
+    "skin": "daylight",
+    "tags": [
+      "science",
+      "biology",
+      "virology",
+      "nsp15",
+      "preprint",
+      "evidence",
+      "animated",
+      "rna",
+      "gfp"
+    ],
+    "sections": [
+      {
+        "id": "green-reporter",
+        "heading": "01 / How does a rare lineage make cells glow?",
+        "accent": "green",
+        "text": [
+          "Bianco et al. · preprint, not peer reviewed. An out-of-frame GFP reporter starts dark. A rare frame-restoring indel lets infected cells fluoresce; the virus particle itself is not green. [Fig. 1]"
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "observe": {
+              "title": "Observe"
+            },
+            "infer": {
+              "title": "Interpret"
+            }
+          },
+          "rows": [
+            [
+              "observe",
+              "infer"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "observe",
+              "to": "infer",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "frame",
+              "type": "nspstory",
+              "title": "THE GREEN CLUE · follow the reporter trait",
+              "scene": "reporter",
+              "ambient": true,
+              "ambientIntensity": "medium",
+              "ambientTempo": "slow",
+              "initial": {
+                "phase": 0
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "dark",
+              "text": "A virus particle carries the reporter into a cell. When the GFP message is out of frame, the infected cell stays dark. GFP is a fluorescent protein: the cell can glow, but the particle itself is not green. This cartoon has no molecular timescale. [Fig. 1a]",
+              "panels": {
+                "frame": {
+                  "phase": 0
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "restored",
+              "text": "A rare insertion or deletion can repair the grouping of the reporter message. The infected cell can then make functional GFP and glow green. A virus lineage carrying that genetic change can pass the reporter trait to newly infected cells. [Fig. 1a–c]",
+              "panels": {
+                "frame": {
+                  "phase": 1
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "screen",
+              "text": "A green-positive well is a clue that at least one compatible variant is present. It may still contain several virus lineages. Finding a glowing well and recovering a separable mutant lineage are different steps. [Fig. 1b]",
+              "panels": {
+                "frame": {
+                  "phase": 2
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "specificity",
+              "text": "Both WT and inactive-NSP15 reporters yielded green-positive isolates (18 and 16 examined). Green alone is not NSP15-specific. Sequence analysis found insertions in 8/18 WT isolates and no inserts >2 nt in the inactive group. [Fig. 1c,d; Results 87–104]",
+              "panels": {
+                "frame": {
+                  "phase": 3
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "frame",
+                "x": 0,
+                "y": 4,
+                "w": 24,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 15,
+                "w": 24,
+                "h": 3,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "limiting-dilution",
+        "heading": "02 / Fewer founders make the green trait traceable",
+        "accent": "green",
+        "text": [
+          "Limiting dilution spreads a mixed population so that fewer lineages start each positive culture. It helps separate a rare reporter-restoring variant from its neighbors. This is a conceptual explanation, not an experimental recipe."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "observe": {
+              "title": "Observe"
+            },
+            "infer": {
+              "title": "Interpret"
+            }
+          },
+          "rows": [
+            [
+              "observe",
+              "infer"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "observe",
+              "to": "infer",
+              "kind": "int"
+            }
+          ],
+        "panels": [
+          {
+            "id": "founders",
+            "type": "nspstory",
+              "title": "FROM A MIXTURE TO A TRACEABLE LINEAGE",
+              "scene": "dilution",
+              "ambient": true,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
+              "initial": {
+              "phase": 0
+            }
+          }
+        ],
+          "steps": [
+            {
+              "id": "mixture",
+              "text": "With many founders, a green-positive culture can include the rare reporter-restoring variant plus other lineages. The green signal does not identify every virus in that mixture. [Fig. 1b]",
+              "panels": {
+                "founders": {
+                  "phase": 0
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "separate",
+              "text": "With fewer founders, a positive culture is more likely to descend from a single lineage. That reduces ambiguity about which genome carries the green-reporting trait. Some cultures receive no founder. [Fig. 1b]",
+              "panels": {
+                "founders": {
+                  "phase": 1
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "verify",
+              "text": "The authors followed green-positive isolates and checked the reporter region’s sequence. This connects a phenotype to a recovered genotype. Dilution helps separation; sequencing identifies the change. [Fig. 1c,d]",
+              "panels": {
+                "founders": {
+                  "phase": 2
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "selection",
+              "text": "This assay selects for changes that restore GFP. It misses other insertions and deletions, so 8/18 describes the examined WT green isolates, not all viral genomes. The next stage broadens the view with sequencing. [Results 87–124]",
+              "panels": {
+                "founders": {
+                  "phase": 3
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "founders",
+                "x": 0,
+                "y": 4,
+                "w": 24,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 15,
+                "w": 24,
+                "h": 3,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "analysis-ladder",
+        "heading": "03 / From reads to a testable interpretation",
+        "accent": "green",
+        "text": [
+          "The reporter recovers selected green lineages. Sequencing surveys a broader set of insertion events. Follow the evidence from a read to a proposed explanation; each arrow adds a question, not proof of a mechanism."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "reads": {
+              "title": "Sequencing reads",
+              "sub": "Sampled viral RNA"
+            },
+            "calls": {
+              "title": "Candidate insertions",
+              "sub": "Find added sequence"
+            },
+            "map": {
+              "title": "Origin + destination",
+              "sub": "Classify the event"
+            },
+            "rates": {
+              "title": "Normalize",
+              "sub": "Events / viral reads"
+            },
+            "infer": {
+              "title": "Interpret",
+              "sub": "Compare classes + controls"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "reads",
+              "to": "calls",
+              "kind": "int"
+            },
+            {
+              "from": "calls",
+              "to": "map",
+              "kind": "int"
+            },
+            {
+              "from": "map",
+              "to": "rates",
+              "kind": "int"
+            },
+            {
+              "from": "rates",
+              "to": "infer",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+          {
+            "id": "ladder",
+            "type": "table",
+            "title": "FIVE QUESTIONS · read the evidence in order",
+            "columns": [
+              {
+                "id": "step",
+                "label": "Step"
+              },
+              {
+                "id": "question",
+                "label": "Ask"
+              }
+            ],
+            "initial": {
+              "rows": [
+                {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+              ]
+            }
+          },
+            {
+              "id": "analysis",
+              "type": "table",
+            "title": "OBSERVATION ≠ INTERPRETATION",
+              "columns": [
+                {
+                  "id": "a",
+                "label": "Layer"
+                },
+                {
+                  "id": "b",
+                "label": "What it supports"
+                }
+              ],
+              "initial": {
+                "rows": [
+                {"id": "observe", "cells": {"a": "Observation", "b": "Reads, matches, classes and reported rates."}},
+                {"id": "interpret", "cells": {"a": "Interpretation", "b": "Origin and mechanism are inferred, not directly observed."}}
+              ]
+            }
+          }
+          ],
+          "steps": [
+            {
+              "id": "read-call",
+              "text": "Sequencing produces reads; analysis identifies candidate insertions. This is broader than the GFP screen because a candidate does not have to restore that reporter. Technical artifacts remain possible. [Results 105–125]",
+              "panels": {
+                "ladder": {
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}, "status": "changed"},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
+                }
+              },
+              "nodes": [
+                "reads",
+                "calls"
+              ]
+            },
+            {
+              "id": "classify",
+              "text": "Match an insert to a possible donor region and locate its recipient. The relationship defines classes such as tandem and distal. Longer matches reduce chance assignment; matching does not directly observe transfer. [Results 126–160]",
+              "panels": {
+                "ladder": {
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}, "status": "changed"},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
+                }
+              },
+              "nodes": [
+                "map"
+              ]
+            },
+            {
+              "id": "normalize",
+              "text": "Divide event counts by the corresponding number of virus-derived reads to compare datasets in cpm. Keep the length/mapping subset and dataset identity visible. [Fig. 2; Fig. 3]",
+              "panels": {
+                "ladder": {
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}, "status": "changed"},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}}
+                  ]
+                }
+              },
+              "nodes": [
+                "rates"
+              ]
+            },
+            {
+              "id": "interpret",
+              "text": "Then ask which class changes with NSP15 activity and which controls challenge an artifact explanation. A mechanism is inferred from these comparisons; it is not supplied by a read alignment alone. [Discussion]",
+              "panels": {
+                "ladder": {
+                  "rows": [
+                    {"id": "read", "cells": {"step": "1 · Read", "question": "Treat sequence reads as observations."}},
+                    {"id": "find", "cells": {"step": "2 · Find", "question": "Call candidate added material."}},
+                    {"id": "match", "cells": {"step": "3 · Match", "question": "Locate a source and recipient."}},
+                    {"id": "compare", "cells": {"step": "4 · Compare", "question": "Normalize within each dataset."}},
+                    {"id": "interpret", "cells": {"step": "5 · Interpret", "question": "Weigh activity and artifact controls."}, "status": "changed"}
+                  ]
+                }
+              },
+              "nodes": [
+                "infer"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "x": 0,
+                "y": 4,
+                "w": 14,
+                "h": 11,
+                "hidden": true
+              },
+              {
+                "panel": "ladder",
+                "x": 0,
+                "y": 4,
+                "w": 24,
+                "h": 7
+              },
+              {
+                "panel": "analysis",
+                "x": 0,
+                "y": 11,
+                "w": 24,
+                "h": 4
+              }
+            ]
+          },
+          "floats": [
+            {
+              "id": "reads",
+              "side": "below",
+              "x": 95,
+              "y": 65,
+              "noSpread": true
+            },
+            {
+              "id": "calls",
+              "side": "below",
+              "x": 335,
+              "y": 65,
+              "noSpread": true
+            },
+            {
+              "id": "map",
+              "side": "below",
+              "x": 95,
+              "y": 185,
+              "noSpread": true
+            },
+            {
+              "id": "rates",
+              "side": "below",
+              "x": 335,
+              "y": 185,
+              "noSpread": true
+            },
+            {
+              "id": "infer",
+              "side": "below",
+              "x": 215,
+              "y": 305,
+              "noSpread": true
+            }
+          ]
+        }
+      },
+      {
+        "id": "class-signature",
+        "heading": "04 / A selective loss of distal insertions",
+        "accent": "cyan",
+        "text": [
+          "Bianco et al. • August 17, 2026 preprint • NOT PEER REVIEWED. In HCoV-OC43/fsGFP, inactive NSP15 is associated with fewer and shorter insertions. The strongest change is in the distal class."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "evidence": {
+              "title": "Observed",
+              "sub": "Published data"
+            },
+            "meaning": {
+              "title": "Interpreted",
+              "sub": "Claim with limits"
+            }
+          },
+          "rows": [
+            [
+              "evidence",
+              "meaning"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "evidence",
+              "to": "meaning",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "comparison",
+              "type": "nspstory",
+              "title": "ACTIVITY CONTRAST · published rates, shared scale",
+              "scene": "evidence",
+              "ambient": false,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
+              "initial": {
+                "phase": 0
+              }
+            },
+            {
+              "id": "sizes",
+              "type": "grid",
+              "title": "SIZE SHIFT · all detected inserts",
+              "rows": [
+                {
+                  "id": "median",
+                  "label": "Median"
+                }
+              ],
+              "cols": [
+                {
+                  "id": "wt",
+                  "label": "WT"
+                },
+                {
+                  "id": "inactive",
+                  "label": "Inactive"
+                }
+              ],
+              "scale": {
+                "min": 0,
+                "max": 12
+              },
+              "unit": "nt",
+              "decimals": 0,
+              "initial": {
+                "cells": {
+                  "median.wt": 12,
+                  "median.inactive": 3
+                },
+                "note": "Fig. 2a. Medians summarize distributions; individual events are not shown."
+              }
+            },
+            {
+              "id": "denominator",
+              "type": "table",
+              "title": "SOURCE COUNTS",
+              "columns": [
+                {
+                  "id": "what",
+                  "label": "Group"
+                },
+                {
+                  "id": "value",
+                  "label": "Events / reads"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "0",
+                    "cells": {
+                      "what": "WT",
+                      "value": "21,894 / ~640M"
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "cells": {
+                      "what": "Inactive",
+                      "value": "2,925 / ~420M"
+                    }
+                  }
+                ],
+                "note": "Rounded virus-derived read totals; use reported cpm. Results 110–122."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "all",
+              "text": "All insertions ≥2 nt: 33.9 versus 6.93 cpm, about 4.9×. This is a read-normalized event frequency, not the fraction of infectious particles. [Fig. 2a; Results 110–122]",
+              "panels": {
+                "comparison": {
+                  "phase": 0,
+                  "caption": "cpm counts unique insertion events per million virus-derived reads. Bars keep their published values; emphasis guides comparison, not change over time."
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "distal",
+              "text": "Distal mapped insertions ≥11 nt: 16.7 versus 0.2 cpm. The ratio of rounded rates is 83.5×; the authors report 84×. The effect is much larger than the all-insertion comparison. [Fig. 2c–e; Results 143–160]",
+              "panels": {
+                "comparison": {
+                  "phase": 1,
+                  "caption": "The authors report an 84× distal contrast. Exact rounded rates stay labeled; the tiny inactive bar is 0.2 cpm, not zero."
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "tandem",
+              "text": "Tandem mapped insertions ≥11 nt: 0.98 versus 0.99 cpm. Their similar frequency is an internal contrast, but some tandem events may be amplification artifacts. [Fig. 2b; Discussion 370–381]",
+              "panels": {
+                "comparison": {
+                  "phase": 2,
+                  "caption": "Tandem rates are nearly unchanged. Some tandem signals may be amplification artifacts; distal and tandem use the mapped ≥11 nt subset."
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "size",
+              "text": "The overall median falls from 12 to 3 nt. Median length and event frequency answer different questions; neither alone proves how an insert was generated. [Fig. 2a]",
+              "panels": {
+                "sizes": {
+                  "highlight": {
+                    "row": "median"
+                  }
+                },
+                "comparison": {
+                  "phase": 3,
+                  "caption": "Overall median length: 12 nt (WT) versus 3 nt (inactive). A median is not an event frequency or a mechanism."
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "comparison",
+                "x": 0,
+                "y": 4,
+                "w": 17,
+                "h": 11
+              },
+              {
+                "panel": "sizes",
+                "x": 17,
+                "y": 4,
+                "w": 7,
+                "h": 5
+              },
+              {
+                "panel": "denominator",
+                "x": 17,
+                "y": 9,
+                "w": 7,
+                "h": 6
+              },
+              {
+                "x": 0,
+                "y": 24,
+                "w": 24,
+                "h": 4,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "origin-map",
+        "heading": "05 / Where did the added material come from?",
+        "accent": "cyan",
+        "text": [
+          "A donor is a matching source region; a recipient is the insertion location. Dashed links mean inferred origin. Only the last step animates a proposed transfer, with its uncertainty kept on screen."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "evidence": {
+              "title": "Observed",
+              "sub": "Published data"
+            },
+            "meaning": {
+              "title": "Interpreted",
+              "sub": "Claim with limits"
+            }
+          },
+          "rows": [
+            [
+              "evidence",
+              "meaning"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "evidence",
+              "to": "meaning",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "map",
+              "type": "nspstory",
+              "title": "SOURCE → INSERTION · evidence and proposed interpretation",
+              "scene": "origin",
+              "ambient": true,
+              "ambientIntensity": "quiet",
+              "ambientTempo": "slow",
+              "initial": {
+                "phase": 0
+              }
+            },
+            {
+              "id": "origin",
+              "type": "funnel",
+              "title": "HCoV-OC43 WT · nested sets",
+              "unit": "unique insertion events",
+              "stages": [
+                {
+                  "id": "all",
+                "label": "All ≥2 nt"
+                },
+                {
+                  "id": "long",
+                "label": "≥11 nt"
+                },
+                {
+                  "id": "mapped",
+                "label": "Mapped to virus",
+                  "tone": "teal"
+                }
+              ],
+              "initial": {
+                "counts": {
+                  "all": 21894,
+                  "long": 13816,
+                  "mapped": 12063
+                },
+                "note": "12,063 / 13,816 = 87% of long inserts map with a perfect or near-perfect viral match. Results 126–135."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "define",
+              "text": "Tandem means a neighboring duplication. Distal means the matching source is elsewhere. Mapping gives an inferred origin, not a direct view of molecular transfer. [Extended Data Fig. 1b]",
+              "panels": {
+                "map": {
+                  "phase": 0
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "distance",
+              "text": "In WT, distal donor sites span the genome; recipient sites favor the 3′ region and the embedded reporter. The donor–recipient distance has a median of about 10 kb. In inactive NSP15, sites are more locally linked. [Fig. 2c–e]",
+              "panels": {
+                "map": {
+                  "phase": 1
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "assign",
+              "text": "Longer inserts improve source assignment: 12,063 of 13,816 WT inserts ≥11 nt (87%) map to the virus. Short matches are more likely to arise by chance, and mapping remains inferential. [Results 126–135]",
+              "panels": {
+                "map": {
+                  "phase": 2
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "model",
+              "text": "Together, activity dependence and source/recipient patterns support the authors’ fragment-generation model. The exact incorporation mechanism remains unresolved; the chart does not establish a unique biochemical route. [Discussion]",
+              "panels": {
+                "map": {
+                  "phase": 3
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "map",
+                "x": 0,
+                "y": 4,
+                "w": 16,
+                "h": 11
+              },
+              {
+                "panel": "origin",
+                "x": 16,
+                "y": 4,
+                "w": 8,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 15,
+                "w": 24,
+                "h": 3,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "second-virus",
+        "heading": "06 / A second virus, a different comparison",
+        "accent": "cyan",
+        "text": [
+          "SARS-CoV-2 supports a related insertion signature. Keep the paired public dataset separate from the authors’ deeper WT-only dataset: preparation, read depth and sampled population differ."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "evidence": {
+              "title": "Observed",
+              "sub": "Published data"
+            },
+            "meaning": {
+              "title": "Interpreted",
+              "sub": "Claim with limits"
+            }
+          },
+          "rows": [
+            [
+              "evidence",
+              "meaning"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "evidence",
+              "to": "meaning",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "paired",
+              "type": "grid",
+              "title": "PUBLIC PAIRED DATA · SARS-CoV-2",
+              "rows": [
+                {
+                  "id": "all",
+                  "label": "All ≥2 nt"
+                }
+              ],
+              "cols": [
+                {
+                  "id": "wt",
+                  "label": "WT"
+                },
+                {
+                  "id": "inactive",
+                  "label": "Inactive"
+                }
+              ],
+              "scale": {
+                "min": 0,
+                "max": 16
+              },
+              "unit": "cpm",
+              "decimals": 1,
+              "initial": {
+                "cells": {
+                  "all.wt": 15.8,
+                  "all.inactive": 14.2
+                },
+                "note": "1,705 / 108 million mapped reads (WT); 1,393 / 98 million (inactive). Fig. 3a; Results 203–216."
+              }
+            },
+            {
+              "id": "deep",
+              "type": "funnel",
+              "title": "NEW WT-ONLY DATA · nested sets",
+              "unit": "unique insertion events",
+              "stages": [
+                {
+                  "id": "all",
+                  "label": "All reported >2 nt"
+                },
+                {
+                  "id": "long",
+                  "label": "Length ≥11 nt"
+                },
+                {
+                  "id": "mapped",
+                  "label": "Likely viral origin",
+                  "tone": "teal"
+                },
+                {
+                  "id": "distal",
+                  "label": "Distal class",
+                  "tone": "violet"
+                }
+              ],
+              "initial": {
+                "counts": {
+                  "all": 21406,
+                  "long": 7371,
+                  "mapped": 6141,
+                  "distal": 3772
+                },
+                "note": "~990 million reads. Of 6,141 mapped long inserts: 3,772 distal, 2,183 tandem, 186 other. Results 223–232."
+              }
+            },
+            {
+              "id": "cross",
+              "type": "table",
+              "title": "WHAT TRANSFERS ACROSS VIRUSES",
+              "columns": [
+                {
+                  "id": "what",
+                  "label": "Evidence"
+                },
+                {
+                  "id": "value",
+                  "label": "Reading"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "0",
+                    "cells": {
+                      "what": "Total rate",
+                      "value": "15.8 vs 14.2 cpm (~1.11×)."
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "cells": {
+                      "what": "Size pattern",
+                      "value": "WT: longer; inactive: 2–3 nt."
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "cells": {
+                      "what": "Deep WT median",
+                      "value": "8 nt; HCoV-OC43: 12 nt."
+                    }
+                  }
+                ],
+                "note": "Different datasets cannot be ranked as controlled species effects. No deep inactive partner is supplied here."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "paired",
+              "text": "In the public paired SARS-CoV-2 dataset, total rates are close: 15.8 versus 14.2 cpm. Do not transfer the ~4.9× HCoV-OC43 total-rate contrast to this virus. [Fig. 3a; Results 203–216]",
+              "panels": {
+                "paired": {
+                  "highlight": {
+                    "row": "all"
+                  }
+                },
+                "cross": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Total rate",
+                        "value": "15.8 vs 14.2 cpm (~1.11×)."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Size pattern",
+                        "value": "WT: longer; inactive: 2–3 nt."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Deep WT median",
+                        "value": "8 nt; HCoV-OC43: 12 nt."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "shape",
+              "text": "The distinguishing feature is the size and origin pattern: WT has more longer inserts; inactive NSP15 is dominated by 2–3 nt inserts, with more local source–recipient linkage. [Fig. 3a; Extended Data Fig. 4a; Results 237–241]",
+              "panels": {
+                "cross": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Total rate",
+                        "value": "15.8 vs 14.2 cpm (~1.11×)."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Size pattern",
+                        "value": "WT: longer; inactive: 2–3 nt."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Deep WT median",
+                        "value": "8 nt; HCoV-OC43: 12 nt."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "depth",
+              "text": "The new WT dataset contains 21,406 reported inserts >2 nt. Of 7,371 inserts ≥11 nt, 6,141 (83%) map to the viral genome. Its WT-only design cannot supply a matched NSP15 effect size. [Fig. 3b; Results 223–232]",
+              "panels": {
+                "cross": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Total rate",
+                        "value": "15.8 vs 14.2 cpm (~1.11×)."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Size pattern",
+                        "value": "WT: longer; inactive: 2–3 nt."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Deep WT median",
+                        "value": "8 nt; HCoV-OC43: 12 nt."
+                      },
+                      "status": "changed"
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "classes",
+              "text": "Within those 6,141 mapped long inserts, 3,772 are distal and 2,183 are tandem. The remaining 186 are outside these two listed classes; do not make the two labels exhaustive. [Results 230–232; Extended Data Fig. 4c]",
+              "panels": {
+                "cross": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Total rate",
+                        "value": "15.8 vs 14.2 cpm (~1.11×)."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Size pattern",
+                        "value": "WT: longer; inactive: 2–3 nt."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Deep WT median",
+                        "value": "8 nt; HCoV-OC43: 12 nt."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "paired",
+                "x": 0,
+                "y": 4,
+                "w": 12,
+                "h": 5
+              },
+              {
+                "panel": "cross",
+                "x": 0,
+                "y": 9,
+                "w": 12,
+                "h": 6
+              },
+              {
+                "panel": "deep",
+                "x": 12,
+                "y": 4,
+                "w": 12,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 24,
+                "w": 24,
+                "h": 4,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "assay-limits",
+        "heading": "07 / What survives the artifact challenge?",
+        "accent": "cyan",
+        "text": [
+          "Converging evidence strengthens the interpretation, but each assay sees a different subset. Clinical insertion counts are observations, not incidence or mutation-rate estimates."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "observe": {
+              "title": "Observe",
+              "sub": "Counts + mapping"
+            },
+            "compare": {
+              "title": "Compare",
+              "sub": "Activity + controls"
+            },
+            "bound": {
+              "title": "Bound the claim",
+              "sub": "Mechanism ≠ fitness"
+            }
+          },
+          "rows": [
+            [
+              "observe",
+              "compare",
+              "bound"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "observe",
+              "to": "compare",
+              "kind": "int"
+            },
+            {
+              "from": "compare",
+              "to": "bound",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "audit",
+              "type": "table",
+              "title": "ASSAY EVIDENCE · Fig. 1 & Fig. 4",
+              "columns": [
+                {
+                  "id": "what",
+                  "label": "Evidence"
+                },
+                {
+                  "id": "value",
+                  "label": "Reading"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "0",
+                    "cells": {
+                      "what": "Reporter isolates",
+                      "value": "8 of 18 WT GFP-positive isolates contained insertions."
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "cells": {
+                      "what": "Amplicon control",
+                      "value": "39 tandem events appeared in a very low-complexity control."
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "cells": {
+                      "what": "Distal criterion",
+                      "value": "876 events in complex virion RNA; 0 in that control."
+                    }
+                  },
+                  {
+                    "id": "3",
+                    "cells": {
+                      "what": "Clinical datasets",
+                      "value": "488 and 301 qualifying distal inserts in two datasets."
+                    }
+                  }
+                ],
+                "note": "Each row has a different denominator. These are not a pooled dataset or a common-scale rate comparison."
+              }
+            },
+            {
+              "id": "limits",
+              "type": "table",
+              "title": "CLAIM BOUNDARIES",
+              "columns": [
+                {
+                  "id": "what",
+                  "label": "Evidence"
+                },
+                {
+                  "id": "value",
+                  "label": "Reading"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "0",
+                    "cells": {
+                      "what": "Reporter selection",
+                      "value": "Only mutations that restore the reporter are visible."
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "cells": {
+                      "what": "PCR / library artifacts",
+                      "value": "Some tandem and local rearrangements can be technical."
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "cells": {
+                      "what": "Clinical frequency",
+                      "value": "Unknown input complexity prevents a per-genome rate."
+                    }
+                  },
+                  {
+                    "id": "3",
+                    "cells": {
+                      "what": "Functional consequence",
+                      "value": "An insertion alone does not establish fitness or transmission."
+                    }
+                  }
+                ],
+                "note": "Preprint: not peer reviewed. Data support a mutational process; they do not reconstruct any historical emergence event."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "reporter",
+              "text": "The biological reporter independently recovered insertion-bearing WT viruses: 8 of 18 GFP-positive isolates. This selected set is not a whole-population insertion frequency. [Fig. 1b–d; Results 87–104]",
+              "panels": {
+                "audit": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter isolates",
+                        "value": "8 of 18 WT GFP-positive isolates contained insertions."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Amplicon control",
+                        "value": "39 tandem events appeared in a very low-complexity control."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Distal criterion",
+                        "value": "876 events in complex virion RNA; 0 in that control."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Clinical datasets",
+                        "value": "488 and 301 qualifying distal inserts in two datasets."
+                      }
+                    }
+                  ]
+                },
+                "limits": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter selection",
+                        "value": "Only mutations that restore the reporter are visible."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "PCR / library artifacts",
+                        "value": "Some tandem and local rearrangements can be technical."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Clinical frequency",
+                        "value": "Unknown input complexity prevents a per-genome rate."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Functional consequence",
+                        "value": "An insertion alone does not establish fitness or transmission."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "control",
+              "text": "The low-complexity amplicon control yielded 39 tandem events among 345 million reads. That result makes the origin of some tandem signals ambiguous. [Fig. 4a; Results 255–274; Discussion 370–381]",
+              "panels": {
+                "audit": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter isolates",
+                        "value": "8 of 18 WT GFP-positive isolates contained insertions."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Amplicon control",
+                        "value": "39 tandem events appeared in a very low-complexity control."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Distal criterion",
+                        "value": "876 events in complex virion RNA; 0 in that control."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Clinical datasets",
+                        "value": "488 and 301 qualifying distal inserts in two datasets."
+                      }
+                    }
+                  ]
+                },
+                "limits": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter selection",
+                        "value": "Only mutations that restore the reporter are visible."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "PCR / library artifacts",
+                        "value": "Some tandem and local rearrangements can be technical."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Clinical frequency",
+                        "value": "Unknown input complexity prevents a per-genome rate."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Functional consequence",
+                        "value": "An insertion alone does not establish fitness or transmission."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "distal-control",
+              "text": "With the paper’s distal-origin criteria, complex virion RNA yielded 876 events among 380 million amplicon reads, versus 0 qualifying events in the low-complexity control. These assay-specific counts cannot be compared directly with whole-genome cpm. [Fig. 4a]",
+              "panels": {
+                "audit": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter isolates",
+                        "value": "8 of 18 WT GFP-positive isolates contained insertions."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Amplicon control",
+                        "value": "39 tandem events appeared in a very low-complexity control."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Distal criterion",
+                        "value": "876 events in complex virion RNA; 0 in that control."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Clinical datasets",
+                        "value": "488 and 301 qualifying distal inserts in two datasets."
+                      }
+                    }
+                  ]
+                },
+                "limits": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter selection",
+                        "value": "Only mutations that restore the reporter are visible."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "PCR / library artifacts",
+                        "value": "Some tandem and local rearrangements can be technical."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Clinical frequency",
+                        "value": "Unknown input complexity prevents a per-genome rate."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Functional consequence",
+                        "value": "An insertion alone does not establish fitness or transmission."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            },
+            {
+              "id": "clinical",
+              "text": "Clinical datasets contain 488 and 301 qualifying distal inserts with related signatures. Their unknown input complexity and possible PCR artifacts prevent a clinical mutation-frequency estimate. Potential functional effects need separate evidence. [Fig. 4b–e; Discussion 382–394]",
+              "panels": {
+                "audit": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter isolates",
+                        "value": "8 of 18 WT GFP-positive isolates contained insertions."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "Amplicon control",
+                        "value": "39 tandem events appeared in a very low-complexity control."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Distal criterion",
+                        "value": "876 events in complex virion RNA; 0 in that control."
+                      }
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Clinical datasets",
+                        "value": "488 and 301 qualifying distal inserts in two datasets."
+                      },
+                      "status": "changed"
+                    }
+                  ]
+                },
+                "limits": {
+                  "rows": [
+                    {
+                      "id": "0",
+                      "cells": {
+                        "what": "Reporter selection",
+                        "value": "Only mutations that restore the reporter are visible."
+                      }
+                    },
+                    {
+                      "id": "1",
+                      "cells": {
+                        "what": "PCR / library artifacts",
+                        "value": "Some tandem and local rearrangements can be technical."
+                      }
+                    },
+                    {
+                      "id": "2",
+                      "cells": {
+                        "what": "Clinical frequency",
+                        "value": "Unknown input complexity prevents a per-genome rate."
+                      },
+                      "status": "changed"
+                    },
+                    {
+                      "id": "3",
+                      "cells": {
+                        "what": "Functional consequence",
+                        "value": "An insertion alone does not establish fitness or transmission."
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": []
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 4
+              },
+              {
+                "panel": "audit",
+                "x": 0,
+                "y": 4,
+                "w": 12,
+                "h": 11
+              },
+              {
+                "panel": "limits",
+                "x": 12,
+                "y": 4,
+                "w": 12,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 19,
+                "w": 24,
+                "h": 5,
+                "hidden": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "sources",
+        "heading": "08 / Sources, provenance and the open question",
+        "accent": "green",
+        "text": [
+          "A nuclease-associated insertion process is supported by several forms of evidence. How fragments become integrated, which events survive selection, and how often they matter in nature remain separate questions."
+        ],
+        "contract": {
+          "title": "Evidence ledger",
+          "fields": [
+            {
+              "k": "Primary source",
+              "v": "Bianco et al. — Genetic innovation in coronaviruses driven by a viral nuclease",
+              "g": "bioRxiv version posted August 17, 2026. DOI 10.64898/2026.08.15.744938. Preprint, not certified by peer review. Quantitative values are transcribed from Results and figure descriptions; no raw-read reanalysis.",
+              "link": "https://doi.org/10.64898/2026.08.15.744938"
+            },
+            {
+              "k": "Figure map",
+              "v": "Fig. 1: reporter • Fig. 2: HCoV-OC43 • Fig. 3: SARS-CoV-2 • Fig. 4: artifacts and clinical data",
+              "g": "Extended Data Fig. 1 and 4 define the insert classes. Figure 5 is not used to derive a design rule or to infer historical origin, fitness, transmissibility or pathogenicity."
+            },
+            {
+              "k": "Normalization",
+              "v": "cpm counts unique insertion events per million virus-derived reads",
+              "g": "The paper’s per-genome estimates rely on sampled RNA complexity and library assumptions. cpm is neither per-PFU frequency nor the percentage of infected people. Rounded read totals need not reproduce reported cpm exactly."
+            },
+            {
+              "k": "Public analysis code",
+              "v": "coronavirus_insert_analysis",
+              "g": "Public code linked by the preprint. This Flowview visualizes published summaries; it does not rerun the analysis.",
+              "link": "https://github.com/cbianco1/coronavirus_insert_analysis"
+            },
+            {
+              "k": "Visual provenance",
+              "v": "Original animated conceptual lessons + native Flowview evidence panels",
+              "g": "Finite motion illustrates authored explanations, not molecular dynamics. Source transfer is marked proposed; donor matching is inferred. Bars use published rounded rates on one linear scale, with a static endpoint for reduced motion and print. No exact sequences, site coordinates or experimental procedures."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

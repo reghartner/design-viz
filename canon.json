@@ -2,6 +2,7 @@
   "version": 1,
   "diagrams": [
     {"folder": "diagrams/friends/season-of-seats", "owner": "group:default/flowview-examples"},
-    {"folder": "diagrams/friends/copy-gate", "owner": "group:default/flowview-examples"}
+    {"folder": "diagrams/friends/copy-gate", "owner": "group:default/flowview-examples"},
+    {"folder": "diagrams/friends/nsp15-insertion-evidence", "owner": "group:default/flowview-examples"}
   ]
 }

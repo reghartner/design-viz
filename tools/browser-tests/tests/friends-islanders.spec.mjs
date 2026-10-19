@@ -1,4 +1,5 @@
-import {test,expect,chooseNavigation} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation,paste} from '../helpers/test.mjs';
+import {CORE_EDITOR_SKINS,auditEditorStyle} from '../helpers/node-styles.mjs';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
@@ -9,6 +10,16 @@ test.beforeEach(({audit})=>{
   audit.allowStatus(404,url=>new URL(url).pathname==='/workbench/catalog.json');
 });
 const shell='/workbench/flowspec.html';
+test('Friends node style presets preserve contrast, state and SVG export',async({page,server},testInfo)=>{
+  await page.setViewportSize({width:1800,height:1200});
+  await auditEditorStyle({page,server},'islanders',{
+    fixture:()=>({page:{title:'Friends node styles',sections:[{id:'overview',heading:'Overview',diagram:{}}]}}),
+    start:async(page,server,raw)=>{await page.goto(server.origin+shell);await paste(page,JSON.stringify(raw,null,2));},
+    expectedSkins:[...CORE_EDITOR_SKINS,'islanders'],
+    defaultCard:{fill:'rgb(255, 255, 255)',stroke:'rgb(139, 168, 202)',t1:'rgb(7, 30, 66)',t2:'rgb(83, 106, 128)'},
+  });
+  await capture(page,testInfo,'islanders-node-styles-desktop');
+});
 async function capture(page,testInfo,name){
   await page.evaluate(()=>document.fonts.ready);
   const path=testInfo.outputPath(name+'.png');await page.screenshot({path,fullPage:true});

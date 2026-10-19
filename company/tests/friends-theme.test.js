@@ -33,5 +33,7 @@ test('official Islanders crest is embedded, centered on UBS ice, and absent from
   assert.match(css,/\.sk-islanders \.seatmap-islanders-logo\{display:inline/);
   assert.equal(C.IslandersBrand.story('copy-gate'),false);
   assert.equal(C.IslandersBrand.story('nsp15-insertion-evidence'),false);
-  assert.equal(C.IslandersBrand.story('season-of-seats'),true);
+  assert.equal(C.IslandersBrand.story('islanders-marketing'),true);
+  for(const id of ['season-of-seats','sell-the-inventory','serve-game-night','build-next-season'])
+    assert.equal(C.IslandersBrand.story(id),false);
 });

@@ -5,5 +5,5 @@
   "styles": {"core": "core.css", "workbench": "workbench.css"},
   "assets": {"light": "assets/primary-light.png", "dark": "assets/primary-dark.png"},
   "guidance": "authoring.md",
-  "kitFiles": ["company/themes/islanders/assets/README.md", "packages/sports/diagrams/**/*.md", "packages/sports/diagrams/**/*.json"]
+  "kitFiles": ["company/themes/islanders/assets/README.md", "packages/sports/diagrams/islanders-marketing/**/*.md", "packages/sports/diagrams/islanders-marketing/**/*.json"]
 }

@@ -35,6 +35,10 @@ class FriendsThemeContextTest(unittest.TestCase):
             self.assertTrue(guidance in files, 'Friends theme guidance missing from kit')
             self.assertIn('Friends appearance', files['contract/authoring-contract.md'])
             self.assertTrue('packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json' in files, 'Friends marketing story missing from kit')
+            sports_specs = {name for name in files
+                            if name.startswith('packages/sports/diagrams/') and name.endswith('.spec.json')}
+            self.assertEqual(sports_specs,
+                             {'packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json'})
             self.assertIn('Friends appearance', packet_for('seatmap'))
             with tempfile.TemporaryDirectory() as directory:
                 kit = Path(directory)

@@ -1,6 +1,7 @@
 import {test,expect,chooseNavigation,paste,inspectPageElement} from '../helpers/test.mjs';
 import {CORE_EDITOR_SKINS,auditEditorStyle} from '../helpers/node-styles.mjs';
 import {execFileSync} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
 
@@ -25,6 +26,27 @@ async function capture(page,testInfo,name){
   const path=testInfo.outputPath(name+'.png');await page.screenshot({path,fullPage:true});
   await testInfo.attach(name,{path,contentType:'image/png'});
 }
+function rinkFixture(){
+  return {page:{title:'Reusable Islanders venue fixture',skin:'daylight',sections:[{
+    id:'rink',heading:'UBS Arena theme fixture',diagram:{view:'step',nodes:{
+      venue:{title:'Venue theme',sub:'Reusable rink panel fixture',icon:'monitor',tint:'data'}
+    },rows:[['venue']],panels:[{
+      id:'map',type:'seatmap',title:'UBS Arena fixture',venue:'ubs-arena',currency:'USD',
+      initial:{mode:'sold',sold:{'101':12},highlight:'101'}
+    }],steps:[
+      {id:'opening',text:'Opening state.',panels:{map:{sold:{'101':24,'102':18},highlight:'102'}}},
+      {id:'follow-up',text:'Follow-up state.',panels:{map:{sold:{'101':36,'102':30},highlight:'101'}}}
+    ]}
+  }]}};
+}
+function injectRinkFixture(server,testInfo,name,{served=false}={}){
+  const root=fileURLToPath(new URL('../../..',import.meta.url));
+  const spec=testInfo.outputPath(name+'.spec.json');
+  const output=served?path.join(server.root,name+'.html'):testInfo.outputPath(name+'.html');
+  writeFileSync(spec,JSON.stringify(rinkFixture(),null,2));
+  execFileSync('python3',[path.join(root,'tools/inject.py'),spec,path.join(server.root,'template/flowview.html'),output]);
+  return output;
+}
 test('shared Islanders theme survives library, reader, home, copied links and explicit live changes',async({page,server},testInfo)=>{
   await page.context().addCookies([{name:'dv_skin',value:'terminal',url:server.origin}]);
   await page.goto(server.origin+shell+'?theme=islanders');
@@ -32,8 +54,8 @@ test('shared Islanders theme survives library, reader, home, copied links and ex
   await expect(page.locator('.islanders-site-mark')).toBeVisible();
   expect(await page.locator('.islanders-site-mark').evaluate(img=>img.complete && img.naturalWidth===2000)).toBe(true);
   await page.locator('#welcome-library').click();
-  await expect(page.locator('.canon-library-card')).toHaveCount(6);
-  await expect(page.locator('.islanders-card-mark:visible')).toHaveCount(4);
+  await expect(page.locator('.canon-library-card')).toHaveCount(2);
+  await expect(page.locator('.islanders-card-mark:visible')).toHaveCount(1);
   await expect(page.locator('.canon-library-card[data-id="copy-gate"]')).toHaveCount(0);
   await expect(page.locator('.canon-library-card[data-id="nsp15-insertion-evidence"]')).toHaveCount(1);
   await expect(page.locator('.canon-library-card[data-id="nsp15-insertion-evidence"] .islanders-card-mark')).toHaveCount(0);
@@ -41,24 +63,19 @@ test('shared Islanders theme survives library, reader, home, copied links and ex
   const hrefs=await cards.evaluateAll(nodes=>nodes.map(n=>n.href));
   expect(hrefs.every(href=>new URL(href).searchParams.get('theme')==='islanders')).toBe(true);
   const previews=await page.locator('.canon-library-preview img').evaluateAll(nodes=>nodes.map(n=>n.src));
-  expect(new Set(previews).size).toBe(6);
+  expect(new Set(previews).size).toBe(2);
   await capture(page,testInfo,'islanders-library-desktop');
-  await cards.filter({hasText:'1 · Create demand'}).click();
+  await cards.filter({hasText:'Islanders marketing stories'}).click();
   await expect(page.locator('#canon-reader')).toHaveClass(/\bsk-islanders\b/);
   expect(new URL(page.url()).searchParams.get('theme')).toBe('islanders');
-  await expect(page.locator('.seatmap:visible').first()).toBeVisible();
-  await expect(page.locator('.seatmap-islanders-logo:visible').first()).toBeVisible();
-  await expect(page.locator('.seatmap-islanders-ice-label:visible')).toHaveCount(0);
+  await expect(page.locator('#canon-reader .pt-appscreens:visible')).toHaveCount(2);
   await page.evaluate(()=>{window.__copied='';Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied=text;}}});});
   await page.locator('#canon-reader-copy').click();
   await expect.poll(()=>page.evaluate(()=>window.__copied)).toContain('theme=islanders');
-  await capture(page,testInfo,'islanders-create-demand-desktop');
+  await capture(page,testInfo,'islanders-marketing-reader-desktop');
   await page.evaluate(()=>window.dvSetSkin('rose'));
-  await expect(page.locator('.seatmap-islanders-logo:visible')).toHaveCount(0);
-  await expect(page.locator('.seatmap-islanders-ice-label:visible').first()).toBeVisible();
   await expect(page.locator('.islanders-site-mark')).toBeHidden();
   await page.evaluate(()=>window.dvSetSkin('islanders'));
-  await expect(page.locator('.seatmap-islanders-logo:visible').first()).toBeVisible();
   await expect(page.locator('.islanders-site-mark')).toBeVisible();
   await page.evaluate(()=>window.dvSetSkin('rose'));
   await page.locator('#canon-reader-copy').click();
@@ -72,46 +89,25 @@ test('shared Islanders theme survives library, reader, home, copied links and ex
   expect((await page.context().cookies()).find(c=>c.name==='dv_skin').value).toBe('terminal');
 });
 
-test('direct links in either query order override cookies, render all four arcs, and expose the theme picker',async({page,server},testInfo)=>{
-  test.setTimeout(90000); // Four complete stories plus full-page and panel captures.
+test('marketing direct links in either query order override cookies and expose the theme picker',async({page,server},testInfo)=>{
   await page.context().addCookies([{name:'dv_skin',value:'terminal',url:server.origin}]);
-  const arcs=[['season-of-seats',4],['sell-the-inventory',4],['serve-game-night',4],['build-next-season',2]];
-  for(const [index,[id,count]] of arcs.entries()){
-    const query=index%2?'theme=islanders&diagram='+id:'diagram='+id+'&theme=islanders';
+  for(const [index,query] of ['diagram=islanders-marketing&theme=islanders','theme=islanders&diagram=islanders-marketing'].entries()){
     await page.goto(server.origin+shell+'?'+query);
     await expect(page.locator('#canon-reader')).toHaveClass(/\bsk-islanders\b/);
-    await expect(page.locator('#canon-reader .doc-sec')).toHaveCount(count);
+    await expect(page.locator('#canon-reader .reader-tree-tab')).toHaveCount(3);
+    await expect(page.locator('#canon-reader .pt-appscreens:visible')).toHaveCount(2);
     await expect(page.locator('.islanders-site-mark')).toBeVisible();
-    const rinkCount=await page.locator('#canon-reader .seatmap-svg').count();
-    await expect(page.locator('#canon-reader .seatmap-islanders-logo')).toHaveCount(rinkCount);
-    for(const crest of await page.locator('#canon-reader .seatmap-islanders-logo').all()){
-      await expect(crest).toHaveAttribute('href',/^data:image\/png;base64,/);
-      expect(await crest.evaluate(el=>getComputedStyle(el).display)).toBe('inline');
-    }
     await expect(page.locator('[data-reader-skin="islanders"]')).toHaveAttribute('aria-checked','true');
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-    await capture(page,testInfo,'islanders-'+id+'-desktop');
-    for(const type of ['seatmap','grid','funnel','tiles']){
-      const panel=page.locator('#canon-reader .pt-'+type).first();
-      if(!await panel.count())continue;
-      if(type==='funnel' && id!=='build-next-season'){
-        // Directly address a populated narrative state; scrolling an offscreen
-        // section's sticky transport is not needed to capture its panel.
-        const target=id==='sell-the-inventory'?'heritage-night-link&m=step&s=tie':'score-first&m=step&s=chain-fires';
-        await page.goto(server.origin+shell+'?diagram='+id+'&theme=islanders#d='+target);
-        await expect(panel.locator('.funnel-bar').first()).toBeVisible();
-      }
-      await panel.scrollIntoViewIfNeeded();
-      const path=testInfo.outputPath(id+'-'+type+'.png');await panel.screenshot({path});
-      await testInfo.attach(id+'-'+type,{path,contentType:'image/png'});
-    }
+    if(index===0)await capture(page,testInfo,'islanders-marketing-direct-desktop');
   }
 });
 
-test('standalone reader honors shared theme over cookie, source and embed, then accepts live changes',async({page,server})=>{
+test('standalone reader honors shared theme over cookie, source and embed, then accepts live changes',async({page,server},testInfo)=>{
   await page.context().addCookies([{name:'dv_skin',value:'terminal',url:server.origin}]);
-  const spec='../diagrams/friends/season-of-seats/season-of-seats.spec.json';
-  await page.goto(server.origin+'/template/flowview.html?spec='+spec+'&theme=islanders#embed=schaefer-effect&sk=daylight');
+  injectRinkFixture(server,testInfo,'islanders-standalone-rink',{served:true});
+  const url=server.origin+'/islanders-standalone-rink.html';
+  await page.goto(url+'?theme=islanders#embed=rink&sk=daylight');
   await expect(page.locator('#docview')).toHaveClass(/\bsk-islanders\b/);
   await expect(page.locator('.seatmap-islanders-logo:visible').first()).toBeVisible();
   // Embedded raster bytes survive serializing a standalone rink SVG. The
@@ -124,7 +120,7 @@ test('standalone reader honors shared theme over cookie, source and embed, then 
   await expect(page.locator('.seatmap-islanders-logo:visible')).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get('theme')).toBe('blueprint');
   await page.reload();await expect(page.locator('#docview')).toHaveClass(/\bsk-blueprint\b/);
-  await page.goto(server.origin+'/template/flowview.html?theme=invalid&spec='+spec);
+  await page.goto(url+'?theme=invalid');
   await expect(page.locator('#docview')).toHaveClass(/\bsk-terminal\b/);
 });
 
@@ -189,7 +185,11 @@ test('Friends NSP15 opens all eight tabs with readable dark-section text in both
 test('Friends NSP15 setup controls commit strings and Boolean motion without JSON quoting',async({page,server},testInfo)=>{
   test.setTimeout(90000); // Four edits, each checked through a full Undo/Redo render.
   await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence');
-  await page.locator('#canon-reader-edit').click();
+  // NSP15 is the largest Friends document. Enter the editor only after its
+  // fonts and queued reader layout have crossed a painted-frame boundary.
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+  const edit=page.locator('#canon-reader-edit');
+  await expect(edit).toBeEnabled();await edit.click();
   const panel=page.locator('#docview .pt-nspstory').first();
   await inspectPageElement(page,panel.locator('.ptitle'));
   const inspector=page.locator('#guide'),src=page.locator('#src');
@@ -243,10 +243,8 @@ test('marketing tabs retain their panels and the desktop editor retains the sele
   await capture(page,testInfo,'islanders-marketing-editor-desktop');
 });
 
-test('offline sports HTML retains its crest across steps and mode changes at desktop width',async({page,context,server},testInfo)=>{
-  const root=fileURLToPath(new URL('../../..',import.meta.url));
-  const output=testInfo.outputPath('islanders-offline.html');
-  execFileSync('python3',[path.join(root,'tools/inject.py'),path.join(root,'packages/sports/diagrams/season-of-seats/season-of-seats.spec.json'),path.join(server.root,'template/flowview.html'),output]);
+test('offline reusable rink fixture retains its crest across steps and mode changes at desktop width',async({page,context,server},testInfo)=>{
+  const output=injectRinkFixture(server,testInfo,'islanders-offline-rink');
   await page.setViewportSize({width:1280,height:900});
   await context.setOffline(true);
   await page.goto(pathToFileURL(output).href+'?theme=islanders');

@@ -9,10 +9,14 @@ const arcs=[
   ['serve-game-night',['buyer-is-not-attendee','gate-night','score-first','morning-after'],58],
   ['build-next-season',['friend-to-member','clinch-or-fade'],25],
 ];
-test('Friends publishes the consolidated marketing document, four sports arcs and the science story',()=>{
+test('Friends publishes exactly the consolidated marketing document and science story',()=>{
   const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
   const registry=JSON.parse(fs.readFileSync(path.join(root,'canon.json')));
-  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),[...arcs.map(a=>a[0]),'nsp15-insertion-evidence','islanders-marketing']);
+  assert.deepEqual(registry.diagrams.map(d=>path.basename(d.folder)),['nsp15-insertion-evidence','islanders-marketing']);
+});
+
+test('retired sports arcs remain valid preserved sources without being published',()=>{
+  const runtime={console,URL};vm.runInNewContext(entrypoint('native').source,runtime);
   for(const id of ['member-campaign','group-night','fan-event-rsvp']){
     const source=fs.readFileSync(path.join(root,'diagrams/friends',id,id+'.spec.json'),'utf8');
     assert.ok(!fs.existsSync(path.join(root,'packages/sports/diagrams',id,id+'.spec.json')),'retired image-heavy output must not duplicate the active document in the offline kit');

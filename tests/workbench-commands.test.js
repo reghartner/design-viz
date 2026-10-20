@@ -591,6 +591,32 @@ test('planDeleteNode removes placement and touching edges, pruning steps to lega
   assert.ok(!('nodes' in f.steps[1]));
 });
 
+/* Issue #685: deleting a node never leaves rows: [] (the validator rejects it
+   and layout used to throw on it).
+   | row | fixture | assertion (scoped) | rejects |
+   | floats-only section keeps its empty row | rows [[]], floats a,b; delete b | diagram.rows deepEquals [[]] | the empty-row filter that turns [[]] into [] |
+   | last row node deleted | rows [['a']], float b; delete a | diagram.rows deepEquals [[]] | same filter on the last placed row |
+   | other empty rows still collapse | rows [['a'],['b']]; delete a | diagram.rows deepEquals [['b']] | a fix that keeps every emptied row |
+   | result validates | each result | validate(normalize(spec)).errors deepEquals [] | an impl that writes rows: [] or rows: null | */
+test('planDeleteNode keeps one empty row when the last row placement goes', () => {
+  const run = (diagram, id) => {
+    const raw = {page: {title: 'T', blocks: [{heading: 'S', diagram}]}}, text = JSON.stringify(raw, null, 2);
+    const plan = B.planDeleteNode(text, raw, 0, id);
+    assert.ok(!plan.error, plan.error);
+    const next = JSON.parse(plan.text);
+    assert.deepStrictEqual(plain(B.validate(B.normalize(next)).errors), []);
+    return next.page.blocks[0].diagram;
+  };
+  const floatsOnly = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [[]],
+    floats: [{id: 'a', side: 'above'}, {id: 'b', side: 'below'}], edges: [{from: 'a', to: 'b'}]}, 'b');
+  assert.deepStrictEqual(floatsOnly.floats, [{id: 'a', side: 'above'}], 'precondition: b was removed');
+  assert.deepStrictEqual(floatsOnly.rows, [[]]);
+  const lastRow = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [['a']], floats: [{id: 'b', side: 'below'}]}, 'a');
+  assert.deepStrictEqual(lastRow.rows, [[]]);
+  const twoRows = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [['a'], ['b']]}, 'a');
+  assert.deepStrictEqual(twoRows.rows, [['b']]);
+});
+
 test('planDeleteEdge splices the edge and prunes step references unless a duplicate key survives', () => {
   const plan = B.planDeleteEdge(RICH_TEXT, RICH, 0, 0); /* a->b */
   const d = JSON.parse(plan.text).page.blocks[0].diagram;

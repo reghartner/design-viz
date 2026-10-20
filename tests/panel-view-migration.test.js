@@ -1,6 +1,14 @@
 'use strict';
+/* #677 contract matrix (topology-importing specs; ticket "Fix direction" + Chuck's ruling: extend this file).
+   row | fixture | scoped assertion | rejects
+   1 provider-backed check passes | examples/canon/topology/checkout.json + platform.json | migrate(spec,{providers}) returns, report.changed false, spec deepEqual input | impl that validates the unresolved spec (throws "Invalid input")
+   2 authored imports kept, nothing materialized into output | same | spec diagram.topologyImports deepEqual input, no "platform::" node keys | impl that migrates the pre-resolved spec
+   3 focus panel under imports gains arrangements | checkout + homemap panel 'main' | diagram.layouts ids ['home','flow'], topologyImports kept, output materializes with provider and validates clean, rerun unchanged | impl that skips migration for topology sections
+   4 inputs never mutated | rows 1 and 3 | JSON of spec and provider identical before/after | in-place materialization
+   5 missing provider refused with the resolution error | checkout without provider | throws /missing spec platform/ | impl that drops the unresolved-topology error
+   6 CLI --provider | checkout.json + platform.json files | --check exit 0; --output writes authored spec (topologyImports kept); without --provider exit 1, no output file; --provider without a value exit 1 | CLI with no provider option */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
-const {migrate}=require('../tools/migrate-panel-views.cjs');
+const {migrate}=require('../tools/migrate-panel-views.cjs'),core=require('../tools/canon/core.cjs');
 const c=require('./workbench-command-context.cjs')(['graph','layout']);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const diagram=(type='homemap')=>({nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],panels:[{id:'main',type,title:'Scene'}],steps:[{id:'one',nodes:['a']},{id:'two',edge:'a->b'}],paths:[{id:'happy',name:'Happy',steps:['one','two']},{id:'alternate',name:'Alternate',steps:['one']}]});
@@ -80,4 +88,31 @@ test('detail-only owners materialize arrangements without inventing empty Views'
   const raw={blocks:[detail,{tabs:[{label:'Main',sections:[main]}]}]};
   const {spec}=check(raw);assert.equal(spec.views,undefined);assert.equal(spec.defaultView,undefined);assert.equal(spec.blocks[0].diagram.layouts.length,2);assert.deepEqual(spec.blocks[1],raw.blocks[1]);
  }
+});
+
+test('topology-importing specs migrate with authored providers and keep their imports',()=>{
+ const checkoutFile='examples/canon/topology/checkout.json',platformFile='examples/canon/topology/platform.json';
+ const read=f=>JSON.parse(fs.readFileSync(f,'utf8')),checkout=read(checkoutFile),platform=read(platformFile),imports=checkout.page.sections[0].diagram.topologyImports;
+ assert.ok(imports.length && Object.keys(checkout.page.sections[0].diagram.nodes).every(id=>!id.includes('::')),'fixture must import its platform nodes');
+ const run=(raw,providers)=>{const before=JSON.stringify([raw,providers]),result=migrate(raw,{providers});assert.equal(JSON.stringify([raw,providers]),before);return result;};
+ const plainResult=run(checkout,[platform]);
+ assert.equal(plainResult.report.changed,false);assert.deepEqual(plainResult.spec,checkout);
+ const focused=plain(checkout);focused.page.sections[0].diagram.panels=[{id:'main',type:'homemap',title:'Map'}];
+ const {spec,report}=run(focused,[platform]),d=spec.page.sections[0].diagram;
+ assert.equal(report.changed,true);assert.deepEqual(d.layouts.map(v=>v.id),['home','flow']);assert.deepEqual(d.topologyImports,imports);
+ assert.deepEqual(Object.keys(d.nodes),['client']);
+ const resolved=core.materializeTopology([spec,platform])[0];assert.ok(resolved.page.sections[0].diagram.nodes['platform::api']);
+ assert.deepEqual(plain(c.validate(c.normalize(resolved)).errors),[]);
+ assert.equal(run(spec,[platform]).report.changed,false);
+ assert.throws(()=>migrate(checkout),/missing spec platform/);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'panel-views-topology-')),input=path.join(dir,'in.json'),output=path.join(dir,'out.json');
+ try{
+  fs.writeFileSync(input,JSON.stringify(focused));
+  const cli=(...args)=>cp.spawnSync(process.execPath,['tools/migrate-panel-views.cjs',input,...args],{encoding:'utf8'});
+  const checked=cli('--check','--provider',platformFile);assert.equal(checked.status,0,checked.stderr);assert.equal(fs.existsSync(output),false);
+  assert.equal(cli('--output',path.join(dir,'none.json')).status,1);assert.equal(fs.existsSync(path.join(dir,'none.json')),false);
+  assert.equal(cli('--check','--provider').status,1);
+  const written=cli('--output',output,'--provider',platformFile);assert.equal(written.status,0,written.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(output,'utf8')),spec);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

@@ -604,17 +604,19 @@ test('planDeleteNode keeps one empty row when the last row placement goes', () =
     const plan = B.planDeleteNode(text, raw, 0, id);
     assert.ok(!plan.error, plan.error);
     const next = JSON.parse(plan.text);
-    assert.deepStrictEqual(plain(B.validate(B.normalize(next)).errors), []);
-    return next.page.blocks[0].diagram;
+    return {d: next.page.blocks[0].diagram, errors: plain(B.validate(B.normalize(next)).errors)};
   };
   const floatsOnly = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [[]],
     floats: [{id: 'a', side: 'above'}, {id: 'b', side: 'below'}], edges: [{from: 'a', to: 'b'}]}, 'b');
-  assert.deepStrictEqual(floatsOnly.floats, [{id: 'a', side: 'above'}], 'precondition: b was removed');
-  assert.deepStrictEqual(floatsOnly.rows, [[]]);
+  assert.deepStrictEqual(floatsOnly.d.floats, [{id: 'a', side: 'above'}], 'precondition: b was removed');
+  assert.deepStrictEqual(floatsOnly.d.rows, [[]]);
+  assert.deepStrictEqual(floatsOnly.errors, []);
   const lastRow = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [['a']], floats: [{id: 'b', side: 'below'}]}, 'a');
-  assert.deepStrictEqual(lastRow.rows, [[]]);
+  assert.deepStrictEqual(lastRow.d.rows, [[]]);
+  assert.deepStrictEqual(lastRow.errors, []);
   const twoRows = run({nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [['a'], ['b']]}, 'a');
-  assert.deepStrictEqual(twoRows.rows, [['b']]);
+  assert.deepStrictEqual(twoRows.d.rows, [['b']]);
+  assert.deepStrictEqual(twoRows.errors, []);
 });
 
 test('planDeleteEdge splices the edge and prunes step references unless a duplicate key survives', () => {

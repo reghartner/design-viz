@@ -867,7 +867,7 @@ function wireTour(ctl, view, win, config, options){
       ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
     parts.heading.textContent = String(copy.heading || '');
     parts.body.textContent = String(RM && copy.reducedMotionBody != null ? copy.reducedMotionBody : copy.body || '') +
-      /* under reduced motion the engine disables ▶ too — the arrows remain */
+      /* under reduced motion the demo does not auto-advance — the arrows remain */
       (step.demo && step.demo.advance != null && RM && copy.reducedMotionBody == null ?
         ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
     parts.replayExample.hidden=RM || !step.demo || step.demo.advance == null;
@@ -1308,8 +1308,8 @@ function wireTour(ctl, view, win, config, options){
     if(options.restore!==false)restoreReader().then(function(){if(!destroyed)updateDiscovery();});
     if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
     /* Done hands over control: the recap invites pressing ▶, so focus the
-       transport of the section the tour ran in (a step arrow under reduced
-       motion, where the engine disables ▶). Skip/Esc return the reader to
+       transport of the section the tour ran in (a step arrow when ▶ is
+       disabled on a one-step path). Skip/Esc return the reader to
        where they were. */
     var home = done && lastSection && lastSection.sectionEl ? lastSection.sectionEl : null;
     var handoff = home ? (home.querySelector('.playback-button:not([disabled])') ||

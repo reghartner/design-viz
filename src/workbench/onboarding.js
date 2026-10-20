@@ -240,7 +240,9 @@ function initWorkbenchPractice(opts){
   if(chapter==='viewer' || chapter==='example'){
     workspace.canvas.reset();builder.destroy();
     var readerView=doc.getElementById('docview');readerView.replaceChildren();
-    var readerPage=normalize(sample);reader=renderPage(readerView,readerPage,null,null,{autoplay:false});reader.suppressFragmentWrites=true;
+    var readerPage=normalize(sample);// The guided viewer tour starts paused so its lessons point at a fixed
+    // step; the practice viewer is a reader and follows the authored autoplay.
+    reader=renderPage(readerView,readerPage,null,null,chapter==='viewer'?{autoplay:false}:{});reader.suppressFragmentWrites=true;
     // The practice reader replaced the editor renderer. Its canvas and shared
     // navigation must resolve records from this live controller.
     workspace.canvas.bind(function(){return reader;},function(){return readerPage;});
@@ -251,6 +253,8 @@ function initWorkbenchPractice(opts){
       workbenchLandingActivate(reader,section);
       if(initial && initial.view && section)reader.views.ensure(section,initial.view,true);
       if(initial && player){player.jumpSource(initial.step,initial.path);if(initial.mode==='ambient')player.enterAmbient();}
+      // Carrying the homepage card's step pauses playback; resume an authored autoplay.
+      if(player && player.autoplays() && player.mode()==='step' && !player.playing())player.toggleAuto();
     }
     doc.body.classList.add('practice-viewer');
     if(section)workspace.canvas.select(section.number-1);

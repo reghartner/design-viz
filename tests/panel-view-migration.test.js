@@ -3,10 +3,10 @@
    row | fixture | scoped assertion | rejects
    1 provider-backed check passes | examples/canon/topology/checkout.json + platform.json | migrate(spec,{providers}) returns, report.changed false, spec deepEqual input | impl that validates the unresolved spec (throws "Invalid input")
    2 authored imports kept, nothing materialized into output | same | spec diagram.topologyImports deepEqual input, no "platform::" node keys | impl that migrates the pre-resolved spec
-   3 focus panel under imports gains arrangements | checkout + homemap panel 'main' | diagram.layouts ids ['home','flow'], topologyImports kept, output materializes with provider and validates clean, rerun unchanged | impl that skips migration for topology sections
+   3 focus panel under imports gains arrangements | checkout + homemap panel 'main' + second import from provider 'audit' (platform copy) | diagram.layouts ids ['home','flow'], topologyImports kept, output materializes with provider and validates clean, rerun unchanged | impl that skips migration for topology sections
    4 inputs never mutated | rows 1 and 3 | JSON of spec and provider identical before/after | in-place materialization
    5 missing provider refused with the resolution error | checkout without provider | throws /missing spec platform/ | impl that drops the unresolved-topology error
-   6 CLI --provider | checkout.json + platform.json files | --check exit 0; --output writes authored spec (topologyImports kept); without --provider exit 1, no output file; --provider without a value exit 1 | CLI with no provider option */
+   6 CLI --provider is repeatable | row 3 fixture + platform.json + audit provider file | --check with both exit 0; either provider alone exit 1; --output writes authored spec (topologyImports kept); without --provider exit 1, no output file; --provider without a value exit 1 | CLI with no provider option, or one that keeps only the first/last --provider */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
 const {migrate}=require('../tools/migrate-panel-views.cjs'),core=require('../tools/canon/core.cjs');
 const c=require('./workbench-command-context.cjs')(['graph','layout']);
@@ -97,22 +97,25 @@ test('topology-importing specs migrate with authored providers and keep their im
  const run=(raw,providers)=>{const before=JSON.stringify([raw,providers]),result=migrate(raw,{providers});assert.equal(JSON.stringify([raw,providers]),before);return result;};
  const plainResult=run(checkout,[platform]);
  assert.equal(plainResult.report.changed,false);assert.deepEqual(plainResult.spec,checkout);
- const focused=plain(checkout);focused.page.sections[0].diagram.panels=[{id:'main',type:'homemap',title:'Map'}];
- const {spec,report}=run(focused,[platform]),d=spec.page.sections[0].diagram;
- assert.equal(report.changed,true);assert.deepEqual(d.layouts.map(v=>v.id),['home','flow']);assert.deepEqual(d.topologyImports,imports);
+ const audit=plain(platform);audit.page.canon.id='audit';audit.page.title='Audit';
+ const focused=plain(checkout);focused.page.sections[0].diagram.panels=[{id:'main',type:'homemap',title:'Map'}];focused.page.sections[0].diagram.topologyImports.push({spec:'audit',export:'core',as:'audit'});
+ const focusedImports=plain(focused.page.sections[0].diagram.topologyImports);
+ const {spec,report}=run(focused,[platform,audit]),d=spec.page.sections[0].diagram;
+ assert.equal(report.changed,true);assert.deepEqual(d.layouts.map(v=>v.id),['home','flow']);assert.deepEqual(d.topologyImports,focusedImports);
  assert.deepEqual(Object.keys(d.nodes),['client']);
- const resolved=core.materializeTopology([spec,platform])[0];assert.ok(resolved.page.sections[0].diagram.nodes['platform::api']);
+ const resolved=core.materializeTopology([spec,platform,audit])[0];assert.ok(resolved.page.sections[0].diagram.nodes['platform::api'] && resolved.page.sections[0].diagram.nodes['audit::api']);
  assert.deepEqual(plain(c.validate(c.normalize(resolved)).errors),[]);
- assert.equal(run(spec,[platform]).report.changed,false);
+ assert.equal(run(spec,[platform,audit]).report.changed,false);
  assert.throws(()=>migrate(checkout),/missing spec platform/);
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'panel-views-topology-')),input=path.join(dir,'in.json'),output=path.join(dir,'out.json');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'panel-views-topology-')),input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),auditFile=path.join(dir,'audit.json');
  try{
-  fs.writeFileSync(input,JSON.stringify(focused));
+  fs.writeFileSync(input,JSON.stringify(focused));fs.writeFileSync(auditFile,JSON.stringify(audit));
   const cli=(...args)=>cp.spawnSync(process.execPath,['tools/migrate-panel-views.cjs',input,...args],{encoding:'utf8'});
-  const checked=cli('--check','--provider',platformFile);assert.equal(checked.status,0,checked.stderr);assert.equal(fs.existsSync(output),false);
+  const checked=cli('--check','--provider',platformFile,'--provider',auditFile);assert.equal(checked.status,0,checked.stderr);assert.equal(fs.existsSync(output),false);
   assert.equal(cli('--output',path.join(dir,'none.json')).status,1);assert.equal(fs.existsSync(path.join(dir,'none.json')),false);
+  assert.equal(cli('--check','--provider',platformFile).status,1);assert.equal(cli('--check','--provider',auditFile).status,1);
   assert.equal(cli('--check','--provider').status,1);
-  const written=cli('--output',output,'--provider',platformFile);assert.equal(written.status,0,written.stderr);
+  const written=cli('--output',output,'--provider',platformFile,'--provider',auditFile);assert.equal(written.status,0,written.stderr);
   assert.deepEqual(JSON.parse(fs.readFileSync(output,'utf8')),spec);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

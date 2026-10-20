@@ -135,3 +135,27 @@ test('the CLI retains findings and batch exit status when no renderer source is 
     }
   } finally { fs.rmSync(isolated, {recursive: true, force: true}); }
 });
+
+/* Issue #685: an empty rows array.
+   | row | fixture | assertion (scoped) | rejects |
+   | layout tolerates rows: [] | floats-only diagram (above, below, positioned) with rows: [] | core.layout returns the same pos/H/vb as rows: [[]] | a layout that reads rowsMeta[last].top unguarded; an early return of empty positions |
+   | input stays authored | same diagram | diagram.rows still deepEquals [] after layout | a fix that writes rows = [[]] into the caller's spec |
+   | edges still route | edge between two floats | edgePath on the rows: [] layout equals the rows: [[]] path | positions without float geometry |
+   The Workbench float drag calls layout() on the authored diagram, so this
+   is the throw behind the drag-ghost errors. */
+test('layout treats an empty rows array as one empty row and leaves the spec unchanged', () => {
+  const core = withoutDOM();
+  vm.runInContext(readSource('validator.js'), core);
+  const diagram = rows => ({nodes: {a: {}, b: {}, c: {}}, rows,
+    floats: [{id: 'a', side: 'above'}, {id: 'b', side: 'below'}, {id: 'c', side: 'below', x: 400, y: 300}],
+    edges: [{from: 'a', to: 'b'}]});
+  const empty = diagram([]), oneEmptyRow = diagram([[]]);
+  const expected = core.layout(oneEmptyRow);
+  assert.equal(Object.keys(expected.pos).length, 3, 'precondition: the [[]] layout places every float');
+  const actual = core.layout(empty);
+  assert.deepEqual(plain(actual.pos), plain(expected.pos));
+  assert.equal(actual.H, expected.H);
+  assert.deepEqual(plain(actual.vb), plain(expected.vb));
+  assert.equal(core.edgePath(empty.edges[0], actual), core.edgePath(oneEmptyRow.edges[0], expected));
+  assert.deepEqual(empty.rows, []);
+});

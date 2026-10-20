@@ -150,6 +150,24 @@ test('selected stacked and floating nodes remain placed without copying the pare
   assert.ok(!(result.parent.floats || []).some(item=>item.id==='store'));
 });
 
+/* Issue #685: extraction never leaves the parent with rows: [].
+   | row | fixture | assertion (scoped) | rejects |
+   | extraction is allowed | fixture() with rows [[]] and every node a float; extract accept+store | plan.error is undefined | today's refusal "rows: required" after the parent's empty row is dropped |
+   | floats-only parent keeps its empty row | fixture() with rows [[]] and every node a float; extract accept+store | parent diagram rows deepEquals [[]] | extractionRows dropping the authored empty row |
+   | domain still placed as a float | same | parent.floats contains plan.id | a fix that moves the domain into the empty row |
+   | result validates | same | valid(next) | an impl that writes rows: [] | */
+test('extracting from a floats-only parent keeps one empty row',()=>{
+  const raw=fixture(),d=diagram(raw);
+  d.rows=[[]];d.floats=['client','accept','store','audit'].map((id,i)=>({id,side:i%2?'below':'above'}));
+  valid(raw);
+  const plan=B.planExtractIndependentDiagram(JSON.stringify(raw,null,2),raw,0,['accept','store'],{mode:'local',title:'Orders'});
+  assert.equal(plan.error,undefined,plan.error);
+  const next=JSON.parse(plan.text),parent=diagram(next);
+  assert.ok(parent.floats.some(item=>item.id===plan.id),'precondition: the domain node replaces the selected float');
+  assert.deepEqual(parent.rows,[[]]);
+  valid(next);
+});
+
 test('parent lane routing stays authored while the child starts with an independent layout',()=>{
   const raw=fixture(),d=diagram(raw);d.routing='lanes';valid(raw);
   const result=extract(raw);assert.equal(result.parent.routing,'lanes');noInheritedStory(childOf(result));

@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -49,7 +50,7 @@ test('strandscene template, picker example, feature label, styles and sizing use
   assert.match(css, /prefers-reduced-motion: reduce\)\{\.mech-move[^}]*transition:none\}\.mech-transient\{display:none\}/);
   assert.match(css, /@media print\{\.mech-transient\{display:none\}/);
   assert.ok(def.styles.indexOf('.bio-b-') < 0 && def.styles.indexOf('.bio-tone-') < 0 && def.styles.indexOf('--bio-letter:#') < 0, 'letter and tone palettes are reused, not redefined');
-  for (const file of ['src/panels/types/strandscene.js', 'src/panels/mech.js'])
+  for (const file of ['packages/science/panels/types/strandscene.js', 'packages/science/panels/mech.js'])
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), /requestAnimationFrame|setTimeout|setInterval/, file);
 });
 
@@ -60,12 +61,12 @@ test('the model resolves pieces, overhangs, actor coordinates, camera and the na
   assert.equal(whole.lowerText, 'TCGATGCCTAGAATTCTGCAACGT'); assert.equal(whole.rungs.length, 24);
   assert.equal(whole.letters[0].x, 61.5); assert.equal(whole.letters[23].x, 498.5); assert.equal(whole.letters[11].x, 270.5);
   const enz = whole.actors[0];
-  assert.equal(enz.at, 11); assert.equal(enz.x, whole.letters[10].x); assert.equal(enz.y, 150 - 5 - 22); assert.equal(enz.state, 'bound'); assert.equal(enz.piece, 0);
+  assert.equal(enz.at, 11); assert.equal(enz.x, whole.letters[10].x); assert.equal(enz.y, 150 - 13 - 22); assert.equal(enz.state, 'bound'); assert.equal(enz.piece, 0);
   assert.deepEqual(plain(whole.letters.filter(l => l.hot).map(l => l.coord)), [9, 10, 11, 12, 13, 14]);
   assert.equal(whole.sites[0].hot, true); assert.equal(whole.sites[0].cut, false); assert.equal(whole.sites[0].x1, 204); assert.equal(whole.sites[0].x2, 318);
   assert.equal(whole.aria, 'Double strand 1 to 24; cleavage site 9 to 14; enzyme bound at 11.');
   const scanning = C.strandsceneModel(p, states[0]);
-  assert.equal(scanning.actors[0].y, 150 - 5 - 22 - 20); assert.deepEqual(plain(scanning.letters.filter(l => l.passed).map(l => l.coord)), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(scanning.actors[0].y, 150 - 13 - 22 - 14); assert.deepEqual(plain(scanning.letters.filter(l => l.passed).map(l => l.coord)), [1, 2, 3, 4, 5, 6, 7, 8]);
   const cut = C.strandsceneModel(p, states[2]);
   assert.deepEqual(plain(cut.pieces), [
     {index:0, upperFrom:1, upperTo:9, lowerFrom:1, lowerTo:13, dx:-28, dy:22},
@@ -74,7 +75,7 @@ test('the model resolves pieces, overhangs, actor coordinates, camera and the na
   assert.equal(cut.lowerLetters.filter(l => l.piece === 0).map(l => l.ch).join(''), 'TCGATGCCTAGAA', 'product A keeps a four-letter overhang');
   assert.equal(cut.lowerLetters.filter(l => l.piece === 1).map(l => l.ch).join(''), 'TTCTGCAACGT');
   assert.equal(cut.rungs.length, 20); assert.equal(cut.sites[0].cut, true); assert.equal(cut.sites[0].hidden, true);
-  assert.equal(cut.actors[0].piece, 1); assert.equal(cut.actors[0].x, 251.5 + 28); assert.equal(cut.actors[0].y, 150 - 22 - 5 - 22);
+  assert.equal(cut.actors[0].piece, 1); assert.equal(cut.actors[0].x, 251.5 + 28); assert.equal(cut.actors[0].y, 150 - 22 - 13 - 22);
   assert.match(cut.aria, /enzyme active at 11; cut after 9 and 13\.$/);
   const apart = C.strandsceneModel(p, states[3]);
   assert.deepEqual(plain(apart.labels.map(l => [l.x, l.y, l.text])), [[118.5 - 28, 190 + 46 + 22, 'product A · 1–9 / 1–13'], [403.5 + 28, 150 - 36 - 22, 'product B · 10–24 / 14–24']]);
@@ -213,7 +214,7 @@ test('markup is the settled end state; motion is glide, transient, pulse, settle
   assert.doesNotMatch(first.html, /mech-transient|style="transform/); assert.match(first.html, /mech-st-scanning/); assert.match(first.html, /scanning →/);
   const bind = render(host, p, states[1], true, states, 1);
   assert.match(bind.html, /mech-transient mech-ripple k-bind" style="--mx:251\.5px;--my:175px;animation-delay:0ms"/);
-  assert.match(bind.html, /mech-move mech-actor-move" style="transform:translate\(0px,-20px\)"/, 'the enzyme glides down from its hover position');
+  assert.match(bind.html, /mech-move mech-actor-move" style="transform:translate\(0px,-14px\)"/, 'the enzyme glides down from its hover position');
   assert.equal((bind.html.match(/mech-move[^>]*style="transform/g) || []).length, 1, 'only the moved actor glides');
   assert.doesNotMatch(bind.baseline, /mech-transient|style="transform/); assert.equal(bind.pulse.selector, '.mech-chip[data-id="enz"]'); assert.equal(bind.pulse.changed, true);
   assert.match(bind.html, /mech-site bio-tone-accent hot/);
@@ -226,7 +227,7 @@ test('markup is the settled end state; motion is glide, transient, pulse, settle
   assert.doesNotMatch(cut.baseline, /mech-transient|style="transform/); assert.equal(cut.pulse.selector, '.mech-chip[data-id="enz"]');
   assert.doesNotMatch(cut.html, /mech-ruler/, 'the ruler is gone once pieces drift');
   const apart = render(host, p, states[3], true, states, 3);
-  assert.doesNotMatch(apart.html, /mech-transient/); assert.match(apart.html, /mech-actor-move" style="transform:translate\(-190\.5px,41px\)"/);
+  assert.doesNotMatch(apart.html, /mech-transient/); assert.match(apart.html, /mech-actor-move" style="transform:translate\(-190\.5px,33px\)"/);
   assert.equal((apart.html.match(/mech-appear/g) || []).length, 2, 'new callouts enter'); assert.doesNotMatch(apart.baseline, /mech-appear/);
   assert.equal(apart.patch(), false, 'a moving step never takes the surgical path');
   const still = {};

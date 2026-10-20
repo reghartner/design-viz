@@ -15,6 +15,13 @@ const origin='https://flowview-folder.test';
 // that a human granted native browser permission or that Claude's Monitor ran.
 async function setup(page){
   const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0,readGate=null,listener;const requests=[],errors=[],writes=[];
+  async function retireListener(){
+    const child=listener;listener=null;
+    // SIGTERM leaves exitCode null: signalCode distinguishes it from a live child.
+    if(child && child.exitCode===null && child.signalCode===null){
+      await new Promise(resolve=>{child.once('close',resolve);child.kill();});
+    }
+  }
   await writeFile(path.join(folder,'README.md'),'Existing agent project notes.');
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
@@ -67,11 +74,11 @@ async function setup(page){
       await expect.poll(async()=>{try{return JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;}catch{return null;}}).toBeTruthy();
       // A renewed session retires the old watcher; start one for the current connection.
       const connection=JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;
-      if(listener && listener.exitCode===null && listener.connection!==connection){listener.kill();await new Promise(resolve=>listener.once('close',resolve));}
-      if(!listener || listener.exitCode!==null){listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});listener.connection=connection;}
+      if(listener && (listener.connection!==connection || listener.exitCode!==null || listener.signalCode!==null))await retireListener();
+      if(!listener){listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});listener.connection=connection;}
       await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
     },
-    cleanup:async()=>{listener?.kill();if(listener && listener.exitCode===null)await new Promise(resolve=>listener.once('close',resolve));await rm(folder,{recursive:true,force:true});}};
+    cleanup:async()=>{await retireListener();await rm(folder,{recursive:true,force:true});}};
 }
 async function closeGuide(page){
   const guide=page.locator('#folder-agent-guide');

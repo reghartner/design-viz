@@ -5,6 +5,7 @@ Usage:
   python3 tools/widget_doc.py thermo battery        # those two widgets
   python3 tools/widget_doc.py --list                # valid type names
   python3 tools/widget_doc.py --contract-card       # the message-contract card section
+  python3 tools/widget_doc.py --config site.json cellscene  # external site in a source checkout
 
 Reads contract/authoring-contract.md live (no generated copies to drift),
 with any company/contract/*.md fragments appended. A fragment documents its
@@ -15,6 +16,7 @@ enterOnce) always prints after them. Unknown names exit 2 and print the
 valid list on stderr.
 """
 import re
+import os
 import sys
 from pathlib import Path
 
@@ -104,6 +106,17 @@ def load_sections(text):
 
 
 def main(argv):
+    if '--config' in argv:
+        if not (ROOT / 'tools/source-loader.cjs').is_file():
+            print('--config is available only in a source checkout; this kit has a fixed package selection', file=sys.stderr)
+            return 2
+        index = argv.index('--config')
+        if index + 1 >= len(argv) or argv[index + 1].startswith('--'):
+            print('usage: widget_doc.py [--config site.json] --list|TYPE...', file=sys.stderr)
+            return 2
+        os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
+        os.environ['FLOWVIEW_SITE_CONFIG'] = str(Path(argv[index + 1]).resolve())
+        argv = argv[:index] + argv[index + 2:]
     card, intro, tail, blocks = load_sections(contract_text(ROOT))
     if "--list" in argv:
         print(" ".join(sorted(blocks)))

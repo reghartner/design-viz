@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -13,6 +14,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const validate = d => plain(C.validate(C.normalize(d)));
 const near = (a,b) => assert.ok(Math.abs(a-b)<1e-7, `${a} ≈ ${b}`);
 const HOSTILE = '<img src=x onerror=bad()>';
+
 
 function panel() {
   return {
@@ -352,9 +354,14 @@ test('all authored text is escaped; the markup carries titles, aria totals, hatc
   assert.match(html, /<pattern id="spm-static"/);
   assert.match(html, /class="seatmap-hold" d="M[\d.,L]+Z" fill="url\(#spm-static\)"/);
   assert.match(html, /class="seatmap-sec seatmap-hi" data-sec="101"/);
-  assert.match(html, /fill="var\(--seatmap-accent\)" fill-opacity="0.640"/);
-  assert.match(html, /class="seatmap-lbl seatmap-lbl-on"/);
-  assert.match(C.seatmapHTML(p, {mode:'tier'}), /fill="#D7A34F"[^>]*><title>[^<]*<\/title><\/path><text class="seatmap-lbl seatmap-lbl-dark"/);
+  /* Fills take one of ten classed skin bins (--seatmap-r1..r10, 10% each): ink labels on r1-r6, inverse labels from 60% (r7-r10). */
+  const ROWS = '(?:<path class="seatmap-rows" d="[^"]+"\\/>)?';
+  assert.match(html, /fill="var\(--seatmap-r7\)" fill-opacity="1.000"/);
+  assert.match(html, new RegExp('fill="var\\(--seatmap-r7\\)" fill-opacity="1.000"><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-on"'));
+  assert.doesNotMatch(C.seatmapHTML(p, {sold:{101:30}}), /class="seatmap-lbl seatmap-lbl-on"/);
+  assert.match(C.seatmapHTML(p, {sold:{101:30}}), /data-sec="101"><path class="seatmap-fill" d="[^"]+" fill="var\(--seatmap-r4\)"/);
+  assert.match(C.seatmapHTML(p, {sold:{101:90}}), new RegExp('fill="var\\(--seatmap-r10\\)" fill-opacity="1.000"><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-on"'));
+  assert.match(C.seatmapHTML(p, {mode:'tier'}), new RegExp('fill="#D7A34F"[^>]*><title>[^<]*</title></path>' + ROWS + '<text class="seatmap-lbl seatmap-lbl-dark"'));
   assert.match(html, /class="seatmap-outline"/);
   assert.match(html, /seatmap-stat-warn/);
   assert.match(html, /class="swnote">&lt;img/);
@@ -397,7 +404,7 @@ test('typed authoring collects maps and modes through the shared field pipeline'
 });
 
 test('narrow lettered section ids stack their letter on a second line; labels below 9 units are hidden but keep their tooltip', () => {
-  const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/sports/arena-sections.sections.json'), 'utf8'));
+  const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '../packages/sports/examples/arena-sections.sections.json'), 'utf8'));
   const p = Object.assign({id:'map', type:'seatmap'}, seed);
   const m = C.seatmapModel(p, {});
   const by = Object.fromEntries(m.sections.map(s => [s.id, s]));
@@ -408,8 +415,8 @@ test('narrow lettered section ids stack their letter on a second line; labels be
   assert.deepEqual(plain(by['103'].lines), ['103']);
   assert.ok(by['201A'].font > C.seatmapLabelFont('201A', {arc: 30, depth: 60}).font || true);
   const html = C.seatmapHTML(p, {});
-  assert.match(html, /<text class="seatmap-lbl[^"]*" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" dy="-0.2em">201<tspan x="[\d.]+" dy="1.05em">A<\/tspan><\/text>/);
-  assert.match(html, /dy="0.35em">103<\/text>/, 'wide wedges keep one line');
+  assert.match(html, /<text class="seatmap-lbl[^"]*" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" dy="-0.2em" data-fit="[\d.]+">201<tspan x="[\d.]+" dy="1.05em">A<\/tspan><\/text>/);
+  assert.match(html, /dy="0.35em" data-fit="[\d.]+">103<\/text>/, 'wide wedges keep one line');
   const tiny = panel(); tiny.sections = []; for (let i = 0; i < 160; i++) tiny.sections.push({id:'S' + i, ring:'lower', capacity:1, zone:'corner'});
   const tm = C.seatmapModel(tiny, {});
   assert.ok(tm.sections.some(s => s.font === 0), 'very narrow wedges hide the label');

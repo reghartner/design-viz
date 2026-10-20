@@ -1,0 +1,26 @@
+{
+  "pages": [
+    {
+      "file": "copy-gate.html",
+      "spec": "copy-gate.spec.json",
+      "title": "From viral RNA copying to sequencing evidence",
+      "family": "copy-gate",
+      "description": "A conceptual positive-sense RNA copy gate followed by an illustrative, strand-aware RNA-seq reading exercise. Source limits separate RNA detection from claims of active replication or infectivity.",
+      "tags": [
+        "biology",
+        "virology",
+        "rna-seq",
+        "sequencing",
+        "positive-sense-rna",
+        "teaching"
+      ],
+      "widgets": [
+        "cellscene",
+        "funnel",
+        "grid",
+        "locus",
+        "rnacopy"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,9 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const repo=fileURLToPath(new URL('../../..',import.meta.url));
-const fixture=path.join(repo,'src/starters/sequencing-walkthrough.json');
+const scienceEnabled=(process.env.FLOWVIEW_PACKAGES||'').split(',').includes('science');
+test.skip(!scienceEnabled,'The science package is opt-in for browser builds.');
+const fixture=path.join(repo,'packages/science/starters/sequencing-walkthrough.json');
 
 test('sequencing walkthrough drives all six sequence panels through both endings',async({page,server},testInfo)=>{
   execFileSync('python3',[path.join(repo,'tools/inject.py'),fixture,path.join(repo,'template/flowview.html'),path.join(server.root,'sequencing.html')]);

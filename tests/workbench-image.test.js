@@ -25,7 +25,7 @@ function kitFiles(html){
 }
 
 function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
-  for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon',
+  for(const folder of ['deploy/workbench','tools/canon','workbench','src','packages','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon',
     ...markedExamples()]){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }

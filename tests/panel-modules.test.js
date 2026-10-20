@@ -14,7 +14,9 @@ function core(overrides = {}) {
 test('every supported panel has one discoverable renderer and duplicate registration fails', () => {
   const c = core();
   // Company overlay types (company/panels/types) are discovered the same way.
-  const files = sourceFiles('validator.js').filter(file => /^(?:@company\/)?panels\/types\//.test(file));
+  const files = sourceFiles('validator.js').filter(file =>
+    file.startsWith('panels/types/') || file.startsWith('@company/panels/types/') ||
+    /^@package\/[^/]+\/panels\/types\//.test(file));
   assert.deepEqual(files.map(file => path.basename(file, '.js')).sort(), Array.from(c.PANEL_TYPES).sort());
   assert.deepEqual(Array.from(c.PanelViews.types()).sort(), Array.from(c.PANEL_TYPES).sort());
   assert.throws(() => c.PanelViews.register('gauge', () => ({})), /Duplicate/);
@@ -30,7 +32,7 @@ test('adding a renderer file needs no assembly-list or shared lifecycle edit', (
     fs.mkdirSync(path.join(root,'core'),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'../src/source-bundles.json'),path.join(root,'source-bundles.json'));
     // The synthetic root holds upstream sources only; it has no company overlay.
-    for (const file of sourceFiles('validator.js').filter(file => !file.startsWith('panels/types/') && !file.startsWith('@company/'))) {
+    for (const file of sourceFiles('validator.js').filter(file => !file.startsWith('panels/types/') && !file.startsWith('@'))) {
       fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});
       fs.copyFileSync(path.join(__dirname,'../src',file),path.join(root,file));
     }

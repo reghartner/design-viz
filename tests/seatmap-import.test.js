@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = [...new Set([...(process.env.FLOWVIEW_PACKAGES || '').split(',').filter(Boolean), 'sports'])].join(',');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,9 +11,9 @@ const {readSource} = require('../tools/source-loader.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const TOOL = path.join(ROOT, 'tools/seatmap-import.mjs');
-const CSV = path.join(ROOT, 'examples/sports/arena-sections.csv');
+const CSV = path.join(ROOT, 'packages/sports/examples/arena-sections.csv');
 const SVG = path.join(__dirname, 'fixtures/seatmap-chart.svg');
-const SEED = path.join(ROOT, 'examples/sports/arena-sections.sections.json');
+const SEED = path.join(ROOT, 'packages/sports/examples/arena-sections.sections.json');
 const importer = () => import(TOOL);
 const C = {URL, TextEncoder, console};
 vm.createContext(C);

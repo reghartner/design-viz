@@ -301,18 +301,6 @@
       ]
     },
     {
-      "file": "membrane-signal/membrane-signal.html",
-      "spec": "membrane-signal/membrane-signal.spec.json",
-      "title": "A signal crosses the membrane and the cell divides",
-      "family": "membrane-signal",
-      "description": "",
-      "tags": [],
-      "widgets": [
-        "cellscene",
-        "log"
-      ]
-    },
-    {
       "file": "nestrel-warden/warden.html",
       "spec": "nestrel-warden/warden.spec.json",
       "title": "Nestrel Warden — a cloud camera that remembers the outage",
@@ -399,33 +387,6 @@
         "waterfall",
         "xray",
         "zoneframe"
-      ]
-    },
-    {
-      "file": "sports/venue-map.html",
-      "spec": "sports/venue-map.spec.json",
-      "title": "Venue map — a sell-through story",
-      "family": "sports",
-      "description": "A venue map panel: presale fills the lower bowl, a group hold appears and converts, a promo lifts the upper deck, then the story forks between a sellout and a repriced upper tier.",
-      "tags": [
-        "sports",
-        "ticketing",
-        "seatmap",
-        "venue-map"
-      ],
-      "widgets": [
-        "seatmap"
-      ]
-    },
-    {
-      "file": "strand-cut/strand-cut.html",
-      "spec": "strand-cut/strand-cut.spec.json",
-      "title": "A bacterium cuts foreign DNA",
-      "family": "strand-cut",
-      "description": "",
-      "tags": [],
-      "widgets": [
-        "strandscene"
       ]
     },
     {

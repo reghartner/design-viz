@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -156,4 +157,22 @@ test('the cursor glides between cells in one row and settles without motion', ()
   const hidden = render(host, p, {cursor:null}, null, [], 3, true);
   assert.doesNotMatch(hidden.html, /seq-cur"/);
   assert.match(render(host, p, {cursor:2}, null, [], 4, true).html, /--seq-at:1"/);
+});
+
+
+test('reveal animation only decorates newly shown letters and seeking returns settled markup', () => {
+  const render = C.PanelViews.get('sequence'), p = panel({}), host = {};
+  render(host, p, {reveal:3}, null, [], 0, false);
+  const advanced = render(host, p, {reveal:8}, null, [], 1, true);
+  assert.equal((advanced.html.match(/ seq-new/g) || []).length, 5);
+  assert.equal(advanced.baseline, html(p, {reveal:8}));
+  assert.doesNotMatch(advanced.baseline, /seq-new|--seq-k/);
+  const sought = render(host, p, {reveal:12}, null, [], 2, false);
+  assert.equal(sought.html, html(p, {reveal:12}));
+  assert.equal(sought.baseline, null);
+  const replaced = render(host, panel({sequence:'T'.repeat(48)}), {reveal:20}, null, [], 3, true);
+  assert.doesNotMatch(replaced.html, /seq-new|--seq-k/);
+  assert.equal(replaced.baseline, null);
+  const backwards = render(host, p, {reveal:1}, null, [], 0, true);
+  assert.doesNotMatch(backwards.html, /seq-new|--seq-k/);
 });

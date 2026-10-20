@@ -1,0 +1,21 @@
+{
+  "name": "physics",
+  "sourceFiles": [
+    "panels/types/forcebody.js",
+    "panels/types/wavefield.js"
+  ],
+  "routes": {
+    "forcebody": "cookbook/physics-panels.md",
+    "wavefield": "cookbook/physics-panels.md"
+  },
+  "templates": [
+    {
+      "name": "Waves & forces",
+      "desc": "Explore interference with a screen probe, then compare force, velocity and acceleration in explicit mass trials.",
+      "category": "physics",
+      "tag": "Physics · idealized models",
+      "art": "perspectives",
+      "source": "starters/waves-and-forces.json"
+    }
+  ]
+}

@@ -35,7 +35,9 @@ export async function vendorFlowview(source, destination) {
   // Offline-kit examples carry an .agent-kit marker; company/ is the fork overlay.
   const marked = tracked.filter(name => name.startsWith('examples/') && path.posix.basename(name) === '.agent-kit')
     .map(name => path.posix.dirname(name) + '/');
-  const inputs = ['src/', 'tools/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
+  // Optional package sources must accompany the company selection while building;
+  // only the compiled runtime is copied to the destination below.
+  const inputs = ['src/', 'tools/', 'packages/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
     '.claude/skills/hld-to-page/', 'examples/canon/', ...marked, 'company/', 'diagrams/'];
   try {
     for (const name of tracked.filter(name => ['canon.json', 'LICENSE'].includes(name) || inputs.some(prefix => name.startsWith(prefix)))) {

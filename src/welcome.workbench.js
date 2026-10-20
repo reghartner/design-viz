@@ -48,7 +48,10 @@ function welcomeAgentPrompt(kind, brief, audience, repository, level){
 
 /* Stable public links identify a document, independent of its source filename. */
 function canonDiagramURL(href,id){
-  var url=new URL(href);url.search='';url.hash='';url.searchParams.set('diagram',id);return url.href;
+  var url=new URL(href),theme=url.searchParams.get('theme');
+  url.search='';url.hash='';if(id!=null)url.searchParams.set('diagram',id);
+  if(SKIN_NAMES.indexOf(theme)>=0)url.searchParams.set('theme',theme);
+  return url.href;
 }
 
 /* Screens are history entries, not project snapshots. The small visit marker
@@ -182,6 +185,10 @@ function initWorkbenchWelcome(opts){
   var templateGrid = document.getElementById('welcome-templates');
   var filter = 'all';
   var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices'};
+  templates.forEach(function(entry){
+    if (entry.category && !Object.prototype.hasOwnProperty.call(categories, entry.category))
+      categories[entry.category] = entry.categoryLabel || entry.category.charAt(0).toUpperCase() + entry.category.slice(1);
+  });
   var blank = {name:'Blank diagram', category:'blank', desc:'A clean canvas for your own nodes, connections, and story.',
     spec:welcomeBlankSpec()};
   function el(id){ return document.getElementById(id); }
@@ -253,6 +260,10 @@ function initWorkbenchWelcome(opts){
     selectScreen(name,focus);
   }
   function display(screen,focus){
+    // History can restore an older theme query. An explicit session choice
+    // still owns the shell, so keep the shared address aligned with it.
+    if(typeof opts.skin==='function')updateThemeURL(window,opts.skin());
+    if(homeLink)homeLink.href=canonDiagramURL(window.location.href,null);
     if(library)library.hide();
     if(screen==='build'){buildWithAgent('external',false,true);return;}
     if(screen==='editor'){
@@ -283,7 +294,7 @@ function initWorkbenchWelcome(opts){
   var homeLink=el('workbench-home');
   /* Keep a real, rename-safe navigation target for open-in-new-tab and for
      the no-script fallback. Ordinary clicks retain the in-app history. */
-  homeLink.href=window.location.pathname;
+  homeLink.href=canonDiagramURL(window.location.href,null);
   homeLink.addEventListener('click', function(ev){
     if(ev.button!==0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey)return;
     ev.preventDefault();show();
@@ -493,7 +504,7 @@ function initWorkbenchWelcome(opts){
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor, buildWithAgent:function(){buildWithAgent('external',true);},
-    setSkin:function(skin){if(library && library.setSkin)library.setSkin(skin);},
+    setSkin:function(skin){homeLink.href=canonDiagramURL(window.location.href,null);if(library && library.setSkin)library.setSkin(skin);},
     localProjectOpened:navigation.localProject,
     canonicalLoaded:function(){if(navigation.screen()==='editor')displayEditor(false);else updateResume();}};
 }

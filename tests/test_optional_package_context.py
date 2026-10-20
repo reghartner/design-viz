@@ -1,0 +1,140 @@
+"""The selected package must match what agents receive in the offline kit."""
+import base64
+import gzip
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'tools'))
+from company_overlay import contract_text  # noqa: E402
+from folder_agent_kit import folder_agent_kit  # noqa: E402
+
+
+def kit_files():
+    payload = json.loads(folder_agent_kit(ROOT, '// test runtime'))
+    return json.loads(gzip.decompress(base64.b64decode(payload['gzip'])))['files']
+
+
+def packet_for(panel):
+    return subprocess.check_output(['python3', str(ROOT / 'tools/authoring-packet.py'),
+                                    '--panel', panel, '--mode', 'edit'],
+                                   text=True, stderr=subprocess.DEVNULL)
+
+
+class OptionalPackageContextTest(unittest.TestCase):
+    def test_core_and_sports_kits_exclude_company_theme_guidance_and_resources(self):
+        for packages in ('', 'sports'):
+            with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': packages,
+                                         'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_SITE_CONFIG': ''}):
+                files = kit_files()
+                self.assertFalse('tools/company-theme.json' in files, 'Unexpected theme metadata in generic kit')
+                self.assertFalse(any(path.startswith('company/themes/') for path in files))
+                self.assertFalse(any(path.startswith('packages/sports/diagrams/') for path in files))
+                for name, content in files.items():
+                    self.assertFalse('islanders' in content.lower(), f'Unexpected Islanders content in {name}')
+                self.assertNotIn('islanders', packet_for('seatmap' if packages else 'state').lower())
+
+    def test_default_agent_kit_and_packet_exclude_optional_material(self):
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': ''}):
+            files = kit_files()
+            self.assertFalse(any(path.startswith(('packages/science/', 'packages/physics/', 'packages/sports/')) for path in files))
+            self.assertNotIn('tools/enabled-packages.json', files)
+            contract = files['contract/authoring-contract.md']
+            for name in ('wavefield', 'forcebody', 'rnacopy', 'sequence', 'frames', 'reads', 'locus', 'strandscene', 'cellscene', 'seatmap'):
+                self.assertNotIn('- `' + name + '` —', contract)
+            for name in ('funnel', 'grid'):
+                self.assertIn('- `' + name + '` —', contract)
+            self.assertNotIn('physics-panels.md', files['.claude/skills/hld-to-page/SKILL.md'])
+            packet = packet_for('state')
+            self.assertNotIn('packages/science/', packet)
+            generic_packet = packet_for('funnel')
+            self.assertIn('cookbook/data-panels.md', generic_packet)
+            self.assertNotIn('packages/science/', generic_packet)
+            self.assertNotIn('packages/sports/', generic_packet)
+
+    def test_selected_package_adds_contract_routes_and_examples(self):
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'science'}):
+            files = kit_files()
+            self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['science'])
+            for path in ('packages/science/package.json',
+                         'packages/science/cookbook/cell-scenes.md',
+                         'packages/science/cookbook/viral-copy-gate.md',
+                         'packages/science/starters/copy-gate.json',
+                         'packages/science/starters/sequencing-walkthrough.json',
+                         'packages/science/cookbook/sequence-panels.md'):
+                self.assertIn(path, files)
+            contract = contract_text(ROOT)
+            self.assertFalse(any(path.startswith('packages/physics/') for path in files))
+            self.assertNotIn('panel.wavefield', files['tools/canon/generated-runtime.cjs'])
+            self.assertNotIn('panel.forcebody', files['tools/canon/generated-runtime.cjs'])
+            for name in ('rnacopy', 'sequence', 'frames', 'reads', 'locus', 'funnel', 'grid', 'strandscene', 'cellscene'):
+                self.assertIn('- `' + name + '` —', contract)
+                self.assertEqual(files['contract/authoring-contract.md'].count('- `' + name + '` —'), 1)
+            for name in ('wavefield', 'forcebody'):
+                self.assertNotIn('- `' + name + '` —', contract)
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for name in ('contract/authoring-contract.md', 'tools/company_overlay.py',
+                             'tools/widget_doc.py', 'tools/enabled-packages.json'):
+                    target = root / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(files[name])
+                names = subprocess.check_output(['python3', str(root / 'tools/widget_doc.py'), '--list'], text=True)
+                self.assertEqual(names.split().count('rnacopy'), 1)
+            packet = packet_for('rnacopy')
+            self.assertIn('packages/science/cookbook/viral-copy-gate.md', packet)
+            self.assertNotIn('packages/physics/', packet)
+            cell_packet = packet_for('cellscene')
+            self.assertIn('packages/science/cookbook/cell-scenes.md', cell_packet)
+            self.assertNotIn('packages/science/cookbook/viral-copy-gate.md', cell_packet)
+
+    def test_selected_physics_package_has_only_physics_context(self):
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'physics'}):
+            files = kit_files()
+            self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['physics'])
+            for path in ('packages/physics/package.json',
+                         'packages/physics/cookbook/physics-panels.md',
+                         'packages/physics/starters/waves-and-forces.json'):
+                self.assertIn(path, files)
+            self.assertFalse(any(path.startswith('packages/science/') for path in files))
+            contract = files['contract/authoring-contract.md']
+            for name in ('wavefield', 'forcebody'):
+                self.assertIn('- `' + name + '` —', contract)
+            for name in ('rnacopy', 'sequence', 'reads', 'cellscene'):
+                self.assertNotIn('- `' + name + '` —', contract)
+            packet = packet_for('wavefield')
+            self.assertIn('packages/physics/cookbook/physics-panels.md', packet)
+            self.assertNotIn('packages/science/', packet)
+
+
+    def test_selected_sports_package_adds_venue_context_only(self):
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'sports'}):
+            files = kit_files()
+            self.assertEqual(json.loads(files['tools/enabled-packages.json']), ['sports'])
+            for path in ('packages/sports/package.json',
+                         'packages/sports/cookbook/venue-map.md',
+                         'packages/sports/examples/venue-map.spec.json'):
+                self.assertIn(path, files)
+            self.assertFalse(any(path.startswith('packages/science/') for path in files))
+            contract = files['contract/authoring-contract.md']
+            self.assertIn('- `grid` —', contract)
+            self.assertIn('- `funnel` —', contract)
+            self.assertIn('- `seatmap` —', contract)
+            self.assertNotIn('- `rnacopy` —', contract)
+            packet = packet_for('seatmap')
+            self.assertIn('packages/sports/cookbook/venue-map.md', packet)
+            self.assertNotIn('packages/science/', packet)
+            data_packet = packet_for('funnel')
+            self.assertIn('cookbook/data-panels.md', data_packet)
+            self.assertNotIn('packages/science/', data_packet)
+
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -5,6 +5,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const context={URL,URLSearchParams};vm.createContext(context);
 for(const name of ['validator.js','viewer/workspace-handoff.js','welcome.workbench.js'])vm.runInContext(readSource(name),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
+test('canonical links retain only a supported shared theme beside the diagram ID',()=>{
+  for(const query of ['theme=lavender&diagram=old','diagram=old&theme=lavender']){
+    assert.equal(context.canonDiagramURL('https://example.test/view?'+query+'&review=private#s=three','new'),'https://example.test/view?diagram=new&theme=lavender');
+  }
+  assert.equal(context.canonDiagramURL('https://example.test/view?theme=unknown','new'),'https://example.test/view?diagram=new');
+});
 test('agent guidance links to the selected GitHub fork and revision, including enterprise hosts',()=>{
   const r=context.welcomeRepository('https://github.company.test/platform/flowview.git/','feature/welcome');
   assert.equal(r.repository,'https://github.company.test/platform/flowview');

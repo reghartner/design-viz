@@ -23,7 +23,7 @@ const intensities = m => plain(m.rows.map(row => row.cells.map(cell => cell.inte
 test('grid template, picker example, feature label, styles and registry metadata use ordinary discovery', () => {
   const d = {nodes:{n:{}}, rows:[['n']], panels:[{...plain(C.PANEL_TEMPLATES.grid), id:'g', type:'grid'}]};
   assert.deepEqual(validate(d), {errors:[], warnings:[]});
-  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'grid' && item.category === 'Science & sequencing'));
+  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'grid' && item.category === 'Data & charts'));
   const example = C.panelPickerExample('grid');
   assert.equal(example.panel.type, 'grid');
   assert.deepEqual(validate({nodes:{n:{}}, rows:[['n']], panels:[example.panel]}), {errors:[], warnings:[]});

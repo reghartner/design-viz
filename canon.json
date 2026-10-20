@@ -1,4 +1,7 @@
 {
   "version": 1,
-  "diagrams": []
+  "diagrams": [
+    {"folder": "diagrams/friends/nsp15-insertion-evidence", "owner": "group:default/flowview-examples"},
+    {"folder": "diagrams/friends/islanders-marketing", "owner": "group:default/flowview-examples"}
+  ]
 }

@@ -25,6 +25,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| a small value matrix or stage-count funnel using authored numbers | [Data panels](data-panels.md) — generic `grid` and `funnel` setup and step fields |
 | a camera phone UX whose fields come from different backend services | [Device app sources](device-app-sources.md) — doorbell refresh and partial outage |
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |
@@ -38,8 +39,6 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | two-way conversation, operator talk-down, device sounds, chimes, sirens, sound detection or audio failures | [audio-storytelling.md](audio-storytelling.md) — shared endpoint audio and the complete Sound at the door seed |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
-| a sequence, aligned reads, an insertion or variant, a genome or plasmid map, pipeline stage counts, reading frames, or a small heatmap for a teaching page | [sequence-panels.md](sequence-panels.md) — six sequence-teaching panels and the sequencing walkthrough starter |
-| a venue seating map that fills section by section, group holds, promo waves, repricing, or importing a real seating chart | [venue-map.md](venue-map.md) — generic bowl or imported SVG; sold, held, price, tier and revenue modes |
 | messaging bus alternatives, cost per million messages, engineering components or break-even volume | [messaging-cost.md](messaging-cost.md) — two routes and explicit pricing assumptions |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |
 | replica positions, read-your-writes tokens, lag, or device/cloud versions | `replica-positions.md` |

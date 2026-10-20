@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');

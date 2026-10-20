@@ -282,6 +282,7 @@ async function refreshTopologyRepository(context){
 }
 
 function initWorkbenchLibrary(opts){
+  var decoration=typeof createCompanyLibraryDecoration==='function'?createCompanyLibraryDecoration(document.getElementById('workbench-home')):null;
   var grid=document.getElementById('welcome-library-grid'),status=document.getElementById('welcome-library-status');
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
@@ -292,10 +293,12 @@ function initWorkbenchLibrary(opts){
   var specRequests=new Map(),headerObserver=null;
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
+    if(decoration)decoration.home();
     if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
     headerTitle.hidden=true;title.removeAttribute('title');
   }
   function showHeader(){
+    if(decoration)decoration.reader(current);
     title.title=title.textContent;headerTitle.append(title,toolbar);headerTitle.hidden=false;
   }
   function retireViewer(){
@@ -379,7 +382,9 @@ function initWorkbenchLibrary(opts){
     return {autoplay:false,handoffHost:'site',siteBaseUrl:site.href,resolveDiagramLink:function(reference){
       var entry=frozen.find(function(item){return item.id===reference.spec;});
       if(!entry || reference.revision && reference.revision!==entry.revision)return null;
-      return documentSiteURL(site.href,reference);
+      var destination=new URL(documentSiteURL(site.href,reference)),theme=querySkin(location.search);
+      if(theme)destination.searchParams.set('theme',theme);
+      return destination.href;
     },loadDetail:async function(reference,signal){
       var entry=frozen.find(function(item){return item.id===reference.spec;});
       if(!entry)throw new Error('The detail diagram is not in this published library.');
@@ -390,7 +395,11 @@ function initWorkbenchLibrary(opts){
   }
   function selectedSkin(page){return typeof opts.skin==='function'?opts.skin(page):resolveSkin('',page && page.skin);}
   function setSkin(name){
-    if(!current || SKIN_NAMES.indexOf(name)<0)return false;
+    if(SKIN_NAMES.indexOf(name)<0)return false;
+    document.querySelectorAll('a.canon-library-open,a.canon-recent-link').forEach(function(link){
+      var id=new URL(link.href).searchParams.get('diagram');if(id)link.href=canonDiagramURL(location.href,id);
+    });
+    if(!current)return true;
     return applySkinClasses(document.body,reader,name);
   }
   var facets={team:document.getElementById('welcome-library-team'),service:document.getElementById('welcome-library-service'),topic:document.getElementById('welcome-library-topic')};
@@ -479,6 +488,7 @@ function initWorkbenchLibrary(opts){
       var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
       var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
       var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);
+      if(decoration)decoration.card(entry,name);
       if(entry.description){var description=document.createElement('span');description.className='canon-library-description';description.textContent=entry.description;open.append(description);}
       var metadata=document.createElement('div');metadata.className='canon-library-metadata';
       var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=libraryTeamName(entry.canon.owner);owner.title=entry.canon.owner || entry.id;
@@ -572,7 +582,7 @@ function initWorkbenchLibrary(opts){
         }
       }
       edit.disabled=false;copy.disabled=!published;
-      deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
+      deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id),theme:function(){return querySkin(location.search);}});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
       document.body.classList.add('canon-reader-active');

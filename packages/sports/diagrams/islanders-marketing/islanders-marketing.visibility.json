@@ -1,0 +1,509 @@
+{
+  "version": 1,
+  "expectations": [
+    {
+      "section": "member-campaign",
+      "view": "flow",
+      "path": "member",
+      "step": "email",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "member-campaign",
+      "view": "flow",
+      "path": "member",
+      "step": "cms",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "member-campaign",
+      "view": "flow",
+      "path": "signin",
+      "step": "signin",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "member-campaign",
+      "view": "flow",
+      "path": "ended",
+      "step": "expired",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "member-campaign",
+      "view": "flow",
+      "path": "ended",
+      "step": "paused",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "landing",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "landing",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "inquiry",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "inquiry",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "handoff",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "handoff",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "next",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "help",
+      "step": "next",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "landing",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "landing",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "choice",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "choice",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "options",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "group-night",
+      "view": "flow",
+      "path": "tickets",
+      "step": "options",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "details",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "details",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "form",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "form",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "reserved",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "reserved",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "followup",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "reserved",
+      "step": "followup",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "details",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "details",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "form-no",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "form-no",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "reserved-no",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "reserved-no",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "followup-no",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "nooptin",
+      "step": "followup-no",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "promo",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "promo",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "details",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "details",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "content",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "content",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "full",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "full",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "waitlist",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "waitlist",
+      "panel": "record",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "waitlist-followup",
+      "panel": "destination",
+      "visible": true
+    },
+    {
+      "section": "fan-event-rsvp",
+      "view": "flow",
+      "path": "full",
+      "step": "waitlist-followup",
+      "panel": "record",
+      "visible": true
+    }
+  ]
+}

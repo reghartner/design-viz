@@ -3,7 +3,7 @@
 Upstream ships only company/README.md. A fork keeps its additions there:
 
   company/panels/*.js, company/panels/types/*.js   bundled by tools/source-loader.cjs
-  company/panels/venues/*.js                        seatmap venue library entries, bundled the same way
+  company/panels/venues/*.js                        optional package venue data, bundled the same way
   company/contract/*.md                             appended to the authoring contract
   company/examples/**                               bundled into the folder-agent kit
   company/tests/*.test.js, company/tests/test_*.py  run by the normal test suites
@@ -21,6 +21,8 @@ from pathlib import Path
 CONTRACT = 'contract/authoring-contract.md'
 CONTRACT_ADDITIONS = '## Company contract additions'
 AGENT_CONTEXT = 'tools/company-agent-context.json'
+ENABLED_PACKAGES = 'tools/enabled-packages.json'
+COMPANY_THEME = 'tools/company-theme.json'
 # Upstream examples join the offline kit by carrying this marker; each line is a
 # file glob, matched in the marker's folder and below, where the nearest marker
 # above a file decides. Company example folders always join: files with no
@@ -51,6 +53,49 @@ def company_agent_context(root):
         return json.loads(result.stdout)
     exported = root / AGENT_CONTEXT
     return json.loads(exported.read_text()) if exported.is_file() else {}
+
+
+def enabled_packages(root):
+    """Use the source loader's validated package selection in a checkout.
+
+    An extracted authoring kit carries the selection as a small metadata file,
+    so its packet and widget documentation match the runtime built into it.
+    """
+    root = Path(root)
+    loader = root / 'tools/source-loader.cjs'
+    if loader.is_file():
+        result = subprocess.run(['node', str(loader), '--packages'], capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(result.stderr.strip())
+        return json.loads(result.stdout)
+    exported = root / ENABLED_PACKAGES
+    return json.loads(exported.read_text()) if exported.is_file() else []
+
+
+def company_theme(root):
+    """Selected theme resources, or the fixed context in an extracted kit."""
+    root = Path(root)
+    if os.environ.get('FLOWVIEW_COMPANY_IDENTITY') == 'off':
+        return {}
+    loader = root / 'tools/source-loader.cjs'
+    if loader.is_file():
+        result = subprocess.run(['node', str(loader), '--theme'], capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(result.stderr.strip())
+        return json.loads(result.stdout) or {}
+    exported = root / COMPANY_THEME
+    return json.loads(exported.read_text()) if exported.is_file() else {}
+
+
+def package_content(root):
+    """Validated company content restrictions; absent in generic/source-free builds."""
+    loader = Path(root) / 'tools/source-loader.cjs'
+    if not loader.is_file():
+        return {}
+    result = subprocess.run(['node', str(loader), '--company'], capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError(result.stderr.strip())
+    return (json.loads(result.stdout) or {}).get('packageContent', {})
 
 
 def contract_fragments(root):
@@ -85,17 +130,33 @@ def _relink(text, source, target):
 
 
 def contract_text(root):
-    """The authoring contract with the overlay's fragments appended, in order."""
+    """The core contract plus selected package and company fragments."""
     root = Path(root)
     text = (root / CONTRACT).read_text()
     fragments = contract_fragments(root)
-    if not fragments:
+    theme = company_theme(root)
+    if (root / 'tools/source-loader.cjs').is_file() and theme.get('guidance'):
+        path = 'company/' + theme['guidance']
+        fragments.append((path, (root / path).read_text()))
+    # The extracted kit already contains the assembled contract; append only
+    # while reading source in a checkout.
+    packages = enabled_packages(root) if (root / 'tools/source-loader.cjs').is_file() else []
+    if not fragments and not packages:
         return text
-    parts = [text.rstrip('\n'), '', CONTRACT_ADDITIONS, '',
-             'These sections come from the company overlay (`company/contract/`). '
-             'They extend this contract for this fork and follow its rules.']
-    for path, fragment in fragments:
-        parts += ['', '<!-- ' + path + ' -->', _relink(fragment, path, CONTRACT).strip('\n')]
+    parts = [text.rstrip('\n')]
+    if fragments:
+        parts += ['', CONTRACT_ADDITIONS, '',
+                  'These sections come from company contract fragments and the selected company theme. '
+                  'They extend this contract for this fork and follow its rules.']
+        for path, fragment in fragments:
+            parts += ['', '<!-- ' + path + ' -->', _relink(fragment, path, CONTRACT).strip('\n')]
+    for name in packages:
+        path = 'packages/' + name + '/contract.md'
+        file = root / path
+        if file.is_file():
+            parts += ['', '## ' + name.title() + ' package contract', '',
+                      '<!-- ' + path + ' -->',
+                      _relink(file.read_text(), path, CONTRACT).strip('\n')]
     return '\n'.join(parts) + '\n'
 
 

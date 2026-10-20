@@ -1,0 +1,857 @@
+{
+  "page": {
+    "title": "Two invisible sums: waves and forces",
+    "subtitle": "Interactive physics lab · two guided mechanisms · idealized classroom models",
+    "skin": "daylight",
+    "sections": [
+      {
+        "heading": "01 / When a second wave makes a dark stripe",
+        "text": [
+          "Can adding a source make a screen darker? Follow two coherent paths from source to probe. The geometry fixes the path difference; wavelength turns that difference into phase. Choose either ending to compare two different interventions at the same dark probe."
+        ],
+        "bullets": [
+          "Distances are in centimetres. The point sources have equal amplitude and emit in phase. The model omits diffraction envelope and geometric spreading; the numbers are illustrative model outputs, not measured light levels."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "drive": {
+              "title": "Coherent drive",
+              "sub": "one phase reference",
+              "icon": "antenna",
+              "tint": "cmd"
+            },
+            "sources": {
+              "title": "Sources S₁ / S₂",
+              "sub": "open or close the second path",
+              "icon": "sensor",
+              "tint": "data"
+            },
+            "screen": {
+              "title": "Screen",
+              "sub": "sum amplitudes at each point",
+              "icon": "monitor",
+              "tint": "dev"
+            },
+            "probe": {
+              "title": "Probe P",
+              "sub": "read intensity at y",
+              "icon": "chip",
+              "tint": "mqtt"
+            }
+          },
+          "rows": [
+            [
+              "drive",
+              "sources",
+              "screen",
+              "probe"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "drive",
+              "to": "sources",
+              "kind": "int",
+              "label": "same phase"
+            },
+            {
+              "from": "sources",
+              "to": "screen",
+              "kind": "int",
+              "label": "two paths"
+            },
+            {
+              "from": "screen",
+              "to": "probe",
+              "kind": "int",
+              "label": "sample y"
+            }
+          ],
+          "panels": [
+            {
+              "id": "wave",
+              "type": "wavefield",
+              "title": "Where two paths meet",
+              "wavelength": 1,
+              "separation": 4,
+              "screenDistance": 10,
+              "screenHeight": 12,
+              "unit": "cm",
+              "initial": {
+                "sources": "one",
+                "probe": 0,
+                "note": "One source gives the reference intensity I₀. The flat strip is an idealized baseline, not a single-slit diffraction pattern."
+              }
+            },
+            {
+              "id": "wave-ledger",
+              "type": "table",
+              "title": "Wave lab notebook",
+              "columns": [
+                {
+                  "id": "setup",
+                  "label": "Setup"
+                },
+                {
+                  "id": "probe",
+                  "label": "Probe"
+                },
+                {
+                  "id": "result",
+                  "label": "Model result"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "one",
+                    "cells": {
+                      "setup": "S₁ only · λ 1 cm",
+                      "probe": "centre, y = 0",
+                      "result": "I/I₀ = 1; no two-source fringes"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "one-source",
+              "nodes": [
+                "drive",
+                "sources"
+              ],
+              "text": "**Start with one path.** S₁ illuminates the screen. At the centre probe, one source gives the reference I₀. There is no second wave to reinforce or cancel it.",
+              "panels": {
+                "wave": {
+                  "sources": "one",
+                  "probe": 0,
+                  "note": "Baseline: equal-amplitude point-source model; one-source intensity is normalized to I₀ everywhere."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "open-second",
+              "edge": "drive->sources",
+              "text": "**Open S₂.** Its wave travels a different distance to each screen point. At y = 2 cm the intensity lies between a bright and a dark fringe; scan the curve.",
+              "panels": {
+                "wave": {
+                  "sources": "two",
+                  "probe": 2,
+                  "note": "Both sources share a phase at emission. Their relative phase at the screen follows the path-length difference."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    },
+                    {
+                      "id": "open",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 2 cm",
+                        "result": "intensity depends on path difference"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "centre",
+              "edge": "sources->screen",
+              "text": "**Probe the centre.** Both paths are equal, so Δr = 0. The amplitudes add and the intensity reaches four times the one-source reference.",
+              "panels": {
+                "wave": {
+                  "probe": 0,
+                  "note": "Same phase at P: two unit amplitudes add to 2; intensity is proportional to amplitude squared, so I/I₀ = 4."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    },
+                    {
+                      "id": "open",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 2 cm",
+                        "result": "intensity depends on path difference"
+                      }
+                    },
+                    {
+                      "id": "centre",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "Δr = 0 · I/I₀ = 4"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "dark",
+              "edge": "sources->screen",
+              "text": "**Probe the first dark fringe.** At y ≈ 1.284446 cm, S₂ travels 0.5 cm farther: half a wavelength. Opposite phases cancel.",
+              "panels": {
+                "wave": {
+                  "probe": 1.284446,
+                  "note": "At this geometric probe, Δr ≈ λ/2. The computed intensity is effectively zero; the authored y coordinate approximates the exact minimum."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    },
+                    {
+                      "id": "open",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 2 cm",
+                        "result": "intensity depends on path difference"
+                      }
+                    },
+                    {
+                      "id": "centre",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "Δr = 0 · I/I₀ = 4"
+                      }
+                    },
+                    {
+                      "id": "dark",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 1.284446 cm",
+                        "result": "Δr ≈ 0.5 cm · I/I₀ ≈ 0"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "longer-wave",
+              "edge": "screen->probe",
+              "text": "**Change only λ to 2 cm.** At the same point, Δr stays 0.5 cm but becomes λ/4. Partial reinforcement gives I/I₀ ≈ 2.",
+              "panels": {
+                "wave": {
+                  "wavelength": 2,
+                  "note": "New wavelength trial at the same y, d and L. The geometry fixes Δr; changing λ changes the phase difference."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    },
+                    {
+                      "id": "centre",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "Δr = 0 · I/I₀ = 4"
+                      }
+                    },
+                    {
+                      "id": "dark",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 1.284446 cm",
+                        "result": "Δr ≈ 0.5 cm · I/I₀ ≈ 0"
+                      }
+                    },
+                    {
+                      "id": "long",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 2 cm",
+                        "probe": "same y = 1.284446 cm",
+                        "result": "Δr/λ ≈ 0.25 · I/I₀ ≈ 2"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "close-second",
+              "edge": "drive->sources",
+              "text": "**Close S₂ at the same probe.** The cancelling path is gone. With λ still 1 cm, the one-source baseline returns: I/I₀ = 1.",
+              "panels": {
+                "wave": {
+                  "sources": "one",
+                  "note": "This comparison keeps λ = 1 cm; the probe remains at y = 1.284446 cm."
+                },
+                "wave-ledger": {
+                  "rows": [
+                    {
+                      "id": "one",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "I/I₀ = 1; no two-source fringes"
+                      }
+                    },
+                    {
+                      "id": "centre",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "centre, y = 0",
+                        "result": "Δr = 0 · I/I₀ = 4"
+                      }
+                    },
+                    {
+                      "id": "dark",
+                      "cells": {
+                        "setup": "S₁ + S₂ · λ 1 cm",
+                        "probe": "y = 1.284446 cm",
+                        "result": "Δr ≈ 0.5 cm · I/I₀ ≈ 0"
+                      }
+                    },
+                    {
+                      "id": "shutter",
+                      "cells": {
+                        "setup": "S₁ only · λ 1 cm",
+                        "probe": "same y = 1.284446 cm",
+                        "result": "no second path · I/I₀ = 1"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "wavelength",
+              "label": "Change wavelength",
+              "color": "#38E1FF",
+              "steps": [
+                "one-source",
+                "open-second",
+                "centre",
+                "dark",
+                "longer-wave"
+              ]
+            },
+            {
+              "id": "shutter",
+              "label": "Close second source",
+              "color": "#FFB454",
+              "steps": [
+                "one-source",
+                "open-second",
+                "centre",
+                "dark",
+                "close-second"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 6
+              },
+              {
+                "x": 0,
+          "y": 34,
+          "w": 24,
+          "h": 6
+              },
+              {
+                "panel": "wave",
+                "x": 0,
+          "y": 6,
+                "w": 24,
+                "h": 28
+              },
+              {
+                "panel": "wave-ledger",
+                "x": 0,
+                "y": 40,
+                "w": 24,
+                "h": 7
+              }
+            ]
+          }
+        }
+      },
+      {
+        "heading": "02 / When a moving puck accelerates backward",
+        "text": [
+          "Does a moving object need a forward force to keep going? Compare two separate frictionless pucks under equal pushes, then follow a later snapshot of Puck A. Force sets acceleration; velocity is shown independently."
+        ],
+        "bullets": [
+          "Force vectors are in newtons, mass in kilograms, acceleration in m/s². Velocity snapshots are authored examples; the panels do not calculate a trajectory or stopping time. Puck A stays 2 kg and Puck B stays 4 kg."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "pushes": {
+              "title": "Applied pushes",
+              "sub": "vectors in newtons",
+              "icon": "person",
+              "tint": "cmd"
+            },
+            "sum": {
+              "title": "Vector sum",
+              "sub": "ΣF with direction",
+              "icon": "gear",
+              "tint": "data"
+            },
+            "accel": {
+              "title": "Acceleration",
+              "sub": "ΣF divided by mass",
+              "icon": "chip",
+              "tint": "dev"
+            },
+            "velocity": {
+              "title": "Velocity now",
+              "sub": "separate authored snapshot",
+              "icon": "motion",
+              "tint": "mqtt"
+            }
+          },
+          "rows": [
+            [
+              "pushes",
+              "sum",
+              "accel",
+              "velocity"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "pushes",
+              "to": "sum",
+              "kind": "int",
+              "label": "add vectors"
+            },
+            {
+              "from": "sum",
+              "to": "accel",
+              "kind": "int",
+              "label": "divide by m"
+            }
+          ],
+          "panels": [
+            {
+              "id": "trial-a",
+              "type": "forcebody",
+              "title": "Trial A · light puck",
+              "label": "Puck A",
+              "trial": "Trial A",
+              "mass": 2,
+              "initial": {
+                "forces": [
+                  {
+                    "label": "Right push",
+                    "x": 4,
+                    "y": 0
+                  },
+                  {
+                    "label": "Left push",
+                    "x": -4,
+                    "y": 0
+                  }
+                ],
+                "velocity": {
+                  "x": 0,
+                  "y": 0
+                },
+                "caption": "Equal opposite pushes; no acceleration",
+                "note": "Illustrative frictionless surface. At this snapshot the puck is at rest."
+              }
+            },
+            {
+              "id": "trial-b",
+              "type": "forcebody",
+              "title": "Trial B · heavy puck",
+              "label": "Puck B",
+              "trial": "Trial B",
+              "mass": 4,
+              "initial": {
+                "forces": [
+                  {
+                    "label": "Right push",
+                    "x": 4,
+                    "y": 0
+                  },
+                  {
+                    "label": "Left push",
+                    "x": -4,
+                    "y": 0
+                  }
+                ],
+                "velocity": {
+                  "x": 0,
+                  "y": 0
+                },
+                "caption": "A separate puck awaits comparison",
+                "note": "Separate 4 kg trial. Its mass stays fixed throughout this panel."
+              }
+            },
+            {
+              "id": "force-ledger",
+              "type": "table",
+              "title": "Force lab notebook",
+              "columns": [
+                {
+                  "id": "snapshot",
+                  "label": "Snapshot"
+                },
+                {
+                  "id": "net",
+                  "label": "ΣF x"
+                },
+                {
+                  "id": "acceleration",
+                  "label": "a x"
+                },
+                {
+                  "id": "velocity",
+                  "label": "v x"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "balance",
+                    "cells": {
+                      "snapshot": "A · balanced",
+                      "net": "0 N",
+                      "acceleration": "0 m/s²",
+                      "velocity": "0 m/s"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "balanced",
+              "nodes": [
+                "pushes"
+              ],
+              "text": "**Start with equal pushes.** Two people push Puck A right and left with 4 N each. The vectors cancel: ΣF = 0 and a = 0. Puck B is a separate 4 kg trial, also balanced.",
+              "panels": {
+                "trial-a": {
+                  "caption": "4 N right and 4 N left cancel"
+                },
+                "trial-b": {
+                  "caption": "Separate trial · balanced at 4 kg"
+                },
+                "force-ledger": {
+                  "rows": [
+                    {
+                      "id": "balance",
+                      "cells": {
+                        "snapshot": "A · balanced",
+                        "net": "0 N",
+                        "acceleration": "0 m/s²",
+                        "velocity": "0 m/s"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "unbalanced",
+              "edge": "pushes->sum",
+              "text": "**Remove the left push on A.** The remaining +4 N acts on a 2 kg puck, giving +2 m/s² acceleration. At this instant its authored velocity is still zero; acceleration describes how velocity begins to change.",
+              "panels": {
+                "trial-a": {
+                  "forces": [
+                    {
+                      "label": "Right push",
+                      "x": 4,
+                      "y": 0
+                    }
+                  ],
+                  "velocity": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "caption": "One +4 N push acts on 2 kg",
+                  "note": "ΣF = +4 N; a = +2 m/s². This is an instantaneous state, not a predicted trajectory."
+                },
+                "force-ledger": {
+                  "rows": [
+                    {
+                      "id": "balance",
+                      "cells": {
+                        "snapshot": "A · balanced",
+                        "net": "0 N",
+                        "acceleration": "0 m/s²",
+                        "velocity": "0 m/s"
+                      }
+                    },
+                    {
+                      "id": "a",
+                      "cells": {
+                        "snapshot": "A · one push",
+                        "net": "+4 N",
+                        "acceleration": "+2 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "heavier",
+              "edge": "sum->accel",
+              "text": "**Repeat the push with a heavier puck.** Trial B is a separate 4 kg puck under the same +4 N net force. Its acceleration is +1 m/s², half of A’s. No puck changes mass during motion.",
+              "panels": {
+                "trial-b": {
+                  "forces": [
+                    {
+                      "label": "Right push",
+                      "x": 4,
+                      "y": 0
+                    }
+                  ],
+                  "velocity": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "caption": "Same +4 N push acts on 4 kg",
+                  "note": "Separate trial: fixed mass 4 kg. Compare a = 1 m/s² here with A’s 2 m/s²."
+                },
+                "force-ledger": {
+                  "rows": [
+                    {
+                      "id": "balance",
+                      "cells": {
+                        "snapshot": "A · balanced",
+                        "net": "0 N",
+                        "acceleration": "0 m/s²",
+                        "velocity": "0 m/s"
+                      }
+                    },
+                    {
+                      "id": "a",
+                      "cells": {
+                        "snapshot": "A · one push",
+                        "net": "+4 N",
+                        "acceleration": "+2 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    },
+                    {
+                      "id": "b",
+                      "cells": {
+                        "snapshot": "B · same push, double mass",
+                        "net": "+4 N",
+                        "acceleration": "+1 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "coast",
+              "nodes": [
+                "velocity"
+              ],
+              "text": "**Look later at Puck A.** The push is gone, but A is moving right at an authored 2 m/s snapshot. With ΣF = 0 its acceleration is zero: zero force means no change in velocity, not zero velocity.",
+              "panels": {
+                "trial-a": {
+                  "forces": [],
+                  "velocity": {
+                    "x": 2,
+                    "y": 0
+                  },
+                  "caption": "Moving right with no applied force",
+                  "note": "The later 2 m/s value is authored for teaching; this panel does not integrate earlier acceleration over time."
+                },
+                "force-ledger": {
+                  "rows": [
+                    {
+                      "id": "a",
+                      "cells": {
+                        "snapshot": "A · one push",
+                        "net": "+4 N",
+                        "acceleration": "+2 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    },
+                    {
+                      "id": "b",
+                      "cells": {
+                        "snapshot": "B · same push, double mass",
+                        "net": "+4 N",
+                        "acceleration": "+1 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    },
+                    {
+                      "id": "coast",
+                      "cells": {
+                        "snapshot": "A · later coasting snapshot",
+                        "net": "0 N",
+                        "acceleration": "0 m/s²",
+                        "velocity": "+2 m/s (authored)"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "brake",
+              "edge": "pushes->sum",
+              "text": "**Push left while A still moves right.** Its velocity is still +2 m/s in this snapshot, but ΣF is −4 N and a is −2 m/s². The opposing acceleration reduces rightward speed; it does not reverse the velocity instantly.",
+              "panels": {
+                "trial-a": {
+                  "forces": [
+                    {
+                      "label": "Left push",
+                      "x": -4,
+                      "y": 0
+                    }
+                  ],
+                  "velocity": {
+                    "x": 2,
+                    "y": 0
+                  },
+                  "caption": "Moving right, accelerating left",
+                  "note": "Opposite signs for velocity and acceleration mean slowing at this instant. No stop time or future position is inferred."
+                },
+                "force-ledger": {
+                  "rows": [
+                    {
+                      "id": "a",
+                      "cells": {
+                        "snapshot": "A · one push",
+                        "net": "+4 N",
+                        "acceleration": "+2 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    },
+                    {
+                      "id": "b",
+                      "cells": {
+                        "snapshot": "B · same push, double mass",
+                        "net": "+4 N",
+                        "acceleration": "+1 m/s²",
+                        "velocity": "0 m/s at this instant"
+                      }
+                    },
+                    {
+                      "id": "coast",
+                      "cells": {
+                        "snapshot": "A · later coasting snapshot",
+                        "net": "0 N",
+                        "acceleration": "0 m/s²",
+                        "velocity": "+2 m/s (authored)"
+                      }
+                    },
+                    {
+                      "id": "brake",
+                      "cells": {
+                        "snapshot": "A · opposing push",
+                        "net": "−4 N",
+                        "acceleration": "−2 m/s²",
+                        "velocity": "+2 m/s (authored)"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 9
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 9,
+                "w": 24,
+                "h": 3,
+                "attachTo": "diagram"
+              },
+              {
+                "panel": "trial-a",
+                "x": 0,
+                "y": 9,
+                "w": 12,
+                "h": 23
+              },
+              {
+                "panel": "trial-b",
+                "x": 12,
+                "y": 9,
+                "w": 12,
+                "h": 23
+              },
+              {
+                "panel": "force-ledger",
+                "x": 0,
+                "y": 32,
+                "w": 24,
+                "h": 7
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "brand": false
+  }
+}

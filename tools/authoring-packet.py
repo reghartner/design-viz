@@ -9,6 +9,7 @@ metadata to stderr. Selections union with inference; they never narrow a spec.
 import argparse
 import hashlib
 import json
+import os
 import posixpath
 import re
 import subprocess
@@ -16,7 +17,7 @@ import sys
 from pathlib import Path
 
 from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
-from company_overlay import company_agent_context, contract_text
+from company_overlay import company_agent_context, company_theme, enabled_packages, contract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -189,6 +190,9 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         text = normalize_links(text, path)
         parts.append('<!-- Source: ' + path + (' # ' + heading if heading else '') + ' -->\n' + text)
         provenance.append({'path': path, 'section': heading, 'sha256': hashlib.sha256(loaded[path].encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
+    theme = company_theme(ROOT)
+    if theme.get('guidance'):
+        add('company/' + theme['guidance'])
     add(WORKFLOW, 'Scoped exceptions and handoff')
     add(WORKFLOW, 'The rules that matter most')
     if mode == 'new':
@@ -224,6 +228,17 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     routes.update(path for feature in features for path in ROUTES.get(feature, []))
     # The maintained route table gives examples without embedding the cookbook.
     routes.add('cookbook/README.md')
+    if panels & {'grid', 'funnel'}:
+        routes.add('cookbook/data-panels.md')
+    for package in enabled_packages(ROOT):
+        manifest = json.loads((ROOT / 'packages' / package / 'package.json').read_text())
+        for panel in panels:
+            listed = manifest.get('routes', {}).get(panel, [])
+            for relative in [listed] if isinstance(listed, str) else listed:
+                path = Path(relative)
+                if path.is_absolute() or '..' in path.parts:
+                    raise ValueError('Package route escapes package: ' + relative)
+                routes.add('packages/' + package + '/' + path.as_posix())
     route_text = '\n'.join('- `' + path + '`' for path in sorted(routes) if (ROOT / path).exists())
     document = '# Focused authoring packet\n\nMode: ' + mode + '. Selection is the union of explicit choices and spec inference.\n\nPanels: ' + (', '.join(sorted(panels)) or 'none') + '. Features: ' + (', '.join(sorted(features)) or 'none') + '.\n\nThis packet is the primary authoring guidance: use its selected rules instead of preloading the full workflow, contract, cookbook or session manual. Linked references are on demand unless this packet names a needed worksheet/source route. Follow the active collaboration protocol for candidate approval; a packet does not grant publication or new story decisions. Fully specified small edits retain the scoped-edit exception below. Full documentation remains available on demand; source paths and relative links resolve from VIZ, not the packet output folder.\n\n' + '\n\n'.join(parts) + '\n\n## On-demand routes and examples\n\n' + route_text + '\n'
     baseline_paths = [CONTRACT, SKILL, WORKFLOW, REFS + 'worked-example.md', 'cookbook/README.md']
@@ -245,9 +260,15 @@ def main():
     parser.add_argument('--feature', choices=sorted(FEATURES), action='append', default=[])
     parser.add_argument('--mode', choices=['new', 'edit'], default='new')
     parser.add_argument('--spec', type=Path)
+    parser.add_argument('--config', type=Path, help='site config for package selection in a source checkout')
     parser.add_argument('--out', type=Path)
     args = parser.parse_args()
     try:
+        if args.config:
+            if not (ROOT / 'tools/source-loader.cjs').is_file():
+                raise ValueError('--config is available only in a source checkout; this kit has a fixed package selection')
+            os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
+            os.environ['FLOWVIEW_SITE_CONFIG'] = str(args.config.resolve())
         if args.out and args.spec and args.out.resolve() in (args.spec.resolve(),):
             raise ValueError('Output must not overwrite the input spec')
         document, metadata = generate(args.panel, args.feature, args.mode, json.loads(args.spec.read_text()) if args.spec else None)

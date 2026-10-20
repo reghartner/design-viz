@@ -1,4 +1,5 @@
 'use strict';
+process.env.FLOWVIEW_PACKAGES = 'science';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -38,7 +39,7 @@ const fakeHost = () => {
     querySelector(selector){ return host.parts[selector] || null; }, querySelectorAll(){ return []; },
     get innerHTML(){ return host.html; },
     set innerHTML(value){ host.writes++; host.html = value;
-      host.parts = {'.cellscene-frame':el(), '.cellscene-view':el(), '.cellscene-overlay':el(), '.cellscene-hud':el(), '.cellscene-foot':el()};
+      host.parts = {'.cellscene-frame':el(), '.cellscene-view':el(), '.cellscene-highlight':el(), '.cellscene-overlay':el(), '.cellscene-hud':el(), '.cellscene-foot':el()};
       const view = /class="cellscene-view" style="([^"]*)"/.exec(value); host.parts['.cellscene-view'].attrs.style = view ? view[1] : '';
     }};
   return host;
@@ -57,7 +58,7 @@ test('cellscene template, picker example, feature label, styles and metadata use
   assert.equal(panelAssets().features['panel.cellscene'].since, '0.2.0');
   const css = readStyles('style.core.css');
   for (const rule of [/\.cellscene-view\{/, /\.cellscene-crossing\{/, /@keyframes cellsceneCross/, /\.cellscene-parent\{/, /prefers-reduced-motion:reduce\)\{\.cellscene-view/]) assert.match(css, rule);
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/types/cellscene.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../packages/science/panels/types/cellscene.js'), 'utf8');
   assert.doesNotMatch(source, /\.mech-[a-z-]*\s*\{/, 'the strandscene panel owns the shared .mech-* rules');
   assert.doesNotMatch(source, /document\.|setTimeout|setInterval|requestAnimationFrame|fetch\(/);
   assert.equal(C.PanelRegistry.get('cellscene').order, 47);
@@ -199,6 +200,98 @@ test('model resolves anchors, clusters, division geometry, zoom, highlight and c
   const rings = C.cellsceneModel(p, {events:[{kind:'signal',at:'nuc',rings:3}]});
   same(plain(rings.transients.map(t => [t.kind, t.x, t.y, t.delay])), [['signal',352,158,0],['signal',352,158,250],['signal',352,158,500]]);
 });
+test('legend mode preserves all items by default and validates setup values without mutating the declaration', () => {
+  const p = panel(), expected = C.cellsceneModel(p, {}).legend;
+  same(expected.map(chip => chip.id), ['p', 'c', 'nucleus', 'cell']);
+  same(C.cellsceneModel({...p, legendMode:'all'}, {}).legend, expected);
+  for (const invalid of ['VISIBLE', '', null, 0, {}, []]) {
+    const authored = {...p, legendMode:invalid}, before = JSON.stringify(authored);
+    const warnings = validate({nodes:{n:{}}, rows:[['n']], panels:[authored]}).warnings;
+    same(warnings, ['sections[0].diagram.panels[0].legendMode: expected all|visible — using all']);
+    same(C.cellsceneModel(authored, {}).legend, expected);
+    assert.equal(C.cellsceneDecl(authored).legendMode, 'all');
+    assert.equal(JSON.stringify(authored), before);
+  }
+  for (const legendMode of ['all', 'visible'])
+    same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, legendMode}]}), {errors:[], warnings:[]});
+  const authoring = C.panelAuthoring('cellscene');
+  same(authoring.setupFields.find(field => field[0] === 'legendMode'), ['legendMode', 'text']);
+  assert.match(authoring.fieldMeta.legendMode.help, /default.*hidden.*count 0.*cell and nucleus/);
+  assert.ok(!C.panelPatchFields(p).some(field => field[0] === 'legendMode'), 'legend mode is declaration setup');
+});
+test('visible legend follows drawn items through hide, zero count, reveal and reset, keeping cell context and aria', () => {
+  const p = {...panel(), legendMode:'visible'};
+  const steps = [
+    {id:'hidden', panels:{cell:{items:{p:{state:'hidden',count:3}, c:{state:'free',count:0}}}}},
+    {id:'reveal', panels:{cell:{items:{p:{state:'free'}, c:{state:'active',count:6}}}}},
+    {id:'zero', panels:{cell:{items:{p:{count:0}, c:{count:0}}}}},
+    {id:'reset', panels:{cell:{items:{p:null, c:null}}}},
+  ];
+  const states = folded({...diagram(steps), panels:[p]});
+  const expectedIds = [['nucleus','cell'], ['p','c','nucleus','cell'], ['nucleus','cell'], ['p','nucleus','cell']];
+  states.forEach((state, index) => {
+    const m = C.cellsceneModel(p, state), html = C.cellsceneHTML(p, state);
+    same(m.legend.map(chip => chip.id), expectedIds[index]);
+    same(m.legend.filter(chip => !['nucleus','cell'].includes(chip.id)).map(chip => chip.id), m.items.filter(item => item.visible).map(item => item.id));
+    same(m.aria, C.cellsceneModel(panel(), state).aria, 'legend filtering does not alter the visible scene description');
+    const legend = /<ul class="mech-legend"[^>]*>([\s\S]*?)<\/ul>/.exec(html)[1];
+    same([...legend.matchAll(/data-id="([^"]+)"/g)].map(match => match[1]), expectedIds[index]);
+    for (const item of m.items) {
+      assert.equal(html.includes('cellscene-item cellscene-role-' + item.role), item.visible);
+      assert.equal(m.aria.includes(item.label), item.visible);
+    }
+  });
+  const divided = C.cellsceneModel(p, {...states[0], divided:true});
+  same(divided.legend.map(chip => [chip.id, chip.state]), [['nucleus','×2'], ['cell','2']]);
+});
+test('changing legend mode patches the legend while retaining scene geometry', () => {
+  const p = panel(), host = fakeHost(), state = folded(diagram([]))[0];
+  C.renderPanelBody(host, p, state, 'aurora', [state], 0, false);
+  const visible = {...p, legendMode:'visible'};
+  C.renderPanelBody(host, visible, state, 'aurora', [state], 0, false);
+  assert.equal(host.writes, 1, 'legend setup changes patch the footer in place');
+  assert.doesNotMatch(host.parts['.cellscene-foot'].innerHTML, /data-id="c"/);
+  assert.match(host.parts['.cellscene-foot'].innerHTML, /data-id="p"/);
+  C.renderPanelBody(host, p, state, 'aurora', [state], 0, false);
+  assert.equal(host.writes, 1);
+  assert.match(host.parts['.cellscene-foot'].innerHTML, /data-id="c"/);
+});
+test('readable label mode enlarges scene labels and moves the caption into the footer', () => {
+  const p = panel(), state = {caption:'A long explanation that needs room to wrap.'};
+  const standard = C.cellsceneHTML(p, state), readable = C.cellsceneHTML({...p, labelMode:'readable'}, state);
+  assert.match(standard, /class="cellscene-t-cap"/);
+  assert.doesNotMatch(standard, /cellscene-readable|cellscene-caption/);
+  assert.match(readable, /class="swpanel cellscene cellscene-readable"/);
+  assert.match(readable, /<p class="cellscene-caption">A long explanation that needs room to wrap\.<\/p>/);
+  assert.doesNotMatch(readable, /class="cellscene-t-cap"/);
+  same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'readable'}]}), {errors:[], warnings:[]});
+  same(validate({nodes:{n:{}}, rows:[['n']], panels:[{...p, labelMode:'large'}]}).warnings,
+    ['sections[0].diagram.panels[0].labelMode: expected standard|readable — using standard']);
+  same(C.panelAuthoring('cellscene').setupFields.find(field => field[0] === 'labelMode'), ['labelMode','text']);
+  const host = fakeHost(), states = folded(diagram([{id:'caption', panels:{cell:state}}]));
+  C.renderPanelBody(host, {...p, labelMode:'readable'}, states[0], 'aurora', states, 0, false);
+  assert.match(host.html, /cellscene-caption/);
+});
+test('readable adjacent item labels separate and clear nearby shapes', () => {
+  const p = panel();
+  p.items = [
+    {id:'rna',role:'cargo',shape:'pill',label:'+RNA',start:{in:'cyt',x:200,y:125}},
+    {id:'polymerase',role:'polymerase',shape:'clamp',label:'Polymerase',start:{in:'cyt',x:280,y:125}},
+    {id:'copy',role:'particle',shape:'wedge',label:'New RNA',start:{in:'cyt',x:313,y:190}},
+  ];
+  const standard = C.cellsceneModel(p, {}), readable = C.cellsceneModel({...p,labelMode:'readable'}, {});
+  const standardPositions = C.cellsceneItemLabelPositions(standard), readablePositions = C.cellsceneItemLabelPositions(readable);
+  same(standardPositions.polymerase, {x:0,y:standard.items[1].reach + 13}, 'compact labels keep their existing placement');
+  const rna = readablePositions.rna, polymerase = readablePositions.polymerase;
+  assert.equal(rna.x, 0);
+  assert.ok(polymerase.x > 0, 'the longer neighboring label moves sideways');
+  const rnaRight = readable.items[0].x + rna.x + 4 * 18 * .62 / 2;
+  const polymeraseLeft = readable.items[1].x + polymerase.x - 10 * 18 * .62 / 2;
+  assert.ok(polymeraseLeft - rnaRight >= 7.9, 'the two readable labels have a visible gap');
+  assert.ok(polymerase.y >= readable.items[1].h / 2 + 18 + 4, 'the label clears its own shape');
+  assert.ok(readable.items[1].y + polymerase.y < readable.items[2].y - readable.items[2].h / 2, 'the label clears the RNA pool shape below');
+  same(polymerase, C.cellsceneItemLabelPositions(readable).polymerase, 'the settled geometry is deterministic');
+});
 test('render emits settled markup with glide styles, one crossing transient per enter, and nothing when not animating', () => {
   const p = panel(), states = folded(diagram(story())), host = {};
   const first = render()(host, p, states[0], null, states, 0, true);
@@ -264,6 +357,22 @@ test('a zoom or caption change alone takes the patch path and keeps the scene su
   C.renderPanelBody(host, p, states[2], 'aurora', states, 2, true);
   assert.equal(host.writes, 2, 'a moved item rebuilds the scene');
   assert.match(host.html, /data-id="p" style="transform:translate\(-15px,0px\)"/);
+});
+test('highlight renders behind item names and patches without rebuilding them', () => {
+  const p = panel(), highlighted = C.cellsceneHTML(p, {highlight:'cyt'});
+  const cell = highlighted.indexOf('class="cellscene-cell"');
+  const layer = highlighted.indexOf('<g class="cellscene-highlight">');
+  const ellipse = highlighted.indexOf('<ellipse class="cellscene-hl"');
+  const item = highlighted.indexOf('class="mech-move cellscene-item');
+  assert.ok(cell < layer && layer < ellipse && ellipse < item, 'the accent sits above the cell fill and below item labels');
+  const host = fakeHost(), rest = folded(diagram([]))[0];
+  C.renderPanelBody(host, p, rest, 'aurora', [rest], 0, false);
+  C.renderPanelBody(host, p, {...rest,highlight:'cyt'}, 'aurora', [rest], 0, false);
+  assert.equal(host.writes, 1, 'a highlight-only change retains the item subtree');
+  assert.match(host.parts['.cellscene-highlight'].innerHTML, /cellscene-hl/);
+  C.renderPanelBody(host, p, rest, 'aurora', [rest], 0, false);
+  assert.equal(host.writes, 1);
+  assert.equal(host.parts['.cellscene-highlight'].innerHTML, '');
 });
 test('hostile strings are escaped everywhere and never become attributes', () => {
   const p = panel();

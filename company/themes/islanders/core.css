@@ -1,0 +1,48 @@
+/* Islanders: ice surfaces, royal-blue structure and orange live accents.
+   The Pastel layer supplies the light semantic states; no team artwork. */
+body.sk-islanders{--is-blue:#003087;--is-orange:#FC4C02;--is-navy:#071E42;--is-ice:#EDF5FA;--is-line:#C8D9E8;background:var(--is-ice);color:var(--is-navy);}
+body.sk-islanders .docview.docview{--dink:#071E42;--dtext:#294561;--dfaint:#536A80;--pv-surface:#FFFFFF;}
+body.sk-islanders :is(.section-viewport,.explore-navigation){--explore-bg:#F5F9FC;--explore-border:#C8D9E8;--navigation-accent:#003087;--reader-paper:#FFFFFF;--reader-top:#E4EEF8;--reader-toolbar:#F5F9FC;--reader-sidebar:#FFFFFF;--reader-footer:#EDF5FA;--reader-selected:#DDEBFA;--reader-hover:#EDF5FA;}
+body.sk-islanders :is(.doc-title,.sec-h){color:#003087;font-family:'Sora','IBM Plex Sans',sans-serif;font-weight:700;letter-spacing:-.025em;}
+body.sk-islanders .doc-sec{background:#FFFFFF;border-color:#C8D9E8;box-shadow:0 5px 24px #00308708;}
+body.sk-islanders .docview :is(.pwidget,.explore-window,.lg){background:#FFFFFF;border-color:#C8D9E8;color:#294561;}
+body.sk-islanders .docview .pwidget{border-top:3px solid #003087;box-shadow:0 3px 12px #00308709;}
+body.sk-islanders .docview .board{--dv-board-ground:#EDF5FA;background:linear-gradient(90deg,transparent 24%,#00308709 24%,#00308709 24.4%,transparent 24.4%,transparent 49.8%,#FC4C020C 49.8%,#FC4C020C 50.2%,transparent 50.2%,transparent 75.6%,#00308709 75.6%,#00308709 76%,transparent 76%),#F4F9FC;border-color:#C8D9E8;}
+body.sk-islanders .docview .board :where(.node:not(.node-styled)) .card{fill:#FFFFFF;stroke:#8BA8CA;}
+body.sk-islanders .docview .t1{fill:#071E42;}body.sk-islanders .docview .t2{fill:#536A80;}
+body.sk-islanders .docview .stepmode .node.lit:not([class*="tone-"]) .card{stroke:#FC4C02;fill:#FFF4EC;filter:drop-shadow(0 2px 4px #FC4C0220);}
+body.sk-islanders .docview :is(.termbar,.step-text){background:#F5F9FC;border-color:#C8D9E8;color:#294561;}
+body.sk-islanders .docview :is(.mbtn,.tbtn,.schip,.pathbtn){background:#FFFFFF;border-color:#B3C8DF;color:#003087;}
+body.sk-islanders .docview :is(.mbtn,.pathbtn)[aria-pressed=true],body.sk-islanders .docview .schip[aria-current=true]{background:#003087;color:#FFFFFF;border-color:#003087;box-shadow:inset 0 -3px #FC4C02;}
+body.sk-islanders .docview .step-transport .playback-button{background:#003087;color:#FFFFFF;border-color:#003087;box-shadow:inset 0 -3px #FC4C02;}
+body.sk-islanders .docview .termbar.has-paths .path-timeline .schip[aria-current=true]{border-color:#FC4C02;background:#003087;color:#FFFFFF;box-shadow:0 0 0 3px #FFFFFF,0 0 0 5px #FC4C02;}
+body.sk-islanders .docview .termbar :is(.slabel,.stext a){color:#003087;}
+body.sk-islanders .docview .tltile{background:linear-gradient(145deg,#FFFFFF,#EDF5FA);border-color:#B8CEE2;border-left:3px solid #003087;border-radius:6px;}
+body.sk-islanders .docview :is(.tllabel,.tlsub){color:#365575;}
+body.sk-islanders .docview .grid-table{--grid-low:#EEF5FC;--grid-mid:#EEF5FC;--grid-high:#88AAD3;--grid-neg:#E9B495;border-spacing:3px;}
+/* Keep dark figures across the entire ice/peach ramp, including middle values
+   where the generic deep-cell white text would have insufficient contrast. */
+body.sk-islanders .docview .grid-cell{border-radius:3px;color:#071E42;}
+body.sk-islanders .docview .grid-cell.grid-hl-cell{box-shadow:inset 0 0 0 2px #FC4C02,0 0 0 1px #FFFFFF;}
+body.sk-islanders .docview .grid-legend{color:#536A80;}
+body.sk-islanders .docview .funnel-track{background:#E1EDF7;border-radius:3px;height:14px;}
+body.sk-islanders .docview .funnel-row:not(.funnel-active) .funnel-bar:not(.data-tone-danger):not(.data-tone-bad):not(.data-tone-warning):not(.data-tone-success):not(.data-tone-good){background:linear-gradient(90deg,#003087,#3679B4);border-radius:3px;}
+body.sk-islanders .docview .funnel-active{background:#FFF4EC;border-color:#FC4C02;}
+body.sk-islanders .docview .funnel-active .funnel-bar{background:#FC4C02;}
+body.sk-islanders .docview .funnel-live{background:#003087;color:#FFFFFF;}
+body.sk-islanders :focus-visible{outline-color:#FC4C02;}
+body.sk-islanders .seatmap{--seatmap-accent:#003087;--seatmap-gutter:#FFFFFF;--seatmap-label-on:#FFFFFF;
+  --seatmap-r1:#E5EFF9;--seatmap-r2:#D0E2F3;--seatmap-r3:#B4CEE9;--seatmap-r4:#94B7DD;--seatmap-r5:#739DCF;--seatmap-r6:#5283BF;--seatmap-r7:#3866AC;--seatmap-r8:#23529C;--seatmap-r9:#10418F;--seatmap-r10:#003087;--seatmap-full:#071E42;
+  --seatmap-w1:#FFF1E8;--seatmap-w2:#FFE1CF;--seatmap-w3:#FFCCAF;--seatmap-w4:#FFB58C;--seatmap-w5:#FF9B68;--seatmap-w6:#FC824A;--seatmap-w7:#E96220;--seatmap-w8:#D84D0D;--seatmap-w9:#B83B00;--seatmap-w10:#942F00;
+  --seatmap-base:#EDF5FA;--seatmap-base-line:#C8D9E8;--seatmap-lbl:#071E42;--seatmap-lbl-dark:#071E42;--seatmap-hover:#003087;
+  --seatmap-sel:#FC4C02;--seatmap-sel-ring:#FC4C0240;--seatmap-hold:#B33A00;--seatmap-hold-bg:#FFF0E6;--seatmap-hold-lbl:#713000;--seatmap-hold-halo:#FFF0E6;
+  --seatmap-ice:#F5FBFF;--seatmap-board:#8DAECD;--seatmap-red:#FC4C0270;--seatmap-blue:#00308765;--seatmap-crease:#00308714;
+  --seatmap-ink:#071E42;--seatmap-text:#294561;--seatmap-muted:#536A80;--seatmap-chip-bg:#003087;--seatmap-chip-ink:#FFFFFF;--seatmap-well:#EDF5FA;--seatmap-well-line:#C8D9E8;--seatmap-glow:#FC4C02;
+  --seatmap-lm-bg:#FFFFFF;--seatmap-lm-line:#B3C8DF;--seatmap-lm-text:#003087;--seatmap-radius:5px;--seatmap-num:'Sora','IBM Plex Sans',sans-serif;}
+.seatmap-islanders-logo{display:none;pointer-events:none}
+.sk-islanders .seatmap-islanders-logo{display:inline}
+.sk-islanders .seatmap-islanders-ice-label{display:none}
+/* Library previews are immutable snapshots shared across themes. Their card
+   carries the live theme mark, so do not bake one into the thumbnail pixels. */
+.sk-islanders .thumbnail-ready .seatmap-islanders-logo{display:none}
+.sk-islanders .thumbnail-ready .seatmap-islanders-ice-label{display:inline}

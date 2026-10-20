@@ -1,0 +1,15 @@
+{
+  "pages": [
+    {
+      "file": "strand-cut.html",
+      "spec": "strand-cut.spec.json",
+      "title": "A bacterium cuts foreign DNA",
+      "family": "strand-cut",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "strandscene"
+      ]
+    }
+  ]
+}

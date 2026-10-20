@@ -4,6 +4,7 @@
     "panels/registry.js",
     "icons/library.js",
     "validator.js",
+    "@theme/runtime",
     "core/navigation.js",
     "core/document.js",
     "core/contracts.js",
@@ -25,14 +26,12 @@
     "panels/shared.js",
     "panels/notifications.js",
     "panels/audio.js",
-    "panels/bio.js",
-    "panels/sports.js",
-    "panels/mech.js",
-    "panels/venue-library.js",
+    "@packages/panels/*.js",
     "@company/panels/*.js",
-    "panels/venues/*.js",
+    "@packages/panels/venues/*.js",
     "@company/panels/venues/*.js",
     "panels/types/*.js",
+    "@packages/panels/types/*.js",
     "@company/panels/types/*.js"
   ],
   "engine.js": [
@@ -51,6 +50,7 @@
     "viewer/handoffs.js",
     "viewer/shortcuts.js"
   ],
+  "library.workbench.js": ["@theme/workbench", "library.workbench.js"],
   "builder.workbench.js": [
     "workbench/source-edit.js",
     "workbench/targets.js",
@@ -74,7 +74,7 @@
     "workbench/session.js",
     "workbench/field-values.js",
     "workbench/panel-collections.js",
-    "panels/seatmap-import.js",
+    "@packages/workbench/*.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/image-nodes.js",

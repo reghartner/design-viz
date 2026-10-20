@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD = ROOT / "tools" / "build.py"
@@ -32,6 +33,67 @@ def entrypoint(name):
     return json.loads(subprocess.check_output(
         ['node', str(ROOT / 'tools/source-loader.cjs'), '--entrypoint', name], text=True,
         env={**os.environ, 'FLOWVIEW_COMPANY_IDENTITY': 'off'}))
+
+
+class SitePackageSelectionTests(unittest.TestCase):
+    def test_site_package_list_overrides_or_inherits_company_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'site.json'
+            path.write_text('{"version":1,"landing":{}}')
+            self.assertIsNone(build.site_packages(path))
+            path.write_text('{"version":1,"landing":{},"packages":[]}')
+            self.assertEqual(build.site_packages(path), [])
+            path.write_text('{"version":1,"landing":{},"packages":["science","sports"]}')
+            self.assertEqual(build.site_packages(path), ['science', 'sports'])
+            self.assertIsNone(build.site_packages(path, no_config=True))
+
+    def test_site_package_list_rejects_duplicate_and_invalid_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'site.json'
+            for names in (["sports", "sports"], ["Science"], [42], "sports"):
+                path.write_text(json.dumps({"version": 1, "landing": {}, "packages": names}))
+                with self.assertRaisesRegex(SystemExit, 'packages must be a list'):
+                    build.site_packages(path)
+
+    def test_external_site_without_packages_inherits_company_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'site.json'
+            path.write_text('{"version":1,"landing":{}}')
+            with patch.object(build, 'company', return_value={'packages': ['science']}):
+                self.assertEqual(build.package_base(path), ['science'])
+            path.write_text('{"version":1,"landing":{},"packages":[]}')
+            with patch.object(build, 'company', return_value={'packages': ['science']}):
+                self.assertEqual(build.package_base(path), [])
+
+    def test_source_loader_uses_site_base_and_explicit_additions(self):
+        env = {**os.environ, 'FLOWVIEW_COMPANY_IDENTITY': 'off',
+               'FLOWVIEW_PACKAGE_BASE': 'science', 'FLOWVIEW_PACKAGES': 'sports'}
+        names = subprocess.check_output(
+            ['node', str(ROOT / 'tools/source-loader.cjs'), '--packages'], text=True, env=env)
+        self.assertEqual(json.loads(names), ['science', 'sports'])
+        env['FLOWVIEW_PACKAGE_BASE'] = ''
+        env['FLOWVIEW_PACKAGES'] = ''
+        names = subprocess.check_output(
+            ['node', str(ROOT / 'tools/source-loader.cjs'), '--packages'], text=True, env=env)
+        self.assertEqual(json.loads(names), [])
+
+    def test_source_loader_reads_checkout_site_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / 'src').mkdir()
+            (root / 'workbench').mkdir()
+            site = root / 'workbench/site.json'
+            script = ('const loader=require(process.argv[1]);'
+                      'process.stdout.write(JSON.stringify(loader.sitePackageSelection(process.argv[2])));')
+            command = ['node', '-e', script, str(ROOT / 'tools/source-loader.cjs'), str(root / 'src')]
+            site.write_text('{"version":1,"packages":[]}')
+            self.assertEqual(json.loads(subprocess.check_output(command, text=True)), [])
+            site.write_text('{"version":1,"packages":["sports"]}')
+            self.assertEqual(json.loads(subprocess.check_output(command, text=True)), ['sports'])
+            site.write_text('{"version":1,"packages":["sports","sports"]}')
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('packages must be a list', result.stderr)
 
 
 class BuildTests(unittest.TestCase):
@@ -224,6 +286,27 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn('id="gallery"', text)
         self.assertNotIn('fonts.googleapis.com', text)
         self.assertIn('/* ---- src/welcome.workbench.js ---- */', text)
+
+    def test_science_templates_require_explicit_package_selection(self):
+        # Match the --no-config build above, not this fork's package defaults.
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off',
+                                     'FLOWVIEW_PACKAGE_BASE': '', 'FLOWVIEW_PACKAGES': ''}):
+            default = json.loads(build.workbench_templates())
+        self.assertFalse(any(item['name'] in ('Waves & forces', 'From viral RNA copying to sequencing evidence') for item in default))
+        self.assertNotIn('panel.wavefield', self.texts['flowspec.html'])
+        self.assertNotIn('panel.rnacopy', self.texts['flowspec.html'])
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'science'}):
+            selected = json.loads(build.workbench_templates())
+            self.assertEqual(build.enabled_packages(), ['science'])
+        added = [item for item in selected if item['name'] == 'From viral RNA copying to sequencing evidence']
+        self.assertEqual([item['name'] for item in added], ['From viral RNA copying to sequencing evidence'])
+        self.assertTrue(all(item['category'] == 'science' for item in added))
+        with patch.dict(os.environ, {'FLOWVIEW_COMPANY_IDENTITY': 'off', 'FLOWVIEW_PACKAGES': 'physics'}):
+            physics = json.loads(build.workbench_templates())
+            self.assertEqual(build.enabled_packages(), ['physics'])
+        added = [item for item in physics if item['name'] == 'Waves & forces']
+        self.assertEqual([item['name'] for item in added], ['Waves & forces'])
+        self.assertEqual(added[0]['category'], 'physics')
 
     def test_flowview_has_separate_empty_derived_backlink_block(self):
         blocks = BACKLINK_RE.findall(self.texts["flowview.html"])

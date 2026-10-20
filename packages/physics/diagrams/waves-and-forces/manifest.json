@@ -1,0 +1,17 @@
+{
+  "pages": [
+    {
+      "file": "waves-and-forces.html",
+      "spec": "waves-and-forces.spec.json",
+      "title": "Two invisible sums: waves and forces",
+      "family": "waves-and-forces",
+      "description": "",
+      "tags": [],
+      "widgets": [
+        "forcebody",
+        "table",
+        "wavefield"
+      ]
+    }
+  ]
+}

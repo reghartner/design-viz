@@ -78,8 +78,10 @@ class DockerSourceBuildTests(unittest.TestCase):
             self.assertIn('state', json.loads(files['tools/arrange/layouts.json']))
             self.assertFalse(any(name.endswith(('generated-native.html', 'setup.cjs', 'package-lock.json')) for name in files))
             self.assertIn('module.exports', files['tools/canon/generated-runtime.cjs'])
-            self.assertFalse(any('node_modules' in name or name.endswith('package.json') or
-                                 name.endswith('package-lock.json') for name in files))
+            self.assertFalse(any(
+                'node_modules' in name or name.endswith('package-lock.json') or
+                (name.endswith('package.json') and not re.fullmatch(r'packages/[a-z][a-z0-9-]*/package.json', name))
+                for name in files))
 
 
 if __name__ == '__main__':

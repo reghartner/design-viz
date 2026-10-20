@@ -1,0 +1,1256 @@
+{
+  "page": {
+    "title": "From viral RNA copying to sequencing evidence",
+    "subtitle": "A conceptual +RNA virus story, then an illustrative RNA-seq reading exercise",
+    "skin": "aurora",
+    "sections": [
+      {
+        "id": "journey",
+        "heading": "01 / One genome, two copying paths",
+        "accent": "cyan",
+        "text": [
+          "Choose a path and follow its seven beats. Both reach one completed +RNA copy before the fork. Compare continued synthesis with a hypothetical interruption; counts and extents are symbolic, with no timescale."
+        ],
+        "diagram": {
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "arrival": {
+              "title": "01 Arrival",
+              "sub": "genome inside a particle",
+              "tint": "dev"
+            },
+            "entry": {
+              "title": "02 Entry",
+              "sub": "RNA becomes accessible",
+              "tint": "dev"
+            },
+            "translation": {
+              "title": "03 Translation",
+              "sub": "proteins become available",
+              "tint": "data"
+            },
+            "gate": {
+              "title": "04 Copy gate",
+              "sub": "one copy before the fork",
+              "tint": "cmd"
+            },
+            "new": {
+              "title": "05 New RNA",
+              "sub": "further genome supply",
+              "tint": "mqtt"
+            },
+            "assembly": {
+              "title": "06 Assembly",
+              "sub": "RNA + proteins meet",
+              "tint": "mqtt"
+            },
+            "release": {
+              "title": "07 Release",
+              "sub": "particles leave the cell",
+              "tint": "mqtt"
+            },
+            "interrupt": {
+              "title": "05 Interruption",
+              "sub": "further synthesis stops",
+              "tint": "auth"
+            },
+            "limited": {
+              "title": "06 Limited assembly",
+              "sub": "uses the pre-fork copy",
+              "tint": "auth"
+            },
+            "residual": {
+              "title": "07 Limited release",
+              "sub": "a smaller symbolic outcome",
+              "tint": "auth"
+            }
+          },
+          "rows": [
+            [
+              "arrival",
+              "entry",
+              "translation",
+              "gate"
+            ],
+            [
+              "new",
+              "assembly",
+              "release"
+            ],
+            [
+              "interrupt",
+              "limited",
+              "residual"
+            ]
+          ],
+          "edges": [
+            {
+              "to": "entry",
+              "kind": "int",
+              "from": "arrival"
+            },
+            {
+              "to": "translation",
+              "kind": "int",
+              "from": "entry"
+            },
+            {
+              "to": "gate",
+              "kind": "int",
+              "from": "translation"
+            },
+            {
+              "to": "new",
+              "kind": "int",
+              "from": "gate"
+            },
+            {
+              "to": "assembly",
+              "kind": "int",
+              "from": "new"
+            },
+            {
+              "to": "release",
+              "kind": "int",
+              "from": "assembly"
+            },
+            {
+              "to": "interrupt",
+              "kind": "int",
+              "from": "gate"
+            },
+            {
+              "to": "limited",
+              "kind": "int",
+              "from": "interrupt"
+            },
+            {
+              "to": "residual",
+              "kind": "int",
+              "from": "limited"
+            }
+          ],
+          "panels": [
+            {
+              "id": "cellview",
+              "type": "cellscene",
+              "title": "CELL CONTEXT · a fixed view",
+              "label": "Illustrative eukaryotic cell",
+              "compartments": [
+                {
+                  "id": "outside",
+                  "kind": "outside",
+                  "label": "Outside the cell",
+                  "x": 72,
+                  "y": 105
+                },
+                {
+                  "id": "cell",
+                  "kind": "cell",
+                  "label": "Cell membrane",
+                  "x": 306,
+                  "y": 162,
+                  "rx": 170,
+                  "ry": 110
+                },
+                {
+                  "id": "cyt",
+                  "kind": "region",
+                  "parent": "cell",
+                  "label": "Cytoplasm",
+                  "x": 390,
+                  "y": 166,
+                  "rx": 65,
+                  "ry": 55
+                }
+              ],
+              "items": [
+                {
+                  "id": "incoming",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Incoming virion",
+                  "size": "m",
+                  "start": {
+                    "x": 72,
+                    "y": 105,
+                    "count": 1,
+                    "state": "free",
+                    "in": "outside"
+                  }
+                },
+                {
+                  "id": "genome",
+                  "role": "cargo",
+                  "shape": "pill",
+                  "label": "+RNA",
+                  "size": "m",
+                  "start": {
+                    "x": 200,
+                    "y": 125,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "ribosome",
+                  "role": "ribosome",
+                  "shape": "lobes",
+                  "label": "Host ribosome",
+                  "size": "m",
+                  "start": {
+                    "x": 246,
+                    "y": 177,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "enzyme",
+                  "role": "polymerase",
+                  "shape": "clamp",
+                  "label": "Polymerase",
+                  "size": "m",
+                  "start": {
+                    "x": 280,
+                    "y": 125,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "protein",
+                  "role": "protein",
+                  "shape": "box",
+                  "label": "Protein pool",
+                  "size": "m",
+                  "start": {
+                    "x": 220,
+                    "y": 215,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "copies",
+                  "role": "particle",
+                  "shape": "wedge",
+                  "label": "New RNA pool",
+                  "size": "m",
+                  "start": {
+                    "x": 313,
+                    "y": 190,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "assembled",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Assembled",
+                  "size": "m",
+                  "start": {
+                    "x": 398,
+                    "y": 228,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                },
+                {
+                  "id": "released",
+                  "role": "virus",
+                  "shape": "spiky",
+                  "label": "Released",
+                  "size": "m",
+                  "start": {
+                    "x": 507,
+                    "y": 238,
+                    "count": 0,
+                    "state": "hidden",
+                    "in": "cyt"
+                  }
+                }
+              ],
+              "initial": {
+                "zoom": null,
+                "caption": "An arriving particle carries RNA. The modeled copying pathway is cytoplasmic.",
+                "note": "Pill: incoming RNA · wedge: new RNA pool · spiky: assembly pool or outside particle."
+              },
+              "legendMode": "visible",
+              "labelMode": "readable"
+            },
+            {
+              "id": "copyview",
+              "type": "rnacopy",
+              "title": "RNA COPYING · the close-up",
+              "label": "Incoming +RNA → complementary intermediate → new +RNA",
+              "initial": {
+                "status": "ready",
+                "position": 0.2,
+                "progress": 0,
+                "copies": 0,
+                "caption": "The polymerase site is ready; no complementary intermediate or completed copy is shown yet.",
+                "note": "The site, copy tray and pathway bridge are separate teaching views. Sequence, cofactors and membrane organization are omitted."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "arrival",
+              "nodes": [
+                "arrival"
+              ],
+              "text": "The arriving enveloped particle carries the starting genome. Being outside the cell gives it no access to the host translation machinery.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "incoming": {
+                      "x": 95,
+                      "y": 112,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 75,
+                        "y": 67
+                      },
+                      "text": "RNA is still packaged"
+                    }
+                  ],
+                  "caption": "Arrival supplies a starting genome, still enclosed in a particle."
+                }
+              }
+            },
+            {
+              "id": "entry",
+              "nodes": [
+                "entry"
+              ],
+              "text": "Entry and uncoating make the positive-sense RNA accessible in the cytoplasm. That accessibility allows the host ribosome to read it.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "incoming": {
+                      "state": "hidden",
+                      "count": 0
+                    },
+                    "genome": {
+                      "count": 1,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 222,
+                        "y": 91
+                      },
+                      "text": "Accessible incoming RNA"
+                    }
+                  ],
+                  "caption": "Uncoating makes the incoming RNA accessible to host machinery."
+                }
+              },
+              "edge": "arrival->entry"
+            },
+            {
+              "id": "translation",
+              "nodes": [
+                "translation"
+              ],
+              "text": "Host translation reads the incoming RNA to make viral proteins, including the machinery needed for copying. Protein production alone does not multiply the genome.",
+              "panels": {
+                "cellview": {
+                  "items": {
+                    "ribosome": {
+                      "count": 1,
+                      "state": "active"
+                    },
+                    "enzyme": {
+                      "count": 1,
+                      "state": "free"
+                    },
+                    "protein": {
+                      "count": 1,
+                      "state": "free"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 73
+                      },
+                      "text": "Translation supplies machinery"
+                    }
+                  ],
+                  "caption": "A ribosome supplies protein and polymerase pools without copying RNA."
+                }
+              },
+              "edge": "entry->translation"
+            },
+            {
+              "id": "gate",
+              "nodes": [
+                "gate"
+              ],
+              "text": "Copying through a complementary RNA intermediate has supplied one symbolic new +RNA genome. The close-up now shows a separate synthesis event in progress. Both paths share the completed pre-fork copy; the hypothetical interruption affects further synthesis.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "ribosome": {
+                      "state": "hidden",
+                      "count": 0
+                    },
+                    "genome": {
+                      "x": 200,
+                      "y": 125
+                    },
+                    "enzyme": {
+                      "x": 280,
+                      "y": 125,
+                      "state": "active"
+                    },
+                    "copies": {
+                      "count": 1,
+                      "state": "free",
+                      "label": "New RNA ×1"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 245,
+                        "y": 281
+                      },
+                      "text": "Shared · one completed new RNA"
+                    }
+                  ],
+                  "caption": "One completed new RNA is available before the paths diverge."
+                },
+                "copyview": {
+                  "status": "copying",
+                  "position": 0.4,
+                  "progress": 0.3,
+                  "copies": 1,
+                  "caption": "One completed +RNA token sits in the tray. The dashed strand at the polymerase site represents a separate illustrative synthesis event; it does not require a new complementary template for every +RNA copy.",
+                  "note": "The bridge compresses the mechanism: a complementary template can support further +RNA synthesis. Strand extent and completed-copy count are separate authored states, not a rate or yield."
+                }
+              },
+              "edge": "translation->gate"
+            },
+            {
+              "id": "new-rna",
+              "nodes": [
+                "new"
+              ],
+              "text": "Further RNA synthesis expands the symbolic completed-genome pool from one to four. These genomes provide material that this model assumes can join viral proteins during assembly.",
+              "panels": {
+                "cellview": {
+                  "items": {
+                    "copies": {
+                      "count": 1,
+                      "state": "free",
+                      "label": "New RNA ×4"
+                    },
+                    "enzyme": {
+                      "x": 280,
+                      "y": 125
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 74
+                      },
+                      "text": "New genomes become available"
+                    }
+                  ],
+                  "caption": "The labeled wedge now represents a larger completed RNA pool."
+                },
+                "copyview": {
+                  "status": "complete",
+                  "position": 0.8,
+                  "progress": 1,
+                  "copies": 4,
+                  "caption": "Four separate +RNA tokens show the authored completed-copy count. The site shows a complementary intermediate at its authored full extent.",
+                  "note": "The site and tray summarize different copying rounds. Neither the token count nor strand extent predicts kinetics, yield or efficacy."
+                }
+              },
+              "edge": "gate->new"
+            },
+            {
+              "id": "assembly",
+              "nodes": [
+                "assembly"
+              ],
+              "text": "The model assumes some completed new genomes can be packaged with viral proteins. Packaging and envelope acquisition are grouped here; their coupling to replication varies among viruses.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cell",
+                  "items": {
+                    "copies": {
+                      "count": 1,
+                      "label": "New RNA ×1"
+                    },
+                    "protein": {
+                      "count": 1
+                    },
+                    "assembled": {
+                      "count": 1,
+                      "state": "bound",
+                      "label": "Assembly pool"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 386,
+                        "y": 274
+                      },
+                      "text": "Packaging is a separate stage"
+                    }
+                  ],
+                  "caption": "The model assigns new RNA to assembly; one symbolic copy remains."
+                },
+                "copyview": {
+                  "caption": "The tray retains four cumulative completed-copy tokens. The cell assigns three symbolic copies to its assembly pool and leaves one free.",
+                  "note": "The intermediate remains a separate authored state. Packaging and later release are illustrative assumptions; real coupling varies."
+                }
+              },
+              "edge": "new->assembly"
+            },
+            {
+              "id": "release",
+              "nodes": [
+                "release"
+              ],
+              "text": "Assembled particles leave the modeled cell. The outside particles are an outcome of prior copying and assembly, rather than RNA strands becoming infectious on their own.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "assembled": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 166,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released B"
+                    },
+                    "released": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 238,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released C"
+                    },
+                    "incoming": {
+                      "in": "outside",
+                      "x": 507,
+                      "y": 95,
+                      "state": "released",
+                      "count": 1,
+                      "label": "Released A"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 305,
+                        "y": 279
+                      },
+                      "text": "Baseline · three particle symbols"
+                    }
+                  ],
+                  "caption": "Three separate outside symbols show the baseline release outcome."
+                }
+              },
+              "edge": "assembly->release"
+            },
+            {
+              "id": "interrupted",
+              "nodes": [
+                "interrupt"
+              ],
+              "text": "Suppose further synthesis is interrupted at the shared gate. The dashed complementary intermediate stays incomplete, while the completed pre-fork +RNA copy remains available in the tray.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cyt",
+                  "items": {
+                    "enzyme": {
+                      "state": "bound"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 140,
+                        "y": 74
+                      },
+                      "text": "Further synthesis interrupted"
+                    }
+                  ],
+                  "caption": "Further synthesis stops; the completed pre-fork RNA copy remains."
+                },
+                "copyview": {
+                  "status": "interrupted",
+                  "position": 0.4,
+                  "progress": 0.3,
+                  "copies": 1,
+                  "caption": "The stop square marks interrupted synthesis. The dashed intermediate remains incomplete; the separate tray retains the completed pre-fork +RNA token.",
+                  "note": "An interruption preserves both authored states. Later packaging and release are illustrative assumptions, with no efficacy estimate."
+                }
+              },
+              "edge": "gate->interrupt",
+              "tone": {
+                "interrupt": "warn"
+              }
+            },
+            {
+              "id": "limited-assembly",
+              "nodes": [
+                "limited"
+              ],
+              "text": "For this illustration, assume the one completed new RNA copy made before the fork can be packaged with existing viral proteins. That assumption permits one symbolic particle; real replication–assembly coupling varies.",
+              "panels": {
+                "cellview": {
+                  "highlight": "cell",
+                  "items": {
+                    "protein": {
+                      "count": 1
+                    },
+                    "assembled": {
+                      "count": 1,
+                      "state": "bound",
+                      "label": "One assembly"
+                    },
+                    "copies": {
+                      "count": 0,
+                      "state": "hidden"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 379,
+                        "y": 274
+                      },
+                      "text": "Pre-fork copy → assumed packaging"
+                    }
+                  ],
+                  "caption": "Assumed packaging uses the completed pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "The tray retains one cumulative completed-copy token. In the cell, that pre-fork copy is assigned to a particle; the incomplete intermediate persists at the stopped site.",
+                  "note": "The incoming genome remains in place. Packaging and release are illustrative assumptions; real coupling varies."
+                }
+              },
+              "edge": "interrupt->limited",
+              "tone": {
+                "limited": "warn"
+              }
+            },
+            {
+              "id": "limited-release",
+              "nodes": [
+                "residual"
+              ],
+              "text": "Under the model’s packaging and release assumptions, that pre-fork copy supports one symbolic outside particle. This authored outcome is not a yield prediction, efficacy estimate or guarantee about real viruses.",
+              "panels": {
+                "cellview": {
+                  "highlight": "outside",
+                  "items": {
+                    "assembled": {
+                      "count": 0,
+                      "state": "hidden"
+                    },
+                    "released": {
+                      "count": 1,
+                      "state": "released",
+                      "in": "outside"
+                    }
+                  },
+                  "labels": [
+                    {
+                      "at": {
+                        "x": 305,
+                        "y": 279
+                      },
+                      "text": "Hypothesis · one particle symbol"
+                    }
+                  ],
+                  "caption": "Assumed release of a particle derived from the pre-fork copy."
+                },
+                "copyview": {
+                  "caption": "One cumulative completed-copy token remains in the tray; the incomplete intermediate remains at the stopped site. The cell shows the assumed release of one particle.",
+                  "note": "These are independent authored symbols, not measured output, efficacy or a guarantee about real viruses."
+                }
+              },
+              "edge": "limited->residual",
+              "tone": {
+                "residual": "warn"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "baseline",
+              "label": "Baseline · copying continues",
+              "color": "#38bdb1",
+              "steps": [
+                "arrival",
+                "entry",
+                "translation",
+                "gate",
+                "new-rna",
+                "assembly",
+                "release"
+              ]
+            },
+            {
+              "id": "interruption",
+              "label": "Hypothesis · copying interrupted",
+              "color": "#db8c68",
+              "steps": [
+                "arrival",
+                "entry",
+                "translation",
+                "gate",
+                "interrupted",
+                "limited-assembly",
+                "limited-release"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 8
+              },
+              {
+                "panel": "cellview",
+                "x": 0,
+                "y": 8,
+                "w": 10,
+                "h": 14
+              },
+              {
+                "panel": "copyview",
+                "x": 10,
+                "y": 8,
+                "w": 14,
+                "h": 16
+              },
+              {
+                "x": 0,
+                "y": 24,
+                "w": 24,
+                "h": 18
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "read-model",
+        "heading": "02 / Read the mechanism, not a result",
+        "accent": "violet",
+        "text": [
+          "The two paths are a teaching comparison. The shared pre-fork copy and later token counts are authored symbols, not observations from an experiment."
+        ],
+        "bullets": [
+          "Incoming +RNA is a pill in the cell and a solid strand in the close-up. The dashed complementary strand is an intermediate; separate tray tokens stand for completed new +RNA.",
+          "The cytoplasmic drawing simplifies a membrane-associated replication process and omits sequence, molecular structure, cofactors, host responses, and time.",
+          "The alternate path assumes the pre-fork copy can join existing proteins and leave the cell. Assembly coupling varies among viruses; the outside particles are not measured yield or intervention efficacy.",
+          "Checkpoint: explain why protein production can continue without guaranteeing a supply of new complete genomes."
+        ]
+      },
+      {
+        "id": "rna-evidence",
+        "heading": "03 / Follow the RNA-seq evidence",
+        "accent": "violet",
+        "text": [
+          "RNA-seq reads shift the view from mechanism to observation: which fragments match viral RNA, where they map, and—if the library preserves strand—what orientation they support. Every count and colored tile here is invented. A read shows RNA in sampled material, not when it was made."
+        ],
+        "diagram": {
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "fragments": {
+              "title": "01 Fragments",
+              "sub": "sampled RNA",
+              "tint": "dev"
+            },
+            "matches": {
+              "title": "02 Matches",
+              "sub": "viral subset",
+              "tint": "data"
+            },
+            "regions": {
+              "title": "03 Regions",
+              "sub": "map position",
+              "tint": "cmd"
+            },
+            "polarity": {
+              "title": "04 Orientation",
+              "sub": "strand view",
+              "tint": "mqtt"
+            },
+            "limits": {
+              "title": "05 Claim limit",
+              "sub": "claim boundary",
+              "tint": "auth"
+            },
+            "ledger": {
+              "title": "06 Evidence ledger",
+              "sub": "observe → infer",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "fragments",
+              "matches",
+              "regions"
+            ],
+            [
+              "ledger",
+              "limits",
+              "polarity"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "fragments",
+              "to": "matches",
+              "kind": "int"
+            },
+            {
+              "from": "matches",
+              "to": "regions",
+              "kind": "int"
+            },
+            {
+              "from": "regions",
+              "to": "polarity",
+              "kind": "int"
+            },
+            {
+              "from": "polarity",
+              "to": "limits",
+              "kind": "int"
+            },
+            {
+              "from": "limits",
+              "to": "ledger",
+              "kind": "int"
+            }
+          ],
+          "panels": [
+            {
+              "id": "rna_map",
+              "type": "locus",
+              "title": "WHERE · schematic viral RNA",
+              "label": "Illustrative map; positions are drawing coordinates",
+              "length": 1000,
+              "features": [
+                {
+                  "id": "left",
+                  "label": "Region A",
+                  "from": 80,
+                  "to": 290,
+                  "tone": "feature",
+                  "row": 0
+                },
+                {
+                  "id": "middle",
+                  "label": "Region B",
+                  "from": 355,
+                  "to": 645,
+                  "tone": "accent",
+                  "row": 0
+                },
+                {
+                  "id": "right",
+                  "label": "Region C",
+                  "from": 710,
+                  "to": 920,
+                  "tone": "good",
+                  "row": 0
+                }
+              ],
+              "initial": {
+                "markers": [],
+                "arcs": [],
+                "highlight": null,
+                "note": "A fictional coordinate strip, with no nucleotide letters or real genome scale."
+              }
+            },
+            {
+              "id": "read_flow",
+              "type": "funnel",
+              "title": "HOW MANY · illustrative fragment groups",
+              "unit": "illustrative fragments",
+              "stages": [
+                {
+                  "id": "all",
+                  "label": "RNA-derived fragments",
+                  "tone": "neutral"
+                },
+                {
+                  "id": "assignable",
+                  "label": "Assignable to a reference",
+                  "tone": "info"
+                },
+                {
+                  "id": "viral",
+                  "label": "Viral matches",
+                  "tone": "teal"
+                },
+                {
+                  "id": "oriented",
+                  "label": "Strand-aware viral matches",
+                  "tone": "violet"
+                }
+              ],
+              "initial": {
+                "counts": {},
+                "note": "Invented values show how sets nest. They are not read yield, quality thresholds, or an analysis recipe."
+              }
+            },
+            {
+              "id": "strand_matrix",
+              "type": "grid",
+              "title": "CLOSE VIEW · A/B/C × two read windows",
+              "unit": "illustrative signal units",
+              "decimals": 0,
+              "rows": [
+                {
+                  "id": "plus",
+                  "label": "+ orientation"
+                },
+                {
+                  "id": "minus",
+                  "label": "Complementary orientation"
+                }
+              ],
+              "cols": [
+                {
+                  "id": "a1",
+                  "label": "A1"
+                },
+                {
+                  "id": "a2",
+                  "label": "A2"
+                },
+                {
+                  "id": "b1",
+                  "label": "B1"
+                },
+                {
+                  "id": "b2",
+                  "label": "B2"
+                },
+                {
+                  "id": "c1",
+                  "label": "C1"
+                },
+                {
+                  "id": "c2",
+                  "label": "C2"
+                }
+              ],
+              "scale": {
+                "min": 0,
+                "max": 4,
+                "kind": "sequential"
+              },
+              "initial": {
+                "cells": {},
+                "note": "A1/A2 belong to Region A, B1/B2 to B, and C1/C2 to C. Colors are invented relative signal, not counts."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "observe",
+              "nodes": [
+                "fragments"
+              ],
+              "text": "Start with RNA-derived fragments from a mixed sample. A fragment is an observation of material in that sample; this view does not show when that RNA was made.",
+              "panels": {
+                "read_flow": {
+                  "counts": {
+                    "all": 100
+                  },
+                  "active": null,
+                  "note": "100 is a round teaching token, not a sample size or experimental result."
+                }
+              }
+            },
+            {
+              "id": "assign",
+              "edge": "fragments->matches",
+              "text": "Some fragments can be assigned to a reference; a subset matches viral RNA. The nested bars keep the denominator visible before any biological interpretation.",
+              "panels": {
+                "read_flow": {
+                  "counts": {
+                    "assignable": 72,
+                    "viral": 24
+                  },
+                  "active": null,
+                  "note": "72 and 24 are invented set sizes. This panel specifies no filtering criteria or sequencing workflow."
+                }
+              }
+            },
+            {
+              "id": "map",
+              "edge": "matches->regions",
+              "text": "Mapping asks where the viral matches fall. The schematic strip groups observations into three anonymous regions, with no base letters or named genome.",
+              "panels": {
+                "rna_map": {
+                  "highlight": "left",
+                  "markers": [
+                    {
+                      "id": "a",
+                      "at": 190,
+                      "label": "reads in A",
+                      "tone": "feature"
+                    },
+                    {
+                      "id": "b",
+                      "at": 500,
+                      "label": "reads in B",
+                      "tone": "accent"
+                    },
+                    {
+                      "id": "c",
+                      "at": 810,
+                      "label": "reads in C",
+                      "tone": "good"
+                    }
+                  ],
+                  "note": "Markers indicate illustrated read support. The ruler is a drawing coordinate, not a real genome length."
+                },
+                "strand_matrix": {
+                  "cells": {
+                    "plus.a1": 4,
+                    "plus.a2": 3,
+                    "plus.b1": 4,
+                    "plus.b2": 2,
+                    "plus.c1": 1,
+                    "plus.c2": 0
+                  },
+                  "highlight": {
+                    "row": "plus"
+                  },
+                  "note": "The + row is an invented visual profile. Values are not molecule counts."
+                }
+              }
+            },
+            {
+              "id": "orient",
+              "edge": "regions->polarity",
+              "text": "When strand information is preserved, read orientation adds another view of RNA species. The highlighted complementary-orientation window sits within mapped Region B; neither orientation is a direct rate of copying.",
+              "panels": {
+                "read_flow": {
+                  "counts": {
+                    "oriented": 15
+                  }
+                },
+                "strand_matrix": {
+                  "cells": {
+                    "minus.a1": 0,
+                    "minus.a2": 1,
+                    "minus.b1": 2,
+                    "minus.b2": 1,
+                    "minus.c1": 0,
+                    "minus.c2": 0
+                  },
+                  "highlight": {
+                    "cell": "minus.b1"
+                  },
+                  "note": "B1 is inside Region B. These invented signals do not establish active replication; real strand signals require assay controls and biological context."
+                },
+                "rna_map": {
+                  "highlight": "middle"
+                }
+              }
+            },
+            {
+              "id": "uneven",
+              "nodes": [
+                "regions"
+              ],
+              "text": "Window C2 has no illustrated signal while adjacent C1 does. An empty tile is a pattern to question, not proof that RNA from this window is biologically absent.",
+              "panels": {
+                "strand_matrix": {
+                  "highlight": {
+                    "col": "c2"
+                  },
+                  "note": "Zero here is an invented empty tile, not a biological absence call. Coverage patterns need context."
+                },
+                "rna_map": {
+                  "highlight": "right"
+                }
+              }
+            },
+            {
+              "id": "bound",
+              "edge": "polarity->limits",
+              "text": "The defensible statement is narrow: this schematic read set supports viral RNA matches in several regions and illustrates strand-aware observations. RNA detection alone does not show ongoing replication or infectious virus.",
+              "panels": {
+                "strand_matrix": {
+                  "highlight": null,
+                  "note": "Do not turn read support, polarity, or a one-sample signal into a claim about active replication or infectious output."
+                },
+                "rna_map": {
+                  "highlight": null,
+                  "note": "The map is a location aid, not a clock or an infectivity assay."
+                },
+                "read_flow": {
+                  "note": "The invented numbers are not a comparison between conditions and do not estimate antiviral efficacy."
+                }
+              }
+            },
+            {
+              "id": "record",
+              "edge": "limits->ledger",
+              "text": "Record three separate lines: observed read pattern, supported interpretation, and unresolved question. Continue to the evidence ledger for source-backed claim limits instead of turning this readout into a replication or infectivity verdict.",
+              "panels": {
+                "strand_matrix": {
+                  "highlight": null,
+                  "note": "Observation: matching RNA across illustrated windows. Inference: region and orientation pattern, conditional on strand-aware data. Open question: active synthesis or infectious output."
+                },
+                "rna_map": {
+                  "highlight": null,
+                  "markers": [],
+                  "note": "The location map has served its purpose; the ledger below separates observed signal from mechanism claims."
+                },
+                "read_flow": {
+                  "note": "The invented set sizes end here. They are not a comparison between conditions or an estimate of antiviral efficacy."
+                }
+              }
+            }
+          ],
+          "autoplay": false,
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 5
+              },
+              {
+                "panel": "rna_map",
+                "x": 0,
+                "y": 5,
+                "w": 12,
+                "h": 8
+              },
+              {
+                "panel": "read_flow",
+                "x": 12,
+                "y": 5,
+                "w": 12,
+                "h": 8
+              },
+              {
+                "panel": "strand_matrix",
+                "x": 0,
+                "y": 13,
+                "w": 24,
+                "h": 6
+              },
+              {
+                "x": 0,
+                "y": 19,
+                "w": 24,
+                "h": 10
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "evidence",
+        "heading": "04 / Evidence and claim limits",
+        "accent": "green",
+        "text": [
+          "The first act is a composite mechanism model; the second is a fictional RNA-seq reading exercise. The cited research supports the underlying questions, not the invented counts, colored tiles, or hypothetical interruption."
+        ],
+        "contract": {
+          "title": "Observation → supported reading → boundary",
+          "fields": [
+            {
+              "k": "+RNA copy mechanism",
+              "v": "Positive-strand RNA passes through a complementary intermediate",
+              "g": "This study discusses the established complementary-strand model while testing RNA properties across several +RNA viruses. It does not establish the timing, particle count, or interruption outcome drawn here.",
+              "link": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9479745/"
+            },
+            {
+              "k": "Strand-aware sequencing",
+              "v": "A strand-preserving library lets RNA-seq report read orientation",
+              "g": "Fabozzi et al. used strand-specific dual RNA-seq with influenza A, a negative-sense virus. Orientation requires a strand-preserving library; this study supports the measurement concept, not transferring its biology or findings to the unnamed +RNA teaching model.",
+              "link": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6096831/"
+            },
+            {
+              "k": "RNA detection limit",
+              "v": "Detected viral RNA does not by itself prove current replication",
+              "g": "Alexandersen et al. showed that genomic and subgenomic RNA in clinical SARS-CoV-2 samples was not a direct indicator of active replication. This is a context-specific caution, not a universal assay verdict.",
+              "link": "https://www.nature.com/articles/s41467-020-19883-7"
+            },
+            {
+              "k": "Authored hypothesis",
+              "v": "A stop in further synthesis changes the symbolic supply of new +RNA",
+              "g": "The branch is an explanatory assumption. The completed pre-fork copy, assembly, and release outcomes are not measured, predicted, or supported as intervention efficacy."
+            },
+            {
+              "k": "Illustrative sequencing display",
+              "v": "Map positions, 100→72→24→15 fragments, and heatmap values",
+              "g": "These are invented teaching marks with no nucleotide sequence, named virus, real sample, experimental timing, or clinical interpretation."
+            }
+          ]
+        },
+        "bullets": [
+          "Evidence ledger: read matches support the presence of matching RNA in the sampled material; where and orientation refine the description of that signal.",
+          "Open question: whether new RNA is being made at the sampled moment, and whether infectious particles are present, requires independent evidence beyond this schematic read set.",
+          "Checkpoint: state one observation, one supported interpretation, and one claim these displays cannot justify."
+        ]
+      }
+    ],
+    "description": "A conceptual positive-sense RNA copy gate followed by an illustrative, strand-aware RNA-seq reading exercise. Source limits separate RNA detection from claims of active replication or infectivity.",
+    "tags": [
+      "biology",
+      "virology",
+      "rna-seq",
+      "sequencing",
+      "positive-sense-rna",
+      "teaching"
+    ]
+  }
+}

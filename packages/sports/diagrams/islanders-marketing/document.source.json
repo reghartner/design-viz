@@ -1,0 +1,10 @@
+{
+  "id": "islanders-marketing",
+  "title": "Islanders marketing stories",
+  "description": "Three marketing journeys: member campaigns, group-night sales handoffs, and fan-event RSVPs. Follow the creative, content and alternate outcomes.",
+  "tabs": [
+    {"label": "Member campaign", "source": "member-campaign"},
+    {"label": "Group night", "source": "group-night"},
+    {"label": "Fan event RSVP", "source": "fan-event-rsvp"}
+  ]
+}

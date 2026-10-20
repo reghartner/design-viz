@@ -266,6 +266,7 @@ function specStructureErrors(page){
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
+  validateSectionTextStyle(sec.textStyle,P,errors);
   var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
     ? Math.max.apply(null,[0].concat(diagramPathList(sec.diagram).map(function(p){return p.indices.length;}))) : 0;
   bulletRevealWarnings(sec.bullets, P + '.bullets', sectionStepCount, warnings);

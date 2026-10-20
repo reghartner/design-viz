@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const C=vm.createContext({URL,TextEncoder});
-for(const source of ['validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/graph.js','workbench/commands/layout.js','workbench/commands/clipboard.js'])vm.runInContext(readSource(source),C);
+for(const source of ['validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/graph.js','workbench/commands/document.js','workbench/commands/layout.js','workbench/commands/clipboard.js'])vm.runInContext(readSource(source),C);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const fixture=()=>({nodes:{a:{title:'A'}},rows:[['a']],edges:[]});
 test('add/edit/duplicate/copy/paste preserve plain text, style and ordinary node identity',()=>{
@@ -76,4 +76,27 @@ test('one whole-box transaction preserves handwritten source and unrelated locke
   const plan=C.planEditTextBox(text,raw,0,'a',{text:'After\nwith formatting',textStyle:style});assert.ok(!plan.error,plan.error);
   const next=JSON.parse(plan.text);assert.deepEqual(next.nodes.a,{...raw.nodes.a,text:'After\nwith formatting',textStyle:style});assert.equal(raw.nodes.a.text,'Before');assert.ok(plan.text.endsWith('\n'));assert.ok(plan.text.includes('   "rows"'));
   const rejected=C.planEditTextBox(text,raw,0,'a',{text:'Unsaved',textStyle:{...style,fontSize:161}});assert.ok(rejected.error);assert.equal(rejected.text,undefined);
+});
+
+
+test('section notes styles are validated, surgical and independent of prose and layouts',()=>{
+  const section={heading:'Notes',text:['**Keep markup**','Second paragraph'],bullets:[{text:'Parent',sub:['Nested']}],diagram:fixture()};
+  for(const raw of [{page:{sections:[section]}},{blocks:[{tabs:[{sections:[section]}]}]}]){
+    const text=JSON.stringify(raw,null,3)+'\n',style={fontFamily:'Lora',fontSize:27,bold:true,italic:true,color:'#123456'};
+    const plan=C.planEditSectionTextStyle(text,raw,0,style);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text),path=C.builderTargetPath(next,{section:0,kind:'prose'}),edited=C.specValueAt(next,path);
+    assert.deepEqual(edited,{...section,textStyle:style});assert.ok(plan.text.endsWith('\n'));
+    assert.equal(JSON.stringify(raw,null,3)+'\n',text);assert.deepEqual(plain(C.validate(C.normalize(next)).errors),[]);
+    assert.equal(C.sectionTextStyleCSS(edited),"--section-text-font:'Lora';--section-text-size:27px;--section-text-weight:700;--section-text-style:italic;--section-text-color:#123456");
+    const reset=C.planEditSectionTextStyle(plan.text,next,0,{...style,color:null});assert.ok(!reset.error,reset.error);assert.equal(C.specValueAt(JSON.parse(reset.text),path).textStyle.color,undefined);
+  }
+});
+test('section typography rejects unsafe values and box geometry before publication',()=>{
+  const raw={page:{sections:[{text:'Safe'}]}},text=JSON.stringify(raw);
+  for(const style of [[],false,'red',{width:100},{align:'center'},{fontSize:7},{fontSize:161},{fontSize:NaN},{fontFamily:'Lora; color:red'},{color:'url(javascript:bad)'},{bold:'true'},{italic:1}]){
+    const plan=C.planEditSectionTextStyle(text,raw,0,style);assert.ok(plan.error,JSON.stringify(style));assert.equal(plan.text,undefined);
+    assert.equal(C.sectionTextStyleCSS({textStyle:style}),'');
+    const errors=[];C.validateSectionTextStyle(style,'Notes',errors);assert.ok(errors.length);
+  }
+  assert.equal(C.sectionTextStyleCSS({}),'');assert.equal(C.planEditSectionTextStyle(text,raw,4,{}).error,'Section notes not found.');
 });

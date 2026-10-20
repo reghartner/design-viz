@@ -42,6 +42,9 @@ For new topology, run `tools/compose-page-layout.cjs` (graph-only:
 `sectionLayout` is geometry only. [Migrate intentional old choices](../../../docs/section-layout-migration.md)
 to explicit Views. See [arrangement limits](../../../docs/auto-arrange.md).
 
+Explore Section notes support whole-box typography through section `textStyle`
+(font, size, bold, italic, color); see [notes typography](../../../docs/section-layouts.md#section-notes-typography). The desktop text toolbar edits these fields while preserving prose markup.
+
 JSON: `--feature contracts`; [recipe](../../../docs/contract-blocks.md#json-directly-on-a-connection). Desktop editing only.
 
 ## Choose the starting point

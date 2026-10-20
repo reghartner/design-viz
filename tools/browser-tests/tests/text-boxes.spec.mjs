@@ -150,3 +150,19 @@ test('stale toolbar callbacks retire on source replacement, preview and builder 
   await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();await expect(page.locator('#page-preview')).toBeVisible();await expect(toolbar).toHaveCount(0);await expect(page.locator('#page-preview [data-dv-text-box]')).toBeVisible();await expect(page.locator('#page-preview .dv-text-toolbar,#page-preview .dv-text-editor')).toHaveCount(0);await page.locator('#close-page-preview').click();
   await box(page).dblclick();await edit.fill('Destroy draft');const old=await toolbar.getByLabel('Font',{exact:true}).elementHandle();const before=await source(page);await page.evaluate(()=>__editorTest.builder.destroy());await expect(edit).toHaveCount(0);await expect(toolbar).toHaveCount(0);await old.evaluate(el=>{el.value='Lora';el.dispatchEvent(new Event('change',{bubbles:true}));});await expect(page.locator('#src')).toHaveValue(before);
 });
+
+test('compact toolbar color previews, cancels, saves with text and restores the theme',async({page,server})=>{
+  const raw=fixture(),d=raw.page.blocks[0].diagram;d.nodes.note={type:'text',text:'Original',textStyle:{fontSize:24,color:'#884422'}};d.floats=[{id:'note',x:550,y:120,side:'below'}];
+  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await pastePage(page,original);await closeTools(page);
+  const toolbar=page.getByRole('toolbar',{name:'Text formatting',exact:true}),edit=page.getByRole('textbox',{name:'Edit text box',exact:true});
+  await box(page).dblclick();await edit.fill('Draft text');const color=toolbar.getByLabel('Text color',{exact:true});await color.fill('#225588');await color.dispatchEvent('input');
+  await expect(edit).toHaveCSS('color','rgb(34, 85, 136)');await expect(page.locator('#src')).toHaveValue(original);await color.press('Escape');await expect(page.locator('#src')).toHaveValue(original);await expect(box(page).locator('text')).toHaveCSS('fill','rgb(136, 68, 34)');
+  await box(page).dblclick();await edit.fill('Saved with color');await color.fill('#225588');await color.dispatchEvent('change');await color.press('Control+Enter');
+  const saved=await source(page);expect(JSON.parse(saved).page.blocks[0].diagram.nodes.note).toEqual({...d.nodes.note,text:'Saved with color',textStyle:{fontSize:24,color:'#225588'}});await expect(box(page).locator('text')).toHaveCSS('fill','rgb(34, 85, 136)');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);
+  await box(page).click();await toolbar.getByRole('button',{name:'Use theme text color',exact:true}).click();expect(JSON.parse(await source(page)).page.blocks[0].diagram.nodes.note.textStyle.color).toBeUndefined();await expect(box(page).locator('text')).not.toHaveCSS('fill','rgb(34, 85, 136)');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);
+  await box(page).dblclick();await toolbar.getByRole('button',{name:'Use theme text color',exact:true}).click();
+  const theme=await edit.evaluate(el=>'#'+getComputedStyle(el).color.match(/\d+/g).slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join(''));
+  await expect(color).toHaveValue(theme);await edit.press('Escape');await expect(page.locator('#src')).toHaveValue(saved);
+});

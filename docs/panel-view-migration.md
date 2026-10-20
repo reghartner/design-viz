@@ -61,6 +61,18 @@ are recognized automatically, as is any explicitly declared `primaryPanel`.
 Custom focus labels are unavailable after extension flags are retired; the panel
 title supplies the generated name. Inspect that label before publication.
 
+For a story whose diagrams declare `topologyImports`, pass each provider spec it
+imports from, the same files `tools/validate.js` needs:
+
+```sh
+node tools/migrate-panel-views.cjs /path/to/story.json --output /path/to/story.explicit.json --provider /path/to/platform.json
+```
+
+Repeat `--provider` for additional providers. The tool validates the story with
+the imported topology resolved, but writes the story as authored: its
+`topologyImports` stay in the output and no imported nodes are copied into it.
+A missing provider fails before output creation.
+
 The maintained upstream starters/examples have been converted. This does not
 inventory your personal or company repository: upstream `canon.json` is empty.
 Use the [company integration inventory](section-layout-migration.md) to include

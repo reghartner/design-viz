@@ -519,7 +519,7 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
 .docview .section-viewport.explore-text-sizing .explore-prose-window .explore-window-grip{font-size:calc(10px * var(--explore-text-scale,1));line-height:1.2;padding-top:4px;padding-bottom:4px;max-height:100%;box-sizing:border-box;}
 .docview .section-viewport.explore-text-sizing .explore-prose-window .sec-prose,
 .docview .section-viewport.explore-text-sizing .explore-prose-window .sec-text,
-.docview .section-viewport.explore-text-sizing .explore-prose-window .sec-bullets{font-size:calc(18px * var(--explore-text-scale,1));line-height:1.55;}
+.docview .section-viewport.explore-text-sizing .explore-prose-window .sec-bullets{font-size:calc(var(--section-text-size,18px) * var(--explore-text-scale,1));line-height:1.55;}
 body .docview .section-viewport.explore-text-sizing .explore-player .stepline,
 body .docview .section-viewport.explore-text-sizing .explore-player .stepline b{font-size:calc(16px * var(--explore-text-scale,1));line-height:1.5;}
 body .docview .section-viewport.explore-text-sizing .explore-player .path-chip,
@@ -536,3 +536,14 @@ body .docview .section-viewport.explore-text-sizing .explore-player .schip{width
 .explore-text-sizing .explore-player .playback-status{max-width:100%;white-space:normal;}
 @container(max-width:560px){.explore-text-sizing .explore-player .step-transport{max-width:100%;}}
 body .docview .section-viewport.explore-text-sizing .explore-player .playback-mode-rail .mbtn{font-size:calc(12px * var(--explore-text-scale,1));}
+
+/* The variables travel with the live prose node, but only Explore consumes them.
+   Paragraphs and every nested bullet level share the whole notes box style. */
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-font:"],
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-font:"] :is(.sec-text,.sec-bullets){font-family:var(--section-text-font);}
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-weight:"],
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-weight:"] :is(.sec-text,.sec-bullets){font-weight:var(--section-text-weight);}
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-style:"],
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-style:"] :is(.sec-text,.sec-bullets){font-style:var(--section-text-style);}
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-color:"],
+body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-color:"] :is(.sec-text,.sec-bullets){color:var(--section-text-color);}

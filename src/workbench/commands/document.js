@@ -359,3 +359,15 @@ function planAddViewSection(text,raw,sectionIdx,viewId){
   var next=JSON.parse(update.text),path=listPath.concat([list.length]),index=specSectionPaths(next).findIndex(function(rec){return JSON.stringify(rec.section)===JSON.stringify(path);}),range=jsonLocate(update.text,path);
   return {text:update.text,kind:'section',index:index,start:range.start,end:range.end};
 }
+
+function planEditSectionTextStyle(text,raw,sectionIdx,style){
+  var path=builderTargetPath(raw,{section:sectionIdx,kind:'prose'}),section=path && specValueAt(raw,path);
+  if(!section)return {error:'Section notes not found.'};
+  if(style && typeof style==='object' && !Array.isArray(style)){
+    style=Object.assign({},style);
+    if(style.color==null || typeof style.color==='string' && !style.color.trim())delete style.color;
+  }
+  var errors=[];validateSectionTextStyle(style,'Section notes',errors);
+  if(errors.length)return {error:errors.join('. ')};
+  return planSetField(text,raw,path,'textStyle',JSON.stringify(style));
+}

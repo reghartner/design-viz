@@ -76,7 +76,9 @@ function validateTextBox(node,at,errors){
     else if(bounded.overflow==='height')errors.push(at+'.text: wrapped text height exceeds '+TEXT_BOX_LIMITS.height+'; shorten the text, reduce font size or widen the box');
   }
   if(node.image || node.handoff || node.detail)errors.push(at+': text boxes cannot also be images, handoffs or domain details');
-  var s=node.textStyle;
+  validateTextBoxStyle(node.textStyle,at,errors);
+}
+function validateTextBoxStyle(s,at,errors){
   if(s==null)return;
   if(typeof s!=='object' || Array.isArray(s)){errors.push(at+'.textStyle: expected an object');return;}
   [['fontSize',8,160],['width',48,2000],['height',32,2000]].forEach(function(f){
@@ -86,4 +88,23 @@ function validateTextBox(node,at,errors){
   if(s.fontFamily!=null && TEXT_BOX_FONTS.indexOf(s.fontFamily)<0)errors.push(at+'.textStyle.fontFamily: choose a bundled text font');
   if(s.align!=null && ['left','center','right'].indexOf(s.align)<0)errors.push(at+'.textStyle.align: use left, center or right');
   if(s.color!=null && (typeof s.color!=='string' || !/^#[0-9a-f]{6}$/i.test(s.color)))errors.push(at+'.textStyle.color: use a six-digit hex color');
+}
+
+/* Section notes share typography with native boxes, without box geometry or
+   alignment. Authored values apply only in Explore; prose markup stays intact. */
+function validateSectionTextStyle(style,at,errors){
+  validateTextBoxStyle(style,at,errors);
+  if(!style || typeof style!=='object' || Array.isArray(style))return;
+  Object.keys(style).forEach(function(key){
+    if(['fontFamily','fontSize','bold','italic','color'].indexOf(key)<0)errors.push(at+'.textStyle.'+key+': unsupported section text setting');
+  });
+}
+function sectionTextStyleCSS(section){
+  var style=section.textStyle,errors=[];validateSectionTextStyle(style,'Section',errors);
+  if(!style || errors.length)return '';
+  var names={fontFamily:'font',fontSize:'size',bold:'weight',italic:'style',color:'color'};
+  return Object.keys(names).filter(function(key){return style[key]!=null;}).map(function(key){
+    var value=key==='fontFamily'?"'"+style[key]+"'":key==='fontSize'?style[key]+'px':key==='bold'?(style[key]?'700':'400'):key==='italic'?(style[key]?'italic':'normal'):style[key];
+    return '--section-text-'+names[key]+':'+value;
+  }).join(';');
 }

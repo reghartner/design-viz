@@ -587,3 +587,24 @@ Use `exploreLayout.textScale: {prose: 1.25, controls: 1.5}` for 125% notes and 1
 The notes text setting also scales the **Section notes** window heading, which stays within its 32px header and truncates with an ellipsis when narrow. Section headings and View navigation keep their existing sizes: they are shared navigation chrome, independent of either content surface.
 
 Typed widget panels retain their existing per-widget content sizing and overlay scaling; these notes/control text settings do not change widget text or panel headings. Use a widget’s own content options where available, enlarge its frame for more room, or adjust **Panels & controls** to scale floating widgets. On-canvas widgets follow diagram zoom.
+
+
+### Section notes typography
+
+In the desktop Explore editor, select Section notes, a paragraph, or a bullet
+and use the floating text toolbar to set the font, size, bold, italic, and text
+color. These controls format the entire notes box while preserving prose markup.
+The same toolbar includes text color for native text boxes; during native text
+editing, color previews with the draft and saves or cancels together with it.
+Use **Use theme text color** to remove an explicit color.
+
+Section notes persist typography as `textStyle` on the section, shared across
+its Explore views. Supported fields are `fontFamily` (a bundled text font),
+`fontSize` (8–160 logical pixels), `bold`, `italic`, and `color` (`#RRGGBB`).
+The Explore prose text scale still multiplies the authored size. Omitted fields
+retain their existing defaults; Standard prose and notes window geometry are
+unaffected. For example:
+
+```json
+"textStyle": {"fontFamily":"Lora", "fontSize":24, "color":"#225588"}
+```

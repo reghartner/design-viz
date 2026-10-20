@@ -2497,8 +2497,9 @@ function sectionIntroHTML(sec, gi, sectionReference){
       (gi + 1) + srcChip + embedChip + '</p>' + toggle + '</div>';
   }
   if (hasProse){
+    var proseStyle=sectionTextStyleCSS(sec);
     h += '<div class="sec-prose" id="section-' + esc(sectionReference) + '-prose"' +
-      (defaultCollapsed ? ' hidden' : '') + '>';
+      (proseStyle?' style="'+esc(proseStyle)+'"':'')+(defaultCollapsed ? ' hidden' : '') + '>';
     var texts = typeof sec.text === 'string' ? [sec.text] :
                 (Array.isArray(sec.text) ? sec.text : []);
     texts.forEach(function(t, ti){ h += '<div class="sec-text" data-dv-para="' + ti + '">' + proseMarkup(t) + '</div>'; });

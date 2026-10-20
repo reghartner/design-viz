@@ -278,3 +278,34 @@ test('saved and newly authored canvas notes retain their rectangle on live brows
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
 });
+
+test('Section notes share the compact text toolbar, persist typography and preserve source through Undo and reader reopen',async({page,server,context},info)=>{
+  const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.textScale={prose:1.25};
+  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);await closeTools(page);
+  const toolbar=page.getByRole('toolbar',{name:'Text formatting',exact:true});
+  await notes(page).locator('.explore-window-body').click({position:{x:5,y:5}});await expect(toolbar).toBeVisible();
+  await expect(toolbar.getByLabel('Font size',{exact:true})).toHaveValue('18');
+  const before=await source(page);await toolbar.getByLabel('Font',{exact:true}).focus();await toolbar.getByLabel('Font',{exact:true}).selectOption('Lora');
+  const fontChanged=await source(page);await expect(notes(page)).toHaveClass(/dv-sel/);await expect(toolbar.getByLabel('Font',{exact:true})).toBeFocused();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(fontChanged);
+  await notes(page).locator('[data-dv-para="1"]').click();await expect(toolbar).toBeVisible();
+  await toolbar.getByLabel('Font size',{exact:true}).fill('24');await toolbar.getByLabel('Font size',{exact:true}).press('Enter');
+  await expect(notes(page).locator('[data-dv-para="1"]')).toHaveClass(/dv-sel/);
+  await notes(page).locator('[data-dv-bullet-path="0.0"]').click();await toolbar.getByRole('button',{name:'Bold',exact:true}).click();await toolbar.getByRole('button',{name:'Italic',exact:true}).click();
+  await expect(notes(page).locator('[data-dv-bullet-path="0.0"]')).toHaveClass(/dv-sel/);
+  const beforeColor=await source(page);await toolbar.getByLabel('Text color',{exact:true}).fill('#225588');await toolbar.getByLabel('Text color',{exact:true}).dispatchEvent('change');
+  const savedText=await source(page),saved=JSON.parse(savedText),expected=structuredClone(raw);expected.page.sections[0].textStyle={fontFamily:'Lora',fontSize:24,bold:true,italic:true,color:'#225588'};expect(saved).toEqual(expected);
+  async function verify(target){
+    for(const item of await notes(target).locator('.sec-prose,.sec-text,.sec-bullets').all()){
+      await expect(item).toHaveCSS('font-family','Lora');await expect(item).toHaveCSS('font-size','30px');await expect(item).toHaveCSS('font-weight','700');await expect(item).toHaveCSS('font-style','italic');await expect(item).toHaveCSS('color','rgb(34, 85, 136)');
+    }
+    await expect(notes(target).locator('strong')).toHaveText('Why this matters.');await expect(notes(target).locator('code')).toHaveText('recording_id');
+  }
+  await verify(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeColor);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(savedText);await verify(page);
+  await notes(page).locator('[data-dv-para="0"]').click();await toolbar.getByRole('button',{name:'Use theme text color',exact:true}).click();expect(JSON.parse(await source(page)).page.sections[0].textStyle.color).toBeUndefined();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(savedText);
+  await notes(page).locator('[data-dv-para="0"]').click();await toolbar.getByLabel('Text color',{exact:true}).focus();await page.keyboard.press('Escape');await expect(toolbar).toHaveCount(0);await expect(notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true})).toBeFocused();
+  await notes(page).locator('[data-dv-para="0"]').click();await page.screenshot({path:info.outputPath('section-notes-text-toolbar.png')});
+  await page.getByRole('button',{name:'Business',exact:true}).click();await expect(toolbar).toHaveCount(0);await page.getByRole('button',{name:'Show prose for Delivery explained',exact:true}).click();await expect(page.locator('.doc-sec>.sec-prose .sec-text').first()).not.toHaveCSS('font-size','30px');
+  const reader=await context.newPage();await reader.goto(await build(server,saved,'formatted-section-notes'));await verify(reader);await expect(reader.locator('.dv-text-toolbar')).toHaveCount(0);await reader.close();
+  await page.reload();await expect(page.locator('#src')).toHaveValue(savedText);await closeTools(page);await page.getByRole('button',{name:'Explore',exact:true}).click();await verify(page);
+});

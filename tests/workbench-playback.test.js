@@ -69,7 +69,7 @@ test('workbench step entry and tab reveal stay paused; explicit Play advances an
   assert.equal(h.term.btnPlay.attrs['aria-label'],'Play');
 });
 
-test('autoplay is opt-in, manual navigation stays paused across tabs, and reduced motion is a hard gate',()=>{
+test('autoplay is opt-in, manual navigation stays paused across tabs, and reduced motion blocks only the automatic start',()=>{
   for (const autoplay of [undefined,false,'true',1,null]){
     const h=stepperHarness(undefined,false,{autoplay}); h.stepper.enterStep(true);
     assert.equal(h.intervals.size,0); assert.equal(h.term.playbackStatus.textContent,'Paused');
@@ -84,10 +84,13 @@ test('autoplay is opt-in, manual navigation stays paused across tabs, and reduce
   s.onHide(); s.onShow(); assert.equal(h.intervals.size,0);
   s.enterStep(false); assert.equal(h.intervals.size,0);
   const quiet=stepperHarness(undefined,true,{autoplay:true});
-  quiet.stepper.enterStep(true); quiet.term.btnPlay.fire('click');
-  assert.equal(quiet.intervals.size,0);
-  assert.equal(quiet.term.btnPlay.disabled,true);
+  quiet.stepper.enterStep(true);
+  assert.equal(quiet.intervals.size,0); assert.equal(quiet.stepper.autoplays(),false);
+  assert.equal(quiet.term.btnPlay.disabled,false);
   assert.equal(quiet.term.playbackStatus.textContent,'Paused · reduced motion');
+  quiet.term.btnPlay.fire('click');
+  assert.equal(quiet.intervals.size,1);
+  assert.equal(quiet.term.playbackStatus.textContent,'Playing · 3s / step');
   const editor=stepperHarness({autoplay:false},false,{autoplay:true});
   editor.stepper.enterStep(true); assert.equal(editor.intervals.size,0);
 });

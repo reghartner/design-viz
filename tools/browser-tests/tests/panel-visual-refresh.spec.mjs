@@ -2,13 +2,16 @@ import {test,expect} from '@playwright/test';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),{entrypoint,entrypointAssets,readSource}=require('../../source-loader.cjs');
 const assets=entrypointAssets('native');
+// Generic browser setup builds with --no-config. Friends keeps seven domain
+// panels in the opt-in science package, so the independent core catalog is 35.
+const CORE_PANEL_COUNT=35;
 const script=entrypoint('native').body+'\n'+readSource('builder.workbench.js')+'\n'+readSource('panel-picker.workbench.js');
 const html=`<!doctype html><meta charset="utf-8"><style>${assets.styles.map(a=>a.source).join('\n')}\nbody{margin:0;padding:20px}#gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.pwidget{max-height:none}.audit-label{font:600 13px sans-serif;margin-bottom:8px;color:var(--dink)}</style>${assets.icons}<main class="docview" id="gallery"></main><script>${script.replace(/<\/script/gi,'<\\/script')}\nwindow.paint=(skin,width)=>{applySkinClasses(document.body,gallery,skin);gallery.innerHTML='';const ref=panelPickerReferenceImage();PANEL_CATALOG.forEach(e=>{const card=panelPickerPreview(e.type,ref,skin==='daylight'?'daylight':'aurora');card.dataset.type=e.type;card.style.width=(width||PanelRegistry.get(e.type).layout.sectionSizing.minWidth)+'px';gallery.append(card)});};</script>`;
 for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint'])test('catalog renders at its own minimum and wider desktop panel sizes: '+skin,async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setContent(html);
  for(const width of [null,340,640]){
   await page.evaluate(({skin,width})=>paint(skin,width),{skin,width});
-  await expect(page.locator('.pwidget')).toHaveCount(42);
+  await expect(page.locator('.pwidget')).toHaveCount(CORE_PANEL_COUNT);
   const bad=await page.locator('.pwidget').evaluateAll(cards=>cards.filter(c=>!c.textContent.trim()||c.offsetHeight<20||c.scrollWidth>c.clientWidth+2).map(c=>({type:c.dataset.type,width:c.clientWidth,overflow:c.scrollWidth-c.clientWidth})));
   expect(bad,'outer cards contain content; deliberate internal table scrollers remain allowed').toEqual([]);
  }

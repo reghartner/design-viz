@@ -47,6 +47,13 @@ function injectRinkFixture(server,testInfo,name,{served=false}={}){
   execFileSync('python3',[path.join(root,'tools/inject.py'),spec,path.join(server.root,'template/flowview.html'),output]);
   return output;
 }
+function injectNspFixture(server,testInfo,name){
+  const root=fileURLToPath(new URL('../../..',import.meta.url));
+  const source=path.join(root,'packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json');
+  const output=testInfo.outputPath(name+'.html');
+  execFileSync('python3',[path.join(root,'tools/inject.py'),source,path.join(server.root,'template/flowview.html'),output]);
+  return output;
+}
 test('shared Islanders theme survives library, reader, home, copied links and explicit live changes',async({page,server},testInfo)=>{
   await page.context().addCookies([{name:'dv_skin',value:'terminal',url:server.origin}]);
   await page.goto(server.origin+shell+'?theme=islanders');
@@ -147,15 +154,51 @@ async function readableText(locator){
   return colors;
 }
 
-test('Friends NSP15 opens all eight tabs with readable dark-section text in both themes',async({page,server},testInfo)=>{
-  test.setTimeout(90000);
+function rgba(value){
+  const text=String(value),channels=text.match(/[\d.]+/g)?.map(Number)??[];
+  if(channels.length<3)throw Error('Expected an RGB color, received '+value);
+  const scale=text.startsWith('color(srgb ')?255:1;
+  return [...channels.slice(0,3).map(channel=>channel*scale),channels[3]??1];
+}
+function composite(foreground,background){
+  const front=rgba(foreground),back=rgba(background),alpha=front[3]+back[3]*(1-front[3]);
+  const channels=front.slice(0,3).map((channel,index)=>(channel*front[3]+back[index]*back[3]*(1-front[3]))/alpha);
+  return 'rgb('+channels.join(', ')+')';
+}
+function luminance(value){
+  return rgba(value).slice(0,3).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;})
+    .reduce((sum,c,index)=>sum+c*[.2126,.7152,.0722][index],0);
+}
+function contrast(foreground,background){
+  const a=luminance(foreground),b=luminance(background);
+  return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+}
+async function nspVisualSnapshot(section){
+  return section.evaluate(root=>{
+    const style=selector=>{const element=root.querySelector(selector);if(!element)return null;const css=getComputedStyle(element);return {background:css.backgroundColor,backgroundImage:css.backgroundImage,color:css.color,fill:css.fill,fillOpacity:css.fillOpacity,opacity:css.opacity,stroke:css.stroke};};
+    const scene=root.querySelector('.nspstory');
+    const resolve=variable=>{
+      if(!scene)return null;
+      const probe=document.createElement('i');probe.style.color='var('+variable+')';scene.append(probe);
+      const value=getComputedStyle(probe).color;probe.remove();return value;
+    };
+    return {
+      section:style(':scope'),panel:style('.pwidget'),title:style('.ptitle'),cell:style('.swtable td'),frame:style('.nspstory-screen-frame'),heading:style('.nspstory-heading'),
+      green:style('.nspstory-position-pill, .nspstory-wt, .nspstory-insert'),violet:style('.nspstory-gfp-boundary, .nspstory-inactive, .nspstory-source'),highlight:style('.nspstory-triplet-focus'),
+      paper:resolve('--ns-paper'),ink:resolve('--ns-ink'),semanticGreen:resolve('--ns-green'),semanticViolet:resolve('--ns-violet')
+    };
+  });
+}
+
+test('Friends NSP15 opens all eight tabs with readable skin-responsive surfaces',async({page,server},testInfo)=>{
+  test.setTimeout(150000);
   const reader=page.locator('#canon-reader');
   const spec=await (await page.request.get(server.origin+'/diagrams/friends/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json')).json();
-  const results=[];
-  for(const theme of ['default','islanders']){
-    await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence'+(theme==='default'?'':'&theme=islanders'));
+  const results=[],representative={};
+  for(const theme of ['aurora','daylight','islanders']){
+    await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence&theme='+theme);
     await expect(reader.locator('.doc-sec').first()).toBeVisible();
-    await expect(reader).toHaveClass(new RegExp('\\bsk-'+(theme==='default'?spec.page.skin:theme)+'\\b'));
+    await expect(reader).toHaveClass(new RegExp('\\bsk-'+theme+'\\b'));
     await expect(page.locator('.islanders-site-mark')).toBeHidden();
     await expect(reader.locator('.seatmap-islanders-logo')).toHaveCount(0);
     await expect(reader.locator('.reader-tree-tab')).toHaveCount(8);
@@ -163,11 +206,24 @@ test('Friends NSP15 opens all eight tabs with readable dark-section text in both
       await chooseNavigation(reader.locator('.explore-navigation'),'Tab',tab.label);
       const section=reader.locator('#section-'+tab.sections[0].id),toggle=section.locator(':scope > .sec-heading-row .prosetoggle');
       await expect(section).toBeVisible();
-      await expect(section).toHaveCSS('background-color','rgb(11, 25, 35)');
       if(await toggle.getAttribute('aria-expanded')==='true')await toggle.click();
       await expect(section.locator(':scope > .sec-teaser')).toBeVisible();
       const collapsed=await readableText(section.locator(':scope > .sec-heading-row .sec-h, :scope > .sec-teaser .teasertext, :scope > .sec-teaser .teasermore'));
-      await capture(page,testInfo,'friends-nsp15-'+theme+'-tab-'+(index+1)+'-desktop');
+      const visual=await nspVisualSnapshot(section);
+      if(visual.paper){
+        const paper=composite(visual.paper,visual.panel.background);
+        expect(contrast(visual.ink,paper),JSON.stringify({theme,tab:tab.label,visual,paper})).toBeGreaterThanOrEqual(4.5);
+        expect(visual.semanticGreen).not.toBe(visual.semanticViolet);
+        expect(contrast(visual.semanticGreen,paper),JSON.stringify({theme,tab:tab.label,visual,paper})).toBeGreaterThanOrEqual(3);
+        expect(contrast(visual.semanticViolet,paper),JSON.stringify({theme,tab:tab.label,visual,paper})).toBeGreaterThanOrEqual(3);
+        if(visual.cell){
+          const cell=composite(visual.cell.background,visual.panel.background);
+          expect(contrast(visual.cell.color,cell),JSON.stringify({theme,tab:tab.label,visual,cell})).toBeGreaterThanOrEqual(4.5);
+        }
+        if(tab.label==='Reporter')expect(Number(visual.highlight.fillOpacity),'The position highlight must not cover the reporter letters').toBeLessThanOrEqual(.2);
+      }
+      if(index===0)representative[theme]=visual;
+      if(index===0)await capture(page,testInfo,'friends-nsp15-'+theme+'-reporter-desktop');
       await toggle.click();
       await expect(section.locator(':scope > .sec-prose')).toBeVisible();
       await expect(section.locator(':scope > .sec-prose')).toHaveCSS('opacity','1');
@@ -175,11 +231,46 @@ test('Friends NSP15 opens all eight tabs with readable dark-section text in both
       // The authored source ledger has links on its own table surface; include
       // those actual rendered links without changing the approved prose/spec.
       const links=await section.locator('a:visible').count()?await readableText(section.locator('a:visible')):[];
-      results.push({theme,tab:tab.label,collapsed,expanded,links});
+      results.push({theme,tab:tab.label,collapsed,expanded,links,visual});
       if(index===1)await capture(page,testInfo,'friends-nsp15-'+theme+'-expanded-prose-desktop');
     }
   }
+  expect(luminance(representative.aurora.panel.background)).toBeLessThan(.2);
+  expect(luminance(representative.daylight.panel.background)).toBeGreaterThan(.8);
+  expect(luminance(representative.islanders.panel.background)).toBeGreaterThan(.8);
+  expect(representative.aurora.frame.backgroundImage).not.toBe(representative.daylight.frame.backgroundImage);
+  expect(representative.daylight.frame.backgroundImage).not.toBe(representative.islanders.frame.backgroundImage);
+  expect(representative.aurora.green.fill).not.toBe(representative.daylight.green.fill);
+  expect(representative.daylight.green.fill).not.toBe(representative.islanders.green.fill);
   await testInfo.attach('nsp15-rendered-text-contrast',{body:JSON.stringify(results,null,2),contentType:'application/json'});
+});
+
+test('Friends NSP15 preserves narrative state through live dark, light and Islanders changes',async({page,server},testInfo)=>{
+  test.setTimeout(60000);
+  await page.goto(server.origin+shell+'?diagram=nsp15-insertion-evidence&theme=aurora');
+  const reader=page.locator('#canon-reader'),navigation=reader.locator('.explore-navigation');
+  await expect(reader.locator('.doc-sec').first()).toBeVisible({timeout:30000});
+  await expect(navigation).toBeVisible({timeout:30000});
+  await chooseNavigation(navigation,'Tab','Compare');
+  const section=reader.locator('#section-class-signature'),step=section.locator('.schip[data-step-source="2"]');
+  await step.click();await expect(step).toHaveAttribute('aria-current','true');
+  const story=section.locator('.nspstory'),phase=await story.getAttribute('data-phase');
+  const snapshots={};
+  for(const [index,theme] of ['aurora','daylight','islanders','aurora'].entries()){
+    await page.evaluate(value=>window.dvSetSkin(value),theme);
+    await expect(reader).toHaveClass(new RegExp('\\bsk-'+theme+'\\b'));
+    await expect(reader.locator('.reader-tree-tab').filter({hasText:'Compare'})).toHaveAttribute('aria-expanded','true');
+    await expect(step).toHaveAttribute('aria-current','true');
+    await expect(story).toHaveAttribute('data-phase',phase);
+    snapshots[theme]=await nspVisualSnapshot(section);
+    await capture(page,testInfo,'friends-nsp15-live-'+(index+1)+'-'+theme+'-evidence-desktop');
+  }
+  expect(luminance(snapshots.aurora.panel.background)).toBeLessThan(.2);
+  expect(luminance(snapshots.daylight.panel.background)).toBeGreaterThan(.8);
+  expect(luminance(snapshots.islanders.panel.background)).toBeGreaterThan(.8);
+  expect(snapshots.aurora.green.fill).not.toBe(snapshots.daylight.green.fill);
+  expect(snapshots.daylight.green.fill).not.toBe(snapshots.islanders.green.fill);
+  expect(snapshots.daylight.green.fill).not.toBe(snapshots.daylight.violet.fill);
 });
 
 test('Friends NSP15 setup controls commit strings and Boolean motion without JSON quoting',async({page,server},testInfo)=>{
@@ -223,6 +314,12 @@ test('Friends NSP15 setup controls commit strings and Boolean motion without JSO
   await expect(panel.locator('.nspstory')).toHaveAttribute('data-scene','dilution');
   await expect(panel.locator('.nspstory')).toHaveAttribute('data-ambient','off');
   await capture(page,testInfo,'friends-nsp15-editor-setup-desktop');
+  await page.evaluate(()=>window.dvSetSkin('daylight'));
+  await expect(page.locator('#docview')).toHaveClass(/\bsk-daylight\b/);
+  const visual=await nspVisualSnapshot(page.locator('#docview .doc-sec').first());
+  expect(luminance(visual.panel.background)).toBeGreaterThan(.8);
+  expect(contrast(visual.ink,composite(visual.paper,visual.panel.background))).toBeGreaterThanOrEqual(4.5);
+  await capture(page,testInfo,'friends-nsp15-editor-daylight-desktop');
 });
 
 test('marketing tabs retain their panels and the desktop editor retains the selected theme',async({page,server},testInfo)=>{
@@ -271,4 +368,26 @@ test('offline reusable rink fixture retains its crest across steps and mode chan
   await page.evaluate(()=>window.dvSetSkin('islanders'));
   await expect(crest).toBeVisible();
   await section.locator('.pt-seatmap').screenshot({path:testInfo.outputPath('islanders-offline-seatmap-1280.png')});
+});
+
+test('offline NSP15 remains themed and usable with reduced motion and print media',async({page,context,server},testInfo)=>{
+  const output=injectNspFixture(server,testInfo,'friends-offline-nsp15');
+  await page.setViewportSize({width:1280,height:900});
+  await context.setOffline(true);
+  await page.goto(pathToFileURL(output).href+'?theme=daylight');
+  const doc=page.locator('#docview'),section=doc.locator('#section-green-reporter'),story=section.locator('.nspstory');
+  await expect(doc).toHaveClass(/\bsk-daylight\b/);
+  await expect(story).toBeVisible();
+  const visual=await nspVisualSnapshot(section);
+  expect(luminance(visual.panel.background)).toBeGreaterThan(.8);
+  expect(contrast(visual.ink,composite(visual.paper,visual.panel.background))).toBeGreaterThanOrEqual(4.5);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect.poll(()=>story.evaluate(element=>element.getAnimations({subtree:true}).filter(animation=>animation.playState!=='finished').length)).toBe(0);
+  await expect(story.locator('.nspstory-controls')).toBeVisible();
+  await capture(page,testInfo,'friends-offline-nsp15-daylight-desktop');
+  await page.emulateMedia({media:'print',reducedMotion:'reduce'});
+  await expect(story.locator('.nspstory-screen-frame')).toBeHidden();
+  await expect(story.locator('.nspstory-print-frame')).toBeVisible();
+  await expect(story.locator('.nspstory-controls')).toBeHidden();
+  await capture(page,testInfo,'friends-offline-nsp15-print-desktop');
 });

@@ -3,7 +3,6 @@
 Upstream ships only company/README.md. A fork keeps its additions there:
 
   company/panels/*.js, company/panels/types/*.js   bundled by tools/source-loader.cjs
-  company/panels/venues/*.js                        seatmap venue library entries, bundled the same way
   company/contract/*.md                             appended to the authoring contract
   company/examples/**                               bundled into the folder-agent kit
   company/tests/*.test.js, company/tests/test_*.py  run by the normal test suites

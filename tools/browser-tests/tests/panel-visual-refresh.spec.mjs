@@ -8,7 +8,7 @@ for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprin
  const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setContent(html);
  for(const width of [null,340,640]){
   await page.evaluate(({skin,width})=>paint(skin,width),{skin,width});
-  await expect(page.locator('.pwidget')).toHaveCount(42);
+  await expect(page.locator('.pwidget')).toHaveCount(35);
   const bad=await page.locator('.pwidget').evaluateAll(cards=>cards.filter(c=>!c.textContent.trim()||c.offsetHeight<20||c.scrollWidth>c.clientWidth+2).map(c=>({type:c.dataset.type,width:c.clientWidth,overflow:c.scrollWidth-c.clientWidth})));
   expect(bad,'outer cards contain content; deliberate internal table scrollers remain allowed').toEqual([]);
  }

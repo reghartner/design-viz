@@ -1,5 +1,17 @@
 # Changelog
 
+## Sports and biology panels removed from main (2026-10-19)
+
+- Removed the sports panel (`seatmap`, its venue library, seating-chart
+  importer and `tools/seatmap-import.mjs`) and the biology panels (`sequence`,
+  `frames`, `reads`, `locus`, `strandscene`, `cellscene`, with `bio.js` and
+  `mech.js`), plus their examples, cookbook recipes, the **Sequencing
+  walkthrough** template, tests and the `company/panels/venues/` overlay glob.
+  They continue as opt-in packages on PR #658.
+- `funnel` and `grid` stay in core with their own tones (`neutral accent info
+  warning success danger violet teal pink`; older sequence tones still render)
+  and move to the **Data & charts** picker category.
+
 ## Venue library for the Venue map panel (2026-10-17)
 
 - `seatmap` panels can reference a venue: `"venue": "ubs-arena"` supplies

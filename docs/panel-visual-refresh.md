@@ -40,7 +40,6 @@ physical material/light palette; UI surfaces use the existing skin tokens.
 | `battery` | Larger tabular charge readout and wrapping status heading | Solar camera charge | 155 / 195 / 420 |
 | `budget` | Prominent tabular measurement and clearer threshold track | Detection latency budget | 230 / 310 / 550 |
 | `buffer` | Taller segments with clearer write-head separation | Pre-roll recording buffer | 180 / 280 / 600 |
-| `cellscene` | Lighter cell boundary and restrained molecule shadows | Cell signaling (biology) | 320 / 560 / 900 |
 | `checks` | Separate evidence rows and wrapping check headers | Incident verification gates | 220 / 270 / 500 |
 | `chime` | Refined device surface and calmer label rhythm | Doorbell chime | 220 / 300 / 480 |
 | `cost` | Route surfaces and component separation; tabular totals | Cloud event processing cost | 420 / 570 / 1000 |
@@ -64,12 +63,10 @@ physical material/light palette; UI surfaces use the existing skin tokens.
 | `reads` | Larger alignment cells, separated header and calmer scroller | Sequence alignment (biology) | 360 / 560 / 1000 |
 | `replicas` | Reference summary, stronger values and more track separation | Replicated event history | 280 / 360 / 700 |
 | `screen` | Architectural/material/light detail in existing clips; driveway arrival, garage opening and side gate one-shots | Residential security clips | 240 / 310 / 480 |
-| `seatmap` | Separated summary metrics and quieter venue field | Venue occupancy | 360 / 560 / 900 |
 | `security` | More prominent camera within operator scene and refined surfaces | Monitoring-center review | 480 / 610 / 1000 |
 | `sequence` | Separated header and clearer legend swatches | Sequence motifs (biology) | 320 / 520 / 1000 |
 | `signal` | Separated, wrapping radio rows and clearer bars | Wi-Fi and cellular signal | 190 / 240 / 450 |
 | `state` | Larger current state and stronger selected-chip underline | Armed/live device state | 150 / 180 / 420 |
-| `strandscene` | Refined scene corners, callouts and restrained actor shadows | Molecular mechanism (biology) | 320 / 560 / 900 |
 | `table` | Alternating record rows and stronger header surface | Device inventory | 260 / 400 / 900 |
 | `thermo` | Larger reading and clearer thermal state chip | Camera thermal limit | 190 / 280 / 500 |
 | `tiles` | Adaptive card columns, roomier labels and wrapping detail | Device fleet status | 180 / 300 / 600 |

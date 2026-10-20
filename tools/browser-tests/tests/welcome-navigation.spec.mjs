@@ -173,7 +173,7 @@ test('Start new project filters built-in and team templates by name, description
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-new').click();
   await expect(page.locator('#welcome-company-grid .welcome-template-card')).toHaveCount(1);
   const all=await visibleTemplateTitles(page),empty=page.locator('#welcome-template-empty');
-  expect(all).toHaveLength(16);expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));await expect(empty).toBeHidden();
+  expect(all).toHaveLength(15);expect(all).toEqual(expect.arrayContaining(['Blank diagram','Payroll handoff','Rollout decisions']));await expect(empty).toBeHidden();
   const search=page.getByRole('searchbox',{name:'Search templates'});
   for(let presses=0;presses<12 && !await page.evaluate(()=>document.activeElement?.type==='search');presses++)await page.keyboard.press('Tab');
   await expect(search).toBeFocused();

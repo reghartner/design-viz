@@ -20,7 +20,7 @@ const folded = (d, path) => C.foldPanelStates(path ? C.diagramForPath(d, path) :
 test('funnel template, picker example, feature label and styles use ordinary discovery', () => {
   const d = {nodes:{n:{}}, rows:[['n']], panels:[{...plain(C.PANEL_TEMPLATES.funnel), id:'f', type:'funnel'}]};
   assert.deepEqual(validate(d), {errors:[], warnings:[]});
-  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'funnel' && item.category === 'Science & sequencing'));
+  assert.ok(C.PANEL_CATALOG.some(item => item.type === 'funnel' && item.category === 'Data & charts'));
   const example = C.panelPickerExample('funnel');
   assert.equal(example.panel.type, 'funnel');
   assert.deepEqual(validate({nodes:{n:{}}, rows:[['n']], panels:[example.panel]}), {errors:[], warnings:[]});
@@ -30,7 +30,7 @@ test('funnel template, picker example, feature label and styles use ordinary dis
   const css = readStyles('style.core.css');
   assert.match(css, /\.funnel-row/); assert.match(css, /\.funnel-bar\.dv-bar-enter/); assert.match(css, /prefers-reduced-motion/);
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/panels/types/funnel.js'), 'utf8');
-  assert.doesNotMatch(source, /\.bio-tone-[a-z]*\s*\{/, 'the sequence panel owns the shared tone colours');
+  assert.match(source, /\.funnel-bar\.data-tone-accent\{/);
   assert.doesNotMatch(source, /document\.|setTimeout|fetch\(/);
   assert.equal(C.PanelRegistry.get('funnel').order, 44);
   assert.equal(C.panelAuthoring('funnel').picker.order, 44);
@@ -48,8 +48,17 @@ test('model reports retained share, drops between known stages, growth and unkno
   const html = C.funnelHTML(panel(), {counts:{raw:1000000, qc:900000, dedup:450000}, active:'aligned'});
   assert.match(html, /−100,000<\/b><span>\(−10\.0%\)/); assert.match(html, /funnel-row funnel-active funnel-unknown/);
   assert.match(html, /<span class="funnel-count">—<\/span>/); assert.doesNotMatch(html, /bio-tone/);
-  assert.match(C.funnelHTML(panel(), {counts:{raw:10, aligned:5}}), /funnel-bar bio-tone-accent" style="width:50\.000%"/);
+  assert.match(C.funnelHTML(panel(), {counts:{raw:10, aligned:5}}), /funnel-bar data-tone-accent" style="width:50\.000%"/);
   assert.match(html, /1,000,000 reads in/); assert.doesNotMatch(html, /NaN|Infinity|undefined/);
+});
+test('generic tones are offered to new authors while older tones keep rendering', () => {
+  const generic = panel(); generic.stages[1].tone = 'info';
+  const legacy = panel(); legacy.stages[1].tone = 'primer';
+  const pickerTones = C.PanelRegistry.get('funnel').authoring.setupFields[1][2].cols[2].options;
+  assert.deepEqual(plain(pickerTones), ['neutral','accent','info','warning','success','danger','violet','teal','pink']);
+  assert.deepEqual(validate({nodes:{n:{}},rows:[['n']],panels:[generic, {...legacy,id:'old'}]}), {errors:[],warnings:[]});
+  assert.match(C.funnelHTML(generic, {counts:{raw:10,qc:9}}), /data-tone-info/);
+  assert.match(C.funnelHTML(legacy, {counts:{raw:10,qc:9}}), /data-tone-primer/);
 });
 test('a count larger than the previous known count is flagged grew, never a negative drop', () => {
   const m = C.funnelModel(panel(), {counts:{raw:100, qc:80, aligned:120, dedup:90}});

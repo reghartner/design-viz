@@ -1,7 +1,13 @@
 /* Stage counts: ordered stages of a filtering pipeline with the number of
    items that remain at each one. Every count is authored; nothing is read
-   from data files. Shared alphabet/tone helpers live in ../bio.js, and the
-   `.bio-tone-*` colour classes are owned by the sequence panel's styles. */
+   from data files. Its count and tone helpers are local to this panel. */
+var FUNNEL_DOCUMENTED_TONES = ['neutral', 'accent', 'info', 'warning', 'success', 'danger', 'violet', 'teal', 'pink'];
+/* Older stories keep their authored colours; new authoring guidance uses the
+   neutral palette above so a core-only packet has no subject vocabulary. */
+var FUNNEL_TONES = FUNNEL_DOCUMENTED_TONES.concat(['insert', 'mismatch', 'motif', 'primer', 'cut', 'feature', 'good', 'bad']);
+function funnelValidCount(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
 var FUNNEL_MAX_STAGES = 12;
 /* Stage ids become keys of the authored `counts` object, so they must be
    plain identifier-like strings (no leading underscore keeps `__proto__` out). */
@@ -15,7 +21,7 @@ function funnelStages(panel) {
     return {
       id: stage.id,
       label: typeof stage.label === 'string' && stage.label.trim() ? stage.label : stage.id,
-      tone: BIO_TONES.indexOf(stage.tone) >= 0 ? stage.tone : null,
+      tone: FUNNEL_TONES.indexOf(stage.tone) >= 0 ? stage.tone : null,
     };
   });
 }
@@ -48,13 +54,13 @@ function funnelDeclarationWarnings(panel, path, warnings) {
     valid++;
     if (stage.label !== undefined && typeof stage.label !== 'string')
       warnings.push(at + '.label: expected text — using the id');
-    if (stage.tone !== undefined && BIO_TONES.indexOf(stage.tone) < 0)
-      warnings.push(at + '.tone: expected ' + BIO_TONES.join('|') + ' — using the default bar colour');
+    if (stage.tone !== undefined && FUNNEL_TONES.indexOf(stage.tone) < 0)
+      warnings.push(at + '.tone: expected ' + FUNNEL_DOCUMENTED_TONES.join('|') + ' — using the default bar colour');
   });
   if (Array.isArray(panel.stages) && panel.stages.length >= 2 && valid < 2)
     warnings.push(path + '.stages: fewer than 2 usable stages — the panel renders empty');
   if (panel.unit !== undefined && (typeof panel.unit !== 'string' || !panel.unit.trim()))
-    warnings.push(path + '.unit: expected a non-empty item noun such as "reads" — using items');
+    warnings.push(path + '.unit: expected a non-empty item noun such as "records" — using items');
   funnelPatchWarnings(panel.initial, path + '.initial', panel, warnings);
 }
 function funnelCountWarnings(counts, path, ids, warnings) {
@@ -66,7 +72,7 @@ function funnelCountWarnings(counts, path, ids, warnings) {
   Object.keys(counts).forEach(function (id) {
     var at = path + '.' + id, value = counts[id];
     if (ids.indexOf(id) < 0) warnings.push(at + ': unknown stage id — ignored');
-    else if (value !== null && !bioCount(value))
+    else if (value !== null && !funnelValidCount(value))
       warnings.push(at + ': expected a non-negative whole number or null — ignored');
   });
 }
@@ -97,7 +103,7 @@ function funnelMergeCounts(base, patch, ids) {
     if (!panelOwn(patch, id)) return;
     var value = patch[id];
     if (value === null) delete out[id];
-    else if (bioCount(value)) out[id] = value;
+    else if (funnelValidCount(value)) out[id] = value;
   });
   return out;
 }
@@ -125,7 +131,7 @@ function funnelFold(panel, steps) {
   return states;
 }
 function funnelFormat(value) {
-  return bioCount(value) ? value.toLocaleString('en-US') : '—';
+  return funnelValidCount(value) ? value.toLocaleString('en-US') : '—';
 }
 function funnelPct(value) {
   return isFiniteNum(value) ? value.toFixed(1) + '%' : '';
@@ -139,7 +145,7 @@ function funnelModel(panel, state) {
   var first = null, prev = null, max = 0, last = null;
   var rows = stages.map(function (stage) {
     var raw = panelOwn(counts, stage.id) ? counts[stage.id] : null;
-    var count = bioCount(raw) ? raw : null, known = count !== null;
+    var count = funnelValidCount(raw) ? raw : null, known = count !== null;
     var row = {
       id: stage.id, label: stage.label, tone: stage.tone, count: count, known: known, active: stage.id === active,
       pct: null, dropped: null, droppedPct: null, gained: null, gainedPct: null, grew: false, barPct: 0,
@@ -197,7 +203,7 @@ function funnelHTML(panel, state, model) {
     h += '<div class="funnel-row' + (row.active ? ' funnel-active' : '') + (row.known ? '' : ' funnel-unknown') + (row.grew ? ' funnel-row-grew' : '') +
       '" role="listitem" aria-label="' + esc(text) + '">' +
       '<span class="funnel-label" title="' + esc(row.label) + '">' + esc(row.label) + '</span>' +
-      '<span class="funnel-track">' + (row.known ? '<span class="funnel-bar' + (row.tone ? ' bio-tone-' + row.tone : '') +
+      '<span class="funnel-track">' + (row.known ? '<span class="funnel-bar' + (row.tone ? ' data-tone-' + row.tone : '') +
         '" style="width:' + row.barPct.toFixed(3) + '%"></span>' : '') + '</span>' +
       '<span class="funnel-count">' + (row.known ? funnelFormat(row.count) : '—') + '</span>' +
       '<span class="funnel-pct">' + (row.pct !== null ? funnelPct(row.pct) : (row.known ? '' : '—')) + '</span>' +
@@ -229,6 +235,11 @@ PanelRegistry.define('funnel', {
 .funnel-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dink)}
 .funnel-track{display:block;height:12px;border-radius:6px;background:color-mix(in srgb,var(--dtext) 10%,transparent);overflow:hidden}
 .funnel-bar{display:block;height:100%;border-radius:6px;background:var(--dink);transition:width .5s ease}
+.funnel-bar.data-tone-neutral{background:#94a3b8}.funnel-bar.data-tone-accent{background:#38bdf8}
+.funnel-bar.data-tone-violet,.funnel-bar.data-tone-insert{background:#a78bfa}.funnel-bar.data-tone-danger,.funnel-bar.data-tone-mismatch{background:#f43f5e}.funnel-bar.data-tone-bad{background:#ef4444}
+.funnel-bar.data-tone-warning,.funnel-bar.data-tone-motif{background:#facc15}.funnel-bar.data-tone-teal,.funnel-bar.data-tone-primer{background:#2dd4bf}
+.funnel-bar.data-tone-pink,.funnel-bar.data-tone-cut{background:#e879f9}.funnel-bar.data-tone-info,.funnel-bar.data-tone-feature{background:#3b82f6}
+.funnel-bar.data-tone-success,.funnel-bar.data-tone-good{background:#22c55e}
 .funnel-bar.dv-bar-enter{transform-origin:left center;animation:dvbarenter .5s cubic-bezier(.4,0,.2,1)}
 .funnel-count{font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--dink)}
 .funnel-pct{font:500 10px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right;color:var(--dfaint)}
@@ -250,13 +261,13 @@ PanelRegistry.define('funnel', {
   authoring: {
     initialFields: true,
     template: {
-      title: 'Read filtering', unit: 'reads',
-      stages: [{ id: 'raw', label: 'Raw reads' }, { id: 'qc', label: 'Passed quality filter' }, { id: 'aligned', label: 'Aligned' }],
-      initial: { counts: { raw: 1200000 } },
+      title: 'Processing stages', unit: 'items',
+      stages: [{ id: 'intake', label: 'Received' }, { id: 'review', label: 'Reviewed' }, { id: 'complete', label: 'Completed' }],
+      initial: { counts: { intake: 12000 } },
     },
     setupFields: [
       ['unit', 'text'],
-      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'tone', kind: 'enum', options: BIO_TONES }] }],
+      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'tone', kind: 'enum', options: FUNNEL_DOCUMENTED_TONES }] }],
       ['initial', 'json'],
     ],
     patchFields: [['counts', 'json', { nullable: true }], ['active', 'text'], ['note', 'text']],
@@ -264,27 +275,27 @@ PanelRegistry.define('funnel', {
       return [['counts', 'json', { nullable: true }], ['active', 'enum', funnelStageIds(panel)], ['note', 'text']];
     },
     fieldMeta: {
-      unit: { label: 'Item noun', help: 'What is being counted, e.g. reads, cells, variants. Default items.' },
+      unit: { label: 'Item noun', help: 'What is being counted, e.g. records, requests, seats. Default items.' },
       stages: { label: 'Stages', help: 'Declare 2–12 stages in pipeline order with unique ids. Optional tone colours that stage’s bar.' },
-      counts: { label: 'Counts by stage', help: 'An object keyed by stage id, e.g. {"qc": 980000}. Keys merge into the carried counts; a key set to null forgets that stage; null clears every count.', nullLabel: 'Clear every count' },
+      counts: { label: 'Counts by stage', help: 'An object keyed by stage id, e.g. {"review": 9800}. Keys merge into the carried counts; a key set to null forgets that stage; null clears every count.', nullLabel: 'Clear every count' },
       active: { label: 'Stage being computed', help: 'Shows an animated stripe on this stage while the story explains it.', nullLabel: 'No stage active' },
       note: { label: 'Explanation' },
     },
     picker: {
-      order: 44, name: 'Stage counts', category: 'Science & sequencing', tagline: 'How many survive each stage',
+      order: 44, name: 'Stage counts', category: 'Data & charts', tagline: 'How many reach each stage',
       description: 'Show the items that remain after each filtering stage of a pipeline, with the drop between stages, so readers see where data is lost.',
     },
     example: function (sample) {
       var panel = sample.panel, state = sample.state;
-      panel.unit = 'reads';
+      panel.unit = 'items';
       panel.stages = [
-        { id: 'raw', label: 'Raw reads' }, { id: 'qc', label: 'Passed quality filter' },
-        { id: 'trimmed', label: 'Adapter trimmed' }, { id: 'aligned', label: 'Aligned', tone: 'accent' },
-        { id: 'dedup', label: 'Deduplicated', tone: 'good' },
+        { id: 'intake', label: 'Received' }, { id: 'review', label: 'Reviewed' },
+        { id: 'ready', label: 'Ready' }, { id: 'delivered', label: 'Delivered', tone: 'accent' },
+        { id: 'complete', label: 'Completed', tone: 'success' },
       ];
-      state.counts = { raw: 1200000, qc: 1136400, trimmed: 1131900, aligned: 1048600 };
-      state.active = 'dedup';
-      state.note = 'Illustrative counts. Deduplication is still running.';
+      state.counts = { intake: 12000, review: 11364, ready: 11319, delivered: 10486 };
+      state.active = 'complete';
+      state.note = 'Illustrative counts. The last stage is still in progress.';
       panel.initial = builderClone(state);
       return sample;
     },

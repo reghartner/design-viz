@@ -2,7 +2,18 @@
 'use strict';
 /* Offline only: never imported by a reader, editor or runtime bundle. */
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const {readSource}=require('./source-loader.cjs');
+const {readSource}=require('./source-loader.cjs'),core=require('./canon/core.cjs');
+const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+function declaresTopology(raw){
+  if(!raw || typeof raw!=='object' || Array.isArray(raw))return false;
+  if(own(raw,'topologyImports') || own(raw,'topologyExports'))return true;
+  return core.sections(raw).some(s=>s.diagram && typeof s.diagram==='object' && (own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports')));
+}
+// Validation sees imported topology resolved from the authored providers; the migrated spec keeps its declarations.
+function resolved(document,providers){
+  if(!providers.length && !declaresTopology(document))return document;
+  return core.materializeTopology(JSON.parse(JSON.stringify([document,...providers])))[0];
+}
 function context(legacy){
   const c=vm.createContext({URL});
   for(const name of ['validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/layout.js'])vm.runInContext(readSource(name),c);
@@ -10,11 +21,11 @@ function context(legacy){
   return c;
 }
 function migrate(input,options={}){
-  const modern=context(false),old=context(true),raw=JSON.parse(JSON.stringify(input)),changes=[],links=[];
+  const modern=context(false),old=context(true),raw=JSON.parse(JSON.stringify(input)),providers=options.providers || [],changes=[],links=[];
   old.legacyFocusTypes=['homemap','data-contract',...(options.focusTypes || [])];
   const bare=!!(raw && raw.nodes && raw.rows),document=bare?{sections:[{diagram:raw}]}:raw;
   const page=old.normalize(document),owners=old.tabViewOwners(page);
-  const initial=modern.validate(modern.normalize(document));
+  const initial=modern.validate(modern.normalize(resolved(document,providers)));
   const errors=initial.errors.filter(e=>!e.endsWith('.layout: name an arrangement belonging to this section'));
   if(errors.length)throw new Error('Invalid input: '+errors.join('; '));
   const snapshots=owners.map(owner=>({owner,views:old.tabViewDefinitions(owner)}));
@@ -60,19 +71,21 @@ function migrate(input,options={}){
     }
   }
   const output=bare && changes.length?document:bare?raw:document;
-  const result=modern.validate(modern.normalize(output));if(result.errors.length)throw new Error('Migration refused: '+result.errors.join('; '));
+  const result=modern.validate(modern.normalize(resolved(output,providers)));if(result.errors.length)throw new Error('Migration refused: '+result.errors.join('; '));
   return {spec:JSON.parse(JSON.stringify(output)),report:{changed:changes.length>0,changes,links,warnings:result.warnings}};
 }
 function main(args){
-  let file,output,check=false,focusTypes=[];
+  let file,output,check=false,focusTypes=[],providerFiles=[];
   for(let i=0;i<args.length;i++){
     if(args[i]==='--output')output=args[++i];else if(args[i]==='--check')check=true;
     else if(args[i]==='--focus-type')focusTypes.push(args[++i]);
-    else if(args[i].startsWith('-') || file)throw new Error('Usage: node tools/migrate-panel-views.cjs INPUT.json (--check | --output NEW.json) [--focus-type TYPE]');else file=args[i];
+    else if(args[i]==='--provider')providerFiles.push(args[++i]);
+    else if(args[i].startsWith('-') || file)throw new Error('Usage: node tools/migrate-panel-views.cjs INPUT.json (--check | --output NEW.json) [--focus-type TYPE] [--provider PROVIDER.json ...]');else file=args[i];
   }
-  if(!file || check===!!output || focusTypes.some(t=>!t))throw new Error('Provide INPUT.json and exactly one of --check or --output NEW.json.');
-  if(fs.statSync(file).size>16*1024*1024)throw new Error('Input exceeds the 16 MiB migration limit.');
-  const result=migrate(JSON.parse(fs.readFileSync(file,'utf8')),{focusTypes});
+  if(!file || check===!!output || focusTypes.some(t=>!t) || providerFiles.some(f=>!f))throw new Error('Provide INPUT.json and exactly one of --check or --output NEW.json.');
+  for(const f of [file,...providerFiles])if(fs.statSync(f).size>16*1024*1024)throw new Error(f+' exceeds the 16 MiB migration limit.');
+  const providers=providerFiles.map(f=>JSON.parse(fs.readFileSync(f,'utf8')));
+  const result=migrate(JSON.parse(fs.readFileSync(file,'utf8')),{focusTypes,providers});
   // Exclusive creation rejects existing files, symlinks and the source path.
   if(output)fs.writeFileSync(output,JSON.stringify(result.spec,null,2)+'\n',{flag:'wx'});
   console.log(JSON.stringify(result.report,null,2));

@@ -577,6 +577,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
         return Array.isArray(slot) ? slot.length > 0 : slot !== id;
       });
     }).filter(function(row){ return row.length > 0; });
+    if (!d.rows.length) d.rows = [[]]; /* floats-only diagrams keep one empty row */
     if (Array.isArray(d.floats)){
       d.floats = d.floats.filter(function(f){ return !(f && f.id === id); });
       if (!d.floats.length) delete d.floats;

@@ -153,6 +153,9 @@ function sanitizedGroupParents(groups, ignored){
 
 /* ---------------- layout + geometry (per diagram) ---------------- */
 function layout(spec){
+  /* An empty rows array lays out as one empty row (floats only); the
+     authored spec is left as written. */
+  if (!spec.rows.length) spec = Object.assign({}, spec, {rows: [[]]});
   var pos = {}, rowsMeta = [];
   var lanes = spec.routing === 'lanes' && laneRoutingSupported(spec);
   var laneCounts = {};

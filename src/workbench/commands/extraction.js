@@ -165,6 +165,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     // Selections may include a defined but unplaced endpoint through commands.
     var placedParent=new Set(builderFlatRowIds(d.rows).concat((d.floats || []).map(function(f){return f.id;})));
     ports.forEach(function(port){if(!placedParent.has(port))d.rows.push([port]);});
+    if(!d.rows.length)d.rows=[[]]; // A floats-only parent keeps one empty row.
     d.edges=allEdges.filter(function(edge){return !internal.has(builderEdgeKey(edge));}).map(function(edge){
       var beforeKey=builderEdgeKey(edge),from=selected.has(edge.from),to=selected.has(edge.to);
       if(!from && !to)return edge;

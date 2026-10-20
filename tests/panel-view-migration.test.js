@@ -6,7 +6,7 @@
    3 focus panel under imports gains arrangements | checkout + homemap panel 'main' + second import from provider 'audit' (platform copy) | diagram.layouts ids ['home','flow'], topologyImports kept, output materializes with provider and validates clean, rerun unchanged | impl that skips migration for topology sections
    4 inputs never mutated | rows 1 and 3 | JSON of spec and provider identical before/after | in-place materialization
    5 missing provider refused with the resolution error | checkout without provider | throws /missing spec platform/ | impl that drops the unresolved-topology error
-   6 CLI --provider is repeatable | row 3 fixture + platform.json + audit provider file | --check with both exit 0; either provider alone exit 1; --output writes authored spec (topologyImports kept); without --provider exit 1, no output file; --provider without a value exit 1 | CLI with no provider option, or one that keeps only the first/last --provider */
+   6 CLI --provider is repeatable | row 3 fixture + platform.json + audit provider file | checkout.json --check --provider platform.json exit 0; --check with both exit 0; either provider alone exit 1; --output writes authored spec (topologyImports kept); without --provider exit 1, no output file; --provider without a value exit 1 | CLI with no provider option, or one that keeps only the first/last --provider */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process');
 const {migrate}=require('../tools/migrate-panel-views.cjs'),core=require('../tools/canon/core.cjs');
 const c=require('./workbench-command-context.cjs')(['graph','layout']);
@@ -111,6 +111,7 @@ test('topology-importing specs migrate with authored providers and keep their im
  try{
   fs.writeFileSync(input,JSON.stringify(focused));fs.writeFileSync(auditFile,JSON.stringify(audit));
   const cli=(...args)=>cp.spawnSync(process.execPath,['tools/migrate-panel-views.cjs',input,...args],{encoding:'utf8'});
+  const single=cp.spawnSync(process.execPath,['tools/migrate-panel-views.cjs',checkoutFile,'--check','--provider',platformFile],{encoding:'utf8'});assert.equal(single.status,0,single.stderr);
   const checked=cli('--check','--provider',platformFile,'--provider',auditFile);assert.equal(checked.status,0,checked.stderr);assert.equal(fs.existsSync(output),false);
   assert.equal(cli('--output',path.join(dir,'none.json')).status,1);assert.equal(fs.existsSync(path.join(dir,'none.json')),false);
   assert.equal(cli('--check','--provider',platformFile).status,1);assert.equal(cli('--check','--provider',auditFile).status,1);

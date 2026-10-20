@@ -1,6 +1,6 @@
 ---
 name: hld-to-page
-description: Author or update a Flowview diagram from a business story, an existing engineering flow, an HLD, or Honeycomb trace evidence. Supports engineer enrichment and local pilot transcript capture. Produces a source-grounded storyboard, spec, coverage ledger, and verified visual page. Use for diagram authoring, not renderer implementation or PR review.
+description: Author or update Flowview diagrams from business stories, engineering flows, HLDs or Honeycomb traces, with engineer enrichment and local pilot transcript capture. Produce source-grounded storyboards, specs, coverage ledgers and verified visual pages. For authoring, not renderer implementation or PR review.
 ---
 
 # HLD to page: packet first
@@ -12,9 +12,9 @@ animations and story outcomes; do not re-ask settled facts.
 
 ## Generate the entry packet
 
-VIZ is the checkout or extracted `authoring/` kit. Run from VIZ (or use absolute
-tool paths). Select planned panels/features for a new story; infer from the
-existing spec for an edit, adding selections for new source requirements:
+VIZ is the checkout or extracted `authoring/` kit. Run there or use absolute paths.
+Select planned panels/features for new stories; for edits, infer from the spec
+and add new source requirements:
 
 ```sh
 python3 tools/authoring-packet.py --panel state --feature steps --out <scratch>/packet.md
@@ -28,11 +28,11 @@ changed story use `--mode new` (also with `--spec`), which includes source,
 question and worksheet phases before JSON. A fully specified scoped edit needs
 no new question batch or worksheet. Read the emitted packet first; do not
 preload the full contract, workflow, cookbook, session guide or worked example.
-Follow only its relevant routes. Full documentation remains available offline.
+Follow relevant routes; full documentation remains available offline.
 
 The packet owns story/fidelity/state/placement and verification rules. Before
-proposing completion, author explicit visible-beat evidence in the ledger and
-run supported visibility and value/icon checks as described there. Report
+proposing completion, add explicit visible-beat ledger evidence and run its
+supported visibility and value/icon checks. Report
 rendered fit, occlusion and legibility unverified until a real Workbench preview
 or already-authorized rendered evidence supplies them. A file-only kit requires
 no browser, server, installation or additional agent.
@@ -42,8 +42,7 @@ For new topology, run `tools/compose-page-layout.cjs` (graph-only:
 `sectionLayout` is geometry only. [Migrate intentional old choices](../../../docs/section-layout-migration.md)
 to explicit Views. See [arrangement limits](../../../docs/auto-arrange.md).
 
-Explore Section notes support whole-box typography through section `textStyle`
-(font, size, bold, italic, color); see [notes typography](../../../docs/section-layouts.md#section-notes-typography). The desktop text toolbar edits these fields while preserving prose markup.
+Explore notes: section [`textStyle`](../../../docs/section-layouts.md#section-notes-typography) formats the whole box.
 
 JSON: `--feature contracts`; [recipe](../../../docs/contract-blocks.md#json-directly-on-a-connection). Desktop editing only.
 
@@ -51,7 +50,7 @@ JSON: `--feature contracts`; [recipe](../../../docs/contract-blocks.md#json-dire
 
 Browser imports: [supported formats](../../../docs/workbench-user-guide.md).
 
-After the packet, load a guide only for starting-material or handoff details:
+After the packet, load guides only for source or handoff details:
 
 | Starting point | Guide |
 |---|---|

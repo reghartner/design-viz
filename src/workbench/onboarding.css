@@ -17,7 +17,9 @@
 .workbench-tour-host iframe{flex:1;width:100%;min-height:0;border:0;background:#f7f9fc}
 .practice-viewer .workbench-header,.practice-viewer .workspace-rail,.practice-viewer #spec-editor,.practice-viewer .workspace-canvas-controls,.practice-viewer #workspace-appearance{display:none!important}
 .practice-viewer #workspace-canvas{inset:0!important;padding:12px!important}
-.practice-viewer #workspace-canvas-world{padding:12px!important}
+/* Content starts right of Contents (or its rail); --reader-host-inset is its width. No tool rail here. */
+.practice-viewer #workspace-canvas-world{padding:12px 12px 12px calc(var(--reader-host-inset,0px) + 12px)!important}
+.practice-viewer .workbench-diagram-canvas{left:calc(var(--reader-host-inset,0px) + 12px)!important}
 .practice-viewer #workbench-workspace{grid-template-columns:1fr!important}
 .workbench-practice #workspace-home,.workbench-practice #workbench-home{pointer-events:none}
 .practice-conversation{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;overflow:hidden;background:#324868;color:#25354c}

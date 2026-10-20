@@ -278,6 +278,51 @@ test('closing the first viewer card keeps the introduction available and expansi
   await expect.poll(()=>practice(page).locator('#docview .stepline').first().innerText()).toBe(caption);
 });
 
+/* #682 practice viewer (homepage → Open practice viewer ↗), desktop 1440x900, landing = onboarding.json.
+   row | fixture | assertion | rejects
+   I1 Story clears Contents | default landing, Contents open | #section-visitor left >= .reader-contents right; closing Contents moves it left | Contents drawn over the diagram (padding forced to 12px)
+   I2 System flow clears Contents | System flow View, Contents open | .workbench-diagram-canvas left >= .reader-contents right and within 24px of it | canvas under Contents; the editor's 84px tool-rail gap
+   A1 autoplay false stays paused | default landing (autoplay false), reduced motion off | .playback-status "Paused" | a viewer that always plays
+   A2 authored autoplay plays | landing with diagram.autoplay true, reduced motion off | .playback-status "Playing · 3s / step" | the forced {autoplay:false} and the pause from carrying the card's step
+   A3 reduced motion blocks only autoplay | same landing, the suite's reduced motion on | status "Paused · reduced motion"; Play enabled; real click on Play → "Playing · 3s / step" | autoplay under reduced motion; a disabled Play button */
+async function openPracticeViewer(page,server,patch,motion){
+  if(motion)await page.emulateMedia({reducedMotion:motion});
+  if(patch){
+    const sample=JSON.parse(await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8'));patch(sample);
+    await page.route(server.origin+'/workbench.html',async route=>{
+      const response=await route.fetch(),html=await response.text();
+      const body=html.replace(/var WORKBENCH_LANDING = [^\n]*;\n/,'var WORKBENCH_LANDING = '+JSON.stringify({spec:sample,title:'Example',label:'',footer:''}).replace(/</g,'\\u003c')+';\n');
+      expect(body).not.toBe(html);await route.fulfill({response,body});
+    });
+  }
+  await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
+  await page.getByRole('button',{name:'Open practice viewer ↗',exact:true}).click();
+  const frame=practice(page);await expect(frame.locator('body.practice-viewer')).toHaveCount(1);return frame;
+}
+test('#682 practice viewer content starts right of Contents and stays paused without authored autoplay',async({page,server})=>{
+  const frame=await openPracticeViewer(page,server,null,'no-preference'),side=frame.locator('.reader-contents'),toggle=frame.locator('.reader-top>button'),section=frame.locator('#section-visitor');
+  await expect(side).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
+  const open=await side.boundingBox(),story=await section.boundingBox();
+  expect(story.x).toBeGreaterThanOrEqual(open.x+open.width);
+  await expect(section.locator('.playback-status')).toHaveText('Paused');
+  await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await expect.poll(async()=>(await section.boundingBox()).x).toBeLessThan(story.x);
+  await toggle.click();await expect(side).toBeVisible();
+  await frame.locator('#docview>.explore-navigation').getByRole('button',{name:'System flow',exact:true}).click();
+  const canvas=frame.locator('.workbench-diagram-canvas');await expect(canvas).toBeVisible();
+  const box=await canvas.boundingBox(),contents=await side.boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(contents.x+contents.width);expect(box.x-(contents.x+contents.width)).toBeLessThanOrEqual(24);
+});
+test('#682 practice viewer plays a landing diagram whose autoplay is true',async({page,server})=>{
+  const frame=await openPracticeViewer(page,server,sample=>{sample.page.sections[0].diagram.autoplay=true;},'no-preference');
+  await expect(frame.locator('#section-visitor .playback-status')).toHaveText('Playing · 3s / step');
+});
+test('#682 reduced motion keeps an autoplay landing paused but Play still plays',async({page,server})=>{
+  const frame=await openPracticeViewer(page,server,sample=>{sample.page.sections[0].diagram.autoplay=true;},'reduce');
+  const section=frame.locator('#section-visitor'),status=section.locator('.playback-status'),play=section.getByRole('button',{name:'Play',exact:true});
+  await expect(status).toHaveText('Paused · reduced motion');await expect(play).toBeEnabled();
+  await play.click();await expect(status).toHaveText('Playing · 3s / step');
+});
 test('practice object copy stays local and step lessons follow the user’s selected step',async({page,context,server})=>{
   test.setTimeout(90000);
   await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});

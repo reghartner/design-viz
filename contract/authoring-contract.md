@@ -468,9 +468,10 @@ path pauses advancement. Switching diagram tabs resumes only if the sequence
 was playing when hidden; a manual pause persists. Leaving the browser tab pauses
 until Play is pressed. A deep link to a specific step opens paused.
 
-Reduced motion disables automatic advancement and explains the disabled Play
-button; arrows and step chips still work. A one-step path also has no automatic
-playback. Pausing advancement does not freeze animations inside the current step.
+Reduced motion stops `autoplay` from starting playback on its own; the status
+reads **Paused · reduced motion**. Play stays enabled, so a reader can still
+start advancement, and arrows and step chips still work. Step changes under
+reduced motion do not animate. A one-step path has no automatic playback. Pausing advancement does not freeze animations inside the current step.
 Workbench and Confluence configuration previews always start paused; published
 standalone pages and the Confluence viewer respect the authored setting.
 

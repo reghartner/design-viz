@@ -1856,7 +1856,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     clearEditingPreview();
     if(filteredPaths().indexOf(selectedPath)<0 || !stops().length)selectPath(filteredPaths().find(function(p){return stops(p).length;}).id);
     var visible=stops(),last=visible[visible.length-1];
-    if (destroyed || timer || RM || visible.length < 2 || mode !== 'step' || hidden || document.hidden) return;
+    if (destroyed || timer || visible.length < 2 || mode !== 'step' || hidden || document.hidden) return;
     if (explicitPaths && cur === last) setStep(visible[0], false, false);
     /* the modulo wrap back to step 0 is a jump, not a narrative move */
     var id = window.setInterval(function(){
@@ -1877,9 +1877,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var action = timer ? 'Pause' : ended ? 'Replay' : 'Play';
     btnPlay.innerHTML = '<span aria-hidden="true">' + (timer ? '&#10074;&#10074;' : '&#9654;') + '</span> ' + action;
     btnPlay.setAttribute('aria-label', action);
-    btnPlay.disabled = RM || count < 2;
-    btnPlay.title = RM ? 'Automatic steps are disabled by reduced motion. Use the step arrows.' :
-      count < 2 ? 'This view shows only one step on this path.' : timer ? 'Pause automatic step advancement' :
+    btnPlay.disabled = count < 2;
+    btnPlay.title = count < 2 ? 'This view shows only one step on this path.' : timer ? 'Pause automatic step advancement' :
       ended ? 'Play this path again from step 1' : 'Advance one step every 3 seconds';
     bar.setAttribute('data-playback', state);
     var label = timer ? 'Playing · 3s / step' : count < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
@@ -1935,7 +1934,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     bar.hidden = false;
     paintedStep = null;
     setStep(stops()[0], undefined, false);
-    if (auto && autoplay) startAuto();
+    /* reduced motion blocks only the automatic start; Play still plays */
+    if (auto && autoplay && !RM) startAuto();
     syncToggle();
   }
   function enterAmbient(){
@@ -2057,6 +2057,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     advance: advanceTo,
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
     playing: function(){ return !!timer; },
+    autoplays: function(){ return autoplay && !RM; },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
     destroy: function(){

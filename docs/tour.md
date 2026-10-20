@@ -205,7 +205,7 @@ Per step:
     can watch again after reading or trying a control. Under
     `prefers-reduced-motion` it never auto-advances: the transport is
     spotlit instead, the authored target becomes a secondary ring, and the
-    copy points at the ‹ › step arrows (the engine disables ▶ there).
+    copy points at the ‹ › step arrows.
     Replay example is not offered under reduced motion; **Try controls**
     provides keyboard access to the highlighted manual controls.
   - `click` — a demonstrated action: the tour scrolls the control's node to

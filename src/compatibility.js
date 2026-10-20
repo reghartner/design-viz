@@ -32,7 +32,8 @@ var FlowviewCompatibility = (function(){
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
     'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
-    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0']
+    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0'],
+    'media.residential-clips':['Driveway, garage and side-gate camera clips','0.2.0']
   };
   Object.keys(released).forEach(function(id){features[id]={label:released[id][0],since:released[id][1]};});
   // Panel capabilities come from their definitions at build time.
@@ -103,6 +104,7 @@ var FlowviewCompatibility = (function(){
         }
         if(['homemap','screen','security','phone'].indexOf(p.type)<0)return;
         var camera=p.type==='screen' || p.type==='security';
+        if(camera && ['driveway-arrival','garage-opening','side-gate'].indexOf(p.scene)>=0)used['media.residential-clips']=true;
         if(camera && p.scene==='raccoon-at-night')used['media.scene-raccoon-at-night']=true;
         function endpoint(value){
           if(!object(value))return;
@@ -111,6 +113,7 @@ var FlowviewCompatibility = (function(){
           if(!camera)return;
           if(value.siren==='on' || value.siren==='off')used['media.camera-siren']=true;
           // Security already carried state scenes; only the new clip is new there.
+          if(['driveway-arrival','garage-opening','side-gate'].indexOf(value.scene)>=0)used['media.residential-clips']=true;
           if(value.scene==='raccoon-at-night')used['media.scene-raccoon-at-night']=true;
           if(p.type!=='screen')return;
           if(value.mode==='playing')used['media.screen-playing']=true;

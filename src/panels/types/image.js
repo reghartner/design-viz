@@ -48,6 +48,10 @@ PanelRegistry.extend('image', {
 
 PanelRegistry.extend('image', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-image .pbody img{border-radius:10px}.pt-image figure{margin:0;min-width:0}.pt-image figcaption{font-size:11px;line-height:1.5;color:var(--dtext);padding-top:8px}
+`},
     {
       order: 2466,
       css: String.raw`.docview .section-layout-tile>.pt-image{display:flex;flex-direction:column;}

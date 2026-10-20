@@ -29,6 +29,34 @@ function panelPickerReferenceImage(){
   return canvas.toDataURL('image/png');
 }
 
+/* A local product screen for the App screens thumbnail, not insertion data. */
+function panelPickerAppScreenImage(){
+  var canvas=document.createElement('canvas');canvas.width=640;canvas.height=1060;
+  var c=canvas.getContext('2d');
+  function box(x,y,w,h,r,fill){c.fillStyle=fill;c.beginPath();c.roundRect(x,y,w,h,r);c.fill();}
+  function label(text,x,y,size,color,weight){c.fillStyle=color;c.font=(weight||500)+' '+size+'px sans-serif';c.fillText(text,x,y);}
+  c.fillStyle='#F3F6F5';c.fillRect(0,0,640,1060);
+  label('9:41',35,42,21,'#203C42',700);label('HOME',480,42,18,'#54736E',700);
+  label('Good evening',34,111,21,'#6D8581');label('Maple House',34,158,39,'#203C42',700);
+  box(34,189,572,92,22,'#DCEAE2');label('All secure',57,231,26,'#2D6455',700);label('3 cameras online · Doors locked',57,261,18,'#4D7567');
+  box(34,306,572,307,24,'#D6E5E7');
+  c.save();c.beginPath();c.roundRect(34,306,572,307,24);c.clip();
+  c.fillStyle='#8AA99B';c.fillRect(34,486,572,127);
+  c.fillStyle='#D9D5C5';c.fillRect(145,406,355,156);
+  c.fillStyle='#4D656B';c.beginPath();c.moveTo(117,418);c.lineTo(318,335);c.lineTo(529,418);c.closePath();c.fill();
+  box(283,454,70,108,4,'#608C87');box(181,448,70,56,3,'#A1C7CC');box(391,448,70,56,3,'#A1C7CC');
+  c.strokeStyle='#F3EBDA';c.lineWidth=5;c.strokeRect(181,448,70,56);c.strokeRect(391,448,70,56);
+  c.fillStyle='#C5BEA8';c.beginPath();c.moveTo(279,562);c.lineTo(359,562);c.lineTo(407,613);c.lineTo(231,613);c.fill();
+  c.restore();box(51,325,84,30,10,'#244D49');label('LIVE',65,347,17,'#EFF9F3',700);
+  box(34,577,572,58,0,'#FFF');label('Front door',55,613,23,'#203C42',700);label('Updated now',430,613,16,'#728780');
+  label('Devices',34,684,26,'#203C42',700);
+  [[34,'Door lock','Locked','#E1EDE7'],[328,'Garage','Closed','#E3EAF0']].forEach(function(v){box(v[0],706,278,119,19,'#FFF');box(v[0]+19,725,35,8,4,v[3]);label(v[1],v[0]+20,767,21,'#5E7772');label(v[2],v[0]+20,801,26,'#203C42',700);});
+  label('Recent activity',34,874,26,'#203C42',700);box(34,896,572,95,19,'#FFF');
+  label('Package delivered',56,935,23,'#203C42',700);label('Front door camera',56,965,18,'#6D8581');label('4:32 PM',486,948,17,'#6D8581');
+  label('Home',88,1035,19,'#2D6455',700);label('Activity',280,1035,19,'#82928F');label('Settings',474,1035,19,'#82928F');
+  return canvas.toDataURL('image/png');
+}
+
 var PANEL_PICKER_ID = 0;
 function panelPickerNamespace(root){
   var ids = Object.create(null);
@@ -49,7 +77,7 @@ function panelPickerNamespace(root){
 }
 
 function panelPickerPreview(type, referenceImage, skin){
-  var sample = panelPickerExample(type, {referenceImage:referenceImage});
+  var sample = panelPickerExample(type, {referenceImage:referenceImage,appScreenImage:type === 'appscreens' ? panelPickerAppScreenImage() : null});
   var host = document.createElement('div'); host.className = 'pbody';
   renderPanelBody(host,sample.panel,sample.state,skin || 'aurora',sample.states,sample.step,false);
   /* false disables JS animation. Cloning drops device-app listeners and every

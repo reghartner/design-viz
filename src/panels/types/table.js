@@ -143,6 +143,10 @@ PanelRegistry.extend('table', {
 
 PanelRegistry.extend('table', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.swtable thead{background:color-mix(in srgb,var(--dtext) 6%,transparent)}.swtable th,.swtable td{padding:7px 10px}.swtable tbody tr:not([class]):nth-child(even){background:color-mix(in srgb,var(--dtext) 3%,transparent)}.swtablewrap{border-radius:9px;scrollbar-width:thin}
+`},
     {
       order: 263,
       css: String.raw`.swtablewrap{overflow:auto; max-height:300px; border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent); border-radius:6px;}
@@ -216,3 +220,5 @@ PanelRegistry.extend('table', {
     },
   },
 });
+
+PanelRegistry.extend('table', {layout: {sectionSizing: { minWidth: 260, preferredWidth: 400, maxWidth: 900, aspectPolicy: 'content', grow: 1 }}});

@@ -180,7 +180,7 @@ test('screen footers wrap independently and capped phone content stays bounded',
  const phone={id:'phone',type:'phone'},many={notifications:Array.from({length:20},()=>({app:'Dispatch',title:'Important notification '.repeat(100),text:'Detailed evidence '.repeat(500)}))};
  const small=E.panelSize(phone,many,220),large=E.panelSize(phone,many,900);
  assert.equal(small.intrinsicHeight,large.intrinsicHeight);assert.ok(small.intrinsicHeight<400,'clamped native cards must not create giant empty outer tiles');
- assert.equal(small.nativeLimits.contentWidth,178);assert.equal(small.nativeLimits.notificationLimit,3);
+ assert.equal(small.nativeLimits.contentWidth,220);assert.equal(small.nativeLimits.notificationLimit,3);assert.equal(small.nativeLimits.nominalBodyFontPx,10);
  const V=require('../tools/arrange/contracts.cjs'),c=V.contract({id:'app',type:'deviceapp'},E.inputs({diagram:A.seed(diagram(),[])},1200).registry);
  const a=V.dimensions(c,12,50,E.panelSize({type:'deviceapp'}, {},592)),b=V.dimensions(c,20,50,E.panelSize({type:'deviceapp'}, {},992));
  assert.equal(a.bodyHeight,b.bodyHeight,'330px portrait cap bounds height as outer tile grows');
@@ -225,5 +225,23 @@ test('device-app composition preserves all cards, sibling layouts, hidden tiles 
  assert.equal(JSON.stringify(d),before);assert.deepEqual(out.panels,d.panels);assert.deepEqual(out.steps,d.steps);assert.deepEqual(out.sectionLayout.backstage,d.sectionLayout.backstage);assert.deepEqual(out.sectionLayout.default.find(t=>t.hidden),hidden);
  const phoneOnly=diagram();phoneOnly.panels=[{id:'phone',type:'phone'}];const baseline=await A.arrange(phoneOnly,defaults);
  const phone=out.sectionLayout.default.find(t=>t.panel==='phone'),old=baseline.raw.page.sections[0].diagram.sectionLayout.default.find(t=>t.panel==='phone');assert.equal(phone.w,old.w);assert.equal(phone.h,old.h);
- const limits=result.diagnostics[0].panels.find(p=>p.id==='phone');assert.equal(limits.estimatedNativeContent,null);assert.equal(limits.nativeLimits.contentWidth,178);assert.equal(limits.nativeLimits.estimatedBodyFontPx,8);
+ const limits=result.diagnostics[0].panels.find(p=>p.id==='phone');assert.equal(limits.estimatedNativeContent,null);assert.equal(limits.nativeLimits.contentWidth,220);assert.equal(limits.nativeLimits.estimatedBodyFontPx,8);
+});
+
+
+test('budget estimates account for each declared metric and wrapping labels',()=>{
+ const metric={id:'latency',label:'Response latency',max:300,unit:'ms'},one={type:'budget',metrics:[metric]},three={type:'budget',metrics:[metric,{...metric,id:'memory'},{...metric,id:'power'}]};
+ const oneSize=E.panelSize(one,{},270),threeSize=E.panelSize(three,{},270);
+ assert.ok(threeSize.intrinsicHeight>oneSize.intrinsicHeight*2,'each metric adds its own measurement and track');
+ const wrapped={type:'budget',metrics:[{...metric,label:'Response latency including notification delivery confirmation'}]};
+ assert.ok(E.panelSize(wrapped,{},252).intrinsicHeight>E.panelSize(wrapped,{},600).intrinsicHeight,'narrow metric labels reserve their wrapped height');
+});
+
+
+test('cost spacing reserve applies only to expanded route rows',()=>{
+ const p={type:'cost',components:[{id:'compute',label:'Compute'}]};
+ const compact=E.panelSize({...p,density:'compact'},{},620),expanded=E.panelSize({...p,density:'expanded'},{},620);
+ assert.equal(E.panelSize(p,{},620).intrinsicHeight,expanded.intrinsicHeight);
+ assert.equal(E.panelSize(p,{},420).intrinsicHeight,E.panelSize({...p,density:'compact'},{},420).intrinsicHeight);
+ assert.ok(expanded.intrinsicHeight>compact.intrinsicHeight);
 });

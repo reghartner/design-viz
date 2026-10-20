@@ -89,13 +89,17 @@ PanelRegistry.extend('orbit', {
   order: 7,
   label: 'Orbit',
   since: '0.1.0',
-  layout: {
+  layout: {sectionSizing: { minWidth: 220, preferredWidth: 280, maxWidth: 420, aspectPolicy: 'fixed', grow: 0, bodyAspect: 220 / 156, contentSelector: '.orbit' },
     canvasSizing: { mode: 'fixed-aspect', aspect: 220 / 156, resizeAxis: 'width' },
   },
 });
 
 PanelRegistry.extend('orbit', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-orbit .orbit{max-width:360px}.pt-orbit .oring{stroke-width:1.5;stroke-dasharray:2 6}.pt-orbit .olbl{font-size:9.5px}.pt-orbit .ocur{font-size:15px;letter-spacing:-.4px}
+`},
     {
       order: 335,
       css: String.raw`.odot.dv-chip-pulse{transform-box:fill-box; transform-origin:center; animation:dvchippulse .58s ease-out;}`,

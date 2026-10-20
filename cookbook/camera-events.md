@@ -207,7 +207,15 @@ All stock scenes render in color, independently of the page skin:
 | `package-drop` | A courier delivering a cardboard package |
 | `kitchen-fire` | Flames, smoke, and reflected light around a stove |
 | `raccoon-at-night` | A masked, ring-tailed raccoon crossing a night porch and sniffing the mat |
+| `driveway-arrival` | A vehicle pulling into a landscaped residential driveway |
+| `garage-opening` | A sectional garage door rising to reveal the garage interior |
+| `side-gate` | A garden gate swinging open beside a side path |
 | `static-noise` | A color test pattern with boot interference |
+
+The driveway, garage and side-gate scenes are finite events.
+`scenePlayback:"waiting"` holds their pre-event setting; `"playing"` starts the
+action independently of recording, lighting, siren and audio. Reduced motion
+and print show a readable event still.
 
 In the workbench, select the screen panel and choose **Screen scene**.
 **Replay clip** replays only its inline preview, even if the story camera is
@@ -236,7 +244,8 @@ when nothing is being recorded or watched; the clip then restarts for playback.
 `playing`, a per-state `scene`, and `raccoon-at-night` need Flowview 0.2.0.
 Workbench Save/Export and `node tools/compatibility.js --stamp` record
 `minVersion: "0.2.0"` and the features `media.screen-playing`,
-`media.screen-scene-override` and `media.scene-raccoon-at-night`. Older
+`media.screen-scene-override` and `media.scene-raccoon-at-night`. The driveway,
+garage and side-gate scenes also require 0.2.0 and record `media.residential-clips`. Older
 installed viewers then show an upgrade notice instead of silently showing
 STANDBY or the declared clip. Stories using only the older modes and scenes
 keep their 0.1.0 minimum.

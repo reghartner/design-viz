@@ -327,7 +327,10 @@
       picker:{order:26, name:'App screens', category:'Devices & interfaces', tagline:'Your product screens, in step',
         description:'Upload exported Figma screens or screenshots, then change the displayed screen alongside the flow. Choose a phone frame and cut or crossfade transitions.'},
       example:function (sample, context) {
-        if (context.referenceImage) {
+        if (context.appScreenImage) {
+          sample.panel.screens=[{id:'sample',label:'Maple House',alt:'Home security dashboard with live camera, locked door, closed garage, and package delivery activity',src:context.appScreenImage,width:640,height:1060}];
+          sample.panel.frame='phone';sample.panel.initial={screen:'sample'};sample.state={screen:'sample'};
+        } else if (context.referenceImage) {
           sample.panel.screens = [{id:'sample',label:'Sample screen',alt:'Illustrative screen preview',src:context.referenceImage,width:640,height:340}];
           sample.panel.frame = 'none'; sample.panel.initial = {screen:'sample'}; sample.state = {screen:'sample'};
         }
@@ -367,6 +370,9 @@
   .docview .appscreens{min-height:390px;}
   .docview .appscreen-stage{height:320px;min-height:320px;flex:none;}
 }
+
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.appscreens{min-height:0;gap:10px}.appscreen-stage{height:clamp(180px,110cqi,380px);min-height:0}.pt-appscreens{container-type:inline-size}.appscreen-viewport{border-radius:10px;box-shadow:0 6px 18px #00000018}.appscreen-phone{border-color:#59697e;border-radius:25px}.appscreens figcaption strong{font-weight:600;letter-spacing:-.2px}.appscreen-empty{background:color-mix(in srgb,var(--dtext) 5%,transparent);border:1px dashed color-mix(in srgb,var(--dtext) 25%,transparent);border-radius:10px}
 `,
     editorStyles:String.raw`
 .appscreen-editor{display:flex;flex-direction:column;gap:10px;min-width:0;}

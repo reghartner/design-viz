@@ -2,14 +2,9 @@
 
 This branch is the Friends company fork overlay. `company/company.json` enables
 the science and sports packages for this site. The upstream default build
-remains core-only. `canon.json` publishes six active reviewed documents copied from
+remains core-only. `canon.json` publishes two active reviewed documents copied from
 those packages into `diagrams/friends/`:
 
-- Create demand (`season-of-seats`): the Schaefer effect, schedule, bobblehead clock, and group holds
-  (`packages/sports/diagrams/season-of-seats/season-of-seats.spec.json`)
-- Sell the inventory (`sell-the-inventory`): on-sale day, pricing, heritage-night offers, and giveaway eligibility
-- Serve and learn from game night (`serve-game-night`): ticket transfers, gate operations, sponsor rewards, and recap
-- Build the next season (`build-next-season`): membership conversion and the renewal fork
 - Islanders marketing stories (`islanders-marketing`): three native tabs—Member campaign, Group night, and Fan event RSVP—with all eight approved alternate paths
 - The insertion signature of NSP15: eight tabs following the reporter lineage,
   insertion evidence, and assay limits from the reviewed preprint story
@@ -22,14 +17,14 @@ reviewed upstream package content without appearing in this site's library.
 
 When upstream changes one of these specs, copy the reviewed version into its
 matching `diagrams/friends/<slug>/<slug>.spec.json` before preparing the site.
-The deployment script requires exactly these six Canon IDs and distinct thumbnails.
+The deployment script requires exactly these two Canon IDs and distinct thumbnails.
 It builds the selected packages, keeps the diagram library, and hides the
 service catalog. The default build is restored when the script exits.
 
 The build embeds only the NSP15 science starter and both packages' panel code in
 the Workbench and viewer. The Workbench also embeds an offline authoring kit
 with the selected contracts, recipes, and source story specs. The hosted
-`workbench/starters.json` exposes editable copies of all six active Friends documents.
+`workbench/starters.json` exposes editable copies of both active Friends documents.
 `prepare` verifies those contents against the actual staged HTML and fails if
 one is absent or an unselected package appears.
 
@@ -44,10 +39,11 @@ Reusable panel guidance can still link to those upstream examples; the examples
 remain in the repository but are intentionally absent from the Friends kit.
 All manifest routes and selected starter paths resolve inside the downloaded kit.
 
-The four sports sources live at `packages/sports/diagrams/<slug>/<slug>.spec.json`
-and retain all 14 chapters and 173 steps. The numbered library titles establish
-the reading order; their READMEs link the previous and next arcs. The original
-`season-of-seats` URL remains the first arc. Authoring is desktop-only.
+The older `season-of-seats`, `sell-the-inventory`, `serve-game-night`, and
+`build-next-season` sources remain in `packages/sports/diagrams/` and
+`diagrams/friends/` for maintenance and source-preservation checks. They are not
+published in Canon, copied into deploy assets, exposed as hosted starters, or
+included in the Friends authoring kit. Authoring is desktop-only.
 
 The company config explicitly selects `themes/islanders/theme.json`. That
 overlay owns the extra skin, CSS, logos and authoring guidance. Sports alone
@@ -63,7 +59,8 @@ The standalone `member-campaign`, `group-night`, and `fan-event-rsvp` Canon card
 are retired. Their original files remain in `diagrams/friends/` and their sibling
 package folders for recovery and maintenance; they are not included in the active
 registry or hosted starters. See `packages/sports/diagrams/islanders-marketing/`
-for the consolidated source and checks. The four older sports arcs remain active.
+for the consolidated source and checks. The four older sports arcs are also
+retired from the Friends publishing surfaces while their repository sources remain.
 
 Set `FLOWVIEW_CF_WORKER` in the environment or in ignored
 `deploy/cloudflare/local.env` (see `deploy/cloudflare/local.env.example`).
@@ -81,8 +78,9 @@ cd tools/browser-tests
 npx playwright test -c friends-islanders.config.mjs
 ```
 
-The browser report includes the library, all four opening readers and focused
-arena, heatmap, funnel and card screenshots at a 1440-pixel desktop viewport.
+The browser report includes the two-document library, both retained readers,
+the three marketing tabs, and an explicit reusable UBS Arena fixture at a
+1440-pixel desktop viewport.
 
 `prepare` creates `deploy/cloudflare/site/` and
 `deploy/cloudflare/.generated/wrangler.jsonc` without uploading. Inspect the

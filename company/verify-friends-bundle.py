@@ -11,10 +11,6 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SELECTED = {"science", "sports"}
 STORIES = {
-    "season-of-seats": "packages/sports/diagrams/season-of-seats/season-of-seats.spec.json",
-    "sell-the-inventory": "packages/sports/diagrams/sell-the-inventory/sell-the-inventory.spec.json",
-    "serve-game-night": "packages/sports/diagrams/serve-game-night/serve-game-night.spec.json",
-    "build-next-season": "packages/sports/diagrams/build-next-season/build-next-season.spec.json",
     "nsp15-insertion-evidence": "packages/science/diagrams/biology/nsp15-insertion-evidence/nsp15-insertion-evidence.spec.json",
     "islanders-marketing": "packages/sports/diagrams/islanders-marketing/islanders-marketing.spec.json",
 }
@@ -127,7 +123,7 @@ def main(stage):
             (ROOT / "workbench/diagrams.json").read_bytes(),
             "Staged Canon index differs from selected build")
     require({entry["id"] for entry in index["diagrams"]} == set(STORIES) and
-            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly six active Friends documents")
+            len(index["diagrams"]) == len(STORIES), "Canon index does not contain exactly two active Friends documents")
     hosted = json.loads((stage / "workbench/starters.json").read_text())
     require({path.name for path in (stage / 'diagrams/friends').iterdir()} == set(STORIES),
             'Staged Friends assets include a retired story')
@@ -143,7 +139,7 @@ def main(stage):
                 f"Hosted starter manifest does not expose editable {slug} story")
 
     print("Verified staged Friends workbench: science and sports panels, contracts, recipes, "
-          "built-in and hosted starters, six active Canon documents, and selected-only authoring kit")
+          "built-in and hosted starters, two active Canon documents, and selected-only authoring kit")
 
 
 if __name__ == "__main__":

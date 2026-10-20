@@ -33,6 +33,10 @@ PanelRegistry.extend('state', {
 
 PanelRegistry.extend('state', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-state .preadout{font-size:24px;letter-spacing:-.6px;margin-bottom:13px;overflow-wrap:anywhere}.pt-state .prail{gap:6px}.pt-state .pchip{padding:5px 8px}.pt-state .pchip.cur{box-shadow:inset 0 -2px currentColor}
+`},
     {
       order: 307,
       css: String.raw`.preadout{font:700 20px 'IBM Plex Mono',monospace; margin-bottom:8px;}

@@ -215,6 +215,21 @@ test('SVG motion owns no Canvas, image, observer or JavaScript frame loop', () =
   assert.match(css,/translate\(-18px,10px\)/,'Ambient travel must be visible at desktop scene sizes');
 });
 
+test('screen styling follows shared skins without leaking NSP15 story selectors', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../packages/science/panels/types/nspstory.js'),'utf8');
+  const fingerprint='\.docview:has\\\(#section-green-reporter\\\):has\\\(#section-class-signature\\\):has\\\(#section-origin-map\\\)';
+  assert.match(source,new RegExp(fingerprint+'\\{--nsp-green:#187858'));
+  assert.match(source,new RegExp('\\.docview\\.sk-aurora[^\\n]*:has\\\(#section-green-reporter\\\)[^\\n]+--nsp-softer:#091a24'));
+  assert.match(source,new RegExp('\\.docview\\.sk-islanders:has\\\(#section-green-reporter\\\)[^\\n]+--nsp-softer:#f7fafc'));
+  assert.match(source,/\.nspstory\{--ns-ink:var\(--dink\);--ns-muted:var\(--dtext\)/);
+  assert.match(source,/\.nspstory-screen-frame\{aspect-ratio:760\/410\}/);
+  assert.match(source,/\.nspstory-controls\{[^\n]+background:var\(--ns-paper\)/);
+  assert.match(source,/\.nspstory-wt\{fill:var\(--ns-green\)\}\.nspstory-inactive\{fill:var\(--ns-violet\)\}/);
+  assert.match(source,/\.nspstory-triplet-focus\{fill:var\(--ns-green\);fill-opacity:\.13;/,'The scan highlight stays translucent so every RNA letter remains visible');
+  assert.doesNotMatch(source,/\.pt-nspstory:has\([^\n]+background:#050b13|\.nspstory\[data-scene="(?:reporter|dilution|origin|evidence)"\]\{--ns-ink:/);
+  assert.doesNotMatch(source,/^(?:\.doc-sec:is\(#section-|#section-(?:analysis-ladder|assay-limits|second-virus))/m,'Story section styling needs the complete document fingerprint');
+});
+
 test('Canvas paints synchronously without rAF and retires live reduced-motion listeners', () => {
   const originalRAF=C.requestAnimationFrame;
   C.requestAnimationFrame=undefined;

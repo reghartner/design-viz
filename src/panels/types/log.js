@@ -41,6 +41,10 @@ PanelRegistry.extend('log', {
 
 PanelRegistry.extend('log', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+:where(.pt-log) .plog{height:auto;max-height:240px;min-height:0;scrollbar-width:thin;padding:0}.pt-log .plogline{padding:3px 8px;gap:10px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 12%,transparent)}.pt-log .plogline:nth-child(even){background:color-mix(in srgb,var(--dtext) 3%,transparent)}.pt-log .plogline>span:last-child{min-width:0;overflow-wrap:anywhere}
+`},
     {
       order: 338,
       css: String.raw`.plog{font:500 10.5px/1.7 'IBM Plex Mono',monospace; height:170px; overflow-y:auto;}
@@ -91,7 +95,7 @@ PanelRegistry.extend('log', {
       css: String.raw`@media screen {
 
   body.sk-blueprint .docview .plog{
-    height:148px;
+    height:auto;
     padding:5px 7px;
     border:1px solid #347F9E;
     color:#C5E1EE;
@@ -163,3 +167,5 @@ PanelRegistry.extend('log', {
     },
   },
 });
+
+PanelRegistry.extend('log', {layout: {sectionSizing: { minWidth: 240, preferredWidth: 340, maxWidth: 700, aspectPolicy: 'content', grow: 1 }}});

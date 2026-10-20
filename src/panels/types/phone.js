@@ -256,13 +256,17 @@ PanelRegistry.extend('phone', {
   label: 'Phone',
   since: '0.1.0',
   layout: {
-    sectionSizing: { minWidth: 202, preferredWidth: 210, maxWidth: 250, aspectPolicy: 'intrinsic', grow: 0, contentSelector: '.phoneframe' },
+    sectionSizing: { minWidth: 254, preferredWidth: 270, maxWidth: 320, aspectPolicy: 'intrinsic', grow: 0, contentSelector: '.phoneframe' },
     height: 10,
   },
 });
 
 PanelRegistry.extend('phone', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-phone .phoneframe{width:min(100%,220px);min-height:300px;padding:36px 12px 23px;border-width:3px;border-radius:30px;box-shadow:0 8px 20px #00000014}.pt-phone .phonecards{min-height:210px;gap:8px;padding-top:12px}.pt-phone .phonecard{max-height:76px;padding:9px 10px;border-radius:12px}.pt-phone .phonetitle{font-size:11px;line-height:1.4}.pt-phone .phonetext{font-size:10px;line-height:1.4}.pt-phone .phoneapp{font-size:8px}.pt-phone .phonebrandname{font-size:13px}.pt-phone .phonebadge{top:41px}.pt-phone .phonespeaker{top:10px}.pt-phone .phonestatus{top:20px}
+`},
     {
       order: 429,
       css: String.raw`.phoneframe{position:relative;box-sizing:border-box;width:178px;min-height:252px;margin:0 auto;padding:30px 11px 19px;

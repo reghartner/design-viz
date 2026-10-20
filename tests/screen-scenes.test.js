@@ -14,7 +14,7 @@ function load(extra = {}){
   return ctx;
 }
 const C = load();
-const names = ['person-at-door-night', 'person-through-door', 'doorbell-run-away', 'doorbell-runners', 'package-drop', 'kitchen-fire', 'raccoon-at-night', 'static-noise'];
+const names = ['person-at-door-night', 'person-through-door', 'doorbell-run-away', 'doorbell-runners', 'package-drop', 'kitchen-fire', 'raccoon-at-night', 'driveway-arrival', 'garage-opening', 'side-gate', 'static-noise'];
 const plain = v => JSON.parse(JSON.stringify(v));
 const screenCss = () => [].concat(C.PanelRegistry.get('screen').styles).map(s => typeof s === 'string' ? s : s.css).join('\n');
 function host(){

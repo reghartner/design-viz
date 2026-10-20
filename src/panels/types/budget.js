@@ -145,6 +145,10 @@ PanelRegistry.extend('budget', {
 
 PanelRegistry.extend('budget', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.pt-budget .swmeasure{margin:8px 0 10px;font-variant-numeric:tabular-nums}.pt-budget .swmeasure strong{font-size:27px;letter-spacing:-1px}.pt-budget .swtrack{height:10px}.pt-budget .swthreshold{height:16px}.pt-budget .swdetail{margin-top:8px;line-height:1.5}
+`},
     {
       order: 291,
       css: String.raw`.swmeasure{font:11px/1.6 'IBM Plex Mono',monospace; margin:4px 0 6px;}

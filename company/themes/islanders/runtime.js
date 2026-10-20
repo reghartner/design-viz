@@ -3,7 +3,7 @@ var IslandersBrand = Object.freeze({
   light: /* @theme-asset:light */ "",
   dark: /* @theme-asset:dark */ "",
   story: function (id) {
-    return ['season-of-seats', 'sell-the-inventory', 'serve-game-night', 'build-next-season'].indexOf(id) >= 0;
+    return id === 'islanders-marketing';
   },
   image: function (variant, className) {
     var img = document.createElement('img');

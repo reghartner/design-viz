@@ -7,9 +7,10 @@ temporary viewing preference and takes precedence over the cookie and saved skin
 Live appearance changes update an existing valid theme query and copied links.
 The library, reader and desktop editor share the theme. Authoring is desktop only.
 
-The four sports arcs show official marks on library cards and UBS Arena ice.
-Science stories have no team marks. The marketing document retains its three
-native tabs, phone-shaped content panels and approved alternate paths.
+The marketing document shows the official mark on its library card and retains
+its three native tabs, phone-shaped content panels and approved alternate paths.
+The science story has no team mark. Reusable `seatmap` panels still place the
+approved mark on UBS Arena ice when the Islanders theme is active.
 Rebuild with this company theme before exporting standalone HTML: the theme and
 artwork are embedded for offline use. Enabling the sports package alone does not
 enable this theme or its branding. Artwork provenance is in

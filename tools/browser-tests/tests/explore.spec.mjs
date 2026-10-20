@@ -209,11 +209,11 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
  else for(const panel of arranged)for(const control of utilityControls)expect(overlaps(panel,control)).toBe(false);
  await page.screenshot({path:info.outputPath('stacked-panels.png')});
 });
-test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
+test('panels resize inward to their native minimum, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  const home=page.locator('[data-explore-panel=home]'),handle=home.locator('.explore-window-resize');
  const initial=await rect(home);let r=await rect(handle);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+initial.width-145,r.y+15,{steps:5});await page.mouse.up();
- expect((await rect(home)).width).toBeLessThan(160);const narrow=await rect(home);
+ expect((await rect(home)).width).toBeCloseTo(230,0);const narrow=await rect(home);
  const grip=home.locator('.explore-window-grip');await grip.focus();await page.keyboard.press('ArrowLeft');await expect(home).not.toHaveClass(/explore-stacked/);
  const detached=await rect(home);await grip.press('ArrowLeft');expect((await rect(home)).x).toBeLessThan(detached.x);
  r=await rect(grip);const start=await rect(home);await page.mouse.move(r.x+20,r.y+15);await page.mouse.down();await page.mouse.move(r.x-220,r.y+100,{steps:5});await page.keyboard.press('Escape');await page.mouse.up();expect((await rect(home)).x).toBeCloseTo(start.x,0);

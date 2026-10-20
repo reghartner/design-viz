@@ -349,3 +349,14 @@ test('canonical Tab and implicit page Views declare membership and Explore capab
     const older={...C.features};delete older['document.tab-views'];assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('document.tab-views'));
   }
 });
+
+test('residential clips are detected in camera declarations and carried or transient scene changes',()=>{
+  for(const type of ['screen','security'])for(const scene of ['driveway-arrival','garage-opening','side-gate']){
+    const base={nodes:{a:{}},rows:[['a']],panels:[{id:'cam',type,scene}],steps:[]};
+    assert.ok(C.detect(base).includes('media.residential-clips'));
+    delete base.panels[0].scene;base.steps=[{panels:{cam:{enterOnce:{scene}}}}];
+    assert.ok(C.detect(base).includes('media.residential-clips'));
+    const older={...C.features};delete older['media.residential-clips'];
+    assert.equal(C.check(C.stamp(base),{features:older}).status,'unsupported');
+  }
+});

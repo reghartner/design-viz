@@ -385,6 +385,10 @@ PanelRegistry.extend('trace', {
 
 PanelRegistry.extend('trace', {
   styles: [
+    {order:2300,css:String.raw`
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.tr-metrics{gap:8px}.tr-metrics>div{padding:9px;border:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);border-radius:8px;background:color-mix(in srgb,var(--dtext) 3%,transparent)}.tr-metrics dd{font-size:19px;font-variant-numeric:tabular-nums;margin-top:5px}.tr-selected{padding:12px 0;gap:5px}.tr-picker select{padding:9px;border-color:color-mix(in srgb,var(--dtext) 30%,transparent)}
+`},
     {
       order: 2241,
       css: String.raw`.tr-time{color:var(--dtext);font:12px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
@@ -464,3 +468,5 @@ PanelRegistry.extend('trace', {
     },
   },
 });
+
+PanelRegistry.extend('trace', {layout: {sectionSizing: { minWidth: 280, preferredWidth: 380, maxWidth: 700, aspectPolicy: 'content', grow: 1 }}});

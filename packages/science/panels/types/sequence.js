@@ -499,6 +499,8 @@ body.sk-blueprint .seq-meta{border-radius:2px}
 body.sk-blueprint .seq-cur i{border-radius:2px}
 @media (prefers-reduced-motion: reduce){.seq-cur,.seq-letters .bio-b{transition:none}.seq-letters .seq-new{animation:none}}
 @media print{.bio-b,[class*="bio-tone-"],.seq-cur i,.bio-key i{-webkit-print-color-adjust:exact;print-color-adjust:exact}.seq-rows{overflow:visible}.seq-letters .seq-new{animation:none}}
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.seq-head:not(.seq-head-bare){padding-bottom:9px;margin-bottom:9px}.pt-sequence .bio-legend{padding-top:6px;gap:7px 14px}
 `,
   authoring: {
     initialFields: true,

@@ -508,6 +508,8 @@ p.reads-empty{margin:4px 0;font-size:11.5px;font-style:normal;line-height:1.4}
 .reads-key-clip{background:color-mix(in srgb,var(--dtext) 18%,transparent);opacity:.7;box-shadow:inset 0 0 0 1px var(--sq-line-strong,transparent)}
 body.sk-blueprint :is(.reads-key,.reads-band,.reads-cell){border-radius:0}
 @media print{.reads-scroll{max-height:none;overflow:visible}.reads-cell,.reads-band,.reads-dcell i,.reads-wedge,.reads-lane,.reads-hl{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* Content hierarchy and intrinsic fit; authored state and saved geometry stay authoritative. */
+.reads-head{margin-bottom:10px}.reads-scroll{padding-top:8px;padding-bottom:10px;scrollbar-width:thin}.reads-name{font-weight:600}.reads-panel{--reads-cell:16px}
 `,
   authoring: {
     initialFields: true,

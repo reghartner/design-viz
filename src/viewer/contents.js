@@ -172,14 +172,14 @@ function createReaderContents(ctl,nav,actions,options){
     pageLabel.textContent='Section '+(index+1 || 1)+' of '+(count || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=count-1;
     pager.setAttribute('aria-label',list[0] && list[0].owner?'Document sections':'Sections in selected View');
     toggleCount.textContent=(count || 1)+(count>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
+    // A rebuild keeps keyboard focus on the same marker, so a marker that
+    // navigates (without opening Contents) stays focused.
+    var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusIndex=railList.contains(focused)?Array.from(railList.querySelectorAll('.reader-rail-mark')).indexOf(focused):-1;
     railList.replaceChildren();
     list.forEach(function(part,i){
-      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){
-        // A marker navigates without opening Contents. Navigation rebuilds the
-        // rail, so return focus to this marker's replacement.
-        goPart(part);var replacement=railList.querySelectorAll('.reader-rail-mark')[i];if(replacement)replacement.focus({preventScroll:true});
-      });
+      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);});
       mark.classList.add('reader-rail-mark');if(i<index)mark.classList.add('reader-rail-past');if(i===index)mark.setAttribute('aria-current','page');
+      if(i===focusIndex)mark.focus({preventScroll:true});
     });
     railCount.textContent=(index+1 || 1)+'/'+(count || 1);
   }

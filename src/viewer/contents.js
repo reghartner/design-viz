@@ -4,7 +4,8 @@
 function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[];
-  // Closed Contents leaves a numbered rail; hovering it floats the panel over the page.
+  // Closed Contents leaves a numbered rail; hovering it floats the panel over the page
+  // and clicking a marker goes to that part with Contents still closed.
   var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
@@ -171,10 +172,14 @@ function createReaderContents(ctl,nav,actions,options){
     pageLabel.textContent='Section '+(index+1 || 1)+' of '+(count || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=count-1;
     pager.setAttribute('aria-label',list[0] && list[0].owner?'Document sections':'Sections in selected View');
     toggleCount.textContent=(count || 1)+(count>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
+    // A rebuild keeps keyboard focus on the same marker, so a marker that
+    // navigates (without opening Contents) stays focused.
+    var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusIndex=railList.contains(focused)?Array.from(railList.querySelectorAll('.reader-rail-mark')).indexOf(focused):-1;
     railList.replaceChildren();
     list.forEach(function(part,i){
-      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);setOpen(true,true,true);});
+      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);});
       mark.classList.add('reader-rail-mark');if(i<index)mark.classList.add('reader-rail-past');if(i===index)mark.setAttribute('aria-current','page');
+      if(i===focusIndex)mark.focus({preventScroll:true});
     });
     railCount.textContent=(index+1 || 1)+'/'+(count || 1);
   }

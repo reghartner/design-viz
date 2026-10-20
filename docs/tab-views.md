@@ -21,8 +21,9 @@ pushes the canvas; on phones it overlays it with a scrim and closes after a choi
 With Contents closed on desktop, a 44px rail at the left shows one numbered marker per part
 (the current one filled) and an n/m count; Contents numbers its entries to match. Resting the
 mouse on the rail for a moment shows Contents over the page without moving it, with only the
-current part expanded; it closes when the mouse leaves or on Escape. A marker click goes to that
-part and pins Contents open; the overlay’s **Pin** pins it in place. Phones have no rail.
+current part expanded; it closes when the mouse leaves or on Escape. A marker click (or Enter)
+goes to that part and leaves Contents closed, with focus kept on the marker; the overlay’s **Pin**
+and the Contents toggle pin it open. Phones have no rail.
 Escape closes an open menu first, then Contents, returning focus to its trigger.
 The tree scrolls independently of its pinned theme footer. Zoom is separate from
 Section navigation; phones use the percentage menu at left and Fit at right. In

@@ -338,7 +338,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
   }
 });
 
-/* #622 — closed Contents: labelled toggle, numbered rail with hover overlay and click-to-pin, and a pager over document parts.
+/* #622 — closed Contents: labelled toggle, numbered rail with hover overlay, and a pager over document parts. #681: a marker click navigates only; pinning stays on the toggle and the overlay's Pin.
    A part is a top-level Contents entry: the page's own sections, then each Tab. atlas() has six: Doorbell atlas (page
    section), then five Tabs; "Answer and talk" holds two Views of two sections each, so a per-View pager reads "1 of 2" there.
    row | fixture | assertion (scoped) | rejects
@@ -355,8 +355,9 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    H5 only current part expanded | overlay open on part 2 | .reader-tree-tab aria-expanded = [false,true,false×4] | the pinned all-expanded tree in the overlay
    H6 mouse leave closes after a delay | real mouse move from the marker into the overlay, then to the page centre | crossing into the overlay keeps it open 600ms later; leaving it hides it 150–1000ms after the pointerleave; toggle aria-expanded=false | an overlay that stays until clicked; one that closes the instant the pointer leaves the rail
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
-   K1 click pins | real click on marker 4 while the overlay is open | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; tab label "Smart motion"; pager "Section 4 of 6"; every Contents Tab aria-expanded=true (#607) | a click that only navigates; a pinned panel that keeps the overlay tree
-   K2 keyboard | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=true, pager "Section 5 of 6", focus on the current Contents row inside "Day-one setup" | mouse-only markers; a marker that pins without navigating
+   K1 click navigates only (#681) | real click on marker 4 while the overlay is open | toggle aria-expanded=false; rail visible; marker 4 current, count "4/6"; tab label "Smart motion"; pager "Section 4 of 6"; the hovered panel is still the overlay; the overlay tree expands only part 4 | a marker click that pins Contents open
+   P1 overlay Pin pins | real click on the overlay's "Pin Contents open" | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; every Contents Tab aria-expanded=true (#607) | a pinned panel that keeps the overlay tree
+   K2 keyboard (#681) | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=false, rail visible, pager "Section 5 of 6", marker 5 current and focused | mouse-only markers; a marker that pins Contents; focus lost when the rail redraws
    G1 pager unit | Contents closed on part 4 | pager group "Document sections"; Previous → "Section 3 of 6" with tab label "Answer and talk", marker 3 current, count "3/6" (not "Section 1 of 2"); Previous ×2 → "Section 1 of 6", Previous disabled; Next ×5 → "Section 6 of 6", Next disabled | today's per-View pager
    X1 Explore accepts the rail | Answer map (Explore) with Contents closed | .viewer-diagram-canvas left = rail right | a canvas under the rail
    X2 canvas drag | real mouse down on the canvas, drag onto marker 2, hold 600ms, release | overlay never shown | opening from drags that pass over the rail
@@ -400,7 +401,7 @@ async function expectHoverOverlay(page,root,index){
   expect(await root.locator('#section-overview').boundingBox()).toEqual(before);await expect(root.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
 }
 
-test('#622 closed Contents shows a numbered rail, a hover overlay that pins on click, and a pager over document parts',async({page,server})=>{
+test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks that navigate without pinning (#681), and a pager over document parts',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   const root=await openRaw(page,server,atlas(),'contents-rail'),nav=root.locator('.reader-navigation'),toggle=root.locator('.reader-top>button'),side=root.locator('.reader-contents'),label=root.locator('.reader-page-label'),pager=root.locator('.reader-page-index');
   await expect(side).toBeVisible();await expect(railOf(root)).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','true');
@@ -425,18 +426,22 @@ test('#622 closed Contents shows a numbered rail, a hover overlay that pins on c
   expect(left && hidden,'pointerleave then hide').toBeTruthy();expect(hidden.t-left.t).toBeGreaterThanOrEqual(150);expect(hidden.t-left.t).toBeLessThanOrEqual(1000);
   await marksOf(root).nth(1).hover();await expect(side).toBeVisible();await page.keyboard.press('Escape');await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
   await page.mouse.move(900,500);await expectHoverOverlay(page,root,3);await marksOf(root).nth(3).click();
-  await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).toBeVisible();await expect(side).not.toHaveClass(/reader-contents-overlay/);expect((await side.boundingBox()).x).toBe(navBox.x);await expect(railOf(root)).toBeHidden();
   await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');await expect(label).toHaveText('Section 4 of 6');
+  await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,3);
+  await expect(side).toBeVisible();await expect(side).toHaveClass(/reader-contents-overlay/);expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(['false','false','false','true','false','false']);
+  await side.getByRole('button',{name:'Pin Contents open',exact:true}).click();
+  await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).toBeVisible();await expect(side).not.toHaveClass(/reader-contents-overlay/);expect((await side.boundingBox()).x).toBe(navBox.x);await expect(railOf(root)).toBeHidden();
+  await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(Array(6).fill('true'));
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,3);
   await root.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
   for(let i=0;i<4;i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(4)).toBeFocused();await page.keyboard.press('Enter');
-  await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(label).toHaveText('Section 5 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
-  await expect(root.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab',{hasText:'Day-one setup'})}).locator('[aria-current="page"]:focus')).toHaveCount(1);
+  await expect(label).toHaveText('Section 5 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
+  await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,4);await expect(marksOf(root).nth(4)).toBeFocused();
   await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(label).toHaveText('Section 6 of 6');await root.getByRole('button',{name:'Previous section',exact:true}).click();await root.getByRole('button',{name:'Previous section',exact:true}).click();await expect(label).toHaveText('Section 4 of 6');
-  await closeContents(root);await expectCurrentPart(root,3);
+  await expectCurrentPart(root,3);
   const previous=pager.getByRole('button',{name:'Previous section',exact:true}),next=pager.getByRole('button',{name:'Next section',exact:true});
   await previous.click();await expect(label).toHaveText('Section 3 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Answer and talk');await expect(root.locator('#section-answer')).toBeVisible();await expectCurrentPart(root,2);
   await previous.click();await expect(label).toHaveText('Section 2 of 6');await previous.click();await expect(label).toHaveText('Section 1 of 6');await expect(previous).toBeDisabled();await expectCurrentPart(root,0);

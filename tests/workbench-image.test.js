@@ -152,6 +152,10 @@ test('nginx image publishes central canon membership and replaces a stale librar
     catch(error){if(attempt===19)throw error;await new Promise(resolve=>setTimeout(resolve,100));}
   }
   assert.equal(response.status,200);assert.match(response.headers['cache-control'],/no-cache/);
+  const rootResponse=await probeHttp('http://127.0.0.1:'+port+'/',2000);
+  assert.equal(rootResponse.status,302);assert.equal(rootResponse.headers.location,'/workbench/flowspec.html');
+  const catalogResponse=await probeHttp('http://127.0.0.1:'+port+'/workbench/catalog.json',2000);
+  assert.equal(catalogResponse.status,200);assert.match(catalogResponse.headers['cache-control'],/no-cache/);
   const library=JSON.parse(response.body);assert.equal(library.version,3);
   const expected=structuredClone(spec);expected.page.canon.id='feature';expected.page.canon.kind='canonical';
   assert.equal(library.diagrams[0].spec,undefined);
@@ -184,9 +188,11 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(licenseResponse.status,200);
   assert.equal(licenseResponse.body,fs.readFileSync(path.join(ROOT,'LICENSE'),'utf8'));
   const editorResponse=await probeHttp('http://127.0.0.1:'+port+'/workbench/flowspec.html',2000);
-  assert.equal(editorResponse.status,200);assert.match(editorResponse.body,/id="workbench-welcome"/);
+  assert.equal(editorResponse.status,200);assert.equal(editorResponse.headers['cache-control'],'no-cache');
+  assert.match(editorResponse.body,/id="workbench-welcome"/);
   assert.ok(editorResponse.body.includes("PanelRegistry.define('ticket-board'"),'company overlay panel in the image');
   const viewerResponse=await probeHttp('http://127.0.0.1:'+port+'/template/flowview.html',2000);
-  assert.equal(viewerResponse.status,200);assert.match(viewerResponse.body,/id="flowspec"/);
+  assert.equal(viewerResponse.status,200);assert.equal(viewerResponse.headers['cache-control'],'no-cache');
+  assert.match(viewerResponse.body,/id="flowspec"/);
   assert.deepEqual(JSON.parse(fs.readFileSync(source)),spec);
 });

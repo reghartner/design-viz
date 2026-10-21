@@ -35,15 +35,43 @@ test('Explore geometry acceptance keeps the live model and controller only for t
   const source=JSON.parse(SOURCE),diagram=source.page.sections[0].diagram;
   diagram.layouts=[{id:'engineering',name:'Engineering',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
   p.render(JSON.stringify(source));
-  const page=p.page(),live=page.sections[0].diagram.layouts[0],ctl=p.controller(),adopted=[];
-  ctl.sections=[{number:1,viewport:{viewDefinition:()=>({id:'engineering',presentation:'explore'})},presentation:{viewId:()=> 'engineering',adoptExploreLayout:(id,value)=>{adopted.push([id,plain(value)]);return true;}}}];
+  const page=p.page(),live=page.sections[0].diagram.layouts[0],ctl=p.controller(),adopted=[],menus=[];
+  ctl.sections=[{number:1,viewport:{viewDefinition:()=>({id:'engineering',presentation:'explore'}),snapshotPanelMenu:()=>({id:'engineering',focus:'Shrink panels and controls'}),restorePanelMenu:saved=>{assert.equal(h.outcomes.at(-1).retained,'explore');menus.push(plain(saved));}},presentation:{viewId:()=> 'engineering',adoptExploreLayout:(id,value)=>{adopted.push([id,plain(value)]);return true;}}}];
   const next=structuredClone(source);next.page.sections[0].diagram.layouts[0].exploreLayout={camera:{zoom:1,x:.3,y:.4}};
   const text=JSON.stringify(next,null,2),request={origin:'edit',retention:{exploreLayout:{section:0,id:'engineering'}}};
   const result=p.render(text,request);
   assert.equal(result.ok,true);assert.equal(result.replaced,false);assert.equal(result.retained,'explore');
   assert.equal(p.page(),page);assert.equal(p.controller(),ctl);assert.equal(ctl.dead,false);assert.equal(p.renderedText(),text);
   assert.deepEqual(plain(live.exploreLayout),next.page.sections[0].diagram.layouts[0].exploreLayout);assert.equal(adopted.length,1);
+  assert.deepEqual(menus,[]);result.restorePanelMenu();result.restorePanelMenu();
+  assert.deepEqual(menus,[{id:'engineering',focus:'Shrink panels and controls'}]);
   p.repaint('pastel');assert.equal(ctl.dead,true);assert.deepEqual(plain(p.page()),next.page);
+});
+test('Explore menu restoration follows matching sections after replacement and stops at document boundaries',()=>{
+  for(const origin of ['edit','project','import'])for(const survives of [true,false])for(const stale of [false,true]){
+    const h=harness(),p=h.preview,source=JSON.parse(SOURCE),restored=[];
+    source.page.sections[0].id='original';p.render(JSON.stringify(source));
+    const ctl=p.controller();ctl.sections=[{number:1,viewport:{viewDefinition:()=>null,snapshotPanelMenu:()=>({id:'flow',focus:'Shrink panels and controls'})}}];
+    const render=h.c.renderWorkbenchPreview;
+    h.c.renderWorkbenchPreview=(...args)=>{
+      const next=render(...args);next.sections=[{number:1,viewport:{restorePanelMenu:saved=>{assert.equal(h.outcomes.at(-1).replaced,true);restored.push(plain(saved));}}}];return next;
+    };
+    const next=structuredClone(source);next.page.title='Edited';
+    if(!survives){next.page.sections[0].id='replacement';next.page.sections[0].diagram.nodes.a.title='New content';}
+    const result=p.render(JSON.stringify(next),{origin,retention:{exploreLayout:{section:0,id:'flow'}}});
+    assert.equal(result.ok,true);assert.equal(result.replaced,true);
+    if(stale)p.repaint('pastel');
+    if(result.restorePanelMenu)result.restorePanelMenu();
+    assert.deepEqual(restored,origin==='edit' && survives && !stale?[{id:'flow',focus:'Shrink panels and controls'}]:[]);
+  }
+});
+test('accepted edits restore Panels only after selection hooks complete',()=>{
+  const h=harness(),calls=[];let text=SOURCE;
+  const session=h.c.createBuilderSession({source:{read:()=>text,write:value=>{text=value;}},
+    persistence:{read:()=>({}),save(){},preserve(){},cancel(){},destroy(){}},
+    render:()=>({ok:true,replaced:false,restorePanelMenu:()=>calls.push('menu')}),renderedText:()=>text});
+  assert.equal(session.accept({text:SOURCE+' '},{afterRender:()=>calls.push('selection')}),true);
+  assert.deepEqual(calls,['selection','menu']);
 });
 test('forged Explore hints, unrelated edits and invalid documents cannot bypass normal preview replacement or validation',()=>{
   for(const variant of ['unrelated','inactive','effectiveStandard','differentGeometry','history','invalid','missing','duplicate']){

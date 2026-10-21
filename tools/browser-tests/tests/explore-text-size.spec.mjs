@@ -25,7 +25,7 @@ const player=page=>page.locator('.explore-player');
 async function typeMetrics(page){return page.locator('.explore-stage').evaluate(stage=>{
  const note=stage.querySelector('[data-explore-content=prose]'),controls=stage.querySelector('.explore-player');
  function metric(el,frame){return {logical:parseFloat(getComputedStyle(el).fontSize),physical:parseFloat(getComputedStyle(el).fontSize)*frame.getBoundingClientRect().width/frame.offsetWidth};}
- return {notes:metric(note.querySelector('.sec-text'),note),caption:metric(controls.querySelector('.stepline'),controls),chip:metric(controls.querySelector('.path-chip'),controls),transport:metric(controls.querySelector('.tbtn'),controls),scale:controls.getBoundingClientRect().width/controls.offsetWidth};
+ return {notes:metric(note.querySelector('.sec-text'),note),caption:metric(controls.querySelector('.stepline'),controls.querySelector('.termbar')),chip:metric(controls.querySelector('.path-chip'),controls.querySelector('.termbar')),transport:metric(controls.querySelector('.tbtn'),controls.querySelector('.termbar')),scale:controls.getBoundingClientRect().width/controls.offsetWidth};
 });}
 async function checkControls(page){
  await expect.poll(()=>player(page).evaluate(el=>{
@@ -43,7 +43,7 @@ for(const host of ['reader','native'])for(const placement of ['floating','canvas
  for(const width of [1280,1440,1920]){
   await page.setViewportSize({width,height:1080});await checkControls(page);
   const m=await typeMetrics(page);expect(m.notes.logical).toBe(18);expect(m.caption.logical).toBe(16);expect(m.chip.logical).toBe(13);expect(m.transport.logical).toBe(13);
-  expect(m.caption.physical).toBeCloseTo(16*(placement==='canvas'?m.scale:1),1);expect(m.notes.physical).toBeCloseTo(18*(placement==='canvas'?m.scale:1),1);
+  expect(m.caption.physical).toBeCloseTo(16*(placement==='canvas'?m.scale:.8),1);expect(m.notes.physical).toBeCloseTo(18*(placement==='canvas'?m.scale:1),1);
   await page.screenshot({path:info.outputPath(`${placement}-${width}.png`)});
  }
  if(placement==='canvas'){
@@ -51,7 +51,7 @@ for(const host of ['reader','native'])for(const placement of ['floating','canvas
   expect(fit.caption.logical).toBe(16);expect(fit.caption.physical).toBeCloseTo(16*fit.scale,2);
   await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) out$/,exact:true}).click();const smaller=await typeMetrics(page);expect(smaller.caption.physical).toBeCloseTo(fit.caption.physical*.8,1);
  }else{
-  const before=await typeMetrics(page);await panelsOptions(page,page.locator('.reader-navigation'));await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect(await typeMetrics(page)).toEqual(before);
+  const before=await typeMetrics(page);await panelsOptions(page,page.locator('.reader-navigation'));await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();const after=await typeMetrics(page);expect(after.notes).toEqual(before.notes);for(const key of ['caption','chip','transport']){expect(after[key].logical).toBe(before[key].logical);expect(after[key].physical).toBeCloseTo(before[key].physical*.7/.8,1);}await checkControls(page);
  }
 });
 for(const shared of [true,false])for(const placement of ['floating','canvas'])test(`${shared?'timeline':'matrix'} ${placement} enlarged text fits or scrolls inside narrow frames`,async({page,server})=>{

@@ -71,7 +71,7 @@ its block. Node/edge labels and panel values remain plain text. See
 Each Tab defines **Views** over ordered subsets of its sections. **Standard**
 stacks its member sections; **Explore** shows one member at a time. The editor and
 reader share the same shell: Views across the top, centered Section controls below
-that page through the document’s parts, and a collapsible **Contents** sidebar for Tabs,
+that page through the sections in each Tab’s selected View, and a collapsible **Contents** sidebar for Tabs,
 Views, and Explore members that leaves a numbered section rail when closed. The
 compact app bar keeps the document title visible; on phones, **More project
 actions** contains File, Undo/Redo, Appearance, Preview, Help, and Export. Content stays in

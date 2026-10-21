@@ -299,8 +299,23 @@ function createWorkbenchPreviewController(opts){
       var next=normalize(raw),verdict=validate(next),lint=verdict.errors.length?[]:lintPage(next);
       opts.findings({errors:verdict.errors,warnings:verdict.warnings.concat(lint)});
       if(verdict.errors.length)return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});
-      var retained=retainExplore(next,text,request);if(retained)return retained;
-      return replace(next,text,opts.skin(next),request);
+      // Explore size buttons stay usable across both retained edits and full
+      // preview replacement. Restore only this operation's matching section
+      // and arrangement, after the accepted edit's selection hooks finish
+      // moving its live menu into place. The outcome is consumed synchronously.
+      var menus=request.origin==='edit' && request.retention && request.retention.exploreLayout && page && ctl?workbenchPreviewSections(page):null;
+      if(menus)(ctl.sections || []).forEach(function(rec){if(menus[rec.number-1] && rec.viewport && rec.viewport.snapshotPanelMenu)menus[rec.number-1].panelMenu=rec.viewport.snapshotPanelMenu();});
+      var outcome=retainExplore(next,text,request) || replace(next,text,opts.skin(next),request);
+      if(menus && menus.some(function(section){return section.panelMenu;}) && outcome.ok && ctl){
+        var menuController=ctl,menuPage=page,pendingMenu=true;
+        outcome.restorePanelMenu=function(){
+          if(!pendingMenu)return;pendingMenu=false;
+          if(ctl!==menuController || page!==menuPage || renderedText!==text)return;
+          var matches=matchWorkbenchPreviewSections(menus,workbenchPreviewSections(page));
+          (ctl.sections || []).forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.panelMenu && rec.viewport && rec.viewport.restorePanelMenu)rec.viewport.restorePanelMenu(prior.panelMenu);});
+        };
+      }
+      return outcome;
     },
     repaint:function(skin){
       if(!page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};

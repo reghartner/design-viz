@@ -9,9 +9,9 @@ View has an ordered subset of section references and one presentation:
   active playback group. Contents lists only that View’s members under it.
 
 The reader keeps a stable two-row header: a **Contents · N sections** toggle, active Tab label, visible View choices
-and utilities above centered **‹ Section n of m ›** controls. The pager counts the document’s parts, the
-top-level Contents entries (the page’s own sections, then each Tab), and ‹ › move between parts. A
-document whose Contents has one entry pages through its selected View’s sections instead.
+and utilities above centered **‹ Section n of m ›** controls. The pager counts every section in each Tab’s currently selected View, including the page’s own sections.
+The ‹ › controls follow Tab order and each selected View’s section order and subset, preserving
+the selected View when crossing Tabs. The numbered rail continues to identify top-level Contents entries.
 View choices remain available when Contents is closed; on narrow screens they
 wrap within the first header bar. Arrow keys move between View choices, and
 Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**, with every Tab and View expanded when the page opens; full section titles appear

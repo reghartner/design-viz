@@ -156,7 +156,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   // Notes retain readable text and independent geometry when panels are scaled.
   // Dormant canvas controls sizing must never resize floating panel content.
-  function controlsContentScale(){return (definition && definition.presentation==='explore' || canvasWindow(playerWindow))?1:overlayScale();}
+  function controlsContentScale(){return canvasWindow(playerWindow)?1:overlayScale();}
   function windowScale(w){return w.prose?1:w===playerWindow?overlayScale():floatingOverlayScale();}
   function zoomFloor(){
     if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
@@ -974,6 +974,15 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,refreshChrome:paint,
+    snapshotPanelMenu:function(){
+      var focused=menu.ownerDocument.activeElement;
+      return active && menu.open?{id:definition.id,focus:menu.contains(focused)?focused.getAttribute('aria-label'):null}:null;
+    },
+    restorePanelMenu:function(saved){
+      if(!saved || retired || !active || definition.id!==saved.id || !menu.isConnected)return;
+      menu.open=true;syncNavigationPopover(menu);
+      if(saved.focus){var control=Array.prototype.find.call(menu.querySelectorAll('button,select'),function(el){return el.getAttribute('aria-label')===saved.focus;});if(control && !control.disabled)control.focus({preventScroll:true});}
+    },
     snapshotCanvasState:function(){
       if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);

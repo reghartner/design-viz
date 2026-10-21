@@ -156,6 +156,7 @@ function createBuilderSession(options){
       if(hooks && hooks.beforePublish)hooks.beforePublish();
       options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
+      if(outcome && outcome.restorePanelMenu)outcome.restorePanelMenu();
       return true;
     },
     restoreHistoryText:function(value){

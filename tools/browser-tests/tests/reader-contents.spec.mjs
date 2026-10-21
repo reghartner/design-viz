@@ -18,21 +18,21 @@ async function openRaw(page,server,raw,name='contents'){
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
 test('Contents preserves Standard stacks, ordered Explore members and state through theme changes',async({page,server})=>{
-  // #622: the pager counts the document's parts (two Tabs here), so moves inside a View go through Contents rows.
-  const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  // The pager counts selected View members across Tabs; Contents also selects individual sections.
+  const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 4');
   await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await root.locator('.reader-tree-sections[data-reader-view="full"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
+  await root.locator('.reader-tree-sections[data-reader-view="full"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();const zoom=await root.locator('.reader-zoom-menu>summary').innerText();
   const board=await root.locator('#section-review .board').elementHandle();
   await root.locator('.reader-theme-menu>summary').click();await expect(root.getByRole('menuitemradio')).toHaveText(['Aurora','Pastel','Blueprint','Terminal','Rose','Lavender','Opus Lilac']);
-  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
+  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
   await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();
   await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
-  await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section').nth(2)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section').nth(2)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 4');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
 });
 
 test('Standard Contents exposes ordered section headlines and routes mouse and keyboard without collapsing the stack',async({page,server})=>{
@@ -42,11 +42,11 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
   await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
-  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
-  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');
+  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 3');
 });
 
 test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
@@ -58,7 +58,7 @@ test('desktop Contents expands every View by default and preserves independent d
   await disclosure('full').focus();await page.keyboard.press('Enter');await expect(disclosure('full')).toBeFocused();await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('full')).toHaveAccessibleName('Expand Full story');await expect(sections('full')).toHaveCount(0);await expect(sections('explore')).toHaveCount(3);
   await disclosure('explore').click();await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');await expect(sections('explore')).toHaveCount(0);
   await choose(root,'explore');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
-  await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
+  await page.evaluate(()=>location.hash='d=review&v=explore');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(disclosure('full')).toHaveAttribute('aria-expanded','false');await expect(disclosure('explore')).toHaveAttribute('aria-expanded','false');
   await disclosure('full').click();await disclosure('explore').click();await expect(sections('full')).toHaveCount(3);await expect(sections('explore')).toHaveCount(3);
 });
 
@@ -84,6 +84,28 @@ function twoTabs(){
   reference.defaultView='ref-standard';reference.views=[{id:'ref-standard',name:'Reference pages',presentation:'standard',sections:['reference','glossary']},{id:'ref-explore',name:'Reference map',presentation:'explore',sections:['glossary','reference']}];
   return raw;
 }
+test('section pager follows selected View order and subsets across Tabs in both directions',async({page,server},info)=>{
+  const raw=twoTabs(),[journey,reference]=raw.page.sections[0].tabs;
+  journey.defaultView='subset';reference.defaultView='ref-explore';
+  reference.views.find(view=>view.id==='ref-explore').sections=['glossary'];
+  const root=await openRaw(page,server,raw,'section-pager'),label=root.locator('.reader-page-label');
+  const previous=root.getByRole('button',{name:'Previous section',exact:true}),next=root.getByRole('button',{name:'Next section',exact:true});
+  async function current(id,index,view){
+    await expect(label).toHaveText('Section '+index+' of 3');
+    await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-'+id);
+    await expect(root.locator('.reader-tree-sections[data-reader-view="'+view+'"] .reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section',id);
+    await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view',view);
+  }
+  await current('backstage',1,'subset');await expect(previous).toBeDisabled();
+  await next.click();await current('review',2,'subset');
+  await next.click();await current('glossary',3,'ref-explore');await expect(next).toBeDisabled();await page.screenshot({path:info.outputPath('cross-tab-section-pager.png')});
+  await previous.click();await current('review',2,'subset');
+  await previous.click();await current('backstage',1,'subset');await expect(previous).toBeDisabled();
+  await choose(root,'full');await expect(label).toHaveText('Section 3 of 4');
+  await next.click();await expect(label).toHaveText('Section 4 of 4');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','ref-explore');
+  await previous.click();await expect(label).toHaveText('Section 3 of 4');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','full');
+});
+
 const authored={'Product journey':{full:3,explore:3,subset:2},'Reference':{'ref-standard':2,'ref-explore':2}};
 async function expectAllExpanded(root){
   for(const [label,views] of Object.entries(authored)){
@@ -110,7 +132,7 @@ test('#607 desktop Contents lands with every Tab and View expanded and keeps rea
   await tabRow('Reference').click();await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveText(['Reference pages','Reference map']);
   await disclosure('ref-standard').focus();await page.keyboard.press('Enter');await expect(disclosure('ref-standard')).toHaveAttribute('aria-expanded','false');await expect(sections('ref-standard')).toHaveCount(0);await expect(sections('ref-explore')).toHaveCount(2);
   await disclosure('ref-standard').click();await expect(disclosure('ref-standard')).toHaveAttribute('aria-expanded','true');await expect(sections('ref-standard')).toHaveCount(2);
-  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 5');await expect(tabRow('Reference')).toHaveAttribute('aria-expanded','true');await expect(views('Reference')).toHaveCount(2);
   await group('Reference').locator('.reader-tree-view[data-tab-view="ref-explore"]').click();await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(tabRow('Product journey')).toHaveAttribute('aria-expanded','true');await expect(views('Product journey')).toHaveCount(3);
   await page.goto(server.origin+'/contents-expanded.html#t=reference&d=glossary&v=ref-explore');await page.reload();
   await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(sections('ref-explore').filter({hasText:'Glossary terms'})).toHaveAttribute('aria-current','page');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-glossary');
@@ -165,7 +187,7 @@ test('native Contents themes and destruction are isolated between sibling hosts'
   await choose(one,'explore');await one.locator('.reader-theme-menu>summary').click();await one.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(one.locator('.docview')).toHaveClass(/sk-rose/);await expect(two.locator('.docview')).not.toHaveClass(/sk-rose/);
   const canvas=await one.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.x+canvas.width).toBeLessThanOrEqual(900);
   const nativeRoot=await one.locator('flowview-root').boundingBox(),sidebar=await one.locator('.reader-contents').boundingBox();expect(sidebar.y+sidebar.height).toBe(nativeRoot.y+nativeRoot.height);
-  await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next section',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Section 2 of 2');await expect(one.locator('.reader-navigation')).toHaveCount(0);
+  await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next section',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(one.locator('.reader-navigation')).toHaveCount(0);
 });
 
 
@@ -174,7 +196,7 @@ test('desktop Contents closes on transition to phone and releases its focus trap
   await expect(root.locator('.reader-contents')).toBeVisible();await root.locator('.reader-tree-view[aria-current="page"]').focus();
   await page.setViewportSize({width:390,height:844});
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(toggle).toBeFocused();await expect(root.locator('.reader-scrim')).toBeHidden();
-  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');
   await toggle.click();await expect(root.locator('.reader-contents')).toBeVisible();
   // A height-only resize must preserve a deliberately opened phone overlay.
   await page.setViewportSize({width:390,height:700});await expect(toggle).toHaveAttribute('aria-expanded','true');
@@ -187,11 +209,11 @@ for(const width of [1440,390])test('top Views route with Contents closed and ret
   await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story','Review + Backstage']);
   const full=strip.getByRole('tab',{name:'Full story',exact:true}),subset=strip.getByRole('tab',{name:'Review + Backstage',exact:true});
   await full.focus();await page.keyboard.press('ArrowRight');const explore=strip.getByRole('tab',{name:'Explore story',exact:true});await expect(explore).toBeFocused();
-  await page.evaluate(()=>location.hash='d=review&v=full');await expect(root.locator('#section-review')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');await expect(explore).toBeFocused();await expect(explore).toHaveAttribute('tabindex','0');await expect(full).toHaveAttribute('tabindex','-1');await expect(full).toHaveAttribute('aria-selected','true');await expect(strip.locator('[tabindex="0"]')).toHaveCount(1);
-  await page.evaluate(()=>location.hash='d=build&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await page.evaluate(()=>location.hash='d=review&v=full');await expect(root.locator('#section-review')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(explore).toBeFocused();await expect(explore).toHaveAttribute('tabindex','0');await expect(full).toHaveAttribute('tabindex','-1');await expect(full).toHaveAttribute('aria-selected','true');await expect(strip.locator('[tabindex="0"]')).toHaveCount(1);
+  await page.evaluate(()=>location.hash='d=build&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 4');
   await full.focus();await page.keyboard.press('End');await expect(subset).toBeFocused();await expect(full).toHaveAttribute('aria-selected','true');await page.keyboard.press('Enter');
   await expect(subset).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(root.locator('.reader-contents')).toBeHidden();
-  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');expect(new URL(page.url()).hash).toContain('v=subset');
+  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');expect(new URL(page.url()).hash).toContain('v=subset');
   await page.evaluate(()=>location.hash='d=review&v=subset');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   const step=root.locator('#section-review .stepid'),before=await step.innerText();await page.evaluate(()=>document.body.classList.add('presenting'));
   await subset.focus();await page.keyboard.press('ArrowLeft');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);
@@ -338,12 +360,12 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
   }
 });
 
-/* #622 — closed Contents: labelled toggle, numbered rail with hover overlay, and a pager over document parts. #681: a marker click navigates only; pinning stays on the toggle and the overlay's Pin.
+/* #622 — closed Contents: labelled toggle, numbered rail with hover overlay, and a pager over actual sections. #681: a marker click navigates only; pinning stays on the toggle and the overlay's Pin.
    A part is a top-level Contents entry: the page's own sections, then each Tab. atlas() has six: Doorbell atlas (page
-   section), then five Tabs; "Answer and talk" holds two Views of two sections each, so a per-View pager reads "1 of 2" there.
+   section), then five Tabs; "Answer and talk" holds two Views of two sections each, so the pager counts seven actual sections while the rail has six markers.
    row | fixture | assertion (scoped) | rejects
    P0 precondition | atlas(), 1440x900, no hash | .reader-contents visible, .reader-rail hidden, toggle aria-expanded=true; the reader lands on the first Tab (engine default activeTarget), so part 2 | a test that starts with Contents already closed
-   A1 labelled toggle | same | .reader-top>button text = "Contents · 6 sections"; accessible name stays "Close Contents"/"Open Contents" | a bare ☰ icon; a count of sections in the current View
+   A1 labelled toggle | same | .reader-top>button text = "Contents · 7 sections"; accessible name stays "Close Contents"/"Open Contents" | a bare ☰ icon; a count of Tabs instead of actual sections
    R1 rail shown when closed | real click on the toggle | .reader-rail visible, 44px wide, left edge = navigation left; ends at the viewport bottom | no rail; a rail that stays when Contents is pinned
    R2 markers are buttons | same | rail buttons text = 1..6; each button's accessible name = that part's Contents title, in order | unnamed/number-only markers; markers for sections of one View
    R3 current + progress | same | exactly one marker aria-current=page (marker 2, the landing Tab); .reader-rail-count = "2/6" | no current marker; a 0-based or per-View count
@@ -355,18 +377,18 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    H5 only current part expanded | overlay open on part 2 | .reader-tree-tab aria-expanded = [false,true,false×4] | the pinned all-expanded tree in the overlay
    H6 mouse leave closes after a delay | real mouse move from the marker into the overlay, then to the page centre | crossing into the overlay keeps it open 600ms later; leaving it hides it 150–1000ms after the pointerleave; toggle aria-expanded=false | an overlay that stays until clicked; one that closes the instant the pointer leaves the rail
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
-   K1 click navigates only (#681) | real click on marker 4 while the overlay is open | toggle aria-expanded=false; rail visible; marker 4 current, count "4/6"; tab label "Smart motion"; pager "Section 4 of 6"; the hovered panel is still the overlay; the overlay tree expands only part 4 | a marker click that pins Contents open
+   K1 click navigates only (#681) | real click on marker 4 while the overlay is open | toggle aria-expanded=false; rail visible; marker 4 current, count "4/6"; tab label "Smart motion"; pager "Section 5 of 7"; the hovered panel is still the overlay; the overlay tree expands only part 4 | a marker click that pins Contents open
    P1 overlay Pin pins | real click on the overlay's "Pin Contents open" | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; every Contents Tab aria-expanded=true (#607) | a pinned panel that keeps the overlay tree
-   K2 keyboard (#681) | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=false, rail visible, pager "Section 5 of 6", marker 5 current and focused | mouse-only markers; a marker that pins Contents; focus lost when the rail redraws
-   G1 pager unit | Contents closed on part 4 | pager group "Document sections"; Previous → "Section 3 of 6" with tab label "Answer and talk", marker 3 current, count "3/6" (not "Section 1 of 2"); Previous ×2 → "Section 1 of 6", Previous disabled; Next ×5 → "Section 6 of 6", Next disabled | today's per-View pager
+   K2 keyboard (#681) | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=false, rail visible, pager "Section 6 of 7", marker 5 current and focused | mouse-only markers; a marker that pins Contents; focus lost when the rail redraws
+   G1 pager unit | Contents closed on part 4 | pager group "Document sections"; Previous → "Section 4 of 7" with tab label "Answer and talk", marker 3 current, count "3/6" (not "Section 1 of 2"); Previous ×3 → "Section 1 of 7", Previous disabled; Next ×6 → "Section 7 of 7", Next disabled | today's per-View pager
    X1 Explore accepts the rail | Answer map (Explore) with Contents closed | .viewer-diagram-canvas left = rail right | a canvas under the rail
    X2 canvas drag | real mouse down on the canvas, drag onto marker 2, hold 600ms, release | overlay never shown | opening from drags that pass over the rail
-   D1 deep link | fresh load of #d=setup | pager "Section 5 of 6"; after closing, marker 5 current and count "5/6" | parts counted from the landing default instead of the link
-   D2 hash change | real same-document navigation to #d=talk&v=answer-explore | pager "Section 3 of 6", #section-talk is the Explore section | hashchange that leaves the pager on the old part
-   D3 cross-document link | second document with a handoff to contents-rail section setup; real click on its new-tab link | opened tab: tab label "Day-one setup", pager "Section 5 of 6" | a cross-document landing on part 1
-   B1 Backstage native | atlas() through nativeViewer.js in a 1200x800 shadow host | rail visible inside the host with the six named markers; hover opens the overlay beside the rail without moving the page; Escape closes; the overlay's "Pin Contents open" pins (toggle expanded, rail hidden); Next → "Section 3 of 6" | fixing only the standalone viewer
-   W1 Workbench reader | atlas() pasted into workbench.html | after closing Contents: rail with six named markers left of the Workbench tool rail; hover opens the overlay; pager "Section 1 of 6", Next → "Section 2 of 6" with marker 2 current | fixing only the viewer bundle
-   N1 phone hides the rail | atlas() at 390x844 (read-only mobile) | .reader-rail hidden; #section-overview left < 44; Next → "Section 3 of 6"; widening to 1440 shows the rail with its single current marker = the pager's part | a rail covering phone content
+   D1 deep link | fresh load of #d=setup | pager "Section 6 of 7"; after closing, marker 5 current and count "5/6" | parts counted from the landing default instead of the link
+   D2 hash change | real same-document navigation to #d=talk&v=answer-explore | pager "Section 4 of 7", #section-talk is the Explore section | hashchange that leaves the pager on the old part
+   D3 cross-document link | second document with a handoff to contents-rail section setup; real click on its new-tab link | opened tab: tab label "Day-one setup", pager "Section 6 of 7" | a cross-document landing on part 1
+   B1 Backstage native | atlas() through nativeViewer.js in a 1200x800 shadow host | rail visible inside the host with the six named markers; hover opens the overlay beside the rail without moving the page; Escape closes; the overlay's "Pin Contents open" pins (toggle expanded, rail hidden); Next → "Section 3 of 7" | fixing only the standalone viewer
+   W1 Workbench reader | atlas() pasted into workbench.html | after closing Contents: rail with six named markers left of the Workbench tool rail; hover opens the overlay; pager "Section 1 of 7", Next → "Section 2 of 7" with marker 2 current | fixing only the viewer bundle
+   N1 phone hides the rail | atlas() at 390x844 (read-only mobile) | .reader-rail hidden; #section-overview left < 44; Next → "Section 3 of 7"; widening to 1440 shows the rail with its single current marker = the pager's part | a rail covering phone content
    M1 many parts scroll | 30 one-section prose Tabs at 1440x900, Tab link #t=part-28, Contents closed | rail bottom = 900; .reader-rail-list scrollHeight > clientHeight; marker 28 is current and its box lies inside the list's box; the rail's own .reader-rail-count reads "28/30" and its box lies inside the rail's box | a rail that overflows the window or hides the current marker off-list
    C1 current marker contrast | every theme in the picker at 1440, Contents closed | current marker text vs its own filled background >= 4.5:1 | accent-on-accent or dark-on-dark text in the dark skins */
 function atlas(skin='pastel'){
@@ -401,13 +423,13 @@ async function expectHoverOverlay(page,root,index){
   expect(await root.locator('#section-overview').boundingBox()).toEqual(before);await expect(root.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
 }
 
-test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks that navigate without pinning (#681), and a pager over document parts',async({page,server})=>{
+test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks that navigate without pinning (#681), and a pager over actual sections',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   const root=await openRaw(page,server,atlas(),'contents-rail'),nav=root.locator('.reader-navigation'),toggle=root.locator('.reader-top>button'),side=root.locator('.reader-contents'),label=root.locator('.reader-page-label'),pager=root.locator('.reader-page-index');
   await expect(side).toBeVisible();await expect(railOf(root)).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','true');
-  await expect(toggle).toHaveText(/^Contents\s*·\s*6 sections$/);await expect(toggle).toHaveAccessibleName('Close Contents');
+  await expect(toggle).toHaveText(/^Contents\s*·\s*7 sections$/);await expect(toggle).toHaveAccessibleName('Close Contents');
   // The engine's landing target is the first Tab, so a page with its own section above the Tabs lands on part 2.
-  await expect(pager).toHaveAttribute('aria-label','Document sections');await expect(label).toHaveText('Section 2 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('The doorbell moment');
+  await expect(pager).toHaveAttribute('aria-label','Document sections');await expect(label).toHaveText('Section 2 of 7');await expect(root.locator('.reader-tab-label')).toHaveText('The doorbell moment');
   await closeContents(root);await expect(toggle).toHaveAccessibleName('Open Contents');
   const navBox=await nav.boundingBox(),rail=await railOf(root).boundingBox();
   expect(rail.width).toBe(44);expect(rail.x).toBe(navBox.x);expect(rail.y).toBe(navBox.y+navBox.height);expect(rail.y+rail.height).toBe(900);
@@ -426,7 +448,7 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   expect(left && hidden,'pointerleave then hide').toBeTruthy();expect(hidden.t-left.t).toBeGreaterThanOrEqual(150);expect(hidden.t-left.t).toBeLessThanOrEqual(1000);
   await marksOf(root).nth(1).hover();await expect(side).toBeVisible();await page.keyboard.press('Escape');await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
   await page.mouse.move(900,500);await expectHoverOverlay(page,root,3);await marksOf(root).nth(3).click();
-  await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');await expect(label).toHaveText('Section 4 of 6');
+  await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');await expect(label).toHaveText('Section 5 of 7');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,3);
   await expect(side).toBeVisible();await expect(side).toHaveClass(/reader-contents-overlay/);expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(['false','false','false','true','false','false']);
   await side.getByRole('button',{name:'Pin Contents open',exact:true}).click();
@@ -438,25 +460,25 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await closeContents(root);await expectCurrentPart(root,3);
   await root.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
   for(let i=0;i<4;i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(4)).toBeFocused();await page.keyboard.press('Enter');
-  await expect(label).toHaveText('Section 5 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
+  await expect(label).toHaveText('Section 6 of 7');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,4);await expect(marksOf(root).nth(4)).toBeFocused();
-  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(label).toHaveText('Section 6 of 6');await root.getByRole('button',{name:'Previous section',exact:true}).click();await root.getByRole('button',{name:'Previous section',exact:true}).click();await expect(label).toHaveText('Section 4 of 6');
+  await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(label).toHaveText('Section 7 of 7');await root.getByRole('button',{name:'Previous section',exact:true}).click();await root.getByRole('button',{name:'Previous section',exact:true}).click();await expect(label).toHaveText('Section 5 of 7');
   await expectCurrentPart(root,3);
   const previous=pager.getByRole('button',{name:'Previous section',exact:true}),next=pager.getByRole('button',{name:'Next section',exact:true});
-  await previous.click();await expect(label).toHaveText('Section 3 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Answer and talk');await expect(root.locator('#section-answer')).toBeVisible();await expectCurrentPart(root,2);
-  await previous.click();await expect(label).toHaveText('Section 2 of 6');await previous.click();await expect(label).toHaveText('Section 1 of 6');await expect(previous).toBeDisabled();await expectCurrentPart(root,0);
-  for(let i=2;i<=6;i++){await next.click();await expect(label).toHaveText('Section '+i+' of 6');}
+  await previous.click();await expect(label).toHaveText('Section 4 of 7');await expect(root.locator('.reader-tab-label')).toHaveText('Answer and talk');await expect(root.locator('#section-talk')).toBeVisible();await expectCurrentPart(root,2);
+  await previous.click();await expect(label).toHaveText('Section 3 of 7');await expectCurrentPart(root,2);await previous.click();await expect(label).toHaveText('Section 2 of 7');await previous.click();await expect(label).toHaveText('Section 1 of 7');await expect(previous).toBeDisabled();await expectCurrentPart(root,0);
+  for(let i=2;i<=7;i++){await next.click();await expect(label).toHaveText('Section '+i+' of 7');}
   await expect(next).toBeDisabled();await expect(root.locator('.reader-tab-label')).toHaveText('Offline recovery');await expectCurrentPart(root,5);
-  await page.evaluate(()=>location.hash='d=talk&v=answer-explore');await expect(label).toHaveText('Section 3 of 6');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-talk');await expectCurrentPart(root,2);
+  await page.evaluate(()=>location.hash='d=talk&v=answer-explore');await expect(label).toHaveText('Section 4 of 7');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-talk');await expectCurrentPart(root,2);
   const canvas=await root.locator('.viewer-diagram-canvas').boundingBox(),railNow=await railOf(root).boundingBox();expect(canvas.x).toBe(railNow.x+railNow.width);
   const second=await marksOf(root).nth(1).boundingBox();await takeLog(nav);
   await page.mouse.move(canvas.x+canvas.width/2,canvas.y+canvas.height/2);await page.mouse.down();await page.mouse.move(second.x+second.width/2,second.y+second.height/2,{steps:12});await page.waitForTimeout(600);await page.mouse.up();
   await expectNeverShown(page,nav,400);await page.mouse.move(900,500);
-  await page.goto(server.origin+'/contents-rail.html#d=setup');await page.reload();await expect(label).toHaveText('Section 5 of 6');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
+  await page.goto(server.origin+'/contents-rail.html#d=setup');await page.reload();await expect(label).toHaveText('Section 6 of 7');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
   await closeContents(root);await expectCurrentPart(root,4);
   const linking={page:{title:'Rail linking document',documentLinks:{id:'rail-linking',siteBaseUrl:server.origin+'/rail-linking.html'},sections:[{id:'source',heading:'Source',diagram:{nodes:{a:{title:'Setup link',handoff:{spec:'contents-rail',section:'setup',siteBaseUrl:server.origin+'/contents-rail.html'}}},rows:[['a']]}}]}};
   await openRaw(page,server,linking,'rail-linking');const opened=page.context().waitForEvent('page');await page.getByRole('link',{name:'Open Setup link diagram (new tab)',exact:true}).click();const linked=await opened;
-  const target=linked.locator('#docview');await expect(target.locator('.reader-tab-label')).toHaveText('Day-one setup');await expect(target.locator('.reader-page-label')).toHaveText('Section 5 of 6');await linked.close();
+  const target=linked.locator('#docview');await expect(target.locator('.reader-tab-label')).toHaveText('Day-one setup');await expect(target.locator('.reader-page-label')).toHaveText('Section 6 of 7');await linked.close();
 });
 
 test('#622 a long document scrolls its rail and keeps the current marker in view',async({page,server})=>{
@@ -479,33 +501,33 @@ test('#622 Backstage native reader shows the rail, hover overlay, pin and part p
   await writeFile(path.join(server.root,'rail-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./rail-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/rail-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.one=mount(document.querySelector('#one'),raw);},atlas());
   const native=page.locator('#one'),host=await native.boundingBox(),toggle=native.locator('.reader-top>button'),side=native.locator('.reader-contents');
-  await expect(side).toBeVisible();await expect(toggle).toHaveText(/^Contents\s*·\s*6 sections$/);await closeContents(native);
+  await expect(side).toBeVisible();await expect(toggle).toHaveText(/^Contents\s*·\s*7 sections$/);await closeContents(native);
   const rail=await railOf(native).boundingBox();expect(rail.x).toBeGreaterThanOrEqual(host.x);expect(rail.y+rail.height).toBeLessThanOrEqual(host.y+host.height);expect(rail.width).toBe(44);
   await expectRailMarkers(native);await expectCurrentPart(native,1);
   await watchOverlay(native.locator('.reader-navigation'));await expectHoverOverlay(page,native,1);
   await page.keyboard.press('Escape');await expect(side).toBeHidden();
   await page.mouse.move(900,500);await marksOf(native).nth(2).hover();await expect(side).toBeVisible();
   await side.getByRole('button',{name:'Pin Contents open',exact:true}).click();await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).not.toHaveClass(/reader-contents-overlay/);await expect(railOf(native)).toBeHidden();
-  await native.getByRole('button',{name:'Next section',exact:true}).click();await expect(native.locator('.reader-page-label')).toHaveText('Section 3 of 6');await expect(native.locator('.reader-tab-label')).toHaveText('Answer and talk');
+  await native.getByRole('button',{name:'Next section',exact:true}).click();await expect(native.locator('.reader-page-label')).toHaveText('Section 3 of 7');await expect(native.locator('.reader-tab-label')).toHaveText('Answer and talk');
 });
 
 test('#622 Workbench reader shows the rail beside its tool rail and pages through document parts',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(atlas(),null,2));await closeTools(page);
   const root=page.locator('#docview'),nav=root.locator('.explore-navigation');await expect(nav.locator('.reader-contents')).toBeVisible();
-  await expect(nav.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*6 sections$/);await closeContents(root);
+  await expect(nav.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*7 sections$/);await closeContents(root);
   await expectRailMarkers(root);await expectCurrentPart(root,0);
   const rail=await railOf(root).boundingBox(),tools=await page.locator('.workspace-rail').boundingBox();expect(tools.x).toBeGreaterThanOrEqual(rail.x+rail.width);
   await page.mouse.move(900,500);await marksOf(root).nth(1).hover();await expect(nav.locator('.reader-contents')).toBeVisible();await expect(nav.locator('.reader-contents')).toHaveClass(/reader-contents-overlay/);await page.mouse.move(900,500);await expect(nav.locator('.reader-contents')).toBeHidden();
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 6');await nav.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 6');await expectCurrentPart(root,1);
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 7');await nav.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 7');await expectCurrentPart(root,1);
 });
 
 test('#622 the rail is hidden at the read-only phone width and its current marker stays legible in every theme',async({page,server})=>{
   await page.setViewportSize({width:390,height:844});const root=await openRaw(page,server,atlas(),'contents-rail-phone'),toggle=root.locator('.reader-top>button');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeHidden();expect((await root.locator('#section-overview').boundingBox()).x).toBeLessThan(44);
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 6');await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 6');await expect(railOf(root)).toBeHidden();
-  // Resizing re-runs scroll tracking, so check the rail against whichever part the pager reports.
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 7');await root.getByRole('button',{name:'Next section',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 7');await expect(railOf(root)).toBeHidden();
+  // Resizing re-runs scroll tracking; the rail still identifies the selected Tab.
   await page.setViewportSize({width:1440,height:900});await expect(railOf(root)).toBeVisible();
-  await expect.poll(async()=>{const part=(await root.locator('.reader-page-label').innerText()).match(/^Section (\d+) of 6$/),marks=await railOf(root).locator('[aria-current="page"]').allInnerTexts();return !!part && marks.length===1 && marks[0]===part[1];}).toBe(true);
+  await expect.poll(async()=>{const current=railOf(root).locator('[aria-current="page"]');return await current.count()===1 && await current.getAttribute('aria-label')===await root.locator('.reader-tab-label').innerText();}).toBe(true);
   const contrast=locator=>locator.evaluate(el=>{
     const rgba=v=>{const m=v.match(/[\d.]+/g).map(Number),scale=v.startsWith('color(')?255:1;return{r:m[0]*scale,g:m[1]*scale,b:m[2]*scale,a:m.length>3?m[3]:1};};
     const over=(top,base)=>({r:top.r*top.a+base.r*(1-top.a),g:top.g*top.a+base.g*(1-top.a),b:top.b*top.a+base.b*(1-top.a),a:1});

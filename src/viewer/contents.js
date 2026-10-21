@@ -155,7 +155,7 @@ function createReaderContents(ctl,nav,actions,options){
     if(focusKey){var target=Array.from(tree.querySelectorAll('[data-reader-key]')).find(function(el){return el.getAttribute('data-reader-key')===focusKey;});if(target)target.focus({preventScroll:true});}
   }
   /* A part is a top-level Contents entry: the page's own sections, then each
-     Tab. A document with a single entry pages through its selected View. */
+     Tab. With a single entry the rail lists its selected View’s sections. */
   function topParts(){var embed=embedded();return (ctl.views?ctl.views.owners:[]).filter(function(item){return item.views.length && !(embed && ctl.views.owner(embed)!==item);});}
   function parts(){
     var owners=topParts();
@@ -166,12 +166,19 @@ function createReaderContents(ctl,nav,actions,options){
     if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
     else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
   }
-  function pageBy(delta){var list=parts(),target=list[list.findIndex(function(part){return part.current;})+delta];if(target)goPart(target);}
+  // The rail identifies top-level parts; the pager visits every section in
+  // each part's selected View, including its authored order and subset.
+  function pages(){
+    var embed=embedded();
+    return topParts().flatMap(function(item){return (item.current?item.current.members:[]).filter(function(member){return !embed || member.record.runtime===embed;}).map(function(member){return {owner:item,rec:member.record.runtime};});});
+  }
+  function pageBy(delta){var list=pages(),target=list[list.findIndex(function(page){return page.rec===current;})+delta];if(target)choose(target.owner,target.owner.current,target.rec,true);}
   function drawParts(){
+    var sections=pages(),sectionIndex=sections.findIndex(function(page){return page.rec===current;}),sectionCount=sections.length;
+    pageLabel.textContent='Section '+(sectionIndex+1 || 1)+' of '+(sectionCount || 1);previous.disabled=sectionIndex<=0;next.disabled=sectionIndex<0 || sectionIndex>=sectionCount-1;
+    pager.setAttribute('aria-label',topParts().length>1?'Document sections':'Sections in selected View');
     var list=parts(),index=list.findIndex(function(part){return part.current;}),count=list.length;partCount=count;
-    pageLabel.textContent='Section '+(index+1 || 1)+' of '+(count || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=count-1;
-    pager.setAttribute('aria-label',list[0] && list[0].owner?'Document sections':'Sections in selected View');
-    toggleCount.textContent=(count || 1)+(count>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
+    toggleCount.textContent=(sectionCount || 1)+(sectionCount>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
     // A rebuild keeps keyboard focus on the same marker, so a marker that
     // navigates (without opening Contents) stays focused.
     var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusIndex=railList.contains(focused)?Array.from(railList.querySelectorAll('.reader-rail-mark')).indexOf(focused):-1;

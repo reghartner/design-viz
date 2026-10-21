@@ -33,10 +33,9 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   await panelsOptions(page);const zoom=page.locator('.explore-overlay-zoom');await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
   await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
   await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
-  // Frame fitting respects the rail and readable controls text. Panels still
-  // scale their content; controls retain their physical text size.
+  // Floating panel and step-control content scale independently of the camera.
   expect((await size(panel(page))).w).toBeCloseTo(start.w*.9,0);expect((await size(player(page))).h).toBeLessThanOrEqual(steps.h);
-  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(1,2);
+  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(.9,2);
   expect((await size(player(page))).w).toBeGreaterThan(steps.w);
   expect(await graph(page).boundingBox()).toEqual(startGraph);
   const content=await panel(page).locator('.explore-window-body').evaluate(el=>({logical:el.offsetWidth,visual:el.getBoundingClientRect().width}));expect(content.visual/content.logical).toBeCloseTo(.9,2);
@@ -73,6 +72,28 @@ test('pristine layouts respond to stage width while reset and first geometry sav
   expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(1);
   await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');
 });
+for(const automatic of [false,true])test(`workbench ${automatic?'automatic':'saved'} Panels size controls remain open for repeated edits`,async({page,server},info)=>{
+  const raw=fixture(.75),d=raw.page.sections[0].diagram;
+  if(automatic){delete d.layouts;delete d.defaultLayout;raw.page.views=[{id:'canvas',name:'Canvas',presentation:'explore',sections:['doorbell']}];raw.page.defaultView='canvas';}
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await page.evaluate(()=>document.fonts.ready);await panelsOptions(page);
+  const menu=page.locator('#docview .explore-panel-menu').filter({visible:true}),zoom=menu.locator('.explore-overlay-zoom'),source=page.locator('#src');
+  const graphBefore=await graph(page).boundingBox(),before=await source.inputValue(),initial=Number((await zoom.locator('.explore-overlay-value').innerText()).replace('%',''));
+  const shrink=zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}),grow=zoom.getByRole('button',{name:'Enlarge panels and controls',exact:true}),reset=zoom.getByRole('button',{name:'Reset panels and controls size',exact:true});
+  let afterFirst;
+  for(const [button,percent] of [[shrink,initial-10],[shrink,initial-20],[grow,initial-10],[reset,100]]){
+    await button.click();await expect(menu).toHaveAttribute('open','');await expect(button).toBeVisible();await expect(button).toBeFocused();await expect(reset).toHaveText(percent+'%');
+    expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(percent/100,2);
+    expect(await graph(page).boundingBox()).toEqual(graphBefore);
+    afterFirst??=await source.inputValue();
+    if(percent===initial-20)await page.screenshot({path:info.outputPath('repeated-shrink-menu-open.png')});
+  }
+  const after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(afterFirst);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
+  for(let i=0;i<4;i++)await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
+  await panelsOptions(page);await shrink.click();await expect(menu).toHaveAttribute('open','');
+  // Changing View retires the open menu instead of a delayed callback reopening it.
+  if(!automatic){await chooseView(page,'Home story');await expect(page.locator('#docview .explore-panel-menu[open]')).toHaveCount(0);}
+});
+
 test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view switches and HTML export',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(.75),null,2));
   const source=()=>page.locator('#src').inputValue(),readout=page.locator('#docview .explore-navigation .explore-overlay-value');await panelsOptions(page);
@@ -82,7 +103,7 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   const scaled=await source();expect(JSON.parse(scaled).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(.65);
   expect((await size(panel(page))).w).toBeCloseTo(width*.65/.75,0);expect(await graph(page).boundingBox()).toEqual(graphBefore);
   expect((await size(player(page))).w).toBeCloseTo(savedControls.w,0);expect((await size(player(page))).h).toBeLessThanOrEqual(savedControls.h);
-  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(1,2);
+  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(.65,2);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(readout).toHaveText('75%');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(scaled);await expect(readout).toHaveText('65%');
   await panel(page).locator('.explore-window-grip').press('ArrowLeft');

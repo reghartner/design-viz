@@ -33,7 +33,7 @@ var TOUR_DEFAULT_CONFIG = {
       secondary: [{target: {selector: '.reader-tree-views:has([aria-current="page"])', within: 'page'}}],
       copy: {
         heading: 'Choose a View',
-        body: 'Open Contents to choose a Tab and View. Standard stacks the View’s sections; Explore shows one at a time. Use ‹ › to move between the document’s sections, or the titles in Contents to move within the current View. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
+        body: 'Open Contents to choose a Tab and View. Standard stacks the View’s sections; Explore shows one at a time. Use ‹ › to move through each Tab’s selected View in section order, or choose a section title in Contents. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
       }
     },
     {

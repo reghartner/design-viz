@@ -166,17 +166,17 @@ function createReaderContents(ctl,nav,actions,options){
     if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
     else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
   }
-  // The rail identifies top-level parts; the pager visits every section in
-  // each part's selected View, including its authored order and subset.
-  function pages(){
-    var embed=embedded();
-    return topParts().flatMap(function(item){return (item.current?item.current.members:[]).filter(function(member){return !embed || member.record.runtime===embed;}).map(function(member){return {owner:item,rec:member.record.runtime};});});
+  // Pager order and labels use each distinct navigable section once in authored
+  // document order. A View can reorder or omit sections without renumbering it.
+  function documentSections(){
+    var embed=embedded();if(embed)return [{owner:ctl.views && ctl.views.owner(embed),rec:embed}];
+    return ctl.sections.filter(function(rec){var item=ctl.views && ctl.views.owner(rec);return !rec.detailOnly && item && item.views.some(function(definition){return definition.members.some(function(member){return member.record.runtime===rec;});});}).map(function(rec){return {owner:ctl.views.owner(rec),rec:rec};});
   }
-  function pageBy(delta){var list=pages(),target=list[list.findIndex(function(page){return page.rec===current;})+delta];if(target)choose(target.owner,target.owner.current,target.rec,true);}
+  function pageBy(delta){var list=documentSections(),target=list[list.findIndex(function(page){return page.rec===current;})+delta];if(target){var definition=target.owner.current;if(!definition.members.some(function(member){return member.record.runtime===target.rec;}))definition=target.owner.views.find(function(view){return view.members.some(function(member){return member.record.runtime===target.rec;});});if(definition)choose(target.owner,definition,target.rec,true);}}
   function drawParts(){
-    var sections=pages(),sectionIndex=sections.findIndex(function(page){return page.rec===current;}),sectionCount=sections.length;
+    var sections=documentSections(),sectionIndex=sections.findIndex(function(page){return page.rec===current;}),sectionCount=sections.length;
     pageLabel.textContent='Section '+(sectionIndex+1 || 1)+' of '+(sectionCount || 1);previous.disabled=sectionIndex<=0;next.disabled=sectionIndex<0 || sectionIndex>=sectionCount-1;
-    pager.setAttribute('aria-label',topParts().length>1?'Document sections':'Sections in selected View');
+    pager.setAttribute('aria-label','Document sections');
     var list=parts(),index=list.findIndex(function(part){return part.current;}),count=list.length;partCount=count;
     toggleCount.textContent=(sectionCount || 1)+(sectionCount>1?' sections':' section');toggle.setAttribute('aria-description',toggleCount.textContent);
     // A rebuild keeps keyboard focus on the same marker, so a marker that

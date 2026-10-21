@@ -103,3 +103,14 @@ test('formatting selects inserted content, escapes code delimiters and rejects u
  const link=C.proseFormatEdit('Docs',0,4,'link','https://example.org/api');assert.equal(link.text,'[Docs](https://example.org/api)');
  for(const url of ['javascript:alert(1)','https://example.org/a b','https://example.org/a)'])assert.ok(C.proseFormatEdit('Docs',0,4,'link',url).error);
 });
+
+test('inline list Enter continues indentation, exits empty markers and leaves code/selection native',()=>{
+ const enter=value=>JSON.parse(JSON.stringify(C.inlineProseEnter(value,value.length,value.length)));
+ assert.deepEqual(enter('- first'),{start:7,end:7,text:'\n- '});
+ assert.deepEqual(enter('  + nested'),{start:10,end:10,text:'\n  + '});
+ assert.deepEqual(enter('- first\n- '),{start:8,end:10,text:''});
+ assert.equal(enter('```js\n- literal'),null);
+ assert.equal(enter('````\n```\n- literal'),null);
+ assert.deepEqual(enter('```\nx\n```\n* next'),{start:16,end:16,text:'\n* '});
+ assert.equal(C.inlineProseEnter('- selected',2,5),null);
+});

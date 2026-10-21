@@ -639,7 +639,7 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl,revealProse:revealProseTarget,detail:function(target,parentId){
+    preview:{editProse:function(target){if(interactions)interactions.editInlineText(findTargetEl(target),false,true);},stepper:stepperFor,targetElement:findTargetEl,revealProse:revealProseTarget,detail:function(target,parentId){
       var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
       if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
       var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
@@ -1150,6 +1150,7 @@ function initWorkbenchBuilder(opts){
   }
   function previewRendered(outcome){
     hideDiff();
+    interactions.refreshInlineText();
     if(outcome.ok && outcome.retained==='explore'){
       // Retain the live canvas, but renew source-bound View action callbacks.
       if(sectionLayoutEditor)sectionLayoutEditor.refreshViewSettings();
@@ -1195,7 +1196,7 @@ function initWorkbenchBuilder(opts){
                   index: identity.index, card:identity.card, el: el}, false,!!destination);
     if(kind==='para' || kind==='bullet')revealProseTarget(identity);
     selectRange(plan);
-    if(kind==='para' || kind==='bullet')inspector.focusProse();
+    if(kind==='para' || kind==='bullet')interactions.editInlineText(el,false,true);
     return el;
   }
   var addButtons = {
@@ -1340,7 +1341,7 @@ function initWorkbenchBuilder(opts){
       var fit=board.classList.contains('explore-board')?document.getElementById('workspace-fit-selection'):board.querySelector('[aria-label="Fit diagram"]');
       if(fit && !fit.disabled)fit.click();
     },
-    addNode:function(preset,at){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset,at && at.point);},at);},
+    addNode:function(preset,at){var el=runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset,at && at.point);},at);if(el)interactions.editInlineText(el,true,true);},
     addPanel:function(at){
       if(!panelPicker || !currentAddition(at))return;
       panelPicker.open(null,{

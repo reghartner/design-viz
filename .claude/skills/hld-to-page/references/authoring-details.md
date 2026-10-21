@@ -471,10 +471,15 @@ edited.
 
 Humans can start section prose with **Add to diagram → Paragraph** or
 **Bullet point**, using the **Section** selector to choose the destination. These append to `text`
-or `bullets`, work without a diagram, select the new item, and open page preview
-when Explore hides prose. Empty section inspectors offer **Add an introduction**
+or `bullets`, work without a diagram, select the new item, and reveal it in
+Standard prose or Explore Section notes. Empty section inspectors offer **Add an introduction**
 and **Add first point**. Insertions focus and select the placeholder text for
-replacement. Paragraphs support add before/after, move up/down,
+replacement in an inline native input with a live Markdown result below it.
+Double-click existing paragraph/point text (or focus it and press Enter) to edit
+in place. Ctrl/Command+Enter or click away commits one Undo; Escape cancels.
+Single-click still selects the inspector. Enter continues Markdown bullets;
+Enter on an empty bullet exits the list. Structured bullet subtrees and reveal
+metadata remain intact. Paragraphs support add before/after, move up/down,
 and deletion. Existing string `text` becomes an array when another paragraph
 is added. Nested bullets support siblings/subpoints, indent/outdent, reorder
 and deletion of complete subtrees. Each structural action has one Undo/Redo.

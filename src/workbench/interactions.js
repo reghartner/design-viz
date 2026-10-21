@@ -37,6 +37,18 @@ function createBuilderInteractions(opts){
       session.target=target;rehighlight();renderInspector();
     }});
   life.own(function(){textEditor.destroy();});
+
+  var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,
+    disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
+    commit:function(plan,snapshot,target,nextTarget){
+      if(plan.error){inspectorMessage(plan.error);return;}
+      if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      // Resolve the clicked authored identity after publication; its old DOM was retired.
+      var nextEl=nextTarget && findTargetEl(nextTarget);
+      if(nextEl){selectTarget(Object.assign({},nextTarget,{el:nextEl}),false,true);return;}
+      session.target=target;rehighlight();renderInspector();
+    }});
+  life.own(function(){inlineEditor.destroy();});
   function selectionChanged(){if(opts.workspace && opts.workspace.selectionChanged)opts.workspace.selectionChanged();if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
@@ -110,7 +122,7 @@ function createBuilderInteractions(opts){
                                   '[data-dv-panel="' + t.index + '"]';
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
-  function rehighlight(){ setSelected(findTargetEl(session.target)); }
+  function rehighlight(){ setSelected(findTargetEl(session.target));inlineEditor.decorate(); }
 
   /* ---- board markers for the selected step's members ---- */
   function clearStepMarkers(){
@@ -1727,6 +1739,7 @@ function createBuilderInteractions(opts){
   life.listen(window,'blur',function(){if(connect)cancelConnect('Connection cancelled');});
   function beforeReplace(request){
     textEditor.clear();
+    inlineEditor.clear();
     var retention=request && request.retention || {};
     pathReorder.beforeReplace();
     cancelGestures();
@@ -1737,6 +1750,7 @@ function createBuilderInteractions(opts){
   }
   function retire(){
     textEditor.clear();
+    inlineEditor.clear();
     curveEditor.clear();
     pathReorder.retire();
     cancelGestures();clearConnectChrome();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
@@ -1744,6 +1758,8 @@ function createBuilderInteractions(opts){
     clearAddModeChrome();clearMultiSelect();clearStepMarkers();setSelected(null);rowGrabRows={};
   }
   return {
+    refreshInlineText:life.guard(function(){inlineEditor.refresh();}),
+    editInlineText:life.guard(function(el,creation,selectAll){inlineEditor.open(el,creation,selectAll);}),
     editText:life.guard(function(el){textEditor.open(el);}),
     setSelected:life.guard(setSelected),
     updateTargetLabel:life.guard(updateTargetLabel),

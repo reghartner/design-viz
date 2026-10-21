@@ -87,3 +87,19 @@ function proseFormatEdit(value,start,end,kind,url){
   }else return {error:'Unknown prose format.'};
   return {text:text.slice(0,a)+before+chosen+after+text.slice(b),start:a+before.length,end:a+before.length+chosen.length};
 }
+
+/* Native Enter insertion; fenced code and selected ranges keep normal newlines.
+   The caller inserts with the browser's editing command, preserving native Undo. */
+function inlineProseEnter(value,start,end){
+  if(start!==end)return null;
+  var before=value.slice(0,start),lines=before.split('\n'),fence=0;
+  lines.slice(0,-1).forEach(function(line){
+    var match=/^ {0,3}(`{3,})([^`]*)$/.exec(line);
+    if(match){if(!fence)fence=match[1].length;else if(match[1].length>=fence && !match[2].trim())fence=0;}
+  });
+  if(fence)return null;
+  var line=lines[lines.length-1],bullet=/^( *)([-+*])([ \t]+)(.*)$/.exec(line);
+  if(!bullet)return null;
+  if(!bullet[4] && (start===value.length || value[start]==='\n'))return {start:start-line.length,end:end,text:''};
+  return {start:start,end:end,text:'\n'+bullet[1]+bullet[2]+' '};
+}

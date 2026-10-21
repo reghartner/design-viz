@@ -2096,6 +2096,7 @@ function sectionForm(val, ctx){
 
 function focusProse(){
     if(disposed || !session.target || (session.target.kind!=='para' && session.target.kind!=='bullet'))return;
+    if(opts.preview.editProse){opts.preview.editProse(session.target);return;}
     var input=guide.querySelector('.prose-editor textarea');
     if(input){input.focus({preventScroll:true});input.select();}
   }
@@ -2118,7 +2119,7 @@ function sectionProseActions(val,target){
   }
 function sectionNotesForm(val,ctx){
     var help=document.createElement('p');help.className='fnote';
-    help.textContent='Select a paragraph or bullet to edit it. Delete Section notes removes only the text and bullets; the section, diagram and layouts stay in place. Use × on the notes window to hide it temporarily.';
+    help.textContent='Double-click a paragraph or bullet to type directly with live Markdown, or select it to edit in Inspect. Delete Section notes removes only the text and bullets; the section, diagram and layouts stay in place. Use × on the notes window to hide it temporarily.';
     return exploreTextSizeRows('prose',ctx.diagram).concat([help],sectionProseActions(val,session.target));
   }
 function proseControl(value,commit,options){

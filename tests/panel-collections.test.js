@@ -48,3 +48,20 @@ test('log edits preserve unknown fields, legacy strings and scalar text across r
   assert.deepEqual(plain(C.panelLogEditorCollect([{_sourceIndex:1,tag:'NEW',text:'updated'}],input).value),[{tag:'NEW',text:'updated',future:{keep:true}}]);
   assert.deepEqual(plain(C.panelLogEditorCollect([],input).value),[]);
 });
+
+test('table composer hides Change while edits and reorder preserve stored statuses and typed cells',()=>{
+  let projected,shape,collect;
+  const columns=[{id:'number'},{id:'bool'},{id:'nil'},{id:'text'}];
+  const rows=[{id:'one',status:'removed',cells:{number:0,bool:false,nil:null,text:' padded ',hidden:{keep:true}}},
+    {id:'two',status:'future',cells:{number:2}},{id:'three',cells:{}}];
+  const original=JSON.stringify(rows);
+  C.createPanelTableComposer({controls:{rows(key,items,config,options){projected=items;shape=config;collect=options.collect;}}},
+    {panel:{type:'table',showChange:false,columns},value:rows,commit(){}});
+  assert.ok(!shape.cols.some(col=>col.k==='status'));
+  // Model the row control's submitted values without a status input.
+  projected.forEach(item=>{delete item.status;item.value3=item.value3.trim();});
+  projected[0].id='renamed';
+  const out=plain(collect([projected[1],projected[0],projected[2]]).value);
+  assert.deepEqual(out,[rows[1],{...rows[0],id:'renamed'},rows[2]]);
+  assert.equal(JSON.stringify(rows),original);
+});

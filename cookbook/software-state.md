@@ -8,8 +8,10 @@ with `python3 tools/widget_doc.py table checks budget`.
 For an API or event contract, choose **Data contract** (`data-contract`): each
 field is a row, with custom columns such as Type, Required, Example and Notes.
 In Inspect, add or reorder fields and columns and set their widths. Names are
-editable without changing the IDs used by cells or highlights. Step controls also
-expose every cell, the full field and column lists, and the field-name width.
+editable without changing the IDs used by cells or highlights. **First column
+name** (`fieldLabel`, default `Field`) names the leading heading; custom column
+labels name the others. Desktop step controls also expose this heading, every
+cell, the full field and column lists, and the field-name width.
 Assignments carry forward; choose **This step only** for a temporary override
 or **Inherit previous** to remove the local assignment. Use
 `python3 tools/widget_doc.py data-contract` for the contract and
@@ -18,7 +20,10 @@ for a complete story. Highlight colors and optional labels belong to starting
 state or step patches; an empty highlights map clears the emphasis, and
 `enterOnce` makes it temporary. Highlights explain authored meaning, not
 automatically inferred validity. The ordinary table also accepts per-column
-`width` in pixels to keep record snapshots steady across steps.
+`width` in pixels to keep record snapshots steady across steps. Turn off **Show
+Change column** (`showChange:false`) in desktop table setup for a plain snapshot.
+This hides its badges and status controls while preserving stored statuses and
+row styling; omit the setting or turn it back on to show the column again.
 
 Values below are fictional examples. For a real HLD, replace every value and
 outcome with source evidence. An omitted budget value is unknown, not zero.
@@ -38,7 +43,7 @@ select a valid alternative path, such as replaying a cached response.
         "rows": [["worker"]],
         "edges": [],
         "panels": [
-          {"id": "data", "type": "table", "title": "Configuration", "columns": [{"id": "key", "label": "Field"}, {"id": "value", "label": "Value"}], "initial": {"rows": [{"id": "v", "cells": {"key": "version", "value": 7}}]}},
+          {"id": "data", "type": "table", "title": "Configuration", "showChange": false, "columns": [{"id": "key", "label": "Field"}, {"id": "value", "label": "Value"}], "initial": {"rows": [{"id": "v", "cells": {"key": "version", "value": 7}}]}},
           {"id": "gate", "type": "checks", "checks": [{"id": "newer", "label": "Newer version"} ]},
           {"id": "limits", "type": "budget", "metrics": [{"id": "ram", "label": "Staging memory", "unit": "KiB", "max": 64, "warn": 48}], "initial": {"values": {"ram": null}}}
         ],

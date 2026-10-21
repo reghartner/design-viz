@@ -1,5 +1,13 @@
 # Changelog
 
+## Flexible table and contract columns (2026-10-21)
+
+- Data tables can hide the Change column from desktop setup with
+  `showChange:false`, preserving stored row statuses for later use.
+- Data contracts can name every column, including the first with `fieldLabel`.
+  First-column names support starting state, inherited step edits and
+  **This step only**, with existing documents keeping the **Field** heading.
+
 ## Sports and biology panels removed from main (2026-10-19)
 
 - Removed the sports panel (`seatmap`, its venue library, seating-chart

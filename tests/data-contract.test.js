@@ -166,3 +166,34 @@ test('temporary field declarations validate locally and do not carry into later 
   assert.equal(result.warnings.length,1);
   assert.match(result.warnings[0],/steps\[1\].*highlights.temporary: unknown/);
 });
+
+test('every contract heading is named independently and safely without changing data or widths',()=>{
+  const p=panel(), original=JSON.stringify(p);
+  assert.match(render(p),/<th scope="col">Field<\/th>/);
+  const named={...p,fieldLabel:'<Attribute>',columns:p.columns.map(col=>({...col,label:'Named '+col.id}))};
+  const html=render(named);
+  assert.match(html,/<th scope="col">&lt;Attribute&gt;<\/th>/);
+  for(const col of p.columns)assert.ok(html.includes('>Named '+col.id+'<'));
+  assert.equal(JSON.stringify(p),original);
+  assert.deepEqual(named.fields,p.fields);
+  assert.deepEqual(plain(C.validate(C.normalize(diagram(named)))),{errors:[],warnings:[]});
+  for(const value of ['', '   '])assert.match(render({...p,fieldLabel:value}),/<th scope="col">Field<\/th>/);
+  for(const value of [null,42,false,{},[]]){
+    assert.match(render({...p,fieldLabel:value}),/<th scope="col">Field<\/th>/);
+    const result=C.validate(C.normalize(diagram({...p,fieldLabel:value},[{panels:{contract:{fieldLabel:value,enterOnce:{fieldLabel:value}}}}])));
+    for(const at of ['panels[0].fieldLabel','panels.contract.fieldLabel','enterOnce.fieldLabel'])assert.ok(result.warnings.some(w=>w.includes(at)),at);
+    assert.match(render({...p,fieldLabel:'Declared'},{fieldLabel:value}),/<th scope="col">Declared<\/th>/);
+  }
+});
+
+test('first column name follows starting, carried, and one-step overrides with sparse inheritance',()=>{
+  const p=panel();p.fieldLabel='Declared';p.initial.fieldLabel='Initial';
+  const d=diagram(p,[{nodes:['service']}, {panels:{contract:{fieldLabel:'Carried'}}},
+    {panels:{contract:{enterOnce:{fieldLabel:'Only here'}}}}, {nodes:['service']}, {panels:{contract:{fieldLabel:''}}}]);
+  const original=JSON.stringify(d),states=C.foldPanelStates(d).contract;
+  ['Initial','Carried','Only here','Carried','Field'].forEach((name,i)=>{
+    assert.match(render(p,states[i]),new RegExp('<th scope="col">'+name+'</th>'));
+  });
+  assert.deepEqual(plain(C.validate(C.normalize(d))),{errors:[],warnings:[]});
+  assert.equal(JSON.stringify(d),original);
+});

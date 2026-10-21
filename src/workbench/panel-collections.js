@@ -67,12 +67,13 @@ function panelTableEditorRows(rows,columns){
     });return item;
   });
 }
-function panelTableEditorCollect(items,original,columns){
+function panelTableEditorCollect(items,original,columns,preserveStatus){
   var seen=Object.create(null),rows=[];
   for(var i=0;i<items.length;i++){
     var item=items[i];if(seen[item.id])return {error:'Each row needs a unique ID.'};seen[item.id]=true;
     var base=Array.isArray(original) && original[item._sourceIndex],row=panelCollectionCopy(base);
-    row.id=item.id;if(item.status===undefined)delete row.status;else row.status=item.status;
+    row.id=item.id;
+    if(!preserveStatus){if(item.status===undefined)delete row.status;else row.status=item.status;}
     var cells=panelCollectionCopy(base && base.cells);
     for(var j=0;j<columns.length;j++){
       var id=columns[j].id,type=item['type'+j] || 'unset',raw=item['value'+j] || '';
@@ -100,13 +101,14 @@ function panelTableEditorCollect(items,original,columns){
 function createPanelTableComposer(context,options){
   var columns=softwarePanelItems(options.panel),rows=panelTableEditorRows(options.value,columns);
   if(rows===null)return null;
-  var cols=[{k:'id',label:'Row ID',req:true},{k:'status',label:'Change',kind:'enum',options:TABLE_STATUSES}];
+  var showChange=options.panel.showChange!==false,cols=[{k:'id',label:'Row ID',req:true}];
+  if(showChange)cols.push({k:'status',label:'Change',kind:'enum',options:TABLE_STATUSES});
   columns.forEach(function(col,i){
     cols.push({k:'type'+i,label:(col.label || col.id)+' type',kind:'enum',options:['unset','string','number','boolean','null','advanced']});
     cols.push({k:'value'+i,label:col.label || col.id});
   });
   return context.controls.rows('Rows',rows,{cols:cols,max:12,wide:true},{raw:false,commitValue:options.commit,
-    collect:function(items){return panelTableEditorCollect(items,options.value,columns);}});
+    collect:function(items){return panelTableEditorCollect(items,options.value,columns,!showChange);}});
 }
 
 function panelLogEditorCollect(items,original){

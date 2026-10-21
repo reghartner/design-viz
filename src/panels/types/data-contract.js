@@ -14,15 +14,22 @@
   function text(value) {
     return value === undefined ? '' : value === null ? 'null' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   }
+  function fieldLabel(value) { return typeof value === 'string' && value.trim() ? value : 'Field'; }
+  function labelWarnings(value, path, warnings) {
+    if (value.fieldLabel !== undefined && typeof value.fieldLabel !== 'string')
+      warnings.push(path + '.fieldLabel: expected text — using declared name or Field');
+  }
   function content(panel, state) {
     var resolved = Object.assign({}, panel);
     ['columns', 'fields'].forEach(function (key) {
       if (Array.isArray(state && state[key])) resolved[key] = state[key];
     });
+    if (state && typeof state.fieldLabel === 'string') resolved.fieldLabel = state.fieldLabel;
     if (state && width(state.fieldWidth, null) !== null) resolved.fieldWidth = state.fieldWidth;
     return resolved;
   }
   function contentWarnings(value, path, warnings) {
+    labelWarnings(value, path, warnings);
     if (value.fieldWidth != null && width(value.fieldWidth, null) === null)
       warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using declared width');
     ['columns', 'fields'].forEach(function (key) {
@@ -66,7 +73,7 @@
       '<table class="dcontract-table" style="width:' + total + 'px"><caption class="dcontract-caption">' + esc(panel.title || 'Data contract') +
       '</caption><colgroup><col style="width:' + firstWidth + 'px">';
     cols.forEach(function (col) { h += '<col style="width:' + width(col.width, 160) + 'px">'; });
-    h += '</colgroup><thead><tr><th scope="col">Field</th>';
+    h += '</colgroup><thead><tr><th scope="col">' + esc(fieldLabel(panel.fieldLabel)) + '</th>';
     cols.forEach(function (col) { h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
     h += '</tr></thead><tbody>';
     rows.forEach(function (field) {
@@ -214,6 +221,9 @@
     }
     return {
       setupField:function (field, panel) {
+        if (field[0] === 'fieldLabel') return controls.row('First column name', controls.text(fieldLabel(panel.fieldLabel), function (value) {
+          return context.commit('fieldLabel', value === null ? null : JSON.stringify(value));
+        }));
         if (field[0] === 'columns' || field[0] === 'fields') return collection(field[0], panel);
         if (field[0] === 'fieldWidth') return controls.row('Field name width (px)', controls.number(panel.fieldWidth, function (value) {
           if (value !== null && width(value, null) === null) { context.error('Field name width must be at least 40 pixels.'); return false; }
@@ -230,6 +240,11 @@
           if (value !== undefined) resolved[key] = value;
           return collection(key, resolved, options.commit);
         }
+        if (key === 'fieldLabel') {
+          var input = controls.text(fieldLabel(value === undefined ? resolved.fieldLabel : value), function (next) { return options.commit(next === null ? '' : next); });
+          input.setAttribute('aria-label', 'First column name');
+          return input;
+        }
         if (key === 'fieldWidth') return controls.number(value === undefined ? resolved.fieldWidth : value, function (next) {
           if (next !== null && width(next, null) === null) { context.error('Field name width must be at least 40 pixels.'); return false; }
           return options.commit(next === null ? undefined : next);
@@ -243,6 +258,7 @@
     itemCollection:{key:'fields',max:MAX_FIELDS},
     layout:{sectionSizing: { minWidth: 300, preferredWidth: 540, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },large:true,height:12,supporting:false,attachControls:true},
     validateDeclaration:function (panel, path, warnings, errors, diagram) {
+      labelWarnings(panel, path, warnings);
       if (panel.fieldWidth != null && width(panel.fieldWidth, null) === null) warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using 180');
       if (Array.isArray(panel.columns) && !panel.columns.length) { /* A field-only contract is valid. */ }
       else panelCollectionWarnings(panel, path, warnings, 'columns', MAX_COLUMNS, function (col, at, warnings) {
@@ -282,16 +298,17 @@
       Array.from(new Set(found)).forEach(function (warning) { warnings.push(warning); });
     }, render:render,
     authoring:{
-      initialFields:true, transientFields:['columns','fields','fieldWidth','highlights'],
+      initialFields:true, transientFields:['columns','fields','fieldLabel','fieldWidth','highlights'],
       template:{title:'Data contract',fieldWidth:180,
         columns:[{id:'type',label:'Type',width:110},{id:'required',label:'Required',width:90},{id:'example',label:'Example',width:180},{id:'notes',label:'Notes',width:240}],
         fields:[{id:'order-id',label:'order_id',cells:{type:'string',required:'Yes',example:'ord_2048',notes:'Unique order identifier'}},
           {id:'status',label:'status',cells:{type:'enum',required:'Yes',example:'pending',notes:'pending | confirmed | cancelled'}},
           {id:'customer-id',label:'customer_id',cells:{type:'string',required:'No',example:'cus_1024',notes:'Present for registered customers'}}],
         initial:{highlights:{}}},
-      setupFields:[['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['initial','json']],
-      patchFields:[['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['highlights','json'],['note','text']],
+      setupFields:[['fieldLabel','text'],['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['initial','json']],
+      patchFields:[['fieldLabel','text'],['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['highlights','json'],['note','text']],
       fieldMeta:{
+        fieldLabel:{label:'First column name',group:'Content',help:'Name the first column. Blank uses Field. Starting and step names override the declaration; Inherit previous restores the earlier name, and This step only changes it temporarily.'},
         columns:{label:'Columns',group:'Content',help:'Add, rename, reorder or remove custom columns. Set columns and widths for this step or inherit the previous values. Blank widths use 160 px. Up to 12 custom columns.'},
         fields:{label:'Fields',group:'Content',help:'One contract field per row. Field and column names can change without losing highlights or values. Edit every cell for this step or inherit the previous rows. Up to 64 fields.'},
         fieldWidth:{label:'Field name width (px)',group:'Layout'},

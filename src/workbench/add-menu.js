@@ -85,7 +85,7 @@ function initDiagramAddMenu(opts){
         closeInline(false);snapshot=null;destination=null;run(captured);
       });
     }
-    item('Text',opts.addText);item('Node…',function(at){open(at,true);});item('Panel…',opts.addPanel);
+    item('Text',opts.addText);item('Node',function(at){opts.addNode(null,at);});item('Panel…',opts.addPanel);
     item('Connection',opts.addEdge);item('Step',opts.addStep);
     at.shell.appendChild(inline);if(inline.showPopover)inline.showPopover();
     var r=inline.getBoundingClientRect(),win=doc.defaultView;

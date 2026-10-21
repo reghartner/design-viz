@@ -189,6 +189,7 @@ function wireTour(ctl, view, win, config, options){
     return {number:sec.number, mode:sp && sp.mode(), path:sp && sp.path(),
       sourceIndex:sp && sp.sourceIndex(), reader:reader && reader.snapshotReaderState(),
       size:sec.boardSize && sec.boardSize.mode(), scroll:board && {x:board.scrollLeft,y:board.scrollTop},
+      boardNavigation:sec.boardSize && sec.boardSize.snapshot(), follow:sec.follow && sec.follow.snapshot(),
       stepIndex:cur ? cur.n : 0, playing:!!(sp && sp.playing()),
       view:sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
   }
@@ -208,6 +209,8 @@ function wireTour(ctl, view, win, config, options){
     if(reader && saved.reader)reader.restoreReaderState(saved.reader);
     var board=sec.sectionEl.querySelector('.board');
     if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+    if(sec.boardSize && saved.boardNavigation)sec.boardSize.restore(saved.boardNavigation);
+    if(sec.follow)sec.follow.restore(saved.follow);
   }
   function takeSnapshot(){
     /* an open drill-down: save it and return to the overview so the tour

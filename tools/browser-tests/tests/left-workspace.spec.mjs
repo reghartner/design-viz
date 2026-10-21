@@ -175,8 +175,9 @@ test('Steps panel has one name and the editor mode toggle uses sentence case',as
   expect(other).toEqual([]);
   // M1
   const modes=page.locator('.section-layout-grid').filter({visible:true}).first().locator('.mtoggle button');
-  await expect(modes).toHaveCount(2);
-  expect([await rendered(modes.nth(0)),await rendered(modes.nth(1))]).toEqual(['Ambient','Step']);
+  await expect(modes).toHaveCount(3);
+  expect([await rendered(modes.nth(0)),await rendered(modes.nth(1)),await rendered(modes.nth(2))]).toEqual(['Ambient','Step','Follow active']);
+  await expect(modes.nth(2)).toHaveAttribute('aria-pressed','true');
 });
 
 test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{

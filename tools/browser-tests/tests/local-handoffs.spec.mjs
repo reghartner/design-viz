@@ -119,14 +119,20 @@ test(`workbench ${sourcePresentation} to ${destination} handoffs keep the destin
  await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/Back to/,includeHidden:true})).toHaveCount(0);
  const back=handoffCrumb(delivery).getByRole('button',{name:'Back to Order intake',exact:true});
  await expect(back).toBeInViewport();await back.press('Enter');
- await expect(orders.locator('[data-dv-node="start"]')).toBeInViewport();
+ // Return restores beat 2; Follow frames its active connection, whose
+ // endpoints are Validate and Accept rather than the inactive entry node.
+ for(const id of ['middle','end']){
+  await expect(orders.locator('[data-dv-node="'+id+'"]')).toHaveClass(/lit/);
+  await expect(orders.locator('[data-dv-node="'+id+'"]')).toBeInViewport();
+ }
  await expect(orders.locator('.step-text')).toHaveText('Validate hands off to Accept.');
  await expect(page.locator('#diagram-add-target')).toHaveValue('0');
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
  await next.focus();await next.press('Enter');
  const reciprocal=delivery.getByRole('button',{name:'Open Order intake diagram in this spec',exact:true});
  await reciprocal.focus();await reciprocal.press('Enter');
- await expect(orders.locator('[data-dv-node="start"]')).toBeInViewport();
+ for(const id of ['middle','end'])await expect(orders.locator('[data-dv-node="'+id+'"]')).toBeInViewport();
+ await expect(orders.locator('.step-text')).toHaveText('Validate hands off to Accept.');
  await expect(page.locator('#diagram-add-target')).toHaveValue('0');
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

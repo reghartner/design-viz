@@ -87,6 +87,23 @@ def contract_text(root):
     """The authoring contract with the overlay's fragments appended, in order."""
     root = Path(root)
     text = (root / CONTRACT).read_text()
+    # Keep fork IDs with the shared-icon rules so focused packets select them.
+    # Portable kits already contain this expanded contract and need no sources.
+    if (root / 'tools/source-loader.cjs').is_file() and list((company_dir(root) / 'icons').glob('*.js')):
+        result = subprocess.run(['node', str(root / 'tools/source-loader.cjs'), '--company-icons'], capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(result.stderr.strip())
+        icons = json.loads(result.stdout)
+        if icons:
+            heading = '### Shared icons and company branding\n'
+            if heading not in text:
+                raise ValueError('Missing shared icons heading in authoring contract')
+            # JSON keeps fork-owned metadata inert within the Markdown table.
+            def cell(value):
+                return json.dumps(value, ensure_ascii=True).replace('|', '&#124;').replace('`', '&#96;')
+            rows = ['| ' + ' | '.join(cell(icon[key]) for key in ('id', 'label', 'category', 'tone')) + ' |' for icon in icons]
+            text = text.replace(heading, heading + '\nThis fork also supplies these built-in library choices. Use their IDs in icon fields; SVG is bundled by the fork.\n\n'
+                                '| ID | Label | Category | Tone |\n| --- | --- | --- | --- |\n' + '\n'.join(rows) + '\n\n', 1)
     fragments = contract_fragments(root)
     if not fragments:
         return text

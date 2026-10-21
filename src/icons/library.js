@@ -113,6 +113,64 @@ var FlowIcons = (function () {
   add('camera-off', 'Camera unavailable', 'Video', 'neutral', rect(3, 5.5, 18, 12.5, 3, 'wash') + circle(12, 11.75, 3.5, 'accent') + path('M12 18v3M8 21h8') + detail(path('m3 3 18 18')));
   add('person', 'Person', 'Home', 'violet', circle(12, 6, 3, 'wash') + path('M5 21v-2a7 7 0 0 1 14 0v2Z', 'wash') + detail(path('M8.5 20v-2M15.5 20v-2')));
 
+  // Build-time company modules use this private hook before the public library
+  // freezes. Geometry is trusted repository code, never authored document data.
+  function checkCompanyGeometry(svg, id) {
+    // Enforce the inner-geometry format, not a sandbox for trusted fork code.
+    // A wrapper, unmatched close or duplicate ID can break the surrounding
+    // glyph/sprite even when the module itself is otherwise well intentioned.
+    var tags = /<[^<>]*>/g, stack = [], cursor = 0, shapes = 0, token;
+    function invalid(reason) { throw new Error(id + ': invalid SVG geometry: ' + reason); }
+    while ((token = tags.exec(svg))) {
+      if (svg.slice(cursor, token.index).trim()) invalid('expected only geometry elements');
+      cursor = tags.lastIndex;
+      var close = /^<\/([a-z][a-z0-9]*)\s*>$/.exec(token[0]);
+      if (close) {
+        if (stack.pop() !== close[1]) invalid('unmatched closing tag ' + close[1]);
+        continue;
+      }
+      var open = /^<([a-z][a-z0-9]*)([\s\S]*?)(\/?)>$/.exec(token[0]);
+      if (!open || !/^(g|path|rect|circle|ellipse|line|polyline|polygon)$/.test(open[1])) invalid('unsupported element ' + token[0]);
+      if (stack.length && stack[stack.length - 1] !== 'g') invalid('only g may contain geometry elements');
+      var attributes = /\s+([A-Za-z_][\w:.-]*)\s*=\s*("[^"<>]*"|'[^'<>]*')/g, attribute, end = 0, seen = Object.create(null);
+      while ((attribute = attributes.exec(open[2]))) {
+        if (open[2].slice(end, attribute.index).trim()) invalid('malformed attributes');
+        end = attributes.lastIndex;
+        var name = attribute[1], value = attribute[2].slice(1, -1);
+        if (own(seen, name)) invalid('duplicate attribute ' + name);
+        seen[name] = true;
+        if (/^(?:id|style|xmlns(?::.*)?|(?:.*:)?href)$/i.test(name) || /^on/i.test(name)) invalid('unsupported attribute ' + name);
+        if (/[&<>]/.test(value) || /url\s*\(/i.test(value)) invalid('references and entities are unsupported');
+        if (/\$/.test(value) && (!/^(fill|stroke)$/.test(name) || !/^\$(primary|accent|wash)$/.test(value))) invalid('palette tokens must be exact fill or stroke values');
+      }
+      if (open[2].slice(end).trim()) invalid('malformed attributes');
+      if (open[1] !== 'g') shapes++;
+      if (!open[3]) stack.push(open[1]);
+    }
+    if (svg.slice(cursor).trim() || stack.length) invalid('unbalanced or malformed markup');
+    if (!shapes) invalid('expected at least one geometry shape');
+  }
+  function defineCompanyIcon(definition) {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) throw new Error('expected an icon definition object');
+    var keys = ['id', 'label', 'category', 'tone', 'svg'];
+    Object.keys(definition).forEach(function (key) {
+      if (keys.indexOf(key) < 0) throw new Error('unknown icon field: ' + key);
+    });
+    var id = definition.id;
+    if (typeof id !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(id)) throw new Error('icon id must be 1–80 lowercase letters, digits or hyphens, starting with a letter');
+    if (own(registry, id)) throw new Error('duplicate icon id: ' + id);
+    ['label', 'category'].forEach(function (key) {
+      var value = definition[key];
+      if (typeof value !== 'string' || !value.trim() || value.length > 80 || /[\u0000-\u001f\u007f<>]/.test(value))
+        throw new Error(id + ': ' + key + ' must be 1–80 characters of plain text');
+    });
+    if (typeof definition.tone !== 'string' || !own(palettes, definition.tone)) throw new Error(id + ': tone must be a named icon palette');
+    if (typeof definition.svg !== 'string' || !definition.svg.trim()) throw new Error(id + ': svg must be nonempty trusted SVG geometry');
+    checkCompanyGeometry(definition.svg, id);
+    add(id, definition.label.trim(), definition.category.trim(), definition.tone, definition.svg);
+  }
+  /* @company-icons */
+
   function has(id) { return typeof id === 'string' && own(registry, id); }
   function resolve(id, fallback) { return has(id) ? id : has(fallback) ? fallback : 'gear'; }
   function toneName(value, fallback) {

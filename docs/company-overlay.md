@@ -39,6 +39,71 @@ Backstage and Confluence viewers and the native viewer. Assembled bundles label
 these files `/* ---- company/panels/... ---- */`. A company type with the same
 name as an upstream type fails the build.
 
+## Custom icons
+
+Place trusted JavaScript modules in `company/icons/*.js`. They are discovered in
+file-name order and run before the shared `FlowIcons` library freezes. No
+manifest or upstream source edit is needed. For example, `company/icons/acme.js`:
+
+```js
+defineIcon({
+  id: 'acme-beacon', label: 'Acme beacon', category: 'Acme equipment', tone: 'teal',
+  svg: shapes.path('M3 20 12 2 21 20 12 15Z', 'wash') +
+       shapes.detail(shapes.path('M12 7v5M8 20h8'))
+});
+```
+
+Each file has its own strict function scope with `defineIcon(definition)` and a
+frozen `shapes` object. Files may define multiple icons. Use deterministic,
+self-contained code without DOM, network, process or filesystem access: modules
+also execute during build-time validation. These modules have the same trust as
+company panel code; their wrapper is not a security sandbox. Do not paste
+untrusted SVG or document data into them, and do not depend on private library
+variables or another module's locals.
+
+Every definition requires exactly `id`, `label`, `category`, `tone`, and `svg`:
+
+- `id`: 1–80 lowercase letters, digits or hyphens, beginning with a letter.
+  Use a company prefix to reduce future upstream collisions. Reusing any
+  upstream or company ID fails the build with the offending module path.
+- `label` and `category`: nonempty plain text, at most 80 characters. The
+  desktop picker uses these for search and category filtering.
+- `tone`: one of `neutral`, `blue`, `teal`, `green`, `amber`, `red`, or `violet`.
+- `svg`: code-owned inner SVG geometry in a 24 × 24 view box. Use balanced
+  `g`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon`
+  elements with quoted attributes. Only groups may contain other elements.
+  The build rejects wrappers, symbols, IDs, references, entities, scripts,
+  event handlers, inline `style`, malformed markup and unknown palette tokens.
+  Normal geometry attributes such as `transform`, `fill-rule`, `opacity` and
+  stroke settings are supported. This structural check is not a sanitizer or
+  a path-data validator; fork maintainers still review the trusted code and
+  confirm that its geometry renders correctly.
+
+Helpers return SVG strings: `path(d, fill?)`, `rect(x,y,w,h,r,fill?)`,
+`circle(x,y,r,fill?)`, `detail(svg)` (accent stroke), and `solid(svg)` (no
+stroke). Optional fills are `primary`, `accent`, or `wash`; omit fill for an
+outline. Custom inner SVG may use `$primary`, `$accent`, and `$wash` paint
+tokens. The shared renderer replaces these with its palette/CSS colors and
+supports tone overrides and monochrome rendering.
+
+Run `python3 tools/build.py` and rebuild any viewer package you distribute.
+The same assembled library supplies validation, compatibility IDs, sprites,
+node/group icons, shared panels, brand choices, the desktop picker, standalone
+HTML, the offline kit and native ShadowRoot viewers. Authored JSON stores only
+IDs, such as `"icon":"acme-beacon"`; it cannot register icons or inject SVG.
+A reader using a build without that icon retains the existing unknown-ID
+fallback. Distribute a viewer built from the same fork when sharing the JSON.
+`--no-config` and `FLOWVIEW_COMPANY_IDENTITY=off` disable identity settings,
+**not** structural extensions such as icons and panels.
+
+`node tools/source-loader.cjs --company-icons` lists validated custom metadata.
+The shared-icons section in generated authoring packets and the offline kit's
+contract includes these IDs automatically. For direct source-contract reading,
+use that command as well; the upstream Markdown file remains unchanged.
+`tests/company-icons.test.js` and the desktop browser `company-icons.spec.mjs`
+copy the real modules from `tests/fixtures/company-icons/` into scratch forks,
+build them and assert distinctive paths through saved exports and viewers.
+
 ## Contract fragments
 
 Write one Markdown file per panel or topic in `company/contract/*.md`. Fragments

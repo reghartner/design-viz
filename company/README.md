@@ -9,6 +9,7 @@ Everything below is discovered automatically. No upstream list needs an edit.
 
 | Path | What it does |
 |---|---|
+| `company/icons/*.js` | Trusted custom icons registered with `defineIcon` and `shapes`, bundled into the frozen shared library, validator, picker and all viewers. See [custom icons](../docs/company-overlay.md#custom-icons). |
 | `company/panels/*.js` | Shared helper modules for company panels. Bundled before every panel type. |
 | `company/panels/types/*.js` | Company panel types, one `PanelRegistry.define(...)` per file, bundled after the upstream types into every viewer, the workbench and the validator. |
 | `company/contract/*.md` | Authoring-contract fragments, one per panel or topic, appended in file-name order to `contract/authoring-contract.md` for agents, `tools/widget_doc.py`, authoring packets and the folder-agent kit. Document a panel under a `### panels` heading with one ``- `type` `` bullet. |

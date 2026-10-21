@@ -1,9 +1,14 @@
 # Shared icons and company branding
 
-Flowview uses one library of 63 colored SVG icons for diagram nodes, groups,
+Flowview ships one library of 63 colored SVG icons for diagram nodes, groups,
 Home elements, Device app cards, audio controls, monitoring and dispatch. Battery,
 voltage, temperature and alarm variants differ in shape as well as color. Icons describe
 the authored story; choosing an alarm icon does not trigger or verify an alarm.
+
+Company forks can add icons through [`company/icons/*.js`](company-overlay.md#custom-icons).
+They appear in the same desktop picker, panels, branding and viewers with their
+own labels, categories, palettes and geometry. Rebuild the viewer when icons
+change; document JSON selects an ID and cannot supply SVG.
 
 ## Choose an icon in the workbench
 
@@ -174,6 +179,7 @@ exports and native ShadowRoots. CSS consumers can override
 `symbols()` emits the 42 new `#i-*` symbols by default. The source loader appends
 them to the existing 21-symbol sprite, preserving legacy diagram tint behavior.
 `symbols({newOnly:false})` emits all 63 for consumers that have no legacy sprite.
+Both methods also include every fork icon; fork icons never replace legacy symbols.
 Do not append the full set to a document that already contains those IDs.
 
 [`src/company-brand.config.js`](../src/company-brand.config.js) holds upstream's

@@ -90,7 +90,14 @@ icon and of operation state: set it for hot/cold stories, and set
 | Person / vehicle / package | `person`, `car`, `package` | |
 | Microphone muted | `microphone-muted` (normal: `microphone`) | |
 
-Complete ID list, by category (from `docs/shared-icons.md`):
+Upstream ID list, by category (from `docs/shared-icons.md`). Company forks may
+also supply `company/icons/*.js`: use the custom metadata in the focused
+authoring packet (`--feature icons`) or run
+`node tools/source-loader.cjs --company-icons` in a source checkout. The offline
+kit includes those IDs in its contract. See `docs/company-overlay.md#custom-icons`;
+authored specs select IDs, never SVG.
+
+Upstream IDs:
 Software `terminal gear db server chip`; Connectivity `cloud antenna router
 wifi wifi-off cloud-off signal`; Security `shield key lock alarm armed disarmed
 triggered door motion smoke water sensor`; Temperature `thermo temperature hot

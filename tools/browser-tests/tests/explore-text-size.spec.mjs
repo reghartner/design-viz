@@ -18,12 +18,12 @@ async function open(page,server,spec,host='reader'){
  }else{
   await writeFile(path.join(server.root,'type.json'),JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'type.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'type.html')]);await page.goto(server.origin+'/type.html');
  }
- await page.evaluate(()=>document.fonts.ready);await expect(page.locator('.explore-player')).toBeVisible();
+ await page.evaluate(()=>document.fonts.ready);await expect(page.locator('.termbar').first()).toBeVisible();
 }
 const notes=page=>page.locator('[data-explore-content=prose]');
 const player=page=>page.locator('.explore-player');
-async function typeMetrics(page){return page.locator('.explore-stage').evaluate(stage=>{
- const note=stage.querySelector('[data-explore-content=prose]'),controls=stage.querySelector('.explore-player');
+async function typeMetrics(page){return page.locator('.doc-sec').first().evaluate(stage=>{
+ const note=stage.querySelector('[data-explore-content=prose]') || stage.querySelector('.sec-prose'),controls=stage.querySelector('.explore-player');
  function metric(el,frame){return {logical:parseFloat(getComputedStyle(el).fontSize),physical:parseFloat(getComputedStyle(el).fontSize)*frame.getBoundingClientRect().width/frame.offsetWidth};}
  return {notes:metric(note.querySelector('.sec-text'),note),caption:metric(controls.querySelector('.stepline'),controls.querySelector('.termbar')),chip:metric(controls.querySelector('.path-chip'),controls.querySelector('.termbar')),transport:metric(controls.querySelector('.tbtn'),controls.querySelector('.termbar')),scale:controls.getBoundingClientRect().width/controls.offsetWidth};
 });}
@@ -51,7 +51,7 @@ for(const host of ['reader','native'])for(const placement of ['floating','canvas
   expect(fit.caption.logical).toBe(16);expect(fit.caption.physical).toBeCloseTo(16*fit.scale,2);
   await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) out$/,exact:true}).click();const smaller=await typeMetrics(page);expect(smaller.caption.physical).toBeCloseTo(fit.caption.physical*.8,1);
  }else{
-  const before=await typeMetrics(page);await panelsOptions(page,page.locator('.reader-navigation'));await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();const after=await typeMetrics(page);expect(after.notes).toEqual(before.notes);for(const key of ['caption','chip','transport']){expect(after[key].logical).toBe(before[key].logical);expect(after[key].physical).toBeCloseTo(before[key].physical*.7/.8,1);}await checkControls(page);
+  const before=await typeMetrics(page);await panelsOptions(page,page.locator('.reader-navigation'));await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();const after=await typeMetrics(page);expect(after.notes).toEqual(before.notes);for(const key of ['caption','chip','transport']){expect(after[key].logical).toBe(before[key].logical);expect(after[key].physical).toBeCloseTo(before[key].physical*.7/.8,1);}await checkControls(page);
  }
 });
 for(const shared of [true,false])for(const placement of ['floating','canvas'])test(`${shared?'timeline':'matrix'} ${placement} enlarged text fits or scrolls inside narrow frames`,async({page,server})=>{
@@ -70,15 +70,16 @@ test('Inspect edits notes and controls independently, retains frame geometry, an
  await expect.poll(async()=>(await typeMetrics(page)).notes.logical).toBe(22.5);expect((await typeMetrics(page)).caption.logical).toBe(16);
  const notesEdited=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(notesEdited);
  await closeTools(page);await player(page).locator('.stepline').click();if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
- const controlsSize=page.getByRole('textbox',{name:'Step controls text size',exact:true});await controlsSize.fill('150');await controlsSize.press('Enter');await expect.poll(async()=>(await typeMetrics(page)).caption.logical).toBe(24);
+ await expect(page.getByRole('textbox',{name:'Step controls text size',exact:true})).toHaveCount(0);
+ await closeTools(page);await panelsOptions(page);await page.getByRole('button',{name:'Enlarge step controls',exact:true}).click();
  const after=await source.inputValue(),layout=JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout;
- expect(layout).toEqual({...spec.page.sections[0].diagram.layouts[0].exploreLayout,textScale:{prose:1.25,controls:1.5}});
- await page.getByRole('button',{name:'Reset text size',exact:true}).click();await expect.poll(async()=>(await typeMetrics(page)).caption.logical).toBe(16);expect((await typeMetrics(page)).notes.logical).toBe(22.5);
+ expect(layout).toEqual({...spec.page.sections[0].diagram.layouts[0].exploreLayout,textScale:{prose:1.25},controlsScale:.9});
+ await page.getByRole('button',{name:'Reset step controls size',exact:true}).click();await expect.poll(async()=>(await typeMetrics(page)).caption.physical).toBeCloseTo(16,1);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(after);await closeTools(page);
  const prior=await typeMetrics(page);await player(page).locator('.explore-window-resize').press('ArrowRight');const resized=await typeMetrics(page);for(const key of ['notes','caption','chip','transport']){expect(resized[key].logical).toBe(prior[key].logical);expect(resized[key].physical).toBeCloseTo(prior[key].physical,2);}
- expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[0].exploreLayout.textScale).toEqual({prose:1.25,controls:1.5});
- await open(page,server,JSON.parse(after),'native');expect((await typeMetrics(page)).caption.logical).toBe(24);expect((await typeMetrics(page)).notes.logical).toBe(22.5);
- await open(page,server,JSON.parse(after));expect((await typeMetrics(page)).caption.logical).toBe(24);
+ expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[0].exploreLayout.textScale).toEqual({prose:1.25});
+ await open(page,server,JSON.parse(after),'native');expect((await typeMetrics(page)).caption.physical).toBeCloseTo(14.4,1);expect((await typeMetrics(page)).notes.logical).toBe(22.5);
+ await open(page,server,JSON.parse(after));expect((await typeMetrics(page)).caption.physical).toBeCloseTo(14.4,1);
  await chooseNavigation(page.locator('.reader-navigation'),'View','Standard');await expect(page.locator('.explore-text-sizing')).toHaveCount(0);expect(await page.locator('.stepline').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeLessThan(16);
 });
 
@@ -120,18 +121,19 @@ for(const named of [true,false])test(`Tab-owned Explore text sizing preserves ${
  expect(saved.page.sections[0].diagram.layouts.find(l=>l.id===(named?'explore':'flow')).exploreLayout.textScale).toEqual({prose:1.25});
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
  await closeTools(page);await player(page).locator('.stepline').click();await page.locator('#editor-tab-inspect').click();
- const controls=page.getByRole('textbox',{name:'Step controls text size',exact:true});await controls.fill('150');await controls.press('Enter');
- await expect.poll(async()=>(await typeMetrics(page)).caption.logical).toBe(24);
+ await expect(page.getByRole('textbox',{name:'Step controls text size',exact:true})).toHaveCount(0);
+ await closeTools(page);await panelsOptions(page);await page.getByRole('button',{name:'Enlarge step controls',exact:true}).click();
+ await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts.find(l=>l.id===(named?'explore':'flow')).exploreLayout.controlsScale).toBe(.9);
  expect(JSON.parse(await source.inputValue()).page.views).toEqual(raw.page.views);
 });
 
 test('Optimize Explore layout retains independent text sizes and hidden notes with one Undo',async({page,server})=>{
- const raw=fixture('floating',1.25);raw.page.sections[0].diagram.layouts[0].exploreLayout.prose.hidden=true;
+ const raw=fixture('floating',1.25);raw.page.sections[0].diagram.layouts[0].exploreLayout.prose.hidden=true;raw.page.sections[0].diagram.layouts[0].exploreLayout.controlsScale=.9;
  await page.setViewportSize({width:1440,height:1080});await open(page,server,raw,'workbench');
  const source=page.locator('#src'),before=await source.inputValue();await arrangeChapter(page);
  await page.getByRole('button',{name:'Optimize layout',exact:true}).click();
  const after=await source.inputValue(),layout=JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout;
- expect(layout).toEqual({prose:{hidden:true},textScale:{prose:1.25,controls:1.25}});
+ expect(layout).toEqual({prose:{hidden:true},textScale:{prose:1.25,controls:1.25},controlsScale:.9});
  await expect(notes(page)).toBeHidden();expect((await typeMetrics(page)).caption.logical).toBe(20);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
 });
@@ -156,4 +158,101 @@ for(const placement of ['floating','canvas'])for(const scale of [1,1.75])for(con
   expect(geometry.separate).toBe(true);expect(geometry.trackHeight).toBeGreaterThanOrEqual(geometry.transportHeight);expect(geometry.chipsOverflow).toBeLessThanOrEqual(1);expect(geometry.barOverflow).toBeLessThanOrEqual(1);
   await page.screenshot({path:info.outputPath(`${placement}-${scale}-${position}-${width}.png`)});
  }
+});
+
+for(const presentation of ['standard','explore'])for(const placement of ['floating','canvas'])test(`${presentation} ${placement}: active View owns complete step-control authoring`,async({page,server},info)=>{
+ test.setTimeout(120000);
+ const raw=fixture(placement,1.25),sec=raw.page.sections[0],d=sec.diagram;sec.id='story';
+ d.layouts[0].exploreLayout.canvas.controls.w=1100;
+ // Deliberately disagree with the arrangement's old presentation flag.
+ d.layouts[0].presentation=presentation==='standard'?'explore':'standard';
+ d.panels=[{id:'status',type:'state',title:'Status',states:['Ready'],initial:{state:'Ready'}}];
+ raw.page.views=[{id:'active',name:'Active',presentation,sections:[{section:'story',layout:'explore'}]}];raw.page.defaultView='active';
+ await page.setViewportSize({width:1920,height:1200});await open(page,server,raw,'workbench');
+ const source=page.locator('#src'),initial=await source.inputValue();
+ await player(page).locator('.path-chip').nth(1).click();await player(page).getByRole('button',{name:'Next step',exact:true}).click();
+ const selectedStep=await player(page).locator('.stepid').textContent();
+ await player(page).locator('.stepline').click();await page.locator('#editor-tab-inspect').click();
+ await expect(page.getByRole('textbox',{name:'Step controls text size',exact:true})).toHaveCount(0);
+ const width=page.getByRole('textbox',{name:'Path label width',exact:true});await width.fill('300');await width.press('Enter');
+ await expect.poll(()=>player(page).locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
+ await expect.poll(()=>player(page).locator('.path-chip').first().evaluate(el=>el.offsetWidth)).toBeGreaterThan(220);
+ for(const transport of ['above','beside'])for(const caption of ['above','left','right','below']){
+  await page.getByRole('combobox',{name:'Play buttons',exact:true}).selectOption(transport);
+  await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption(caption);
+  await expect.poll(()=>player(page).evaluate((el,{transport,caption})=>{
+   const t=el.querySelector('.step-transport').getBoundingClientRect(),c=el.querySelector('.schips').getBoundingClientRect(),p=el.querySelector('.stepline:not(.dv-caption-old)').getBoundingClientRect();
+   return (transport==='above'?t.bottom<=c.top+1:t.right<=c.left+1) && (caption==='left'?p.right<=c.left+1:caption==='right'?p.left>=c.right-1:caption==='above'?p.bottom<=c.top+1:p.top>=c.bottom-1);
+  },{transport,caption})).toBe(true);
+  await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+ }
+ await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption('right');
+ const beforePlacement=await source.inputValue();
+ await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption(placement==='canvas'?'floating':'canvas');
+ await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[0].exploreLayout.controlsPlacement).toBe(placement==='canvas'?'floating':'canvas');
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforePlacement);await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+ await closeTools(page);await panelsOptions(page);const before=await typeMetrics(page),beforeSize=await source.inputValue();
+ await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();
+ const after=await source.inputValue(),saved=JSON.parse(after),layout=saved.page.sections[0].diagram.layouts[0].exploreLayout;
+ expect(layout.controlsScale).toBe(placement==='canvas'?.9:.7);expect(layout.textScale.controls).toBe(1.25);
+ expect(layout.controls).toEqual(d.layouts[0].exploreLayout.controls);expect(layout.canvas).toEqual(d.layouts[0].exploreLayout.canvas);
+ expect(saved.page.views).toEqual(raw.page.views);expect(saved.page.sections[0].diagram.layouts[1]).toEqual(d.layouts[1]);
+ const scaled=await typeMetrics(page);for(const key of ['caption','chip','transport'])expect(scaled[key].physical).toBeCloseTo(before[key].physical*(placement==='canvas'?.9:.7/.8),1);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeSize);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+ await closeTools(page);await panelsOptions(page);
+ if(presentation==='explore'){
+  const prior=await typeMetrics(page);await page.getByRole('button',{name:'Shrink floating panels',exact:true}).click();const panelSized=await typeMetrics(page);
+  for(const key of ['caption','chip','transport'])expect(panelSized[key].physical).toBeCloseTo(prior[key].physical,1);
+ }
+ await page.keyboard.press('Escape');
+ if(presentation==='standard' && placement==='canvas'){
+  const prior=await typeMetrics(page);await page.locator('.board-zoom').getByRole('button',{name:'Diagram zoom out',exact:true}).click();
+  await expect.poll(async()=>(await typeMetrics(page)).caption.physical).toBeCloseTo(prior.caption.physical*.8,1);
+ }
+ await page.screenshot({path:info.outputPath('controls.png')});
+ expect(initial).not.toBe(after);
+ await open(page,server,saved); // HTML roundtrip, including the normal Standard grid reader.
+ if(presentation==='standard'){
+  const bar=page.locator('.termbar').first();await expect(bar).toHaveCSS('zoom',String(layout.controlsScale));
+  expect(await bar.locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
+  await expect.poll(()=>bar.evaluate(el=>{const p=el.querySelector('.stepline').getBoundingClientRect(),c=el.querySelector('.schips').getBoundingClientRect();return p.left>=c.right-1;})).toBe(true);
+ }else {const exported=await typeMetrics(page);expect(exported.caption.logical).toBe(20);await checkControls(page);}
+});
+
+test('Standard first placement and sizing keep stacked sections, grid panels and prose with exact Undo',async({page,server})=>{
+ const raw=fixture(),first=raw.page.sections[0];first.id='first';first.diagram.layouts[0].presentation='standard';delete first.diagram.layouts[0].exploreLayout.controlsPlacement;
+ first.diagram.panels=[{id:'status',type:'state',title:'Status',states:['Ready'],initial:{state:'Ready'}}];
+ const second=structuredClone(first);second.id='second';second.heading='Second section';raw.page.sections.push(second);
+ raw.page.views=[{id:'standard',name:'Standard',presentation:'standard',sections:[{section:'first',layout:'explore'},{section:'second',layout:'explore'}]}];raw.page.defaultView='standard';
+ await page.setViewportSize({width:1800,height:1400});await open(page,server,raw,'workbench');const source=page.locator('#src'),before=await source.inputValue();
+ await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(page.locator('.standard-controls-player')).toHaveCount(0);
+ await panelsOptions(page);await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();
+ const sized=await source.inputValue();expect(JSON.parse(sized).page.sections[0].diagram.layouts[0].exploreLayout.controlsScale).toBe(.9);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(sized);
+ await closeTools(page);await panelsOptions(page);await page.locator('.explore-panel-menu[open]').getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('canvas');
+ await expect(page.locator('.standard-controls-player')).toHaveCount(1);await expect(page.locator('.standard-controls-player')).toBeVisible();
+ await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(page.locator('.doc-sec')).toHaveCount(2);
+ for(const sec of await page.locator('.doc-sec').all()){
+  await expect(sec).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel]')).toBeVisible();await expect(sec.locator('.sec-prose')).toBeVisible();
+  await expect(sec.locator('.explore-stage')).toBeHidden();await expect(sec.locator('.explore-window')).toHaveCount(0);
+ }
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(sized);await expect(page.locator('.standard-controls-player')).toHaveCount(0);
+ await page.locator('#redo-builder').click();await expect(page.locator('.standard-controls-player')).toHaveCount(1);
+ await closeTools(page);await page.locator('.standard-controls-player .stepline').click();await page.locator('#editor-tab-inspect').click();
+ await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('floating');await expect(page.locator('.standard-controls-surface>.standard-controls-player')).toHaveCount(1);
+ await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption('left');await expect(page.locator('.standard-controls-player')).toHaveAttribute('data-step-text-position','left');
+ await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('default');await expect(page.locator('.standard-controls-player')).toHaveCount(0);
+ await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('floating');await expect(page.locator('.standard-controls-surface>.standard-controls-player')).toHaveCount(1);
+});
+
+test('Standard canvas control extents remain reachable after graph zoom with negative saved coordinates',async({page,server})=>{
+ const raw=fixture('canvas'),d=raw.page.sections[0].diagram;d.layouts[0].presentation='standard';d.layouts[0].exploreLayout.canvas.controls={x:-400,y:-100,w:900,h:220};
+ await page.setViewportSize({width:1800,height:1200});await open(page,server,raw,'workbench');const source=page.locator('#src'),before=await source.inputValue();
+ const prior=await player(page).boundingBox();await page.locator('.board-zoom').getByRole('button',{name:'Diagram zoom out',exact:true}).click();
+ await expect.poll(()=>player(page).evaluate(el=>{
+  const r=el.getBoundingClientRect(),c=el.parentElement.getBoundingClientRect();
+  return r.left>=c.left-1 && r.top>=c.top-1 && r.right<=c.right+1 && r.bottom<=c.bottom+1;
+ })).toBe(true);
+ expect((await player(page).boundingBox()).width).toBeCloseTo(prior.width*.8,0);await expect(source).toHaveValue(before);
+ await player(page).scrollIntoViewIfNeeded();await expect(player(page).locator('.stepline')).toBeInViewport();
 });

@@ -94,7 +94,7 @@ test('reader mode switching preserves independent layouts, story state, widget a
 });
 test('Workbench canvas mode and object gestures save one Undo action, preserve the other layout, and export',async({page,server,context})=>{
  const raw=fixture(false);await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);const states=[await source(page)];
- for(const action of [()=>selectPlacement(page,'canvas'),async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-grip'),50,30);},async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-resize'),30,25);},()=>panelPlacement(page,'Section notes','canvas'),async()=>{const notes=page.locator('[data-explore-content=prose]');await selectCanvas(notes);await drag(page,notes.locator('.explore-window-grip'),20,15);},async()=>{await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Shrink controls',exact:true}).click();await page.keyboard.press('Escape');}]){
+ for(const action of [()=>selectPlacement(page,'canvas'),async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-grip'),50,30);},async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-resize'),30,25);},()=>panelPlacement(page,'Section notes','canvas'),async()=>{const notes=page.locator('[data-explore-content=prose]');await selectCanvas(notes);await drag(page,notes.locator('.explore-window-grip'),20,15);},async()=>{await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();await page.keyboard.press('Escape');}]){
   await closeTools(page);if(states.length>1)await fit(page,'workbench');await action();await expect.poll(async()=>await source(page)!==states.at(-1)).toBe(true);const next=await source(page);states.push(next);
   expect(JSON.parse(next).page.sections[0].diagram.layouts[1].exploreLayout.panels).toEqual(raw.page.sections[0].diagram.layouts[1].exploreLayout.panels);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(states.at(-2));await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(next);
@@ -102,11 +102,13 @@ test('Workbench canvas mode and object gestures save one Undo action, preserve t
  for(let i=states.length-2;i>=0;i--){await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(states[i]);}await expect(page.locator('#undo-builder')).toBeDisabled();
  for(const text of states.slice(1)){await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(text);}await expect(page.locator('#redo-builder')).toBeDisabled();
  const saved=JSON.parse(states.at(-1)),reader=await context.newPage();await reader.goto(await build(server,saved,'canvas-export'));const r=saved.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='home');expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).left))).toBeCloseTo(r.x,1);expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).width))).toBeCloseTo(r.w,1);
- const layout=saved.page.sections[0].diagram.layouts[1].exploreLayout;expect(layout.overlayScale).toBeUndefined();expect(layout.canvas.controlsScale).toBe(.9);
- expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
- await selectPlacement(reader,'floating');await panelPlacement(reader,'Section notes','floating');expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('1');
+ const layout=saved.page.sections[0].diagram.layouts[1].exploreLayout;expect(layout.overlayScale).toBeUndefined();expect(layout.controlsScale).toBe(.9);
+ expect(await player(reader).evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
+ expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('1');
+ await selectPlacement(reader,'floating');await panelPlacement(reader,'Section notes','floating');expect(await player(reader).evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
  expect((await home(reader).boundingBox()).width).toBeCloseTo((await reader.locator('.explore-stage').boundingBox()).width*.25,0);
- await selectPlacement(reader,'canvas');expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
+ await selectPlacement(reader,'canvas');expect(await player(reader).evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('0.9');
+ expect(await reader.locator('.explore-stage').evaluate(el=>el.style.getPropertyValue('--explore-overlay-scale'))).toBe('1');
  expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).width))).toBeCloseTo(r.w,1);await reader.close();
 });
 

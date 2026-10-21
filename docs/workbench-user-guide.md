@@ -248,7 +248,7 @@ In Explore, **Panels → Placement for Section notes** chooses **Floating** or
 **On canvas** independently of other panels and step controls. Notes retain a
 separate position and size for each placement. Select canvas notes to reveal
 their move and resize handles. Floating notes use 16px body text and remain at
-100% when you resize panels with **Panels & controls**. Use the notes corner to
+100% when you resize panels with **Panels → Floating panels**. Use the notes corner to
 resize their window. Workbench changes save with Undo/Redo; reader changes are
 temporary. Older files preserve their initial notes placement when you change
 other placements.

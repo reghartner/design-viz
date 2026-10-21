@@ -155,7 +155,7 @@ columns as the lane fills. Exceptionally tall automatic content is capped at the
 usable lane height and scrolls inside its panel. When the view has no saved
 panel, notes or step-control rectangles and no saved panel scale, this automatic
 stack uses 80% scale on desktop stages through 1280px wide and grows smoothly
-to 100% at 1440px. Notes and step-control text retain their independent Text size settings. Stages narrower
+to 100% at 1440px. Notes retain their independent Text size setting; saved legacy control typography is preserved. Stages narrower
 than 800px retain 100% so the compact playback controls remain readable. An authored or manually resized
 panel taller than the available stack lane stays full-size and top-aligned, with
 the next panel starting a column to its left. **Expand**
@@ -385,9 +385,8 @@ Optional `layouts[].exploreLayout` saves floating defaults separately from the
 grid. Positions and dimensions use fractions of the Explore viewport. Panel
 width/height and control height describe their size at 100% content scale;
 control width is its horizontal span and does not change with content scale.
-Optional `overlayScale`
-(0.5–1.25) scales floating panels and step controls together,
-independently of diagram zoom. The **Panels & controls** minus/plus buttons
+Optional `controlsScale` (0.5–1.25) scales the entire step-control content in either placement, independently of diagram zoom. **Panels → Step controls** changes this value. Canvas graph zoom also scales on-canvas controls. Optional `overlayScale`
+(0.5–1.25) scales floating panels. **Panels → Floating panels** minus/plus buttons
 change this scale; clicking its percentage saves an explicit 100% reset. A layout
 with saved panel, notes or controls geometry and no `overlayScale` uses 100% for
 backward compatibility. A pristine layout with neither geometry nor an explicit
@@ -438,9 +437,8 @@ changes save with one Undo/Redo operation; reader changes stay in the session.
 Notes keep separate floating `prose` and graph-unit `canvas.prose` rectangles.
 Drag the notes header or resize its corner in either placement; select canvas
 notes first to reveal these handles. Explore notes use 18px body text at 100% text size, independently of the
-Panels & controls frame setting. Both placements use the same logical type
-across desktop widths. Inspect → Text size (%) adjusts notes separately from
-playback controls. New canvas rectangles start 440 graph units
+Floating panels size setting. Both placements use the same logical type
+across desktop widths. Inspect → Text size (%) adjusts notes; Panels → Step controls sizes playback content. New canvas rectangles start 440 graph units
 wide with a height fitted to the content. Unsaved notes keep fitting through
 browser resizing until moved, resized, or saved as an authored rectangle.
 Saved rectangles retain their dimensions. Canvas
@@ -475,11 +473,7 @@ must be finite and within ±10000, with positive `w` and `h`. Toggling a panel
 preserves both rectangles, visibility, and the current step/path. The whole
 canvas window scales with diagram zoom, including its header and contents.
 Floating panels retain their responsive or authored `overlayScale`; optional
-`canvas.controlsScale` (0.5–1.25) independently preserves floating playback sizing
-when canvas objects are present. With mixed panel placement and floating playback,
-**Floating panels & controls** sizes both together. With all panels on canvas and
-playback floating, **Controls** changes playback only. With playback on canvas,
-**Floating panels** sizes the remaining floating panels.
+`canvas.controlsScale` (0.5–1.25) remains a legacy fallback for floating playback when canvas objects are present. New explicit `controlsScale` takes precedence in both placements. **Step controls** sizes playback content, and **Floating panels** sizes floating widgets independently. Both controls live in **Panels**; on-canvas step controls always expose their size control.
 
 **Fit canvas** includes the diagram and currently visible on-canvas objects,
 and reserves space for visible floating panels and fixed playback. Hidden
@@ -576,17 +570,20 @@ Select empty space in the step controls, then use **Inspect → Path label width
 
 The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported values warn and render at the default width. Arrangement duplication, Undo/Redo, and JSON or standalone HTML export preserve the setting.
 
-### Explore text size
+### Step-control layout and content size
 
-Select empty space in **Section notes** or the **step controls**, then use **Inspect → Text size (%)**. Each has an independent setting from 75% to 175%; clearing it or choosing **Reset text size** restores 100%. The section arrangement saves these settings with Undo/Redo, duplication, JSON, standalone HTML and Backstage rendering. Standard typography is unchanged.
+Select step controls in either Standard or Explore and use **Inspect** for **Play buttons** (Auto, Above steps, Beside steps), **Path label width** (160–360 px), **Placement** (View default, Floating, On canvas), and **Caption position** (Below, Above, Left, Right). These settings follow the selected arrangement even when the active tab View overrides its legacy presentation flag. Use **Panels → Step controls** for overall content size (50–125%); clicking its percentage resets to 100%. The inspector no longer exposes step-control Text size. Standard authoring retains its stacked sections, prose and grid panels. View default restores the original grid controls in Standard (and Floating controls in Explore). An explicit Floating placement uses a section-local surface at the original controls position; On canvas attaches controls to that section’s graph and follows its zoom. Standard grid readers preserve their original grid placement while honoring authored caption direction and explicit control size.
 
-At 100%, Explore uses 18px notes with a 10px window heading, 16px captions, 13px path names and transport labels, and 12px step numbers. These logical sizes are consistent at 1280, 1440 and 1920 desktop widths. In the **Panels** menu, **Panels & controls** scales floating step-control content, including its text, independently of graph zoom; the controls' text-size multiplier still applies. Floating notes keep their physical text size when panel scale changes. Canvas content follows graph zoom, including Fit; zooming out reduces its physical text size. Resize frames for room; text wraps or scrolls within constrained frames.
+In Explore, select **Section notes** and use **Inspect → Text size (%)** (75–175%). Clear the field or choose **Reset text size** for 100%. Notes size remains independent of panel and control sizing. Settings survive Undo/Redo, arrangement duplication, JSON, standalone HTML and Backstage rendering.
 
-Use `exploreLayout.textScale: {prose: 1.25, controls: 1.5}` for 125% notes and 150% step-control text. Each optional multiplier defaults to 1 and accepts 0.75–1.75. Malformed imported values warn and independently use 1. Placement and frame geometry are separate settings. Resetting the arrangement retains text sizes.
+`exploreLayout.controlsScale` is the explicit whole-control scale. For example, `{"controlsScale": 0.9, "steps": {"textPosition": "right"}}` renders controls at 90% with the caption on the right. It scales transport, paths, step circles and caption content together. Floating controls retain their horizontal span; their frame fits the scaled content. On-canvas controls retain graph-unit geometry and also follow graph zoom. Malformed imported scales warn and fall back independently of valid geometry and typography.
 
-The notes text setting also scales the **Section notes** window heading, which stays within its 32px header and truncates with an ellipsis when narrow. Section headings and View navigation keep their existing sizes: they are shared navigation chrome, independent of either content surface.
+Legacy documents retain their appearance until explicitly sized: floating controls use the existing `overlayScale`/`canvas.controlsScale` fallback, while on-canvas controls default to 100%. The first floating-panel size edit pins this effective control size, so resizing panels does not resize controls. Existing `textScale.controls` (0.75–1.75) remains supported as saved typography and is multiplied by the whole-control scale; it is never silently removed. `textScale.prose` continues to drive notes text. Resetting the arrangement retains text sizes and explicit `controlsScale`.
 
-Typed widget panels retain their existing per-widget content sizing and overlay scaling; these notes/control text settings do not change widget text or panel headings. Use a widget’s own content options where available, enlarge its frame for more room, or adjust **Panels & controls** to scale floating widgets. On-canvas widgets follow diagram zoom.
+At 100%, Explore uses 18px notes with a 10px window heading, 16px captions, 13px path names and transport labels, and 12px step numbers. Logical sizes are consistent across desktop widths. Floating notes keep their physical text size when panel scale changes. Canvas content follows graph zoom, including Fit. Resize frames for room; text wraps or scrolls within constrained frames.
+
+Typed widget panels retain their existing per-widget sizing. **Panels → Floating panels** scales floating widgets independently from step controls; on-canvas widgets follow diagram zoom.
+
 
 
 ### Section notes typography

@@ -281,7 +281,7 @@ function createWorkbenchPreviewController(opts){
     }
     var before=target(page),after=target(next),rec=(ctl.sections || []).find(function(r){return r.number===hint.section+1;});
     var presentation=rec && rec.presentation,effective=rec && rec.viewport && rec.viewport.viewDefinition();
-    if(!before || !after || !effective || effective.presentation!=='explore' || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
+    if(!before || !after || !effective || effective.presentation!=='explore' && !(rec.viewport.isWorkbenchCanvas && rec.viewport.isWorkbenchCanvas()) || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
     var candidate=JSON.parse(JSON.stringify(page)),candidateView=target(candidate);
     if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))candidateView.exploreLayout=after.exploreLayout;
     else delete candidateView.exploreLayout;

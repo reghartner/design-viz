@@ -52,7 +52,7 @@ test('mixed panel scaling stays independent and focus preserves a closed Content
  const original=await open(page,server,'explore');await nav(page).locator('.reader-top>button').click();await expect(nav(page).locator('.reader-contents')).toBeHidden();
  const sizes=()=>selected(page).evaluate(el=>{const width=selector=>el.querySelector(selector).getBoundingClientRect().width;return {graph:width('.boardcanvas>svg'),canvas:width('[data-explore-panel=p]'),floating:width('[data-explore-panel=q]')};});
  const initial=await sizes();await nav(page).getByRole('button',{name:'Canvas zoom in',exact:true}).click();const zoomed=await sizes();expect(zoomed.graph).toBeGreaterThan(initial.graph);expect(zoomed.canvas).toBeGreaterThan(initial.canvas);expect(zoomed.floating).toBeCloseTo(initial.floating,0);
- await nav(page).locator('.explore-panel-menu>summary').click();await nav(page).getByRole('button',{name:'Enlarge panels and controls',exact:true}).click();await frame(page);
+ await nav(page).locator('.explore-panel-menu>summary').click();await nav(page).getByRole('button',{name:'Enlarge floating panels',exact:true}).click();await frame(page);
  const scaled=await sizes();expect(scaled.graph).toBeCloseTo(zoomed.graph,0);expect(scaled.canvas).toBeCloseTo(zoomed.canvas,0);expect(scaled.floating).toBeGreaterThan(zoomed.floating);
  const authored=await page.locator('#src').inputValue();expect(authored).not.toBe(original);
  await page.locator('#workspace-focus-diagram').click();await page.getByRole('button',{name:'Return to page',exact:true}).click();await frame(page);

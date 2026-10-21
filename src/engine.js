@@ -2601,7 +2601,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
    camera; these styles and gestures are inactive while it borrows the board. */
 function createBoardNavigation(board, group, legend, changed){
   var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
-  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false;
+  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,publishedScale=null;
   var motion=createCameraMotion();
   function manual(){motion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
   var controls=document.createElement('div');controls.className='board-zoom';
@@ -2623,7 +2623,7 @@ function createBoardNavigation(board, group, legend, changed){
   function graph(){return canvas.querySelector('svg');}
   function displayScale(){var grid=board.closest('.section-layout-grid');return grid && grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
   function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/displayScale()/svg.viewBox.baseVal.width:1;}
-  function refresh(){if(!enabled())return;var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;}
+  function refresh(){if(!enabled())return;var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;if(r!==publishedScale){publishedScale=r;board.dispatchEvent(new CustomEvent('board-scale-change'));}}
   function zoom(next){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return;
     var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect(),display=displayScale();
@@ -2652,9 +2652,17 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    // The SVG clips at its viewBox, so the framed box never extends past it.
+    var controls=canvas.querySelector('.standard-controls-player:not([hidden])');
+    if(controls){
+      var r={};['x','y','w','h'].forEach(function(key){r[key]=parseFloat(controls.style.getPropertyValue('--float-'+key));});
+      if(Object.keys(r).every(function(key){return Number.isFinite(r[key]);})){
+        var left=Math.min(ink.x,box.x+r.x),top=Math.min(ink.y,box.y+r.y);
+        ink={x:left,y:top,w:Math.max(ink.x+ink.w,box.x+r.x+r.w)-left,h:Math.max(ink.y+ink.h,box.y+r.y+r.h)-top};
+      }else controls=null;
+    }
+    // SVG ink clips at its viewBox; attached controls may extend beyond it.
     function axis(start,size,full,length,available,legacy){
-      var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
+      var from=controls?start:Math.max(start,full),to=controls?start+size:Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
       // Follow needs half a viewport of runway at either end so an edge node
@@ -2675,7 +2683,7 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function down(ev){
     suppressClick=false;
-    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('.standard-controls-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     manual();
     // Desktop touchscreens pan natively. Relinquish Follow before returning,
     // without preventing scrolling or capturing the pointer for a mouse drag.
@@ -2881,7 +2889,7 @@ function createBoardSizeControl(board, legend, label){
   setMode('auto');
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
-  return {mode:function(){ return mode; }, setMode:setMode,
+  return {mode:function(){ return mode; }, setMode:setMode,refresh:syncOverflow,
     followActive:function(extent){if(navigation)navigation.followActive(extent);},cancelFollow:function(){if(navigation)navigation.cancelFollow();},
     fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},

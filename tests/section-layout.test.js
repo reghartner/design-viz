@@ -799,3 +799,21 @@ test('play buttons normalize, edit, reset and duplicate per arrangement with leg
     assert.equal(JSON.parse(plan.text).layouts.find(v=>v.id===plan.layoutId).playbackPosition,'above');
   }
 });
+
+test('whole step-controls scale validates independently and survives arrangement duplication',()=>{
+ const d=diagram();d.layouts=[{id:'eng',name:'Engineering',presentation:'standard',sectionLayout:{default:[board]},exploreLayout:{controlsPlacement:'canvas',textScale:{controls:1.5},canvas:{controlsScale:.6,controls:{x:0,y:500,w:720,h:220}}}},{id:'other',name:'Other',sectionLayout:{default:[board]}}];
+ const text=JSON.stringify(d),before=structuredClone(d);
+ for(const scale of [.5,.9,1,1.25]){
+  const value={...d.layouts[0].exploreLayout,controlsScale:scale},warnings=[];
+  assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+  const plan=ctx.planSectionExploreLayout(text,d,0,'eng',value,true);assert.ok(!plan.error,plan.error);
+  const saved=JSON.parse(plan.text);assert.deepEqual(saved.layouts[0].exploreLayout,value);assert.deepEqual(saved.layouts[1],before.layouts[1]);
+  const duplicate=ctx.planDuplicateSectionLayout(plan.text,saved,0,'eng');assert.deepEqual(JSON.parse(duplicate.text).layouts[2].exploreLayout,value);
+ }
+ for(const controlsScale of [.49,1.26,'1',null,{},Infinity]){
+  const value={...d.layouts[0].exploreLayout,controlsScale},warnings=[];
+  assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),d.layouts[0].exploreLayout);assert.equal(warnings.length,1);assert.match(warnings[0],/controlsScale/);
+  assert.ok(ctx.planSectionExploreLayout(text,d,0,'eng',value,true).error);
+ }
+ assert.deepEqual(d,before);
+});

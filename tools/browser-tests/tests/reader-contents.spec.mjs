@@ -18,17 +18,17 @@ async function openRaw(page,server,raw,name='contents'){
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
 test('Contents preserves Standard stacks, ordered Explore members and state through theme changes',async({page,server})=>{
-  // The pager counts selected View members across Tabs; Contents also selects individual sections.
+  // The pager keeps document-wide numbers while Contents selects individual sections.
   const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 4');
   await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
   await root.locator('.reader-tree-sections[data-reader-view="full"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
+  await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();const zoom=await root.locator('.reader-zoom-menu>summary').innerText();
   const board=await root.locator('#section-review .board').elementHandle();
   await root.locator('.reader-theme-menu>summary').click();await expect(root.getByRole('menuitemradio')).toHaveText(['Aurora','Pastel','Blueprint','Terminal','Rose','Lavender','Opus Lilac']);
-  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
+  await root.getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(root).toHaveClass(/sk-lilac/);await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');await expect(root.locator('.reader-zoom-menu>summary')).toHaveText(zoom);expect(await board.evaluate(el=>el.isConnected)).toBe(true);
   await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();
   await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
@@ -42,11 +42,11 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
   await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 3');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 4');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
-  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 4');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
-  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 3');
+  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Section 4 of 4');
 });
 
 test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
@@ -84,26 +84,60 @@ function twoTabs(){
   reference.defaultView='ref-standard';reference.views=[{id:'ref-standard',name:'Reference pages',presentation:'standard',sections:['reference','glossary']},{id:'ref-explore',name:'Reference map',presentation:'explore',sections:['glossary','reference']}];
   return raw;
 }
-test('section pager follows selected View order and subsets across Tabs in both directions',async({page,server},info)=>{
+test('section pager follows document order across View subsets and selects a containing View when needed',async({page,server},info)=>{
   const raw=twoTabs(),[journey,reference]=raw.page.sections[0].tabs;
   journey.defaultView='subset';reference.defaultView='ref-explore';
   reference.views.find(view=>view.id==='ref-explore').sections=['glossary'];
   const root=await openRaw(page,server,raw,'section-pager'),label=root.locator('.reader-page-label');
   const previous=root.getByRole('button',{name:'Previous section',exact:true}),next=root.getByRole('button',{name:'Next section',exact:true});
-  async function current(id,index,view){
-    await expect(label).toHaveText('Section '+index+' of 3');
+  async function current(id,view){
+    const documentIndex={backstage:3,review:2,glossary:5}[id];
+    await expect(label).toHaveText('Section '+documentIndex+' of 5');
     await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-'+id);
     await expect(root.locator('.reader-tree-sections[data-reader-view="'+view+'"] .reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section',id);
     await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view',view);
   }
-  await current('backstage',1,'subset');await expect(previous).toBeDisabled();
-  await next.click();await current('review',2,'subset');
-  await next.click();await current('glossary',3,'ref-explore');await expect(next).toBeDisabled();await page.screenshot({path:info.outputPath('cross-tab-section-pager.png')});
-  await previous.click();await current('review',2,'subset');
-  await previous.click();await current('backstage',1,'subset');await expect(previous).toBeDisabled();
-  await choose(root,'full');await expect(label).toHaveText('Section 3 of 4');
-  await next.click();await expect(label).toHaveText('Section 4 of 4');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','ref-explore');
-  await previous.click();await expect(label).toHaveText('Section 3 of 4');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','full');
+  await current('backstage','subset');
+  await previous.click();await current('review','subset');
+  await previous.click();await expect(label).toHaveText('Section 1 of 5');await expect(root.locator('#section-build')).toBeVisible();await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section','build');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','full');await expect(previous).toBeDisabled();
+  await next.click();await expect(label).toHaveText('Section 2 of 5');await next.click();await expect(label).toHaveText('Section 3 of 5');
+  await next.click();await expect(label).toHaveText('Section 4 of 5');await expect(root.locator('.reader-top-view[aria-selected="true"]')).toHaveAttribute('data-tab-view','ref-standard');
+  await next.click();await expect(label).toHaveText('Section 5 of 5');await expect(root.locator('#section-glossary')).toBeVisible();await expect(root.locator('.reader-tree-sections[data-reader-view="ref-standard"] .reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section','glossary');await expect(next).toBeDisabled();await page.screenshot({path:info.outputPath('cross-tab-section-pager.png')});
+});
+
+function fiveSectionDocument(){
+  const base=story().page.sections[0].tabs[0].sections[0],section=(id,heading,explore=false)=>{const value={...structuredClone(base),id,heading};if(explore){value.diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];value.diagram.defaultLayout='canvas';}return value;};
+  return {page:{title:'Five document sections',sections:[{tabs:[
+    {label:'First',sections:[section('one','One')]},
+    {label:'Second',sections:[section('two','Two')]},
+    {label:'Third',sections:[section('three','Three',true),section('four','Four',true),section('five','Five',true)]}
+  ]}]}};
+}
+
+test('three Tabs with 1, 1 and 3 sections keep a five-section document total in standalone, native and Workbench readers',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});const raw=fiveSectionDocument();
+  const root=await openRaw(page,server,raw,'five-document-sections'),label=root.locator('.reader-page-label'),toggle=root.locator('.reader-top>button');
+  const ids=['one','two','three','four','five'],assertCurrent=async index=>{await expect(label).toHaveText('Section '+(index+1)+' of 5');await expect(root.locator('.reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section',ids[index]);};
+  await expect(toggle).toHaveText(/^Contents\s*·\s*5 sections$/);await expect(label).toHaveText('Section 1 of 5');
+  const previous=root.getByRole('button',{name:'Previous section',exact:true}),next=root.getByRole('button',{name:'Next section',exact:true});
+  await assertCurrent(0);await expect(previous).toBeDisabled();
+  for(let index=1;index<5;index++){await next.click();await assertCurrent(index);}
+  await expect(next).toBeDisabled();await expect(root.locator('.reader-tab-label')).toHaveText('Third');
+  for(let index=3;index>=0;index--){await previous.click();await assertCurrent(index);}
+  await expect(previous).toBeDisabled();
+  await info.attach('five-section-standalone',{body:await page.screenshot(),contentType:'image/png'});
+
+  await writeFile(path.join(server.root,'five-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+  await writeFile(path.join(server.root,'five-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./five-native.js";window.mount=mountNativeViewer;</script>');
+  await page.goto(server.origin+'/five-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(spec=>{window.one=mount(document.querySelector('#one'),spec);},raw);
+  const native=page.locator('#one');await expect(native.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*5 sections$/);await expect(native.locator('.reader-page-label')).toHaveText('Section 1 of 5');
+  for(let index=2;index<=5;index++){await native.getByRole('button',{name:'Next section',exact:true}).click();await expect(native.locator('.reader-page-label')).toHaveText('Section '+index+' of 5');}
+  await info.attach('five-section-native',{body:await page.screenshot(),contentType:'image/png'});
+
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+  const workbench=page.locator('#docview');await expect(workbench.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*5 sections$/);await expect(workbench.locator('.reader-page-label')).toHaveText('Section 1 of 5');
+  for(let index=2;index<=5;index++){await workbench.getByRole('button',{name:'Next section',exact:true}).click();await expect(workbench.locator('.reader-page-label')).toHaveText('Section '+index+' of 5');}
+  await info.attach('five-section-workbench',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 const authored={'Product journey':{full:3,explore:3,subset:2},'Reference':{'ref-standard':2,'ref-explore':2}};
@@ -213,7 +247,7 @@ for(const width of [1440,390])test('top Views route with Contents closed and ret
   await page.evaluate(()=>location.hash='d=build&v=full');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 4');
   await full.focus();await page.keyboard.press('End');await expect(subset).toBeFocused();await expect(full).toHaveAttribute('aria-selected','true');await page.keyboard.press('Enter');
   await expect(subset).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(root.locator('.reader-contents')).toBeHidden();
-  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 3');expect(new URL(page.url()).hash).toContain('v=subset');
+  await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');await expect(root.locator('.reader-page-label')).toHaveText('Section 3 of 4');expect(new URL(page.url()).hash).toContain('v=subset');
   await page.evaluate(()=>location.hash='d=review&v=subset');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   const step=root.locator('#section-review .stepid'),before=await step.innerText();await page.evaluate(()=>document.body.classList.add('presenting'));
   await subset.focus();await page.keyboard.press('ArrowLeft');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);

@@ -125,7 +125,7 @@ test('short floating tools keep their close buttons and rail reachable above can
    R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection Shift+F10/ContextMenu, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
    R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
    R6 Redo is ⌘/Ctrl+Shift+Z only | Storage right-click Lock position, then Undo | from a canvas-focused node a real ControlOrMeta+Y leaves nodes.c.locked false and #redo-builder enabled, then ControlOrMeta+Shift+Z re-applies it | a Y alias that still redoes, or a listed Redo that does nothing
-   R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Sections in selected View" | "Page 1 of 2" or Page-named arrows
+   R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Document sections" | "Page 1 of 2" or Page-named arrows
    R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
 /* #611 contract matrix (desktop editor): the Layers tab is removed; position locks stay in Inspect and the object menu.
    row | fixture | assertion (scoped) | rejects
@@ -164,7 +164,7 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
 
   const pager=page.locator('#docview .explore-navigation .reader-page-index');
-  await expect(pager).toHaveAttribute('aria-label','Sections in selected View');
+  await expect(pager).toHaveAttribute('aria-label','Document sections');
   await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');
   await pager.getByRole('button',{name:'Next section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 2 of 2');
   await pager.getByRole('button',{name:'Previous section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');

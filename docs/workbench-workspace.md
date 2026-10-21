@@ -49,7 +49,13 @@ to create section prose. **Change destination** chooses another section. These
 actions append and select the new item, including in sections without diagrams,
 and reveal it on the selected view surface: Notes in Explore or prose in Standard.
 Empty section inspectors also offer **Add an introduction** and **Add first point**.
-New paragraphs and points focus their text field with the placeholder selected.
+New paragraphs and points open an inline text field with the placeholder selected.
+Double-click existing prose, or focus it and press Enter, to type directly in
+Standard prose or Explore Section notes. Markdown renders live below the native
+text field: emphasis, links, bullets, inline code and fenced code blocks. Enter
+continues a bullet; Enter on an empty bullet ends the list. Ctrl/Command+Enter
+or clicking outside saves the draft as one Undo; Escape discards it. Native
+text Undo works while typing. Single-click still selects prose for Inspect.
 Select a paragraph for **Add paragraph before/after**, **Move paragraph up/down**,
 and **Delete paragraph**. Select a bullet for siblings, subpoints, indent/outdent,
 reordering and deletion; these move or remove its whole subtree. Each addition,
@@ -161,7 +167,9 @@ The selected View owns its Standard or Explore surface. **View → Arrange selec
 **Home**, **File**, **Add**, **Undo/Redo**, **Appearance**, **Preview**, **Help**, and download share one project band. **Appearance** is the editor's only skin control (the Contents sidebar has no theme picker while editing; readers and the page preview keep theirs), and **Preview** opens the read-only page preview in one click. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
 
 Each card in **Add to diagram** opens its next step immediately. **Node** opens
-presets; click a preset to add it and customize it in the inspector. **All additions**
+presets; click a preset to add it and type its main title directly on the node.
+Enter or clicking outside saves; Escape keeps the initial title. Later title
+edits and other fields use Inspect. **All additions**
 returns to the menu without inserting anything. **Connection** starts choosing a
 source and target in the selected section. **Step** immediately appends to that
 section's selected timeline. **Panel** opens the visual library, and **Services

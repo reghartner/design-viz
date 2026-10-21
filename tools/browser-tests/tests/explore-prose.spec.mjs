@@ -91,7 +91,7 @@ test('Standard to Explore frames a short graph after indexing, and preserves a r
 test('first prose from Add or section inspector creates visible notes and keeps Explore with exact history',async({page,server})=>{
   const raw=fixture('explore');raw.page.sections[0].text='';delete raw.page.sections[0].bullets;
   const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
-  const input=page.locator('#guide').getByLabel('Prose text',{exact:true});
+  const input=page.getByRole('textbox',{name:'Edit section text',exact:true});
   for(const [route,kind] of [['add','paragraph'],['section','paragraph'],['add','bullet'],['section','bullet']]){
     await closeTools(page);await expect(notes(page)).toHaveCount(0);await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
     if(route==='section'){

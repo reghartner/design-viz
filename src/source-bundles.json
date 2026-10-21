@@ -104,6 +104,7 @@
     "workbench/edge-curves.js",
     "workbench/shortcuts.js",
     "workbench/text-boxes.js",
+    "workbench/inline-text.js",
     "workbench/spatial-selection.js",
     "workbench/path-reorder.js",
     "workbench/interactions.js",

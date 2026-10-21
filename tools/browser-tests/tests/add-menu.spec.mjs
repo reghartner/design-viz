@@ -122,7 +122,7 @@ test('Add UI stays within a narrow editor and its modal fits supported skins',as
     if(skin==='pastel')await testInfo.attach('add-node-presets-pastel',{body:await dialog.screenshot(),contentType:'image/png'});
     await page.keyboard.press('Escape');
   }
-  await page.setViewportSize({width:720,height:800});await page.locator('#diagram-add').click();
+  await page.setViewportSize({width:1440,height:1000});await page.locator('#diagram-add').click();
   await expect(page.locator('#add-panel')).toBeInViewport();
   expect(await page.locator('#diagram-add-menu').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
 });

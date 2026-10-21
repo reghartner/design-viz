@@ -1,6 +1,8 @@
 import {chooseAddDestination,test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFileSync} from 'node:fs';
 import {paste as pasteDiagram} from '../helpers/test.mjs';
+// New prose opens on its authored surface; keep this suite's inspector coverage.
+const createdInline=async(page,value)=>{const edit=page.getByRole('textbox',{name:'Edit section text',exact:true});await expect(edit).toHaveValue(value);await expect(edit).toBeFocused();expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,value.length]);await edit.press('Escape');};
 const add=async(page,kind)=>{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();};
 test('blank starter creates, edits, orders and removes prose through the UI with exact Undo/Redo',async({page,server},info)=>{
  const raw=JSON.parse(readFileSync(new URL('../../../src/starters/minimal.json',import.meta.url),'utf8'));
@@ -10,12 +12,12 @@ test('blank starter creates, edits, orders and removes prose through the UI with
  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
  await add(page,'paragraph');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await expect(page.locator('[data-explore-content="prose"]')).toBeVisible();
  await expect(paragraphs.first()).toBeVisible();await expect(paragraphs.first()).toHaveClass(/dv-sel/);await expect(field).toHaveValue('New paragraph');
- await expect(field).toBeFocused();expect(await field.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'New paragraph'.length]);
+ await createdInline(page,'New paragraph');
  const created=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
  await page.locator('#redo-builder').click();await expect(src).toHaveValue(created);await inspectPageElement(page,paragraphs.first());
  await field.fill('First with `code`');await field.press('Tab');await expect(paragraphs.first().locator('code')).toHaveText('code');
  await guide.getByRole('button',{name:'Add paragraph after',exact:true}).click();await expect(field).toHaveValue('New paragraph');
- await expect(field).toBeFocused();
+ await createdInline(page,await field.inputValue());
  await field.fill('Second');await field.press('Tab');await expect(paragraphs.nth(1)).toHaveText('Second');
  const two=await src.inputValue();
  await guide.getByRole('button',{name:'Move paragraph up',exact:true}).click();await expect(paragraphs.first()).toHaveText('Second');await expect(paragraphs.first()).toHaveClass(/dv-sel/);
@@ -23,26 +25,26 @@ test('blank starter creates, edits, orders and removes prose through the UI with
  const moved=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(two);
  await page.locator('#redo-builder').click();await expect(src).toHaveValue(moved);await inspectPageElement(page,paragraphs.first());
  await guide.getByRole('button',{name:'Move paragraph down',exact:true}).click();await expect(src).toHaveValue(two);await expect(paragraphs.nth(1)).toHaveClass(/dv-sel/);
- await guide.getByRole('button',{name:'Add paragraph before',exact:true}).click();await expect(paragraphs.nth(1)).toHaveText('New paragraph');await expect(paragraphs.nth(1)).toHaveClass(/dv-sel/);
+ await guide.getByRole('button',{name:'Add paragraph before',exact:true}).click();await createdInline(page,'New paragraph');await expect(paragraphs.nth(1)).toHaveText('New paragraph');await expect(paragraphs.nth(1)).toHaveClass(/dv-sel/);
  await guide.getByRole('button',{name:'Delete paragraph',exact:true}).click();await expect(src).toHaveValue(two);
  await add(page,'bullet');await expect(field).toHaveValue('New point');
- await expect(field).toBeFocused();
+ await createdInline(page,await field.inputValue());
  await field.fill('First point');await field.press('Tab');
  await guide.getByRole('button',{name:'Add subpoint',exact:true}).click();await expect(field).toHaveValue('New subpoint');
  await guide.getByRole('button',{name:'Add sibling',exact:true}).click();await expect(field).toHaveValue('New point');
  const nested=await src.inputValue();await guide.getByRole('button',{name:'Move point up',exact:true}).click();
  await expect(page.locator('#docview [data-dv-bullet-path="0.0"]')).toHaveClass(/dv-sel/);
  await page.locator('#undo-builder').click();await expect(src).toHaveValue(nested);
- await add(page,'bullet');await expect(page.locator('#docview [data-dv-bullet-path="1"]')).toHaveClass(/dv-sel/);
+ await add(page,'bullet');await createdInline(page,'New point');await expect(page.locator('#docview [data-dv-bullet-path="1"]')).toHaveClass(/dv-sel/);
  const result=JSON.parse(await src.inputValue());expect(result.page.sections[0].bullets).toEqual([{text:'First point',sub:['New subpoint','New point']},'New point']);
  expect(result.page.sections[0].text).toEqual(['First with `code`','Second']);expect(result.page.sections[0].diagram).toEqual(section.diagram);
  await guide.getByRole('button',{name:'Delete point',exact:true}).click();await expect(src).toHaveValue(nested);
- await page.setViewportSize({width:720,height:800});await page.locator('#diagram-add').click();
+ await page.setViewportSize({width:1440,height:1000});await page.locator('#diagram-add').click();
  const menu=page.locator('#diagram-add-menu');expect(await menu.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  await page.locator('#add-paragraph').scrollIntoViewIfNeeded();await expect(page.locator('#add-paragraph')).toBeInViewport();
- await info.attach('prose-add-narrow',{body:await menu.screenshot(),contentType:'image/png'});
+ await info.attach('prose-add-desktop',{body:await menu.screenshot(),contentType:'image/png'});
  await page.keyboard.press('Escape');await inspectPageElement(page,paragraphs.first());
- await info.attach('paragraph-inspector-narrow',{body:await page.screenshot(),contentType:'image/png'});
+ await info.attach('paragraph-inspector-desktop',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 test('prose-only tab sections support first additions and stale Add dialogs do not publish',async({page,server})=>{
@@ -55,10 +57,10 @@ test('prose-only tab sections support first additions and stale Add dialogs do n
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
  await page.locator('#docview').getByRole('heading',{name:'Blank notes',exact:true}).click();
  const guide=page.locator('#guide'),field=guide.getByLabel('Prose text',{exact:true});
- await guide.getByRole('button',{name:'Add an introduction',exact:true}).click();await expect(field).toHaveValue('New paragraph');await expect(field).toBeFocused();
+ await guide.getByRole('button',{name:'Add an introduction',exact:true}).click();await expect(field).toHaveValue('New paragraph');await createdInline(page,await field.inputValue());
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
  await page.locator('#docview').getByRole('heading',{name:'Blank notes',exact:true}).click();
- await guide.getByRole('button',{name:'Add first point',exact:true}).click();await expect(field).toHaveValue('New point');await expect(field).toBeFocused();
+ await guide.getByRole('button',{name:'Add first point',exact:true}).click();await expect(field).toHaveValue('New point');await createdInline(page,await field.inputValue());
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
  await add(page,'bullet');next=JSON.parse(await page.locator('#src').inputValue());expect(next.page.blocks[1].tabs[0].sections[0].bullets).toEqual(['New point']);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
@@ -79,7 +81,7 @@ test('empty string prose becomes one focused first paragraph through either inse
    await page.locator('#guide').getByRole('button',{name:'Add an introduction',exact:true}).click();
   }else await add(page,'paragraph');
   await expect(paragraphs).toHaveCount(1);await expect(paragraphs).toHaveAttribute('data-dv-para','0');await expect(paragraphs).toHaveClass(/dv-sel/);
-  await expect(field).toHaveValue('New paragraph');await expect(field).toBeFocused();
+  await expect(field).toHaveValue('New paragraph');await createdInline(page,await field.inputValue());
   const after=await src.inputValue(),expected=structuredClone(raw);expected.page.sections[0].text=['New paragraph'];expect(JSON.parse(after)).toEqual(expected);
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await expect(paragraphs).toHaveCount(0);
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(after);await expect(paragraphs).toHaveCount(1);

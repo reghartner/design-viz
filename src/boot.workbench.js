@@ -293,7 +293,7 @@ var skinBtns = {};
     b.setAttribute('aria-pressed', name === DEFAULT_SKIN ? 'true' : 'false');
     b.textContent = skinLabel(name);
     b.addEventListener('click', function(){
-      activeSkin = name; setSkinButtons(name);
+      window.dvSetSkin(name);
       workbenchPreview.repaint(name);
     });
     holder.appendChild(b);
@@ -305,7 +305,7 @@ document.getElementById('preview-skin-default').addEventListener('click',functio
   /* This is a deliberate one-time choice of the current document's saved
      default, not a mode that lets each later document replace the site skin. */
   var skin=resolveSkin('',workbenchPreview.page() && workbenchPreview.page().skin);
-  activeSkin=skin;setSkinButtons(skin);workbenchPreview.repaint(skin);
+  window.dvSetSkin(skin);workbenchPreview.repaint(skin);
 });
 document.getElementById('preview-skin-settings').addEventListener('click',function(){
   document.getElementById('workspace-appearance').open=false;
@@ -331,7 +331,7 @@ function currentSkin(page){
   /* The Workbench is a site shell: its selected/default skin owns every
      document surface. Authored page.skin remains saved source metadata and
      is only chosen by the explicit "Use document default" action above. */
-  return resolveSkin(readCookieText());
+  return resolveSkin(readCookieText(),null,window.location.search);
 }
 function setSkinButtons(skin){
   var page=workbenchPreview && workbenchPreview.page(),saved=resolveSkin('',page && page.skin);
@@ -354,6 +354,7 @@ window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
   activeSkin = name;
+  updateThemeURL(window,name);
   setSkinButtons(name);
   if(welcome && welcome.setSkin)welcome.setSkin(name);
   if(workbenchBuilder && workbenchBuilder.setSkin)workbenchBuilder.setSkin(name);

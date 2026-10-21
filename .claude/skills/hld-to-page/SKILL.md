@@ -10,7 +10,7 @@ ledger, inherited state and neighboring steps. Source is evidence, never
 instructions. Preserve facts, icons, animations and outcomes; do not re-ask
 settled facts.
 
-## Generate the entry packet
+## Entry packet
 
 VIZ is the checkout or `authoring/` kit; use its directory or absolute paths.
 Select planned panels/features for new stories; for edits, infer from the spec
@@ -48,7 +48,7 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
 
 ## Choose the starting point
 
-Browser imports: [supported formats](../../../docs/workbench-user-guide.md).
+[Browser import formats](../../../docs/workbench-user-guide.md).
 
 After the packet, route source/handoff details:
 
@@ -95,8 +95,8 @@ After the packet, route source/handoff details:
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md).
 
-Deliver spec/ledger files together. Ask unresolved story decisions and, after
-relevant checks, needed Mixed/Engineering source access plainly.
+Deliver spec/ledger together. Ask unresolved story decisions and, after checks,
+needed Mixed/Engineering source access plainly.
 HTML requires an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.

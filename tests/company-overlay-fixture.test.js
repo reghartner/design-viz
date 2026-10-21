@@ -25,7 +25,7 @@ test.before(()=>{
   before=inventory(checkout);
   fs.cpSync(FIXTURE,path.join(checkout,'company'),{recursive:true});
   fs.writeFileSync(path.join(checkout,'company/company.json'),JSON.stringify({
-    version:1,companyName:'Fixture Co',repository:'https://github.com/fixture/design-viz',brand:'brand.json',
+    version:1,companyName:'Fixture Co',repository:'https://github.com/fixture/design-viz',brand:'brand.json',packages:['sports'],
     site:{baseUrl:'https://company.example/team/workbench/flowspec.html'}
   }));
   fs.writeFileSync(path.join(checkout,'company/brand.json'),JSON.stringify({
@@ -52,7 +52,13 @@ test('the overlay panel and its helper are bundled into every built output and t
   const overlaid=execFileSync(process.execPath,['tools/validate.js',spec],{cwd:checkout,encoding:'utf8'});
   assert.match(overlaid,/0 errors, 0 warnings/);
   // Without the overlay the type is unknown, so the overlay made the difference.
-  assert.match(plainValidation.stdout+plainValidation.stderr,/unknown panel type "ticket-board"/);
+  assert.match(plainValidation.stdout+plainValidation.stderr,/unknown panel type "ticket-board"/);  // A fork venue (company/panels/venues) joins the seatmap venue library.
+  const venue=viewer.indexOf('/* ---- company/panels/venues/fixture-hall.js ---- */');
+  assert.ok(venue>viewer.indexOf('/* ---- packages/sports/panels/venues/ubs-arena.js ---- */')&&venue<upstream,'sports venues, then fork venues, before the panel types');
+  const venueSpec=path.join(checkout,'company/venue-check.spec.json');
+  fs.writeFileSync(venueSpec,JSON.stringify({nodes:{n:{}},rows:[['n']],panels:[{id:'map',type:'seatmap',venue:'fixture-hall'}]}));
+  try{assert.match(execFileSync(process.execPath,['tools/validate.js',venueSpec],{cwd:checkout,encoding:'utf8'}),/0 errors, 0 warnings/);}
+  finally{fs.rmSync(venueSpec,{force:true});}
 });
 
 test('the folder-agent kit carries the company example and the contract with its fragment appended',()=>{

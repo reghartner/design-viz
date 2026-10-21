@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
-const {execFileSync}=require('node:child_process');
+const {execFileSync,spawnSync}=require('node:child_process');
 const loader=require('../tools/source-loader.cjs');
 const root=path.resolve(__dirname,'..'),plain=value=>JSON.parse(JSON.stringify(value));
 function fixture(t){
@@ -73,4 +73,66 @@ test('asset inventory keeps page CSS raw, ordered panel CSS and the explicit all
   for(const font of forge.fonts)assert.match(font.fontsource,/^@fontsource\/.+\/latin-\d+\.css$/);
   assert.equal((loader.fontCss('all').match(/@font-face/g)||[]).length,24);
   assert.throws(()=>loader.fontAssets('unknown'),/Unknown font profile/);
+});
+
+test('biology and physics packages register only their own panel sources and assets',()=>{
+  const cli=(args,selected='')=>execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),...args],{
+    encoding:'utf8',maxBuffer:32*1024*1024,
+    env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:selected}
+  });
+  assert.deepEqual(JSON.parse(cli(['--packages'])),[]);
+  assert.deepEqual(JSON.parse(cli(['--packages'],'science')),['science']);
+  assert.deepEqual(JSON.parse(cli(['--packages'],'physics')),['physics']);
+  const domains={science:['rnacopy'],physics:['forcebody','wavefield']};
+  const baseline=JSON.parse(cli(['--files','validator.js']));
+  const basicAssets=JSON.parse(cli(['--assets']));
+  for(const [name,names] of Object.entries(domains)){
+    const selected=JSON.parse(cli(['--files','validator.js'],name));
+    const assets=JSON.parse(cli(['--assets'],name));
+    for(const type of names){
+      assert.equal(baseline.some(file=>file.includes('/'+type+'.js')),false,type);
+      assert.equal(Object.hasOwn(basicAssets.features,'panel.'+type),false,type);
+      assert.ok(selected.includes('@package/'+name+'/panels/types/'+type+'.js'),type);
+      assert.ok(Object.hasOwn(assets.features,'panel.'+type),type);
+    }
+    for(const other of Object.keys(domains).filter(other=>other!==name))
+      for(const type of domains[other]){
+        assert.equal(selected.some(file=>file.includes('/'+type+'.js')),false,name+' excludes '+type);
+        assert.equal(Object.hasOwn(assets.features,'panel.'+type),false,name+' excludes '+type);
+      }
+  }
+  assert.doesNotMatch(cli(['--styles','style.core.css']),/\.wavefield-panel\{/);
+  assert.doesNotMatch(cli(['--styles','style.core.css'],'science'),/\.wavefield-panel\{/);
+  assert.match(cli(['--styles','style.core.css'],'physics'),/\.wavefield-panel\{/);
+  const unknown=spawnSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),'--packages'],{
+    encoding:'utf8',env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:'unknown'}
+  });
+  assert.notEqual(unknown.status,0);
+  assert.match(unknown.stderr,/Cannot read package unknown/);
+});
+
+test('generic grid and funnel remain core while domain packages stay optional',()=>{
+  const cli=(args,selected='')=>execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),...args],{
+    encoding:'utf8',maxBuffer:32*1024*1024,
+    env:{...process.env,FLOWVIEW_COMPANY_IDENTITY:'off',FLOWVIEW_PACKAGES:selected}
+  });
+  const cases=[
+    {selection:'',packages:[],domain:[]},
+    {selection:'science',packages:['science'],domain:['science']},
+    {selection:'physics',packages:['physics'],domain:['physics']},
+    {selection:'sports',packages:['sports'],domain:['sports']},
+    {selection:'science,sports',packages:['science','sports'],domain:['science','sports']},
+  ];
+  for(const {selection,packages,domain} of cases){
+    assert.deepEqual(JSON.parse(cli(['--packages'],selection)),packages,selection);
+    const files=JSON.parse(cli(['--files','validator.js'],selection));
+    const assets=JSON.parse(cli(['--assets'],selection));
+    for(const type of ['funnel','grid']){
+      assert.equal(files.filter(file=>file==='panels/types/'+type+'.js').length,1,selection+' '+type);
+      assert.equal(Object.hasOwn(assets.features,'panel.'+type),true,selection+' '+type);
+    }
+    assert.equal(files.some(file=>file.startsWith('@package/science/')),domain.includes('science'),selection);
+    assert.equal(files.some(file=>file.startsWith('@package/physics/')),domain.includes('physics'),selection);
+    assert.equal(files.some(file=>file.startsWith('@package/sports/')),domain.includes('sports'),selection);
+  }
 });

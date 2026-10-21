@@ -51,6 +51,15 @@ test('estimates account for wrapping, distinct content models and inherited path
  const all=E.states(d);assert.equal(all.length,5);assert.deepEqual(all[2].panels.log.log.map(x=>x.text),['Initial','First','Second']);assert.deepEqual(all[4].panels.log.log.map(x=>x.text),['Initial','First','Other']);
  d.steps[1].text='Detailed instruction and evidence. '.repeat(50);const input=E.inputs({diagram:A.seed(d,[])},1000);assert.ok(input.stepDepth[12].neededHeight>input.stepDepth[24].neededHeight);assert.ok(input.stepDepth[24].maxLines>10);
 });
+test('composer sizes core data panels from their authored stage and row counts',()=>{
+ const funnel=stages=>E.panelSize({id:'f',type:'funnel',stages:Array.from({length:stages},(_,i)=>({id:'s'+i}))},{counts:{}},360);
+ const grid=rows=>E.panelSize({id:'g',type:'grid',rows:Array.from({length:rows},(_,i)=>({id:'r'+i})),cols:[{id:'a'},{id:'b'}]},{cells:{}},360);
+ assert.equal(funnel(5).model,'funnel');
+ assert.ok(funnel(5).intrinsicHeight>=290,'five-stage funnel includes bars, deltas, and footer');
+ assert.ok(funnel(12).intrinsicHeight>funnel(5).intrinsicHeight);
+ assert.equal(grid(4).model,'grid');
+ assert.ok(grid(12).intrinsicHeight>grid(4).intrinsicHeight);
+});
 test('complete composition is deterministic and preserves profile/state semantics',async()=>{
  const d=diagram();d.nodes.b={title:'B'};d.floats.push({id:'b',side:'below'});d.edges=[{from:'a',to:'b',label:'Request'}];d.panels=[{id:'state',type:'state',states:['ready','done'],initial:{state:'ready'}}];d.steps=[{id:'a',text:'Review the state.',panels:{state:{state:'done'}}}];d.sectionLayout={columns:24,backstage:[{x:0,y:0,w:24,h:10}]};
  const raw={page:{title:'Pure composition',flowview:{authoredWith:'0.1.0',minVersion:'0.1.0',features:['flow.failures']},sections:[{diagram:d},{heading:'Untouched',text:'Keep this exact.'}]}},options={...defaults,width:800,sections:[0],profile:'confluence',rearrange:true},before=JSON.stringify(raw);

@@ -57,9 +57,13 @@ def workbench_templates() -> str:
                 default_routing(tab)
 
     entries = []
-    for template in WORKBENCH_TEMPLATES:
-        entry = {key: value for key, value in template.items() if key not in ("source", "title")}
-        entry["spec"] = json.loads(read(template["source"]))
+    for template in WORKBENCH_TEMPLATES + package_templates():
+        entry = {key: value for key, value in template.items() if key not in ("source", "title", "package")}
+        if "package" in template:
+            spec_source = ROOT / 'packages' / template['package'] / template['source']
+            entry["spec"] = json.loads(spec_source.read_text())
+        else:
+            entry["spec"] = json.loads(read(template["source"]))
         # The legacy minimal example calls itself blank, but contains 3 nodes.
         if "title" in template:
             entry["spec"]["page"]["title"] = template["title"]
@@ -86,6 +90,27 @@ def site_config_path(config=None) -> pathlib.Path:
     return pathlib.Path(config).resolve() if config is not None else ROOT / 'workbench/site.json'
 
 
+def site_packages(config=None, *, no_config=False) -> list[str] | None:
+    """A site package list overrides the company default; absence inherits it."""
+    path = site_config_path(config)
+    if no_config or (config is None and not path.exists()):
+        return None
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError('expected a JSON object')
+        if 'packages' not in data:
+            return None
+        names = data['packages']
+        if (not isinstance(names, list) or any(not isinstance(name, str) or
+                not re.fullmatch(r'[a-z][a-z0-9-]*', name) for name in names) or
+                len(names) != len(set(names))):
+            raise ValueError('packages must be a list of unique lowercase package names')
+        return names
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Invalid site config {path}: {error}') from error
+
+
 def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
     """Read company-owned inputs without changing them. Paths belong to config."""
     path = site_config_path(config)
@@ -95,8 +120,8 @@ def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
                               'footer': 'One story. System flow, Home map, App screens, and Device app—moving together.'})
     try:
         data = json.loads(path.read_text())
-        if not isinstance(data, dict) or set(data) - {'examples'} != {'version', 'landing'}:
-            raise ValueError('expected only version, landing and optional examples fields')
+        if not isinstance(data, dict) or set(data) - {'examples', 'packages'} != {'version', 'landing'}:
+            raise ValueError('expected only version, landing and optional examples and packages fields')
         if type(data['version']) is not int or data['version'] != 1:
             raise ValueError('version must be 1')
         landing = data['landing']
@@ -156,6 +181,15 @@ def company() -> dict:
     return json.loads(loader('--company')) or {}
 
 
+def package_base(config=None, *, no_config=False) -> list[str] | None:
+    selected = site_packages(config, no_config=no_config)
+    if selected is not None:
+        return selected
+    # An external config that omits packages inherits the company default,
+    # never an unrelated in-tree workbench/site.json.
+    return company().get('packages', []) if config is not None else None
+
+
 def company_markers() -> dict:
     """Workbench skeleton values. Without company config they equal upstream's."""
     config = company()
@@ -209,6 +243,21 @@ def panel_assets() -> dict:
     return json.loads(loader('--assets'))
 
 
+def enabled_packages() -> list[str]:
+    return json.loads(loader('--packages'))
+
+
+def package_templates() -> list[dict]:
+    templates = []
+    selections = (json.loads(loader('--company')) or {}).get('packageContent', {})
+    for name in enabled_packages():
+        manifest = json.loads((ROOT / 'packages' / name / 'package.json').read_text())
+        selection = selections.get(name)
+        templates.extend(dict(entry, package=name) for entry in manifest['templates']
+                         if selection is None or entry['source'] in selection['templates'])
+    return templates
+
+
 def panel_css(name: str) -> str:
     return loader('--styles', name)
 
@@ -256,10 +305,21 @@ def main() -> int:
     parser.add_argument('--no-catalog', action='store_true',
                         help='hide the Welcome "From service catalog" actions, for hosts that publish no service catalog; '
                              'the editor Add menu keeps its catalog entry')
+    parser.add_argument('--package', action='append', default=[], metavar='NAME',
+                        help='include an optional content package; repeat for multiple packages (adds to company/site selection)')
     args = parser.parse_args()
+    os.environ.pop('FLOWVIEW_PACKAGE_BASE', None)
+    os.environ.pop('FLOWVIEW_SITE_CONFIG', None)
     if args.no_config:
         # Every loader subprocess (and the kit's arrangement tool) inherits this.
         os.environ['FLOWVIEW_COMPANY_IDENTITY'] = 'off'
+    site_selection = package_base(args.config, no_config=args.no_config)
+    if site_selection is not None:
+        os.environ['FLOWVIEW_PACKAGE_BASE'] = ','.join(site_selection)
+    if args.package:
+        selected = [name for name in os.environ.get('FLOWVIEW_PACKAGES', '').split(',') if name]
+        selected.extend(args.package)
+        os.environ['FLOWVIEW_PACKAGES'] = ','.join(selected)
     if args.runtime_only and args.config is not None:
         parser.error('--config requires an HTML build')
     runtime = canon_runtime()

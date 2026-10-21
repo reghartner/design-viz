@@ -1,0 +1,97 @@
+{
+ "page": {
+  "title": "A bacterium cuts foreign DNA",
+  "subtitle": "Teaching cartoon · fictional bacterium, generic enzyme · one strand scene driven by the story",
+  "description": "A fictional bacterium recognises a six-letter site on foreign DNA, cuts both backbones and clears the fragments; its own copy of the site carries a cap that blocks binding.",
+  "tags": ["biology", "mechanism", "strand", "teaching"],
+  "skin": "aurora",
+  "lanes": {
+   "OUTSIDE": {"color": "#38E1FF"},
+   "CELL": {"color": "#FFB454"}
+  },
+  "sections": [
+   {
+    "heading": "Recognise, bind, cut, clear",
+    "text": [
+     "A classroom cartoon: a short piece of foreign DNA enters a made-up bacterium. A generic restriction enzyme slides along it until a six-letter recognition site matches its pocket, binds, cuts both backbones with a staggered cut and lets go. The two products keep four-letter overhangs before the cell clears them.",
+     "The alternate path follows the same enzyme over the bacterium's own copy of the site, where a cap blocks binding. Everything here is authored for teaching; no real organism, enzyme or sequence is depicted and nothing is measured."
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "foreign": {"title": "Foreign DNA", "sub": "arrives from outside", "icon": "package", "tint": "data"},
+      "enzyme": {"title": "Restriction enzyme", "sub": "scans the strand", "icon": "detection", "tint": "cmd"},
+      "site": {"title": "Recognition site", "sub": "six letters · 9–14", "icon": "key", "tint": "auth"},
+      "cut": {"title": "Strand cut", "sub": "both backbones · staggered", "icon": "triggered", "tint": "dev"},
+      "cleared": {"title": "Fragments cleared", "sub": "products degraded", "icon": "shield", "tint": "mqtt"}
+     },
+     "rows": [["foreign", "enzyme", "site"], ["cleared", "cut"]],
+     "edges": [
+      {"from": "foreign", "to": "enzyme", "kind": "int", "label": "strand enters"},
+      {"from": "enzyme", "to": "site", "kind": "int", "label": "match"},
+      {"from": "site", "to": "cut", "kind": "int", "label": "cleave"},
+      {"from": "cut", "to": "cleared", "kind": "int", "label": "fragments"},
+      {"from": "site", "to": "enzyme", "kind": "int", "ret": true, "label": "blocked · release"}
+     ],
+     "panels": [
+      {
+       "id": "scene",
+       "type": "strandscene",
+       "title": "Strand scene · restriction cut",
+       "label": "foreign DNA",
+       "sequence": "ACGTTGCAGAATTCTAGGCATCGA",
+       "strands": 2,
+       "sites": [
+        {"id": "s1", "from": 9, "to": 14, "label": "recognition site", "tone": "accent", "cutAfter": {"upper": 9, "lower": 13}}
+       ],
+       "actors": [
+        {"id": "enz", "role": "enzyme", "label": "enzyme", "start": {"at": {"x": 470, "y": 60}, "state": "free"}},
+        {"id": "cap", "role": "cap", "label": "cap", "size": "l", "start": {"at": {"x": 505, "y": 262}, "state": "free"}}
+       ],
+       "initial": {
+        "caption": "Foreign DNA, 24 letters, carries the site at 9–14.",
+        "note": "The enzyme is free in the cytoplasm. The dashed box marks the six-letter recognition site on both strands. The cap protein nearby matters only on the host's own copy of the site."
+       }
+      }
+     ],
+     "steps": [
+      {"id": "arrive", "nodes": ["foreign"], "lane": "OUTSIDE", "text": "**Foreign DNA arrives.** A short double strand reaches the bacterium from outside.",
+       "panels": {"scene": {"camera": {"from": 1, "to": 12}, "caption": "The strand arrives; only its first half is in view."}}},
+      {"id": "enter", "edge": "foreign->enzyme", "lane": "CELL", "text": "**It enters the cell.** The whole strand is now inside, in the same compartment as the enzyme.",
+       "panels": {"scene": {"camera": null, "caption": "The whole strand is inside the cell.", "note": "Letters 1–24 are visible; the enzyme has not touched the strand yet."}}},
+      {"id": "scan", "nodes": ["enzyme"], "lane": "CELL", "text": "**The enzyme scans.** It slides along the backbone, reading letters, until the site's pattern matches its pocket.",
+       "panels": {"scene": {"actors": {"enz": {"at": 11, "state": "scanning"}}, "caption": "The enzyme slides along the strand.", "note": "Letters it has already passed are dimmed. The site letters stay bright because they are what it is looking for."}}},
+      {"id": "bind", "edge": "enzyme->site", "lane": "CELL", "text": "**Site recognised.** The pocket closes over letters 9–14 on both strands.",
+       "panels": {"scene": {"actors": {"enz": {"state": "bound"}}, "highlight": "s1", "caption": "It binds at the recognition site.", "note": "The ring marks the binding event; the site box brightens while the enzyme is bound."}}},
+      {"id": "cut", "edge": "site->cut", "lane": "CELL", "text": "**Both backbones are cut.** Upper strand after letter 9, lower strand after letter 13: a staggered cut, so the ends are not flush.",
+       "panels": {"scene": {"events": [{"kind": "cut", "site": "s1"}], "actors": {"enz": {"state": "active"}}, "caption": "It cuts the upper strand after 9 and the lower after 13.", "note": "The gap opens between the two cut positions. Each product keeps a four-letter single-stranded overhang."}}},
+      {"id": "separate", "nodes": ["cut"], "lane": "CELL", "text": "**The products separate.** Product A keeps letters 1–9 over 1–13; product B keeps 10–24 over 14–24.",
+       "panels": {"scene": {"actors": {"enz": {"at": {"x": 470, "y": 60}, "state": "released"}}, "labels": [{"at": 4, "text": "product A · 1–9 / 1–13"}, {"at": 19, "text": "product B · 10–24 / 14–24"}], "caption": "The two products drift apart.", "note": "The overhangs are the four letters with no partner: AATT on product B's upper strand and TTAA on product A's lower strand."}}},
+      {"id": "release", "nodes": ["enzyme"], "lane": "CELL", "text": "**The enzyme is released.** It is free again and could cut another copy of the same site.",
+       "panels": {"scene": {"actors": {"enz": {"state": "free"}}, "highlight": null, "caption": "The enzyme is recycled.", "note": "Nothing about the enzyme changed; it is ready for the next strand."}}},
+      {"id": "cleared", "edge": "cut->cleared", "lane": "CELL", "text": "**Fragments cleared.** The cell degrades the two products; the foreign DNA never got to act.",
+       "panels": {"scene": {"camera": {"from": 1, "to": 13}, "labels": [{"at": 4, "text": "product A · degraded next"}], "caption": "The cell clears the fragments.", "note": "The camera closes in on product A as the clean-up starts; product B follows."}}},
+      {"id": "own-scan", "nodes": ["enzyme"], "lane": "CELL", "text": "**Own DNA, same site.** The bacterium's own chromosome carries the same six letters, but a cap sits on them.",
+       "panels": {"scene": {"actors": {"cap": {"at": 11, "state": "bound"}, "enz": {"at": 11, "state": "scanning"}}, "caption": "The host's own copy of the site carries a cap.", "note": "On this path the strand stands for the host's own copy: the cap binds the site first and the enzyme scans toward it."}}},
+      {"id": "own-block", "edge": "enzyme->site", "lane": "CELL", "text": "**Binding blocked.** The pocket cannot close over the capped letters.",
+       "panels": {"scene": {"actors": {"enz": {"state": "binding"}}, "highlight": "s1", "caption": "The cap on the host's own copy blocks binding.", "note": "The enzyme reaches the site but never grips it; no cut event is authored."}}},
+      {"id": "own-release", "edge": "site->enzyme", "lane": "CELL", "text": "**Released, strand intact.** The enzyme lets go; the host's DNA is untouched.",
+       "panels": {"scene": {"actors": {"enz": {"at": {"x": 470, "y": 60}, "state": "released"}}, "highlight": null, "caption": "The enzyme leaves; the strand is intact.", "note": "Both backbones remain continuous; compare with the cut path."}}}
+     ],
+     "paths": [
+      {"id": "foreign", "label": "Foreign DNA is cut", "color": "#38E1FF", "steps": ["arrive", "enter", "scan", "bind", "cut", "separate", "release", "cleared"]},
+      {"id": "own", "label": "Own DNA is protected", "color": "#FFB454", "steps": ["arrive", "enter", "own-scan", "own-block", "own-release"]}
+     ],
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {"x": 0, "y": 0, "w": 11, "h": 12},
+       {"controls": "steps", "x": 0, "y": 12, "w": 11, "h": 8, "attachTo": "diagram"},
+       {"panel": "scene", "x": 11, "y": 0, "w": 13, "h": 13}
+      ]
+     }
+    }
+   }
+  ]
+ }
+}

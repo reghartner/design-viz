@@ -44,6 +44,117 @@ test('without company.json every marked source assembles exactly as upstream tex
     {companyName:'YOUR COMPANY',logo:'YC',primaryColor:'#6750A4',secondaryColor:'#FFFFFF'});
 });
 
+test('company package list is an opt-in selection with validated names',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  fs.mkdirSync(path.join(root,'packages'),{recursive:true});
+  fs.cpSync(path.join(ROOT,'packages/science'),path.join(root,'packages/science'),{recursive:true});
+  assert.deepEqual(loader.enabledPackages(),[]);
+  write('company.json',{version:1,packages:['science']});
+  assert.deepEqual(loader.enabledPackages(),['science']);
+  assert.ok(loader.sourceFiles('validator.js').includes('@package/science/panels/types/rnacopy.js'));
+  write('company.json',{version:1,packages:['science','science']});
+  assert.throws(()=>loader.companyConfig(),/packages must be a list of unique/);
+  write('company.json',{version:1,packages:['../science']});
+  assert.throws(()=>loader.companyConfig(),/packages must be a list of unique/);
+});
+
+test('company content selection rejects invalid paths and preserves portable manifest dependencies',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  fs.cpSync(path.join(ROOT,'packages/science'),path.join(root,'packages/science'),{recursive:true});
+  const manifest=loader.packageManifest('science');
+  const selection={templates:['starters/nsp15-insertion-evidence.json'],
+    kitFiles:['package.json','contract.md',...new Set(Object.values(manifest.routes)), 'starters/nsp15-insertion-evidence.json']};
+  const config=value=>({version:1,packages:['science'],packageContent:{science:value}});
+  write('company.json',config(selection));
+  assert.deepEqual(loader.companyConfig().packageContent.science,selection);
+  for(const value of [[],{}, {...selection,unknown:true}, {...selection,templates:['starters/sequencing-walkthrough.json']},
+    {...selection,templates:[...selection.templates,...selection.templates]},
+    ...['../outside.md','/tmp/outside.md','cookbook/../contract.md','cookbook\\\\cell-scenes.md','missing.json','panels/bio.js'].map(file=>({...selection,kitFiles:[...selection.kitFiles,file]})),
+    {...selection,kitFiles:selection.kitFiles.filter(file=>file!=='cookbook/nsp15-story.md')},
+    {...selection,kitFiles:selection.kitFiles.filter(file=>file!=='starters/nsp15-insertion-evidence.json')}]){
+    write('company.json',config(value));assert.throws(()=>loader.companyConfig(),/packageContent/);
+  }
+  fs.symlinkSync(path.join(root,'src/starters/minimal.json'),path.join(root,'packages/science/escape.json'));
+  write('company.json',config({...selection,kitFiles:[...selection.kitFiles,'escape.json']}));
+  assert.throws(()=>loader.companyConfig(),/packageContent/);
+  fs.writeFileSync(path.join(root,'packages/science/package.json'),JSON.stringify({...manifest,
+    kitFiles:selection.kitFiles.filter(file=>file!=='starters/nsp15-insertion-evidence.json')}));
+  write('company.json',config(selection));
+  assert.throws(()=>loader.companyConfig(),/cannot widen/);
+  write('company.json',{version:1,packages:['science']});
+  assert.equal(loader.companyConfig().packageContent,undefined);
+  assert.equal(loader.packageManifest('science').templates.length,2);
+});
+
+test('company theme manifests validate names, local resources and disabled selection',t=>{
+  const {write,loader}=scratchLoader(t);
+  write('company.json',{version:1,theme:'theme.json'});
+  write('theme.json',{skins:[{name:'fixture',layers:['aurora','pastel']}],runtime:'theme.js',styles:{core:'theme.css'}});
+  write('theme.js','var FixtureTheme=true;');write('theme.css','.sk-fixture{color:#123456}');
+  assert.deepEqual(loader.companyTheme().skins,[{name:'fixture',layers:['aurora','pastel']}]);
+  assert.ok(loader.sourceFiles('validator.js').includes('@company/theme.js'));
+  for(const skins of [[{name:'pastel',layers:['aurora']}],[{name:'fixture',layers:['unknown']}],
+    [{name:'fixture',layers:[]}],[{name:'fixture',layers:['aurora']},{name:'fixture',layers:['aurora']}],
+    [{name:'fixture',layers:['aurora'],unknown:true}]]){
+    write('theme.json',{skins});assert.throws(()=>loader.companyTheme(),/skins must/);
+  }
+  write('theme.json',{skins:[],runtime:'../src/engine.js'});
+  assert.throws(()=>loader.companyTheme(),/invalid theme file/);
+  write('theme.json',{skins:[],kitFiles:['../outside.md']});
+  assert.throws(()=>loader.companyTheme(),/kitFiles/);
+  const prior=process.env.FLOWVIEW_COMPANY_IDENTITY;
+  try{
+    process.env.FLOWVIEW_COMPANY_IDENTITY='off';
+    assert.equal(loader.companyTheme(),null);
+    assert.ok(!loader.sourceFiles('validator.js').includes('@company/theme.js'));
+  }finally{if(prior===undefined)delete process.env.FLOWVIEW_COMPANY_IDENTITY;else process.env.FLOWVIEW_COMPANY_IDENTITY=prior;}
+});
+
+test('optional package helper, venue and type sources load in dependency order without default leakage',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  const pkg=path.join(root,'packages/sports-fixture');
+  for(const directory of ['panels','panels/venues','panels/types'])
+    fs.mkdirSync(path.join(pkg,directory),{recursive:true});
+  fs.writeFileSync(path.join(pkg,'package.json'),JSON.stringify({
+    name:'sports-fixture',templates:[],sourceFiles:[
+      'panels/types/fixture.js','panels/venues/fixture.js','panels/fixture-helper.js'
+    ],workbenchSourceFiles:['panels/fixture-import.js']
+  }));
+  fs.writeFileSync(path.join(pkg,'panels/fixture-helper.js'),"var PACKAGE_ORDER=['helper'];");
+  fs.writeFileSync(path.join(pkg,'panels/venues/fixture.js'),"PACKAGE_ORDER.push('venue');");
+  fs.writeFileSync(path.join(pkg,'panels/types/fixture.js'),"PACKAGE_ORDER.push('type');PanelRegistry.define('sports-fixture',{label:'Sports fixture'});");
+  fs.writeFileSync(path.join(pkg,'panels/fixture-import.js'),"var PACKAGE_WORKBENCH_IMPORT=true;");
+  assert.deepEqual(loader.enabledPackages(),[]);
+  assert.doesNotMatch(loader.readSource('validator.js'),/PACKAGE_ORDER/);
+  assert.ok(!loader.sourceFiles('builder.workbench.js').some(file=>file.includes('fixture-import')));
+  write('company.json',{version:1,packages:['sports-fixture']});
+  const selected=loader.sourceFiles('validator.js');
+  const packageFiles=selected.filter(file=>file.startsWith('@package/'));
+  assert.deepEqual(packageFiles,[
+    '@package/sports-fixture/panels/fixture-helper.js',
+    '@package/sports-fixture/panels/venues/fixture.js',
+    '@package/sports-fixture/panels/types/fixture.js'
+  ]);
+  const context={};vm.runInNewContext(loader.readSource('validator.js'),context);
+  assert.deepEqual(Array.from(context.PACKAGE_ORDER),['helper','venue','type']);
+  assert.equal(context.PanelRegistry.get('sports-fixture').label,'Sports fixture');
+  assert.ok(!loader.sourceFiles('validator.js').some(file=>file.includes('fixture-import')));
+  assert.ok(loader.sourceFiles('builder.workbench.js').includes('@package/sports-fixture/panels/fixture-import.js'));
+});
+
+test('company venue entries load only when the sports registry is selected',t=>{
+  const {root,write,loader}=scratchLoader(t);
+  const venue=path.join(root,'company/panels/venues/fixture-hall.js');
+  fs.mkdirSync(path.dirname(venue),{recursive:true});
+  fs.writeFileSync(venue,"SeatmapVenues.define({id:'fixture-hall',name:'Fixture Hall',seatmap:{rings:[],sections:[]}});");
+  assert.ok(!loader.sourceFiles('validator.js').includes('@company/panels/venues/fixture-hall.js'));
+  const sports=path.join(root,'packages/sports');
+  fs.mkdirSync(sports,{recursive:true});
+  fs.writeFileSync(path.join(sports,'package.json'),JSON.stringify({name:'sports',sourceFiles:[],templates:[]}));
+  write('company.json',{version:1,packages:['sports']});
+  assert.ok(loader.sourceFiles('validator.js').includes('@company/panels/venues/fixture-hall.js'));
+});
+
 test('company.json replaces the labels, repository links and brand in assembled sources',t=>{
   const {loader,write}=scratchLoader(t);
   write('company.json',CONFIG);write('brand.json',BRAND);write('acme.png',PNG);
@@ -165,6 +276,7 @@ test('the built workbench shows configured links, labels and brand; without conf
       .map(file=>[file,fs.readFileSync(path.join(checkout,file),'utf8')]));
   };
   const plain=build();
+  for(const source of Object.values(plain))assert.doesNotMatch(source,/islanders/i);
   assert.equal(kitFiles(plain['workbench/flowspec.html'])['tools/company-agent-context.json'],undefined);
   const workbench=plain['workbench/flowspec.html'];
   assert.ok(workbench.includes('<a id="welcome-repo-link" href="https://github.com/reghartner/design-viz"'));
@@ -219,6 +331,13 @@ test('the built workbench shows configured links, labels and brand; without conf
   assert.deepEqual(build('--no-config'),plain);
   fs.rmSync(path.join(checkout,'company/company.json'));
   assert.deepEqual(build(),plain);
+  fs.writeFileSync(path.join(checkout,'company/company.json'),JSON.stringify({version:1,companyName:'Other Sports',packages:['sports']}));
+  const sports=build();
+  for(const source of Object.values(sports))assert.doesNotMatch(source,/islanders/i);
+  const sportsKit=kitFiles(sports['workbench/flowspec.html']);
+  for(const source of Object.values(sportsKit))assert.doesNotMatch(source,/islanders/i);
+  assert.match(sports['template/flowview.html'],/function seatmapHTML/);
+  assert.equal(sportsKit['tools/company-theme.json'],undefined);
 });
 
 test('site.baseUrl is configured once, validated and embedded in runtime and agent context',t=>{

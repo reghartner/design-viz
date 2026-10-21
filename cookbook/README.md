@@ -25,6 +25,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| a small value matrix or stage-count funnel using authored numbers | [Data panels](data-panels.md) — generic `grid` and `funnel` setup and step fields |
 | a camera phone UX whose fields come from different backend services | [Device app sources](device-app-sources.md) — doorbell refresh and partial outage |
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |

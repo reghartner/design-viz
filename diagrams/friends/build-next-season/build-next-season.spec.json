@@ -1,0 +1,3184 @@
+{
+ "page": {
+  "title": "4 · Build the next season",
+  "description": "Turn a friend’s first game into membership, then follow the clinch-or-fade renewal fork. Public facts cited; operational flows and uncited figures are illustrative.",
+  "skin": "islanders",
+  "contract": "1",
+  "tags": [
+   "sports",
+   "marketing",
+   "sports-marketing",
+   "ticketing",
+   "islanders",
+   "promotions",
+   "giveaways",
+   "group-sales",
+   "pricing",
+   "crm",
+   "sponsorship",
+   "renewals"
+  ],
+  "protocols": {
+   "sysfeed": {
+    "label": "system data",
+    "color": "#3866AC"
+   },
+   "fan": {
+    "label": "fan-facing",
+    "color": "#C44208"
+   }
+  },
+  "sections": [
+   {
+    "id": "friend-to-member",
+    "heading": "Friend's ticket to member",
+    "accent": "green",
+    "text": [
+     "One illustrative fan, Fan K., and one seat, Sec 312 at UBS Arena, over the 2026-27 season and into the next. The fan starts on a friend's transferred ticket, buys a single game, then a mini plan, then a membership. The bowl is coloured by *how Fan K. held each seat*, the cost panel compares what one game costs on each route, and the ledger shows the points program a membership opens.",
+     "Public facts (dates, giveaways, plans, member benefits, Isles Rewards rules) are cited from team pages. The systems and offer rules are an illustrative reconstruction, not a description of the Islanders', UBS Arena's or Ticketmaster's systems. Prices and point values are illustrative except the **$10 member parking** and the **15% member food and drink discount**."
+    ],
+    "bullets": [
+     {
+      "text": "**Sourced:** mobile-only entry and the 48-hour barcode release; GOAT USA Night (Dec 1) and the Schaefer bobblehead night (Feb 13); the 4-game Giveaway Plan; member parking, the 15% discount and other benefits; Isles Rewards rules.",
+      "sub": [
+       "[Promotional schedule](https://nhl.com/islanders/tickets/promotional-schedule) · [Mini plans](https://www.nhl.com/islanders/tickets/membership/mini-plan) · [Member benefits](https://www.nhl.com/fr/islanders/tickets/membership/central) · [2026-27 fan experiences](https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088) · [Isles Rewards](https://www.nhl.com/islanders/tickets/membership/isles-rewards) · [Mobile tickets](https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting) · [Getting here](https://nhl.com/islanders/arena/getting-here)"
+      ]
+     },
+     "**Illustrative:** Fan K., the seat moves, the offer rules, every ticket price, fee and point value.",
+     "Pick a path: **Offers follow the fan** runs both seasons; **No offer sent** shows the same guest with no follow-up."
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "transfers",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "app": {
+       "title": "Team app",
+       "sub": "illustrative",
+       "icon": "phone"
+      },
+      "gate": {
+       "title": "Gate scan",
+       "sub": "mobile entry",
+       "icon": "shield"
+      },
+      "crm": {
+       "title": "CRM",
+       "sub": "offer rules",
+       "icon": "person",
+       "tint": "data"
+      },
+      "email": {
+       "title": "Email / push",
+       "sub": "offers",
+       "icon": "cloud"
+      },
+      "rewards": {
+       "title": "Rewards ledger",
+       "sub": "Isles Rewards",
+       "icon": "db",
+       "tint": "data"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "app",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "email",
+       "side": "below",
+       "x": 123,
+       "y": 70
+      },
+      {
+       "id": "gate",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "rewards",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      }
+     ],
+     "edges": [
+      {
+       "from": "ticketing",
+       "to": "app",
+       "kind": "https",
+       "label": "ticket delivered",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 13.5,
+         "dy": -14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 13.5,
+         "dy": 14.96
+        }
+       ]
+      },
+      {
+       "from": "app",
+       "to": "gate",
+       "kind": "https",
+       "label": "scan at the door",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "gate",
+       "to": "crm",
+       "kind": "https",
+       "label": "attended",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": -14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": 14.96
+        }
+       ]
+      },
+      {
+       "from": "crm",
+       "to": "email",
+       "kind": "https",
+       "label": "next offer",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "email",
+       "to": "app",
+       "kind": "https",
+       "label": "offer link",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "app",
+       "to": "ticketing",
+       "kind": "https",
+       "label": "purchase",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -13.5,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -13.5,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "ticketing",
+       "to": "rewards",
+       "kind": "https",
+       "label": "account link",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 3.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 3.96
+        }
+       ]
+      },
+      {
+       "from": "gate",
+       "to": "rewards",
+       "kind": "https",
+       "label": "scan points",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "app",
+       "to": "rewards",
+       "kind": "https",
+       "label": "trivia · Claim Now",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 63.64,
+         "dy": -44
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -63.64,
+         "dy": 44
+        }
+       ]
+      },
+      {
+       "from": "rewards",
+       "to": "ticketing",
+       "kind": "https",
+       "label": "upgrade redeemed",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.06666666666666667,
+         "dx": 1.57,
+         "dy": 28.4
+        },
+        {
+         "t": 0.13333333333333333,
+         "dx": 16.63,
+         "dy": 34.8
+        },
+        {
+         "t": 0.2,
+         "dx": 31.7,
+         "dy": 41.2
+        },
+        {
+         "t": 0.26666666666666666,
+         "dx": 46.77,
+         "dy": 48.27
+        },
+        {
+         "t": 0.3333333333333333,
+         "dx": 56.1,
+         "dy": 54
+        },
+        {
+         "t": 0.4,
+         "dx": 64.1,
+         "dy": 54
+        },
+        {
+         "t": 0.4666666666666667,
+         "dx": 12.37,
+         "dy": 54
+        },
+        {
+         "t": 0.5333333333333333,
+         "dx": -39.37,
+         "dy": 54
+        },
+        {
+         "t": 0.6,
+         "dx": -91.1,
+         "dy": 54
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -83.1,
+         "dy": 54
+        },
+        {
+         "t": 0.7333333333333333,
+         "dx": -73.77,
+         "dy": 48.27
+        },
+        {
+         "t": 0.8,
+         "dx": -58.7,
+         "dy": 41.2
+        },
+        {
+         "t": 0.8666666666666667,
+         "dx": -43.63,
+         "dy": 34.8
+        },
+        {
+         "t": 0.9333333333333333,
+         "dx": -28.57,
+         "dy": 28.4
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "map",
+       "type": "seatmap",
+       "title": "Fan K.'s seats · colour = how Fan K. held the seat",
+       "venue": "ubs-arena",
+       "currency": "USD",
+       "showTotals": false,
+       "tiers": [
+        {
+         "id": "guest",
+         "label": "Guest (transferred ticket)",
+         "color": "#A9AFBB"
+        },
+        {
+         "id": "single",
+         "label": "Single-game buyer",
+         "color": "#7FA7D9"
+        },
+        {
+         "id": "plan",
+         "label": "Giveaway Plan (4 games)",
+         "color": "#E3B25B"
+        },
+        {
+         "id": "member",
+         "label": "Half Season Member",
+         "color": "#5FB494"
+        },
+        {
+         "id": "upgrade",
+         "label": "Rewards upgrade",
+         "color": "#D488B3"
+        }
+       ],
+       "initial": {
+        "mode": "tier",
+        "tierOf": {},
+        "highlight": null,
+        "note": "Each coloured section is one Fan K. sat in, coloured by how that ticket was held. Capacities are an illustrative even split; Fan K. is illustrative."
+       }
+      },
+      {
+       "id": "cost",
+       "type": "cost",
+       "title": "One 300-level game, three ways (per game attended)",
+       "currency": "USD",
+       "unit": "game",
+       "period": "per game attended",
+       "density": "compact",
+       "routes": [
+        {
+         "id": "single",
+         "label": "Single games",
+         "tradeoff": "Pick any night; full price and fees every time."
+        },
+        {
+         "id": "plan",
+         "label": "Giveaway Plan",
+         "tradeoff": "4 set nights: two bobbleheads, two gate giveaways."
+        },
+        {
+         "id": "member",
+         "label": "Half Season Member",
+         "tradeoff": "About half the home schedule; the perks around the seat do most of the saving."
+        }
+       ],
+       "items": [
+        {
+         "route": "single",
+         "node": "ticketing",
+         "label": "Ticket and fees",
+         "perMillion": 0,
+         "fixed": 116
+        },
+        {
+         "route": "single",
+         "label": "Parking (Emerald lot)",
+         "perMillion": 0,
+         "fixed": 30
+        },
+        {
+         "route": "single",
+         "label": "Food and drink",
+         "perMillion": 0,
+         "fixed": 40
+        },
+        {
+         "route": "plan",
+         "node": "ticketing",
+         "label": "Ticket and fees",
+         "perMillion": 0,
+         "fixed": 98
+        },
+        {
+         "route": "plan",
+         "label": "Parking (Emerald lot)",
+         "perMillion": 0,
+         "fixed": 30
+        },
+        {
+         "route": "plan",
+         "label": "Food and drink",
+         "perMillion": 0,
+         "fixed": 40
+        },
+        {
+         "route": "member",
+         "node": "ticketing",
+         "label": "Ticket and fees",
+         "perMillion": 0,
+         "fixed": 76
+        },
+        {
+         "route": "member",
+         "label": "Parking (Emerald lot)",
+         "perMillion": 0,
+         "fixed": 10
+        },
+        {
+         "route": "member",
+         "label": "Food and drink",
+         "perMillion": 0,
+         "fixed": 34
+        }
+       ],
+       "assumptions": "Sourced: the $10 Emerald parking member rate and the 15% member food and drink discount (new for 2026-27). Everything else is illustrative: ticket prices, fees, the $30 non-member parking figure (illustrative; a 2024 fan newsletter cites $40+, and the team says lot prices vary by event) and a $40 food and drink spend, which becomes $34 at 15% off. Not team prices.",
+       "initial": {
+        "messages": 1,
+        "activeRoute": null,
+        "note": "Fan K. pays nothing yet: the friend paid for the October seat."
+       }
+      },
+      {
+       "id": "ledger",
+       "type": "table",
+       "title": "Isles Rewards ledger (point values illustrative)",
+       "columns": [
+        {
+         "id": "when",
+         "label": "When"
+        },
+        {
+         "id": "what",
+         "label": "Activity"
+        },
+        {
+         "id": "pts",
+         "label": "Points"
+        },
+        {
+         "id": "bal",
+         "label": "Balance"
+        }
+       ],
+       "initial": {
+        "rows": [],
+        "note": "No ledger yet. Isles Rewards is for Full and Half Season Members, so a guest on a transferred ticket earns nothing."
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "oct-transfer",
+       "edge": "ticketing->app",
+       "text": "**Thu Oct 22, 2026 vs LAK.** Fan K.'s friend, a Half Season Member, transfers one seat in **Sec 312** to Fan K. The barcode appears in the app 48 hours before puck drop; entry at UBS Arena is mobile-only. Fan K. has spent nothing and has no plan.",
+       "link": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting",
+       "delta": true,
+       "deltaText": "Mobile-only entry and the 48-hour barcode release are published on the team's mobile ticket page.",
+       "deltaLinks": [
+        {
+         "label": "Mobile ticket help (Islanders)",
+         "url": "https://www.nhl.com/islanders/tickets/mobile-tickets-troubleshooting"
+        }
+       ],
+       "panels": {
+        "map": {
+         "tierOf": {
+          "312": "guest"
+         },
+         "highlight": "312",
+         "note": "Oct 22: Sec 312 on a friend's transferred ticket. Tier: guest. Capacities are an illustrative even split; Fan K. is illustrative."
+        }
+       }
+      },
+      {
+       "id": "oct-scan",
+       "edges": [
+        "app->gate",
+        "gate->crm"
+       ],
+       "text": "Fan K. scans in. Accepting the transfer meant creating an account, so for the first time the CRM holds a name, an email and one attended game for someone who never bought a ticket (illustrative flow).",
+       "panels": {
+        "map": {
+         "note": "Sec 312 scanned at the gate. The seat belongs to the friend's membership; the attendance now belongs to Fan K.'s new profile. Capacities are an illustrative even split; Fan K. is illustrative."
+        }
+       }
+      },
+      {
+       "id": "dec-offer",
+       "edges": [
+        "crm->email",
+        "email->app"
+       ],
+       "text": "An offer rule fires: *attended once, never bought*. The email names the next big night: **GOAT USA Night, Tue Dec 1 vs FLA**, with a Chuck the Goat ornament for the first 10,000 fans.",
+       "link": "https://nhl.com/islanders/tickets/promotional-schedule",
+       "delta": true,
+       "deltaText": "GOAT USA Night (Dec 1 vs FLA, ornament for the first 10,000) is on the 2026-27 promotional schedule. The offer rule is illustrative.",
+       "deltaLinks": [
+        {
+         "label": "2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ],
+       "panels": {
+        "map": {
+         "highlight": null,
+         "note": "Nothing bought yet. The offer is aimed at one profile, not a section. Capacities are an illustrative even split; Fan K. is illustrative."
+        }
+       }
+      },
+      {
+       "id": "dec-single",
+       "edges": [
+        "app->ticketing",
+        "ticketing->app"
+       ],
+       "text": "Fan K. buys **one single-game ticket** for Dec 1. The friend's section is full that night, so the seat is in **Sec 309**, three sections over. Fan K. is now a buyer, paying full price, fees and parking (amounts illustrative).",
+       "panels": {
+        "map": {
+         "tierOf": {
+          "309": "single"
+         },
+         "highlight": "309",
+         "note": "Dec 1: a single-game ticket in Sec 309. Tier: single-game buyer. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": "single",
+         "note": "A single game: about $186 all in (illustrative)."
+        }
+       }
+      },
+      {
+       "id": "feb-plan",
+       "edges": [
+        "crm->email",
+        "email->app",
+        "app->ticketing"
+       ],
+       "text": "Two games attended. The next offer is the **Giveaway Plan**, four set nights with *two bobbleheads, two gate giveaways*. Fan K. buys it for the **Matthew Schaefer bobblehead night, Sat Feb 13 vs MIN**, and picks seats back in **Sec 312**.",
+       "link": "https://www.nhl.com/islanders/tickets/membership/mini-plan",
+       "delta": true,
+       "deltaText": "The Giveaway Plan (Nov 27 WPG, Dec 1 FLA, Feb 13 MIN, Mar 7 PIT) is a published 2026-27 mini plan. How a plan bought mid-season is priced is not published, so the amounts here are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Mini plans (Islanders)",
+         "url": "https://www.nhl.com/islanders/tickets/membership/mini-plan"
+        },
+        {
+         "label": "2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ],
+       "panels": {
+        "map": {
+         "tierOf": {
+          "312": "plan"
+         },
+         "highlight": "312",
+         "note": "Feb 13: Sec 312 again, now on Fan K.'s own Giveaway Plan. Tier: mini plan. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": "plan",
+         "note": "Plan games cost about $168 each (illustrative): a lower ticket price and fees, the same parking and food."
+        }
+       }
+      },
+      {
+       "id": "compare",
+       "nodes": [
+        "crm",
+        "ticketing"
+       ],
+       "text": "Spring renewal season. The rep's pitch is a comparison for the *same fan in the same section*. The ticket price falls a little; the bigger gaps are around the seat: **$10 member parking** and **15% off food and drink**.",
+       "link": "https://www.nhl.com/fr/islanders/tickets/membership/central",
+       "delta": true,
+       "deltaText": "Sourced member benefits: $10 Emerald parking per game and, new for 2026-27, 15% off concessions and bars for Full and Half Season Members. All other amounts are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Member benefits (Islanders)",
+         "url": "https://www.nhl.com/fr/islanders/tickets/membership/central"
+        },
+        {
+         "label": "2026-27 fan experiences",
+         "url": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088"
+        }
+       ],
+       "panels": {
+        "map": {
+         "highlight": [
+          "309",
+          "312"
+         ],
+         "note": "Two ways in so far: a single game in 309 and a plan seat in 312. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": "member",
+         "note": "Member: about $120 a game (illustrative), $66 less than a single game. Parking drops from $30 to $10; $40 of food costs $34."
+        }
+       }
+      },
+      {
+       "id": "member",
+       "edges": [
+        "app->ticketing",
+        "ticketing->app"
+       ],
+       "text": "Fan K. signs up as a **Half Season Member** for 2027-28, in Sec 312, the seat that started as a friend's spare. Member benefits also include ticket exchange, playoff access and member events.",
+       "link": "https://www.nhl.com/fr/islanders/tickets/membership/central",
+       "panels": {
+        "map": {
+         "tierOf": {
+          "312": "member"
+         },
+         "highlight": "312",
+         "note": "Sec 312 is now Fan K.'s membership seat. Tier: Half Season Member. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": "member",
+         "note": "Chosen route: Half Season Member (illustrative amounts, sourced parking rate and discount)."
+        }
+       }
+      },
+      {
+       "id": "link",
+       "edge": "ticketing->rewards",
+       "text": "Membership opens **Isles Rewards**. Fan K. first tries a personal email and the link fails: the program requires the *same email as the membership*. With the matching email, the ticket account links and points start.",
+       "link": "https://www.nhl.com/islanders/tickets/membership/isles-rewards",
+       "delta": true,
+       "deltaText": "Isles Rewards rules (members only, same email as the membership, points from attendance, Claim Now, content and in-game trivia, redemptions posted within 48 hours) are from the official program page. Point values are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Isles Rewards (Islanders)",
+         "url": "https://www.nhl.com/islanders/tickets/membership/isles-rewards"
+        }
+       ],
+       "panels": {
+        "map": {
+         "highlight": null
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "fail",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Link with a different email: not matched",
+            "pts": "0",
+            "bal": "0"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ok",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Ticket account linked (membership email)",
+            "pts": "+250",
+            "bal": "250"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "The failed link is the common support case: a second email address."
+        }
+       }
+      },
+      {
+       "id": "scan-points",
+       "edges": [
+        "app->gate",
+        "gate->rewards"
+       ],
+       "text": "Opening night of 2027-28. Attending at UBS Arena earns the most points, so the gate scan posts to the ledger. A daily **Claim Now** and a game watched from away add smaller amounts.",
+       "panels": {
+        "map": {
+         "highlight": "312",
+         "note": "Fan K. in Sec 312 on opening night, now on the membership. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "fail",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Link with a different email: not matched",
+            "pts": "0",
+            "bal": "0"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ok",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Ticket account linked (membership email)",
+            "pts": "+250",
+            "bal": "250"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "claim",
+           "cells": {
+            "when": "Sep–Oct",
+            "what": "Daily Claim Now (12 days)",
+            "pts": "+120",
+            "bal": "370"
+           },
+           "status": "added"
+          },
+          {
+           "id": "scan",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Attended home game (gate scan)",
+            "pts": "+500",
+            "bal": "870"
+           },
+           "status": "added"
+          },
+          {
+           "id": "away",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Watched a road game",
+            "pts": "+100",
+            "bal": "970"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Attendance outweighs everything else in this illustrative ledger."
+        }
+       }
+      },
+      {
+       "id": "trivia",
+       "edge": "app->rewards",
+       "text": "During a stoppage, Fan K. answers the **live in-game trivia** in the app. Small points, but it keeps a member opening the app while in the seat.",
+       "panels": {
+        "ledger": {
+         "rows": [
+          {
+           "id": "fail",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Link with a different email: not matched",
+            "pts": "0",
+            "bal": "0"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ok",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Ticket account linked (membership email)",
+            "pts": "+250",
+            "bal": "250"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "claim",
+           "cells": {
+            "when": "Sep–Oct",
+            "what": "Daily Claim Now (12 days)",
+            "pts": "+120",
+            "bal": "370"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "scan",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Attended home game (gate scan)",
+            "pts": "+500",
+            "bal": "870"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "away",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Watched a road game",
+            "pts": "+100",
+            "bal": "970"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "trivia",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "In-game trivia, 1st period stoppage",
+            "pts": "+50",
+            "bal": "1,020"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "1,020 points: enough for the illustrative upgrade price of 800."
+        }
+       }
+      },
+      {
+       "id": "upgrade",
+       "edges": [
+        "rewards->ticketing",
+        "ticketing->app"
+       ],
+       "text": "Fan K. redeems points in the Marketplace for a **seat upgrade**. It posts to the ticket account within 48 hours, and for one November game Fan K. sits in **Sec 212**, down in the 200 level.",
+       "link": "https://www.nhl.com/islanders/tickets/membership/isles-rewards",
+       "panels": {
+        "map": {
+         "tierOf": {
+          "212": "upgrade"
+         },
+         "highlight": "212",
+         "note": "One game in Sec 212 on a rewards upgrade. Tier: rewards upgrade. Capacities are an illustrative even split; Fan K. is illustrative."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "fail",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Link with a different email: not matched",
+            "pts": "0",
+            "bal": "0"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ok",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Ticket account linked (membership email)",
+            "pts": "+250",
+            "bal": "250"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "claim",
+           "cells": {
+            "when": "Sep–Oct",
+            "what": "Daily Claim Now (12 days)",
+            "pts": "+120",
+            "bal": "370"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "scan",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Attended home game (gate scan)",
+            "pts": "+500",
+            "bal": "870"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "away",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Watched a road game",
+            "pts": "+100",
+            "bal": "970"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "trivia",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "In-game trivia, 1st period stoppage",
+            "pts": "+50",
+            "bal": "1,020"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "redeem",
+           "cells": {
+            "when": "Nov 2027",
+            "what": "Redeemed: seat upgrade (posted within 48 h)",
+            "pts": "−800",
+            "bal": "220"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "The burn is part of the design: a member who spends points has a reason to keep earning them."
+        }
+       }
+      },
+      {
+       "id": "season-view",
+       "nodes": [
+        "crm",
+        "rewards",
+        "ticketing"
+       ],
+       "text": "Two seasons on one bowl: a **single game** in 309, Sec 312 as a **guest**, then a **plan** seat, then a **membership** (the map keeps 312's latest colour), and one **upgrade** in 212. Each move followed one small offer triggered by what Fan K. had just done, and the first came before Fan K. had ever paid.",
+       "panels": {
+        "map": {
+         "highlight": [
+          "312",
+          "309",
+          "212"
+         ],
+         "note": "History: Sec 312 was held three ways (guest in Oct, Giveaway Plan in Feb, membership from 2027-28) and shows its latest tier; 309 was a single game and 212 one upgrade. The legend counts sections, not holds. Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": "member",
+         "note": "The member route wins on the perks around the seat, not mainly on the ticket price."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "fail",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Link with a different email: not matched",
+            "pts": "0",
+            "bal": "0"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ok",
+           "cells": {
+            "when": "Sep 2027",
+            "what": "Ticket account linked (membership email)",
+            "pts": "+250",
+            "bal": "250"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "claim",
+           "cells": {
+            "when": "Sep–Oct",
+            "what": "Daily Claim Now (12 days)",
+            "pts": "+120",
+            "bal": "370"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "scan",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Attended home game (gate scan)",
+            "pts": "+500",
+            "bal": "870"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "away",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "Watched a road game",
+            "pts": "+100",
+            "bal": "970"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "trivia",
+           "cells": {
+            "when": "Oct 2027",
+            "what": "In-game trivia, 1st period stoppage",
+            "pts": "+50",
+            "bal": "1,020"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "redeem",
+           "cells": {
+            "when": "Nov 2027",
+            "what": "Redeemed: seat upgrade (posted within 48 h)",
+            "pts": "−800",
+            "bal": "220"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Ledger after the first month of membership. Point values illustrative."
+        }
+       }
+      },
+      {
+       "id": "no-offer",
+       "nodes": [
+        "crm"
+       ],
+       "tone": {
+        "crm": "warn"
+       },
+       "text": "**Without the offer rule.** If the CRM sends no *attended once, never bought* offer, Fan K. stays a one-time guest: a name, an email and one scan on file. The next night in Sec 312 is the friend's seat again, and the profile goes cold (illustrative).",
+       "panels": {
+        "map": {
+         "highlight": "312",
+         "note": "Only the Oct 22 guest seat, ever. Fan K. is illustrative."
+        },
+        "cost": {
+         "activeRoute": null,
+         "note": "Fan K. never pays for a game: no route to compare."
+        }
+       }
+      }
+     ],
+     "graphFrame": {
+      "x": 0,
+      "y": 10,
+      "w": 454,
+      "h": 438
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+       },
+       {
+        "panel": "map",
+        "x": 0,
+        "y": 7,
+        "w": 14,
+        "h": 16
+       },
+       {
+        "x": 14,
+        "y": 7,
+        "w": 10,
+        "h": 16
+       },
+       {
+        "panel": "cost",
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 9
+       },
+       {
+        "panel": "ledger",
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 7
+       }
+      ]
+     },
+     "paths": [
+      {
+       "id": "journey",
+       "label": "Offers follow the fan",
+       "steps": [
+        "oct-transfer",
+        "oct-scan",
+        "dec-offer",
+        "dec-single",
+        "feb-plan",
+        "compare",
+        "member",
+        "link",
+        "scan-points",
+        "trivia",
+        "upgrade",
+        "season-view"
+       ]
+      },
+      {
+       "id": "no-offer",
+       "label": "No offer sent",
+       "color": "#E0796B",
+       "steps": [
+        "oct-transfer",
+        "oct-scan",
+        "no-offer"
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "id": "clinch-or-fade",
+    "heading": "Clinch or fade",
+    "accent": "violet",
+    "text": [
+     "In mid-March nobody knows whether the playoff games exist, yet members must be invoiced, presales staged and giveaways sourced. Playoff ticketing is **conditional inventory**: it is built and priced before the schedule is real, and the elimination branch needs as much planning as the clinch.",
+     "Two paths share one board. **Eliminated** is what actually happened to the 2025-26 Islanders (out on Apr 12, 2026). **Clinch** replays the April 2024 playbook (home Games 3 and 4 against Carolina). Both end at the 2026-27 renewal, where All-Star 2027 priority is the lever."
+    ],
+    "bullets": [
+     "**Sourced:** 2024 Round 1 dates and Apr 20 on-sale ([NHL.com](https://nhl.com/islanders/news/islanders-hurricanes-first-round-schedule-announced-2024)); rally towels, commemorative ticket and doors 90 minutes early ([The Hockey News](https://thehockeynews.com/nhl/new-york-islanders/game-day/new-york-islanders-playoffs-ubs-arena-hurricanes-game-three)); elimination Apr 12, 2026 ([Wikipedia](https://en.wikipedia.org/wiki/2025%E2%80%9326_New_York_Islanders_season)); All-Star 2027 member priority and waitlist ([NHL.com](https://www.nhl.com/islanders/fans/all-star)); $100 membership deposit, published for 2025-26 ([NHL.com](https://www.nhl.com/islanders/tickets/2025-26-deposits)).",
+     "**Pattern, not Islanders policy:** charge at clinch or on a date, and credits for unplayed games, follow the [Oilers' 2026 FAQ](https://www.nhl.com/oilers/tickets/season-seat-holders/renewal-faq).",
+     "**Illustrative:** member accounts, prices, risk reasons, the All-Star allocation split, every funnel count and all sell-through. Seat capacities are an even split of 17,250 over 80 sections."
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "standings": {
+       "title": "Standings",
+       "sub": "magic number",
+       "icon": "monitor",
+       "tint": "auth"
+      },
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "playoff seats",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "billing": {
+       "title": "Billing",
+       "sub": "invoices",
+       "icon": "db",
+       "tint": "data"
+      },
+      "crm": {
+       "title": "CRM",
+       "sub": "members · risk",
+       "icon": "person",
+       "tint": "data"
+      },
+      "push": {
+       "title": "Email / push",
+       "sub": "offers",
+       "icon": "phone",
+       "tint": "mqtt"
+      },
+      "promo": {
+       "title": "Promotions",
+       "sub": "rally towels",
+       "icon": "package",
+       "tint": "dev"
+      },
+      "reps": {
+       "title": "Renewal reps",
+       "sub": "task queue",
+       "icon": "headset",
+       "tint": "dev"
+      },
+      "waitlist": {
+       "title": "All-Star list",
+       "sub": "deposits",
+       "icon": "key",
+       "tint": "auth"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "billing",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "promo",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "push",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      },
+      {
+       "id": "reps",
+       "side": "below",
+       "x": 349,
+       "y": 466
+      },
+      {
+       "id": "standings",
+       "side": "below",
+       "x": 123,
+       "y": 70
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "waitlist",
+       "side": "below",
+       "x": 123,
+       "y": 466
+      }
+     ],
+     "edges": [
+      {
+       "from": "standings",
+       "to": "ticketing",
+       "kind": "sysfeed",
+       "label": "clinch / out"
+      },
+      {
+       "from": "ticketing",
+       "to": "billing",
+       "kind": "sysfeed",
+       "label": "playoff invoices"
+      },
+      {
+       "from": "billing",
+       "to": "crm",
+       "kind": "sysfeed",
+       "label": "charges · credits"
+      },
+      {
+       "from": "crm",
+       "to": "push",
+       "kind": "sysfeed",
+       "label": "member lists"
+      },
+      {
+       "from": "push",
+       "to": "ticketing",
+       "kind": "fan",
+       "label": "fans buy"
+      },
+      {
+       "from": "ticketing",
+       "to": "promo",
+       "kind": "sysfeed",
+       "label": "towel count"
+      },
+      {
+       "from": "promo",
+       "to": "ticketing",
+       "kind": "fan",
+       "label": "towels at doors"
+      },
+      {
+       "from": "crm",
+       "to": "reps",
+       "kind": "sysfeed",
+       "label": "risk queue"
+      },
+      {
+       "from": "waitlist",
+       "to": "crm",
+       "kind": "fan",
+       "label": "sign-ups"
+      }
+     ],
+     "panels": [
+      {
+       "id": "season",
+       "type": "state",
+       "title": "Season status",
+       "states": [
+        "In the hunt",
+        "Clinched",
+        "Round 1 home",
+        "Eliminated",
+        "Credits issued",
+        "Renewal + All-Star"
+       ],
+       "colors": {
+        "In the hunt": "#C98A1E",
+        "Clinched": "#2E9E74",
+        "Round 1 home": "#2E9E74",
+        "Eliminated": "#C2465A",
+        "Credits issued": "#4F6FC2",
+        "Renewal + All-Star": "#7A55C2"
+       },
+       "initial": {
+        "state": "In the hunt"
+       }
+      },
+      {
+       "id": "map",
+       "type": "seatmap",
+       "title": "UBS Arena · playoff, then All-Star inventory",
+       "venue": "ubs-arena",
+       "currency": "USD",
+       "tiers": [
+        {
+         "id": "league",
+         "label": "League & partners",
+         "color": "#B8A6E8"
+        },
+        {
+         "id": "member",
+         "label": "Member priority",
+         "color": "#6FC3A8"
+        },
+        {
+         "id": "waitlist",
+         "label": "Waitlist window",
+         "color": "#F2B36B"
+        },
+        {
+         "id": "public",
+         "label": "Public on-sale",
+         "color": "#9CB7E8"
+        }
+       ],
+       "initial": {
+        "mode": "held",
+        "note": "Playoff Round 1 home game. Capacities: illustrative even split of 17,250 over 80 sections."
+       }
+      },
+      {
+       "id": "ledger",
+       "type": "table",
+       "title": "Member ledger, then rep queue",
+       "columns": [
+        {
+         "id": "who",
+         "label": "Account"
+        },
+        {
+         "id": "seats",
+         "label": "Seats"
+        },
+        {
+         "id": "ledger",
+         "label": "Money / signal"
+        },
+        {
+         "id": "next",
+         "label": "Next"
+        }
+       ],
+       "initial": {
+        "rows": []
+       }
+      },
+      {
+       "id": "funnel",
+       "type": "funnel",
+       "title": "All-Star 2027 priority funnel",
+       "unit": "fans",
+       "stages": [
+        {
+         "id": "waitlist",
+         "label": "Waitlist",
+         "tone": "neutral"
+        },
+        {
+         "id": "eligible",
+         "label": "Deposit holders",
+         "tone": "accent"
+        },
+        {
+         "id": "offered",
+         "label": "Offered",
+         "tone": "accent"
+        },
+        {
+         "id": "purchased",
+         "label": "Purchased",
+         "tone": "success"
+        },
+        {
+         "id": "converted",
+         "label": "New members",
+         "tone": "info"
+        }
+       ],
+       "initial": {
+        "counts": {},
+        "note": "Opens once the playoff question is settled (counts illustrative)."
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "hunt",
+       "edge": "standings->ticketing",
+       "nodes": [
+        "standings",
+        "ticketing"
+       ],
+       "text": "**Mid-March 2026: in the hunt.** The standings move nightly, so ticket ops builds playoff inventory for home games that may never exist. Every section is *held* for a conditional Round 1 home game, and nothing is on sale yet.",
+       "panels": {
+        "season": {
+         "state": "In the hunt"
+        },
+        "map": {
+         "mode": "held",
+         "held": {
+          "101": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "102": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "103": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "104": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "105": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "106": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "107": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "108": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "109": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "110": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "111": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "112": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "113": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "114": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "115": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "116": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "117": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "118": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "119": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "120": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "121": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "202": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "203": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "204": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "205": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "206": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "207": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "208": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "209": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "210": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "211": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "212": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "213": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "214": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "215": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "216": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "217": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "218": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "219": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "220": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "221": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "222": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "223": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "224": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "225": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "227": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "228": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "230": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "231": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "301": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "302": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "303": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "304": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "305": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "306": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "307": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "308": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "309": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "310": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "311": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "312": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "313": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "314": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "315": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "316": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "317": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "318": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "319": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "320": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "321": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "322": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "323": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "324": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "325": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "326": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "329": {
+           "count": 215,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "201A": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "201B": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "226A": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          },
+          "226B": {
+           "count": 216,
+           "label": "Round 1 home game (conditional)",
+           "until": "clinch or elimination"
+          }
+         },
+         "note": "Every seat held for a Round 1 home game that is not yet scheduled."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "R1 home games: not scheduled",
+            "next": "await clinch"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "R1 home games: not scheduled",
+            "next": "await clinch"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "R1 home games: not scheduled",
+            "next": "await clinch"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "R1 home games: not scheduled",
+            "next": "await clinch"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Illustrative member accounts; no real fans."
+        }
+       }
+      },
+      {
+       "id": "invoice",
+       "edges": [
+        "ticketing->billing",
+        "crm->push"
+       ],
+       "nodes": [
+        "billing",
+        "promo"
+       ],
+       "text": "**Pre-build both branches.** Member playoff invoices are queued to charge *at clinch or on a fixed date, whichever comes first* (the Oilers published this rule for 2026). Marketing drafts the presale email *and* the credit email, and promotions gets a rally-towel quote, because towels can be made in days and bobbleheads cannot.",
+       "panels": {
+        "ledger": {
+         "rows": [
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "G3 + G4: $520 queued",
+            "next": "charge at clinch or date"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "G3 + G4: $880 queued",
+            "next": "charge at clinch or date"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "G3 + G4: $440 queued",
+            "next": "charge at clinch or date"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "G3 + G4: $760 queued",
+            "next": "charge at clinch or date"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Charge rule follows the Oilers' 2026 pattern; prices illustrative."
+        }
+       },
+       "delta": true,
+       "deltaText": "Oilers 2026: first playoff payment at clinch or by a set date; unplayed games become credit or refund.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com Oilers: renewal and 2026 playoffs FAQ",
+         "url": "https://www.nhl.com/oilers/tickets/season-seat-holders/renewal-faq"
+        }
+       ]
+      },
+      {
+       "id": "clinch",
+       "edge": "standings->ticketing",
+       "nodes": [
+        "standings",
+        "ticketing",
+        "billing"
+       ],
+       "text": "**Clinch (the branch that did not happen in 2026).** The magic number hits zero. Billing charges the first home game, and the schedule fixes the dates. The playbook is April 2024: Round 1 against Carolina, home Games 3 and 4 at UBS Arena on Apr 25 and 27.",
+       "tone": {
+        "standings": "ok"
+       },
+       "panels": {
+        "season": {
+         "state": "Clinched"
+        },
+        "map": {
+         "note": "Dates fixed: two Round 1 home games (2024 pattern: Apr 25 and 27). Seats still held for members."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "G3: $260 charged",
+            "next": "presale code sent"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "G3: $440 charged",
+            "next": "presale code sent"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "G3: $220 charged",
+            "next": "presale code sent"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "G3: $380 charged",
+            "next": "presale code sent"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "G4 charges only if G4 is played. Prices illustrative."
+        }
+       },
+       "delta": true,
+       "deltaText": "2024: Islanders vs Hurricanes, home Games 3 and 4 on Apr 25 and 27, 2024.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com: 2024 first-round schedule",
+         "url": "https://nhl.com/islanders/news/islanders-hurricanes-first-round-schedule-announced-2024"
+        }
+       ]
+      },
+      {
+       "id": "presale",
+       "edges": [
+        "crm->push",
+        "push->ticketing"
+       ],
+       "nodes": [
+        "crm",
+        "push",
+        "ticketing"
+       ],
+       "text": "**Member presale.** Members get first access, so the lower bowl and the clubs go first while the 300 level barely moves. The held hatch turns into real sales section by section.",
+       "panels": {
+        "season": {
+         "state": "Round 1 home"
+        },
+        "map": {
+         "mode": "sold",
+         "held": null,
+         "sold": {
+          "101": 177,
+          "102": 187,
+          "103": 198,
+          "104": 180,
+          "105": 190,
+          "106": 200,
+          "107": 182,
+          "108": 193,
+          "109": 203,
+          "110": 185,
+          "111": 195,
+          "112": 177,
+          "113": 216,
+          "114": 216,
+          "115": 216,
+          "116": 216,
+          "117": 200,
+          "118": 182,
+          "119": 193,
+          "120": 203,
+          "121": 185,
+          "202": 127,
+          "203": 108,
+          "204": 119,
+          "205": 129,
+          "206": 111,
+          "207": 121,
+          "208": 132,
+          "209": 114,
+          "210": 124,
+          "211": 106,
+          "212": 116,
+          "213": 127,
+          "214": 108,
+          "215": 119,
+          "216": 129,
+          "217": 111,
+          "218": 121,
+          "219": 132,
+          "220": 114,
+          "221": 124,
+          "222": 106,
+          "223": 116,
+          "224": 127,
+          "225": 108,
+          "227": 111,
+          "228": 121,
+          "230": 113,
+          "231": 123,
+          "301": 13,
+          "302": 23,
+          "303": 34,
+          "304": 15,
+          "305": 26,
+          "306": 36,
+          "307": 18,
+          "308": 28,
+          "309": 39,
+          "310": 21,
+          "311": 31,
+          "312": 13,
+          "313": 23,
+          "314": 34,
+          "315": 15,
+          "316": 26,
+          "317": 36,
+          "318": 18,
+          "319": 28,
+          "320": 39,
+          "321": 21,
+          "322": 31,
+          "323": 13,
+          "324": 23,
+          "325": 34,
+          "326": 15,
+          "329": 131,
+          "201A": 106,
+          "201B": 116,
+          "226A": 119,
+          "226B": 129
+         },
+         "highlight": [
+          "113",
+          "114",
+          "115",
+          "116"
+         ],
+         "note": "Member presale: clubs gone, 100 level near 90%, 300 level about 12% (illustrative)."
+        }
+       },
+       "delta": true,
+       "deltaText": "Playoff Access is a listed member benefit (member benefits page).",
+       "deltaLinks": [
+        {
+         "label": "NHL.com Islanders: membership renewal",
+         "url": "https://www.nhl.com/fr/islanders/tickets/membership/central"
+        }
+       ]
+      },
+      {
+       "id": "onsale",
+       "edges": [
+        "push->ticketing",
+        "ticketing->promo"
+       ],
+       "nodes": [
+        "ticketing",
+        "promo"
+       ],
+       "text": "**Public on-sale, five days out.** In 2024 single-game tickets went on sale Apr 20 for an Apr 25 Game 3. The bowl fills from the bottom up, and the sold count becomes the towel order: one per seat, plus a buffer.",
+       "panels": {
+        "map": {
+         "sold": {
+          "101": 216,
+          "102": 216,
+          "103": 216,
+          "104": 216,
+          "105": 216,
+          "106": 216,
+          "107": 216,
+          "108": 216,
+          "109": 216,
+          "110": 216,
+          "111": 216,
+          "112": 216,
+          "113": 216,
+          "114": 216,
+          "115": 216,
+          "116": 216,
+          "117": 216,
+          "118": 216,
+          "119": 216,
+          "120": 216,
+          "121": 216,
+          "202": 214,
+          "203": 199,
+          "204": 207,
+          "205": 216,
+          "206": 201,
+          "207": 210,
+          "208": 216,
+          "209": 203,
+          "210": 212,
+          "211": 197,
+          "212": 205,
+          "213": 214,
+          "214": 199,
+          "215": 207,
+          "216": 216,
+          "217": 201,
+          "218": 210,
+          "219": 216,
+          "220": 203,
+          "221": 212,
+          "222": 197,
+          "223": 205,
+          "224": 214,
+          "225": 199,
+          "227": 201,
+          "228": 209,
+          "230": 202,
+          "231": 211,
+          "301": 174,
+          "302": 183,
+          "303": 191,
+          "304": 176,
+          "305": 185,
+          "306": 194,
+          "307": 178,
+          "308": 187,
+          "309": 196,
+          "310": 181,
+          "311": 189,
+          "312": 174,
+          "313": 183,
+          "314": 191,
+          "315": 176,
+          "316": 185,
+          "317": 194,
+          "318": 178,
+          "319": 187,
+          "320": 196,
+          "321": 181,
+          "322": 189,
+          "323": 174,
+          "324": 183,
+          "325": 191,
+          "326": 176,
+          "329": 215,
+          "201A": 197,
+          "201B": 205,
+          "226A": 207,
+          "226B": 216
+         },
+         "highlight": null,
+         "note": "Public on-sale: 100 level sold out, 300 level about 86% (illustrative)."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "towel",
+           "cells": {
+            "who": "Rally towels",
+            "seats": "17,250 + buffer",
+            "ledger": "order sized to sold",
+            "next": "stage at every door"
+           },
+           "status": "added"
+          },
+          {
+           "id": "ticket",
+           "cells": {
+            "who": "Commemorative ticket",
+            "seats": "all fans",
+            "ledger": "design locked",
+            "next": "in-app at T-48h"
+           },
+           "status": "added"
+          },
+          {
+           "id": "doors",
+           "cells": {
+            "who": "Doors",
+            "seats": "90 min early",
+            "ledger": "The Park contests",
+            "next": "push reminder"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "2024 Game 3 precedent: rally towels and a commemorative ticket for all fans, doors 90 minutes early."
+        }
+       },
+       "delta": true,
+       "deltaText": "Single-game tickets for 2024 Games 3 and 4 went on sale Apr 20, 2024.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com: 2024 first-round schedule",
+         "url": "https://nhl.com/islanders/news/islanders-hurricanes-first-round-schedule-announced-2024"
+        }
+       ]
+      },
+      {
+       "id": "game3",
+       "edges": [
+        "promo->ticketing"
+       ],
+       "nodes": [
+        "promo",
+        "ticketing"
+       ],
+       "text": "**Game night.** Every seat is sold and every seat gets a rally towel. This is the 2024 precedent: towels and a commemorative ticket for all fans, The Park with contests, doors 90 minutes early. Game 4 went to double overtime and the Islanders won 3-2.",
+       "tone": {
+        "promo": "ok"
+       },
+       "panels": {
+        "map": {
+         "sold": {
+          "101": 216,
+          "102": 216,
+          "103": 216,
+          "104": 216,
+          "105": 216,
+          "106": 216,
+          "107": 216,
+          "108": 216,
+          "109": 216,
+          "110": 216,
+          "111": 216,
+          "112": 216,
+          "113": 216,
+          "114": 216,
+          "115": 216,
+          "116": 216,
+          "117": 216,
+          "118": 216,
+          "119": 216,
+          "120": 216,
+          "121": 216,
+          "202": 216,
+          "203": 216,
+          "204": 216,
+          "205": 216,
+          "206": 216,
+          "207": 216,
+          "208": 216,
+          "209": 216,
+          "210": 216,
+          "211": 216,
+          "212": 216,
+          "213": 216,
+          "214": 216,
+          "215": 216,
+          "216": 216,
+          "217": 216,
+          "218": 216,
+          "219": 216,
+          "220": 216,
+          "221": 216,
+          "222": 216,
+          "223": 216,
+          "224": 216,
+          "225": 216,
+          "227": 216,
+          "228": 215,
+          "230": 215,
+          "231": 215,
+          "301": 215,
+          "302": 215,
+          "303": 215,
+          "304": 215,
+          "305": 215,
+          "306": 215,
+          "307": 215,
+          "308": 215,
+          "309": 215,
+          "310": 215,
+          "311": 215,
+          "312": 215,
+          "313": 215,
+          "314": 215,
+          "315": 215,
+          "316": 215,
+          "317": 215,
+          "318": 215,
+          "319": 215,
+          "320": 215,
+          "321": 215,
+          "322": 215,
+          "323": 215,
+          "324": 215,
+          "325": 215,
+          "326": 215,
+          "329": 215,
+          "201A": 216,
+          "201B": 216,
+          "226A": 216,
+          "226B": 216
+         },
+         "note": "Sold out (illustrative full house). 2024: rally towels for all fans."
+        }
+       },
+       "delta": true,
+       "deltaText": "2024 Game 3 at UBS Arena: rally towels, commemorative ticket, doors 90 minutes early.",
+       "deltaLinks": [
+        {
+         "label": "The Hockey News: Game 3 at UBS Arena",
+         "url": "https://thehockeynews.com/nhl/new-york-islanders/game-day/new-york-islanders-playoffs-ubs-arena-hurricanes-game-three"
+        }
+       ]
+      },
+      {
+       "id": "datecharge",
+       "edge": "ticketing->billing",
+       "nodes": [
+        "billing"
+       ],
+       "text": "**The date trigger fires first.** No clinch yet, but the fixed charge date arrives, so the first playoff payment is taken anyway. This is the trap the pre-built credit email exists for.",
+       "tone": {
+        "billing": "warn"
+       },
+       "panels": {
+        "ledger": {
+         "rows": [
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "G3: $260 charged",
+            "next": "no game scheduled"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "G3: $440 charged",
+            "next": "no game scheduled"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "G3: $220 charged",
+            "next": "no game scheduled"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "G3: $380 charged",
+            "next": "no game scheduled"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Charged on the date rule before the season is decided (illustrative)."
+        }
+       }
+      },
+      {
+       "id": "eliminated",
+       "edge": "standings->ticketing",
+       "nodes": [
+        "standings",
+        "ticketing"
+       ],
+       "text": "**Apr 12, 2026: eliminated.** This is what actually happened: a second straight playoff miss for a 43-34-5 team. The conditional inventory is released and the bowl empties. Not one playoff seat was ever sold. Source: [Wikipedia: 2025-26 Islanders season](https://en.wikipedia.org/wiki/2025%E2%80%9326_New_York_Islanders_season) · [Yardbarker: Islanders eliminated](https://www.yardbarker.com/nhl/articles/islanders_officially_eliminated_from_2026_stanley_cup_playoff_contention/s1_16958_43721010).",
+       "tone": {
+        "standings": "alert",
+        "billing": "warn"
+       },
+       "panels": {
+        "season": {
+         "state": "Eliminated"
+        },
+        "map": {
+         "mode": "sold",
+         "held": null,
+         "note": "Conditional inventory released: no Round 1 home game."
+        }
+       }
+      },
+      {
+       "id": "credits",
+       "edge": "billing->crm",
+       "nodes": [
+        "billing",
+        "crm"
+       ],
+       "text": "**Unplayed games become credits.** Each charged payment turns into an account credit for next season, refundable on request (the Oilers' published pattern). The credit email that was drafted in March goes out the same day. Source: [NHL.com Oilers: renewal and 2026 playoffs FAQ](https://www.nhl.com/oilers/tickets/season-seat-holders/renewal-faq).",
+       "tone": {
+        "billing": "ok"
+       },
+       "panels": {
+        "season": {
+         "state": "Credits issued"
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "$260 credit",
+            "next": "apply to 2026-27"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "$440 credit",
+            "next": "apply to 2026-27"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "$220 credit",
+            "next": "refund requested"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "$380 credit",
+            "next": "apply to 2026-27"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Credit or refund election per account (illustrative)."
+        }
+       }
+      },
+      {
+       "id": "repqueue",
+       "edge": "crm->reps",
+       "nodes": [
+        "crm",
+        "reps"
+       ],
+       "text": "**The same table becomes the rep queue.** Sorted by churn risk: newer members churn more, and a member who asked for a refund after a losing season is the first call. Flag *transferred* seats before calling, because a member whose family uses the seats is not absent. Source: [Chief Marketer: LA Kings churn modelling](https://www.chiefmarketer.com/la-kings-turn-to-modeling-to-ice-churn/).",
+       "panels": {
+        "map": {
+         "highlight": [
+          "226A",
+          "104",
+          "312",
+          "207"
+         ],
+         "note": "Pulsed: seats of the four accounts in the rep queue."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "a3317",
+           "cells": {
+            "who": "Acct 3317 · full, yr 1",
+            "seats": "2 · Sec 226A",
+            "ledger": "refund · 40% unused",
+            "next": "High: rep call today"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a4120",
+           "cells": {
+            "who": "Acct 4120 · half, yr 2",
+            "seats": "2 · Sec 104",
+            "ledger": "heavy resale",
+            "next": "High: relocation offer"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a2208",
+           "cells": {
+            "who": "Acct 2208 · half, 4 yrs",
+            "seats": "4 · Sec 207",
+            "ledger": "seats transferred",
+            "next": "Mid: not absent, invite"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "a1041",
+           "cells": {
+            "who": "Acct 1041 · full, 9 yrs",
+            "seats": "2 · Sec 312",
+            "ledger": "credit applied",
+            "next": "Low: renewal email"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "Risk order and reasons illustrative; LA Kings model churn from about 10 games in."
+        }
+       }
+      },
+      {
+       "id": "lever",
+       "edges": [
+        "waitlist->crm",
+        "crm->push"
+       ],
+       "nodes": [
+        "waitlist",
+        "crm",
+        "push"
+       ],
+       "text": "**Both branches meet at renewal.** The 2026-27 renewal carries one line no rival can match: Full and Half Season Members get *guaranteed access to buy tickets* (subject to availability) for the 2027 All-Star Weekend at UBS Arena. Others joined a waitlist; the team's 2025-26 deposit page asked $100 for priority access to a new membership (the 2026-27 amount is not confirmed).",
+       "panels": {
+        "season": {
+         "state": "Renewal + All-Star"
+        },
+        "map": {
+         "mode": "tier",
+         "sold": null,
+         "held": null,
+         "highlight": null,
+         "tierOf": {
+          "101": "member",
+          "102": "member",
+          "103": "member",
+          "104": "league",
+          "105": "league",
+          "106": "league",
+          "107": "member",
+          "108": "member",
+          "109": "member",
+          "110": "member",
+          "111": "member",
+          "112": "member",
+          "113": "league",
+          "114": "league",
+          "115": "league",
+          "116": "league",
+          "117": "member",
+          "118": "member",
+          "119": "member",
+          "120": "member",
+          "121": "member",
+          "202": "member",
+          "203": "member",
+          "204": "member",
+          "205": "member",
+          "206": "member",
+          "207": "member",
+          "208": "member",
+          "209": "member",
+          "210": "member",
+          "211": "waitlist",
+          "212": "waitlist",
+          "213": "waitlist",
+          "214": "waitlist",
+          "215": "waitlist",
+          "216": "member",
+          "217": "member",
+          "218": "member",
+          "219": "member",
+          "220": "league",
+          "221": "league",
+          "222": "league",
+          "223": "member",
+          "224": "member",
+          "225": "member",
+          "227": "waitlist",
+          "228": "waitlist",
+          "230": "waitlist",
+          "231": "waitlist",
+          "301": "public",
+          "302": "public",
+          "303": "public",
+          "304": "waitlist",
+          "305": "waitlist",
+          "306": "waitlist",
+          "307": "waitlist",
+          "308": "waitlist",
+          "309": "public",
+          "310": "public",
+          "311": "public",
+          "312": "public",
+          "313": "public",
+          "314": "public",
+          "315": "public",
+          "316": "public",
+          "317": "public",
+          "318": "public",
+          "319": "waitlist",
+          "320": "waitlist",
+          "321": "waitlist",
+          "322": "waitlist",
+          "323": "waitlist",
+          "324": "public",
+          "325": "public",
+          "326": "public",
+          "329": "waitlist",
+          "201A": "member",
+          "201B": "member",
+          "226A": "member",
+          "226B": "member"
+         },
+         "note": "All-Star access plan by section (allocation illustrative; the league's split is not published)."
+        },
+        "funnel": {
+         "counts": {
+          "waitlist": 12000,
+          "eligible": 2600
+         },
+         "active": "eligible",
+         "note": "Waitlist and $100 deposits (counts illustrative)."
+        },
+        "ledger": {
+         "rows": [
+          {
+           "id": "w1",
+           "cells": {
+            "who": "Season members",
+            "seats": "priority window 1",
+            "ledger": "renewal + credit",
+            "next": "guaranteed access"
+           },
+           "status": "added"
+          },
+          {
+           "id": "w2",
+           "cells": {
+            "who": "Deposit holders",
+            "seats": "priority window 2",
+            "ledger": "$100 deposit",
+            "next": "membership offer"
+           },
+           "status": "added"
+          },
+          {
+           "id": "w3",
+           "cells": {
+            "who": "Waitlist",
+            "seats": "window 3",
+            "ledger": "no payment",
+            "next": "offer if seats left"
+           },
+           "status": "added"
+          },
+          {
+           "id": "w4",
+           "cells": {
+            "who": "League & partners",
+            "seats": "held back",
+            "ledger": "n/a",
+            "next": "league allocation"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Order of access illustrative except member priority, which is published."
+        }
+       },
+       "delta": true,
+       "deltaText": "Full and Half Season Members get guaranteed access to buy All-Star 2027 tickets, subject to availability; a waitlist opened for others (The Hockey News); $100 deposit for membership priority was published for 2025-26.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com Islanders: 2027 All-Star",
+         "url": "https://www.nhl.com/islanders/fans/all-star"
+        },
+        {
+         "label": "NHL.com Islanders: membership deposits (2025-26)",
+         "url": "https://www.nhl.com/islanders/tickets/2025-26-deposits"
+        },
+        {
+         "label": "NHL.com Islanders: 2026-27 fan experiences",
+         "url": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088"
+        },
+        {
+         "label": "The Hockey News: All-Star 2027 waitlist (Oct 24, 2025)",
+         "url": "https://thehockeynews.com/nhl/new-york-islanders/latest-news/islanders-announce-dates-for-2027-all-star-game-at-ubs-arena"
+        }
+       ]
+      },
+      {
+       "id": "allstar",
+       "edges": [
+        "crm->push",
+        "push->ticketing"
+       ],
+       "nodes": [
+        "push",
+        "ticketing",
+        "crm"
+       ],
+       "text": "**All-Star 2027 closes the loop.** Feb 5-6, 2027: a 3-on-3 round robin with fan voting. Waitlist fans are offered the seats that remain, and the ones who buy get a membership pitch. The event is a one-time acquisition window, so the last funnel stage is the one that matters next season.",
+       "panels": {
+        "map": {
+         "mode": "sold",
+         "sold": {
+          "101": 216,
+          "102": 216,
+          "103": 216,
+          "104": 216,
+          "105": 216,
+          "106": 216,
+          "107": 216,
+          "108": 216,
+          "109": 216,
+          "110": 216,
+          "111": 216,
+          "112": 216,
+          "113": 216,
+          "114": 216,
+          "115": 216,
+          "116": 216,
+          "117": 216,
+          "118": 216,
+          "119": 216,
+          "120": 216,
+          "121": 216,
+          "202": 216,
+          "203": 216,
+          "204": 216,
+          "205": 216,
+          "206": 216,
+          "207": 216,
+          "208": 216,
+          "209": 216,
+          "210": 216,
+          "211": 202,
+          "212": 190,
+          "213": 197,
+          "214": 204,
+          "215": 192,
+          "216": 216,
+          "217": 216,
+          "218": 216,
+          "219": 216,
+          "220": 216,
+          "221": 216,
+          "222": 216,
+          "223": 216,
+          "224": 216,
+          "225": 216,
+          "227": 206,
+          "228": 193,
+          "230": 206,
+          "231": 194,
+          "301": 171,
+          "302": 159,
+          "303": 166,
+          "304": 203,
+          "305": 191,
+          "306": 198,
+          "307": 205,
+          "308": 193,
+          "309": 169,
+          "310": 176,
+          "311": 164,
+          "312": 171,
+          "313": 159,
+          "314": 166,
+          "315": 173,
+          "316": 161,
+          "317": 168,
+          "318": 175,
+          "319": 193,
+          "320": 200,
+          "321": 206,
+          "322": 194,
+          "323": 201,
+          "324": 159,
+          "325": 166,
+          "326": 173,
+          "329": 200,
+          "201A": 216,
+          "201B": 216,
+          "226A": 216,
+          "226B": 216
+         },
+         "highlight": [
+          "211",
+          "212",
+          "213",
+          "214",
+          "215",
+          "305",
+          "306",
+          "320"
+         ],
+         "note": "All-Star sell-through (illustrative). Pulsed: waitlist sections."
+        },
+        "funnel": {
+         "counts": {
+          "offered": 1800,
+          "purchased": 1350,
+          "converted": 420
+         },
+         "active": null,
+         "note": "Converted: waitlist buyers who took a 2026-27 membership (illustrative)."
+        }
+       },
+       "delta": true,
+       "deltaText": "2027 NHL All-Star Weekend at UBS Arena, Feb 5-6, 2027; 3-on-3 round robin with fan voting.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com Islanders: 2027 All-Star",
+         "url": "https://www.nhl.com/islanders/fans/all-star"
+        },
+        {
+         "label": "NHL.com: 2027 All-Star format",
+         "url": "https://www.nhl.com/news/nhl-unveils-new-format-for-2027-all-star-weekend"
+        }
+       ]
+      }
+     ],
+     "paths": [
+      {
+       "id": "clinch",
+       "label": "Clinch (2024 playbook)",
+       "steps": [
+        "hunt",
+        "invoice",
+        "clinch",
+        "presale",
+        "onsale",
+        "game3",
+        "lever",
+        "allstar"
+       ]
+      },
+      {
+       "id": "fade",
+       "label": "Eliminated (2026)",
+       "color": "#FB923C",
+       "steps": [
+        "hunt",
+        "invoice",
+        "datecharge",
+        "eliminated",
+        "credits",
+        "repqueue",
+        "lever",
+        "allstar"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 10,
+      "w": 436,
+      "h": 516
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "panel": "map",
+        "x": 0,
+        "y": 8,
+        "w": 13,
+        "h": 17
+       },
+       {
+        "x": 13,
+        "y": 8,
+        "w": 11,
+        "h": 17
+       },
+       {
+        "panel": "ledger",
+        "x": 0,
+        "y": 25,
+        "w": 13,
+        "h": 12
+       },
+       {
+        "panel": "season",
+        "x": 13,
+        "y": 25,
+        "w": 11,
+        "h": 4
+       },
+       {
+        "panel": "funnel",
+        "x": 13,
+        "y": 29,
+        "w": 11,
+        "h": 8
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "flowview": {
+   "authoredWith": "0.2.0",
+   "minVersion": "0.2.0",
+   "features": [
+    "content.deviceapp",
+    "content.deviceapp-badges",
+    "content.deviceapp-freshness",
+    "content.deviceapp-navigation",
+    "flow.alternates",
+    "flow.drilldown",
+    "flow.failures",
+    "flow.step-colors",
+    "flow.story-time",
+    "layout.arranged",
+    "layout.cubic-curves",
+    "layout.edge-ports",
+    "layout.free-nodes",
+    "layout.graph-frame",
+    "layout.grid-24",
+    "media.node-styles",
+    "media.shared-icons",
+    "panel.budget",
+    "panel.checks",
+    "panel.cost",
+    "panel.deviceapp",
+    "panel.funnel",
+    "panel.gauge",
+    "panel.grid",
+    "panel.inflight",
+    "panel.log",
+    "panel.orbit",
+    "panel.phone",
+    "panel.queue",
+    "panel.seatmap",
+    "panel.state",
+    "panel.table",
+    "panel.tiles",
+    "panel.timeline"
+   ]
+  },
+  "brand": {
+   "app": "Islanders · A season of seats",
+   "logo": "NY",
+   "accent": "#003087"
+  }
+ }
+}

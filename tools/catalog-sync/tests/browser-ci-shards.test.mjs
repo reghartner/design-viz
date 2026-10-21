@@ -49,7 +49,7 @@ test('aggregate browser check merges useful reports and propagates every shard r
   assert.equal(aggregate.name,'browser-contracts');
   assert.equal(aggregate['runs-on'],'ubuntu-24.04');
   assert.equal(aggregate.if,'always()');
-  assert.equal(aggregate.needs,'browser-contract-shards');
+  assert.deepEqual(aggregate.needs,['browser-contract-shards','science-package-browser','sports-package-browser']);
   assert.equal(stepByUse(aggregate,'actions/setup-node@v7').with['node-version'],24);
 
   const download=stepByUse(aggregate,'actions/download-artifact@v8');
@@ -82,10 +82,28 @@ test('aggregate browser check merges useful reports and propagates every shard r
   assert.equal(upload.with['if-no-files-found'],'ignore');
   assert.equal(upload.with['retention-days'],14);
 
-  const gate=stepByName(aggregate,'Require every browser shard to pass');
+  const gate=stepByName(aggregate,'Require every browser contract job to pass');
   assert.equal(gate.if,'always()');
-  assert.deepEqual(gate.env,{SHARD_RESULT:'${{ needs.browser-contract-shards.result }}'});
-  assert.equal(gate.run,'test "$SHARD_RESULT" = success');
+  assert.deepEqual(gate.env,{
+    SHARD_RESULT:'${{ needs.browser-contract-shards.result }}',
+    SCIENCE_RESULT:'${{ needs.science-package-browser.result }}',
+    SPORTS_RESULT:'${{ needs.sports-package-browser.result }}',
+  });
+  assert.equal(gate.run,'test "$SHARD_RESULT" = success && test "$SCIENCE_RESULT" = success && test "$SPORTS_RESULT" = success');
+});
+
+test('opt-in package browser jobs select their package and desktop checks',()=>{
+  const science=jobs['science-package-browser'];
+  const sports=jobs['sports-package-browser'];
+  assert.equal(science['runs-on'],'ubuntu-24.04');
+  assert.equal(sports['runs-on'],'ubuntu-24.04');
+  const scienceCheck=stepByName(science,'Verify opt-in science stories and starter filter on desktop');
+  const sportsCheck=stepByName(sports,'Verify opt-in venue story controls on desktop');
+  assert.equal(scienceCheck.env.FLOWVIEW_PACKAGES,'science,physics');
+  assert.match(scienceCheck.run,/science-story-controls\.spec\.mjs/);
+  assert.match(scienceCheck.run,/virology story/);
+  assert.equal(sportsCheck.env.FLOWVIEW_PACKAGES,'sports');
+  assert.match(sportsCheck.run,/sports-step-rail\.spec\.mjs/);
 });
 
 test('ordinary local browser command remains single-worker and unsharded',()=>{

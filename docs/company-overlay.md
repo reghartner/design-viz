@@ -18,6 +18,75 @@ All discovery below is automatic. Upstream keeps no list that a fork must
 extend, and an absent or empty overlay adds nothing: builds, tests and
 generated outputs are unchanged.
 
+## Optional packages
+
+`company/company.json` selects content packages for a company build. For example,
+`"packages": ["science", "sports"]` includes biology teaching and venue content;
+without `packages`, the generated viewer, workbench, validator, and offline
+agent kit use the core catalog only. Source files remain in the checkout, but
+unselected packages are absent from the generated outputs and authoring context.
+An optional `"packages"` list in `workbench/site.json` (or the file passed with
+`--config`) overrides the company list for that site. Use `[]` for a core-only
+site; omit the field to inherit the company list. `--package NAME` adds a
+package to the effective selection for a local preview. Generic `grid` and
+`funnel` panels remain in the core catalog. Selecting sports alone never pulls
+in biology panels, examples or guidance. Physics is a separate package:
+`"packages": ["physics"]` adds wave and force panels, its story and authoring
+guidance. Selecting science and sports does not load physics.
+For a local preview, use `python3 tools/build.py --package science --package sports`.
+When authoring against an external site config, pass the same file to the
+repository tools: `node tools/validate.js --config path/to/site.json story.json`
+and `python3 tools/authoring-packet.py --config path/to/site.json --panel cellscene`.
+Use `python3 tools/widget_doc.py --config path/to/site.json cellscene` for a
+single panel's contract under that same selection.
+The downloaded offline kit already carries the selected package context.
+Each enabled package contributes its manifest, panel contracts, examples,
+recipes, and guide under `packages/<name>/`; its guide is
+`packages/<name>/README.md`. Unselected package files are absent from the kit.
+
+A company may narrow a package's published content with `packageContent`:
+each package key maps to `templates` (declared starter source paths) and
+`kitFiles` (exact package-relative Markdown/JSON paths). Both lists are required;
+paths must be unique existing files inside that package. A selection cannot widen
+a package's own `kitFiles` list. It must retain `package.json`, `contract.md`, every
+manifest route, and each selected starter. The exported manifest reflects the
+selected templates and files, while runtime panels remain available. Theme and
+example globs cannot reintroduce excluded package files. Omit the selection to
+retain the package defaults; disabling company identity disables these restrictions.
+Reusable guides retain their original text and may link to upstream examples
+excluded by the content selection. Those examples remain in the repository;
+manifest routes and selected starter references must still resolve in the kit.
+
+## Build-time themes
+
+An optional `theme` field in `company/company.json` selects a JSON manifest
+relative to that file. Themes are independent of package selection and are
+disabled by `--no-config`. A company without this field keeps the core skins.
+The manifest may declare:
+
+- `skins`: unique new `{name, layers}` records; layers name existing core skins.
+- `runtime` and `workbench`: trusted local JavaScript modules. Runtime modules
+  register definitions without accessing the DOM at load time. Workbench modules
+  can supply `createCompanyLibraryDecoration(home)` with `home()`,
+  `reader(entry)` and `card(entry, title)` callbacks, scoped to that library.
+- `styles`: `core` and `workbench` CSS files, appended after shared/panel styles.
+- `assets`: named local PNG/JPEG/WebP files, embedded where a module uses
+  `/* @theme-asset:name */ ""`. No runtime asset fetch is required.
+- `guidance`: a Markdown file included in the selected authoring contract,
+  packet and portable kit.
+- `kitFiles`: repository-relative Markdown/JSON globs for curated resources.
+
+All module, style, image and guidance paths resolve from the manifest within
+`company/`. The sports venue renderer optionally calls a theme's
+`CompanyVenueDecoration.field(panel, model)` and
+`landmarkClass(panel, landmark)` definitions; absent a theme it renders normally.
+Keep team names, CSS, artwork and selection logic in the company theme.
+
+Package manifests may optionally declare `kitFiles`, an explicit list of local
+Markdown/JSON files. Omitting it preserves the package's complete text bundle.
+This lets a general-purpose package ship focused guidance while a company theme
+selects additional story material. Extracted kits keep their fixed selection.
+
 ## Panels and helper modules
 
 - `company/panels/types/<type>.js` — one complete panel definition, written
@@ -28,6 +97,9 @@ generated outputs are unchanged.
   types. Helpers are bundled after the shared panel primitives
   (`src/panels/shared.js` and the other `src/panels/*.js` files) and before
   every panel type, in file-name order.
+- `company/panels/venues/<id>.js` — venue library entries for the optional
+  sports package. These load only when `sports` is enabled. Its guide is
+  `packages/sports/README.md` when that package is selected.
 
 `src/source-bundles.json` lists these directories as optional globs
 (`@company/panels/*.js`, `@company/panels/types/*.js`), and
@@ -37,7 +109,7 @@ Every output that includes the validator therefore includes company panels:
 `tools/canon/generated-runtime.cjs` (used by `tools/validate.js`), the
 Backstage and Confluence viewers and the native viewer. Assembled bundles label
 these files `/* ---- company/panels/... ---- */`. A company type with the same
-name as an upstream type fails the build.
+name as a core or enabled package type fails the build.
 
 ## Custom icons
 
@@ -198,6 +270,7 @@ value is invalid. Every field except `version` is optional.
 | `repository` | The header GitHub link, the welcome form's repository field, the **Read the authoring skill** link, the repository-root example in its validation message, and the reader-tour guide link in the inspector. An `https://` repository root; a trailing `.git` is removed. | `https://github.com/reghartner/design-viz` (the example message keeps `https://github.com/your-team/design-viz`) |
 | `revision` | The branch in the authoring-skill and tour-guide links and the welcome form's revision field. | `main` |
 | `brand` | A brand file path inside `company/`, relative to `company.json`, with `companyName`, `logo`, `primaryColor` and `secondaryColor` (the fields of `src/company-brand.config.js`). `logo` is a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative path (inside `company/`) to a PNG/JPEG/WebP file of up to 512 KiB that the build embeds. The brand's `companyName` defaults to the top-level `companyName`. Every viewer, the workbench and the validator runtime use it as the global brand. | The placeholders in `src/company-brand.config.js` |
+| `packages` | Optional content packages included in generated viewers, workbench starters and agent kits. Package names must match installed `packages/<name>/package.json` manifests. Separate from the singular `package` field below. | Empty list |
 | `package` | Backstage package identity; see below. | Upstream `package.json` values |
 | `backstage.baseUrl` | Public Backstage UI base URL included in copied Workbench connection instructions and focused authoring packets, including the offline folder-agent kit. | No company Backstage context |
 

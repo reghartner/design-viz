@@ -29,11 +29,16 @@ Section navigation; phones use the percentage menu at left and Fit at right. In
 Explore, the Zoom menu also retains Auto, Fit width, and Readable diagram sizing.
 
 The theme picker offers Aurora, Pastel, Blueprint, Terminal, Rose, Lavender, and
-Opus Lilac (`lilac`). Changes affect the live reader without rebuilding its
+Opus Lilac (`lilac`). A company build can add its own themes. Changes affect the live reader without rebuilding its
 sections or editing the source. Daylight and Editorial remain supported in saved
 specs, cookies and host APIs and remain correctly labeled when loaded, but are
 not offered as new choices. Lavender and Opus Lilac bundle Lora locally; the
 restricted Forge font profile retains its existing local font fallback.
+
+A valid `?theme=lavender` (or another supported skin) overrides cookies and
+document defaults at boot. Canonical diagram links retain only that valid theme
+alongside the diagram ID. Choosing a theme during the session updates an existing
+valid theme query, so reload and sharing agree; it does not write a cookie.
 
 Backstage expansion enlarges the container and preserves the selected View’s
 presentation. Workbench retains its authoring navigation below app chrome, with

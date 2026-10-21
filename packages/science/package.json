@@ -1,0 +1,44 @@
+{
+  "name": "science",
+  "sourceFiles": [
+    "panels/bio.js",
+    "panels/mech.js",
+    "panels/canvas-scene.js",
+    "panels/types/sequence.js",
+    "panels/types/frames.js",
+    "panels/types/reads.js",
+    "panels/types/locus.js",
+    "panels/types/strandscene.js",
+    "panels/types/cellscene.js",
+    "panels/types/rnacopy.js",
+    "panels/types/nspstory.js"
+  ],
+  "routes": {
+    "cellscene": "cookbook/cell-scenes.md",
+    "frames": "cookbook/sequence-panels.md",
+    "locus": "cookbook/sequence-panels.md",
+    "reads": "cookbook/sequence-panels.md",
+    "rnacopy": "cookbook/viral-copy-gate.md",
+    "nspstory": "cookbook/nsp15-story.md",
+    "sequence": "cookbook/sequence-panels.md",
+    "strandscene": "examples/strand-cut/README.md"
+  },
+  "templates": [
+    {
+      "name": "From viral RNA copying to sequencing evidence",
+      "desc": "Trace conceptual +RNA copying and a hypothetical interruption, then interpret illustrative RNA-seq reads on a genome map. Detection alone does not establish ongoing replication or infectious virus.",
+      "category": "science",
+      "tag": "Virology \u00b7 RNA-seq interpretation",
+      "art": "branch",
+      "source": "starters/copy-gate.json"
+    },
+    {
+      "name": "The insertion signature of NSP15",
+      "desc": "Follow the rare green reporter lineage, understand why limiting dilution helps, then read the insertion-class evidence and assay limits in Bianco et al.\u2019s August 2026 preprint.",
+      "category": "science",
+      "tag": "Virology \u00b7 paper evidence",
+      "art": "branch",
+      "source": "starters/nsp15-insertion-evidence.json"
+    }
+  ]
+}

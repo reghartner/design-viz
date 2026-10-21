@@ -17,6 +17,6 @@ Everything below is discovered automatically. No upstream list needs an edit.
 | `company/tests/*.test.js` | Node tests, run by `node --test tests/*.test.js` through `tests/company-overlay.test.js`. |
 | `company/tests/test_*.py` | Python tests, run by `python3 -m unittest discover -s tests` through `tests/test_company_overlay.py`. |
 | `company/CHANGELOG.md` | The fork's release notes. Keep upstream's `CHANGELOG.md` unedited. |
-| `company/company.json` | The fork's name, repository, revision, brand file, Backstage UI base URL, internal site base URL and package identity, used for workbench links and labels, the global brand, agent packets and `tools/backstage-pack.mjs`. |
+| `company/company.json` | The fork's name, repository, revision, brand file, optional content packages, Backstage UI base URL, internal site base URL and package identity, used for workbench links and labels, the global brand, agent packets and `tools/backstage-pack.mjs`. |
 
 See [docs/company-overlay.md](../docs/company-overlay.md) for details.

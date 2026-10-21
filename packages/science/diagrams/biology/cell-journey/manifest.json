@@ -1,0 +1,31 @@
+{
+  "pages": [
+    {
+      "file": "biology-teaching.html",
+      "spec": "biology-teaching.spec.json",
+      "title": "How a cell works, one step at a time",
+      "family": "cell-journey",
+      "description": "Thirteen illustrated biology lessons in four acts, with 155 authored steps and alternate paths for core mechanisms.",
+      "tags": [
+        "biology",
+        "teaching",
+        "cell",
+        "sequencing",
+        "alternate-paths"
+      ],
+      "widgets": [
+        "appscreens",
+        "cellscene",
+        "frames",
+        "grid",
+        "locus",
+        "log",
+        "reads",
+        "sequence",
+        "state",
+        "strandscene",
+        "table"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5430 @@
+{
+ "page": {
+  "title": "1 · Create demand",
+  "description": "Schaefer momentum, the schedule drop, bobblehead production and group holds at UBS Arena. Public facts cited; operational flows and uncited figures are illustrative.",
+  "skin": "islanders",
+  "contract": "1",
+  "tags": [
+   "sports",
+   "marketing",
+   "sports-marketing",
+   "ticketing",
+   "islanders",
+   "promotions",
+   "giveaways",
+   "group-sales",
+   "pricing",
+   "crm",
+   "sponsorship",
+   "renewals"
+  ],
+  "sections": [
+   {
+    "id": "schaefer-effect",
+    "heading": "The Schaefer effect",
+    "accent": "cyan",
+    "text": [
+     "How a team sells, fills and follows up on a season of seats at UBS Arena, from the 2025 Schaefer demand surge to next year's renewal, told with the New York Islanders' public promotions. Public facts are cited on each step (open the green markers); the ticketing, CRM, app, scanning and POS flows are illustrative reconstructions, not any team's or vendor's systems, and figures are illustrative unless a source is given."
+    ],
+    "bullets": [
+     "The **fact tiles** light one at a time, each with its date; dimmed tiles have no claim yet",
+     "The **300 level** fills section by section as each fact lands (illustrative): sidelines first, then corners, then the far ends",
+     "The **crowd tiles** track the illustrative crowd against about 17,250 seats",
+     "**Season at a glance, across all four arcs:** Jun 27, 2025 the No. 1 pick · Jul 24, 2026 single-game on-sale · Aug 25 promo schedule · Oct 22 a friend's ticket · Nov 7 hat night · Nov 27 Sorokin night · Dec 1 GOAT USA Night · Feb 13, 2027 Schaefer bobblehead · Mar 27 Greek Heritage Night · renewal and All-Star 2027"
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "crm": {
+       "title": "CRM",
+       "sub": "fan file",
+       "icon": "person",
+       "tint": "data"
+      },
+      "push": {
+       "title": "Email / push",
+       "sub": "news · offers",
+       "icon": "phone",
+       "tint": "mqtt"
+      },
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "plans · games",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "promo": {
+       "title": "Promotions",
+       "sub": "giveaways",
+       "icon": "package",
+       "tint": "dev"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      },
+      {
+       "id": "promo",
+       "side": "below",
+       "x": 123,
+       "y": 70
+      },
+      {
+       "id": "push",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      }
+     ],
+     "edges": [
+      {
+       "from": "crm",
+       "to": "push",
+       "kind": "https",
+       "label": "news to the file",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "push",
+       "to": "ticketing",
+       "kind": "https",
+       "label": "buy links",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 63.64,
+         "dy": 44
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -63.64,
+         "dy": -44
+        }
+       ]
+      },
+      {
+       "from": "ticketing",
+       "to": "crm",
+       "kind": "int",
+       "label": "new buyers",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "promo",
+       "to": "ticketing",
+       "kind": "int",
+       "label": "promo tag on the event",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "facts",
+       "type": "tiles",
+       "title": "Schaefer effect · sourced facts",
+       "tiles": [
+        {
+         "id": "odds",
+         "label": "Lottery odds"
+        },
+        {
+         "id": "pick",
+         "label": "Draft pick"
+        },
+        {
+         "id": "jerseys",
+         "label": "Jersey sales"
+        },
+        {
+         "id": "tickets",
+         "label": "Ticket sales"
+        },
+        {
+         "id": "tv",
+         "label": "TV viewership"
+        },
+        {
+         "id": "social",
+         "label": "Social"
+        },
+        {
+         "id": "calder",
+         "label": "Calder vote"
+        },
+        {
+         "id": "night",
+         "label": "Promo night"
+        }
+       ],
+       "colors": {
+        "NO. 1": "#5B6FD6",
+        "+63% YoY": "#2F9468",
+        "+7%": "#2F9468",
+        "+37%": "#2F9468",
+        "+40%": "#2F9468",
+        "198 / 198": "#B7832F",
+        "3.5%": "#5B6FD6",
+        "FEB 13": "#C2506A"
+       },
+       "initial": {}
+      },
+      {
+       "id": "map",
+       "type": "seatmap",
+       "title": "UBS Arena · sold by section (illustrative)",
+       "venue": "ubs-arena",
+       "currency": "USD",
+       "initial": {
+        "mode": "sold",
+        "sold": {
+         "101": 205,
+         "102": 205,
+         "103": 205,
+         "104": 205,
+         "105": 205,
+         "106": 205,
+         "107": 205,
+         "108": 205,
+         "109": 205,
+         "110": 205,
+         "111": 205,
+         "112": 205,
+         "113": 205,
+         "114": 205,
+         "115": 205,
+         "116": 205,
+         "117": 205,
+         "118": 205,
+         "119": 205,
+         "120": 205,
+         "121": 205,
+         "202": 203,
+         "203": 203,
+         "204": 203,
+         "205": 203,
+         "206": 203,
+         "207": 203,
+         "208": 203,
+         "209": 203,
+         "210": 203,
+         "211": 203,
+         "212": 203,
+         "213": 203,
+         "214": 203,
+         "215": 203,
+         "216": 203,
+         "217": 203,
+         "218": 203,
+         "219": 203,
+         "220": 203,
+         "221": 203,
+         "222": 203,
+         "223": 203,
+         "224": 203,
+         "225": 203,
+         "227": 203,
+         "228": 203,
+         "230": 203,
+         "231": 203,
+         "301": 67,
+         "302": 67,
+         "303": 67,
+         "304": 67,
+         "305": 67,
+         "306": 67,
+         "307": 67,
+         "308": 67,
+         "309": 67,
+         "310": 67,
+         "311": 67,
+         "312": 67,
+         "313": 67,
+         "314": 67,
+         "315": 67,
+         "316": 67,
+         "317": 67,
+         "318": 67,
+         "319": 67,
+         "320": 66,
+         "321": 66,
+         "322": 66,
+         "323": 66,
+         "324": 66,
+         "325": 66,
+         "326": 66,
+         "329": 203,
+         "201A": 203,
+         "201B": 203,
+         "226A": 203,
+         "226B": 203
+        },
+        "note": "Capacities are an illustrative even split of 17,250 seats over 80 sections."
+       },
+       "showTotals": false
+      },
+      {
+       "id": "crowd",
+       "type": "tiles",
+       "title": "Crowd vs about 17,250 seats (illustrative)",
+       "tiles": [
+        {
+         "id": "fans",
+         "label": "Crowd (fans)"
+        },
+        {
+         "id": "fill",
+         "label": "Sell-through"
+        }
+       ],
+       "initial": {
+        "fans": {
+         "state": "12,739",
+         "sub": "sourced"
+        },
+        "fill": {
+         "state": "74%",
+         "sub": "of capacity"
+        }
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "baseline",
+       "text": "**Start from a soft night.** The lowest Islanders crowd in UBS Arena history as of October 2024 was **12,739**, a Tuesday against Detroit ([Isles Fix](https://www.islesfix.com/p/taking-attendance)). The split by section is illustrative: the 300 level is about two-thirds empty. Eight fact tiles wait, dimmed.",
+       "panels": {
+        "crowd": {
+         "fans": {
+          "state": "12,739",
+          "sub": "sourced"
+         },
+         "fill": {
+          "state": "74%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 67,
+          "302": 67,
+          "303": 67,
+          "304": 67,
+          "305": 67,
+          "306": 67,
+          "307": 67,
+          "308": 67,
+          "309": 67,
+          "310": 67,
+          "311": 67,
+          "312": 67,
+          "313": 67,
+          "314": 67,
+          "315": 67,
+          "316": 67,
+          "317": 67,
+          "318": 67,
+          "319": 67,
+          "320": 66,
+          "321": 66,
+          "322": 66,
+          "323": 66,
+          "324": 66,
+          "325": 66,
+          "326": 66,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "mode": "sold",
+         "note": "A soft weeknight. The 12,739 total is sourced (Isles Fix, Oct 2024); the split by section is illustrative. Capacities are an illustrative even split of 17,250 over 80 sections.",
+         "highlight": null
+        }
+       },
+       "nodes": [
+        "ticketing"
+       ],
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "Isles Fix, Taking Attendance (Oct 24, 2024)",
+         "url": "https://www.islesfix.com/p/taking-attendance"
+        }
+       ]
+      },
+      {
+       "id": "lottery",
+       "text": "**2025: the lottery.** The Islanders win the draft lottery from **3.5%** odds ([TSN](https://www.tsn.ca/nhl/new-york-islanders-win-draft-lottery-will-select-first-overall-in-2025-nhl-draft-1.2301275)). Nothing new is on sale yet, but the news goes to every fan on file, and the first 300-level sidelines fill (illustrative).",
+       "panels": {
+        "facts": {
+         "odds": {
+          "state": "3.5%",
+          "sub": "won · 2025"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "13,180",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "76%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 74,
+          "302": 74,
+          "303": 74,
+          "304": 74,
+          "305": 208,
+          "306": 208,
+          "307": 74,
+          "308": 74,
+          "309": 74,
+          "310": 74,
+          "311": 73,
+          "312": 73,
+          "313": 73,
+          "314": 73,
+          "315": 73,
+          "316": 73,
+          "317": 73,
+          "318": 73,
+          "319": 73,
+          "320": 73,
+          "321": 73,
+          "322": 73,
+          "323": 73,
+          "324": 73,
+          "325": 73,
+          "326": 73,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Illustrative: interest shows first in the cheapest seats with the best view, the 300-level sidelines.",
+         "highlight": [
+          "305",
+          "306"
+         ]
+        }
+       },
+       "edge": "crm->push",
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "TSN, Islanders win the 2025 draft lottery",
+         "url": "https://www.tsn.ca/nhl/new-york-islanders-win-draft-lottery-will-select-first-overall-in-2025-nhl-draft-1.2301275"
+        }
+       ]
+      },
+      {
+       "id": "first-pick",
+       "text": "**Jun 27, 2025: the No. 1 pick.** The club takes **Matthew Schaefer** first overall, its first No. 1 pick since John Tavares in 2009 ([IIHF](https://canada-central.iihf.com/en/news/68829/islanders_draft_matthew_schaefer_first_overall)). Every message now has a face, and each one carries a buy link into ticketing.",
+       "panels": {
+        "facts": {
+         "pick": {
+          "state": "NO. 1",
+          "sub": "Jun 27, 2025"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "13,620",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "79%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 82,
+          "302": 82,
+          "303": 81,
+          "304": 81,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 81,
+          "309": 81,
+          "310": 81,
+          "311": 81,
+          "312": 81,
+          "313": 81,
+          "314": 81,
+          "315": 81,
+          "316": 81,
+          "317": 81,
+          "318": 81,
+          "319": 81,
+          "320": 208,
+          "321": 81,
+          "322": 81,
+          "323": 81,
+          "324": 81,
+          "325": 81,
+          "326": 81,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Illustrative: two more 300-level sideline sections fill.",
+         "highlight": [
+          "307",
+          "320"
+         ]
+        }
+       },
+       "edge": "push->ticketing",
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "IIHF, Islanders draft Schaefer first overall",
+         "url": "https://canada-central.iihf.com/en/news/68829/islanders_draft_matthew_schaefer_first_overall"
+        }
+       ]
+      },
+      {
+       "id": "jerseys",
+       "text": "**Dec 18, 2025: jerseys first.** Kelly Cheeseman, president of business operations, reports jersey sales **up 63%** year over year, Schaefer the top seller; the team ran out of 4s and 8s to make jerseys ([NY Post via AOL](https://www.aol.com/news/islanders-matthew-schaefer-effect-real-002411744.html)). Merchandise moves first: a jersey is one click, a ticket is a night out.",
+       "panels": {
+        "facts": {
+         "jerseys": {
+          "state": "+63% YoY",
+          "sub": "Dec 18, 2025"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "14,210",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "82%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 93,
+          "302": 93,
+          "303": 92,
+          "304": 208,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 92,
+          "309": 92,
+          "310": 92,
+          "311": 92,
+          "312": 92,
+          "313": 92,
+          "314": 92,
+          "315": 92,
+          "316": 92,
+          "317": 92,
+          "318": 92,
+          "319": 92,
+          "320": 208,
+          "321": 208,
+          "322": 208,
+          "323": 92,
+          "324": 92,
+          "325": 92,
+          "326": 92,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Illustrative: the last 300-level sideline sections start to fill.",
+         "highlight": [
+          "321",
+          "322",
+          "304"
+         ]
+        }
+       },
+       "nodes": [
+        "promo"
+       ],
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "NY Post via AOL, the Schaefer effect (Dec 18, 2025)",
+         "url": "https://www.aol.com/news/islanders-matthew-schaefer-effect-real-002411744.html"
+        }
+       ]
+      },
+      {
+       "id": "tickets",
+       "text": "**Same report: tickets up 7%.** The article gives no comparison period for this figure, so read it as direction, not a rate. New buyers flow from ticketing back into the CRM, where they become next season's prospects.",
+       "panels": {
+        "facts": {
+         "tickets": {
+          "state": "+7%",
+          "sub": "no baseline"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "14,760",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "86%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 105,
+          "302": 105,
+          "303": 105,
+          "304": 208,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 208,
+          "309": 105,
+          "310": 105,
+          "311": 105,
+          "312": 105,
+          "313": 105,
+          "314": 105,
+          "315": 105,
+          "316": 105,
+          "317": 105,
+          "318": 104,
+          "319": 208,
+          "320": 208,
+          "321": 208,
+          "322": 208,
+          "323": 208,
+          "324": 104,
+          "325": 104,
+          "326": 104,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "“We have a legitimate chance to sell out every game until the Olympic break.” Kelly Cheeseman, NY Post via AOL, Dec 18, 2025. Section fills remain illustrative.",
+         "highlight": [
+          "308",
+          "319",
+          "323"
+         ]
+        }
+       },
+       "edge": "ticketing->crm",
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "NY Post via AOL, the Schaefer effect (Dec 18, 2025)",
+         "url": "https://www.aol.com/news/islanders-matthew-schaefer-effect-real-002411744.html"
+        }
+       ]
+      },
+      {
+       "id": "reach",
+       "text": "**Same report: reach.** Broadcast viewership is **up 37%**, viewers aged 25 to 54 **up 58%**, and social engagement **up 40%** ([NY Post via AOL](https://www.aol.com/news/islanders-matthew-schaefer-effect-real-002411744.html)). A bigger audience means more people to segment and send to. The 300-level corners begin to fill (illustrative).",
+       "panels": {
+        "facts": {
+         "tv": {
+          "state": "+37%",
+          "sub": "58% age 25–54"
+         },
+         "social": {
+          "state": "+40%",
+          "sub": "engagement"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "15,340",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "89%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 126,
+          "302": 126,
+          "303": 208,
+          "304": 208,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 208,
+          "309": 208,
+          "310": 126,
+          "311": 126,
+          "312": 126,
+          "313": 126,
+          "314": 126,
+          "315": 125,
+          "316": 125,
+          "317": 125,
+          "318": 208,
+          "319": 208,
+          "320": 208,
+          "321": 208,
+          "322": 208,
+          "323": 208,
+          "324": 125,
+          "325": 125,
+          "326": 125,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Illustrative: the first 300-level corners fill.",
+         "highlight": [
+          "303",
+          "309",
+          "318"
+         ]
+        }
+       },
+       "edge": "crm->push",
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "NY Post via AOL, the Schaefer effect (Dec 18, 2025)",
+         "url": "https://www.aol.com/news/islanders-matthew-schaefer-effect-real-002411744.html"
+        }
+       ]
+      },
+      {
+       "id": "calder",
+       "text": "**May 13, 2026: a unanimous Calder.** Schaefer wins the rookie award with **198 of 198** first-place votes, the youngest winner ever (18 years, 223 days), after 59 points ([NHL.com](https://nhl.com/news/new-york-islanders-matthew-schaefer-wins-2026-calder-trophy)). The team missed the playoffs, so the rookie carries the renewal pitch.",
+       "panels": {
+        "facts": {
+         "calder": {
+          "state": "198 / 198",
+          "sub": "May 13, 2026"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "15,850",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "92%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 146,
+          "302": 208,
+          "303": 208,
+          "304": 208,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 208,
+          "309": 208,
+          "310": 208,
+          "311": 146,
+          "312": 146,
+          "313": 146,
+          "314": 146,
+          "315": 145,
+          "316": 145,
+          "317": 208,
+          "318": 208,
+          "319": 208,
+          "320": 208,
+          "321": 208,
+          "322": 208,
+          "323": 208,
+          "324": 208,
+          "325": 145,
+          "326": 145,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Illustrative: the 300-level corners are nearly gone; only the far ends stay soft.",
+         "highlight": [
+          "324",
+          "302",
+          "310",
+          "317"
+         ]
+        }
+       },
+       "nodes": [
+        "crm",
+        "ticketing"
+       ],
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com, Schaefer wins the 2026 Calder (May 13, 2026)",
+         "url": "https://nhl.com/news/new-york-islanders-matthew-schaefer-wins-2026-calder-trophy"
+        }
+       ]
+      },
+      {
+       "id": "promo-plan",
+       "text": "**Aug 25, 2026: the moment gets a date.** The 2026-27 promotional schedule names **Sat Feb 13, 2027 vs Minnesota** as Schaefer bobblehead night, for **all fans**, presented by **Northwell** ([Islanders](https://nhl.com/islanders/tickets/promotional-schedule)). Promotions agrees item, logo and count with the sponsor before a ticket for that night sells.",
+       "panels": {
+        "facts": {
+         "night": {
+          "state": "FEB 13",
+          "sub": "2027 game"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "15,850",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "92%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "note": "The bowl holds steady: this step is a plan, not a sale. Feb 13, 2027 is a sourced date; every fill shown is illustrative.",
+         "highlight": null,
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 146,
+          "302": 208,
+          "303": 208,
+          "304": 208,
+          "305": 208,
+          "306": 208,
+          "307": 208,
+          "308": 208,
+          "309": 208,
+          "310": 208,
+          "311": 146,
+          "312": 146,
+          "313": 146,
+          "314": 146,
+          "315": 145,
+          "316": 145,
+          "317": 208,
+          "318": 208,
+          "319": 208,
+          "320": 208,
+          "321": 208,
+          "322": 208,
+          "323": 208,
+          "324": 208,
+          "325": 145,
+          "326": 145,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         }
+        }
+       },
+       "nodes": [
+        "promo"
+       ],
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule (official)",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        },
+        {
+         "label": "NHL.com Islanders, 2026-27 giveaways announced (Aug 25, 2026)",
+         "url": "https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt"
+        }
+       ]
+      },
+      {
+       "id": "dated-product",
+       "text": "**Feb 13, 2027: a dated product.** Promotions tags the event in ticketing and email sells *that night*: a date, a bobblehead for every fan, a sponsor, one buy link. The far 300-level ends are the last soft seats (fills illustrative). A player's year is now something a fan can put on a calendar.",
+       "panels": {
+        "facts": {
+         "night": {
+          "state": "FEB 13",
+          "sub": "'27 all fans"
+         }
+        },
+        "crowd": {
+         "fans": {
+          "state": "16,500",
+          "sub": "illustrative"
+         },
+         "fill": {
+          "state": "96%",
+          "sub": "of capacity"
+         }
+        },
+        "map": {
+         "sold": {
+          "101": 205,
+          "102": 205,
+          "103": 205,
+          "104": 205,
+          "105": 205,
+          "106": 205,
+          "107": 205,
+          "108": 205,
+          "109": 205,
+          "110": 205,
+          "111": 205,
+          "112": 205,
+          "113": 205,
+          "114": 205,
+          "115": 205,
+          "116": 205,
+          "117": 205,
+          "118": 205,
+          "119": 205,
+          "120": 205,
+          "121": 205,
+          "202": 203,
+          "203": 203,
+          "204": 203,
+          "205": 203,
+          "206": 203,
+          "207": 203,
+          "208": 203,
+          "209": 203,
+          "210": 203,
+          "211": 203,
+          "212": 203,
+          "213": 203,
+          "214": 203,
+          "215": 203,
+          "216": 203,
+          "217": 203,
+          "218": 203,
+          "219": 203,
+          "220": 203,
+          "221": 203,
+          "222": 203,
+          "223": 203,
+          "224": 203,
+          "225": 203,
+          "227": 203,
+          "228": 203,
+          "230": 203,
+          "231": 203,
+          "301": 215,
+          "302": 210,
+          "303": 211,
+          "304": 211,
+          "305": 211,
+          "306": 211,
+          "307": 211,
+          "308": 211,
+          "309": 210,
+          "310": 210,
+          "311": 215,
+          "312": 210,
+          "313": 210,
+          "314": 210,
+          "315": 210,
+          "316": 215,
+          "317": 210,
+          "318": 210,
+          "319": 211,
+          "320": 211,
+          "321": 211,
+          "322": 211,
+          "323": 211,
+          "324": 210,
+          "325": 215,
+          "326": 215,
+          "329": 203,
+          "201A": 203,
+          "201B": 203,
+          "226A": 203,
+          "226B": 203
+         },
+         "note": "Feb 13, 2027 vs MIN, Schaefer bobblehead for all fans (Northwell): sourced. The 16,500 forecast and every section fill: illustrative.",
+         "highlight": [
+          "312",
+          "313",
+          "314",
+          "315"
+         ]
+        }
+       },
+       "edge": "promo->ticketing",
+       "delta": true,
+       "deltaText": "Sources for this step.",
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule (official)",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 10,
+      "w": 436,
+      "h": 252
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+       },
+       {
+        "panel": "map",
+        "x": 0,
+        "y": 7,
+        "w": 14,
+        "h": 16
+       },
+       {
+        "panel": "crowd",
+        "x": 0,
+        "y": 23,
+        "w": 14,
+        "h": 3
+       },
+       {
+        "panel": "facts",
+        "x": 14,
+        "y": 7,
+        "w": 10,
+        "h": 5
+       },
+       {
+        "x": 14,
+        "y": 12,
+        "w": 10,
+        "h": 14
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "schedule-drop",
+    "heading": "The schedule drops",
+    "text": [
+     "A promotion calendar is a demand tool. Lay the season out as months by weekday, colour each cell by forecast fill, then drop the real 2026-27 New York Islanders promotions onto it and watch which cells actually move."
+    ],
+    "bullets": [
+     "Promotion dates, items, quantity rules and sponsors come from the official Islanders 2026-27 promotional schedule (announced Aug 25, 2026) and the Hometown Remix schedule (Oct 1, 2026).",
+     "Forecast fill and every lift are illustrative. The only sourced attendance figure is the 12,739 Tuesday crowd vs Detroit in October 2024 (Isles Fix)."
+    ],
+    "diagram": {
+     "view": "step",
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "forecast",
+       "side": "below",
+       "x": 108,
+       "y": 170
+      },
+      {
+       "id": "promo",
+       "side": "below",
+       "x": 318,
+       "y": 170
+      },
+      {
+       "id": "sponsor",
+       "side": "below",
+       "x": 318,
+       "y": 50
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 528,
+       "y": 170
+      }
+     ],
+     "nodes": {
+      "forecast": {
+       "title": "Pricing desk",
+       "sub": "game forecast"
+      },
+      "sponsor": {
+       "title": "Sponsor",
+       "sub": "pays for item"
+      },
+      "promo": {
+       "title": "Promotions",
+       "sub": "item & rule"
+      },
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "tags the event"
+      }
+     },
+     "edges": [
+      {
+       "from": "forecast",
+       "to": "promo",
+       "label": "soft nights",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "sponsor",
+       "to": "promo",
+       "label": "funds item",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "promo",
+       "to": "ticketing",
+       "label": "tags the game",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "season",
+       "type": "grid",
+       "title": "2026-27 home season · forecast fill by month and weekday",
+       "rows": [
+        {
+         "id": "oct",
+         "label": "Oct"
+        },
+        {
+         "id": "nov",
+         "label": "Nov"
+        },
+        {
+         "id": "dec",
+         "label": "Dec"
+        },
+        {
+         "id": "jan",
+         "label": "Jan"
+        },
+        {
+         "id": "feb",
+         "label": "Feb"
+        },
+        {
+         "id": "mar",
+         "label": "Mar"
+        },
+        {
+         "id": "apr",
+         "label": "Apr"
+        }
+       ],
+       "cols": [
+        {
+         "id": "mon",
+         "label": "Mon"
+        },
+        {
+         "id": "tue",
+         "label": "Tue"
+        },
+        {
+         "id": "wed",
+         "label": "Wed"
+        },
+        {
+         "id": "thu",
+         "label": "Thu"
+        },
+        {
+         "id": "fri",
+         "label": "Fri"
+        },
+        {
+         "id": "sat",
+         "label": "Sat"
+        },
+        {
+         "id": "sun",
+         "label": "Sun"
+        }
+       ],
+       "scale": {
+        "min": 70,
+        "max": 100,
+        "mid": 85,
+        "kind": "diverging"
+       },
+       "decimals": 0,
+       "unit": "%",
+       "initial": {
+        "cells": {
+         "oct.mon": 81,
+         "oct.tue": 74,
+         "oct.wed": 80,
+         "oct.thu": 85,
+         "oct.fri": 94,
+         "oct.sat": 98,
+         "oct.sun": 95,
+         "nov.mon": 79,
+         "nov.tue": 76,
+         "nov.wed": 78,
+         "nov.thu": 83,
+         "nov.fri": 92,
+         "nov.sat": 96,
+         "nov.sun": 93,
+         "dec.mon": 82,
+         "dec.tue": 79,
+         "dec.wed": 81,
+         "dec.thu": 86,
+         "dec.fri": 95,
+         "dec.sat": 99,
+         "dec.sun": 96,
+         "jan.mon": 76,
+         "jan.tue": 73,
+         "jan.wed": 75,
+         "jan.thu": 80,
+         "jan.fri": 89,
+         "jan.sat": 93,
+         "jan.sun": 90,
+         "feb.mon": 80,
+         "feb.tue": 77,
+         "feb.wed": 79,
+         "feb.thu": 84,
+         "feb.fri": 93,
+         "feb.sat": 97,
+         "feb.sun": 94,
+         "mar.mon": 81,
+         "mar.tue": 78,
+         "mar.wed": 80,
+         "mar.thu": 85,
+         "mar.fri": 94,
+         "mar.sat": 98,
+         "mar.sun": 95,
+         "apr.mon": 82,
+         "apr.tue": 79,
+         "apr.wed": 81,
+         "apr.thu": 86,
+         "apr.fri": 95,
+         "apr.sat": 99,
+         "apr.sun": 96
+        }
+       }
+      },
+      {
+       "id": "promos",
+       "type": "table",
+       "title": "Promotion nights placed",
+       "columns": [
+        {
+         "id": "night",
+         "label": "Night"
+        },
+        {
+         "id": "item",
+         "label": "Item"
+        },
+        {
+         "id": "who",
+         "label": "Who gets it"
+        },
+        {
+         "id": "sponsor",
+         "label": "Sponsor"
+        }
+       ],
+       "initial": {
+        "rows": []
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "forecast",
+       "text": "The league fixes the home dates; marketing inherits a calendar to fill. Each cell is the forecast fill for a home game on that weekday in that month, before any promotion is placed.",
+       "panels": {
+        "season": {
+         "cells": {
+          "oct.mon": 81,
+          "oct.tue": 74,
+          "oct.wed": 80,
+          "oct.thu": 85,
+          "oct.fri": 94,
+          "oct.sat": 98,
+          "oct.sun": 95,
+          "nov.mon": 79,
+          "nov.tue": 76,
+          "nov.wed": 78,
+          "nov.thu": 83,
+          "nov.fri": 92,
+          "nov.sat": 96,
+          "nov.sun": 93,
+          "dec.mon": 82,
+          "dec.tue": 79,
+          "dec.wed": 81,
+          "dec.thu": 86,
+          "dec.fri": 95,
+          "dec.sat": 99,
+          "dec.sun": 96,
+          "jan.mon": 76,
+          "jan.tue": 73,
+          "jan.wed": 75,
+          "jan.thu": 80,
+          "jan.fri": 89,
+          "jan.sat": 93,
+          "jan.sun": 90,
+          "feb.mon": 80,
+          "feb.tue": 77,
+          "feb.wed": 79,
+          "feb.thu": 84,
+          "feb.fri": 93,
+          "feb.sat": 97,
+          "feb.sun": 94,
+          "mar.mon": 81,
+          "mar.tue": 78,
+          "mar.wed": 80,
+          "mar.thu": 85,
+          "mar.fri": 94,
+          "mar.sat": 98,
+          "mar.sun": 95,
+          "apr.mon": 82,
+          "apr.tue": 79,
+          "apr.wed": 81,
+          "apr.thu": 86,
+          "apr.fri": 95,
+          "apr.sat": 99,
+          "apr.sun": 96
+         },
+         "highlight": null,
+         "note": "Fill is % of about 17,250 seats. Colour key: orange < 85% < blue (illustrative target). Forecasts and lift are illustrative; only the 12,739 anchor is sourced."
+        },
+        "promos": {
+         "rows": [],
+         "note": "Empty until the schedule is announced: no promotion is placed yet."
+        }
+       },
+       "nodes": [
+        "forecast"
+       ]
+      },
+      {
+       "id": "soft-tuesday",
+       "text": "Weeknights run soft: the Tuesday column sits on the orange side of the scale. The sourced anchor: 12,739 fans for Detroit on a Tuesday in October 2024, the lowest UBS Arena crowd at that time, about 74% of capacity.",
+       "panels": {
+        "season": {
+         "highlight": {
+          "col": "tue",
+          "cell": "oct.tue"
+         },
+         "note": "Oct Tue is set to 74% (orange < 85% < blue): the sourced 12,739 crowd for Detroit on a Tuesday in Oct 2024 (Isles Fix, 'Taking Attendance'), over about 17,250 seats. Every other cell is illustrative."
+        },
+        "promos": {
+         "rows": [],
+         "note": "Still empty: the 2024 anchor is a baseline, not a promotion."
+        }
+       },
+       "nodes": [
+        "forecast"
+       ],
+       "delta": true,
+       "deltaText": "12,739 vs Detroit, a Tuesday in October 2024.",
+       "deltaLinks": [
+        {
+         "label": "Isles Fix, Taking Attendance",
+         "url": "https://www.islesfix.com/p/taking-attendance"
+        }
+       ]
+      },
+      {
+       "id": "warm-weekend",
+       "text": "Weekends run strong. Friday, Saturday and Sunday games sit in the 90s before marketing does anything, so a giveaway there mostly rewards fans who were coming anyway.",
+       "panels": {
+        "season": {
+         "highlight": {
+          "col": "sat"
+         },
+         "note": "Illustrative: weekend cells sit at 89 to 99% of capacity before any promotion."
+        }
+       },
+       "nodes": [
+        "forecast"
+       ]
+      },
+      {
+       "id": "opener",
+       "text": "Aug 25, 2026: the real schedule drops, 23 promotion entries from Oct 3 to Apr 10. First up, Saturday, October 3: a T-shirt for every fan at the home opener, presented by UBS. The cell was already near full, so it barely moves.",
+       "panels": {
+        "season": {
+         "cells": {
+          "oct.sat": 99
+         },
+         "marks": {
+          "oct.sat": "***"
+         },
+         "highlight": {
+          "cell": "oct.sat"
+         },
+         "note": "Marks: *** item for all fans · ** first 10,000 fans · * Hometown Remix jersey game. Lift is illustrative."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "added"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Source: official 2026-27 promotional schedule, announced Aug 25, 2026."
+        }
+       },
+       "edge": "sponsor->promo",
+       "delta": true,
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ]
+      },
+      {
+       "id": "november",
+       "text": "November adds two giveaways: a Ford camo hat for the first 10,000 on Military Appreciation night (Sat Nov 7) and an Ilya Sorokin bobblehead for all fans (Fri Nov 27). Both land on nights that already sell.",
+       "panels": {
+        "season": {
+         "cells": {
+          "nov.sat": 98,
+          "nov.fri": 95
+         },
+         "marks": {
+          "nov.sat": "**",
+          "nov.fri": "***"
+         },
+         "highlight": {
+          "row": "nov"
+         },
+         "note": "Marks: *** item for all fans · ** first 10,000 fans · * Hometown Remix jersey game. Weekend lift is small because the cells start near full (illustrative)."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ford",
+           "cells": {
+            "night": "Sat Nov 7 · NJD",
+            "item": "Camo hat (Military Appreciation)",
+            "who": "first 10,000",
+            "sponsor": "Ford"
+           },
+           "status": "added"
+          },
+          {
+           "id": "sorokin",
+           "cells": {
+            "night": "Fri Nov 27 · WPG",
+            "item": "Ilya Sorokin bobblehead",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Quantity rules and sponsors as published on the official schedule."
+        }
+       },
+       "edge": "promo->ticketing",
+       "delta": true,
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ]
+      },
+      {
+       "id": "goat-tuesday",
+       "text": "Tuesday, December 1: the Chuck the Goat ornament for the first 10,000, with GOAT USA. A weeknight item has room to work, and the cell moves from orange to blue, the biggest jump so far.",
+       "panels": {
+        "season": {
+         "cells": {
+          "dec.tue": 88
+         },
+         "marks": {
+          "dec.tue": "**"
+         },
+         "highlight": {
+          "cell": "dec.tue",
+          "col": "tue"
+         },
+         "note": "Marks: *** item for all fans · ** first 10,000 fans · * Hometown Remix jersey game. Dec Tue: 79% to 88% is an illustrative lift."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ford",
+           "cells": {
+            "night": "Sat Nov 7 · NJD",
+            "item": "Camo hat (Military Appreciation)",
+            "who": "first 10,000",
+            "sponsor": "Ford"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "sorokin",
+           "cells": {
+            "night": "Fri Nov 27 · WPG",
+            "item": "Ilya Sorokin bobblehead",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "goat",
+           "cells": {
+            "night": "Tue Dec 1 · FLA",
+            "item": "Chuck the Goat ornament",
+            "who": "first 10,000",
+            "sponsor": "GOAT USA"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Why weeknights: a UC Davis business-school student analysis of 2012 MLB bobblehead games found +24.7% attendance on weekdays vs +8.9% on weekends (observational, baseball)."
+        }
+       },
+       "nodes": [
+        "promo"
+       ],
+       "delta": true,
+       "deltaText": "2012 MLB bobblehead games: +24.7% weekdays, +8.9% weekends (UC Davis student analysis, observational).",
+       "deltaLinks": [
+        {
+         "label": "UC Davis bobblehead study",
+         "url": "https://www.ucdavis.edu/curiosity/blog/do-bobblehead-giveaways-increase-baseball-attendance"
+        },
+        {
+         "label": "Islanders 2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ]
+      },
+      {
+       "id": "headliners",
+       "text": "Two headliners close the giveaway run: a Matthew Schaefer bobblehead for all fans on Saturday, February 13 (Northwell), and a Star Wars reversible bucket hat for the first 10,000 on Sunday, March 7 (Dime Commercial Bank).",
+       "panels": {
+        "season": {
+         "cells": {
+          "feb.sat": 99,
+          "mar.sun": 97
+         },
+         "marks": {
+          "feb.sat": "***",
+          "mar.sun": "**"
+         },
+         "highlight": {
+          "row": "feb",
+          "cell": "feb.sat"
+         },
+         "note": "Marks: *** item for all fans · ** first 10,000 fans · * Hometown Remix jersey game. Lift is illustrative."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ford",
+           "cells": {
+            "night": "Sat Nov 7 · NJD",
+            "item": "Camo hat (Military Appreciation)",
+            "who": "first 10,000",
+            "sponsor": "Ford"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "sorokin",
+           "cells": {
+            "night": "Fri Nov 27 · WPG",
+            "item": "Ilya Sorokin bobblehead",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "goat",
+           "cells": {
+            "night": "Tue Dec 1 · FLA",
+            "item": "Chuck the Goat ornament",
+            "who": "first 10,000",
+            "sponsor": "GOAT USA"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "schaefer",
+           "cells": {
+            "night": "Sat Feb 13 · MIN",
+            "item": "Matthew Schaefer bobblehead",
+            "who": "all fans",
+            "sponsor": "Northwell"
+           },
+           "status": "added"
+          },
+          {
+           "id": "starwars",
+           "cells": {
+            "night": "Sun Mar 7 · PIT",
+            "item": "Star Wars reversible bucket hat",
+            "who": "first 10,000",
+            "sponsor": "Dime Commercial Bank"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Star Wars Day marks the 50th anniversary of A New Hope. Source: official schedule."
+        }
+       },
+       "edge": "sponsor->promo",
+       "delta": true,
+       "deltaLinks": [
+        {
+         "label": "Islanders 2026-27 promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ]
+      },
+      {
+       "id": "hometown-remix",
+       "text": "The Hometown Remix jersey is worn for 10 home games, each spotlighting a piece of Long Island culture. Six fall on Tuesday to Thursday nights, the soft side of the grid.",
+       "panels": {
+        "season": {
+         "cells": {
+          "nov.thu": 87,
+          "nov.wed": 83,
+          "jan.wed": 79,
+          "mar.tue": 82,
+          "dec.sun": 97,
+          "feb.fri": 94,
+          "mar.sat": 99
+         },
+         "marks": {
+          "nov.thu": "*",
+          "nov.wed": "*",
+          "dec.sun": "*",
+          "jan.wed": "*",
+          "feb.fri": "*",
+          "mar.tue": "*",
+          "mar.sat": "*"
+         },
+         "highlight": {
+          "col": "wed"
+         },
+         "note": "Marks: *** item for all fans · ** first 10,000 fans · * Hometown Remix jersey game. Dec Tue keeps ** (Dec 1 ornament) and also holds the Dec 22 Remix game. Lift is illustrative."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ford",
+           "cells": {
+            "night": "Sat Nov 7 · NJD",
+            "item": "Camo hat (Military Appreciation)",
+            "who": "first 10,000",
+            "sponsor": "Ford"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "sorokin",
+           "cells": {
+            "night": "Fri Nov 27 · WPG",
+            "item": "Ilya Sorokin bobblehead",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "goat",
+           "cells": {
+            "night": "Tue Dec 1 · FLA",
+            "item": "Chuck the Goat ornament",
+            "who": "first 10,000",
+            "sponsor": "GOAT USA"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "schaefer",
+           "cells": {
+            "night": "Sat Feb 13 · MIN",
+            "item": "Matthew Schaefer bobblehead",
+            "who": "all fans",
+            "sponsor": "Northwell"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "starwars",
+           "cells": {
+            "night": "Sun Mar 7 · PIT",
+            "item": "Star Wars reversible bucket hat",
+            "who": "first 10,000",
+            "sponsor": "Dime Commercial Bank"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "remix",
+           "cells": {
+            "night": "10 home games, Nov 5 to Mar 20",
+            "item": "Hometown Remix jersey worn",
+            "who": "packages and merch to be announced",
+            "sponsor": "NHL and Fanatics program"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Remix home dates: Nov 5, Nov 25, Dec 20, Dec 22, Dec 27, Jan 13, Jan 20, Feb 26, Mar 9, Mar 20. Packages and merch were not yet announced."
+        }
+       },
+       "delta": true,
+       "deltaLinks": [
+        {
+         "label": "Hometown Remix schedule",
+         "url": "https://www.nhl.com/islanders/news/islanders-announce-2026-27-hometown-remix-jersey-schedule"
+        }
+       ],
+       "nodes": [
+        "ticketing"
+       ]
+      },
+      {
+       "id": "where-lift-lands",
+       "text": "Read the grid again. The marked weeknight cells moved 4 to 9 points; the marked weekend cells moved 1 to 3, because they started near full. Spend promotions where the forecast is soft.",
+       "panels": {
+        "season": {
+         "highlight": {
+          "col": "thu"
+         },
+         "note": "Illustrative lift: weeknight marks +4 to +9 points, weekend marks +1 to +3. The direction matches the MLB weekday vs weekend finding; the sizes are not Islanders data."
+        }
+       },
+       "nodes": [
+        "forecast",
+        "promo"
+       ]
+      },
+      {
+       "id": "still-soft",
+       "text": "Still orange is the next brief. January Mondays and Tuesdays and the October Tuesday carry no giveaway yet: candidates for group nights, bundles and theme offers. Each runs the whole chain again, months ahead: forecast, Promotions, sponsor, Ticketing.",
+       "panels": {
+        "season": {
+         "highlight": {
+          "row": "jan",
+          "cell": "jan.tue"
+         },
+         "note": "Softest unmarked cells (illustrative): Oct Tue 74%, Jan Tue 73%, Jan Mon 76%."
+        },
+        "promos": {
+         "rows": [
+          {
+           "id": "season",
+           "cells": {
+            "night": "Oct 3 – Apr 10",
+            "item": "23 promo entries",
+            "who": "schedule, Aug 25",
+            "sponsor": "various"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "opener",
+           "cells": {
+            "night": "Sat Oct 3 · opener",
+            "item": "T-shirt",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ford",
+           "cells": {
+            "night": "Sat Nov 7 · NJD",
+            "item": "Camo hat (Military Appreciation)",
+            "who": "first 10,000",
+            "sponsor": "Ford"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "sorokin",
+           "cells": {
+            "night": "Fri Nov 27 · WPG",
+            "item": "Ilya Sorokin bobblehead",
+            "who": "all fans",
+            "sponsor": "UBS"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "goat",
+           "cells": {
+            "night": "Tue Dec 1 · FLA",
+            "item": "Chuck the Goat ornament",
+            "who": "first 10,000",
+            "sponsor": "GOAT USA"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "schaefer",
+           "cells": {
+            "night": "Sat Feb 13 · MIN",
+            "item": "Matthew Schaefer bobblehead",
+            "who": "all fans",
+            "sponsor": "Northwell"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "starwars",
+           "cells": {
+            "night": "Sun Mar 7 · PIT",
+            "item": "Star Wars reversible bucket hat",
+            "who": "first 10,000",
+            "sponsor": "Dime Commercial Bank"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "remix",
+           "cells": {
+            "night": "10 home games, Nov 5 to Mar 20",
+            "item": "Hometown Remix jersey worn",
+            "who": "packages and merch to be announced",
+            "sponsor": "NHL and Fanatics program"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "A bobblehead ordered for February needs about 120 days of manufacturing lead time (industry reporting), so these calls happen in the fall."
+        }
+       },
+       "nodes": [
+        "forecast",
+        "promo",
+        "ticketing",
+        "sponsor"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 0,
+      "y": 0,
+      "w": 636,
+      "h": 220
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+       },
+       {
+        "panel": "season",
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+       },
+       {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 9
+       },
+       {
+        "panel": "promos",
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 17
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "bobblehead-clock",
+    "heading": "The 120-day bobblehead clock",
+    "accent": "amber",
+    "source": "https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt",
+    "text": [
+     "An all-fans bobblehead night is a supply chain with a fixed end date. Working back from Sat Feb 13, 2027, four lanes run in parallel: sponsor and licensing approvals, production, freight, and event ops. Each lane has a *last safe change* date, after which a change costs the night.",
+     "The lanes table shows each lane's *last safe change* and its status; the checks show each gate; the budget shows the 172 days from announcement to game night running out and the schedule slack being spent. Pick a path to see freight arrive or slip."
+    ],
+    "bullets": [
+     "**Public facts:** the Schaefer bobblehead for all fans on Feb 13 vs MIN, presented by Northwell ([NHL.com](https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt)); about 120 days to manufacture ([MASN](https://masnsports.com/blog/behind-the-scenes-of-the-bobblehead-giveaway)); a late delivery (Yankees, [NPR](https://www.npr.org/sections/thetwo-way/2013/09/25/226071535/yankees-bobble-the-ball-on-mariano-rivera-give-away-night)); digital vouchers (Pirates, [CBS Pittsburgh](https://www.cbsnews.com/pittsburgh/news/the-pirates-are-giving-paul-skenes-bobblehead-vouchers)).",
+     "**Illustrative:** every date after Aug 25, the 18,000 quantity, case counts, transit time, slack and the redemption window. No Islanders vendor, freight or ops detail is claimed.",
+     "**The lesson:** the approval lane spends slack first, and the voucher plan is cheapest when it is written before T-30."
+    ],
+    "diagram": {
+     "view": "step",
+     "nodes": {
+      "promo": {
+       "title": "Promotions",
+       "sub": "calendar · PO",
+       "icon": "monitor",
+       "tint": "cmd"
+      },
+      "sponsor": {
+       "title": "Sponsor",
+       "sub": "Northwell logo",
+       "icon": "person",
+       "tint": "auth",
+       "link": "https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt"
+      },
+      "licensing": {
+       "title": "Licensing",
+       "sub": "player · NHL",
+       "icon": "shield",
+       "tint": "auth"
+      },
+      "factory": {
+       "title": "Manufacturer",
+       "sub": "120-day build",
+       "icon": "gear",
+       "tint": "dev",
+       "link": "https://masnsports.com/blog/behind-the-scenes-of-the-bobblehead-giveaway"
+      },
+      "freight": {
+       "title": "Freight",
+       "sub": "ocean · truck",
+       "icon": "car",
+       "tint": "mqtt"
+      },
+      "ops": {
+       "title": "Event ops",
+       "sub": "receiving",
+       "icon": "package",
+       "tint": "data"
+      },
+      "gates": {
+       "title": "Gate scan",
+       "sub": "handout",
+       "icon": "door",
+       "tint": "dev"
+      },
+      "app": {
+       "title": "Fan app",
+       "sub": "voucher",
+       "icon": "phone",
+       "tint": "dev"
+      }
+     },
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "app",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      },
+      {
+       "id": "factory",
+       "side": "below",
+       "x": 575,
+       "y": 70
+      },
+      {
+       "id": "freight",
+       "side": "below",
+       "x": 575,
+       "y": 202
+      },
+      {
+       "id": "gates",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "licensing",
+       "side": "below",
+       "x": 123,
+       "y": 70
+      },
+      {
+       "id": "ops",
+       "side": "below",
+       "x": 575,
+       "y": 334
+      },
+      {
+       "id": "promo",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "sponsor",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      }
+     ],
+     "edges": [
+      {
+       "from": "promo",
+       "to": "sponsor",
+       "kind": "https",
+       "label": "logo proof",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -13.5,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -13.5,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "sponsor",
+       "to": "promo",
+       "kind": "https",
+       "ret": true,
+       "label": "logo locked",
+       "fromPort": {
+        "side": "top",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "bottom",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 13.5,
+         "dy": -14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 13.5,
+         "dy": 14.96
+        }
+       ]
+      },
+      {
+       "from": "promo",
+       "to": "licensing",
+       "kind": "https",
+       "label": "sculpt for approval",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 3.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 3.96
+        }
+       ]
+      },
+      {
+       "from": "licensing",
+       "to": "promo",
+       "kind": "https",
+       "ret": true,
+       "label": "likeness OK",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": -3.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": -3.96
+        }
+       ]
+      },
+      {
+       "from": "promo",
+       "to": "factory",
+       "kind": "int",
+       "label": "PO · 18,000 units",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "factory",
+       "to": "freight",
+       "kind": "int",
+       "label": "600 cases",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "freight",
+       "to": "ops",
+       "kind": "int",
+       "label": "delivery",
+       "fromPort": {
+        "side": "bottom",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "top",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 0,
+         "dy": 14.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 0,
+         "dy": -14.96
+        }
+       ]
+      },
+      {
+       "from": "ops",
+       "to": "gates",
+       "kind": "int",
+       "label": "cases by gate",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.5
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.5
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 0
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 0
+        }
+       ]
+      },
+      {
+       "from": "gates",
+       "to": "app",
+       "kind": "https",
+       "label": "voucher on scan",
+       "fromPort": {
+        "side": "left",
+        "offset": 0.59
+       },
+       "toPort": {
+        "side": "right",
+        "offset": 0.59
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": -31.59,
+         "dy": 3.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": 31.59,
+         "dy": 3.96
+        }
+       ]
+      },
+      {
+       "from": "app",
+       "to": "gates",
+       "kind": "https",
+       "ret": true,
+       "label": "redeem later",
+       "fromPort": {
+        "side": "right",
+        "offset": 0.41000000000000003
+       },
+       "toPort": {
+        "side": "left",
+        "offset": 0.41000000000000003
+       },
+       "curveControls": [
+        {
+         "t": 0.3333333333333333,
+         "dx": 31.59,
+         "dy": -3.96
+        },
+        {
+         "t": 0.6666666666666666,
+         "dx": -31.59,
+         "dy": -3.96
+        }
+       ]
+      }
+     ],
+     "panels": [
+      {
+       "id": "lanes",
+       "type": "table",
+       "title": "Four lanes · last safe change (dates after Aug 25 illustrative)",
+       "columns": [
+        {
+         "id": "lane",
+         "label": "Lane",
+         "width": 150
+        },
+        {
+         "id": "gate",
+         "label": "Last safe change",
+         "width": 170
+        },
+        {
+         "id": "now",
+         "label": "Now"
+        }
+       ],
+       "initial": {
+        "rows": []
+       }
+      },
+      {
+       "id": "gates",
+       "type": "checks",
+       "title": "Last safe change gates",
+       "checks": [
+        {
+         "id": "qty",
+         "label": "Quantity locked: all fans, 18,000"
+        },
+        {
+         "id": "logo",
+         "label": "Sponsor logo locked (last safe change T-168, Aug 29)"
+        },
+        {
+         "id": "likeness",
+         "label": "Likeness approved (last safe change T-169, Aug 28)"
+        },
+        {
+         "id": "po",
+         "label": "PO placed, build starts (T-165)"
+        },
+        {
+         "id": "sample",
+         "label": "Pre-production sample signed off"
+        },
+        {
+         "id": "eta",
+         "label": "Freight ETA before the receiving cut-off (T-7)"
+        },
+        {
+         "id": "stage",
+         "label": "Counted against the PO and staged at every gate"
+        },
+        {
+         "id": "voucher",
+         "label": "Voucher per scanned ticket, desk script at every gate"
+        },
+        {
+         "id": "window",
+         "label": "Redemption window published"
+        }
+       ],
+       "initial": {
+        "results": {}
+       }
+      },
+      {
+       "id": "slack",
+       "type": "budget",
+       "title": "Days used of 172 · schedule slack used of 17",
+       "metrics": [
+        {
+         "id": "elapsed",
+         "label": "Calendar used (Aug 25 to Feb 13)",
+         "unit": "days",
+         "max": 172,
+         "warn": 165
+        },
+        {
+         "id": "slack",
+         "label": "Schedule slack used (illustrative)",
+         "unit": "days",
+         "max": 17,
+         "warn": 12
+        }
+       ],
+       "initial": {
+        "values": {
+         "elapsed": 0,
+         "slack": 0
+        }
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "announce",
+       "nodes": [
+        "promo",
+        "sponsor"
+       ],
+       "text": "**Tue Aug 25, 2026 (T-172).** The Islanders announce a Matthew Schaefer bobblehead for **all fans** on Sat Feb 13 vs Minnesota, presented by Northwell ([NHL.com](https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt)). \"All fans\" makes the quantity a forecast: 17,250 seats plus about 4% = 18,000 *(illustrative)*.",
+       "link": "https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt",
+       "delta": true,
+       "deltaText": "Public fact: the Feb 13, 2027 Schaefer bobblehead night, all fans, Northwell.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com, Aug 25, 2026",
+         "url": "https://www.nhl.com/islanders/news/new-york-islanders-promotional-giveaways-include-schaefer-sorokin-bobbleheads-exclusive-home-opener-t-shirt"
+        },
+        {
+         "label": "Promotional schedule",
+         "url": "https://nhl.com/islanders/tickets/promotional-schedule"
+        }
+       ],
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          }
+         },
+         "note": "Every gate is a date after which a change costs money or time."
+        },
+        "slack": {
+         "values": {
+          "elapsed": 0,
+          "slack": 0
+         },
+         "note": "Clock starts at the announcement. Slack budget 17 days (illustrative)."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "logo + likeness open"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "not started"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "not booked"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "logo",
+       "edges": [
+        "promo->sponsor",
+        "sponsor->promo"
+       ],
+       "text": "**Sat Aug 29 (T-168).** The sponsor signs off the logo on the base. After today, a new logo means re-tooling, so this is the sponsor lane's *last safe change*.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 4,
+          "slack": 0
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "logo locked; likeness pending"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "not started"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "not booked"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "likeness",
+       "edges": [
+        "promo->licensing",
+        "licensing->promo"
+       ],
+       "tone": {
+        "licensing": "warn"
+       },
+       "text": "**Mon Aug 31 (T-166).** Player and league approve the likeness, three days later than planned. Nothing broke, but the slack meter moves first in the *approval* lane, before a single unit exists.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 6,
+          "slack": 3
+         },
+         "note": "Approval slip: 3 of 17 slack days used."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "not started"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "not booked"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "po",
+       "edge": "promo->factory",
+       "tone": {
+        "licensing": null
+       },
+       "text": "**Tue Sep 1 (T-165).** The PO goes out and the **120-day** build starts: a 2010 MASN behind-the-scenes piece on the Orioles' giveaways says a bobblehead takes 120 days to manufacture ([MASN](https://masnsports.com/blog/behind-the-scenes-of-the-bobblehead-giveaway)); ordering starts 4 to 6 months out because production is overseas ([SupplyChainBrain](https://supplychainbrain.com/articles/28903-when-your-customer-is-major-league-baseball-its-more-than-a-game)).",
+       "link": "https://masnsports.com/blog/behind-the-scenes-of-the-bobblehead-giveaway",
+       "delta": true,
+       "deltaText": "Public fact: about 120 days to manufacture a bobblehead (MASN on the Orioles, 2010).",
+       "deltaLinks": [
+        {
+         "label": "MASN",
+         "url": "https://masnsports.com/blog/behind-the-scenes-of-the-bobblehead-giveaway"
+        },
+        {
+         "label": "SupplyChainBrain",
+         "url": "https://supplychainbrain.com/articles/28903-when-your-customer-is-major-league-baseball-its-more-than-a-game"
+        }
+       ],
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 7,
+          "slack": 3
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "PO out · 120-day build"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "not booked"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "sample",
+       "nodes": [
+        "factory",
+        "licensing"
+       ],
+       "text": "**Sun Oct 4 (T-132).** Pre-production sample photos come back and match the approved sculpt. This is the last moment a paint or face fix is cheap; a trade or injury after this date would not change the box.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 40,
+          "slack": 3
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "sample signed · locked"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "not booked"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "exfactory",
+       "edge": "factory->freight",
+       "text": "**Wed Dec 30 (T-45).** 120 days after the PO, 600 cases of 30 leave the factory. Ocean, customs and truck are planned at 24 days, so the container should dock Jan 23 *(transit and case size illustrative)*.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "pending",
+           "detail": "Ex-factory Dec 30; container booked, ETA Jan 23"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 127,
+          "slack": 3
+         },
+         "note": "Planned dock Jan 23 leaves 14 days of slack to the T-7 receiving cut-off."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "at sea · ETA Jan 23"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "etacheck",
+       "edge": "freight->ops",
+       "text": "**Thu Jan 14 (T-30).** Ops asks the carrier for a confirmed ETA. This is the fork: the next answer decides whether Feb 13 is a handout night or a voucher night.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "pending",
+           "detail": "T-30 check: carrier update due today"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 142,
+          "slack": 3
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "asking carrier for ETA"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "docked",
+       "edge": "freight->ops",
+       "tone": {
+        "freight": "ok"
+       },
+       "text": "**Mon Jan 25 (T-19).** The container docks two days late. The slack meter absorbs it: 5 of 17 days used, 12 to spare.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "pass",
+           "detail": "Docked Jan 25, 12 days before the T-7 cut-off"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 153,
+          "slack": 5
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "docked Jan 25 (+2 days)"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "not started"
+           },
+           "status": "neutral"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "counted",
+       "nodes": [
+        "ops"
+       ],
+       "text": "**Sat Feb 6 (T-7).** Receiving counts 600 cases, 18,000 units, against the PO. Ops splits the cases by each entrance's expected share of arrivals.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "pass",
+           "detail": "Docked Jan 25, 12 days before the T-7 cut-off"
+          },
+          "stage": {
+           "status": "pending",
+           "detail": "Feb 6: 600 cases of 30 = 18,000 counted; staging next"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 165,
+          "slack": 5
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "docked Jan 25 (+2 days)"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "18,000 counted"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "staged",
+       "edge": "ops->gates",
+       "tone": {
+        "gates": "ok"
+       },
+       "text": "**Sat Feb 13, game night.** Cases are staged at every gate and each scanned ticket gets a bobblehead. The voucher checks are skipped: the plan existed, it was just not needed.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "pass",
+           "detail": "Docked Jan 25, 12 days before the T-7 cut-off"
+          },
+          "stage": {
+           "status": "pass",
+           "detail": "18,000 counted Feb 6; cases split by each door's expected entry share"
+          },
+          "voucher": {
+           "status": "skip",
+           "detail": "Not needed: stock on hand"
+          },
+          "window": {
+           "status": "skip",
+           "detail": "Not needed"
+          }
+         },
+         "note": "7 of 9 gates passed, 1 warned (likeness, 3 days late); the 2 voucher gates were skipped."
+        },
+        "slack": {
+         "values": {
+          "elapsed": 172,
+          "slack": 5
+         },
+         "note": "Delivered with 12 slack days unused."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "docked Jan 25 (+2 days)"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "staged at every gate"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "slipped",
+       "failures": {
+        "freight->ops": "blocked"
+       },
+       "tone": {
+        "freight": "alert"
+       },
+       "text": "**Thu Jan 14 (T-30).** The carrier reports a port hold: new ETA **Feb 16**, three days after the game. A miss marks the planned dock date. It happens: the Yankees' Rivera-night bobbleheads arrived late in 2013 ([NPR](https://www.npr.org/sections/thetwo-way/2013/09/25/226071535/yankees-bobble-the-ball-on-mariano-rivera-give-away-night)).",
+       "link": "https://www.npr.org/sections/thetwo-way/2013/09/25/226071535/yankees-bobble-the-ball-on-mariano-rivera-give-away-night",
+       "delta": true,
+       "deltaText": "Public precedent: late-arriving bobbleheads, Yankees, Sep 2013.",
+       "deltaLinks": [
+        {
+         "label": "NPR",
+         "url": "https://www.npr.org/sections/thetwo-way/2013/09/25/226071535/yankees-bobble-the-ball-on-mariano-rivera-give-away-night"
+        }
+       ],
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "fail",
+           "detail": "Port hold: new ETA Feb 16, 3 days after the game"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 142,
+          "slack": 27
+         },
+         "note": "New ETA uses 27 of 17 slack days: no schedule change can recover this."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "port hold · ETA Feb 16"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "no stock for Feb 13"
+           },
+           "status": "removed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "voucherplan",
+       "edges": [
+        "ops->gates",
+        "gates->app"
+       ],
+       "tone": {
+        "gates": "warn"
+       },
+       "text": "**Sat Jan 16 (T-28).** Promotions switches to a voucher plan rather than improvising on the night, modelled on the Pirates' Skenes night (April 2025): after the gates ran out of bobbleheads, each scanned ticket that missed out got a barcoded voucher in the MLB Ballpark app ([CBS Pittsburgh](https://www.cbsnews.com/pittsburgh/news/the-pirates-are-giving-paul-skenes-bobblehead-vouchers)).",
+       "link": "https://www.cbsnews.com/pittsburgh/news/the-pirates-are-giving-paul-skenes-bobblehead-vouchers",
+       "delta": true,
+       "deltaText": "Public precedent: Pirates digital bobblehead vouchers, April 2025.",
+       "deltaLinks": [
+        {
+         "label": "CBS Pittsburgh",
+         "url": "https://www.cbsnews.com/pittsburgh/news/the-pirates-are-giving-paul-skenes-bobblehead-vouchers"
+        }
+       ],
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "fail",
+           "detail": "Port hold: new ETA Feb 16, 3 days after the game"
+          },
+          "stage": {
+           "status": "fail",
+           "detail": "Nothing to count or stage before game night"
+          },
+          "voucher": {
+           "status": "pending",
+           "detail": "Barcoded voucher per scanned ticket (the Pirates' 2025 approach); desk at each entrance"
+          },
+          "window": {
+           "status": "pending",
+           "detail": "Draft: claim at a later home game"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 144,
+          "slack": 27
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "port hold · ETA Feb 16"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "voucher plan written"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "vouchernight",
+       "edge": "gates->app",
+       "tone": {
+        "gates": "warn",
+        "app": "ok"
+       },
+       "text": "**Sat Feb 13, game night.** The gates scan as usual; each scan drops one voucher into the fan's app or wallet, and guest services reads the same script at every door. Fans leave without a box but with a claim.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "fail",
+           "detail": "Port hold: new ETA Feb 16, 3 days after the game"
+          },
+          "stage": {
+           "status": "fail",
+           "detail": "Nothing to count or stage before game night"
+          },
+          "voucher": {
+           "status": "pass",
+           "detail": "One voucher per scan lands in the app; \"Your bobblehead is in your app\" at every gate"
+          },
+          "window": {
+           "status": "pending",
+           "detail": "Draft: claim at a later home game"
+          }
+         }
+        },
+        "slack": {
+         "values": {
+          "elapsed": 172,
+          "slack": 27
+         }
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "port hold · ETA Feb 16"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "a voucher per scan"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "redeem",
+       "edges": [
+        "freight->ops",
+        "app->gates"
+       ],
+       "tone": {
+        "freight": "ok",
+        "gates": "ok"
+       },
+       "text": "**Tue Feb 16 onward.** The container lands and the redemption window opens at later home games *(window illustrative)*. The lesson for the calendar: put a *last safe change* date on every promo night, and pre-write the voucher plan before T-30.",
+       "panels": {
+        "gates": {
+         "results": {
+          "qty": {
+           "status": "pass",
+           "detail": "Announced Aug 25: bobblehead for all fans. 17,250 seats + about 4% buffer"
+          },
+          "logo": {
+           "status": "pass",
+           "detail": "Northwell mark on the base, approved Aug 29"
+          },
+          "likeness": {
+           "status": "warn",
+           "detail": "Approved Aug 31, 3 days past the Aug 28 plan: slack spent before production starts"
+          },
+          "po": {
+           "status": "pass",
+           "detail": "Sep 1: PO to the factory; artwork is frozen from here"
+          },
+          "sample": {
+           "status": "pass",
+           "detail": "Oct 4: sample photos match the approved sculpt"
+          },
+          "eta": {
+           "status": "fail",
+           "detail": "Port hold: new ETA Feb 16, 3 days after the game"
+          },
+          "stage": {
+           "status": "fail",
+           "detail": "Nothing to count or stage before game night"
+          },
+          "voucher": {
+           "status": "pass",
+           "detail": "One voucher per scan lands in the app; \"Your bobblehead is in your app\" at every gate"
+          },
+          "window": {
+           "status": "pass",
+           "detail": "Claim at a later home game (illustrative window)"
+          }
+         },
+         "note": "Handout gates failed; the voucher plan carried the night."
+        },
+        "slack": {
+         "values": {
+          "elapsed": 172,
+          "slack": 27
+         },
+         "note": "The night happened; the item arrived 3 days after it."
+        },
+        "lanes": {
+         "rows": [
+          {
+           "id": "sponsor",
+           "cells": {
+            "lane": "Sponsor + licensing",
+            "gate": "Aug 29 · T-168",
+            "now": "locked · 3 days late"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "production",
+           "cells": {
+            "lane": "Production",
+            "gate": "Oct 4 · T-132 sample",
+            "now": "600 cases shipped"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "freight",
+           "cells": {
+            "lane": "Freight",
+            "gate": "Feb 6 · T-7 receiving",
+            "now": "landed Feb 16"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "ops",
+           "cells": {
+            "lane": "Event ops",
+            "gate": "Feb 13 · game night",
+            "now": "redeem at later games"
+           },
+           "status": "changed"
+          }
+         ]
+        }
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "ontime",
+       "label": "Freight on time",
+       "steps": [
+        "announce",
+        "logo",
+        "likeness",
+        "po",
+        "sample",
+        "exfactory",
+        "etacheck",
+        "docked",
+        "counted",
+        "staged"
+       ]
+      },
+      {
+       "id": "late",
+       "label": "Freight late: voucher plan",
+       "color": "#FB923C",
+       "steps": [
+        "announce",
+        "logo",
+        "likeness",
+        "po",
+        "sample",
+        "exfactory",
+        "etacheck",
+        "slipped",
+        "voucherplan",
+        "vouchernight",
+        "redeem"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 5,
+      "w": 662,
+      "h": 394
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "panel": "lanes",
+        "x": 0,
+        "y": 8,
+        "w": 14,
+        "h": 8
+       },
+       {
+        "x": 0,
+        "y": 16,
+        "w": 14,
+        "h": 16
+       },
+       {
+        "panel": "slack",
+        "x": 14,
+        "y": 8,
+        "w": 10,
+        "h": 8
+       },
+       {
+        "panel": "gates",
+        "x": 14,
+        "y": 16,
+        "w": 10,
+        "h": 16
+       }
+      ]
+     }
+    }
+   },
+   {
+    "id": "group-holds",
+    "heading": "Holds that quietly expire",
+    "text": [
+     "A group hold takes seats off sale before anyone has paid for them. It is borrowed inventory with an expiry date, and on that date it either converts to sold or goes back on sale. This section follows three holds on one game and forks at the final-payment date.",
+     "Section numbering is from public seating guides; capacities are an illustrative even split of 17,250 seats over 80 sections. The groups, deposits, sales and prices are illustrative. The group bar near Sec 210 is a [sourced 2026-27 announcement](https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088). The ticketing, CRM and reporting flow is an illustrative reconstruction, not any team's or vendor's system."
+    ],
+    "bullets": [
+     "Hatched sections are held: they count against capacity but not against sold",
+     "Choose **Converts** or **Expires silently** below the step controls; both paths share the first six steps"
+    ],
+    "diagram": {
+     "view": "step",
+     "rows": [
+      []
+     ],
+     "floats": [
+      {
+       "id": "app",
+       "side": "below",
+       "x": 349,
+       "y": 334
+      },
+      {
+       "id": "crm",
+       "side": "below",
+       "x": 123,
+       "y": 70
+      },
+      {
+       "id": "email",
+       "side": "below",
+       "x": 123,
+       "y": 334
+      },
+      {
+       "id": "groups",
+       "side": "below",
+       "x": 349,
+       "y": 70
+      },
+      {
+       "id": "pricing",
+       "side": "below",
+       "x": 123,
+       "y": 202
+      },
+      {
+       "id": "ticketing",
+       "side": "below",
+       "x": 349,
+       "y": 202
+      }
+     ],
+     "nodes": {
+      "groups": {
+       "title": "Group sales",
+       "sub": "rep · holds",
+       "icon": "headset",
+       "tint": "dev"
+      },
+      "crm": {
+       "title": "CRM",
+       "sub": "deposits",
+       "icon": "person",
+       "tint": "data"
+      },
+      "ticketing": {
+       "title": "Ticketing",
+       "sub": "inventory",
+       "icon": "server",
+       "tint": "cmd"
+      },
+      "pricing": {
+       "title": "Pricing desk",
+       "sub": "nightly report",
+       "icon": "monitor",
+       "tint": "auth"
+      },
+      "app": {
+       "title": "Fan app",
+       "sub": "group leader",
+       "icon": "phone",
+       "tint": "dev"
+      },
+      "email": {
+       "title": "Email / push",
+       "sub": "upper deck",
+       "icon": "cloud",
+       "tint": "mqtt"
+      }
+     },
+     "edges": [
+      {
+       "from": "crm",
+       "to": "groups",
+       "kind": "int",
+       "label": "deposit posted"
+      },
+      {
+       "from": "groups",
+       "to": "ticketing",
+       "kind": "https",
+       "label": "hold / convert",
+       "labelDx": -62,
+       "labelDy": -10
+      },
+      {
+       "from": "ticketing",
+       "to": "groups",
+       "kind": "int",
+       "ret": true,
+       "label": "expiry",
+       "labelDx": 36,
+       "labelDy": 30
+      },
+      {
+       "from": "ticketing",
+       "to": "pricing",
+       "kind": "int",
+       "label": "holds snapshot"
+      },
+      {
+       "from": "pricing",
+       "to": "email",
+       "kind": "int",
+       "label": "offer audience"
+      },
+      {
+       "from": "ticketing",
+       "to": "app",
+       "kind": "https",
+       "label": "bulk transfer"
+      }
+     ],
+     "panels": [
+      {
+       "id": "map",
+       "type": "seatmap",
+       "title": "UBS Arena, Elmont, NY · capacities illustrative",
+       "venue": "ubs-arena",
+       "currency": "USD",
+       "initial": {
+        "mode": "sold",
+        "price": {
+         "101": 118,
+         "102": 118,
+         "103": 118,
+         "104": 118,
+         "105": 118,
+         "106": 118,
+         "107": 118,
+         "108": 118,
+         "109": 118,
+         "110": 118,
+         "111": 118,
+         "112": 118,
+         "113": 165,
+         "114": 165,
+         "115": 165,
+         "116": 165,
+         "117": 118,
+         "118": 118,
+         "119": 118,
+         "120": 118,
+         "121": 118,
+         "202": 76,
+         "203": 76,
+         "204": 76,
+         "205": 76,
+         "206": 76,
+         "207": 76,
+         "208": 76,
+         "209": 76,
+         "210": 76,
+         "211": 76,
+         "212": 76,
+         "213": 76,
+         "214": 76,
+         "215": 76,
+         "216": 76,
+         "217": 76,
+         "218": 76,
+         "219": 76,
+         "220": 76,
+         "221": 76,
+         "222": 76,
+         "223": 76,
+         "224": 76,
+         "225": 76,
+         "227": 76,
+         "228": 76,
+         "230": 76,
+         "231": 76,
+         "301": 38,
+         "302": 38,
+         "303": 38,
+         "304": 38,
+         "305": 38,
+         "306": 38,
+         "307": 38,
+         "308": 38,
+         "309": 38,
+         "310": 38,
+         "311": 38,
+         "312": 38,
+         "313": 38,
+         "314": 38,
+         "315": 38,
+         "316": 38,
+         "317": 38,
+         "318": 38,
+         "319": 38,
+         "320": 38,
+         "321": 38,
+         "322": 38,
+         "323": 38,
+         "324": 38,
+         "325": 38,
+         "326": 38,
+         "329": 76,
+         "201A": 76,
+         "201B": 76,
+         "226A": 76,
+         "226B": 76
+        },
+        "sold": {
+         "101": 141,
+         "102": 194,
+         "103": 179,
+         "104": 164,
+         "105": 149,
+         "106": 134,
+         "107": 187,
+         "108": 172,
+         "109": 157,
+         "110": 141,
+         "111": 194,
+         "112": 179,
+         "113": 205,
+         "114": 205,
+         "115": 205,
+         "116": 205,
+         "117": 172,
+         "118": 157,
+         "119": 141,
+         "120": 194,
+         "121": 179,
+         "202": 143,
+         "203": 127,
+         "204": 112,
+         "205": 97,
+         "206": 82,
+         "207": 135,
+         "208": 120,
+         "209": 105,
+         "210": 90,
+         "211": 143,
+         "212": 127,
+         "213": 112,
+         "214": 97,
+         "215": 82,
+         "216": 135,
+         "217": 120,
+         "218": 105,
+         "219": 90,
+         "220": 143,
+         "221": 127,
+         "222": 112,
+         "223": 97,
+         "224": 82,
+         "225": 135,
+         "227": 90,
+         "228": 142,
+         "230": 112,
+         "231": 97,
+         "301": 41,
+         "302": 32,
+         "303": 22,
+         "304": 56,
+         "305": 46,
+         "306": 37,
+         "307": 27,
+         "308": 17,
+         "309": 51,
+         "310": 41,
+         "311": 32,
+         "312": 15,
+         "313": 15,
+         "314": 15,
+         "315": 37,
+         "316": 27,
+         "317": 17,
+         "318": 51,
+         "319": 41,
+         "320": 32,
+         "321": 22,
+         "322": 56,
+         "323": 46,
+         "324": 37,
+         "325": 27,
+         "326": 17,
+         "329": 127,
+         "201A": 105,
+         "201B": 90,
+         "226A": 120,
+         "226B": 105
+        }
+       }
+      },
+      {
+       "id": "holds",
+       "type": "table",
+       "title": "Group holds · illustrative",
+       "columns": [
+        {
+         "id": "group",
+         "label": "Group"
+        },
+        {
+         "id": "seats",
+         "label": "Seats"
+        },
+        {
+         "id": "deposit",
+         "label": "Deposit"
+        },
+        {
+         "id": "status",
+         "label": "Status"
+        }
+       ],
+       "initial": {
+        "rows": [],
+        "note": "Group sales has not placed any holds yet."
+       }
+      },
+      {
+       "id": "log",
+       "type": "log",
+       "title": "Ticketing and pricing log · illustrative",
+       "tags": {
+        "HOLD": "#B45309",
+        "PAY": "#15803D",
+        "RPT": "#4F46E5",
+        "XFER": "#0E7490",
+        "WARN": "#DC2626"
+       }
+      }
+     ],
+     "steps": [
+      {
+       "id": "school-hold",
+       "edge": "groups->ticketing",
+       "text": "Three weeks out, group sales holds **600 seats in 312–314** for a school group until **T-7d**, the final-payment date. Hatched seats are off sale but **not sold**.",
+       "panels": {
+        "map": {
+         "mode": "held",
+         "held": {
+          "312": {
+           "count": 200,
+           "label": "School group",
+           "until": "T-7d"
+          },
+          "313": {
+           "count": 200,
+           "label": "School group",
+           "until": "T-7d"
+          },
+          "314": {
+           "count": 200,
+           "label": "School group",
+           "until": "T-7d"
+          }
+         },
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "added"
+          }
+         ],
+         "note": "Each hold has an expiry: the final-payment date."
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "HOLD",
+           "text": "T-21d 312-314 hold 600"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "youth-hold",
+       "edge": "groups->ticketing",
+       "text": "A youth hockey club holds **260 seats in 320–321** on the same terms. Both blocks sit in the 300 level, the slowest-selling ring.",
+       "panels": {
+        "map": {
+         "held": {
+          "320": {
+           "count": 130,
+           "label": "Youth hockey club",
+           "until": "T-7d"
+          },
+          "321": {
+           "count": 130,
+           "label": "Youth hockey club",
+           "until": "T-7d"
+          }
+         },
+         "highlight": [
+          "320",
+          "321"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "added"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "HOLD",
+           "text": "T-20d 320-321 hold 260"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "bar-hold",
+       "edge": "groups->ticketing",
+       "link": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088",
+       "delta": true,
+       "deltaText": "Sourced: for 2026-27 the Islanders announced a new private bar for groups of 50 to 75 near Sec 210. The corporate group booked into it is illustrative.",
+       "deltaLinks": [
+        {
+         "label": "NHL.com/Islanders, new fan experiences (Oct 1, 2026)",
+         "url": "https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088"
+        }
+       ],
+       "text": "A corporate outing of **70** books the new private bar for groups of 50 to 75 near **Sec 210** ([announced for 2026-27](https://www.nhl.com/islanders/news/islanders-unveil-new-fan-experiences-ahead-of-2026-27-season-x1088)). Its seats are held in 210.",
+       "panels": {
+        "map": {
+         "held": {
+          "210": {
+           "count": 70,
+           "label": "Corporate outing",
+           "until": "T-7d"
+          }
+         },
+         "highlight": [
+          "210"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "awaiting",
+            "status": "held to T-7d"
+           },
+           "status": "added"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "HOLD",
+           "text": "T-19d 210 hold 70 (bar)"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "deposits",
+       "edge": "crm->groups",
+       "link": "https://www.mlb.com/guardians/tickets/group-tickets/policies",
+       "delta": true,
+       "deltaText": "Deposit models are published group policies of other clubs: a $200 non-refundable deposit to hold a date (an older Cleveland Guardians group-policy page) and a 20% deposit with full payment 45 days out (Atlanta Braves). The amounts in this table are illustrative.",
+       "deltaLinks": [
+        {
+         "label": "Guardians group policies",
+         "url": "https://www.mlb.com/guardians/tickets/group-tickets/policies"
+        },
+        {
+         "label": "Braves group pricing",
+         "url": "https://www.mlb.com/braves/tickets/group-tickets/pricing"
+        }
+       ],
+       "text": "Deposits post: the youth club pays a flat **$200**, the corporate outing **20%** (models the [Guardians](https://www.mlb.com/guardians/tickets/group-tickets/policies) and [Braves](https://www.mlb.com/braves/tickets/group-tickets/pricing) publish). The school's is **pending** on a district PO.",
+       "panels": {
+        "map": {
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "pending PO",
+            "status": "held to T-7d"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "$200 paid",
+            "status": "held to T-7d"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "20% paid",
+            "status": "held to T-7d"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Deposits are illustrative, modelled on published policies of other clubs."
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "WARN",
+           "text": "T-14d school deposit due"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "report",
+       "edge": "ticketing->pricing",
+       "nodes": [
+        "pricing"
+       ],
+       "text": "Each night pricing pulls a **snapshot** of holds. Held seats look committed, so the upper-deck offer skips 312–314 and 320–321.",
+       "panels": {
+        "map": {
+         "highlight": [
+          "312",
+          "313",
+          "314",
+          "320",
+          "321"
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "RPT",
+           "text": "T-10d offer skips held"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "final-two",
+       "edges": [
+        "crm->groups",
+        "groups->ticketing"
+       ],
+       "text": "**T-7d, final payment.** The youth club and the corporate outing pay in full and turn sold. The school hold is left: pick **Converts** or **Expires silently**.",
+       "panels": {
+        "map": {
+         "held": {
+          "210": null,
+          "320": null,
+          "321": null
+         },
+         "sold": {
+          "210": 160,
+          "320": 162,
+          "321": 152
+         },
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "pending PO",
+            "status": "due today"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          }
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PAY",
+           "text": "T-7d 330 converted"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "school-pays",
+       "edge": "groups->ticketing",
+       "text": "The district's PO clears that afternoon. Group sales converts the hold before midnight: **600 seats in 312–314 turn sold** and no hatches remain.",
+       "panels": {
+        "map": {
+         "mode": "sold",
+         "held": {
+          "312": null,
+          "313": null,
+          "314": null
+         },
+         "sold": {
+          "312": 215,
+          "313": 215,
+          "314": 215
+         },
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "All three holds converted."
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "PAY",
+           "text": "T-7d 312-314 converted"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "transfer",
+       "edge": "ticketing->app",
+       "text": "Ticketing **bulk-transfers** the 600 tickets to the leader's app account. The leader forwards them to families; any not forwarded by doors become a gate line.",
+       "panels": {
+        "map": {
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "paid in full",
+            "status": "in leader wallet"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "paid in full",
+            "status": "in leader wallet"
+           },
+           "status": "changed"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "paid in full",
+            "status": "bar list sent"
+           },
+           "status": "changed"
+          }
+         ],
+         "note": "Delivery is a bulk transfer to each group's leader."
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "XFER",
+           "text": "T-6d 600 -> leader"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "recap-converts",
+       "edge": "ticketing->pricing",
+       "nodes": [
+        "pricing"
+       ],
+       "text": "Recap. Tonight's snapshot matches ticketing: **0 held**, and 312–314 show full on the sold map because every group seat is now paid revenue. When holds convert, a stale report does no harm.",
+       "panels": {
+        "map": {
+         "mode": "sold",
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "RPT",
+           "text": "T-6d report: 0 held"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "expire",
+       "nodes": [
+        "ticketing"
+       ],
+       "tone": {
+        "ticketing": "warn"
+       },
+       "failures": {
+        "ticketing->groups": "blocked",
+        "ticketing->pricing": "blocked"
+       },
+       "text": "Midnight passes unpaid. Ticketing **releases the hold on its own**: the hatch clears and 600 seats go back on sale. No notice reaches group sales or pricing.",
+       "panels": {
+        "map": {
+         "mode": "sold",
+         "held": {
+          "312": null,
+          "313": null,
+          "314": null
+         },
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "holds": {
+         "rows": [
+          {
+           "id": "school",
+           "cells": {
+            "group": "School group",
+            "seats": "600 · 312–314",
+            "deposit": "pending PO",
+            "status": "expired"
+           },
+           "status": "removed"
+          },
+          {
+           "id": "youth",
+           "cells": {
+            "group": "Youth hockey club",
+            "seats": "260 · 320–321",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          },
+          {
+           "id": "corp",
+           "cells": {
+            "group": "Corporate outing",
+            "seats": "70 · 210 (bar)",
+            "deposit": "paid in full",
+            "status": "sold"
+           },
+           "status": "neutral"
+          }
+         ],
+         "note": "The school hold expired. Nobody was told."
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "WARN",
+           "text": "312-314 EXPIRED · no notice"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "stale-report",
+       "edge": "ticketing->pricing",
+       "nodes": [
+        "pricing"
+       ],
+       "tone": {
+        "pricing": "alert"
+       },
+       "failures": {
+        "pricing->email": "blocked"
+       },
+       "text": "Pricing's report still shows the 600 as **held**. To the desk 312–314 is full, so the offer goes out **without** the 630 seats that are actually open.",
+       "panels": {
+        "map": {
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "RPT",
+           "text": "T-6d report: held 600"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "id": "game-night-expired",
+       "nodes": [
+        "ticketing",
+        "pricing"
+       ],
+       "tone": {
+        "pricing": "warn",
+        "ticketing": "base"
+       },
+       "text": "Game night: 312–314 was never offered and draws only walk-ups. The fix is process, not price: **a hold expiry should be an event** that alerts sales, pricing and marketing.",
+       "panels": {
+        "map": {
+         "mode": "sold",
+         "sold": {
+          "312": 34,
+          "313": 31,
+          "314": 28
+         },
+         "highlight": [
+          "312",
+          "313",
+          "314"
+         ]
+        },
+        "log": {
+         "log": [
+          {
+           "tag": "RPT",
+           "text": "game 312-314: 93 sold"
+          }
+         ]
+        }
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "converts",
+       "label": "Converts",
+       "color": "#15803D",
+       "steps": [
+        "school-hold",
+        "youth-hold",
+        "bar-hold",
+        "deposits",
+        "report",
+        "final-two",
+        "school-pays",
+        "transfer",
+        "recap-converts"
+       ]
+      },
+      {
+       "id": "expires",
+       "label": "Expires silently",
+       "color": "#DC2626",
+       "steps": [
+        "school-hold",
+        "youth-hold",
+        "bar-hold",
+        "deposits",
+        "report",
+        "final-two",
+        "expire",
+        "stale-report",
+        "game-night-expired"
+       ]
+      }
+     ],
+     "graphFrame": {
+      "x": 18,
+      "y": 10,
+      "w": 436,
+      "h": 384
+     },
+     "sectionLayout": {
+      "columns": 24,
+      "default": [
+       {
+        "controls": "steps",
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+       },
+       {
+        "panel": "map",
+        "x": 0,
+        "y": 8,
+        "w": 14,
+        "h": 16
+       },
+       {
+        "x": 14,
+        "y": 8,
+        "w": 10,
+        "h": 16
+       },
+       {
+        "panel": "holds",
+        "x": 0,
+        "y": 24,
+        "w": 15,
+        "h": 6
+       },
+       {
+        "panel": "log",
+        "x": 15,
+        "y": 24,
+        "w": 9,
+        "h": 6
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "flowview": {
+   "authoredWith": "0.2.0",
+   "minVersion": "0.2.0",
+   "features": [
+    "content.deviceapp",
+    "content.deviceapp-badges",
+    "content.deviceapp-freshness",
+    "content.deviceapp-navigation",
+    "flow.alternates",
+    "flow.drilldown",
+    "flow.failures",
+    "flow.step-colors",
+    "flow.story-time",
+    "layout.arranged",
+    "layout.cubic-curves",
+    "layout.edge-ports",
+    "layout.free-nodes",
+    "layout.graph-frame",
+    "layout.grid-24",
+    "media.node-styles",
+    "media.shared-icons",
+    "panel.budget",
+    "panel.checks",
+    "panel.cost",
+    "panel.deviceapp",
+    "panel.funnel",
+    "panel.gauge",
+    "panel.grid",
+    "panel.inflight",
+    "panel.log",
+    "panel.orbit",
+    "panel.phone",
+    "panel.queue",
+    "panel.seatmap",
+    "panel.state",
+    "panel.table",
+    "panel.tiles",
+    "panel.timeline"
+   ]
+  },
+  "brand": {
+   "app": "Islanders · A season of seats",
+   "logo": "NY",
+   "accent": "#003087"
+  }
+ }
+}

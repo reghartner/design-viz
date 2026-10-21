@@ -7,6 +7,7 @@ COPY tools/browser-tests/package*.json tools/browser-tests/
 RUN npm ci --prefix tools/browser-tests && cd tools/browser-tests && npx playwright install --with-deps chromium
 COPY LICENSE LICENSE
 COPY src/ src/
+COPY packages/ packages/
 COPY tools/*.py tools/*.cjs tools/*.js tools/
 COPY tools/canon/ tools/canon/
 COPY tools/arrange/*.cjs tools/arrange/

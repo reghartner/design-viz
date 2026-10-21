@@ -1,9 +1,28 @@
 #!/usr/bin/env node
 'use strict';
-const core = require('./canon/core.cjs');
+/* Repository authoring follows the current company/site package selection.
+   A downloaded, source-free agent kit instead uses its embedded runtime. */
+const fs = require('fs');
+const path = require('path');
+const sourceCheckout = fs.existsSync(path.join(__dirname, '../src/source-bundles.json'));
+const configArg = process.argv.indexOf('--config');
+if (configArg !== -1) {
+  if (!sourceCheckout) {
+    console.error('--config is available only in a source checkout; this kit has a fixed package selection');
+    process.exit(2);
+  }
+  if (!process.argv[configArg + 1] || process.argv[configArg + 1].startsWith('--')) {
+    console.error('usage: node tools/validate.js [--quiet] [--config site.json] <spec.json> [<spec.json> ...]');
+    process.exit(2);
+  }
+  delete process.env.FLOWVIEW_PACKAGE_BASE;
+  process.env.FLOWVIEW_SITE_CONFIG = path.resolve(process.argv[configArg + 1]);
+}
+const core = sourceCheckout
+  ? require('./arrange/core.cjs') : require('./canon/core.cjs');
 /* validate.js — flowspec validator + lint CLI.
 
-   Usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]
+   Usage: node tools/validate.js [--quiet] [--config site.json] <spec.json> [<spec.json> ...]
 
    Prints errors, warnings, and lint findings with field paths, one per line,
    prefixed by the file name. Exit 1 when any file has errors (or fails to
@@ -14,7 +33,6 @@ const core = require('./canon/core.cjs');
    validator bundle (including pure geometry) the pages ship with, so CLI
    results and in-page results cannot drift. No DOM renderer is loaded. */
 
-const fs = require('fs');
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
 function hasTopologyDeclarations(raw){
@@ -39,9 +57,9 @@ function topologyDiagnosticFile(entries, error){
 function main(argv){
   const args = argv.slice(2);
   const quiet = args.includes('--quiet');
-  const files = args.filter(a => a !== '--quiet');
+  const files = args.filter((a, index) => a !== '--quiet' && index !== configArg - 2 && index !== configArg - 1);
   if (!files.length){
-    console.error('usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]');
+    console.error('usage: node tools/validate.js [--quiet] [--config site.json] <spec.json> [<spec.json> ...]');
     return 2;
   }
   const C = core.viewerRouting();

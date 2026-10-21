@@ -1,0 +1,35 @@
+{
+  "pages": [
+    {
+      "file": "serve-game-night.html",
+      "spec": "serve-game-night.spec.json",
+      "title": "3 · Serve and learn from game night",
+      "family": "season-of-seats",
+      "description": "Follow Islanders fans from ticket transfer to entry, sponsor rewards and the morning-after recap. Public facts cited; operational flows and uncited figures are illustrative.",
+      "tags": [
+        "sports",
+        "marketing",
+        "sports-marketing",
+        "ticketing",
+        "islanders",
+        "promotions",
+        "giveaways",
+        "group-sales",
+        "pricing",
+        "crm",
+        "sponsorship",
+        "renewals"
+      ],
+      "widgets": [
+        "budget",
+        "checks",
+        "deviceapp",
+        "funnel",
+        "log",
+        "orbit",
+        "table",
+        "timeline"
+      ]
+    }
+  ]
+}

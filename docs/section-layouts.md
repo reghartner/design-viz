@@ -608,3 +608,16 @@ unaffected. For example:
 ```json
 "textStyle": {"fontFamily":"Lora", "fontSize":24, "color":"#225588"}
 ```
+
+
+## Play button placement
+
+Select the step controls in the desktop Workbench, then choose **Inspect → Play buttons**:
+
+- **Auto** keeps the existing layout, which adapts to the presentation and available space.
+- **Above steps** gives Previous, Play/Pause, Next and playback status their own row above the numbered steps or alternate-path tracks.
+- **Beside steps** puts those buttons alongside the steps, including stories with alternate paths.
+
+This setting belongs to the selected section arrangement and works in Standard and Explore, including floating and on-canvas controls. Explore's **Caption position** still places captions above, below, left or right of the steps. With buttons above and a side caption, the caption spans the two control rows. Narrow control windows keep their tracks scrollable; resize the window to provide more room for side captions and play buttons.
+
+The optional JSON property is `diagram.layouts[].playbackPosition`, with values `"auto"` (default), `"above"` and `"beside"`. For example, add `"playbackPosition": "above"` to the arrangement containing `id`, `name` and `sectionLayout`. Invalid imported values warn and render as Auto. Undo/Redo, arrangement duplication, JSON export and standalone HTML export preserve the choice. Shared rendering also applies it in native and Confluence viewers.

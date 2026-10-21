@@ -204,6 +204,7 @@ function sectionLayoutWarnings(d, path, warnings){
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
         sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
         sectionPathLabelWidth(v.pathLabelWidth,warnings,p+'.pathLabelWidth');
+        sectionPlaybackPosition(v.playbackPosition,warnings,p+'.playbackPosition');
         var pathIds=Array.isArray(d.paths)?diagramPathList(d).map(function(path){return path.id;}):[],validPaths=true;
         if(v.paths!=null){
           validPaths=Array.isArray(v.paths) && v.paths.length && !v.paths.some(function(id,j){return typeof id!=='string' || pathIds.indexOf(id)<0 || v.paths.indexOf(id)!==j;});

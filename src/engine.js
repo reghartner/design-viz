@@ -2011,6 +2011,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     path: function(){ return selectedPath.id; },
     paths: function(){ return filteredPaths(); },
     selectPath: selectPath,
+    setPlaybackPosition:function(value){termbar.bar.setAttribute('data-playback-position',sectionPlaybackPosition(value));},
     setPathLabelWidth:function(value){
       var next=sectionPathLabelWidth(value);if(next===pathLabelWidth)return;
       pathLabelWidth=next;paintChips();syncPathControls();
@@ -2418,7 +2419,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
     var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
     layout.grid.hidden=true;
     grid.hidden=false;active=true;grid.setAttribute('data-layout-id',layoutId);
-    if(stepper){var activeDefinition=sectionLayoutDefinition(d,layoutId);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
+    if(stepper){var activeDefinition=sectionLayoutDefinition(d,layoutId);stepper.setPlaybackPosition(activeDefinition.playbackPosition);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed',String(id===layoutId));});
     paintFlow();
     viewport.setView(sectionLayoutDefinition(d,layoutId),items);
@@ -2432,7 +2433,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
     }
-    if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
+    if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setPlaybackPosition(activeDefinition.playbackPosition);stepper.setPathLabelWidth(activeDefinition.pathLabelWidth);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     activate();
   }
   activate();

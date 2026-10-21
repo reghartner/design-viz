@@ -769,3 +769,27 @@ test('Explore text sizing honors a Tab presentation without rewriting View membe
     assert.ok(ctx.planSectionExploreTextScale(text,raw,0,'stale','controls',1.5,true).error);
   }
 });
+
+test('play buttons normalize, edit, reset and duplicate per arrangement with legacy promotion',()=>{
+  const d=diagram();d.layouts=['standard','explore'].map(id=>({id,name:id,presentation:id,sectionLayout:{default:[board]},exploreLayout:{steps:{textPosition:'left'}}}));
+  const before=JSON.stringify(d);
+  for(const value of ['above','beside']){
+    const plan=ctx.planSectionPlaybackPosition(before,d,0,'standard',value);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text);assert.equal(ctx.sectionLayoutDefinition(next,'standard').playbackPosition,value);
+    assert.deepEqual(next.layouts[1],d.layouts[1]);assert.deepEqual(next.layouts[0].exploreLayout,d.layouts[0].exploreLayout);
+    const copy=ctx.planDuplicateSectionLayout(plan.text,next,0,'standard');assert.equal(JSON.parse(copy.text).layouts[2].playbackPosition,value);
+    const reset=ctx.planSectionPlaybackPosition(plan.text,next,0,'standard','auto');assert.deepEqual(JSON.parse(reset.text),d);
+  }
+  for(const value of [null,'top',0,{},[],true]){
+    const bad={...d,layouts:[{...d.layouts[0],playbackPosition:value}]},original=JSON.stringify(bad),warnings=[];
+    ctx.sectionLayoutWarnings(bad,'diagram',warnings);assert.ok(warnings.some(w=>w.includes('.playbackPosition')));
+    assert.equal(ctx.diagramLayoutViews(bad)[0].playbackPosition,'auto');assert.equal(JSON.stringify(bad),original);
+    if(value!==null)assert.ok(ctx.planSectionPlaybackPosition(before,d,0,'standard',value).error);
+  }
+  assert.equal(ctx.sectionPlaybackPosition(undefined),'auto');assert.equal(ctx.sectionPlaybackPosition('auto'),'auto');
+  for(const id of ['flow','layout']){
+    const old=diagram();if(id==='layout')old.sectionLayout={default:[board]};
+    const plan=ctx.planSectionPlaybackPosition(JSON.stringify(old),old,0,id,'above');assert.ok(!plan.error,plan.error);
+    assert.equal(JSON.parse(plan.text).layouts.find(v=>v.id===plan.layoutId).playbackPosition,'above');
+  }
+});

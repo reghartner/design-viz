@@ -191,6 +191,16 @@ function sectionPathLabelWidth(value,warnings,path){
   }
   return value;
 }
+/* Transport placement is arrangement-local and independent of captions and
+   Explore window placement. Omitted values preserve the automatic layout. */
+function sectionPlaybackPosition(value,warnings,path){
+  if(value===undefined)return 'auto';
+  if(['auto','above','beside'].indexOf(value)<0){
+    if(warnings)warnings.push((path || 'playbackPosition')+': use auto, above or beside');
+    return 'auto';
+  }
+  return value;
+}
 function diagramLayoutViews(d){
   var used=Object.create(null), views=[];
   (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
@@ -198,7 +208,7 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',pathLabelWidth:sectionPathLabelWidth(v.pathLabelWidth),exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',pathLabelWidth:sectionPathLabelWidth(v.pathLabelWidth),playbackPosition:sectionPlaybackPosition(v.playbackPosition),exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
       paths:Array.isArray(v.paths)?v.paths:undefined,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   return views;

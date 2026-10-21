@@ -332,7 +332,11 @@ function initWorkbenchPractice(opts){
         if(!selectedStep){builder.navigate({d:'visitor',s:'detect',p:'happy'});selectedStep={kind:'step',section:0,index:1};}
         select(selectedStep);
         if(id==='choose-step')workspace.showTool('steps');
-        if(id==='add-to-step')action('ADD TO STEP');
+        if(id==='add-to-step'){
+          // The step is selected. Clear its picker so the active route remains
+          // clickable when Follow has enlarged it for the diagram exercise.
+          workspace.hideTool('steps');action('ADD TO STEP');
+        }
         if(id==='step-panels'){
           var app=doc.querySelector('#guide .panel-step-group[data-panel-id="app"]');if(app)app.open=true;
           revealInspector(doc.querySelector('#guide .panel-visibility'));

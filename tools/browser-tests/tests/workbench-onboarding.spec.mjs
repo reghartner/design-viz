@@ -203,12 +203,15 @@ test('skipping viewer intro records only visited topics and next entry starts in
   await expect(practice(page).getByRole('button',{name:/Show me both/})).toBeVisible();
 });
 
-test('Add to Step toggles the selected step and Escape keeps the edit while the tour continues',async({page,server})=>{
-  test.setTimeout(90000);
+for(const reducedMotion of ['reduce','no-preference'])test(`Add to Step toggles the selected step and Escape keeps the edit while the tour continues (${reducedMotion})`,async({page,server},info)=>{
+  test.setTimeout(90000);await page.emulateMedia({reducedMotion});
   const frame=await start(page,server,'3. Edit in workbench');
   for(let i=0;i<9;i++)await next(frame);
   await expect(heading(frame)).toHaveText('Add to Step: click on the diagram');
   await expect(frame.locator('#addmode-exit')).toBeVisible();
+  await expect(frame.locator('#workspace-window-steps')).toBeHidden();
+  await expect(frame.locator('#workspace-window-inspect')).toBeVisible();
+  await page.screenshot({path:info.outputPath('add-to-step-accessible.png')});
   await frame.locator('#docview g.node[data-dv-node="camera"]').click();
   const selected=async()=>JSON.parse(await frame.locator('#src').inputValue()).page.sections[0].diagram.steps[1];
   await expect.poll(async()=>(await selected()).nodes).toContain('camera');
@@ -220,6 +223,11 @@ test('Add to Step toggles the selected step and Escape keeps the edit while the 
   await next(frame);await expect(heading(frame)).toHaveText('Change a panel on this same step');
   expect(await selected()).toEqual(edited);
   await expect(frame.getByLabel('Step ID',{exact:true})).toHaveValue('detect');
+  await frame.getByRole('button',{name:'Back',exact:true}).click();
+  await expect(heading(frame)).toHaveText('Add to Step: click on the diagram');
+  await expect(frame.locator('#workspace-window-steps')).toBeHidden();
+  await frame.locator('#docview g.node[data-dv-node="camera"]').click();
+  await expect.poll(async()=>(await selected()).nodes || []).not.toContain('camera');
 });
 
 test('trying Add opens a usable picker and Escape closes it without skipping the chapter',async({page,server})=>{

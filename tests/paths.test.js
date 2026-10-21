@@ -91,6 +91,32 @@ test('append, duplicate and reorder affect only the selected path, while deletin
   p=c.planDeleteStep(text,d,0,2);next=JSON.parse(p.text);
   assert.ok(next.paths.every(p=>!p.steps.includes('three')));assert.deepEqual(plain(c.validate(c.normalize(next)).errors),[]);
 });
+test('path ordering moves whole route records in either direction and reports bounds as no-ops',()=>{
+  const c=commandContext(['graph','narrative']),d=fixture();
+  d.paths.splice(1,0,{id:'hidden',label:'Hidden from this view',color:'#a855f7',steps:['one','drop'],metadata:{keep:true}});
+  const text=JSON.stringify(d,null,2);
+  let plan=c.planReorderPath(text,d,0,'dropped','happy','before'),next=JSON.parse(plan.text);
+  assert.equal(plan.error,undefined);assert.deepEqual(next.paths.map(p=>p.id),['dropped','happy','hidden']);
+  assert.deepEqual(next.paths.find(p=>p.id==='hidden').metadata,{keep:true});assert.deepEqual(next.steps,d.steps);
+  plan=c.planReorderPath(plan.text,next,0,'dropped','hidden','after');next=JSON.parse(plan.text);
+  assert.deepEqual(next.paths.map(p=>p.id),['happy','hidden','dropped']);
+  assert.equal(c.planReorderPath(plan.text,next,0,'happy','hidden','before').noop,true);
+  assert.equal(c.planReorderPath(plan.text,next,0,'dropped','hidden','after').noop,true);
+  assert.equal(c.planReorderPath(plan.text,next,0,'missing','happy','before').error,'Path no longer exists. Render, then try again.');
+});
+test('path ordering uses the addressed raw section and preserves every surrounding source byte',()=>{
+  const c=commandContext(['graph','narrative']),first=fixture(),second=fixture();
+  first.paths[0].metadata={owner:'first'};second.paths[1].metadata={owner:'second'};
+  const raw={untouched:{spacing:[1,2],note:'keep'},page:{sections:[{title:'First',diagram:first},{title:'Second',diagram:second}],tail:{keep:'exact'}}};
+  let text=JSON.stringify(raw,null,4);text='  \n'+text+'\n  ';
+  const path=['page','sections',1,'diagram','paths'],before=c.jsonLocate(text,path);
+  const plan=c.planReorderPath(text,raw,1,'dropped','happy','before'),after=c.jsonLocate(plan.text,path),next=JSON.parse(plan.text);
+  assert.equal(plan.error,undefined);assert.deepEqual(next.page.sections[1].diagram.paths.map(p=>p.id),['dropped','happy']);
+  assert.deepEqual(next.page.sections[0].diagram,first);assert.deepEqual(next.untouched,raw.untouched);assert.deepEqual(next.page.tail,raw.page.tail);
+  assert.equal(plan.text.slice(0,after.start),text.slice(0,before.start));
+  assert.equal(plan.text.slice(after.end),text.slice(before.end));
+  assert.deepEqual(next.page.sections[1].diagram.paths[0].metadata,{owner:'second'});
+});
 test('removing the last alternate retains an explicit primary sequence so orphan outcomes never play',()=>{
   const c=commandContext(['graph','narrative']),d=fixture(),p=c.planPathStepEdit(JSON.stringify(d),d,0,'dropped',5,'remove');
   const next=JSON.parse(p.text);assert.equal(next.paths.length,1);

@@ -53,6 +53,10 @@ Upload and manage the collection by selecting the panel itself. See
   story, including neighbors hidden by the filter. They are under **More step
   actions**; end controls are disabled.
 - **Branch from here** creates an alternate after the selected beat.
+- Drag the colored path chips in the desktop step controller to move whole
+  paths up or down. With a chip focused, **Alt/Option+Up/Down** does the same.
+  The first path is the default for readers, so moving a path to the top changes
+  the unnamed-link default. Each move supports Undo/Redo.
 - **Reuse steps…**, available on paths, copies or shares beats from another
   path with a destination-state preview. Under **Shared step settings**, **Make
   independent here** detaches a shared beat in place; **Remove from this path**

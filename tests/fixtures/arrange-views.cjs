@@ -17,6 +17,7 @@ module.exports=function arrangeViews(kind='named'){
   const tab={label:'Delivery',sections:[{id:'delivery',heading:'Visitor event delivery',text:'Follow a visitor event from the camera to durable storage.',diagram}],
     views:[{id:'standard',name:'Standard',presentation:'standard',sections:[{section:'delivery',layout:'standard-layout'}]},
       {id:'explore',name:'Explore',presentation:'explore',sections:[{section:'delivery',layout:'explore-layout'}]}],defaultView:'explore'};
+  if(kind==='canonical-shared')tab.views[0].sections[0].layout='explore-layout';
   if(kind==='legacy-named'){delete tab.views;delete tab.defaultView;diagram.defaultLayout='explore-layout';}
   if(kind==='legacy-grid' || kind==='automatic'){
     tab.views.forEach(view=>{view.sections=['delivery'];});

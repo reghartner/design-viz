@@ -76,7 +76,8 @@ function initWorkbenchCanvas(options){
   }
   function exploreView(rec){
     var definition=rec && rec.viewport && rec.viewport.viewDefinition();
-    return !!(rec && rec.viewingMode==='explore' || definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
+    if(rec && rec.viewOwner && rec.viewingMode)return rec.viewingMode==='explore';
+    return !!(definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
   }
   function diagramMode(){return !!focusState || exploreView(current());}
   function identity(rec){

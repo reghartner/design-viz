@@ -143,6 +143,36 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
 // borrow an editable grid until the first authored arrangement edit.
 import arrangeViews from '../../../tests/fixtures/arrange-views.cjs';
 import {chooseNavigation} from '../helpers/test.mjs';
+
+for(const attached of [true,false])test(`canonical Standard View resizes ${attached?'attached':'detached'} step controls in a shared legacy Explore arrangement`,async({page,server})=>{
+  await page.setViewportSize({width:1500,height:1000});
+  const raw=arrangeViews('canonical-shared'),tab=raw.page.blocks[0].tabs[0],diagram=tab.sections[0].diagram;
+  if(!attached)delete diagram.layouts[1].sectionLayout.default.find(item=>item.controls==='steps').attachTo;
+  const source=JSON.stringify(raw,null,2),views=JSON.parse(JSON.stringify(tab.views)),opening=JSON.parse(JSON.stringify(diagram.layouts[1]));
+  expect(tab.views[0].sections).toEqual(tab.views[1].sections);
+  expect(opening.presentation).toBe('explore');
+  const nav=page.locator('#docview .explore-navigation'),standard=nav.getByRole('tab',{name:'Standard',exact:true,includeHidden:true});
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await prepareEditorSurface(page);
+  await chooseNavigation(nav,'View','Standard');await expect(standard).toHaveAttribute('aria-selected','true');await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await arrangeChapter(page);await page.evaluate(()=>document.fonts.ready);await settle(page);
+  const grid=page.locator('.section-layout-grid'),grip=attached?page.getByRole('button',{name:'Resize attached step controls',exact:true}):page.locator('[data-layout-key="steps"] .section-tile-resize');
+  await expect(grip).toBeVisible();
+  if(attached){
+    const box=await grip.boundingBox(),scale=await grid.evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--section-layout-scale')) || 1);
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2-40*scale,{steps:8});await page.mouse.up();
+  }else{await grip.focus();await page.keyboard.press('ArrowUp');}
+  const saved=await page.locator('#src').inputValue(),next=JSON.parse(saved),nextTab=next.page.blocks[0].tabs[0],nextLayout=nextTab.sections[0].diagram.layouts[1];
+  expect(nextTab.views).toEqual(views);expect(nextLayout.presentation).toBe('explore');expect(nextLayout.exploreLayout).toEqual(opening.exploreLayout);
+  expect(nextLayout.sectionLayout.default.find(item=>item.controls==='steps').h).toBe(opening.sectionLayout.default.find(item=>item.controls==='steps').h-1);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);
+  await page.getByRole('button',{name:'Done arranging',exact:true}).click();await page.reload();await expect(page.locator('#src')).toHaveValue(saved);
+  await chooseNavigation(nav,'View','Standard');await arrangeChapter(page);
+  await expect(attached?page.getByRole('button',{name:'Resize attached step controls',exact:true}):page.locator('[data-layout-key="steps"] .section-tile-resize')).toBeVisible();
+  await page.getByRole('button',{name:'Done arranging',exact:true}).click();await chooseNavigation(nav,'View','Explore');await expect(page.locator('#docview .explore-board')).toBeVisible();
+  await chooseNavigation(nav,'View','Standard');await expect(standard).toHaveAttribute('aria-selected','true');await expect(page.locator('.section-layout-grid')).toBeVisible();await expect(page.locator('#src')).toHaveValue(saved);
+});
+
 for(const kind of ['named','legacy-named','legacy-grid','automatic'])test(`Arrange preserves the current geometry and both Views for ${kind} JSON`,async({page,server})=>{
   await page.setViewportSize({width:1500,height:1000});
   const raw=arrangeViews(kind),source=JSON.stringify(raw,null,2),tab=raw.page.blocks[0].tabs[0],original=tab.sections[0].diagram;

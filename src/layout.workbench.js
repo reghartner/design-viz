@@ -37,6 +37,10 @@ function sectionLayoutActiveId(p){
   var definition=p.viewDefinition && p.viewDefinition();
   return definition?definition.id:undefined;
 }
+function sectionLayoutEffectivePresentation(views,record,definition){
+  var current=views && views.current && views.current(record);
+  return current && current.presentation || definition && definition.presentation;
+}
 function initSectionLayoutEditor(opts){
   var life=createWorkbenchLifetime(),sections=new Map(),controlsLife=life;
   function clearSections(){var old=Array.from(sections.values());sections.clear();var cleanup=createWorkbenchLifetime();old.forEach(function(rec){cleanup.own(function(){rec.fields.destroy();});cleanup.own(function(){rec.viewFields.destroy();});cleanup.own(function(){rec.life.destroy();});});cleanup.destroy();}
@@ -78,11 +82,12 @@ function initSectionLayoutEditor(opts){
     if(!ready())return false;
     if(expectedLayout!==undefined && expectedLayout!==activeLayout(index)){feedback('The selected layout changed. Use its current visibility controls.');return false;}
     var definition=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));
-    if(editing===index && (!definition || definition.presentation!=='explore'))holdViewport();
+    if(editing===index && effectivePresentation(index,definition)!=='explore')holdViewport();
     var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' view arrangement · Undo restores the previous arrangement.');
     return ok;
   }
   function record(index){var ctl=opts.ctl && opts.ctl();return ctl && ctl.sections.find(function(r){return r.number===index+1;});}
+  function effectivePresentation(index,definition){var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});return sectionLayoutEffectivePresentation(ctl && ctl.views,rec,definition);}
   function presentation(index){var rec=record(index);return rec && rec.presentation;}
   function activeLayout(index){var rec=record(index);return sectionLayoutActiveId(rec && (rec.presentation || rec.viewport));}
   function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
@@ -179,7 +184,7 @@ function initSectionLayoutEditor(opts){
       row.appendChild(el('p','fnote','This section has no active grid arrangement. Choose Optimize layout to create an editable grid from the current content.'));
       return;
     }
-    var explore=definition && definition.presentation==='explore';
+    var explore=effectivePresentation(index,definition)==='explore';
     if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this View with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
     var dock=sectionLayoutDock(items);
     if(!explore){if(dock && selected==='steps')selected=dock;
@@ -309,10 +314,10 @@ function initSectionLayoutEditor(opts){
           if(!ready())return;editing=index;
           var current=rawDiagram(index),items=sectionLayoutItems(current,profile,activeLayout(index)),p=presentation(index);
           var definition=sectionLayoutDefinition(current,activeLayout(index));
-          if(definition && definition.presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
+          if(effectivePresentation(index,definition)==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
           if(persist(index,sectionLayoutOptimize(current,profile,items))){forceLayout(index);refresh();}
         }));
-        controls.appendChild(button('Reset layout',function(){if(!ready())return;var p=presentation(index),v=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));if(v && v.presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}endEditing();persist(index,null);}));
+        controls.appendChild(button('Reset layout',function(){if(!ready())return;var p=presentation(index),v=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));if(effectivePresentation(index,v)==='explore'){if(p && p.resetExplore)p.resetExplore();return;}endEditing();persist(index,null);}));
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
         actions.appendChild(el('div','section-arrange-fields'));
         actionsLife.listen(actions,'keydown',function(ev){
@@ -365,7 +370,7 @@ function initSectionLayoutEditor(opts){
       section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
       if(editing===index){
         fields(section,d);
-        if(!definition || definition.presentation!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
+        if(effectivePresentation(index,definition)!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
           if(!tile.querySelector('.section-tile-move')){
             var name=tile.getAttribute('data-layout-label');
             var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);

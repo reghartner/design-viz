@@ -44,7 +44,7 @@ test('focused manual render and Undo preserve the editing context; navigation an
  const input=await open(page,server);await page.locator('#workspace-focus-diagram').click();await page.locator('#editor-tab-json').click();
  const edited=input.replace('Remote service','Renamed remote service');await page.locator('#src').fill(edited);await page.locator('#go').click();await expect(page.locator('body')).toHaveClass(/workspace-diagram-focused/);await closeTools(page);await selected(page).locator('[data-dv-node=a]').click();await page.locator('#editor-tab-inspect').click();await page.locator('#guide .node-advanced>summary').click();await page.locator('#guide').getByLabel('Stable identifier',{exact:true}).fill('renamed');await page.locator('#guide').getByLabel('Stable identifier',{exact:true}).press('Enter');await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await expect(page.locator('body')).toHaveClass(/workspace-diagram-focused/);
  await page.getByRole('button',{name:'Return to page',exact:true}).click();await assertSource(page,edited);
- await page.locator('#workspace-focus-diagram').click();await nav(page).getByRole('button',{name:'Next section',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram-focused/);await expect(page.locator('.workspace-focus-tucked')).toHaveCount(0);
+ await page.locator('#workspace-focus-diagram').click();await nav(page).getByRole('button',{name:'Next page',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram-focused/);await expect(page.locator('.workspace-focus-tucked')).toHaveCount(0);
  await page.locator('#workspace-focus-diagram').click();await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture()));await expect(page.locator('body')).not.toHaveClass(/workspace-diagram-focused/);await expect(page.getByRole('button',{name:'Focus diagram',exact:true})).toBeVisible();
 });
 
@@ -66,7 +66,7 @@ for(const exit of ['Return','navigation','project replacement'])test(`Focus rest
  const before=await states();await page.locator('#workspace-focus-diagram').click();await page.locator('#editor-tab-file').click();await expect(page.locator('#workspace-window-file')).toBeVisible();
  await page.locator('#editor-tab-inspect').click();await page.locator('#workspace-window-inspect .workspace-window-close').click();
  if(exit==='Return')await page.getByRole('button',{name:'Return to page',exact:true}).click();
- else if(exit==='navigation')await nav(page).getByRole('button',{name:'Next section',exact:true}).click();
+ else if(exit==='navigation')await nav(page).getByRole('button',{name:'Next page',exact:true}).click();
  else{await page.locator('#workspace-home').click();await paste(page,input);}
  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram-focused/);await expect(page.locator('.workspace-focus-tucked')).toHaveCount(0);expect(await states()).toEqual(before);await assertSource(page,input);
 });

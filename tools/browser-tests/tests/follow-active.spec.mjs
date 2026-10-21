@@ -116,8 +116,8 @@ test('Render and section changes retire in-flight follow without stealing the sa
  const input=await open(page,server,'explore',false,data);await next(page).click();await frames(page,8);
  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await closeTools(page);await frames(page,4);const restored=await camera(page);await frames(page,50);expect(await camera(page)).toEqual(restored);
  await expect(follow(page)).toHaveAttribute('aria-pressed','true');
- await previous(page).click();await frames(page,8);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Next section',exact:true}).click();await frames(page,50);
- await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Previous section',exact:true}).click();await frames(page,4);const returned=await camera(page);await frames(page,50);expect(await camera(page)).toEqual(returned);
+ await previous(page).click();await frames(page,8);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Previous page',exact:true}).click();await frames(page,50);
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Next page',exact:true}).click();await frames(page,4);const returned=await camera(page);await frames(page,50);expect(await camera(page)).toEqual(returned);
  await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 

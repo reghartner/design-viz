@@ -125,15 +125,15 @@ test('short floating tools keep their close buttons and rail reachable above can
    R4 complete roster | same | ordered dt list of every #keyboard-shortcuts dl equals the global key handlers (shortcuts.js, builder ⌘K/undo/redo, clipboard copy/paste/duplicate, spatial selection Shift+F10/ContextMenu, interactions Delete/Backspace, canvas Space pan) | an omitted or stale row anywhere in the sheet
    R5 ⌘K implemented | same, focus on a canvas node | real ControlOrMeta+K shows Find objects with #outline-search focused | listing a shortcut that does nothing
    R6 Redo is ⌘/Ctrl+Shift+Z only | Storage right-click Lock position, then Undo | from a canvas-focused node a real ControlOrMeta+Y leaves nodes.c.locked false and #redo-builder enabled, then ControlOrMeta+Shift+Z re-applies it | a Y alias that still redoes, or a listed Redo that does nothing
-   R7 editor pager | editorSpec + a notes-only second section | #docview .reader-page-label reads "Section 1 of 2" then "Section 2 of 2" via the "Next section"/"Previous section" buttons in group "Document sections" | "Page 1 of 2" or Page-named arrows
-   R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Section 1 of 2" | editor and reader using different terms */
+   R7 editor pager | editorSpec (aggregate Standard plus legacy Business View) + a notes-only second section | #docview .reader-page-label reads "Page 1 of 3" then "Page 2 of 3" via the "Next page"/"Previous page" buttons in group "Document pages" | deduplicating the first section's two navigable View occurrences
+   R8 reader preview pager | same, page preview open | #page-preview-view .reader-page-label reads "Page 1 of 3" | editor and reader using different terms */
 /* #611 contract matrix (desktop editor): the Layers tab is removed; position locks stay in Inspect and the object menu.
    row | fixture | assertion (scoped) | rejects
    L1 rail roster | editorSpec | .workspace-rail button[id^=editor-tab-] labels (text outside .editor-tool-icon) equal Agent, Brief, Inspect, Steps, Find objects, JSON, File in order | a Layers tab left in the rail, or another tool dropped with it
    L2 no Layers DOM | same | #editor-tab-layers, #editor-layers and #workspace-window-layers each have count 0 | the tab hidden while its pane or floating window still ships
    L3 stale saved workspace | localStorage dv-workbench-floating-v1 saved with tool "layers" and open layers + steps windows | after load: no page error, #workspace-window-layers count 0, #workspace-window-steps visible | restoring a Layers window, throwing on the unknown name, or discarding every saved window */
 /* Static rows use soft assertions so one RED run reports every unmet row. */
-test('editor rail icons are distinct, the shortcut sheet lists every global key, and the pager counts sections',async({page,server})=>{
+test('editor rail icons are distinct, the shortcut sheet lists every global key, and the pager counts pages',async({page,server})=>{
   const raw=spec();raw.page.blocks.push({heading:'Notes only',text:'No diagram in this section.'});
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
   const icons=page.locator('.workspace-rail .editor-tool-icon');await expect(icons).toHaveCount(7);
@@ -164,12 +164,12 @@ test('editor rail icons are distinct, the shortcut sheet lists every global key,
   await page.locator('#undo-builder').click();await expect.poll(locked).toBe(false);
 
   const pager=page.locator('#docview .explore-navigation .reader-page-index');
-  await expect(pager).toHaveAttribute('aria-label','Document sections');
-  await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');
-  await pager.getByRole('button',{name:'Next section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 2 of 2');
-  await pager.getByRole('button',{name:'Previous section',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await expect(pager).toHaveAttribute('aria-label','Document pages');
+  await expect(pager.locator('.reader-page-label')).toHaveText('Page 1 of 3');
+  await pager.getByRole('button',{name:'Next page',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Page 2 of 3');
+  await pager.getByRole('button',{name:'Previous page',exact:true}).click();await expect(pager.locator('.reader-page-label')).toHaveText('Page 1 of 3');
   await page.locator('#open-page-preview').click();
-  await expect(page.locator('#page-preview-view .reader-page-label')).toHaveText('Section 1 of 2');
+  await expect(page.locator('#page-preview-view .reader-page-label')).toHaveText('Page 1 of 3');
   await page.locator('#close-page-preview').click();
 });
 

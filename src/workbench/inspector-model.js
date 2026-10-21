@@ -195,7 +195,7 @@ var BUILDER_GUIDES = {
   },
   'step-controls': {
     title: 'Step controls',
-    how: 'Set path label width for this section arrangement. Explore also offers text size, placement and caption position.',
+    how: 'Set play-button position, path label width, placement and caption position in either View. Use Panels → Step controls for overall size.',
     fields: [
       ['Caption position', 'place the current step text below, above, left or right of the path controls']
     ]

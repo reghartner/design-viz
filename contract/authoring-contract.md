@@ -1550,27 +1550,35 @@ perspectives" of one timeline). Types:
   section’s `text`/`bullets`; do not duplicate it in `diagram.panels`. Standard
   restores the original prose and its collapse state. Notes use the same move,
   resize, zoom and temporary visibility controls as panels.
-  `layouts[].exploreLayout.overlayScale` optionally
-  sets panel content and control frame size from 0.5 to 1.25 (default 1),
-  independently of diagram zoom. Explore notes and control text keep their
-  independent text sizes. Panel width/height and control height describe the size at 100%; control
-  width keeps its chosen horizontal span at every scale. Floating positions stay
-  in viewport coordinates. The **Panels & controls** zoom saves this value
-  in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
-  host profiles; reader panel movement and sizing do not rewrite the spec.
+  `layouts[].exploreLayout.controlsScale` optionally sizes the complete step-control
+  content from 0.5 to 1.25. **Panels → Step controls** edits it in both Standard
+  and Explore, floating or on canvas; clicking the percentage resets to 100%.
+  Transport, paths, step circles and captions scale together. On-canvas controls
+  also follow diagram zoom. Floating width keeps its chosen horizontal span.
+  `overlayScale` (0.5–1.25) and **Panels → Floating panels** size floating widgets
+  independently. Legacy floating controls inherit the previous overlay/canvas scale
+  until explicitly sized; legacy on-canvas controls remain at 100%. A panel-only
+  size edit pins the old effective control size before changing panel size.
 
-  Use `layouts[].exploreLayout.textScale:{prose:1.25,controls:1.5}` for 125% notes
-  and 150% playback text. Each optional multiplier accepts 0.75–1.75 and defaults
-  to 1; malformed values warn and independently render at 1. In desktop Inspect,
-  select Section notes or empty space in the step controls and edit **Text size
-  (%)**. Clear the field or choose **Reset text size** for 100%. At 100%, notes
-  use 18px logical text, captions 16px, and path/transport labels 13px, at every
-  desktop width. Frame resize and overlay scale preserve those sizes; canvas
-  text follows graph zoom. The notes setting includes its 10px window heading;
-  shared navigation and widget typography remain independent. Text wraps or
-  scrolls inside constrained frames. Arrangement reset retains these settings,
-  and duplication, Undo/Redo, JSON, standalone HTML and native export preserve
-  them. A Tab-owned Explore View uses the selected section arrangement's values.
+  `textScale.prose` controls Explore notes text (0.75–1.75, default 1) through
+  **Inspect → Text size (%)**. Legacy `textScale.controls` remains supported
+  typography, multiplied by the whole-control scale, but has no inspector knob.
+  Malformed scales warn and fall back independently. Explore defaults are 18px notes,
+  16px captions and 13px path/transport labels across desktop widths. Notes sizing
+  includes the 10px window heading; shared navigation and widgets remain independent.
+  Arrangement reset retains text sizes and explicit `controlsScale`; duplication,
+  Undo/Redo, JSON, HTML and native rendering preserve them. The selected arrangement
+  owns the values even when a canonical tab View overrides its old presentation flag.
+
+  View default leaves Standard controls in their original grid and Explore controls
+  Floating; selecting it removes the explicit placement override.
+  In desktop Standard authoring, an explicit Floating control placement uses a
+  section-local surface at the original control location. On canvas attaches controls
+  to that section graph and follows its zoom. Both retain stacked sections, grid
+  panels and prose. Standard readers retain grid placement while honoring saved
+  caption direction and explicit control size. **Inspect** exposes Play buttons
+  (auto/above/beside), Path label width (160–360), Placement and Caption position
+  (below/above/left/right) in both Views and placements. Mobile editing is not supported.
 
   An Explore chapter can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
   or `"floating"` (default). Preserve the separate Floating rectangles when authoring
@@ -1579,9 +1587,9 @@ perspectives" of one timeline). Types:
   are relative to the SVG viewBox's upper-left; negative x/y are valid, all values
   must be finite within ±10000, and w/h must be positive. Canvas rectangles have
   no `stacked` flag. Diagram zoom scales their entire contents; `overlayScale`
-  continues to affect Floating objects and viewport playback only. Optional
-  `canvas.controlsScale` (0.5–1.25) independently sizes Floating playback while
-  canvas objects are present; omission inherits the Floating scale. Panel visibility
+  sizes Floating widgets. Legacy `canvas.controlsScale` (0.5–1.25) remains a
+  fallback for Floating playback while canvas objects are present; explicit
+  `controlsScale` takes precedence. Panel visibility
   uses the chapter's sectionLayout items; notes visibility uses
   `exploreLayout.prose.hidden`. Independently set `exploreLayout.controlsPlacement`
   to `"floating"` (default, viewport pinned) or `"canvas"`. The Panels menu and
@@ -1589,7 +1597,7 @@ perspectives" of one timeline). Types:
   rectangle in `exploreLayout.controls` as viewport fractions and store a separate
   `{x,y,w,h}` graph rectangle in `exploreLayout.canvas.controls`, using the bounds
   above. Preserve both rectangles across placement changes. On-canvas controls
-  pan and zoom with the graph, and show move/resize handles when selected.
+  pan and zoom with the graph, and in Explore show move/resize handles when selected.
   Fit includes visible canvas controls; only Floating playback reserves viewport
   space. Author each completed move/resize or placement change as one
   layout edit, preserving the current path/step and the other mode's rectangles.

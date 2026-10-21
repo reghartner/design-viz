@@ -140,6 +140,10 @@ function sectionExploreLayout(d,value,warnings,path){
       out.canvas=canvasOut;
     }
   }
+  if(value.controlsScale!==undefined){
+    if(!Number.isFinite(value.controlsScale) || value.controlsScale<.5 || value.controlsScale>1.25)warn(path+'.controlsScale','use a scale from 0.5 to 1.25 for step controls');
+    else out.controlsScale=value.controlsScale;
+  }
   if(value.overlayScale!==undefined){
     if(!Number.isFinite(value.overlayScale) || value.overlayScale<.5 || value.overlayScale>1.25)warn(path+'.overlayScale','use a scale from 0.5 to 1.25 for panels and step controls');
     else out.overlayScale=value.overlayScale;

@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
     'media.node-styles':['Preset node styles','0.2.0'],
@@ -155,6 +156,7 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && ['above','beside'].indexOf(v.playbackPosition)>=0;}))used['layout.playback-position']=true;
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;
+        if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.controlsScale!=null;}))used['layout.controls-scale']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && (v.exploreLayout.prosePlacement==='canvas' || v.exploreLayout.controlsPlacement==='canvas' || v.exploreLayout.panelPlacement==='canvas' || v.exploreLayout.canvas!=null);}))used['layout.explore-canvas']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && Array.isArray(v.exploreLayout.panelPlacements) && v.exploreLayout.panelPlacements.length;}))used['layout.explore-panel-placement']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.prosePlacement!=null;}))used['layout.explore-prose-placement']=true;

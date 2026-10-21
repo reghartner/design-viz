@@ -94,3 +94,15 @@ test('Explore places playback around simple numbered steps in floating and canva
   await open(page,server,spec);await geometry(page,position,'below',true);
  }
 });
+
+for(const host of ['reader','native'])test(`${host}: Standard grid honors saved side caption and whole-control scale`,async({page,server})=>{
+ const spec=story('standard','above','left',true),layout=spec.page.sections[0].diagram.layouts[0];layout.exploreLayout.controlsScale=.75;layout.pathLabelWidth=300;
+ await page.setViewportSize({width:1600,height:1200});await open(page,server,spec,host);
+ const bar=page.locator('.termbar').first();await expect(bar).toHaveCSS('zoom','0.75');await expect(page.locator('.explore-stage')).toBeHidden();
+ await expect.poll(()=>bar.evaluate(el=>{
+  const tr=el.querySelector('.step-transport').getBoundingClientRect(),ch=el.querySelector('.schips').getBoundingClientRect(),ca=el.querySelector('.stepline').getBoundingClientRect();
+  return tr.bottom<=ch.top+1 && ca.right<=ch.left+1 && ca.height>0;
+ })).toBe(true);
+ expect(await bar.locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
+ await bar.getByRole('button',{name:'Next step',exact:true}).click();await expect(bar.locator('.stepid')).toHaveText('s1');
+});

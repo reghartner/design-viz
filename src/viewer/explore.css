@@ -561,3 +561,24 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar[data-pla
 body .docview .explore-player>.termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.schips{width:auto;height:100%;min-height:0;max-height:none;}
 body .docview .explore-player>.termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{width:auto;height:100%;min-height:0;max-height:100%;}
 body .docview .explore-player>.termbar[data-playback-position="beside"]>.step-transport{max-width:min(280px,30cqw);}
+
+/* Authored caption direction in the Standard grid reader. Unauthored bars keep
+   their original layout; these rules do not change document/editor placement. */
+body .docview .termbar.standard-controls-layout{display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:auto auto;grid-template-areas:"transport tracks" "caption caption";gap:8px 12px;align-items:start;}
+body .docview .termbar.standard-controls-layout>.step-transport{grid-area:transport;}
+body .docview .termbar.standard-controls-layout>.schips{grid-area:tracks;min-width:0;width:auto;overflow:auto;}
+body .docview .termbar.standard-controls-layout>.stepline{grid-area:caption;min-width:0;width:auto;margin:0;overflow:auto;}
+body .docview .termbar.standard-controls-layout[data-step-text-position="above"]{grid-template-areas:"caption caption" "transport tracks";}
+body .docview .termbar.standard-controls-layout[data-step-text-position="left"]{grid-template-columns:max-content minmax(140px,1fr) minmax(0,1fr);grid-template-areas:"transport caption tracks";}
+body .docview .termbar.standard-controls-layout[data-step-text-position="right"]{grid-template-columns:max-content minmax(0,1fr) minmax(140px,1fr);grid-template-areas:"transport tracks caption";}
+body .docview .termbar.standard-controls-layout[data-playback-position="above"]{grid-template-columns:minmax(0,1fr);grid-template-areas:"transport" "tracks" "caption";}
+body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="above"]{grid-template-areas:"caption" "transport" "tracks";}
+body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="left"]{grid-template-columns:minmax(140px,1fr) minmax(0,1fr);grid-template-areas:"caption transport" "caption tracks";}
+body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="right"]{grid-template-columns:minmax(0,1fr) minmax(140px,1fr);grid-template-areas:"transport caption" "tracks caption";}
+
+/* A Standard section keeps its grid and prose while its controls use a local
+   floating surface or the board's existing graph coordinate space. */
+.standard-controls-surface{position:relative;min-width:0;width:100%;grid-column:1/-1;}
+.standard-controls-player{z-index:2;}
+.standard-controls-player>.explore-player-grip,.standard-controls-player>.explore-window-resize{display:none;}
+.docview .boardcanvas:has(>.standard-controls-player){position:relative;}

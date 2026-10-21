@@ -370,3 +370,11 @@ test('play button overrides declare a capability while automatic placement stays
  }
  for(const value of [undefined,'auto','invalid',null]){raw.layouts[0].playbackPosition=value;assert.ok(!C.detect(raw).includes('layout.playback-position'));}
 });
+
+test('whole step-control sizing declares its own capability independently of legacy overlay scale',()=>{
+  const raw={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[{id:'standard',presentation:'standard',exploreLayout:{controlsScale:.9}}]}}]}};
+  assert.ok(C.detect(raw).includes('layout.controls-scale'));assert.ok(!C.detect(raw).includes('layout.explore-scale'));
+  const stamped=C.stamp(raw),features={...C.features};delete features['layout.controls-scale'];
+  assert.ok(C.check(stamped,{version:C.version,contract:'1',features}).missingFeatures.includes('layout.controls-scale'));
+  delete raw.page.sections[0].diagram.layouts[0].exploreLayout.controlsScale;assert.ok(!C.detect(raw).includes('layout.controls-scale'));
+});

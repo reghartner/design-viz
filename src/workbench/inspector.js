@@ -2577,33 +2577,34 @@ function renderMultiInspector(multiSel){
     width.setAttribute('aria-label','Path label width');width.setAttribute('inputmode','numeric');
     var widthRow=frow('Path label width (px)',width);
     var widthNote=document.createElement('p');widthNote.className='fnote';widthNote.textContent='160–360 px for this section arrangement. Empty restores 230 px. Labels wrap to two lines; hover for the full name.';
-    if(val.presentation!=='explore')return exploreTextSizeRows('controls',ctx.diagram).concat([playbackRow,widthRow,widthNote]);
-    var placement=selectControl(['floating','canvas'],layout.controlsPlacement || 'floating',function(value){
+    var placement=selectControl(['default','floating','canvas'],layout.controlsPlacement || 'default',function(value){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
         var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
-        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
-        var next=JSON.parse(JSON.stringify(view.exploreLayout || {}));next.controlsPlacement=value;
-        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);
+        if(!view)view=sectionLayoutDefinition(diagram || {},target.layoutId);
+        if(!view)return {error:'Reselect the step controls.'};
+        var next=JSON.parse(JSON.stringify(view.exploreLayout || {}));if(value==='default')delete next.controlsPlacement;else next.controlsPlacement=value;
+        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next,true);
       },{exploreLayout:{section:target.section,id:target.layoutId},after:refreshFormSoon});
     });
     placement.setAttribute('aria-label','Step controls placement');
-    Array.prototype.forEach.call(placement.options,function(option){option.textContent=option.value==='canvas'?'On canvas':'Floating';});
+    Array.prototype.forEach.call(placement.options,function(option){option.textContent=option.value==='default'?'View default':option.value==='canvas'?'On canvas':'Floating';});
     var current=layout.steps && layout.steps.textPosition || 'below';
     var position=selectControl(['below','above','left','right'],current,function(value){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
         var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
-        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
+        if(!view)view=sectionLayoutDefinition(diagram || {},target.layoutId);
+        if(!view)return {error:'Reselect the step controls.'};
         var next=view.exploreLayout && typeof view.exploreLayout==='object' && !Array.isArray(view.exploreLayout)?JSON.parse(JSON.stringify(view.exploreLayout)):{};
         if(value==='below')delete next.steps;else next.steps={textPosition:value};
-        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);
+        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next,true);
       },{exploreLayout:{section:target.section,id:target.layoutId},after:refreshFormSoon});
     });
     position.setAttribute('aria-label','Caption position');
     Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
-    var note=document.createElement('p');note.className='fnote';note.textContent='Resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
-    return exploreTextSizeRows('controls',ctx.diagram).concat([playbackRow,widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note]);
+    var note=document.createElement('p');note.className='fnote';note.textContent='Use Panels → Step controls to size all control content. In Explore, resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
+    return [playbackRow,widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note];
   }
 
 function renderInspector(){

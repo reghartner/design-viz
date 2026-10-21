@@ -280,13 +280,14 @@ test('diagram routing edits the selected section or bare diagram with exact undo
   }
 });
 
-test('Explore step controls inspector edits caption placement without changing steps or sibling layout defaults',()=>{
+for(const presentation of ['standard','explore'])test(presentation+' step controls inspector edits caption placement without changing steps or sibling layout defaults',()=>{
   const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
-    id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]},
+    id:'explore',name:'Explore',presentation,sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]},
     exploreLayout:{overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18}}
   }]};
   const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
   assert.match(h.guide.querySelector('b').textContent,/Step controls/);
+  assert.equal(aria(h.guide,'Step controls text size'),null);
   const control=aria(h.guide,'Caption position'),before=h.text;assert.equal(control.value,'below');
   assert.equal(h.guide.querySelectorAll('button').some(button=>button.textContent==='delete step-controls'),false);
   control.value='right';control.fire('change');h.flush();
@@ -297,6 +298,10 @@ test('Explore step controls inspector edits caption placement without changing s
   h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
   const reset=aria(h.guide,'Caption position');reset.value='below';reset.fire('change');h.flush();
   assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.steps,undefined);
+  h.inspector.render();let placement=aria(h.guide,'Step controls placement');assert.equal(placement.value,'default');
+  placement.value='floating';placement.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,'floating');
+  h.inspector.render();placement=aria(h.guide,'Step controls placement');placement.value='default';placement.fire('change');h.flush();
+  assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,undefined);assert.deepEqual(JSON.parse(h.text).layouts[0].exploreLayout.controls,spec.layouts[0].exploreLayout.controls);
 });
 
 test('commit helper keeps blur opt-in, textarea Enter native, unchanged policy and rejected retry explicit',()=>{
@@ -721,7 +726,7 @@ test('path label width inspector is shared by Standard and Explore with exact un
     }]};
     const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'chapter'};h.inspector.render();
     let width=aria(h.guide,'Path label width');assert.equal(width.value,'230');
-    assert.equal(!!aria(h.guide,'Caption position'),presentation==='explore');
+    assert.equal(!!aria(h.guide,'Caption position'),true);
     const before=h.text;width.value='300';width.fire('change');h.flush();const after=h.text;
     assert.equal(JSON.parse(after).layouts[0].pathLabelWidth,300);
     assert.deepEqual(JSON.parse(after).layouts[0].exploreLayout,spec.layouts[0].exploreLayout);
@@ -731,12 +736,12 @@ test('path label width inspector is shared by Standard and Explore with exact un
   }
 });
 
-test('Explore notes and controls use independent percent text controls with exact Undo and reset',()=>{
+test('Explore notes retain percent text controls with exact Undo and reset',()=>{
   const e=environment(),spec={page:{sections:[{text:'Readable section notes',diagram:{nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
     id:'chapter',name:'Chapter',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},
     exploreLayout:{overlayScale:.8,prose:{x:.1,y:.1,w:.3,h:.4},steps:{textPosition:'above'}}
   }]}}]}};
-  for(const [kind,label,key] of [['prose','Section notes text size','prose'],['step-controls','Step controls text size','controls']]){
+  for(const [kind,label,key] of [['prose','Section notes text size','prose']]){
     const h=e.mount(spec);h.session.target={kind,section:0,layoutId:'chapter'};h.inspector.render();
     let control=aria(h.guide,label);assert.equal(control.value,'100');const before=h.text;
     control.value='125';control.fire('change');h.flush();const after=h.text,layout=JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout;

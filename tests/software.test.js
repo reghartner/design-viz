@@ -226,3 +226,30 @@ test('outline indexes hidden tabs, edgeless steps, unplaced nodes, and exact sou
   assert.equal(C.builderOutline(spec,'no-match').length,0);
   assert.equal(C.builderOutline({nodes:{n:{title:'Bare'}},rows:[['n']]},'bare')[0].path[0],'nodes');
 });
+
+test('table Change column is optional with matching widths and empty spans, without mutating statuses', () => {
+  const p={id:'t',type:'table',columns:[{id:'a',width:120},{id:'b'}]};
+  const state={rows:[{id:'r',cells:{a:0,b:false},status:'removed'}]},original=JSON.stringify(state);
+  const legacy=C.softwarePanelHTML(p,state);
+  assert.match(legacy,/>Change<|swbadge/);
+  assert.match(legacy,/min-width:280px/);
+  p.showChange=false;
+  let html=C.softwarePanelHTML(p,state);
+  assert.doesNotMatch(html,/>Change<|swbadge|swchange/);
+  assert.match(html,/min-width:200px/);
+  assert.match(html,/<colgroup><col style="width:120px"><col><\/colgroup>/);
+  assert.match(html,/<tr class="swrow-removed"><td>0<\/td><td>false<\/td><\/tr>/);
+  assert.match(C.softwarePanelHTML(p,{}),/colspan="2"/);
+  delete p.columns[0].width;
+  html=C.softwarePanelHTML(p,state);
+  assert.doesNotMatch(html,/swtable-fixed|<colgroup>|min-width/);
+  p.showChange=true;
+  assert.match(C.softwarePanelHTML(p,state),/>Change<.*swbadge sw-removed/s);
+  assert.equal(JSON.stringify(state),original);
+  assert.deepEqual(plain(issues([p])),{errors:[],warnings:[]});
+  for(const value of [null,0,'false',{},[]]){
+    p.showChange=value;
+    assert.match(issues([p]).warnings.join('\n'),/showChange: expected a boolean/);
+    assert.match(C.softwarePanelHTML(p,state),/>Change</);
+  }
+});

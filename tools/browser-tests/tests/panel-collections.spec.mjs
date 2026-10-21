@@ -103,3 +103,41 @@ test('authored table widths stay fixed across snapshots, empty rows and history'
   await expect.poll(async()=>(await columns())[1].width).toBeUndefined();
   await expect(table).toHaveCSS('table-layout','auto');
 });
+
+test('desktop tables can omit Change, preserve typed rows and statuses, and restore it with exact history',async({page,server},testInfo)=>{
+  const rows=[{id:'one',status:'removed',cells:{number:0,flag:false,nil:null,text:' padded ',hidden:{keep:true}}}];
+  const raw={page:{sections:[{heading:'Plain data',diagram:{view:'step',autoplay:false,nodes:{service:{}},rows:[['service']],
+    panels:[{id:'table',type:'table',title:'Data rows',columns:[{id:'number',label:'Count',width:120},{id:'flag',label:'Enabled'},{id:'nil',label:'Empty'},{id:'text',label:'Text'}],initial:{rows}}],
+    steps:[{id:'start',text:'Values',nodes:['service']},{id:'empty',text:'Empty',panels:{table:{rows:[]}}}]
+  }}]}};
+  const original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src'),table=root.locator('.swtable');
+  const panel=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0];
+  await expect(table.locator('thead th')).toHaveText(['Count','Enabled','Empty','Text','Change']);
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  const toggle=guide.getByRole('checkbox',{name:'Show Change column',exact:true});await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await expect(table.locator('thead th')).toHaveText(['Count','Enabled','Empty','Text']);
+  await expect(table.locator('colgroup col')).toHaveCount(4);await expect(table).toHaveCSS('min-width','360px');
+  await expect(table.locator('.swbadge')).toHaveCount(0);
+  for(const cell of await table.locator('.swrow-removed td').all())await expect(cell).toHaveCSS('text-decoration-line','line-through');
+  expect((await panel()).initial.rows).toEqual(rows);
+  const hidden=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(hidden);
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  const initial=guide.locator('.initialedit');if(await initial.getAttribute('open')===null)await initial.locator(':scope > summary').click();
+  await expect(initial.getByLabel('Change',{exact:true})).toHaveCount(0);
+  await initial.getByLabel('Row ID',{exact:true}).fill('renamed');await initial.getByLabel('Row ID',{exact:true}).press('Tab');
+  await expect.poll(async()=>(await panel()).initial.rows).toEqual([{...rows[0],id:'renamed'}]);
+  await toggle.check();await expect(table.locator('.swbadge')).toHaveText('removed');
+  await expect(initial.getByLabel('Change',{exact:true})).toHaveValue('removed');
+  await toggle.uncheck();
+  await closeTools(page);await root.locator('.pt-table').screenshot({path:testInfo.outputPath('table-without-change.png')});
+  await root.getByRole('button',{name:'Next step',exact:true}).click();
+  await expect(table.locator('.swempty')).toHaveAttribute('colspan','4');
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  const width=guide.getByLabel('Width (px)',{exact:true}).first();await width.fill('');await width.press('Tab');
+  await expect(table).toHaveCSS('table-layout','auto');await expect(table.locator('colgroup')).toHaveCount(0);
+  await expect(table.locator('thead th')).toHaveCount(4);
+});

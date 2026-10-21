@@ -54,6 +54,8 @@ PanelRegistry.extend('table', {
       if (column.width != null && tableColumnWidth(column) === null)
         warnings.push(at + '.width: expected a positive number of pixels — using automatic width');
     });
+    if (panel.showChange !== undefined && typeof panel.showChange !== 'boolean')
+      warnings.push(path + '.showChange: expected a boolean — showing the Change column');
     tablePatchWarnings(panel.initial, path + '.initial', panel, warnings);
   },
   validatePatch: tablePatchWarnings,
@@ -89,10 +91,11 @@ function tableModel(panel, state) {
 PanelViews.register('table', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var table = tableModel(panel, state);
+  var showChange = panel.showChange !== false;
   var widths = table.columns.map(tableColumnWidth);
   var fixed = widths.some(function (width) { return width !== null; });
   // Leave room for unset columns and the Change badge when fixed widths exceed the card.
-  var minWidth = widths.reduce(function (total, width) { return total + (width || 80); }, 80);
+  var minWidth = widths.reduce(function (total, width) { return total + (width || 80); }, showChange ? 80 : 0);
   h +=
     '<div class="swtablewrap panel-fill-scroll" tabindex="0" role="region" aria-label="' +
     esc(panel.title || 'Data state') +
@@ -106,29 +109,30 @@ PanelViews.register('table', function (host, panel, state, skin, states, stepIdx
     widths.forEach(function (width) {
       h += width === null ? '<col>' : '<col style="width:' + width + 'px">';
     });
-    h += '<col></colgroup>';
+    h += (showChange ? '<col>' : '') + '</colgroup>';
   }
   h += '<thead><tr>';
   table.columns.forEach(function (col) {
     h += '<th scope="col">' + esc(col.label || col.id) + '</th>';
   });
-  h += '<th scope="col">Change</th></tr></thead><tbody>';
+  h += (showChange ? '<th scope="col">Change</th>' : '') + '</tr></thead><tbody>';
   table.rows.forEach(function (row) {
     h += '<tr class="swrow-' + row.status + '">';
     row.cells.forEach(function (cell) {
       h += '<td>' + esc(cell) + '</td>';
     });
-    h +=
-      '<td><span class="swbadge sw-' +
+    if (showChange) h +=
+      '<td class="swchange"><span class="swbadge sw-' +
       row.status +
       '">' +
       (row.status === 'neutral' ? '—' : row.status) +
-      '</span></td></tr>';
+      '</span></td>';
+    h += '</tr>';
   });
   if (!table.rows.length)
     h +=
       '<tr><td colspan="' +
-      (table.columns.length + 1) +
+      (table.columns.length + (showChange ? 1 : 0)) +
       '" class="swempty">No rows at this step</td></tr>';
   h += '</tbody></table></div>';
   h = softwarePanelShell(h, state);
@@ -161,7 +165,7 @@ PanelRegistry.extend('table', {
 .swcaption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);}
 .swrow-added{background:color-mix(in srgb,var(--dtext) 5%,transparent);}
 .swrow-changed{background:color-mix(in srgb,var(--dtext) 9%,transparent);}
-.swrow-removed td:not(:last-child){text-decoration:line-through; opacity:.7;}`,
+.swrow-removed td:not(.swchange){text-decoration:line-through; opacity:.7;}`,
     },
   ],
 });
@@ -182,6 +186,7 @@ PanelRegistry.extend('table', {
     },
     setupFields: [
       ['columns', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'width', kind: 'num', label: 'Width (px)' }], max: 4 }],
+      ['showChange', 'jsonAny'],
       ['initial', 'json'],
     ],
     patchFields: [
@@ -190,10 +195,19 @@ PanelRegistry.extend('table', {
     ],
     fieldMeta: {
       columns: {label:'Columns',group:'Content',help:'Set a positive Width (px) to keep columns steady across steps. Unset columns share the remaining space. Leave every width blank for automatic sizing.'},
+      showChange: {label:'Show Change column',group:'Content',help:'Show authored change badges alongside the data. Turn off to hide the column and row status controls; stored statuses and row styling are preserved.'},
       rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
       note: {label:'Explanation'},
     },
-    editor: function(context){return {patchControl:function(field,options){
+    editor: function(context){return {setupField:function(field,panel){
+      if(field[0]!=='showChange')return;
+      var input=context.document.createElement('input');input.type='checkbox';input.checked=panel.showChange!==false;
+      context.listen(input,'change',function(){
+        if(context.commit('showChange',String(input.checked)))context.refresh();
+        else input.checked=panel.showChange!==false;
+      });
+      return context.controls.row('Show Change column',input);
+    },patchControl:function(field,options){
       if(field[0]==='rows')return createPanelTableComposer(context,options);
     }};},
     picker: {

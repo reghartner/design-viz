@@ -143,3 +143,47 @@ test('step content edits inherit all cells and columns, undo exactly, and can la
   await closeTools(page);await root.getByRole('button',{name:'Next step',exact:true}).click();
   await expect(root.locator('[data-contract-field="added"]')).toContainText('Inherited note');
 });
+
+test('desktop contract headings can all be named, inherit by step, and change for one step only',async({page,server},testInfo)=>{
+  const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[2].panels={contract:{}};
+  const original=JSON.stringify(spec,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src'),head=root.locator('.dcontract-table thead th');
+  const diagram=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram;
+  await expect(head).toHaveText(['Field','Type','Example']);
+  await inspectPageElement(page,root.locator('.pt-data-contract .ptitle'));
+  const setup=guide.getByLabel('First column name',{exact:true}).first();
+  await setup.fill('Attribute');await setup.press('Tab');await expect(head).toHaveText(['Attribute','Type','Example']);
+  const changed=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+  expect((await diagram()).panels[0]).toEqual({...d.panels[0],fieldLabel:'Attribute'});
+  await inspectPageElement(page,root.locator('.pt-data-contract .ptitle'));
+  const column=guide.locator('[data-contract-editor="columns"]:not(.patchedit *)').getByLabel('Column name',{exact:true}).first();
+  await column.fill('Data type');await column.press('Tab');await expect(head).toHaveText(['Attribute','Data type','Example']);
+  expect((await diagram()).panels[0].columns[0]).toEqual({...d.panels[0].columns[0],label:'Data type'});
+  const initial=guide.locator('.initialedit');if(await initial.getAttribute('open')===null)await initial.locator(':scope > summary').click();
+  const initialName=initial.getByLabel('First column name',{exact:true});await initialName.fill('Payload attribute');await initialName.press('Tab');
+  await expect(head.first()).toHaveText('Payload attribute');
+  expect((await diagram()).panels[0].initial.fieldLabel).toBe('Payload attribute');
+  await closeTools(page);await root.locator('.pt-data-contract').screenshot({path:testInfo.outputPath('custom-contract-headings.png')});
+  async function inspectStep(index){
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="'+index+'"]').click();await page.locator('#editor-tab-inspect').click();
+    const patch=guide.locator('.patchedit[data-panel-state="step"][data-panel-id="contract"]');
+    if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();return patch;
+  }
+  let patch=await inspectStep(1);await expect(patch.getByLabel('First column name',{exact:true})).toHaveValue('Payload attribute');
+  await patch.getByLabel('First column name',{exact:true}).fill('Validated attribute');await patch.getByLabel('First column name',{exact:true}).press('Tab');
+  patch=await inspectStep(2);await expect(head.first()).toHaveText('Validated attribute');
+  await expect(patch.getByLabel('First column name',{exact:true})).toHaveValue('Validated attribute');
+  const before=await source.inputValue();
+  await patch.getByLabel('First column name',{exact:true}).fill('Only here');await patch.getByLabel('First column name',{exact:true}).press('Tab');
+  const renamed=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(renamed);
+  patch=await inspectStep(2);await patch.getByLabel('fieldLabel duration',{exact:true}).selectOption('once');
+  expect((await diagram()).steps[2].panels.contract).toEqual({enterOnce:{fieldLabel:'Only here'}});
+  await expect(head.first()).toHaveText('Only here');
+  await closeTools(page);await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(head.first()).toHaveText('Validated attribute');
+  patch=await inspectStep(2);await patch.getByLabel('First column name assignment',{exact:true}).selectOption('omit');
+  await expect(head.first()).toHaveText('Validated attribute');
+  expect((await diagram()).steps[2].panels.contract).toEqual({});
+});

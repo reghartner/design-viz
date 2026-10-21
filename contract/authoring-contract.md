@@ -1065,12 +1065,16 @@ perspectives" of one timeline). Types:
   booleans, or null. Missing cells show an em dash; explicit null shows
   `null`. Row status is `neutral` (default), `added`, `changed`, or `removed`;
   removed rows stay visible with a strike-through. Badges are AUTHOR-DECLARED,
-  not a computed diff. Every `rows` patch REPLACES the full snapshot; use
+  not a computed diff. Set panel-level `showChange:false` to omit the Change
+  column and its row status controls; **Show Change column** in desktop setup
+  toggles it back on. Omitted `showChange` defaults to true. Stored row statuses
+  and row styling remain intact, including strike-through on all removed data
+  cells. Every `rows` patch REPLACES the full snapshot; use
   `[]` to clear it. At most 12 rows render; larger inputs warn. The table
   scrolls inside its card. Each column accepts an optional positive numeric
   `width` in pixels, editable as **Width (px)** in the table's Columns setup.
   Setting any width fixes the layout across steps; unset columns and the Change
-  column share the remaining space. Long values wrap, and wide tables scroll
+  column (when shown) share the remaining space. Long values wrap, and wide tables scroll
   horizontally. With all widths omitted, sizing stays content-driven.
   Optional `note` persists until replaced/cleared.
 - `data-contract` — contract fields in rows, with up to 12 custom columns and
@@ -1079,10 +1083,13 @@ perspectives" of one timeline). Types:
   and `fields:[{id:"order-id",label:"order_id",cells:{type:"string",example:"ord_2048"}}]`.
   Field and column IDs remain stable when their display names change in the
   editor. Columns can be added, removed and reordered; removing a column keeps
-  its stored cells. `fieldWidth` sets the first column's width (default 180 px);
+  its stored cells. `fieldLabel` names the first column (default **Field**),
+  editable as **First column name** in desktop setup and state controls. Blank
+  names use **Field**. All other headings use each column's editable `label`.
+  Changing headings preserves IDs, cells, highlights and widths. `fieldWidth` sets the first column's width (default 180 px);
   other column widths default to 160 px. Widths must be at least 40 px. Long
   values wrap and wide contracts scroll. Starting state and step controls expose
-  `columns`, `fields` (including every cell), and `fieldWidth`, as well as
+  `columns`, `fields` (including every cell), `fieldLabel`, and `fieldWidth`, as well as
   highlights and explanation text. Omitted content uses the declaration until
   assigned; step assignments carry forward. Each columns/fields assignment
   replaces the complete array; `[]` clears it. **Inherit previous** removes the

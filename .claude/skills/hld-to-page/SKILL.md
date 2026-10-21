@@ -12,7 +12,7 @@ settled facts.
 
 ## Generate the entry packet
 
-VIZ is the checkout or extracted `authoring/` kit; run there or use absolute paths.
+VIZ is the checkout or `authoring/` kit; use its directory or absolute paths.
 Select planned panels/features for new stories; for edits, infer from the spec
 and add new source requirements:
 
@@ -21,17 +21,15 @@ python3 tools/authoring-packet.py --panel state --feature steps --out <scratch>/
 python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit --out <scratch>/packet.md
 ```
 
-Repeat `--panel` / `--feature` as needed; `python3 tools/widget_doc.py --list`
+Repeat `--panel` / `--feature`; `python3 tools/widget_doc.py --list`
 lists panels; [packet options](../../../docs/authoring-packets.md) lists features.
-Inference and explicit selections combine. New or materially changed stories
+Selections combine with inference. New/changed stories
 use `--mode new` (also with `--spec`) for source, question and worksheet phases
 before JSON. Fully specified scoped edits need no new questions or worksheet.
 Read the packet first; follow relevant routes without preloading the full
 contract, workflow, cookbook, session guide or example. Docs remain offline.
 
-Follow packet story/fidelity/state/placement and verification rules. Before
-completion, add visible-beat ledger evidence and run its visibility and value/icon
-checks. Report fit, occlusion and legibility unverified until a Workbench preview
+Follow packet story/fidelity/state/placement and verification rules. Add visible-beat ledger evidence and run its visibility and value/icon checks. Report fit, occlusion and legibility unverified until a Workbench preview
 or authorized rendered evidence supplies them. File-only kits need no browser,
 server, installation or additional agent.
 
@@ -45,6 +43,8 @@ Play buttons: [`playbackPosition`](../../../docs/section-layouts.md#play-button-
 Explore notes: section [`textStyle`](../../../docs/section-layouts.md#section-notes-typography) formats the whole box.
 
 JSON: `--feature contracts`; [recipe](../../../docs/contract-blocks.md#json-directly-on-a-connection). Desktop editing only.
+
+Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/software-state.md).
 
 ## Choose the starting point
 

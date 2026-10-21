@@ -1534,7 +1534,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }); }
   var steps = playbackSteps(d);
   var N = steps.length;
-  var cur = 0, paintedStep = null, timer = null, mode = 'ambient';
+  var cur = 0, paintedStep = null, timer = null, mode = 'ambient',activeOverview=null;
   var pending = [], wireContracts = null;
   var svg = board.svg;
   function clearWireContracts(){if(wireContracts)wireContracts.destroy();wireContracts=null;}
@@ -1738,6 +1738,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     });
     lightEdgeKeys(keys);
     applyStepNodeFocus(board.nodeEls, {keys:keys}, board.edgeIds);
+    activeOverview={keys:keys,failures:steps[cur] && steps[cur].failures};
+    if(options && options.activeChanged)options.activeChanged();
   }
   function fireDot(key, delayMs){
     var info = board.edgeIds[key];
@@ -1849,7 +1851,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       if (cur === last) stopAuto();
     }
     syncPlayback();
-    paintedStep = cur;
+    paintedStep = cur;activeOverview=null;
+    if(options && options.activeChanged)options.activeChanged();
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
@@ -1955,6 +1958,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     paintWireContracts();
     syncToggle();
     if (panelCtl) panelCtl.setStep(0, false, true);
+    if(options && options.activeChanged)options.activeChanged();
     if (onChange) onChange();
   }
 
@@ -2051,6 +2055,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       else { stopAuto(); setStep(path.indices.indexOf(index),true); }
       return true;
     },
+    activeFocus:function(){return mode==='step'?{board:board,step:activeOverview || steps[cur]}:null;},
     current: function(){ return {n: cur, id: steps[cur] ? steps[cur].id : null}; },
     ids: function(){ return steps.map(function(s){ return s.id; }); },
     stepIndexOf: function(sref){ return stepIndexOf(steps.map(function(s){ return s.id; }), sref); },
@@ -2596,7 +2601,9 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
    camera; these styles and gestures are inactive while it borrows the board. */
 function createBoardNavigation(board, group, legend, changed){
   var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
-  var retired=false,gesture=null,suppressClick=false,paused=null;
+  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false;
+  var motion=createCameraMotion();
+  function manual(){motion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
   var controls=document.createElement('div');controls.className='board-zoom';
   controls.setAttribute('role','group');controls.setAttribute('aria-label','Diagram zoom');
   function button(text,label,action){var b=document.createElement('button');b.type='button';b.className='mbtn';b.textContent=text;b.setAttribute('aria-label',label);b.addEventListener('click',action);controls.appendChild(b);return b;}
@@ -2605,7 +2612,7 @@ function createBoardNavigation(board, group, legend, changed){
   var value=document.createElement('span');value.className='board-zoom-value';controls.appendChild(value);
   var into=button('+','Diagram zoom in',function(){scale(1.25);});
   button('Fit diagram','Fit diagram',function(){
-    var svg=graph();if(!enabled() || !svg)return;
+    manual();followFrame=false;var svg=graph();if(!enabled() || !svg)return;
     var box=svg.viewBox.baseVal;
     zoom(Math.min(board.clientWidth/box.width,Math.max(1,board.clientHeight-legend.offsetHeight)/box.height));
     board.scrollLeft=board.scrollTop=0;
@@ -2632,7 +2639,7 @@ function createBoardNavigation(board, group, legend, changed){
     board.scrollTop+=(after.top+cy*after.height-y)/display;
     refresh();
   }
-  function scale(factor){zoom(ratio()*factor);}
+  function scale(factor){manual();zoom(ratio()*factor);}
   var FRAMED=['--board-canvas-width','--board-canvas-height','--board-offset-x','--board-offset-y'];
   function unframe(){board.classList.remove('board-content-framed');FRAMED.forEach(function(name){board.style.removeProperty(name);});}
   /* A zoomed board scrolls over the drawn graph and its gutter, not the empty
@@ -2650,6 +2657,9 @@ function createBoardNavigation(board, group, legend, changed){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
+      // Follow needs half a viewport of runway at either end so an edge node
+      // can be centered. Preserve it when pausing, until Fit or size reset.
+      if(followFrame)return {room:Math.ceil(extent+available),offset:available/2-lead};
       return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
     }
     var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
@@ -2659,13 +2669,17 @@ function createBoardNavigation(board, group, legend, changed){
     board.classList.add('board-content-framed');
   }
   function reset(){
-    cancel();board.classList.remove('board-zoomed');unframe();
+    motion.cancel();cancel();followFrame=false;board.classList.remove('board-zoomed');unframe();
     board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
     if(paused){paused.width='';paused.height='';}
   }
   function down(ev){
     suppressClick=false;
-    if(!enabled() || ev.button!==0 || ev.pointerType==='touch' || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    manual();
+    // Desktop touchscreens pan natively. Relinquish Follow before returning,
+    // without preventing scrolling or capturing the pointer for a mouse drag.
+    if(ev.pointerType==='touch')return;
     ev.preventDefault();board.focus({preventScroll:true});
     gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,left:board.scrollLeft,top:board.scrollTop};
     board.setPointerCapture(ev.pointerId);board.classList.add('board-dragging');
@@ -2686,7 +2700,7 @@ function createBoardNavigation(board, group, legend, changed){
   function up(ev){finish(ev,false);}
   function cancel(ev){finish(ev && ev.pointerId!==undefined?ev:null,true);}
   function lost(ev){finish(ev,(ev.buttons&1)!==0);}
-  function key(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();cancel();}}
+  function key(ev){if(ev.target===board && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0)Promise.resolve().then(function(){if(!ev.defaultPrevented)manual();});if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();cancel();}}
   function click(ev){if(suppressClick){suppressClick=false;ev.preventDefault();ev.stopPropagation();}}
   function scrollableY(el){
     if(!el || el===document.body || el===document.documentElement)return false;
@@ -2713,7 +2727,7 @@ function createBoardNavigation(board, group, legend, changed){
     return el && roomY(el,delta)?el:null;
   }
   function wheel(ev){
-    if(!enabled())return;
+    if(!enabled())return;manual();
     var unit=ev.deltaMode===1?16:ev.deltaMode===2?board.clientHeight:1;
     var delta=ev.deltaY*unit;
     if(ev.ctrlKey || ev.metaKey){ev.preventDefault();scale(Math.exp(-delta*.006));return;}
@@ -2728,10 +2742,10 @@ function createBoardNavigation(board, group, legend, changed){
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){var tolerance=1/displayScale();return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
-    if(paused)paused=state;
+    if(paused)paused=state;followFrame=!!state.followFrame;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
     if(enabled()){changed();
       // CSS zoom rounds scroll metrics differently from scroll assignments.
@@ -2740,7 +2754,7 @@ function createBoardNavigation(board, group, legend, changed){
     }
   }
   function fitSelection(extent,insets){
-    if(!enabled() || !graph() || !extent)return;
+    manual();if(!enabled() || !graph() || !extent)return;
     insets=insets || {left:24,right:24,top:24,bottom:24};
     var width=Math.max(1,board.clientWidth-insets.left-insets.right),height=Math.max(1,board.clientHeight-legend.offsetHeight-insets.top-insets.bottom);
     zoom(Math.min(width/extent.w,height/extent.h,1.5));
@@ -2749,11 +2763,32 @@ function createBoardNavigation(board, group, legend, changed){
     board.scrollTop+=(rect.top-frame.top)/display+(extent.y-origin.y+extent.h/2)*scale-(legend.offsetHeight+insets.top+height/2);
     refresh();
   }
-  return {refresh:refresh,reset:reset,frame:frame,fitSelection:fitSelection,
+  function followActive(extent){
+    if(!enabled() || !graph() || !board.clientWidth)return;
+    var svg=graph(),origin=svg.viewBox.baseVal,display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect(),r=ratio();
+    // Establish the scroll gutter before measuring the available height: its
+    // controls can add a legend row. Keep the drawn graph in its actual place.
+    followFrame=true;board.style.setProperty('--board-viewport-height',b.height/display+'px');
+    board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
+    var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;
+    rect=svg.getBoundingClientRect();b=board.getBoundingClientRect();
+    var cx=board.clientWidth/2,cy=legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2;
+    var from={x:origin.x+(cx-(rect.left-b.left)/display)/r,y:origin.y+(cy-(rect.top-b.top)/display)/r,zoom:r};
+    var target={x:extent.x+extent.w/2,y:extent.y+extent.h/2,zoom:Math.max(.001,Math.min((board.clientWidth-72)/extent.w,(board.clientHeight-legend.offsetHeight-72)/extent.h,1.35))};
+    motion.move(from,target,function(c){
+      // Follow may fit a very large graph below the manual zoom floor.
+      board.style.setProperty('--board-viewport-height',b.height/display+'px');
+      board.style.setProperty('--board-zoom-width',origin.width*c.zoom+'px');board.classList.add('board-zoomed');changed();
+      var next=svg.getBoundingClientRect();
+      board.scrollLeft+=(next.left-b.left)/display+(c.x-origin.x)*c.zoom-cx;
+      board.scrollTop+=(next.top-b.top)/display+(c.y-origin.y)*c.zoom-(legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2);refresh();
+    },function(){return enabled() && !document.hidden && svg===graph() && board.isConnected && !!board.clientWidth;});
+  }
+  return {refresh:refresh,reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
     snapshot:snapshot,restore:restore,
-    suspend:function(){if(retired || paused)return;cancel();paused=snapshot();},
+    suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
-    destroy:function(){cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);window.removeEventListener('blur',cancel);}};
+    destroy:function(){motion.cancel();cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);window.removeEventListener('blur',cancel);}};
 }
 
 /* CSS handles automatic sizing, including hidden tabs and editor resizes.
@@ -2799,6 +2834,7 @@ function createBoardSizeControl(board, legend, label){
     if (destroyed || !Number.isFinite(offset)) return;
     // The integer estimate may fall one visible pixel short under CSS zoom.
     // Overshoot endpoint requests so the browser clamps to its real limit.
+    if(navigation)navigation.manual();
     board.scrollLeft = offset >= maxScroll() ? board.scrollWidth : Math.max(0, offset); syncPan();
   }
   position.addEventListener('input', function(){ panTo(Number(position.value) / 100 * maxScroll()); });
@@ -2830,7 +2866,7 @@ function createBoardSizeControl(board, legend, label){
   choices.forEach(function(choice){
     var button = document.createElement('button'); button.className = 'mbtn'; button.type = 'button';
     button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
-    button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
+    button.addEventListener('click', function(){ if(!destroyed && navigation)navigation.manual();setMode(choice[0]); }); group.appendChild(button);
   });
   navigation=createBoardNavigation(board,group,legend,syncOverflow);
   group.appendChild(pan);
@@ -2841,6 +2877,7 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
   return {mode:function(){ return mode; }, setMode:setMode,
+    followActive:function(extent){if(navigation)navigation.followActive(extent);},cancelFollow:function(){if(navigation)navigation.cancelFollow();},
     fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
     suspend:function(){if(navigation)navigation.suspend();},resume:function(){if(navigation)navigation.resume();},
@@ -2877,6 +2914,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   result.setVisible = function (visible, activatePanels) {
     var wasVisible = sectionVisible;
     sectionVisible = visible;
+    if(result.follow)result.follow.setVisible(visible);
     if (result.stepper && wasVisible !== visible) {
       if (!visible) {
         /* Pause first: returning to a chapter restores its place, not autoplay.
@@ -2933,7 +2971,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
   var standardViewport=null,staticWireContracts=null;
-  result.destroy=function(){if(staticWireContracts)staticWireContracts.destroy();if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
+  result.destroy=function(){if(result.follow)result.follow.destroy();if(staticWireContracts)staticWireContracts.destroy();if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 
@@ -3074,7 +3112,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
-  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,viewSteps:function(ids,pathIds){
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow)result.follow.update();},viewSteps:function(ids,pathIds){
     var pathSteps=null;
     if(Array.isArray(pathIds)){
       pathSteps=[];diagramPathList(d).forEach(function(path){if(pathIds.indexOf(path.id)>=0)path.indices.forEach(function(index){var step=d.steps[index];if(step && pathSteps.indexOf(step.id)<0)pathSteps.push(step.id);});});
@@ -3093,6 +3131,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   bar.parentNode.insertBefore(modeRail,bar);
   result.modeRail=modeRail;
   addComposition();
+  result.follow=createActiveFollow(box,boardDiv,tog,stepper,function(){return result.viewport && result.viewport.isExplore()?result.viewport:result.boardSize;});
   return result;
 }
 

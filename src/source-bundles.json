@@ -33,6 +33,7 @@
     "viewer/prose.js",
     "viewer/contracts.js",
     "viewer/path-timeline.js",
+    "viewer/follow-active.js",
     "viewer/explore.js",
     "viewer/explore-canvas.js",
     "viewer/contents.js",

@@ -287,3 +287,9 @@ On desktop, right-click blank diagram or Explore canvas space to open **Add** at
 ### Place play buttons above the steps
 
 In the desktop editor, select the step controls and open **Inspect → Play buttons**. Choose **Above steps** for a dedicated playback row, **Beside steps** for playback alongside the numbered steps or path tracks, or **Auto** for the existing automatic layout. The choice is saved per section arrangement in Standard and Explore. Explore's caption position and floating/on-canvas placement stay independent. See [play button placement](section-layouts.md#play-button-placement).
+
+### Follow the active step
+
+**Follow active**, beside **Ambient / Step**, pans and zooms the diagram to the current step’s nodes and complete connections, including their labels. Selecting a path chip frames the highlighted route; selecting a step returns to that step. Standard moves only the diagram panel. Explore moves the canvas, keeping floating panels and controls clear.
+
+Movement takes about 720 ms, with breathing room and a maximum automatic zoom of 135%. Reduced-motion preferences apply immediately. Pan, zoom, Fit, or start editing a diagram object to pause; **Resume follow** frames the current activity again. Empty steps and Ambient hold the camera. Opening or restoring a view preserves its existing camera until the next step action. Following and its toggle do not change the document or create Undo entries.

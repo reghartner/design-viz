@@ -33,6 +33,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
     var prior = {number:rec.number,sectionId:section.sectionId,context:section.context,content:section.content,
       playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
     if(options && options.reader && rec.viewport)prior.reader=rec.viewport.snapshotReaderState();
+    if(rec.follow)prior.followActive=rec.follow.snapshot();
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.boardSize && rec.boardSize.snapshot) prior.boardNavigation = rec.boardSize.snapshot();
     if (rec.presentation){
@@ -83,6 +84,7 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
     }
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
+    if(rec.follow)rec.follow.restore(prior.followActive);
     if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
@@ -103,6 +105,7 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       stepper.jump(stepper.current().n); /* restoration is settled, including hidden authored beats */
     }
     else if(stepper.current().n!==indices[0])stepper.jump(indices[0]);
+    if(rec.follow)rec.follow.restore(prior.followActive);
   });
 }
 /* Arrange borrows a grid only for this authoring render. The controller's

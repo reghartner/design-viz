@@ -29,7 +29,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var panelSource=grid;
   var workbenchFocus=false;
   var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
-  var fitFrame=0,cameraRevision=0;
+  var fitFrame=0,cameraRevision=0,followMotion=createCameraMotion();
+  function manualCamera(){followMotion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
   var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
@@ -256,7 +257,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return {zoom:clamp(graphPixels/graphWidth(),.001,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
   }
   function cancelDeferredFit(){
-    cameraRevision++;
+    followMotion.cancel();cameraRevision++;
     if(fitFrame){cancelAnimationFrame(fitFrame);fitFrame=0;}
   }
   function rememberStableCamera(){
@@ -304,7 +305,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || retired || gesture)return false;
-    cancelDeferredFit();
+    manualCamera();cancelDeferredFit();
     if(!author)return true;
     if(!scrollEdit){var token=beginEdit();if(token===false)return false;scrollEdit={token:token};}
     if(scrollTimer!==null)window.clearTimeout(scrollTimer);
@@ -617,7 +618,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else if(preserve){if(memory.layout.camera)positionCamera(memory.layout.camera);else{board.scrollLeft=marginX;board.scrollTop=marginY;}}
   }
   function changeZoom(factor){
-    if(!active || retired)return;cancelDeferredFit();clearScrollEdit();var token=beginEdit();if(token===false)return;
+    if(!active || retired)return;manualCamera();cancelDeferredFit();clearScrollEdit();var token=beginEdit();if(token===false)return;
     zoom=clamp((graphPixels || graphWidth())/graphWidth()*factor,zoomFloor(),4);sizeGraph(true);saveCamera(token);
   }
   function onLegendClick(ev){if(!active || retired)return;if(ev.target.closest('.board-size>.mbtn:not(.board-pan-button)')){var token=beginEdit();if(token===false)return;zoom=null;sizeGraph(true);saveCamera(token);}}
@@ -642,7 +643,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function begin(ev,w,kind,handle){
     if(!active || ev.button!==0 || gesture)return;
-    cancelDeferredFit();
+    manualCamera();cancelDeferredFit();
     ev.preventDefault();ev.stopPropagation();handle.focus({preventScroll:true});
     /* Leaving an Inspector field can synchronously rebuild this viewport. */
     if(retired || !active || !handle.isConnected)return;
@@ -674,7 +675,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function keyboard(ev,w,kind){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
-    cancelDeferredFit();
+    manualCamera();cancelDeferredFit();
     var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
@@ -741,7 +742,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   // those replacements and card visibility; paint only changes outer-window
   // styles, so this callback cannot observe itself.
   var visibilityObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
-  var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
+  var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){cancelDeferredFit();sizeGraph(true);}):null;
   var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
   // Font metrics can settle after the first rendered measurement without a
   // DOM mutation or stage resize. Remeasure automatic windows once the active
@@ -830,7 +831,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else if(expanded){ev.preventDefault();ev.stopPropagation();exitExpanded();}
     else if(selectedCanvasWindow){ev.preventDefault();ev.stopPropagation();selectCanvasWindow(null);}
   }
-  function scrollKey(ev){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0 && ev.target===board)scrollIntent();}
+  function scrollKey(ev){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0 && ev.target===board)Promise.resolve().then(function(){if(!ev.defaultPrevented)scrollIntent();});}
   function cancel(){finish(true);}
   function pointerEnd(ev){if(gesture && ev.pointerId===gesture.id && (ev.buttons&1)===0)finish(false);}
   function pointerCancel(ev){if(gesture && ev.pointerId===gesture.id)finish(true);}
@@ -844,7 +845,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function resized(){cancelDeferredFit();cancel();fitHeight();paint();}
   function panStart(ev){
     if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,.explore-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
-    cancelDeferredFit();
+    manualCamera();cancelDeferredFit();
     clearScrollEdit();var token=beginEdit();if(token===false)return;
     ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
@@ -864,8 +865,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     windows.concat([playerWindow]).filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=w.rect || constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
-  function fitCanvas(insets,selection,extraObstacles){
-      if(!active)return;cancelDeferredFit();var revision=cameraRevision;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
+  function fitCanvas(insets,selection,extraObstacles,follow,automatic){
+      if(!active)return;if(!follow && !automatic)manualCamera();cancelDeferredFit();var revision=cameraRevision;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
       insets=Object.assign({},insets);
       if(onCanvas() && !selection)insets.right=24;
       // Subtract fixed overlays into free rectangles, then choose the rectangle
@@ -892,6 +893,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       // A narrow free region may need a lower floor than the usual 200px
       // canvas extent. Keep that reachable through subsequent zoom gestures.
       fitFloor=(selection || onCanvas())?Math.max(.001,Math.min(w/extent.w,h/extent.h)):null;
+      if(follow){
+        var graph=board.querySelector('.boardcanvas>svg');if(!graph)return;
+        var vb=graph.viewBox.baseVal,scale=Math.max(.001,Math.min(w/extent.w,h/extent.h,1.35));
+        var target={zoom:scale,x:(extent.x-vb.x+extent.w/2-(region.x+w/2-board.clientWidth/2)/scale)/vb.width,y:(extent.y-vb.y+extent.h/2-(region.y+h/2-board.clientHeight/2)/scale)/vb.height};
+        followMotion.move(camera(),target,function(c){zoom=c.zoom;sizeGraph(false);positionCamera(c);},function(){return active && !retired && !gesture && !document.hidden && board.isConnected && !!board.clientWidth && graph===board.querySelector('.boardcanvas>svg') && revision===cameraRevision;});
+        return;
+      }
       zoom=clamp(Math.min(w/extent.w,h/extent.h,1.5),zoomFloor(),4);sizeGraph(false);
       var svg=board.querySelector('.boardcanvas>svg'),origin=selection && svg?svg.viewBox.baseVal:{x:0,y:0};
       // Selection bounds use SVG coordinates. A graph containing far-negative
@@ -941,7 +949,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     panelPlacement:function(){return onCanvas() && !workbenchFocus?'canvas':'floating';},
     canvasCommand:function(){return expand;},
     navigationKeydown:keydown,
-    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();cancelDeferredFit();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
+    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();manualCamera();cancelDeferredFit();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     setReaderPresentation:function(options){
       if(!active || retired)return;
@@ -954,6 +962,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         if(!onCanvas() || hasFloatingPanels())memory.layout.overlayScale=value;
       }
       paint();
+    },
+    cancelFollow:followMotion.cancel,
+    followActive:function(extent){
+      var bounds=board.getBoundingClientRect(),obstacles=[];
+      box.getRootNode().querySelectorAll('.workspace-window:not([hidden]),.workspace-canvas-controls,.reader-page-actions>*').forEach(function(el){var r=el.getBoundingClientRect();if(r.width && r.height)obstacles.push({x:r.left-bounds.left,y:r.top-bounds.top,w:r.width,h:r.height});});
+      fitCanvas({left:36,right:36,top:36,bottom:36},extent,obstacles,true);
     },
     fitCanvas:fitCanvas,
     fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},

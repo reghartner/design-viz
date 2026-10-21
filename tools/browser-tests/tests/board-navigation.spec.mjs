@@ -419,8 +419,9 @@ test('viewer mode toggle and Present use sentence case and Present says it goes 
   const rendered=locator=>locator.evaluate(el=>el.innerText.trim());
   const modes=page.locator('#section-main .mtoggle button');
   // M0-M3
-  await expect(modes).toHaveCount(3);
-  const ambient=modes.nth(0),step=modes.nth(1),delta=modes.nth(2);
+  await expect(modes).toHaveCount(4);
+  const ambient=modes.nth(0),step=modes.nth(1),delta=modes.nth(2),follow=modes.nth(3);
+  expect(await rendered(follow)).toBe('Follow active');await expect(follow).toHaveAttribute('aria-pressed','true');
   expect(await rendered(ambient)).toBe('Ambient');await expect(ambient).toHaveAttribute('aria-pressed','true');
   expect(await rendered(step)).toBe('Step');await expect(step).toHaveAttribute('aria-pressed','false');
   await step.click();await expect(step).toHaveAttribute('aria-pressed','true');expect(await rendered(step)).toBe('Step');

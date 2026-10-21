@@ -22,7 +22,13 @@ async function edgeCoins(root){
  const out=[];
  for(const coin of await coins.all()){
   await expect(coin).toBeVisible();
-  out.push({source:Number(await coin.getAttribute('data-dv-step')),text:await coin.locator('text').textContent(),box:await coin.locator('circle').boundingBox()});
+  const box=await coin.locator('circle').evaluate(el=>{
+   // Compare authored coin placement in graph coordinates. Following a step
+   // may change its screen position and scale without changing this layout.
+   const r=el.getBBox(),m=el.ownerSVGElement.getCTM().inverse().multiply(el.getCTM());
+   return {x:m.a*r.x+m.c*r.y+m.e,y:m.b*r.x+m.d*r.y+m.f,width:r.width*m.a,height:r.height*m.d};
+  });
+  out.push({source:Number(await coin.getAttribute('data-dv-step')),text:await coin.locator('text').textContent(),box});
  }
  return out.sort((a,b)=>a.source-b.source);
 }

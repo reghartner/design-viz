@@ -83,8 +83,8 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       }
     }
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
-    if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
     if(rec.follow)rec.follow.restore(prior.followActive);
+    try{
     if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
@@ -105,7 +105,12 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       stepper.jump(stepper.current().n); /* restoration is settled, including hidden authored beats */
     }
     else if(stepper.current().n!==indices[0])stepper.jump(indices[0]);
-    if(rec.follow)rec.follow.restore(prior.followActive);
+    }finally{
+      // Path restoration may replace or reframe the SVG. Restore the camera
+      // only after that geometry has settled, including early-return cases.
+      if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
+      if(rec.follow)rec.follow.restore(prior.followActive);
+    }
   });
 }
 /* Arrange borrows a grid only for this authoring render. The controller's

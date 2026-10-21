@@ -269,7 +269,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function positionCamera(c){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     var x=marginX+c.x*graphPixels-board.clientWidth/2,y=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
-    board.scrollLeft=x;board.scrollTop=y;
+    // A keyboard pan may still own a native smooth scroll when Follow resumes.
+    // Explicit instant writes retire that browser animation as well as ours.
+    if(board.scrollTo)board.scrollTo({left:x,top:y,behavior:'instant'});
+    else{board.scrollLeft=x;board.scrollTop=y;}
     // Scroll offsets can round to whole pixels. An odd/even viewport resize
     // otherwise loses half a pixel of camera center on every transition. Keep
     // that fractional remainder in the graph's padding and object origin;

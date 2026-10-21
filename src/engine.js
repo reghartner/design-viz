@@ -2765,11 +2765,16 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function followActive(extent){
     if(!enabled() || !graph() || !board.clientWidth)return;
+    // Compact embedded boards can have less room than the camera padding.
+    // Keep their overview usable instead of reducing the drawing to zero.
+    if(board.clientWidth<=72 || board.clientHeight-legend.offsetHeight<=72)return;
+    var saved=snapshot();
     var svg=graph(),origin=svg.viewBox.baseVal,display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect(),r=ratio();
     // Establish the scroll gutter before measuring the available height: its
     // controls can add a legend row. Keep the drawn graph in its actual place.
     followFrame=true;board.style.setProperty('--board-viewport-height',b.height/display+'px');
     board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
+    if(board.clientHeight-legend.offsetHeight<=72){reset();restore(saved);return;}
     var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;
     rect=svg.getBoundingClientRect();b=board.getBoundingClientRect();
     var cx=board.clientWidth/2,cy=legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2;
@@ -3264,7 +3269,7 @@ function renderPage(view, page, skin, backlinks, options){
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, Object.assign({},options,{deferPanels:deferredPanelSections.has(number)}));
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, detailOnly:!!sec.detailOnly, tabBlock:record.tabBlock, tab:record.tab,
-               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
+               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, follow:built.follow, prose:built.prose,
                presentation:built.presentation, viewport:built.viewport, panels:built.panels, setVisible:built.setVisible,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
@@ -3393,6 +3398,9 @@ function renderPage(view, page, skin, backlinks, options){
   if(records.some(function(r){return Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.handoff && n.handoff.localSection!=null;});}))
     ctl.handoffs=wireLocalHandoffs(ctl,page);
   ctl.externalHandoffs=wireExternalHandoffs(ctl,options);
+  // Initial View filtering settles playback, but the opening camera belongs
+  // to the authored layout or host. Follow starts with subsequent navigation.
+  ctl.sections.forEach(function(rec){if(rec.follow)rec.follow.cancel();});
   return ctl;
 }
 
@@ -3939,6 +3947,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   var previousScrollRestoration=null;
   if(manageHistory && hasInitialTarget && win.history && 'scrollRestoration' in win.history){previousScrollRestoration=win.history.scrollRestoration;win.history.scrollRestoration='manual';}
   if(win.location.hash && (manageHistory || options.restoreHash!==false && hasInitialTarget))apply();else write();
+  ctl.sections.forEach(function(rec){if(rec.follow)rec.follow.cancel();});
   return {receiveLinkBaseMessage:receiveLinkBaseMessage,currentURL:function(){return fullURL(currentHash());},destroy:function(){
     if(previousScrollRestoration!==null && win.history.scrollRestoration==='manual')win.history.scrollRestoration=previousScrollRestoration;
     if(manageHistory)win.removeEventListener('hashchange',apply);

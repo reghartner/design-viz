@@ -61,7 +61,11 @@ for(const presentation of ['standard','explore'])test(`${presentation} follows w
 for(const presentation of ['standard','explore'])test(`${presentation} reader honors reduced motion and settles full route bounds`,async({page,server})=>{
  await open(page,server,presentation,true);await next(page).click();await frames(page,3);await fit(page,['[data-dv-node=c]']);const final=await camera(page);await frames(page,4);expect(await camera(page)).toEqual(final);
  await next(page).click();await frames(page,3);await fit(page,['[data-dv-node=a]','[data-dv-node=b]','text[data-dv-edge="0"]']);
- await board(page).focus();await board(page).press('ArrowRight');await expect(follow(page)).toHaveText('Resume follow');await follow(page).click();await frames(page,3);await fit(page,['[data-dv-node=a]','[data-dv-node=b]']);
+ await board(page).focus();await board(page).press('ArrowRight');await expect(follow(page)).toHaveText('Resume follow');
+ // Native keyboard panning animates on some desktop platforms even under
+ // reduced motion. Force that browser scroll phase before immediate Resume.
+ await board(page).evaluate(el=>el.scrollBy({left:80,behavior:'smooth'}));
+ await follow(page).click();await frames(page,20);await fit(page,['[data-dv-node=a]','[data-dv-node=b]']);
 });
 
 for(const presentation of ['standard','explore'])test(`${presentation} path overview follows the lit route then returns to one-step focus`,async({page,server})=>{
@@ -87,6 +91,24 @@ test('Explore follow avoids floating overlays while canvas objects remain attach
  const measured=await section(page).evaluate(sec=>{const graph=sec.querySelector('.boardcanvas>svg'),board=sec.querySelector('.board'),node=sec.querySelector('[data-dv-node=c]').getBoundingClientRect(),object=sec.querySelector('[data-explore-panel=canvas]').getBoundingClientRect(),svg=graph.getBoundingClientRect();return {scale:svg.width/graph.viewBox.baseVal.width,object:object.width,obstacles:Array.from(sec.querySelectorAll('[data-explore-panel=float],.explore-player')).map(el=>{const r=el.getBoundingClientRect();return node.right<=r.left || node.left>=r.right || node.bottom<=r.top || node.top>=r.bottom;}),board:board.clientWidth};});
  expect(measured.obstacles.every(Boolean)).toBe(true);expect(measured.object).toBeCloseTo(280*measured.scale,0);
  await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+for(const presentation of ['standard','explore'])for(const reducedMotion of ['reduce','no-preference'])test(`${presentation} Render and Undo preserve enabled and paused follow cameras (${reducedMotion})`,async({page,server})=>{
+ await page.emulateMedia({reducedMotion});
+ const data=fixture(presentation);data.page.sections[0].diagram.layouts[0].steps=['remote'];
+ const input=await open(page,server,presentation,false,data);await frames(page,4);
+ await page.locator('#editor-tab-json').click();const initial=await camera(page);
+ await page.locator('#go').click();await frames(page,reducedMotion==='reduce'?4:50);expect(await camera(page)).toEqual(initial);await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ await closeTools(page);const point=await background(page);await page.mouse.move(point.x,point.y);await page.keyboard.down('Control');await page.mouse.wheel(0,-80);await page.keyboard.up('Control');await expect(follow(page)).toHaveText('Resume follow');await frames(page,4);
+ await page.locator('#editor-tab-json').click();const manual=await camera(page);
+ await page.locator('#go').click();await frames(page,reducedMotion==='reduce'?4:50);expect(await camera(page)).toEqual(manual);await expect(follow(page)).toHaveText('Resume follow');
+ await closeTools(page);await follow(page).click();await fit(page,['[data-dv-node=c]']);await frames(page,reducedMotion==='reduce'?4:50);
+ await section(page).locator('[data-dv-node=c]').click();await page.locator('#editor-tab-inspect').click();await frames(page,4);const paused=await camera(page);
+ const name=page.locator('#guide').getByLabel('Name',{exact:true});await name.fill('Renamed destination');await name.press('Enter');await frames(page,reducedMotion==='reduce'?4:50);
+ const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(input);expect(await camera(page)).toEqual(paused);await expect(follow(page)).toHaveText('Resume follow');
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(input);await frames(page,reducedMotion==='reduce'?4:50);expect(await camera(page)).toEqual(paused);await expect(follow(page)).toHaveText('Resume follow');
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await frames(page,reducedMotion==='reduce'?4:50);expect(await camera(page)).toEqual(paused);await expect(follow(page)).toHaveText('Resume follow');
+
 });
 
 test('Render and section changes retire in-flight follow without stealing the saved camera',async({page,server})=>{

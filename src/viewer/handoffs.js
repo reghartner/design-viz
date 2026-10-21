@@ -51,6 +51,7 @@ function wireLocalHandoffs(ctl, page){
       tabView:ctl.views && ctl.views.current(rec) && ctl.views.current(rec).id,detailReader:detailReader && detailReader.snapshotReaderState(),view:rec.presentation && rec.presentation.viewId(),
       mode:sp && sp.mode(),path:sp && sp.path(),sourceIndex:sp && sp.sourceIndex(),
       reader:r && r.snapshotReaderState(),scroll:board && {x:board.scrollLeft,y:board.scrollTop},
+      boardNavigation:rec.boardSize && rec.boardSize.snapshot(),follow:rec.follow && rec.follow.snapshot(),
       drill:ctl.details && ctl.details.snapshot()};
   }
   function restore(saved){
@@ -65,6 +66,8 @@ function wireLocalHandoffs(ctl, page){
     if(r && saved.reader)r.restoreReaderState(saved.reader);
     var board=rec.sectionEl.querySelector('.board');
     if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+    if(rec.boardSize && saved.boardNavigation)rec.boardSize.restore(saved.boardNavigation);
+    if(rec.follow)rec.follow.restore(saved.follow);
     if(saved.drill && ctl.details){
       ctl.details.restore(saved.drill);
       var active=ctl.details.activeSection(),detailReader=active && reader(active);

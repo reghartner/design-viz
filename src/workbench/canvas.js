@@ -264,7 +264,7 @@ function initWorkbenchCanvas(options){
     var page=getPage();saved=page?workbenchPreviewSections(page):null;savedSelection=saved && saved[section];
     var owner=ctl && ctl.views && ctl.views.owner(records().find(function(rec){return rec.number===section+1;}));savedOwnerSections=owner && saved?owner.records.map(function(record){return saved[record.number-1];}):null;
     if(saved)records().forEach(function(rec){var s=saved[rec.number-1];if(s && rec.viewport){
-      s.reader=rec.viewport.snapshotCanvasState();s.config=JSON.stringify([s.diagram.layouts,s.diagram.sectionLayout]);s.visited=rec.canvasVisited;
+      s.reader=rec.viewport.snapshotCanvasState();s.boardNavigation=rec.boardSize && rec.boardSize.snapshot();s.config=JSON.stringify([s.diagram.layouts,s.diagram.sectionLayout]);s.visited=rec.canvasVisited;
     }});
     restoreCanvasCommand();if(navigation)navigation.restore();
   }
@@ -305,6 +305,13 @@ function initWorkbenchCanvas(options){
       section=resolved.indices[0];ctl.details.restore(Object.assign({},savedDetail.navigation,{section:resolved.reference}));
     }
     savedDetail=null;select(section);
+    // The navigation mount restores the outer section zoom. Restore Standard
+    // scroll coordinates only once its final layout can accept them; restoring
+    // into the temporary unzoomed board can clamp the saved camera.
+    records().forEach(function(rec){
+      var prior=matches.get(rec.number-1);
+      if(prior && rec.boardSize && rec.viewport && !rec.viewport.isExplore())rec.boardSize.restore(prior.boardNavigation);
+    });
 
   }
   function setZoom(value){var vp=viewport();if(diagramMode() && vp){vp.canvasZoom(value);paintZoom();}}

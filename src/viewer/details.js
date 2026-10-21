@@ -156,6 +156,8 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     begin(frame);pause(frame);
     var next=build(childSection,childPage,session.root);
     try{applyStep(next,target);}catch(error){retire(next);throw error;}
+    // Selecting the child's opening beat is initial state, not playback.
+    if(next.rec.follow)next.rec.follow.cancel();
     next.via=id;next.external=detail.spec?{spec:detail.spec,revision:detail.revision,section:detail.section}:null;
     next.originStep=frame.rec.stepper && frame.rec.stepper.mode()==='step' ? 'step '+(frame.rec.stepper.current().n+1):null;
     frame.rec.sectionEl.hidden=true;ctl.syncSectionVisibility(frame.rec);session.stack.push(next);breadcrumb(next);changed(true);

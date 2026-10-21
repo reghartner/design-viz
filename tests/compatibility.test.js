@@ -360,3 +360,13 @@ test('residential clips are detected in camera declarations and carried or trans
     assert.equal(C.check(C.stamp(base),{features:older}).status,'unsupported');
   }
 });
+
+test('play button overrides declare a capability while automatic placement stays compatible',()=>{
+ const raw={nodes:{a:{}},rows:[['a']],layouts:[{id:'main',playbackPosition:'above'}]};
+ for(const position of ['above','beside']){
+  raw.layouts[0].playbackPosition=position;assert.ok(C.detect(raw).includes('layout.playback-position'));
+  const stamped=C.stamp(raw),available={...C.features};delete available['layout.playback-position'];
+  assert.ok(C.check(stamped,{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.playback-position'));
+ }
+ for(const value of [undefined,'auto','invalid',null]){raw.layouts[0].playbackPosition=value;assert.ok(!C.detect(raw).includes('layout.playback-position'));}
+});

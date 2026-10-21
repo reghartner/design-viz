@@ -3977,3 +3977,13 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
    keeps the step highlight visible on that one card. A step tone still replaces
    it, like every other preset color. */
 .sk-aurora:not(.sk-editorial):not(.sk-pastel) .docview .stepmode .node.ns-ink.lit:not(.tone-alert):not(.tone-warn):not(.tone-ok):not(.tone-dim) .card{stroke:#1F2430;}
+
+/* Explicit play-button placement applies to every renderer and host. Auto uses
+   the original flex layout. Steps retain their own overflow scroller. */
+body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"]){display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;grid-template-areas:"transport" "tracks" "caption";}
+body .docview .termbar[data-playback-position="beside"]{grid-template-columns:minmax(0,max-content) minmax(0,1fr);grid-template-rows:auto auto;grid-template-areas:"transport tracks" "caption caption";}
+body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.step-transport{grid-area:transport;min-width:0;max-width:100%;flex-wrap:wrap;}
+body .docview .termbar[data-playback-position="beside"]>.step-transport{max-width:280px;}
+body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.schips{grid-area:tracks;min-width:0;max-width:100%;overflow:auto;}
+body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{grid-area:caption;min-width:0;}
+body .docview .termbar[data-playback-position][hidden]{display:none;}

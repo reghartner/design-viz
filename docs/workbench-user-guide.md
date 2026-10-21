@@ -282,3 +282,8 @@ or a file path, returns to the home page with a message naming it; nothing is
 fetched or opened for it.
 
 On desktop, right-click blank diagram or Explore canvas space to open **Add** at the pointer. **Text** inserts a box there and starts editing; **Node…** opens the presets, and **Panel…** opens the existing panel library. Canvas panels appear at the chosen point; Standard panels use the section layout. **Connection** starts the two-node connection gesture and **Step** adds to the current path. Escape or clicking elsewhere dismisses the menu. Cancelling a picker adds nothing; each insertion is one Undo action. Changing the source, project, section or view retires the pending destination. The toolbar **Add** remains available.
+
+
+### Place play buttons above the steps
+
+In the desktop editor, select the step controls and open **Inspect → Play buttons**. Choose **Above steps** for a dedicated playback row, **Beside steps** for playback alongside the numbered steps or path tracks, or **Auto** for the existing automatic layout. The choice is saved per section arrangement in Standard and Explore. Explore's caption position and floating/on-canvas placement stay independent. See [play button placement](section-layouts.md#play-button-placement).

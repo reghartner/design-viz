@@ -794,3 +794,18 @@ test('bulk node editing offers the Node style control and icon color beside the 
   assert.deepEqual(Object.values(JSON.parse(h.text).nodes).map(node=>node.style),['amber','amber',undefined]);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
 });
+
+test('Play buttons inspector changes either presentation with one exact Undo and independent caption placement',()=>{
+  for(const presentation of ['standard','explore']){
+    const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
+      id:'chapter',name:'Chapter',presentation,sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},exploreLayout:{steps:{textPosition:'right'}}
+    }]};
+    const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'chapter'};h.inspector.render();
+    const control=aria(h.guide,'Play buttons');assert.equal(control.value,'auto');
+    const before=h.text;control.value='above';control.fire('change');h.flush();const after=h.text;
+    assert.equal(JSON.parse(after).layouts[0].playbackPosition,'above');
+    assert.deepEqual(JSON.parse(after).layouts[0].exploreLayout,spec.layouts[0].exploreLayout);
+    h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);h.session.redo();assert.equal(h.text,after);
+    h.inspector.render();const reset=aria(h.guide,'Play buttons');reset.value='auto';reset.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].playbackPosition,undefined);
+  }
+});

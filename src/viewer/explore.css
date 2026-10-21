@@ -547,3 +547,17 @@ body .docview .section-viewport .explore-prose-window .sec-prose[style*="--secti
 body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-style:"] :is(.sec-text,.sec-bullets){font-style:var(--section-text-style);}
 body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-color:"],
 body .docview .section-viewport .explore-prose-window .sec-prose[style*="--section-text-color:"] :is(.sec-text,.sec-bullets){color:var(--section-text-color);}
+
+/* Authored transport overrides also apply inside compact desktop windows.
+   Caption direction remains independent; side captions span both control rows. */
+body .docview .explore-player>.termbar[data-playback-position="above"]{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(34px,var(--explore-tracks-height,34px)) minmax(34px,1fr);grid-template-areas:"transport" "tracks" "caption";}
+body .docview .explore-player[data-step-text-position="above"]>.termbar[data-playback-position="above"]{grid-template-rows:minmax(34px,1fr) auto minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"caption" "transport" "tracks";}
+body .docview .explore-player[data-step-text-position="left"]>.termbar[data-playback-position="above"]{grid-template-columns:minmax(140px,1.5fr) minmax(0,1fr);grid-template-rows:auto minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"caption transport" "caption tracks";}
+body .docview .explore-player[data-step-text-position="right"]>.termbar[data-playback-position="above"]{grid-template-columns:minmax(0,1fr) minmax(140px,1.5fr);grid-template-rows:auto minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"transport caption" "tracks caption";}
+body .docview .explore-player>.termbar[data-playback-position="beside"]{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px)) minmax(34px,1fr);grid-template-areas:"transport tracks" "caption caption";}
+body .docview .explore-player[data-step-text-position="above"]>.termbar[data-playback-position="beside"]{grid-template-rows:minmax(34px,1fr) minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"caption caption" "transport tracks";}
+body .docview .explore-player[data-step-text-position="left"]>.termbar[data-playback-position="beside"]{grid-template-columns:minmax(0,max-content) minmax(140px,1.5fr) minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"transport caption tracks";}
+body .docview .explore-player[data-step-text-position="right"]>.termbar[data-playback-position="beside"]{grid-template-columns:minmax(0,max-content) minmax(0,1fr) minmax(140px,1.5fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px));grid-template-areas:"transport tracks caption";}
+body .docview .explore-player>.termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.schips{width:auto;height:100%;min-height:0;max-height:none;}
+body .docview .explore-player>.termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{width:auto;height:100%;min-height:0;max-height:100%;}
+body .docview .explore-player>.termbar[data-playback-position="beside"]>.step-transport{max-width:min(280px,30cqw);}

@@ -447,6 +447,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var chipStyle=chips && getComputedStyle(chips),style=getComputedStyle(bar);
     var tracks=timeline?Math.max(34,timeline.offsetHeight+(parseFloat(chipStyle.paddingTop)||0)+(parseFloat(chipStyle.paddingBottom)||0)):34;
     var caption=bar.querySelector('.stepline:not(.dv-caption-old)'),captionHeight=34;
+    var captionMinimum=Math.max(34,caption?parseFloat(getComputedStyle(caption).lineHeight)||0:0);
     if(caption){
       var oldHeight=caption.style.height,oldMax=caption.style.maxHeight;
       caption.style.height='auto';caption.style.maxHeight='none';
@@ -454,21 +455,24 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       caption.style.height=oldHeight;caption.style.maxHeight=oldMax;
     }
     var transport=bar.querySelector('.step-transport'),transportHeight=transport?transport.offsetHeight:34;
+    var above=bar.getAttribute('data-playback-position')==='above';
     var compact=style.display==='flex',beside=!compact && /^(left|right)$/.test(player.getAttribute('data-step-text-position'));
     var gap=parseFloat(style.rowGap)||0,padding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
     var rail=player.querySelector('.playback-mode-rail'),railHeight=rail?rail.offsetHeight:0;
     var scale=controlsContentScale();
-    var contentHeight=compact?transportHeight+tracks+captionHeight+gap*2:beside?Math.max(transportHeight,tracks,captionHeight):Math.max(transportHeight,tracks)+captionHeight+gap;
+    var separateTransport=compact || above;
+    var controlsHeight=separateTransport?transportHeight+tracks+gap:Math.max(transportHeight,tracks);
+    var contentHeight=beside?Math.max(controlsHeight,captionHeight):controlsHeight+captionHeight+gap;
     var room=Math.max(104,bounds().h-insets.top-insets.bottom);
     r.h=Math.min(Math.max(r.h,railHeight+(contentHeight+padding)*scale+2),room);
     player.style.setProperty('--explore-rail-height',railHeight+'px');
     // Reserve a usable caption row even when the timeline needs scrolling.
-    var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
-    // Grid transport shares the tracks row. Its wrapped status must fit even
-    // when a simple story has only one row of step circles. Compact layouts
-    // put transport in its own flex row and reserve that height above instead.
-    var rowMinimum=compact?34:Math.max(34,transportHeight);
-    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):Math.max(tracks,rowMinimum);
+    var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:captionMinimum+gap)-(separateTransport?transportHeight+gap:0);
+    // Shared-row transport must fit its wrapped status even for a single row
+    // of step circles. Compact layouts and Above steps reserve a separate
+    // transport row; side captions span that row and the tracks.
+    var rowMinimum=separateTransport?34:Math.max(34,transportHeight);
+    var rowHeight=beside?Math.max(tracks,captionHeight-(separateTransport?transportHeight+gap:0),rowMinimum):Math.max(tracks,rowMinimum);
     player.style.setProperty('--explore-tracks-height',Math.max(rowMinimum,Math.min(rowHeight,trackRoom))+'px');
     // Reader utilities reserve space for floating controls. Workbench toolbar
     // insets still apply only to automatic docks, not authored geometry.

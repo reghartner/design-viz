@@ -182,6 +182,38 @@ function companyBrandSource(brand) {
     'var FLOWVIEW_COMPANY_BRAND_CONFIG = Object.freeze(' + JSON.stringify(brand).replace(/</g, '\\u003c') + ');';
 }
 function manifest(root) { return JSON.parse(fs.readFileSync(path.join(root, 'source-bundles.json'), 'utf8')); }
+function companyIconFiles(root = sourceRoot) {
+  const company = companyDir(root), directory = company && path.join(company, 'icons');
+  return directory && fs.existsSync(directory) ? fs.readdirSync(directory, {withFileTypes:true})
+    .filter(file => file.isFile() && file.name.endsWith('.js')).map(file => '@company/icons/' + file.name).sort() : [];
+}
+function expandCompanyIcons(source, root) {
+  const files = companyIconFiles(root);
+  if (!files.length) return source;
+  const marker = '/* @company-icons */';
+  if (!source.includes(marker)) throw new Error('Missing company icon marker in icons/library.js');
+  const modules = files.map(file => {
+    const label = JSON.stringify('Invalid company icon module ' + displayPath(file) + ': ');
+    const body = fs.readFileSync(sourcePath(root, file), 'utf8').replace(/\r\n?/g, '\n');
+    // Parse separately so syntax errors name the actual fork-owned file.
+    new vm.Script('(function (defineIcon, shapes) {\n"use strict";\n' + body + '\n});', {filename:displayPath(file)});
+    return '/* ---- ' + displayPath(file) + ' ---- */\ntry {\n(function (defineIcon, shapes) {\n"use strict";\n' + body +
+      '\n})(defineCompanyIcon, Object.freeze({path:path,rect:rect,circle:circle,detail:detail,solid:solid}));\n' +
+      '} catch (error) { throw new Error(' + label + ' + error.message); }';
+  });
+  source = source.replace(marker, () => modules.join('\n'));
+  // Fail every assembly path at build time, including raw validator assembly.
+  // This is trusted repository code, like company panels, not a security sandbox.
+  vm.runInNewContext(source, {}, {timeout:5000, filename:'company/icons (assembled library)'});
+  return source;
+}
+function companyIcons(root = sourceRoot) {
+  if (!companyIconFiles(root).length) return [];
+  const plain = {}, assembled = {};
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'icons/library.js'), 'utf8'), plain, {timeout:5000});
+  vm.runInNewContext(readSource('icons/library.js', root), assembled, {timeout:5000});
+  return Array.from(assembled.FlowIcons.ids).filter(id => !plain.FlowIcons.has(id)).map(id => assembled.FlowIcons.registry[id]);
+}
 function sourceFiles(name, root = sourceRoot) {
   const config = manifest(root), entries = Object.hasOwn(config, name) ? config[name] : [name];
   if (!Array.isArray(entries)) throw new Error('Not a logical source bundle: ' + name);
@@ -207,6 +239,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (seen.has(file)) throw new Error('Duplicate physical source: ' + file);
     seen.add(file);
     let source = fs.readFileSync(sourcePath(root, file), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
+    if (file === 'icons/library.js') source = expandCompanyIcons(source, root);
     if (file === 'workbench/auto-arrange.js' && substitute) {
       const files = manifest(root).assets.autoArrangeWorker;
       const worker = files.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
@@ -346,7 +379,7 @@ function iconAssets(root = sourceRoot) {
   const sprite = fs.readFileSync(path.join(root,inventory.icons),'utf8');
   if (!inventory.iconLibrary) return sprite;
   const context = {};
-  vm.runInNewContext(fs.readFileSync(path.join(root,inventory.iconLibrary),'utf8'),context,{timeout:5000});
+  vm.runInNewContext(readSource(inventory.iconLibrary,root),context,{timeout:5000});
   return sprite.replace('</svg>', context.FlowIcons.symbols({newOnly:true}) + '</svg>');
 }
 function entrypointAssets(name, root = sourceRoot) {
@@ -358,13 +391,14 @@ function entrypointAssets(name, root = sourceRoot) {
   }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
-module.exports = { companyDir, companyConfig, companyAgentContext, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
+module.exports = { companyDir, companyConfig, companyAgentContext, companyIcons, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
   panelAssets, readStyles, fontAssets, fontCss, entrypointAssets };
 if (require.main === module) {
   const [mode, ...names] = process.argv.slice(2);
   if (mode === '--assets') process.stdout.write(JSON.stringify(panelAssets()));
   else if (mode === '--company' && !names.length) process.stdout.write(JSON.stringify(companyConfig()));
   else if (mode === '--agent-context' && !names.length) process.stdout.write(JSON.stringify(companyAgentContext()));
+  else if (mode === '--company-icons' && !names.length) process.stdout.write(JSON.stringify(companyIcons()));
   else if (mode === '--styles' && names.length === 1) process.stdout.write(readStyles(names[0]));
   else if (mode === '--sources' && names.length) process.stdout.write(composeSources(names));
   else if (mode === '--files' && names.length === 1) process.stdout.write(JSON.stringify(sourceFiles(names[0])));
@@ -372,5 +406,5 @@ if (require.main === module) {
   else if (mode === '--entry-assets' && names.length === 1) process.stdout.write(JSON.stringify(entrypointAssets(names[0])));
   else if (mode === '--font-css' && names.length === 1) process.stdout.write(fontCss(names[0]));
   else if (mode === '--module' && names.length === 2) process.stdout.write(moduleSource(names[0],names[1]));
-  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --agent-context | --styles STYLESHEET');
+  else throw new Error('usage: source-loader.cjs --entrypoint NAME | --entry-assets NAME | --module NAME esm|cjs | --sources SOURCES... | --files SOURCE | --font-css PROFILE | --assets | --company | --company-icons | --agent-context | --styles STYLESHEET');
 }

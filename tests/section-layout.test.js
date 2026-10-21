@@ -245,6 +245,12 @@ test('automatic layout lookup tolerates a viewport before its first view definit
   assert.equal(context.sectionLayoutActiveId({viewDefinition:()=>({id:'flow'})}),'flow');
   assert.equal(context.sectionLayoutActiveId({layoutId:()=> 'canvas',viewDefinition:()=>{throw Error('named presentations use their layout ID');}}),'canvas');
 });
+test('canonical View presentation overrides a shared arrangement legacy flag with legacy fallback',()=>{
+  const context=commandContext(['layout']);vm.runInContext(readSource('layout.workbench.js'),context);
+  const record={},legacy={presentation:'explore'};
+  assert.equal(context.sectionLayoutEffectivePresentation({current:rec=>rec===record?{presentation:'standard'}:null},record,legacy),'standard');
+  assert.equal(context.sectionLayoutEffectivePresentation(null,record,legacy),'explore');
+});
 
 test('optimization preserves hidden elements without reserving their space or changing other views/profiles',()=>{
   for(const target of ['default','backstage','confluence']){

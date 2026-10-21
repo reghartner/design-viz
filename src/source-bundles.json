@@ -104,6 +104,7 @@
     "workbench/shortcuts.js",
     "workbench/text-boxes.js",
     "workbench/spatial-selection.js",
+    "workbench/path-reorder.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
     "workbench/catalog-picker.js",

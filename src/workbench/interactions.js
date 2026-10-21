@@ -131,6 +131,10 @@ function createBuilderInteractions(opts){
       if (rec.stepper && rec.stepper.pause) rec.stepper.pause();
     });
   }
+  var pathReorder=createBuilderPathReorder({view:view,document:document,window:window,src:src,session:session,isActive:opts.isActive,
+    disabled:function(){return !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || spatial && spatial.busy());},
+    pause:pausePreview,message:inspectorMessage,apply:function(plan,options,snapshot){return applyPlan(plan,options,snapshot);}});
+  life.own(function(){pathReorder.destroy();});
   life.listen(src,'focusin', pausePreview);
   life.listen(src,'input', pausePreview);
   if (guide) life.listen(guide,'focusin', pausePreview);
@@ -380,7 +384,7 @@ function createBuilderInteractions(opts){
     }catch(ex){return null;}
   }
   function openReferenceMenu(ev){
-    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag)return;
+    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || pathReorder && pathReorder.busy())return;
     var ref=referenceTarget(ev.target);if(!ref)return;
     // A selected imported member participates in the ordinary multi-object
     // menu. Leave this event for spatial selection so actions can combine the
@@ -440,7 +444,7 @@ function createBuilderInteractions(opts){
   life.own(function(){closeReferenceMenu(false);});
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
-    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
+    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || pathReorder && pathReorder.busy());},
     inspect:function(){inspectSelection(false);},openAdd:opts.openAdd
   });
   life.own(function(){spatial.destroy();});
@@ -1135,6 +1139,7 @@ function createBuilderInteractions(opts){
   }
   function applyRowGrabs(){
     opts.refreshLayout();
+    pathReorder.refresh();
     applyPanelEditorControls();
     applyTopologyBoundaries();
     applyPositionLocks();
@@ -1723,6 +1728,7 @@ function createBuilderInteractions(opts){
   function beforeReplace(request){
     textEditor.clear();
     var retention=request && request.retention || {};
+    pathReorder.beforeReplace();
     cancelGestures();
     if(!retention.multi && multiSel.length){clearMultiSelect();dropMultiUI();}
     if(connect)cancelConnect('connect cancelled — the page re-rendered');
@@ -1732,6 +1738,7 @@ function createBuilderInteractions(opts){
   function retire(){
     textEditor.clear();
     curveEditor.clear();
+    pathReorder.retire();
     cancelGestures();clearConnectChrome();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
     if(buildRow)buildRow.classList.remove('dv-connectmode');
     clearAddModeChrome();clearMultiSelect();clearStepMarkers();setSelected(null);rowGrabRows={};
@@ -1768,7 +1775,7 @@ function createBuilderInteractions(opts){
     selectAllNodes:function(){return life.alive() && spatial.selectAllNodes();},
     inspectSelection:life.guard(inspectSelection),
     spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
-    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || curveEditor.busy());},
+    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || pathReorder.busy() || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();

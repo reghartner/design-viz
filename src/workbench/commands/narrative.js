@@ -130,6 +130,38 @@ function planMoveStep(text, raw, sectionIdx, stepIdx, delta, pathId){
   return r;
 }
 
+/* Reorder whole paths without touching their step references or registry.
+   The destination is expressed relative to another authored path so a
+   filtered View can move its visible chips while hidden paths stay intact. */
+function planReorderPath(text,raw,sectionIdx,pathId,targetId,placement){
+  var got=builderDiagram(text,raw,sectionIdx);
+  if(got.error)return got;
+  var paths=got.d && got.d.paths;
+  if(!Array.isArray(paths) || paths.length<2)return {noop:true};
+  if(placement!=='before' && placement!=='after')return {error:'Choose where to move the path.'};
+  var from=paths.findIndex(function(path){return path && path.id===pathId;});
+  var target=paths.findIndex(function(path){return path && path.id===targetId;});
+  if(from<0)return {error:'Path no longer exists. Render, then try again.'};
+  if(target<0)return {error:'Destination path no longer exists. Render, then try again.'};
+  if(from===target)return {noop:true};
+  var order=paths.slice(),item=order.splice(from,1)[0];
+  target=order.findIndex(function(path){return path && path.id===targetId;});
+  var to=target+(placement==='after'?1:0);
+  order.splice(to,0,item);
+  if(order.every(function(path,index){return path===paths[index];}))return {noop:true};
+  var plan=builderRewrite(text,raw,got.path.concat(['paths']),function(copy){
+    var source=copy.findIndex(function(path){return path && path.id===pathId;});
+    var moved=copy.splice(source,1)[0];
+    var anchor=copy.findIndex(function(path){return path && path.id===targetId;});
+    copy.splice(anchor+(placement==='after'?1:0),0,moved);
+  });
+  if(plan.error)return plan;
+  plan.kind='path';plan.pathId=pathId;plan.index=to;
+  var range=jsonLocate(plan.text,got.path.concat(['paths',to]));
+  if(range){plan.start=range.start;plan.end=range.end;}
+  return plan;
+}
+
 function planDuplicateStep(text, raw, sectionIdx, stepIdx, pathId){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;

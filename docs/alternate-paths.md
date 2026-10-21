@@ -59,6 +59,13 @@ that path, retaining its step bodies in JSON for reuse. The document outline
 can still find unused bodies. Every structural edit uses one undo entry.
 
 Ordinary edits and skin changes preserve the selected path and matching step.
+In the desktop workbench, drag a path chip up or down to reorder the paths, or
+focus the chip and press **Alt/Option+Up/Down**. Each move is one Undo action and
+keeps the selected path, its current source step, step registry, layouts, and
+path metadata. A View may hide some paths; moving the visible chips never
+deletes those hidden paths. Readers keep path chips as selection controls only.
+Because the first authored path is the default, moving another path to the top
+also changes which path opens when a reader link does not name one.
 Raw JSON edits must be rendered before the story list can change the source.
 The effective-state inspector folds the selected path, with source links back
 to the shared registry. Reveal/hide thresholds are positions within the selected

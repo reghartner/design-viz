@@ -8,9 +8,9 @@ View has an ordered subset of section references and one presentation:
 - **Explore** shows one member section at a time, including its prose and one
   active playback group. Contents lists only that View’s members under it.
 
-The reader keeps a stable two-row header: a **Contents · N sections** toggle, active Tab label, visible View choices
-and utilities above centered **‹ Section n of m ›** controls. The count, section number, and ‹ › controls use every navigable section in document order, including the page’s own sections, and stay stable when a View changes, reorders, or omits sections. Sections shared by multiple Views count once; drilldown-only sections do not count. Paging preserves the current View when it contains the target section and otherwise selects a View that contains the target.
-The numbered rail continues to identify top-level Contents entries.
+The reader keeps a stable two-row header: a **Contents · N pages** toggle, active Tab label, visible View choices
+and utilities above centered **‹ Page n of m ›** controls. A page is one navigable section occurrence in one View. The count and ‹ › controls enumerate top-level Contents owners, then their declared Views, then each View’s ordered members. A section shared by two Views therefore contributes two pages, and paging selects the exact destination View and section. Drilldown-only and unreferenced sections do not count. Embedded readers stay scoped to their embedded section while counting each View that contains it.
+The numbered rail continues to identify top-level Contents entries rather than pages.
 View choices remain available when Contents is closed; on narrow screens they
 wrap within the first header bar. Arrow keys move between View choices, and
 Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**, with every Tab and View expanded when the page opens; full section titles appear

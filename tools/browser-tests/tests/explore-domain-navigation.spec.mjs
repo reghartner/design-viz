@@ -28,14 +28,14 @@ async function open(page,server,raw,native=false){
 
 for(const native of [false,true])test(`${native?'native':'standalone'} story navigation excludes detail-only domains`,async({page,server})=>{
   const root=await open(page,server,story(true),native),diagrams=root.locator('.reader-tree-sections[data-reader-view=canvas]');
-  await expect(root.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*2 sections$/);await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await expect(root.locator('.reader-top>button')).toHaveText(/^Contents\s*·\s*2 pages$/);await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');
   await expect(diagrams.getByRole('button')).toHaveText(['root story','other story']);
   await root.locator('#section-root [data-dv-detail]').click();
   const child=root.locator('[data-dv-detail-preview]:visible');await expect(child.locator('.explore-board')).toBeVisible();
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 1 of 2');
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 2');
   await expect(diagrams.getByRole('button',{name:'root story',exact:true})).toHaveAttribute('aria-current','page');
   await diagrams.getByRole('button',{name:'other story',exact:true}).click();
-  await expect(root.locator('.reader-page-label')).toHaveText('Section 2 of 2');
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
   await expect(root.locator('#section-other .explore-board')).toBeVisible();
   await diagrams.getByRole('button',{name:'root story',exact:true}).click();await expect(root.locator('#section-root .explore-board')).toBeVisible();

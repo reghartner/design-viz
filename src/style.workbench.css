@@ -903,11 +903,11 @@ section.doc-sec>.dv-inserttarget-tag{position:absolute; top:-10px; left:10px;
 .docview .stepline{cursor:pointer;}
 /* Path ordering is authoring chrome injected by the Workbench controller.
    Published readers never receive the data attribute or these affordances. */
-.workspace-diagram:not(.welcome-active) .docview .path-chip[data-dv-path-reorder]{cursor:grab;user-select:none;}
-.workspace-diagram:not(.welcome-active) .docview .path-chip.dv-path-dragging{cursor:grabbing;opacity:.58;}
-.workspace-diagram:not(.welcome-active) .docview .path-chip:is(.dv-path-drop-before,.dv-path-drop-after)::after{content:'';position:absolute;left:-4px;right:-4px;height:3px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px var(--card);pointer-events:none;}
-.workspace-diagram:not(.welcome-active) .docview .path-chip.dv-path-drop-before::after{top:-6px;}
-.workspace-diagram:not(.welcome-active) .docview .path-chip.dv-path-drop-after::after{bottom:-6px;}
+.docview .path-chip[data-dv-path-reorder]{cursor:grab;user-select:none;}
+.docview .path-chip[data-dv-path-reorder].dv-path-dragging{cursor:grabbing;opacity:.58;}
+.docview .path-chip[data-dv-path-reorder]:is(.dv-path-drop-before,.dv-path-drop-after)::after{content:'';position:absolute;left:-4px;right:-4px;height:3px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px var(--card);pointer-events:none;}
+.docview .path-chip[data-dv-path-reorder].dv-path-drop-before::after{top:-6px;}
+.docview .path-chip[data-dv-path-reorder].dv-path-drop-after::after{bottom:-6px;}
 /* click selects the current step */
 /* @panel-style-order:573 */
 .rowline.obj-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}

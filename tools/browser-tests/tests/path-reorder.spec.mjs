@@ -28,12 +28,16 @@ for(const shared of [false,true])test((shared?'shared timeline':'matrix')+' path
  const root=page.locator('#docview .doc-sec').first(),controller=root.locator(shared?'.path-timeline':'.path-matrix');
  await expect(controller).toHaveCount(1);await expect(chip(root,'hidden')).toHaveCount(0);
  await expect(chip(root,'alpha')).toHaveAttribute('data-dv-path-reorder','true');
+ await expect(chip(root,'alpha')).toHaveCSS('cursor','grab');
  const selectedStep=root.locator('.schip[data-step-path="alpha"]').last();await selectedStep.click();
  const sourceIndex=await selectedStep.getAttribute('data-step-source');
  const alpha=await chip(root,'alpha').boundingBox(),gamma=await chip(root,'gamma').boundingBox();
  await page.mouse.move(gamma.x+gamma.width/2,gamma.y+gamma.height/2);await page.mouse.down();
  await page.mouse.move(alpha.x+alpha.width/2,alpha.y+1,{steps:10});
- await expect(chip(root,'alpha')).toHaveClass(/dv-path-drop-before/);await page.mouse.up();
+ await expect(chip(root,'gamma')).toHaveCSS('cursor','grabbing');
+ await expect(chip(root,'alpha')).toHaveClass(/dv-path-drop-before/);
+ await expect.poll(()=>chip(root,'alpha').evaluate(el=>({content:getComputedStyle(el,'::after').content,height:getComputedStyle(el,'::after').height}))).toEqual({content:'""',height:'3px'});
+ await page.mouse.up();
  await expect.poll(()=>order(page)).toEqual(['gamma','alpha','hidden']);
  await expect(chip(root,'alpha')).toHaveAttribute('aria-pressed','true');
  await expect(root.locator('.schip[aria-current="true"]')).toHaveAttribute('data-step-source',sourceIndex);

@@ -799,6 +799,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 @keyframes dvselants{to{stroke-dashoffset:-24;}}
 .grp.dv-sel .grpbox, g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
   animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+/* Inactive authoring windows retain their exact animation position while
+   avoiding continuous cosmetic paint anywhere in their graph. SMIL packet
+   clocks are owned separately by the builder motion lifetime. */
+#docview.dv-workbench-motion-paused .boardcanvas > svg *{animation-play-state:paused !important;}
 /* Preset node styles (#610) paint the card stroke with the same specificity as
    skin rules; the selection ring must still win on a styled card. Ink inverts to
    a light card on dark skins, where the bright accent ring would barely show

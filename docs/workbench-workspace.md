@@ -22,6 +22,13 @@ tabs, selecting an element, or focusing the inspector or JSON source pauses
 playback. Selecting the already displayed step also pauses it. Pausing does
 not replace panel contents or disturb a focused control.
 
+Cosmetic graph motion also pauses when the desktop workbench window loses
+focus, the browser document is hidden, or you return to Home. Edge dashes,
+selection rings, and ambient packet dots resume from the same position when
+you return to the editor. This does not change story playback or saved source.
+The read-only page preview, published readers, and exports keep their existing
+motion behavior.
+
 Render, skin changes and inspector edits dispose the previous playback before
 building a paused preview. The current view and beat follow a uniquely matched
 section across property edits, Undo/Redo, and skin/host preview changes. Steps

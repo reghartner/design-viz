@@ -415,6 +415,10 @@ function initWorkbenchBuilder(opts){
   var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime();
   life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});
   var view = opts.view, src = opts.src;
+  var motion=createWorkbenchMotionLifetime({document:document,window:window,view:view,active:opts.isActive,
+    activityTarget:document.getElementById('workbench-workspace')});
+  life.own(function(){motion.destroy();});
+  life.listen(view,'dv:pathrender',motion.refresh);
   function render(request){ hideDiff();var result=opts.render(request || {origin:'navigation'});refreshClipboardActions();return result; }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
@@ -1149,6 +1153,7 @@ function initWorkbenchBuilder(opts){
     hideDiff();
   }
   function previewRendered(outcome){
+    motion.refresh();
     hideDiff();
     interactions.refreshInlineText();
     if(outcome.ok && outcome.retained==='explore'){

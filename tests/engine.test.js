@@ -726,6 +726,61 @@ test('applySkinClasses layers overlays on Aurora, writes no build/skin label and
 });
 
 
+test('same-skin applications preserve notifications without class mutations or title refits',()=>{
+  let writes=0,refits=0,events=0;
+  const classes=new Set(['sk-aurora','sk-pastel']);
+  const el={classList:{contains:c=>classes.has(c),add:c=>{writes++;classes.add(c);},remove:c=>{writes++;classes.delete(c);}},
+    querySelector:()=>null,querySelectorAll:()=>[{_fitLaneTitles(){refits++;}}],dispatchEvent(){events++;}};
+  assert.strictEqual(C.applySkinClasses(el,el,'pastel'),true);
+  assert.deepStrictEqual({writes,refits,events},{writes:0,refits:0,events:1});
+  C.applySkinClasses(el,el,'daylight');
+  assert.ok(writes>0);assert.strictEqual(refits,1);assert.strictEqual(events,2);
+});
+
+test('title font identity tracks relevant faces, loading and replacement without invalidating unrelated fonts',()=>{
+  const face={family:'Test',status:'loaded'},other={family:'Other',status:'loaded'},faces=new Set([face,other]),doc={fonts:faces};
+  const identity=()=>JSON.stringify(C.laneTitleFontIdentity(C.laneTitleCache(doc),'"Test", sans-serif'));
+  const original=identity();
+  other.status='loading';assert.strictEqual(identity(),original);
+  face.status='loading';assert.notStrictEqual(identity(),original);
+  face.status='loaded';assert.strictEqual(identity(),original);
+  face.weight='700';assert.notStrictEqual(identity(),original);
+  faces.delete(face);faces.add({family:'Test',status:'loaded'});assert.notStrictEqual(identity(),original);
+});
+
+test('fitted title outputs are bounded and reuse recent results across new node elements',()=>{
+  let measured=0;
+  const cache=new Map(),measurement={cache,typography:['test font'],visible:true};
+  function node(){
+    const attrs={x:'46',y:'25'},text={textContent:'',
+      get innerHTML(){return this.textContent;},set innerHTML(value){this.textContent=value;},
+      getAttribute:name=>attrs[name],hasAttribute:name=>Object.hasOwn(attrs,name),
+      setAttribute(name,value){attrs[name]=String(value);},
+      getComputedTextLength(){measured++;return this.textContent.length*6;}};
+    const card={getAttribute:()=>54};
+    return {querySelector:selector=>selector==='.t1'?text:selector==='.card'?card:null,querySelectorAll:()=>[],children:[]};
+  }
+  for(let i=0;i<513;i++)C.fitLaneNodeTitle(node(),'Short '+i,200,'',measurement);
+  assert.strictEqual(cache.size,512);assert.strictEqual(measured,513);
+  C.fitLaneNodeTitle(node(),'Short 512',200,'',measurement);assert.strictEqual(measured,513);
+  C.fitLaneNodeTitle(node(),'Short 0',200,'',measurement);assert.strictEqual(measured,514);
+  assert.strictEqual(cache.size,512);
+  for(const value of cache.values())assert.ok(Object.values(value).every(field=>typeof field!=='object'),'cache stores no DOM owners');
+});
+
+test('title observers and font listeners retire with their board, including already queued callbacks',()=>{
+  const listeners=new Map();let observed,disconnected=0,fits=0;
+  const core=loadCore({ResizeObserver:class{constructor(fn){observed=fn;}observe(){}disconnect(){disconnected++;}}});
+  const fonts={addEventListener:(type,fn)=>listeners.set(type,fn),removeEventListener:type=>listeners.delete(type)};
+  const svg={ownerDocument:{fonts},isConnected:true,_titlesPending:true,_fitLaneTitles(){fits++;}};
+  const owner=core.watchLaneTitles(svg),loaded=listeners.get('loadingdone');
+  loaded({});assert.strictEqual(fits,1);
+  observed([{contentRect:{width:200}}]);assert.strictEqual(fits,2);
+  owner.destroy();assert.strictEqual(listeners.size,0);assert.strictEqual(disconnected,1);
+  loaded({});observed([{contentRect:{width:200}}]);assert.strictEqual(fits,2);
+  assert.strictEqual(svg._fitLaneTitles,null);
+});
+
 /* ---------------- tab restore across re-render ---------------- */
 
 function tabBlockMock(slugs, active){

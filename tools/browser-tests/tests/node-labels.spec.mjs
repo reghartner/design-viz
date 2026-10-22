@@ -1,4 +1,4 @@
-import {test,expect,chooseNavigation} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation,pastePage} from '../helpers/test.mjs';
 import {readFile,writeFile,copyFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -369,4 +369,120 @@ test('short float cards grow so the full-size icon has equal space above and bel
     g.cards.forEach((a,i)=>g.cards.slice(i+1).forEach(b=>expect.soft(hit(a.box,b.box),`${label}: ${a.id} and ${b.id} do not overlap`).toBe(false)));
     await board.screenshot({path:info.outputPath(`short-${floatId}.png`)});
   }
+});
+
+// Count the browser's actual SVG measurements at the production entrypoint;
+// CI checks work avoided, not a machine-dependent elapsed-time threshold.
+async function countTitleMeasurements(page){
+  await page.addInitScript(()=>{
+    window.titleMeasures=0;
+    const original=SVGTextContentElement.prototype.getComputedTextLength;
+    SVGTextContentElement.prototype.getComputedTextLength=function(...args){
+      if(this.matches('.t1,.t2'))window.titleMeasures++;
+      return original.apply(this,args);
+    };
+  });
+}
+async function settledFonts(page){
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+}
+async function labelSnapshot(board){
+  return board.locator('.node').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.dvNode,
+    title:n.querySelector('.t1')?.outerHTML,sub:n.querySelector('.t2')?.outerHTML,
+    tip:n.querySelector(':scope>title')?.textContent})));
+}
+
+test('position edits reuse all 50 fitted titles across replaced boards and same-skin calls do no fitting work',async({page,server},info)=>{
+  await countTitleMeasurements(page);
+  const diagram={view:'ambient',autoplay:false,nodes:{},rows:[[]],floats:[],edges:[]};
+  for(let i=0;i<50;i++){
+    diagram.nodes['n'+i]={title:i%3?'Service '+i:'Notification delivery coordinator '+i,sub:'Platform component',link:'https://example.test/'+i};
+    diagram.floats.push({id:'n'+i,side:'below',x:180+i%10*220,y:150+Math.floor(i/10)*180+i%2*50});
+    if(i)diagram.edges.push({from:'n'+(i-1),to:'n'+i});
+  }
+  await page.goto(server.origin+'/workbench.html');
+  await pastePage(page,JSON.stringify({page:{title:'Fitted title reuse',skin:'pastel',blocks:[{heading:'Graph',diagram}]}}));
+  await settledFonts(page);
+  const board=page.locator('#docview .boardcanvas>svg');
+  const cold=await page.evaluate(()=>window.titleMeasures);expect(cold).toBeGreaterThan(100);
+  const before=await labelSnapshot(board);
+  for(const [id,shift]of [['n11',false],['n12',true]]){
+    await page.evaluate(()=>{document.querySelectorAll('.workspace-window-close').forEach(button=>{if(button.getClientRects().length)button.click();});});
+    await board.locator('[data-dv-node="'+id+'"]').click({modifiers:shift?['Shift']:[]});
+  }
+  await expect(board.locator('.node.dv-sel')).toHaveCount(2);
+  await page.locator('#editor-tab-inspect').click();
+  await settledFonts(page);
+  const counts=[];
+  for(const name of ['Align horizontal','Align vertical']){
+    await board.evaluate(svg=>{window.retiredTitleBoard=svg;window.titleMeasures=0;});
+    const oldSource=await page.locator('#src').inputValue();
+    await page.getByRole('button',{name,exact:true}).click();await settledFonts(page);
+    expect(await page.locator('#src').inputValue()).not.toBe(oldSource);
+    counts.push(await page.evaluate(()=>window.titleMeasures));
+    expect(await labelSnapshot(board)).toEqual(before);
+    expect(await page.evaluate(()=>({connected:window.retiredTitleBoard.isConnected,fit:typeof window.retiredTitleBoard._fitLaneTitles}))).toEqual({connected:false,fit:'object'});
+  }
+  expect(counts,'no SVG text measurements for unchanged title typography/geometry').toEqual([0,0]);
+  const sameSkin=await page.evaluate(()=>{
+    let events=0;const view=document.querySelector('#docview');
+    const observe=new MutationObserver(()=>{});observe.observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
+    view.addEventListener('reader-skin-change',()=>events++,{once:true});window.titleMeasures=0;
+    window.dvSetSkin('pastel');
+    const classes=observe.takeRecords().filter(r=>r.target===document.body||r.target===view).length;observe.disconnect();
+    return {classes,events,measures:window.titleMeasures};
+  });
+  expect(sameSkin).toEqual({classes:0,events:1,measures:0});
+  await info.attach('measurement-counts',{body:JSON.stringify({cold,alignment:counts,sameSkin}),contentType:'application/json'});
+});
+
+test('font completion and inherited typography invalidate cached titles while hidden boards wait for reveal',async({page,server},info)=>{
+  await countTitleMeasurements(page);
+  const input=path.join(server.root,'title-font.json'),output=path.join(server.root,'title-font.html');
+  await writeFile(input,JSON.stringify(overflowPage));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/title-font.html');await settledFonts(page);
+  const board=page.locator('#section-free .boardcanvas>svg'),hidden=page.locator('#section-lanes .boardcanvas>svg');
+  await expect(hidden).toBeHidden();
+  const original=await labelSnapshot(board);
+  await board.evaluate(svg=>{svg.parentNode.style.display='none';svg._fitLaneTitles();});
+  expect(await board.evaluate(svg=>svg._titlesPending)).toBe(true);
+  await board.evaluate(svg=>{svg.parentNode.style.display='';svg._fitLaneTitles();});
+  expect(await labelSnapshot(board)).toEqual(original);
+  // Repeated refresh on the same live board is an exact output reuse.
+  expect(await board.evaluate(svg=>{window.titleMeasures=0;svg._fitLaneTitles();svg._fitLaneTitles();return window.titleMeasures;})).toBe(0);
+  const changed=await board.evaluate(svg=>{
+    svg.style.letterSpacing='1px';window.titleMeasures=0;svg._fitLaneTitles();return window.titleMeasures;
+  });
+  expect(changed).toBeGreaterThan(0);
+  expect((await expectBoundedLabels(board,authoredOf(freeDiagram))).failures).toEqual([]);
+  await board.evaluate(svg=>{svg.style.letterSpacing='';svg._fitLaneTitles();});
+  expect(await labelSnapshot(board)).toEqual(original);
+  expect(await board.evaluate(svg=>{const text=svg.querySelector('.t1');text.style.whiteSpace=getComputedStyle(text).whiteSpace==='pre'?'normal':'pre';window.titleMeasures=0;svg._fitLaneTitles();return window.titleMeasures;})).toBeGreaterThan(0);
+  await board.evaluate(svg=>{svg.querySelector('.t1').style.whiteSpace='';svg.querySelector('.t1').removeAttribute('style');svg._fitLaneTitles();});
+  expect(await labelSnapshot(board)).toEqual(original);
+  const font=await readFile(path.join(repo,'apps/confluence/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2'));
+  let release;const gate=new Promise(resolve=>release=resolve);
+  await page.route('**/late-title.woff2',async route=>{await gate;await route.fulfill({body:font,contentType:'font/woff2'});});
+  await page.evaluate(()=>{
+    const style=document.createElement('style');
+    style.textContent='@font-face{font-family:LateTitle;src:url(/late-title.woff2)} #docview .t1{font-family:LateTitle,sans-serif!important}';
+    document.head.appendChild(style);
+    document.querySelectorAll('.boardcanvas>svg').forEach(svg=>svg._fitLaneTitles());
+  });
+  await expect.poll(()=>page.evaluate(()=>document.fonts.status)).toBe('loading');
+  const fallback=await labelSnapshot(board);
+  await page.evaluate(()=>window.titleMeasures=0);release();await settledFonts(page);
+  const loadedMeasures=await page.evaluate(()=>window.titleMeasures);
+  expect(loadedMeasures).toBeGreaterThan(0);
+  expect(await labelSnapshot(board)).not.toEqual(fallback);
+  expect((await expectBoundedLabels(board,authoredOf(freeDiagram))).failures).toEqual([]);
+  expect(await hidden.evaluate(svg=>svg._titlesPending)).toBe(true);
+  await chooseNavigation(page.locator('#docview .explore-navigation').first(),'Tab','Lanes');await expect(hidden).toBeVisible();
+  await expect.poll(()=>hidden.evaluate(svg=>svg._titlesPending)).toBe(false);
+  expect((await expectBoundedLabels(hidden,authoredOf(laneDiagram))).failures).toEqual([]);
+  await page.evaluate(()=>window.dvSetSkin('blueprint'));await settledFonts(page);
+  expect((await expectBoundedLabels(hidden,authoredOf(laneDiagram))).failures).toEqual([]);
+  expect(await hidden.evaluate(svg=>{window.titleMeasures=0;svg._fitLaneTitles();return window.titleMeasures;})).toBe(0);
+  await info.attach('font-invalidation-measurements',{body:JSON.stringify({inheritedTypography:changed,loadedFont:loadedMeasures}),contentType:'application/json'});
 });

@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,paste,prepareEditorSurface,arrangeChapter} from '../helpers/test.mjs';
 import {writeFile,mkdir} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -83,7 +84,7 @@ test('removing the arranged section through Undo or deletion ends Arrange withou
  await page.locator('#diagram-add').click();await page.locator('.diagram-add-structure>summary').click();await page.locator('#add-section').click();await prepareEditorSurface(page);const added=await page.locator('#src').inputValue();expect(JSON.parse(added).page.sections).toHaveLength(2);await expect(page.locator('.doc-sec[data-dv-section="1"]')).not.toHaveClass(/section-arranging/);
  await arrangeChapter(page);await expect(page.locator('.doc-sec[data-dv-section="1"]')).toHaveClass(/section-arranging/);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(page.locator('.section-arranging')).toHaveCount(0);await expect(page.locator('.section-layout-grid')).toHaveCount(0);
  await arrangeChapter(page);await expect(page.getByRole('spinbutton',{name:'Height',exact:true})).toBeVisible();await page.getByRole('button',{name:'Done arranging',exact:true}).click();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(added);
- await page.locator('.doc-sec[data-dv-section="1"] .sec-h').click();await prepareEditorSurface(page);await arrangeChapter(page);await page.locator('#editor-tab-inspect').click();await page.getByRole('button',{name:'delete section',exact:true}).click();await expect(page.locator('.doc-sec')).toHaveCount(1);await expect(page.locator('.section-arranging')).toHaveCount(0);await expect(page.locator('.section-layout-grid')).toHaveCount(0);
+ await chooseAddDestination(page,1);await page.locator('.doc-sec[data-dv-section="1"] .sec-h').click();await prepareEditorSurface(page);await arrangeChapter(page);await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await page.locator('#editor-tab-inspect').click();await page.getByRole('button',{name:'delete section',exact:true}).click();await expect(page.locator('.doc-sec')).toHaveCount(1);await expect(page.locator('.section-arranging')).toHaveCount(0);await expect(page.locator('.section-layout-grid')).toHaveCount(0);
  await prepareEditorSurface(page);await arrangeChapter(page);await expect(page.getByRole('spinbutton',{name:'Height',exact:true})).toBeVisible();await expect(page.locator('.reader-top-view')).toHaveCount(1);
 });
 

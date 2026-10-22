@@ -182,7 +182,7 @@ test('waiting hides and resets the raccoon; the event replays and Playing labels
   await inject(server,'screen-clips',clips);
   await page.goto(server.origin+'/screen-clips.html#d=5&m=step&s=record');
   // Fifth starter section: the raccoon camera.
-  const box=page.locator('.pwidget.pt-screen').nth(4).locator('.screenbox'),raccoon=box.locator('.raccoon');
+  const box=page.locator('.doc-sec:visible .pwidget.pt-screen .screenbox'),raccoon=box.locator('.raccoon');
   await expect(box.locator('.scene-raccoon')).toHaveCount(1);
   await expect(box).toHaveClass(/m-rec scene-waiting/);
   await expect(box.locator('.recchip')).toBeVisible();

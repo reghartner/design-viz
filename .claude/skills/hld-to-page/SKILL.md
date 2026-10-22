@@ -33,10 +33,10 @@ Follow packet story/fidelity/state/placement and verification rules. Add visible
 or authorized rendered evidence supplies them. File-only kits need no browser,
 server, installation or additional agent.
 
-For new topology, run `tools/compose-page-layout.cjs` (graph-only:
-`tools/auto-arrange-spec.cjs`). Preserve existing geometry; inspect rendered fit.
-`sectionLayout` is geometry only. [Migrate intentional old choices](../../../docs/section-layout-migration.md)
-to explicit Views. See [arrangement limits](../../../docs/auto-arrange.md).
+Topology: `tools/compose-page-layout.cjs`; graphs: `tools/auto-arrange-spec.cjs`.
+Preserve geometry; check fit.
+`section.views` share section content; each View is a page: [Views](../../../docs/tab-views.md).
+`sectionLayout` is geometry: [migration](../../../docs/section-layout-migration.md), [limits](../../../docs/auto-arrange.md).
 
 Play buttons: [`playbackPosition`](../../../docs/section-layouts.md#play-button-placement) sets `auto`/`above`/`beside` per arrangement.
 

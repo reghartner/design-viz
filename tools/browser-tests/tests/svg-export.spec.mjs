@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,pastePage} from '../helpers/test.mjs';
 import {readFile} from 'node:fs/promises';
 
@@ -27,9 +28,9 @@ async function graphPaint(page,rootSelector='.boardcanvas > svg',cardSelector='.
 }
 
 test('Download SVG exports only the selected live graph and opens independently',async({page,server},info)=>{
-  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);await chooseAddDestination(page,1);
   const node=page.locator('#docview [data-dv-node="second"]');await node.click();
-  await page.locator('#docview [data-dv-step="0"]').click();
+  await page.locator('#docview .doc-sec:visible [data-dv-step="0"]').click();
   const before=await page.locator('#src').inputValue(),classes=await node.getAttribute('class');
   const download=page.waitForEvent('download');await menu(page,'file-export-svg');const file=await download;
   expect(file.suggestedFilename()).toBe('svg-export-second-section.svg');
@@ -76,7 +77,7 @@ test('Copy SVG uses image/svg+xml and falls back to selectable text on denial',a
     Object.defineProperty(window,'ClipboardItem',{value:Item,configurable:true});
     Object.defineProperty(navigator,'clipboard',{value:{write:async items=>{const item=items[0],blob=item.values['image/svg+xml'];window.__svgCopies.push({types:item.types,text:await blob.text()});}},configurable:true});
   });
-  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);await page.locator('#docview [data-dv-node="second"]').click();
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);await chooseAddDestination(page,1);await page.locator('#docview [data-dv-node="second"]').click();
   await menu(page,'file-copy-svg');await expect.poll(()=>page.evaluate(()=>window.__svgCopies.length)).toBe(1);
   const copied=await page.evaluate(()=>window.__svgCopies[0]);expect(copied.types).toEqual(['image/svg+xml']);expect(copied.text).toContain('Second Node');
   await expect(page.locator('#guide')).toContainText('Copied diagram-only SVG');
@@ -90,7 +91,7 @@ test('Copy SVG uses image/svg+xml and falls back to selectable text on denial',a
 });
 
 test('SVG export refuses a valid stale render but labels the retained preview for invalid source',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);await page.locator('#docview [data-dv-node="second"]').click();
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,source);await chooseAddDestination(page,1);await page.locator('#docview [data-dv-node="second"]').click();
   const downloads=[];page.on('download',item=>downloads.push(item));await page.locator('#editor-tab-json').click();
   const changed=JSON.stringify({...raw,page:{...raw.page,title:'Changed'}},null,2);await page.locator('#src').fill(changed);await menu(page,'file-export-svg');
   await expect(page.locator('#guide')).toContainText('rendered preview is stale');expect(downloads).toHaveLength(0);

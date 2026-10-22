@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,pastePage as paste,closeTools} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 const fixture=()=>({page:{title:'Align and move',blocks:[{heading:'Services',diagram:{view:'ambient',autoplay:false,
@@ -81,16 +82,18 @@ test('automatic group placement cancels on Escape, blur, pointer cancellation, s
   await expect(page.locator('#src')).toHaveValue(fresh);await expect(page.locator('.dv-ghost,.dv-free-edge-preview,.dv-dragsrc')).toHaveCount(0);
 });
 
-test('row and mixed-section selections refuse group arrangement without a partial move',async({page,server})=>{
+test('row selections refuse group arrangement and section navigation isolates selection',async({page,server})=>{
   const raw=fixture();raw.page.blocks.push({heading:'Another',diagram:{nodes:{other:{title:'Other'}},rows:[[]],floats:[{id:'other',side:'below',x:260,y:150}]}});
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));
-  for(const id of ['row','other']){
+  for(const id of ['row']){
     await node(page,'a').click();await node(page,id).click({modifiers:['Shift']});const before=await source(page);
     const align=page.getByRole('button',{name:'Align horizontal',exact:true}),reason=id==='row'?'Use Free placement':'single section';
     await expect(align).toBeDisabled();await expect(align).toHaveAttribute('title',new RegExp(reason));await expect(page.locator('#src')).toHaveValue(before);
     await expect(page.locator('#guide')).toContainText(reason);
     await drag(page,'a',30,45);await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);
   }
+  // Forged mixed-section selections remain covered by the command-model test.
+  const before=await source(page);await chooseAddDestination(page,1);await node(page,'other').click();await expect(node(page,'a')).toBeHidden();await expect(node(page,'a')).not.toHaveClass(/dv-sel/);await expect(node(page,'other')).toHaveClass(/dv-sel/);await expect(page.locator('#src')).toHaveValue(before);
 });
 
 test('group alignment and dragging work in Explore and refuse stale source alignment',async({page,server})=>{

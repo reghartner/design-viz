@@ -77,7 +77,11 @@ html,body{margin:0;background:#fff}#view{width:1200px;max-width:none;margin:0;pa
         const owners=ctl.views.owners.filter(o=>o.tabBlock==null || o.tab===0).sort((a,b)=>Math.min(...a.records.map(r=>r.number))-Math.min(...b.records.map(r=>r.number)));
         const owner=owners.find(o=>o.current && o.current.members.length);
         if(!owner)throw Error('Opening View has no capturable content');
-        const member=owner.current.members.find(m=>m.record.section.diagram) || owner.current.members[0],rec=member.record.runtime;
+        // Legacy thumbnails preferred a diagram within the opening multi-section View.
+        // Canonical Views own exactly one section, including a prose-only opening.
+        const canonical=owner.records.some(r=>Array.isArray(r.section.views));
+        const members=canonical?owner.current.members:owner.views.filter(v=>v.id===owner.current.id).flatMap(v=>v.members);
+        const member=members.find(m=>m.record.section.diagram) || members[0],rec=member.record.runtime;
         ctl.views.ensure(rec,owner.current.id,true);ctl.steppers.forEach(s=>s.stepper.pause());
         rec.sectionEl.dataset.thumbnailSelected='true';if(member.record.section.diagram)rec.sectionEl.dataset.thumbnailVisual='true';
         return {section:rec.reference,view:owner.current.id};

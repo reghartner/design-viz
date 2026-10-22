@@ -3766,6 +3766,8 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     if (target.kind === 'diagram'){
       if(ctl.handoffHistoryPush)fragmentState={tabBlock:null,tab:null,diagramSection:null,cardSection:null,row:null};
       fragmentState.diagramSection = target.section;
+      var targetSection=section(target.section);
+      if(targetSection){fragmentState.tabBlock=targetSection.tabBlock;fragmentState.tab=targetSection.tab;}
     } else if (target.kind === 'tab'){
       fragmentState = {tabBlock:target.tabBlock, tab:target.tab,
                        diagramSection:null, cardSection:null, row:null};

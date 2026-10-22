@@ -79,3 +79,11 @@ test('offline conversion reports compatibility-only changes and rejects malforme
   assert.throws(()=>migrate(input),/Invalid compatibility metadata: page.flowview/);assert.equal(JSON.stringify(input),before);
  }
 });
+
+test('single implicit View visibility materializes one arrangement without synthesizing siblings',()=>{
+ for(const saved of [false,true]){
+  const diagram={nodes:{a:{}},rows:[['a']]};if(saved)diagram.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};
+  const raw={sections:[{id:'one',diagram}]},result=plan(raw,0,'standard','visibility',false),section=JSON.parse(result.text).sections[0];
+  assert.equal(section.views.length,1);assert.deepEqual(section.diagram.layouts.map(v=>v.id),['flow']);assert.equal(section.views[0].layout,'flow');assert.equal(section.diagram.layouts[0].sectionLayout.default.find(t=>!t.panel && !t.controls).hidden,true);assert.deepEqual(section.diagram.nodes,diagram.nodes);
+ }
+});

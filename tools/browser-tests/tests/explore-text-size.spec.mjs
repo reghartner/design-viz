@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -219,7 +220,7 @@ for(const presentation of ['standard','explore'])for(const placement of ['floati
  }else {const exported=await typeMetrics(page);expect(exported.caption.logical).toBe(20);await checkControls(page);}
 });
 
-test('Standard first placement and sizing keep stacked sections, grid panels and prose with exact Undo',async({page,server})=>{
+test('Standard first placement and sizing keep independent section pages, grid panels and prose with exact Undo',async({page,server})=>{
  const raw=fixture(),first=raw.page.sections[0];first.id='first';first.diagram.layouts[0].presentation='standard';delete first.diagram.layouts[0].exploreLayout.controlsPlacement;
  first.diagram.panels=[{id:'status',type:'state',title:'Status',states:['Ready'],initial:{state:'Ready'}}];
  const second=structuredClone(first);second.id='second';second.heading='Second section';raw.page.sections.push(second);
@@ -232,10 +233,11 @@ test('Standard first placement and sizing keep stacked sections, grid panels and
  await closeTools(page);await panelsOptions(page);await page.locator('.explore-panel-menu[open]').getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('canvas');
  await expect(page.locator('.standard-controls-player')).toHaveCount(1);await expect(page.locator('.standard-controls-player')).toBeVisible();
  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(page.locator('.doc-sec')).toHaveCount(2);
- for(const sec of await page.locator('.doc-sec').all()){
-  await expect(sec).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel]')).toBeVisible();await expect(sec.locator('.sec-prose')).toBeVisible();
+ for(let i=0;i<2;i++){
+  await chooseAddDestination(page,i);const sec=page.locator('.doc-sec[data-dv-section="'+i+'"]');await expect(page.locator('.doc-sec:visible')).toHaveCount(1);await expect(sec).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel]')).toBeVisible();await expect(sec.locator('.sec-prose')).toBeVisible();
   await expect(sec.locator('.explore-stage')).toBeHidden();await expect(sec.locator('.explore-window')).toHaveCount(0);
  }
+ await chooseAddDestination(page,0);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(sized);await expect(page.locator('.standard-controls-player')).toHaveCount(0);
  await page.locator('#redo-builder').click();await expect(page.locator('.standard-controls-player')).toHaveCount(1);
  await closeTools(page);await page.locator('.standard-controls-player .stepline').click();await page.locator('#editor-tab-inspect').click();

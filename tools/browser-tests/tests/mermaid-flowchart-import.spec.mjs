@@ -1,5 +1,5 @@
 import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
-import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,chooseAddDestination} from '../helpers/test.mjs';
 
 test.beforeEach(useProjectDownloads);
 
@@ -36,7 +36,8 @@ test('whole Markdown drop and chosen flowchart preview warnings, cancel, confirm
 
 test('additive flowchart paste targets the current section, keeps locks, cancel and exact single Undo/Redo',async({page,server},info)=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,original);await closeTools(page);
-  // A real node selection makes the second section the destination.
+  // Navigate to the second section before selecting its import destination.
+  await chooseAddDestination(page,1);
   await page.locator('#docview [data-dv-node="pin"]').click();await closeTools(page);
   const beforePlacement=await page.locator('#docview [data-dv-node="pin"]').getAttribute('transform');
   const pasteChart=async text=>page.evaluate(text=>{const data=new DataTransfer();data.setData('text/plain',text);document.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));},text);

@@ -51,7 +51,7 @@ test('hash navigation restores named views without history-dependent filters or 
  await page.evaluate(()=>{location.hash='d=front-door';});await expect(selected(page)).toHaveAttribute('data-layout-id','home-story');
 });
 
-test('migrated View links preserve geometry and history; retired shortcuts never recreate Views',async({page,server})=>{
+test('migrated View links and legacy arrangement aliases preserve geometry and history',async({page,server})=>{
  const old=structuredClone(named),d=old.page.sections[0].diagram;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
  d.sectionLayout=structuredClone(named.page.sections[0].diagram.layouts[0].sectionLayout);
  const {spec,report}=migrate(old),flow=report.links.find(l=>l.kind==='fragment-view' && l.from==='flow').to,home=report.links.find(l=>l.kind==='fragment-view' && l.from==='home').to;
@@ -64,8 +64,8 @@ test('migrated View links preserve geometry and history; retired shortcuts never
  await page.reload();await expect(sec).toHaveAttribute('data-view-id','home');
  await page.evaluate(id=>{location.hash='d=front-door&v='+id+'&m=step&s=notify';},flow);await expect(sec).toHaveAttribute('data-view-id','flow');
  await page.goBack();await expect(sec).toHaveAttribute('data-view-id','home');await page.goForward();await expect(sec).toHaveAttribute('data-view-id','flow');
- for(const retired of ['home','flow']){
-  await page.goto(url+'#d=front-door&v='+retired);await expect(sec).toHaveAttribute('data-view-id','home');await expect.poll(()=>viewOf(page)).toBe(home);
+ for(const alias of ['home','flow']){
+  await page.goto(url+'#d=front-door&v='+alias);await expect(sec).toHaveAttribute('data-view-id',alias);await expect.poll(()=>viewOf(page)).toBe(alias==='home'?home:flow);
   await expect(page.locator('[data-view-focus],.secondary-flow')).toHaveCount(0);await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(2);
  }
  const collision=structuredClone(named),cd=collision.page.sections[0].diagram;cd.layouts[1].id='home';

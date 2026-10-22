@@ -18,7 +18,7 @@ async function geometry(root){
     const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};};
     return {grid:rect(grid),shell:rect(grid.parentElement),zoom:parseFloat(getComputedStyle(grid).zoom),
       tiles:Array.from(grid.querySelectorAll('.section-layout-tile:not([hidden])')).map(rect),controls:rect(grid.querySelector('.termbar')),
-      following:rect(grid.closest('.doc-sec').nextElementSibling),section:rect(grid.closest('.doc-sec'))};
+      followingHidden:grid.closest('.doc-sec').nextElementSibling.hidden,section:rect(grid.closest('.doc-sec'))};
   });
 }
 async function settledGeometry(root,width){
@@ -50,9 +50,9 @@ async function verifyResize(root){
       expect(actual.tiles[i].right).toBeLessThanOrEqual(actual.shell.right+1);
       expect(actual.tiles[i].bottom).toBeLessThanOrEqual(actual.grid.bottom+1);
     }
-    // Both the flow box and following section track the rendered height.
+    // The selected page tracks its rendered height; other section pages stay hidden.
     expect(actual.shell.bottom-actual.grid.bottom).toBeLessThan(1);
-    expect(actual.following.y-actual.section.bottom).toBeCloseTo(base.following.y-base.section.bottom,0);
+    expect(actual.followingHidden).toBe(true);
   }
   await section.evaluate(el=>{el.style.width='';el.style.boxSizing='';});
 }

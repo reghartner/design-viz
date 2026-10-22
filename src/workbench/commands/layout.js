@@ -1176,9 +1176,9 @@ function planTabViewEdit(text,raw,section,id,action,value,validateSource){
   }else if(action==='name'){
     if(typeof value!=='string' || !value.trim() || value.trim().length>80)return {error:'Use a View name between 1 and 80 characters.'};selected.name=value.trim();
   }else if(action==='visibility'){
-    // Unspecified arrangements are independent on first write. An explicit
-    // shared layout reference is intentional and continues to share edits.
-    if(!selected.layout){var error=independent();if(error)return error;}
+    // Isolate an implicit arrangement when siblings share it. A single View
+    // only needs materialization; explicit shared references stay shared.
+    if(!selected.layout && views.length>1){var error=independent();if(error)return error;}
     var changed=planSectionDiagramVisibility(next,JSON.parse(next),section,selected.layout,value);if(changed.error)return changed;next=changed.text;selected.layout=changed.layoutId;
   }else if(action==='presentation')selected.presentation=value;
   else if(action==='layout'){if(value)selected.layout=value;else delete selected.layout;}

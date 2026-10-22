@@ -117,7 +117,7 @@ test('new blank project Explore panels save floating geometry, canvas placement,
  await expect(panel).toBeVisible();const states=[await source(page)],floatingBefore=await panel.boundingBox(),label=await grip.innerText();
  await board(page).evaluate(el=>{el.scrollLeft+=80;el.scrollTop+=55;});const camera=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
  await drag(page,grip,-120,70);const moved=await panel.boundingBox();expect(moved.x).toBeLessThan(floatingBefore.x-80);expect(moved.y).toBeGreaterThan(floatingBefore.y+40);states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));
- await expect(page.locator('.workspace-active-section')).toHaveAttribute('data-view-id','flow');expect(JSON.parse(states.at(-1)).page.defaultView).toBe('standard');
+ await expect(page.locator('.workspace-active-section')).toHaveAttribute('data-view-id','flow');expect(JSON.parse(states.at(-1)).page.blocks[0].defaultView).toBe('standard');
  await expect.poll(()=>board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(camera);
  const materialized=JSON.parse(states.at(-1)).page.blocks[0].diagram;expect(materialized.layouts.find(view=>view.id==='flow').exploreLayout.panels[0].stacked).toBe(false);
  await drag(page,resize,80,45);const resized=await panel.boundingBox();expect(resized.width).toBeGreaterThan(moved.width+50);expect(resized.height).toBeGreaterThan(moved.height+25);states.push(await source(page));expect(states.at(-1)).not.toBe(states.at(-2));

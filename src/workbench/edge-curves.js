@@ -42,7 +42,9 @@ function createEdgeCurveEditor(opts){
       chrome.appendChild(element('circle',{cx:p.x,cy:p.y,r:7/(scale || 1),'class':'dv-port-point',
         'data-edge-port':end+'Port',tabindex:0,role:'button','aria-label':(end==='from'?'Exit':'Entry')+' attachment point. Drag to move.'}));
     });
-    c.svg.appendChild(chrome);
+    // Wire contract buttons live on the edge itself. Keep them above the
+    // transparent curve grab path while leaving the rest of that path active.
+    c.svg.insertBefore(chrome,c.svg.querySelector('.wire-contract-marker'));
   }
   function pointer(c,ev){
     var matrix=c.svg.getScreenCTM();if(!matrix)return null;

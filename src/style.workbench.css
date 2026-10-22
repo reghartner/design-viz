@@ -1414,7 +1414,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) #docview>.doc-heading,.workspace-diagram:not(.welcome-active) #docview>.tabbar,.workspace-diagram:not(.welcome-active) #docview>header{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec.workspace-active-section{display:block;position:fixed;inset:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;outline:0;}
-.workspace-diagram:not(.welcome-active) .workspace-active-section>:not(.section-viewport){display:none;}
+.workspace-diagram:not(.welcome-active) .workspace-active-section>:not(.section-viewport):not(.wire-contract-preview){display:none;}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{position:absolute;top:var(--workspace-content-top);left:84px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:8px;}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.explore-stage{position:relative;inset:auto;flex:1 1 auto;min-height:0;width:100%;height:auto!important;border:0;border-radius:0;}
 .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{position:relative;inset:auto;z-index:135;display:flex;flex:none;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;background:none;border:0;}

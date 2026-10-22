@@ -169,7 +169,7 @@ function wireArtifactComments(ctl,view,win){
       var thread=threads.find(function(t){return t && t.id===id;}),el=thread && resolve(thread.anchor);
       var at=thread && ctl.views && ctl.views.viewAt && ctl.views.viewAt(el || nearest(thread.anchor));
       if(!el && !at)return;
-      tabsOf(el || at.owner.slots.get(at.id)).forEach(function(tab){if(tab.block.active()!==tab.index)tab.block.select(tab.index,false);});
+      tabsOf(el || at.owner.slots.get(at.definition.key)).forEach(function(tab){if(tab.block.active()!==tab.index)tab.block.select(tab.index,false);});
       if(at && !at.current){ctl.views.showView(at);el=resolve(thread.anchor);if(!el)return;}
       var rec=sectionOf(el);
       if(rec && ctl.views && !rec.detailOnly && !rendered(rec.sectionEl))ctl.views.ensure(rec,undefined,false);

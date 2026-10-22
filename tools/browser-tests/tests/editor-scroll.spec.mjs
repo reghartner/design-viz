@@ -1,8 +1,9 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 
 function longSpec(){
   return {page:{title:'Scroll retention',sections:Array.from({length:5},(_,i)=>({
-    id:'diagram-'+i,heading:'Section '+(i+1),diagram:{nodes:{
+    id:'diagram-'+i,heading:'Section '+(i+1),text:Array.from({length:50},(_,n)=>'Context paragraph '+n),diagram:{nodes:{
       a:{title:'Camera'},b:{title:'Gateway'},c:{title:'Recording'},d:{title:'Storage'},
       e:{title:'Notifications'},f:{title:'Phone'},
     },view:'step',autoplay:false,steps:[{id:'start',nodes:['a'],text:'Start'},{id:'end',nodes:['f'],text:'End'}],
@@ -16,7 +17,7 @@ function longSpec(){
 }
 
 for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused preview':'page'} in place`,async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(longSpec()));await prepareEditorSurface(page);
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(longSpec()));await prepareEditorSurface(page);await chooseAddDestination(page,3);await prepareEditorSurface(page);
   await page.evaluate(()=>document.fonts.ready);
   if(focus){
     await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();
@@ -27,7 +28,7 @@ for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused pre
   const settled=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const rows=async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[3].diagram.rows;
   const section=page.locator('#section-diagram-3');
-  await section.scrollIntoViewIfNeeded();
+  await section.locator('.board').scrollIntoViewIfNeeded();
   const grabs=section.locator('.dv-rowgrab');
   await expect(grabs).toHaveCount(3);
   const from=await grabs.nth(0).boundingBox(),to=await grabs.nth(2).boundingBox();

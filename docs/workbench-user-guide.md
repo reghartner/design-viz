@@ -253,9 +253,9 @@ resize their window. Workbench changes save with Undo/Redo; reader changes are
 temporary. Older files preserve their initial notes placement when you change
 other placements.
 
-The **Layouts & audiences** guide describes Tab-owned Views and their section
-subsets. Standard stacks members; Explore shows one at a time. The View popover
-owns membership, presentation and naming; arrangement controls remain section-owned.
+The **Layouts & audiences** guide describes section-owned Views. Each View renders
+one section in Standard or full Explore. The View popover
+owns presentation, local ordering and naming; arrangement controls remain section-owned.
 See [Tabs, Views, and sections](tab-views.md).
 
 ## Maintaining the guide

@@ -22,23 +22,23 @@ test('View presentation, duplication and independent arrangements preserve sourc
   await chapterOptions(page);await presentation().selectOption('standard');
   const changed=await page.locator('#src').inputValue(),standard=JSON.parse(changed).page;
   expect(standard.sections[0].diagram).toEqual(named.page.sections[0].diagram);
-  expect(standard.views.map(view=>({name:view.name,presentation:view.presentation}))).toEqual([{name:'Home story',presentation:'standard'},{name:'Service flow',presentation:'standard'}]);
-  expect(standard.defaultView).toBe(standard.views[0].id);expect(standard.views[1].sections).toEqual([{section:standard.sections[0].id,layout:'service-flow'}]);
+  expect(standard.sections[0].views.map(view=>({name:view.name,presentation:view.presentation}))).toEqual([{name:'Home story',presentation:'standard'},{name:'Service flow',presentation:'standard'}]);
+  expect(standard.sections[0].defaultView).toBe(standard.sections[0].views[0].id);expect(standard.sections[0].views[1].layout).toBe('service-flow');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(presentation()).toHaveValue('explore');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(presentation()).toHaveValue('standard');
   await expect(navigation(page).getByRole('button',{name:'Service flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await chapterOptions(page);await presentation().selectOption('explore');
-  const explored=await page.locator('#src').inputValue(),expected=JSON.parse(changed);expected.page.views[1].presentation='explore';expect(JSON.parse(explored)).toEqual(expected);
+  const explored=await page.locator('#src').inputValue(),expected=JSON.parse(changed);expected.page.sections[0].views[1].presentation='explore';expect(JSON.parse(explored)).toEqual(expected);
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Done arranging',exact:true})).toHaveCount(0);await prepareEditorSurface(page);
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
   await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#layout-preview-target')).toBeHidden();
   await arrangeChapter(page,section(page));
   await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
   await chapterOptions(page);await navigation(page).getByRole('button',{name:'Duplicate View',exact:true}).click();
-  const duplicated=await page.locator('#src').inputValue(),duplicatePage=JSON.parse(duplicated).page,viewCopy=duplicatePage.views.at(-1);
-  expect(viewCopy.presentation).toBe('explore');expect(viewCopy.sections).toEqual(duplicatePage.views[1].sections);expect(duplicatePage.sections[0].diagram).toEqual(named.page.sections[0].diagram);
+  const duplicated=await page.locator('#src').inputValue(),duplicatePage=JSON.parse(duplicated).page,viewCopy=duplicatePage.sections[0].views.at(-1);
+  expect(viewCopy.presentation).toBe('explore');expect(viewCopy.layout).not.toBe(duplicatePage.sections[0].views[1].layout);expect(duplicatePage.sections[0].diagram.layouts.slice(0,2)).toEqual(named.page.sections[0].diagram.layouts);expect({...duplicatePage.sections[0].diagram,layouts:named.page.sections[0].diagram.layouts}).toEqual(named.page.sections[0].diagram);
   await expect(navigation(page).getByRole('button',{name:viewCopy.name,exact:true})).toHaveAttribute('aria-pressed','true');
-  // A View shares section content and its arrangement until explicitly separated.
+  // A copied View shares content and starts with its own arrangement.
   await chapterOptions(page);await navigation(page).getByRole('button',{name:'Independent section arrangement',exact:true}).click();
   const arranged=(await raw(page)).page,diagram=arranged.sections[0].diagram,copy=diagram.layouts.at(-1);
   expect(diagram.defaultLayout).toBe('home-story');expect(diagram.layouts.slice(0,2)).toEqual(named.page.sections[0].diagram.layouts);
@@ -46,7 +46,7 @@ test('View presentation, duplication and independent arrangements preserve sourc
   // Independent placement migrates every Standard host profile, including hidden tiles and docked controls.
   const sourceLayout=diagram.layouts[1].sectionLayout;
   expect(copy.sectionLayout).toEqual({columns:24,...Object.fromEntries(Object.entries(sourceLayout).map(([profile,tiles])=>[profile,tiles.map(tile=>({...tile,x:tile.x*2,w:tile.w*2}))]))});
-  expect(copy.exploreLayout).toEqual(diagram.layouts[1].exploreLayout);expect(arranged.views.at(-1).sections).toEqual([{section:arranged.sections[0].id,layout:copy.id}]);expect(arranged.views[1].sections).toEqual(standard.views[1].sections);
+  expect(copy.exploreLayout).toEqual(diagram.layouts[1].exploreLayout);expect(arranged.sections[0].views.at(-1).layout).toBe(copy.id);expect(arranged.sections[0].views[1].layout).toBe(standard.sections[0].views[1].layout);
   await expect(section(page)).toHaveAttribute('data-view-id',copy.id);await expect(presentation()).toHaveValue('explore');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(duplicated);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);

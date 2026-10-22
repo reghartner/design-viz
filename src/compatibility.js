@@ -22,7 +22,8 @@ var FlowviewCompatibility = (function(){
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
     'media.node-styles':['Preset node styles','0.2.0'],
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
-    'document.tab-views':['Tab-owned Views and section membership','0.2.0'],
+    'document.tab-views':['Legacy Tab-owned Views and section membership','0.2.0'],
+    'document.section-views':['Section-owned Views and exact page identity','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
     'layout.graph-frame':['Saved graph content framing','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
@@ -166,6 +167,7 @@ var FlowviewCompatibility = (function(){
     }
     function contracts(s){
       if(!object(s))return;
+      if(Array.isArray(s.views)){used['document.section-views']=true;if(s.views.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;}
       if(Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null)used['content.contracts']=true;
       [s.contract].concat(Array.isArray(s.contracts)?s.contracts:[]).forEach(function(ct){if(object(ct) && Array.isArray(ct.wires) && ct.wires.length)used['content.wire-contracts']=true;});
       var prose=typeof s.text==='string'?s.text.length>0:Array.isArray(s.text) && s.text.some(function(text){return typeof text==='string' && text.length>0;});

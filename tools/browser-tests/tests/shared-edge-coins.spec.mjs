@@ -116,7 +116,8 @@ test('short and hairpin edges keep shared coins apart, off cards, labels and arr
  await page.goto(server.origin+'/tight-coins.html');
  const counts=[3,4,9,9,6,3,9];
  for(let i=0;i<counts.length;i++){
-  const sec=page.locator('.doc-sec').nth(i),svg=sec.locator('svg:has(.coin)').first();
+  if(i)await page.getByRole('button',{name:'Next page',exact:true}).click();
+  const sec=page.locator('.doc-sec').nth(i),svg=sec.locator('svg:has(.coin)').first();await expect(sec).toBeVisible();await expect(page.locator('.doc-sec:visible')).toHaveCount(1);
   await svg.scrollIntoViewIfNeeded();
   await expect(sec.locator('.coin')).toHaveCount(counts[i]);
   for(const coin of await sec.locator('.coin').all())await expect(coin).toBeVisible();

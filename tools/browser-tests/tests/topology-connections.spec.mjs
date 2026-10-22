@@ -132,10 +132,10 @@ test('consumer story activates saved cross and provider edges without changing o
 test('New View and Duplicate View accept an edge-bearing referenced topology document',async({page,server})=>{
   await page.setViewportSize({width:1440,height:1000});const {consumer}=await fixture(page,server),before=await source(page);
   let settings=await viewOptions(page);await settings.getByRole('button',{name:'New View',exact:true}).click();
-  const created=await source(page),createdRaw=JSON.parse(created);expect(createdRaw.page.views).toHaveLength(2);
+  const created=await source(page),createdRaw=JSON.parse(created);expect(createdRaw.page.sections[0].views).toHaveLength(2);
   expect(diagram(createdRaw).topologyImports).toEqual(diagram(consumer).topologyImports);expect(diagram(createdRaw).topologyProvenance).toBeUndefined();
   settings=await viewOptions(page);await settings.getByRole('button',{name:'Duplicate View',exact:true}).click();
-  const duplicated=await source(page),duplicatedRaw=JSON.parse(duplicated);expect(duplicatedRaw.page.views).toHaveLength(3);
+  const duplicated=await source(page),duplicatedRaw=JSON.parse(duplicated);expect(duplicatedRaw.page.sections[0].views).toHaveLength(3);
   expect(diagram(duplicatedRaw).topologyImports).toEqual(diagram(consumer).topologyImports);expect(Object.keys(diagram(duplicatedRaw).nodes)).toEqual(['local','other']);
   await painted(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(created);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);

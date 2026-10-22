@@ -121,7 +121,7 @@ test('layout edits cannot strand an earlier geometry history entry for an inacti
   await chapterOptions(page,sec);await page.locator('#docview > .explore-navigation').getByRole('button',{name:'Independent section arrangement',exact:true}).click();const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);
   const authored=JSON.parse(edited).page,prior=JSON.parse(movedSource).page.blocks[0].diagram.layouts;
   expect(authored.blocks[0].diagram.layouts.slice(0,2)).toEqual(prior);expect(authored.blocks[0].diagram.layouts).toHaveLength(3);
-  expect(authored.views.find(view=>view.name==='Engineering').sections[0].layout).toBe(authored.blocks[0].diagram.layouts[2].id);
+  expect(authored.blocks[0].views.find(view=>view.name==='Engineering').layout).toBe(authored.blocks[0].diagram.layouts[2].id);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await expect(page.locator('#docview > .explore-navigation').getByRole('button',{name:'Engineering',exact:true})).toHaveAttribute('aria-pressed','true');

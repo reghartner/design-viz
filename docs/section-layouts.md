@@ -1,8 +1,8 @@
 # Arrange a section and preview its host
 
-Tabs own **Views** over ordered subsets of their sections. Sections own content;
+Sections own **Views**, each rendering exactly that section. Sections own content;
 section arrangements own panel geometry, visibility and path/step filtering.
-See [Tabs, Views, and sections](tab-views.md) for the canonical schema, membership,
+See [Tabs, Views, and sections](tab-views.md) for the canonical schema, identity,
 source-preserving legacy migration and navigation.
 
 
@@ -10,7 +10,7 @@ source-preserving legacy migration and navigation.
 Adding or editing it never creates or renames reader Views in either the page
 header or the section. A diagram without authored Views or named arrangements remains Standard,
 regardless of its panels. `layoutName`
-does not create a choice. Use canonical `page.views`/`tab.views` for perspectives,
+does not create a choice. Use canonical `section.views` for perspectives,
 or deliberately named `diagram.layouts` for independently selectable arrangements.
 Do not remove placement to suppress an accidental Layout/Data flow toggle.
 For existing files that intentionally relied on that toggle, migrate both choices
@@ -188,7 +188,7 @@ view preserves the setting; changing the preview host does not change it.
 
 ## Link to or capture a particular view
 
-Use the Tab View's stable `views[].id`, not its display name, in the HTML fragment. Legacy documents continue accepting section `layouts[].id` links:
+Use the section View's stable `views[].id`, not its display name, in the HTML fragment. Legacy documents continue accepting section `layouts[].id` links:
 
 ```text
 page.html#d=front-door&v=home-story
@@ -281,9 +281,9 @@ to preserve Home/Data flow as explicit choices.
 
 ## Section arrangement contract
 
-The canonical Tab View fields are documented in [tab-views.md](tab-views.md).
+The canonical section View fields are documented in [tab-views.md](tab-views.md).
 The fields below are section arrangements, not Tab View definitions. Their
-legacy presentation is used only when the owner has no canonical Views.
+legacy presentation is used only when the section has no canonical Views.
 
 
 A diagram can declare default geometry in `sectionLayout`, or a `layouts`

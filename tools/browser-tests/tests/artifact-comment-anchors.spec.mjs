@@ -139,10 +139,11 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
 // (g) One section shown by two Views, in a different position in each: a
 // comment made in one View is saved with a path naming that View, so it pins
 // only there and "Go to" switches back to it.
-test('a section shared by two Views keeps separate comments per View',async({page,server})=>{
+for(const canonical of [false,true])test('a section shared by two Views keeps separate comments per View'+(canonical?' with section-owned Views':''),async({page,server})=>{
  await page.addInitScript(stubClaude);
  const shared=JSON.parse(JSON.stringify(raw)),overview=shared.page.blocks[0].tabs[0];
  overview.views=[{id:'sequence',name:'Sequence',presentation:'standard',sections:['ring']},{id:'both',name:'Both',presentation:'standard',sections:['reply','ring']}];
+ if(canonical){delete overview.views;delete overview.defaultView;overview.opening={section:'ring',view:'sequence'};overview.sections.find(s=>s.id==='ring').views=[{id:'sequence',name:'Sequence',presentation:'standard'},{id:'both',name:'Both',presentation:'standard'}];overview.sections.find(s=>s.id==='reply').views=[{id:'sequence',name:'Answer',presentation:'standard'}];}
  const root=await open(page,server,shared),viewStrip=root.locator('.explore-navigation').first().locator('.reader-view-strip');
  const bullet=root.locator('#section-ring li[data-dv-bullet="2"]'),viewTab=name=>viewStrip.getByRole('tab',{name,exact:true});
  await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);
@@ -152,7 +153,7 @@ test('a section shared by two Views keeps separate comments per View',async({pag
  await bullet.click();
  await expect.poll(()=>composeCount(page)).toBe(1);
  await viewTab('Both').click();
- await expect(root.locator('#section-reply')).toBeVisible();
+ await expect(root.locator('#section-reply')).toBeHidden();await expect(root.locator('#section-ring')).toBeVisible();await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
  await bullet.click();
  await expect.poll(()=>composeCount(page)).toBe(2);
  const [inSequence,inBoth]=[(await composed(page,0)).anchor,(await composed(page,1)).anchor];
@@ -173,7 +174,7 @@ test('a section shared by two Views keeps separate comments per View',async({pag
  // "Go to" on the other comment switches back to its View.
  await page.evaluate(()=>window.__comments.callbacks.reveal('v-both'));
  await expect(viewTab('Both')).toHaveAttribute('aria-selected','true');
- await expect(root.locator('#section-reply')).toBeVisible();
+ await expect(root.locator('#section-reply')).toBeHidden();await expect(root.locator('#section-ring')).toBeVisible();await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
  await expect.poll(()=>placedKeys(page)).toEqual(['v-both']);
 });
 

@@ -116,11 +116,13 @@ test('printing materializes static panels and restores the lazy screen lifecycle
   await expect(canvas(page,'beta')).toHaveCount(0);await expect(canvas(page,'gamma')).toHaveCount(0);
 });
 
-test('ordinary non-tabbed documents eagerly render every panel',async({page,server})=>{
+test('non-tabbed section pages activate only the selected panel and retain its step state',async({page,server})=>{
   await open(page,server,{page:{title:'Ordinary document',sections:[section('alpha'),section('beta')]}});
-  await live(page,['alpha','beta']);await expect(canvas(page,'beta')).toHaveAttribute('data-state','Start');
+  await live(page,['alpha']);await expect(canvas(page,'beta')).toHaveCount(0);
+  await page.getByRole('button',{name:'Next page',exact:true}).click();await live(page,['beta']);await expect(page.locator('#section-alpha')).toBeHidden();await expect(canvas(page,'beta')).toHaveAttribute('data-state','Start');
   await page.locator('#section-beta .schip').nth(1).click();
   await expect(canvas(page,'beta')).toHaveAttribute('data-state','Finish');
+  await page.getByRole('button',{name:'Previous page',exact:true}).click();await live(page,['alpha']);await page.getByRole('button',{name:'Next page',exact:true}).click();await live(page,['beta']);await expect(canvas(page,'beta')).toHaveAttribute('data-state','Finish');
 });
 
 test('direct page Views defer excluded sections until selected',async({page,server})=>{

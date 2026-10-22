@@ -42,11 +42,11 @@ test('one section rendered by two Views is two document pages in standalone, nat
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);await assertPager(page.locator('#docview'));
 });
 
-test('Contents preserves Standard stacks, ordered Explore members and state through theme changes',async({page,server})=>{
+test('Contents selects single Standard pages, ordered Explore members and state through theme changes',async({page,server})=>{
   // The pager counts each View member as its own document page.
   const root=await open(page,server);await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 9');
-  await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
-  await root.locator('.reader-tree-sections[data-reader-view="full"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 9');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
+  await root.locator('.reader-tree-sections[data-reader-view="full"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 9');await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
   await choose(root,'subset');await expect(root.locator('.reader-page-label')).toHaveText('Page 8 of 9');await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-backstage');
   await root.locator('.reader-tree-sections[data-reader-view="subset"]').getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true}).click();await expect(root.locator('.explore-active-section')).toHaveAttribute('id','section-review');
@@ -57,20 +57,20 @@ test('Contents preserves Standard stacks, ordered Explore members and state thro
   await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();
   await choose(root,'full');await root.locator('.reader-toolbar').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
   await choose(root,'explore');await expect(root.locator('#section-review')).toHaveCSS('zoom','1');await choose(root,'full');await expect(root.locator('#section-review')).toHaveCSS('zoom','1.25');
-  await root.locator('#section-backstage').evaluate(el=>el.scrollIntoView({block:'start'}));await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section').nth(2)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 3 of 9');await expect(root.locator('.doc-sec:visible')).toHaveCount(3);
+  await root.locator('.reader-tree-sections[data-reader-view=full] .reader-tree-section').nth(2).click();await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section').nth(2)).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 3 of 9');await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
 });
 
-test('Standard Contents exposes ordered section headlines and routes mouse and keyboard without collapsing the stack',async({page,server})=>{
+test('Standard Contents exposes ordered section headlines and routes mouse and keyboard with one visible section',async({page,server})=>{
   const raw=story(),tab=raw.page.sections[0].tabs[0];tab.defaultView='standard-subset';tab.views.push({id:'standard-subset',name:'Backstage + Review',presentation:'standard',sections:['backstage','review']});
   const root=await openRaw(page,server,raw,'standard-headlines'),headlines=root.locator('.reader-tree-sections[data-reader-view="standard-subset"]');
   await expect(headlines.getByRole('button')).toHaveText(['Find the right workspace in Backstage','Decide what becomes the accepted diagram']);
   await expect(root.locator('.reader-tree-sections[data-reader-view="explore"] .reader-tree-section')).toHaveCount(3);
-  await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
   const review=headlines.getByRole('button',{name:'Decide what becomes the accepted diagram',exact:true});await review.click();
-  await expect(root.locator('.reader-page-label')).toHaveText('Page 10 of 11');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 10 of 11');await expect(review).toHaveAttribute('aria-current','page');await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
-  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 9 of 11');await expect(root.locator('.doc-sec:visible')).toHaveCount(2);
-  const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThanOrEqual(navigation.y+navigation.height+16);
+  await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 9 of 11');await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
+  const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThan(page.viewportSize().height*.6);
   await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 11 of 11');
 });
 
@@ -243,8 +243,8 @@ test('native Contents themes and destruction are isolated between sibling hosts'
   await writeFile(path.join(server.root,'contents-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'contents-native.html'),'<style>body{margin:0;display:flex}.host{width:50vw;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><div id="two" class="host"></div><script type="module">import {mountNativeViewer} from "./contents-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/contents-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.one=mount(document.querySelector('#one'),raw);window.two=mount(document.querySelector('#two'),raw);},story());
-  const one=page.locator('#one'),two=page.locator('#two'),standard=one.locator('.reader-tree-sections[data-reader-view="full"]');await expect(standard.getByRole('button')).toHaveCount(3);await standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true})).toHaveAttribute('aria-current','page');await expect(one.locator('.doc-sec:visible')).toHaveCount(3);
-  const nativeHeading=await one.locator('#section-backstage .sec-h').boundingBox(),nativeNav=await one.locator('.reader-navigation').boundingBox(),nativeHost=await one.boundingBox();expect(await one.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(nativeHeading.y).toBeGreaterThanOrEqual(nativeHost.y+nativeNav.height);expect(nativeHeading.y).toBeLessThanOrEqual(nativeHost.y+nativeHost.height*.6);expect(nativeHeading.y+nativeHeading.height).toBeLessThanOrEqual(nativeHost.y+nativeHost.height);
+  const one=page.locator('#one'),two=page.locator('#two'),standard=one.locator('.reader-tree-sections[data-reader-view="full"]');await expect(standard.getByRole('button')).toHaveCount(3);await standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true}).click();await expect(standard.getByRole('button',{name:'Find the right workspace in Backstage',exact:true})).toHaveAttribute('aria-current','page');await expect(one.locator('.doc-sec:visible')).toHaveCount(1);
+  const nativeHeading=await one.locator('#section-backstage .sec-h').boundingBox(),nativeNav=await one.locator('.reader-navigation').boundingBox(),nativeHost=await one.boundingBox();expect(await one.evaluate(el=>el.scrollTop)).toBeGreaterThanOrEqual(0);expect(nativeHeading.y).toBeGreaterThanOrEqual(nativeHost.y+nativeNav.height);expect(nativeHeading.y).toBeLessThanOrEqual(nativeHost.y+nativeHost.height*.6);expect(nativeHeading.y+nativeHeading.height).toBeLessThanOrEqual(nativeHost.y+nativeHost.height);
   await choose(one,'explore');await one.locator('.reader-theme-menu>summary').click();await one.getByRole('menuitemradio',{name:'Rose',exact:true}).click();await expect(one.locator('.docview')).toHaveClass(/sk-rose/);await expect(two.locator('.docview')).not.toHaveClass(/sk-rose/);
   const canvas=await one.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.x+canvas.width).toBeLessThanOrEqual(900);
   const nativeRoot=await one.locator('flowview-root').boundingBox(),sidebar=await one.locator('.reader-contents').boundingBox();expect(sidebar.y+sidebar.height).toBe(nativeRoot.y+nativeRoot.height);
@@ -396,19 +396,13 @@ test('native top Views retain focus and align wrapped headers with their bounded
    T2 hover tooltip | same | .reader-tab-label title = full label | a clipped label without a full-title tooltip
    T3 long title bounded | 90-char Tab label, 1440x900 | title = full label; label right edge <= Views strip left; no page-wide horizontal overflow | an unbounded label pushing the Views strip off the header */
 function labelled(label){const raw=story();raw.page.sections[0].tabs[0].label=label;return raw;}
-test('scrolling marks the visible section in Contents without pinning clicks or rewriting the deep link',async({page,server})=>{
+test('scrolling stays inside the selected Standard page and Contents navigation updates its exact link',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});const root=await openRaw(page,server,labelled('Chime Doorbell — motion to clip'),'contents-scroll');await page.goto(server.origin+'/contents-scroll.html#t=chime-doorbell-motion-to-clip&d=build&v=full');await page.reload();
   const rows=root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section'),current=()=>rows.evaluateAll(els=>els.map(el=>el.getAttribute('aria-current')));
-  const wheel=async dy=>{await page.mouse.move(720,600);await page.mouse.wheel(0,dy);};
-  await expect(rows).toHaveText(['Turn a doorbell story into a reviewable draft','Decide what becomes the accepted diagram','Find the right workspace in Backstage']);
-  await expect.poll(current).toEqual(['page','false','false']);const hash=await page.evaluate(()=>location.hash);expect(hash).toContain('t=chime-doorbell-motion-to-clip');expect(hash).toContain('d=build');
-  const reviewTop=await root.locator('#section-review').evaluate(el=>el.getBoundingClientRect().top),navBottom=await root.locator('.reader-navigation').evaluate(el=>el.getBoundingClientRect().bottom);
-  await wheel(Math.round(reviewTop-navBottom-8));await expect.poll(current).toEqual(['false','page','false']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
-  await wheel(4000);await expect.poll(current).toEqual(['false','false','page']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
-  await wheel(-4000);await expect.poll(current).toEqual(['page','false','false']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
-  await rows.nth(1).click();await expect.poll(current).toEqual(['false','page','false']);await expect.poll(()=>page.evaluate(()=>location.hash)).toContain('d=review');expect(await page.evaluate(()=>location.hash)).toContain('t=chime-doorbell-motion-to-clip');
-  const target=await root.locator('#section-review').boundingBox(),header=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(header.y+header.height);expect(target.y).toBeLessThanOrEqual(header.y+header.height+24);
-  const clicked=await page.evaluate(()=>location.hash);await wheel(-4000);await expect.poll(current).toEqual(['page','false','false']);expect(await page.evaluate(()=>location.hash)).toBe(clicked);
+  await expect.poll(current).toEqual(['page','false','false']);const hash=await page.evaluate(()=>location.hash);
+  await page.mouse.move(720,600);await page.mouse.wheel(0,4000);await expect.poll(current).toEqual(['page','false','false']);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+  await rows.nth(1).click();await expect.poll(current).toEqual(['false','page','false']);await expect.poll(()=>page.evaluate(()=>location.hash)).toContain('d=review');expect(await page.evaluate(()=>location.hash)).toContain('t=chime-doorbell-motion-to-clip');await expect(root.locator('#section-build')).toBeHidden();await expect(root.locator('#section-backstage')).toBeHidden();
+  const target=await root.locator('#section-review').boundingBox(),header=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(header.y+header.height);expect(target.y).toBeLessThan(page.viewportSize().height*.6);
 });
 test('header Tab title keeps about 30 characters unclipped at 1440 and names the full title on hover',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});

@@ -378,3 +378,8 @@ test('whole step-control sizing declares its own capability independently of leg
   assert.ok(C.check(stamped,{version:C.version,contract:'1',features}).missingFeatures.includes('layout.controls-scale'));
   delete raw.page.sections[0].diagram.layouts[0].exploreLayout.controlsScale;assert.ok(!C.detect(raw).includes('layout.controls-scale'));
 });
+test('section-owned Views declare their capability independently of legacy membership',()=>{
+ const raw={page:{sections:[{text:'Prose',views:[{id:'read',name:'Read',presentation:'standard'}]},{tabs:[{sections:[{views:[{id:'data',name:'Data',presentation:'explore'}]}]}]}]}};
+ const detected=plain(C.detect(raw));assert.ok(detected.includes('document.section-views'));assert.ok(detected.includes('layout.explore'));assert.ok(!detected.includes('document.tab-views'));
+ const older={...C.features};delete older['document.section-views'];assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures.includes('document.section-views'));
+});

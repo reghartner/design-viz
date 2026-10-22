@@ -123,24 +123,17 @@ function initSectionLayoutEditor(opts){
     nameRow.appendChild(button('Rename View',function(){edit('name',name.value);}));
     var management=el('div','view-management-actions');body.appendChild(management);
     management.appendChild(button('New View',function(){edit('create');}));management.appendChild(button('Duplicate View',function(){edit('duplicate');}));
-    var remove=button('Delete View',function(){edit('delete');});remove.disabled=owner.views.length===1;management.appendChild(remove);
-    var openingId=(tabViewDefault(owner,owner.views) || {}).id,opening=button(openingId===id?'Opening View':'Make opening View',function(){edit('default');});opening.disabled=openingId===id;management.appendChild(opening);
-    var membership=el('fieldset'),legend=el('legend',null,'Sections in this View');membership.appendChild(legend);
-    function refs(){return definition.members.map(function(member){var ref={section:member.record.section.id || 'section-'+member.record.number};if(member.layout)ref.layout=member.layout;return ref;});}
-    var ordered=definition.members.map(function(member){return member.record;}).concat(owner.records.filter(function(rec){return !rec.domainOnly && !definition.members.some(function(member){return member.record===rec;});}));
-    ordered.forEach(function(rec){
-      var member=definition.members.find(function(m){return m.record===rec;}),memberRow=el('div','tab-view-member-row'),line=el('label','tab-view-member'),check=el('input');check.type='checkbox';check.checked=!!member;check.setAttribute('aria-label','Include '+(rec.section.heading || rec.reference));line.appendChild(check);line.appendChild(el('span',null,rec.section.heading || rec.reference));
-      fields.listen(check,'change',function(){var list=refs(),ref=rec.section.id || 'section-'+rec.number;list=list.filter(function(m){return m.section!==ref;});if(check.checked)list.push({section:ref});edit('sections',list);});
-      memberRow.appendChild(line);membership.appendChild(memberRow);
-      if(member){var position=definition.members.indexOf(member),up=button('Move '+(rec.section.heading || rec.reference)+' up',function(){var list=refs(),tmp=list[position-1];list[position-1]=list[position];list[position]=tmp;edit('sections',list);});up.disabled=position===0;up.setAttribute('aria-label',up.textContent);up.title=up.textContent;up.textContent='↑';memberRow.appendChild(up);
-        var diagram=rawDiagram(rec.number-1),layouts=diagram?diagramLayoutViews(diagram):[];
-        if(layouts.length){var layoutLabel=el('label',null,'Arrangement for '+(rec.section.heading || rec.reference)),arrangement=el('select');arrangement.setAttribute('aria-label','Arrangement for '+(rec.section.heading || rec.reference));var auto=el('option',null,'Section default');auto.value='';arrangement.appendChild(auto);layouts.forEach(function(layout){var option=el('option',null,layout.name);option.value=layout.legacy?'layout':layout.id;arrangement.appendChild(option);});arrangement.value=member.layout || '';fields.listen(arrangement,'change',function(){var list=refs();if(arrangement.value)list[position].layout=arrangement.value;else delete list[position].layout;edit('sections',list);});layoutLabel.appendChild(arrangement);membership.appendChild(layoutLabel);}
-      }
-    });body.appendChild(membership);
+    var remove=button('Delete View',function(){edit('delete');});remove.disabled=owner.views.filter(function(v){return v.members[0].record.runtime===record;}).length===1;management.appendChild(remove);
+    var openingView=tabViewDefault(owner,owner.views),isOpening=openingView===definition,opening=button(isOpening?'Opening View':'Make opening View',function(){edit('default');});opening.disabled=isOpening;management.appendChild(opening);
+    var localViews=owner.views.filter(function(v){return v.members[0].record.runtime===record;}),position=localViews.indexOf(definition);
+    var up=button('Move View up',function(){edit('up');}),down=button('Move View down',function(){edit('down');});up.disabled=position===0;down.disabled=position===localViews.length-1;management.appendChild(up);management.appendChild(down);
+    if(d){var layoutLabel=el('label',null,'Arrangement '),arrangementChoice=el('select');arrangementChoice.setAttribute('aria-label','Section View arrangement');
+      var auto=el('option',null,'Section default');auto.value='';arrangementChoice.appendChild(auto);diagramLayoutViews(d).forEach(function(layout){var option=el('option',null,layout.name);option.value=layout.id;arrangementChoice.appendChild(option);});arrangementChoice.value=definition.members[0].layout || '';fields.listen(arrangementChoice,'change',function(){edit('layout',arrangementChoice.value);});layoutLabel.appendChild(arrangementChoice);body.appendChild(layoutLabel);
+    }
     if(d){
       var diagramLabel=el('label','chapter-diagram-visibility'),diagramCheck=el('input');diagramCheck.type='checkbox';diagramCheck.setAttribute('aria-label','Show selected section diagram');diagramCheck.title='Saves visibility in this section arrangement across all host profiles.';
       var arrangementId=selectedView(index),shown=record.presentation && record.presentation.diagramVisible?record.presentation.diagramVisible():true;diagramCheck.checked=shown;diagramLabel.appendChild(diagramCheck);diagramLabel.appendChild(el('span',null,'Show selected section diagram'));body.appendChild(diagramLabel);
-      fields.listen(diagramCheck,'change',function(){if(!current()){diagramCheck.checked=shown;return;}cancel();var nextId=opts.setDiagramVisibility(index,arrangementId,diagramCheck.checked);if(nextId){var next=opts.ctl(),fresh=next && next.sections.find(function(rec){return rec.number===index+1;});if(fresh && fresh.presentation)fresh.presentation.setView(nextId);refresh();}});
+      fields.listen(diagramCheck,'change',function(){edit('visibility',diagramCheck.checked);});
     }
     if(d){body.appendChild(button('Auto arrange',function(){options.open=false;syncNavigationPopover(options);document.getElementById('auto-arrange').click();}));body.appendChild(button('Independent section arrangement',function(){edit('arrangement');}));body.appendChild(button('Arrange selected section…',function(){options.open=false;scope.optionsOpen=false;syncNavigationPopover(options);var arrange=section.querySelector('[data-arrange-toggle]');if(arrange)arrange.click();}));}
     var arrangement=d && sectionLayoutDefinition(d,activeLayout(index));
@@ -148,7 +141,7 @@ function initSectionLayoutEditor(opts){
       body.appendChild(button('Use current camera as opening view',function(){if(!current())return;var next=JSON.parse(JSON.stringify(arrangement.exploreLayout || {}));next.camera=record.viewport.currentCamera();opts.setExploreLayout(index,arrangement.id,next);}));
       body.appendChild(button('Reset opening camera',function(){if(!current())return;var next=JSON.parse(JSON.stringify(arrangement.exploreLayout || {}));delete next.camera;opts.setExploreLayout(index,arrangement.id,next);}));
     }
-    body.appendChild(el('p','fnote','Standard stacks these sections. Explore shows one at a time. Content is shared across Views.'));
+    body.appendChild(el('p','fnote','Each View renders this section. Content is shared; duplicate Views have independent arrangements.'));
     options.appendChild(body);row.appendChild(options);fields.listen(row,'click',function(ev){ev.stopPropagation();});fields.listen(row,'pointerdown',function(ev){ev.stopPropagation();});
     fields.listen(options,'keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();options.open=false;options.querySelector('summary').focus();}});
     section.dispatchEvent(new CustomEvent('workbench-navigation-refresh',{bubbles:true}));

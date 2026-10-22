@@ -249,12 +249,12 @@ function wireTour(ctl, view, win, config, options){
       if(ctl.details.snapshot())ctl.details.close(true);
       if(savedPage.drill)restoration=ctl.details.restore(savedPage.drill);
     }
-    ctl.detailHistoryPush=false;
+    ctl.viewHistoryPush=false;ctl.detailHistoryPush=false;
     ctl.activeTarget=savedPage.activeTarget;if(ctl.onChange)ctl.onChange();
     win.scrollTo(savedPage.scrollX,savedPage.scrollY);
     return Promise.resolve(restoration).then(function(){
       if(destroyed)return;
-      ctl.detailHistoryPush=false;
+      ctl.viewHistoryPush=false;ctl.detailHistoryPush=false;
       ctl.activeTarget=savedPage.activeTarget;if(ctl.onChange)ctl.onChange();
       win.scrollTo(savedPage.scrollX,savedPage.scrollY);
     });

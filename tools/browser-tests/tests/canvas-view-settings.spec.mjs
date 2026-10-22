@@ -13,8 +13,8 @@ function fixture(twoSections=false){
   const engineering={...structuredClone(resident),id:'engineering',name:'Engineering',presentation:'explore'};
   d.layouts=[resident,engineering];d.defaultLayout='resident';
   if(twoSections){const other=structuredClone(section);other.id='billing';other.heading='Billing';other.diagram.nodes.a.title='Billing service';raw.page.blocks.push(other);}
-  raw.page.defaultView='resident';raw.page.views=[{id:'resident',name:'Resident story',presentation:'standard',sections:[{section:'delivery',layout:'resident'}]},{id:'engineering',name:'Engineering',presentation:'explore',sections:[{section:'delivery',layout:'engineering'}]}];
-  if(twoSections)raw.page.views.push({id:'billing-resident',name:'Billing · Resident story',presentation:'standard',sections:[{section:'billing',layout:'resident'}]},{id:'billing-engineering',name:'Billing · Engineering',presentation:'explore',sections:[{section:'billing',layout:'engineering'}]});
+  for(const sec of raw.page.blocks){const prefix=sec.id==='delivery'?'':'Billing · ';sec.defaultView='resident';sec.views=[{id:'resident',name:prefix+'Resident story',presentation:'standard',layout:'resident'},{id:'engineering',name:prefix+'Engineering',presentation:'explore',layout:'engineering'}];}
+  raw.page.opening={section:'delivery',view:'resident'};
   return raw;
 }
 const section=(page,index=0)=>page.locator('#docview .doc-sec[data-dv-section="'+index+'"]');
@@ -51,12 +51,12 @@ test('canvas view settings edit only the selected sibling and save one undoable 
   await expect(section(page)).toHaveAttribute('data-view-id','engineering');await expect(presentation(page)).toHaveValue('explore');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await options(page);await presentation(page).selectOption('standard');await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
-  const expected=structuredClone(raw);expected.page.views[1].presentation='standard';
+  const expected=structuredClone(raw);expected.page.blocks[0].views[1].presentation='standard';
   expect(JSON.parse(await text(page))).toEqual(expected);const changed=await text(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await expect(presentation(page)).toHaveValue('explore');await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
   await page.locator('#undo-builder').click();await options(page);await settings(page).getByRole('button',{name:'Make opening View',exact:true,includeHidden:true}).click();
-  const withDefault=structuredClone(raw);withDefault.page.defaultView='engineering';
+  const withDefault=structuredClone(raw);withDefault.page.blocks[0].defaultView='engineering';withDefault.page.opening={section:'delivery',view:'engineering'};
   expect(JSON.parse(await text(page))).toEqual(withDefault);const saved=await text(page);
   await expect(settings(page).getByRole('button',{name:'Opening View',exact:true,includeHidden:true})).toBeDisabled();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -86,13 +86,13 @@ test('canvas view settings edit only the selected sibling and save one undoable 
 test('View options duplicates and renames a sibling without changing its source view',async({page,server})=>{
   const raw=fixture(),original=await open(page,server,raw);await options(page);
   await settings(page).getByRole('button',{name:'Duplicate View',exact:true}).click();
-  const duplicated=await text(page),saved=JSON.parse(duplicated).page,copy=saved.views[1];
-  expect(saved.views).toHaveLength(3);expect(saved.blocks).toEqual(raw.page.blocks);expect(saved.defaultView).toBe('resident');expect(copy.sections).toEqual(raw.page.views[0].sections);expect(copy.presentation).toBe('standard');
+  const duplicated=await text(page),saved=JSON.parse(duplicated).page,copy=saved.blocks[0].views[1];
+  expect(saved.blocks[0].views).toHaveLength(3);expect(saved.blocks[0].defaultView).toBe('resident');expect(saved.opening).toEqual(raw.page.opening);expect(copy.layout).not.toBe('resident');expect(copy.presentation).toBe('standard');expect({...saved.blocks[0].diagram,layouts:raw.page.blocks[0].diagram.layouts}).toEqual(raw.page.blocks[0].diagram);expect(saved.blocks[0].diagram.layouts.slice(0,2)).toEqual(raw.page.blocks[0].diagram.layouts);
   await expect(nav(page).locator('.reader-top-view[data-tab-view="'+copy.id+'"]')).toHaveAttribute('aria-selected','true');await expect(presentation(page)).toHaveValue('standard');
-  await options(page);await presentation(page).selectOption('explore');const explored=await text(page);expect(JSON.parse(explored).page.blocks).toEqual(raw.page.blocks);
+  await options(page);await presentation(page).selectOption('explore');const explored=await text(page);expect(JSON.parse(explored).page.blocks[0].diagram).toEqual(saved.blocks[0].diagram);
   await options(page);const name=settings(page).getByRole('textbox',{name:'View name',exact:true});await name.fill('Workshop');await settings(page).getByRole('button',{name:'Rename View',exact:true}).click();
   await expect(topView(page,'Workshop')).toBeVisible();
-  const renamed=JSON.parse(await text(page));expect(renamed.page.views[1]).toEqual({...copy,presentation:'explore',name:'Workshop'});
+  const renamed=JSON.parse(await text(page));expect(renamed.page.blocks[0].views[1]).toEqual({...copy,presentation:'explore',name:'Workshop'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(duplicated);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -121,17 +121,17 @@ test('a pending view-name draft does not consume a physical Duplicate view click
   const duplicate=settings(page).getByRole('button',{name:'Duplicate View',exact:true});await duplicate.hover();const r=await duplicate.boundingBox();
   // One physical click: do not retry a locator after blur or pre-commit with Tab.
   await page.mouse.click(r.x+r.width/2,r.y+r.height/2);
-  const saved=JSON.parse(await text(page)).page;expect(saved.views).toHaveLength(3);expect(saved.blocks).toEqual(raw.page.blocks);
-  expect(saved.views[1].name).not.toContain('Uncommitted');await expect(nav(page).locator('.reader-top-view[data-tab-view="'+saved.views[1].id+'"]')).toHaveAttribute('aria-selected','true');
+  const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].views).toHaveLength(3);expect({...saved.blocks[0].diagram,layouts:raw.page.blocks[0].diagram.layouts}).toEqual(raw.page.blocks[0].diagram);expect(saved.blocks[0].diagram.layouts.slice(0,2)).toEqual(raw.page.blocks[0].diagram.layouts);
+  expect(saved.blocks[0].views[1].name).not.toContain('Uncommitted');await expect(nav(page).locator('.reader-top-view[data-tab-view="'+saved.blocks[0].views[1].id+'"]')).toHaveAttribute('aria-selected','true');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
 for(const legacy of [false,true])test('View presentation migrates '+(legacy?'a legacy saved arrangement':'automatic views')+' in one Undo without rewriting diagrams',async({page,server})=>{
   const raw=fixture(),d=raw.page.blocks[0].diagram,arrangement=structuredClone(d.layouts[0].sectionLayout);
-  delete raw.page.views;delete raw.page.defaultView;delete d.layouts;delete d.defaultLayout;if(legacy){d.sectionLayout=arrangement;d.layoutName='Saved home';}
+  delete raw.page.blocks[0].views;delete raw.page.blocks[0].defaultView;delete raw.page.opening;delete d.layouts;delete d.defaultLayout;if(legacy){d.sectionLayout=arrangement;d.layoutName='Saved home';}
   const original=await open(page,server,raw);await expect(presentation(page)).toHaveValue('standard');await expect(settings(page).getByRole('button',{name:'Opening View',exact:true,includeHidden:true})).toBeDisabled();
   await presentation(page).selectOption('explore');const promoted=await text(page),next=JSON.parse(promoted).page;
-  expect(next.views.find(v=>v.id===next.defaultView).presentation).toBe('explore');expect(next.blocks[0].diagram).toEqual(d);await expect(presentation(page)).toHaveValue('explore');
+  expect(next.blocks[0].views.find(v=>v.id===next.blocks[0].defaultView).presentation).toBe('explore');expect(next.blocks[0].diagram).toEqual(d);await expect(presentation(page)).toHaveValue('explore');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(promoted);await expect(presentation(page)).toHaveValue('explore');
 });
@@ -145,7 +145,7 @@ test('invalid or unrendered JSON and detached view controls cannot rewrite an un
     controls.name.value='Stale name';controls.name.dispatchEvent(new Event('change',{bubbles:true}));controls.rename.click();controls.duplicate.click();controls.default.click();
   });}
   const invalid=original+'\n{ unfinished';await writeSource(page,invalid);await staleEvents();await expect(page.locator('#src')).toHaveValue(invalid);await expect(page.locator('#undo-builder')).toBeDisabled();
-  const other=fixture();other.page.title='Unrelated story';other.page.blocks[0].id='other';other.page.views.forEach(v=>v.sections.forEach(m=>m.section='other'));other.page.blocks[0].heading='Other section';
+  const other=fixture();other.page.title='Unrelated story';other.page.blocks[0].id='other';other.page.opening.section='other';other.page.blocks[0].heading='Other section';
   const replacement=JSON.stringify(other,null,2);await writeSource(page,replacement);await staleEvents();await expect(page.locator('#src')).toHaveValue(replacement);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#file-input').setInputFiles({name:'other.json',mimeType:'application/json',buffer:Buffer.from(replacement)});
   expect(await held.evaluate(controls=>Object.values(controls).every(el=>!el.isConnected))).toBe(true);
@@ -162,7 +162,7 @@ for(const size of [{width:1800,height:1200}])test('canvas view controls stay rea
   await summary.click();await chooseNavigation(nav(page),'View','Engineering');await options(page);
   const makeDefault=settings(page).getByRole('button',{name:'Make opening View',exact:true,includeHidden:true});await reachable(select);await reachable(makeDefault);
   await expect(select).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(original);
-  await makeDefault.focus();await page.keyboard.press('Enter');expect(JSON.parse(await text(page)).page.defaultView).toBe('engineering');
+  await makeDefault.focus();await page.keyboard.press('Enter');expect(JSON.parse(await text(page)).page.opening.view).toBe('engineering');
   await info.attach('canvas-view-default-'+size.width,{body:await page.screenshot(),contentType:'image/png'});
 });
 
@@ -183,11 +183,11 @@ test('an arranging sibling cannot steal view navigation, and the selected chapte
 
 
 test('changing Standard to Explore never manufactures panel-derived Views',async({page,server})=>{
-  const input=fixture(),d=input.page.blocks[0].diagram;delete input.page.views;delete input.page.defaultView;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
+  const input=fixture(),d=input.page.blocks[0].diagram;delete input.page.blocks[0].views;delete input.page.blocks[0].defaultView;delete input.page.opening;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
   const original=await open(page,server,input);
   await expect(nav(page).locator('.reader-top-view')).toHaveCount(1);await expect(topView(page,'Standard')).toBeVisible();
   await presentation(page).selectOption('explore');
-  const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].diagram).toEqual(d);expect(saved.views).toHaveLength(1);expect(saved.views[0]).toMatchObject({name:'Standard',presentation:'explore'});
+  const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].diagram).toEqual(d);expect(saved.blocks[0].views).toHaveLength(1);expect(saved.blocks[0].views[0]).toMatchObject({name:'Standard',presentation:'explore'});
   await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

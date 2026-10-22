@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 
 const fixture=()=>({page:{title:'Export authoring',sections:[{id:'main',heading:'Main',diagram:{view:'ambient',autoplay:false,
@@ -45,7 +46,8 @@ test('closure, stale source, cross-section and narrow Inspector fail safely; hom
   await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value+'\n';src.dispatchEvent(new Event('input',{bubbles:true}));},before);
   await expect(form(page).getByRole('button',{name:'Create export',exact:true})).toBeDisabled();await expect(form(page).getByRole('status')).toContainText('changed');await expect(src).toHaveValue(before+'\n');
   await page.setViewportSize({width:1800,height:1200});await page.locator('#go').evaluate(el=>el.click());
-  await node(page,'a').click();await node(page,'z').click({modifiers:['Shift']});await expect(form(page)).toContainText('one diagram section');await expect(form(page).getByRole('button',{name:'Create export',exact:true})).toHaveCount(0);
+  // A different section is a different page; forged cross-section selections are rejected in the command-model suite.
+  await node(page,'a').click();await chooseAddDestination(page,1);await node(page,'z').click();await expect(node(page,'a')).toBeHidden();await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);await expect(page.locator('#docview g.node[data-dv-node="z"]')).toHaveClass(/dv-sel/);await expect(src).toHaveValue(before+'\n');await chooseAddDestination(page,0);
   await edge(page,0).click();await edge(page,1).click({modifiers:['Shift']});await expect(page.locator('#guide')).toContainText('2 edges selected');
   await expect(page.locator('#guide').getByLabel('kind',{exact:true})).toBeVisible();await expect(page.locator('#guide').getByLabel('ret',{exact:true})).toBeVisible();
   await expect(form(page)).toContainText('at least one selected node');await expect(page.locator('#undo-builder')).toBeDisabled();

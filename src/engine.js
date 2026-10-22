@@ -2254,17 +2254,17 @@ function createExploreNavigation(ctl,options){
     tabChoices=[];var selectedTab=null;ctl.tabBlocks.forEach(function(block,index){Array.from(block.bar.querySelectorAll('[role="tab"]')).forEach(function(button){tabChoices.push(button);if(button.getAttribute('aria-selected')==='true' && (!selectedTab || rec && rec.tabBlock===index+1))selectedTab=button;});});fillPicker(tabPicker,tabChoices,selectedTab);
     var selected=rec || ctl.activeTarget || {},detail=ctl.details && ctl.details.snapshot && ctl.details.snapshot();
     if(detail && detail.section)selected=ctl.sections.find(function(candidate){return candidate.reference===detail.section;}) || selected;
-    var members=ctl.views?ctl.views.members(selected):null;
+    var members=ctl.views && ctl.views.owner(selected)?ctl.views.owner(selected).records.filter(function(r){return !r.domainOnly;}).map(function(r){return r.runtime;}):null;
     var peers=sectionButtons.filter(function(entry){return members?members.indexOf(entry.rec)>=0:entry.rec.tabBlock===selected.tabBlock && entry.rec.tab===selected.tab;});
     diagrams.querySelector('.explore-navigation-label').textContent='Sections';
     sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
     diagrams.hidden=peers.length<2;
-    var owner=ctl.views && ctl.views.owner(selected);hasSectionChoices=owner?owner.views.some(function(view){return view.members.length>1;}):peers.length>1;
+    var owner=ctl.views && ctl.views.owner(selected);hasSectionChoices=owner?owner.records.filter(function(r){return !r.domainOnly;}).length>1:peers.length>1;
     if(ctl.views){
       var currentView=ctl.views.current(selected);
       chapters.querySelectorAll('.tab-view-choices').forEach(function(el){el.remove();});
       var viewChoices=doc.createElement('div');viewChoices.className='diagram-view-choice tab-view-choices';viewChoices.setAttribute('role','group');viewChoices.setAttribute('aria-label','Views');
-      (owner?owner.views:[]).forEach(function(definition){var button=doc.createElement('button');button.type='button';button.className='mbtn';button.textContent=definition.name;button.setAttribute('data-tab-view',definition.id);button.setAttribute('aria-pressed',String(definition===currentView));setExploreIndicator(button,definition.presentation==='explore','Explore View: its canvas can be panned and zoomed.');button.addEventListener('click',function(){ctl.views.select(selected,definition.id);});viewChoices.appendChild(button);});
+      (owner?owner.views.filter(function(v){return v.members[0].record.runtime===selected;}):[]).forEach(function(definition){var button=doc.createElement('button');button.type='button';button.className='mbtn';button.textContent=definition.name;button.setAttribute('data-tab-view',definition.id);button.setAttribute('aria-pressed',String(definition===currentView));setExploreIndicator(button,definition.presentation==='explore','Explore View: its canvas can be panned and zoomed.');button.addEventListener('click',function(){ctl.views.select(selected,definition.id);});viewChoices.appendChild(button);});
       chapters.appendChild(viewChoices);chapters.hidden=!owner;
     }else chapters.hidden=!move(choices,chapters);
     viewButtons=Array.from(chapters.querySelectorAll('.diagram-view-choice button'));fillPicker(viewPicker,viewButtons,viewButtons.find(function(button){return button.getAttribute('aria-pressed')==='true';}));
@@ -3377,7 +3377,7 @@ function renderPage(view, page, skin, backlinks, options){
       return {index:tb.index, count:tb.count, slugs:tb.slugs.slice()};
     }),
     sections:ctl.sections.map(function(sec){
-      return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
+      return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasSection:true, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
               stepIds:sec.stepper ? sec.stepper.ids() : null,
               hasCard:!!sec.contractCard, rowCount:sec.contractCard?sec.contractCard.querySelectorAll('.ctrow').length:0,
               cards:sec.contractCards.map(function(card){return {reference:card.getAttribute('data-contract-ref'),rowCount:card.querySelectorAll('.ctrow').length};})};
@@ -3766,6 +3766,8 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     if (target.kind === 'diagram'){
       if(ctl.handoffHistoryPush)fragmentState={tabBlock:null,tab:null,diagramSection:null,cardSection:null,row:null};
       fragmentState.diagramSection = target.section;
+      var targetSection=section(target.section);
+      if(targetSection){fragmentState.tabBlock=targetSection.tabBlock;fragmentState.tab=targetSection.tab;}
     } else if (target.kind === 'tab'){
       fragmentState = {tabBlock:target.tabBlock, tab:target.tab,
                        diagramSection:null, cardSection:null, row:null};
@@ -3786,14 +3788,14 @@ function wireDeepLinks(ctl, win, preservedHash, options){
        fragment. The tour restores the pre-tour state before clearing it. */
     /* Host-owned channels never mutate the address bar, so they may keep
        their copy state current even while normal fragment writes are muted. */
-    if (suppress || (manageHistory && ctl.suppressFragmentWrites)) return;
+    if (suppress || ctl.views && ctl.views.updating() || (manageHistory && ctl.suppressFragmentWrites)) return;
     syncChangedTarget();
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
     if(!manageHistory)return h;
     try {
       var historyState=ctl.handoffs?Object.assign({},win.history.state,{dvHandoff:ctl.handoffs.historyState()}):null;
-      win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](historyState, '',
+      win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush || ctl.viewHistoryPush ? 'pushState' : 'replaceState'](historyState, '',
         withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
@@ -3803,6 +3805,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       if (mirrorSource && typeof mirrorSource.postMessage === 'function')
         mirrorSource.postMessage({type:'dv_fragment', fragment:h.replace(/^#/, '')}, mirrorOrigin);
     } catch (ex) { /* sandboxed viewers may refuse; deep links just stay off */ }
+    ctl.viewHistoryPush=false;
     ctl.detailHistoryPush=false;
     ctl.handoffHistoryPush=false;
   }
@@ -3830,7 +3833,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       if(ctl.handoffs && diagramSec && ctl.view.querySelector('.dv-embed-target'))
         ctl.sections.forEach(function(rec){rec.sectionEl.classList.toggle('dv-embed-target',rec===diagramSec);});
       var owner=ctl.views && ctl.views.owner(diagramSec),presentation=diagramSec && diagramSec.presentation;
-      var opening=owner && owner.source.views ? tabViewDefault(owner,owner.views).id : presentation && presentation.defaultView ? presentation.defaultView() : 'flow';
+      var record=owner && owner.records.find(function(r){return r.runtime===diagramSec;}),openingView=record && sectionViewDefault(owner,record,owner.views);var opening=openingView && openingView.id;
       var eligible=!ctl.views || ctl.views.ensure(diagramSec,st.v || opening,true);
       if(!eligible && ctl.views)eligible=ctl.views.ensure(diagramSec,opening,true) || ctl.views.ensure(diagramSec,undefined,true);
       if(ctl.details && diagramSec && eligible)ctl.details.showSection(diagramSec.reference);
@@ -3850,6 +3853,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     var cardTarget = target.card;
     if (cardTarget){
       var cardSec = section(cardTarget.section);
+      if(!diagramTarget && cardSec && ctl.views)ctl.views.ensure(cardSec,undefined,true);
       var selectedCard=cardSec && (cardSec.contractCards ? cardSec.contractCards[cardTarget.cardIndex || 0] : cardSec.contractCard);
       var selectedRows=selectedCard?Array.prototype.slice.call(selectedCard.querySelectorAll('.ctrow')):[];
       targetEl = selectedCard;
@@ -3882,6 +3886,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     else ctl.activeTarget = {kind:'page'};
     if(ctl.details && st.q){try{ctl.details.restore(JSON.parse(st.q));}catch(_) {/* stale drill target leaves its valid ancestor visible */}}
     if(ctl.handoffs)ctl.handoffs.restoreHistory(win.history.state && win.history.state.dvHandoff,diagramTarget && section(diagramTarget.section));
+    ctl.viewHistoryPush=false;
     ctl.detailHistoryPush=false;
     if (targetEl && typeof targetEl.scrollIntoView === 'function'){
       targetEl.scrollIntoView({block: 'start', behavior: 'instant'});
@@ -3954,6 +3959,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   // switch the passive navigation context to an unrelated section.
   var previousScrollRestoration=null;
   if(manageHistory && hasInitialTarget && win.history && 'scrollRestoration' in win.history){previousScrollRestoration=win.history.scrollRestoration;win.history.scrollRestoration='manual';}
+  ctl.viewHistoryPush=false;
   if(win.location.hash && (manageHistory || options.restoreHash!==false && hasInitialTarget))apply();else write();
   ctl.sections.forEach(function(rec){if(rec.follow)rec.follow.cancel();});
   return {receiveLinkBaseMessage:receiveLinkBaseMessage,currentURL:function(){return fullURL(currentHash());},destroy:function(){

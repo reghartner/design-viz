@@ -33,6 +33,7 @@ test('real opening-view captures preserve panel-only content, hidden graph, firs
     const prose=await capture.capture({...entry,spec:tabs});expect(prose.observed.nodes).toEqual([]);expect(prose.observed.text).toContain('Only prose here');
     tabs.page.blocks[0].tabs[0].sections.push({id:'visible',heading:'Visible graph',diagram:graph('Active service')});const active=await capture.capture({...entry,spec:tabs});expect(active.section).toBe('visible');expect(active.observed.nodes.join(' ')).toContain('Active service');expect(active.observed.nodes.join(' ')).not.toContain('INACTIVE SECRET');
     await info.attach('opening-tab-graph',{body:active.png,contentType:'image/png'});
+    const openingTab=tabs.page.blocks[0].tabs[0];openingTab.sections.forEach(section=>{section.views=[{id:'standard',name:'Read',presentation:'standard'}];});openingTab.opening={section:'intro',view:'standard'};const exact=await capture.capture({...entry,spec:tabs});expect(exact.section).toBe('intro');expect(exact.observed.nodes).toEqual([]);expect(exact.observed.text).toContain('Only prose here');
   }finally{await capture.close();}
 });
 

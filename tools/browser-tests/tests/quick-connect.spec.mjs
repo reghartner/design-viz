@@ -1,3 +1,4 @@
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,paste,pastePage,closeTools,canvasTools} from '../helpers/test.mjs';
 
 const initial=()=>({page:{title:'Quick connections',blocks:[{id:'main',heading:'Doorbell services',diagram:{
@@ -41,7 +42,9 @@ test('visible Connect action and the Add menu share cancellation and invalid-tar
   await button.click();await node(page,'a').click();expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'c',to:'a'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#workspace-window-inspect .workspace-window-close').click();
-  for(const target of ['a','b','z']){await start(page);await node(page,target).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);}
+  for(const target of ['a','b']){await start(page);await node(page,target).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);}
+  // Paging away cancels the pending connection; hidden sections cannot be targets.
+  await start(page);await page.getByRole('button',{name:'Next page',exact:true}).click();await node(page,'z').click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);await chooseAddDestination(page,0);await closeTools(page);
   await start(page);await page.keyboard.press('Escape');await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await start(page);await page.locator('.board:visible').first().click({position:{x:5,y:5}});await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#diagram-add').click();await page.locator('[data-add-kind=edge]').click();

@@ -20,9 +20,11 @@ function visibilityEvidence(raw,document){
     var matching=records.filter(function(r){return r.reference===e.section;}),record=matching[0];
     if(matching.length!==1 || !record.section.diagram)return stop('invalid','Unknown or ambiguous diagram section reference');
     var d=record.section.diagram,views=diagramLayoutViews(d),named=views.length && !views[0].legacy;
+    var owner=tabViewOwners(page).find(function(o){return o.records.some(function(r){return r.section===record.section;});}),definition=owner && tabViewDefinitions(owner).find(function(v){return v.id===e.view && v.members[0].record.section===record.section;});
     if((Array.isArray(d.layouts)?d.layouts:[]).filter(function(v){return v && v.id===e.view;}).length>1)return stop('invalid','Ambiguous view ID');
     var view=views.find(function(v){return (v.legacy?'layout':v.id)===e.view;});
-    if(named && !view || !named && e.view!=='flow' && !view)return stop('invalid','Unknown view');
+    if(definition)view=sectionLayoutDefinition(d,definition.members[0].layout);
+    if(!definition && (named && !view || !named && e.view!=='flow' && !view))return stop('invalid','Unknown view');
     if(d.view==='ambient-only')return stop('invalid','Step is unreachable in ambient-only mode');
     var resolved=resolveSourceStep(d,e.path,e.step);
     if(!resolved || resolved.sourceIndex<0)return stop('invalid','Unknown path or step on this path');

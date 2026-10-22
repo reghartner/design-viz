@@ -19,9 +19,9 @@ function createTabViewController(ctl,page){
     updating=true;
     try{
       var active=members(owner);if(active.indexOf(owner.selected)<0)owner.selected=active[0];
-      if(owner.slots && active.length){var slot=owner.slots.get(owner.current.id),prior=null;active.forEach(function(rec){placeSection(rec,prior,slot);prior=rec.sectionEl;});}
+      if(owner.slots && active.length){var slot=owner.slots.get(owner.current.key),prior=null;active.forEach(function(rec){placeSection(rec,prior,slot);prior=rec.sectionEl;});}
       else if(!owner.current.legacy && active.length){var anchor=owner.anchor;if(!anchor){anchor=document.createComment('Tab section order');active[0].sectionEl.before(anchor);owner.anchor=anchor;}var previous=anchor;active.forEach(function(rec){placeSection(rec,previous);previous=rec.sectionEl;});}
-      owner.records.forEach(function(record){var rec=record.runtime,member=owner.current.members.find(function(m){return m.record===record;}),visible=!!member && (owner.current.presentation==='standard' || rec===owner.selected);
+      owner.records.forEach(function(record){var rec=record.runtime,member=owner.current.members.find(function(m){return m.record===record;}),visible=!!member && rec===owner.selected;
         rec.viewExcluded=!member;rec.viewingMode=owner.current.presentation;
         if(member && rec.presentation){var layout=member.layout || rec.presentation.defaultView();if(rec.presentation.viewId()!==layout)rec.presentation.setView(layout);}
         if(rec.viewport)rec.viewport.setPresentation(member?owner.current.presentation:'standard');
@@ -33,12 +33,13 @@ function createTabViewController(ctl,page){
   }
   function notify(owner){
     if(!owner.selected)return;
+    ctl.viewHistoryPush=true;
     ctl.activeTarget={kind:'diagram',section:owner.selected.number};
     ctl.view.dispatchEvent(new CustomEvent('tab-view-change',{detail:{section:owner.selected.number,view:owner.current.id}}));
     if(ctl.onChange)ctl.onChange();
   }
   function select(rec,id,desired,silent){
-    if(retired || updating)return false;var owner=ownerOf(rec),next=owner && owner.views.find(function(view){return view.id===id;});if(!next)return false;
+    if(retired || updating)return false;var owner=ownerOf(rec),next=owner && owner.views.find(function(view){return view.id===id && view.members.some(function(m){return m.record.runtime===(desired || rec);});});if(!next)return false;
     if(desired && !next.members.some(function(member){return member.record.runtime===desired;}))return false;
     if(ctl.details)ctl.details.close(true);
     owner.current=next;owner.selected=desired || (members(owner).indexOf(owner.selected)>=0?owner.selected:members(owner)[0]);apply(owner);if(!silent)notify(owner);return true;
@@ -48,21 +49,22 @@ function createTabViewController(ctl,page){
     var record=owner.records.find(function(record){return record.runtime===rec;}),diagram=record.section.diagram;
     // Exact authored IDs win. Old layout/flow links fall back to a real View
     // containing the addressed section, including explicit multi-section Views.
-    var view=id?owner.views.find(function(v){return v.id===id;}):owner.current;
-    if(id && !view)view=owner.views.find(function(v){return v.legacy && v.legacyLayout===id && v.members.some(function(m){return m.record.runtime===rec;});});
+    var view=id?owner.views.find(function(v){return v.id===id && v.members.some(function(m){return m.record.runtime===rec;});}):owner.current;
+    if(id && !view)view=owner.views.find(function(v){return (v.legacy && v.legacyLayout===id || v.members[0].layout===id) && v.members.some(function(m){return m.record.runtime===rec;});});
     if(!view && (id==='layout' || id==='flow')){
       var opening=tabViewDefault(owner,owner.views);
       view=opening && opening.members.some(function(m){return m.record.runtime===rec;})?opening:owner.views.find(function(v){return v.members.some(function(m){return m.record.runtime===rec;});});
     }
     if(id && (!view || !view.members.some(function(m){return m.record.runtime===rec;})))return false;
-    if(!view || !view.members.some(function(m){return m.record.runtime===rec;}))view=owner.views.find(function(v){return v.members.some(function(m){return m.record.runtime===rec;});});
+    if(!view || !view.members.some(function(m){return m.record.runtime===rec;}))view=sectionViewDefault(owner,record,owner.views);
     if(view && owner.current===view && owner.selected===rec)return true;
     return view?select(rec,view.id,rec,silent):false;
   }
+  function recordHasViews(rec){var owner=ownerOf(rec);return owner.records.some(function(r){return r.runtime===rec && r.section.views;});}
   function legacyChanged(ev){
     if(updating || retired)return;
     var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);}),owner=ownerOf(rec);
-    if(!owner || owner.source.views || !rec.presentation)return;
+    if(!owner || (owner.source.views || recordHasViews(rec)) || !rec.presentation)return;
     var id=rec.presentation.viewId(),current=owner.current;
     if(current && current.members.some(function(m){return m.record.runtime===rec && m.layout===id;}))return;
     var next=owner.views.find(function(v){return v.legacyLayout===id && v.members.some(function(m){return m.record.runtime===rec;});});
@@ -85,7 +87,7 @@ function createTabViewController(ctl,page){
       var siblings=Array.from(parent.children),first=siblings[Math.min.apply(null,els.map(function(el){return siblings.indexOf(el);}))];
       var count=0;for(var node=first;node && count<els.length;node=node.nextElementSibling){if(els.indexOf(node)<0)return;count++;}
       if(count<els.length)return;
-      owner.slots=new Map();owner.views.forEach(function(view){var slot=document.createElement('dv-view-slot');slot.className='tab-view-slot';slot.setAttribute('data-dv-view-slot',view.id);(owner.anchor || first).before(slot);owner.slots.set(view.id,slot);});
+      owner.slots=new Map();owner.views.forEach(function(view){var slot=document.createElement('dv-view-slot');slot.className='tab-view-slot';slot.setAttribute('data-dv-view-slot',view.key);(owner.anchor || first).before(slot);owner.slots.set(view.key,slot);});
       // Every section leaves the old sibling positions, so a path saved before
       // wrappers existed resolves to nothing instead of a renumbered neighbour.
       var rest=document.createElement('dv-view-slot'),prior=null;rest.className='tab-view-slot';(owner.anchor || first).before(rest);
@@ -95,13 +97,13 @@ function createTabViewController(ctl,page){
   }
   function viewAt(el){
     var slot=el && el.closest && el.closest('[data-dv-view-slot]'),owner=slot && owners.find(function(o){return o.slots && o.slots.get(slot.getAttribute('data-dv-view-slot'))===slot;});
-    return owner?{owner:owner,id:slot.getAttribute('data-dv-view-slot'),current:owner.current && owner.current.id===slot.getAttribute('data-dv-view-slot')}:null;
+    var definition=owner && owner.views.find(function(v){return v.key===slot.getAttribute('data-dv-view-slot');});return definition?{owner:owner,id:definition.id,definition:definition,current:owner.current===definition}:null;
   }
   ctl.view.addEventListener('diagram-view-change',legacyChanged);
   owners.forEach(apply);
   return {owners:owners,owner:ownerOf,current:function(rec){var owner=ownerOf(rec);return owner && owner.current;},members:function(rec){return members(ownerOf(rec));},select:select,ensure:ensure,
     primary:function(tabBlock,tab){var owner=owners.find(function(o){return o.tabBlock===tabBlock && o.tab===tab;});return owner && owner.selected;},
     apply:function(){owners.forEach(apply);},useSlots:useSlots,viewAt:viewAt,
-    showView:function(at){return select(at.owner.records[0].runtime,at.id);},updating:function(){return updating;},
+    showView:function(at){return select(at.definition.members[0].record.runtime,at.id);},updating:function(){return updating;},
     destroy:function(){retired=true;ctl.view.removeEventListener('diagram-view-change',legacyChanged);owners.forEach(function(owner){if(owner.anchor)owner.anchor.remove();});}};
 }

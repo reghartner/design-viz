@@ -1138,39 +1138,54 @@ function builderTabViewOwner(raw,section){
   return {path:path,owner:owner};
 }
 function planTabViewEdit(text,raw,section,id,action,value,validateSource){
+  var findings=builderValidateSource(raw,validateSource);if(findings.errors.length)return {error:findings.errors.join('\n')};
   if(raw.nodes && raw.rows){text='{\n  "sections": [{"diagram": '+text+'}]\n}';raw=JSON.parse(text);}
   var got=builderTabViewOwner(raw,section);if(!got)return {error:'Select a section first.'};
-  var owner=got.owner,views=tabViewDefinitions(owner),opening=tabViewDefault(owner,views),current=views.find(function(v){return v.id===id;}) || tabViewDefault(owner,views),next=text;
-  function set(path,key,val){var result=jsonSetField(next,path,key,JSON.stringify(val));if(!result)throw new Error('Unable to locate the View source.');next=result.text;}
-  if(!owner.source.views){
-    var used=new Set(sectionRecords(normalize(raw)).map(function(rec){return rec.section.id;}).filter(Boolean));
-    owner.records.forEach(function(rec){if(rec.section.id)return;var proposed='section-'+rec.number;while(used.has(proposed))proposed+='-copy';used.add(proposed);set(specSectionPaths(raw)[rec.number-1].section,'id',proposed);});
-    raw=JSON.parse(next);got=builderTabViewOwner(raw,section);owner=got.owner;
-    views=views.map(function(view){return {id:view.id,name:view.name.slice(0,80),presentation:view.presentation,sections:view.members.map(function(member){var ref={section:sectionRecords(normalize(raw))[member.record.number-1].section.id};if(member.layout)ref.layout=member.layout;return ref;})};});
-    set(got.path,'views',views);set(got.path,'defaultView',opening && opening.id || views[0].id);
-  }else views=JSON.parse(JSON.stringify(owner.source.views));
-  var index=views.findIndex(function(v){return v.id===id;});if(index<0)index=views.findIndex(function(v){return current && v.id===current.id;});
+  var next=text,path=specSectionPaths(raw)[section].section;
+  function set(at,key,val){var result=jsonSetField(next,at,key,val===undefined?null:JSON.stringify(val));if(!result)throw new Error('Unable to locate the View source.');next=result.text;}
+  // Splice only ownership fields. Prose, topology and diagram bytes remain intact.
+  if(!specValueAt(raw,path).views){
+    var migration;try{migration=migrateSectionViews(raw,got.owner.path);}catch(error){return {error:error.message};}
+    var migrated=specSectionPaths(migration.spec);
+    got.owner.records.forEach(function(rec){var at=specSectionPaths(raw)[rec.number-1].section,after=specValueAt(migration.spec,migrated[rec.number-1].section);['id','views','defaultView'].forEach(function(key){if(JSON.stringify(specValueAt(raw,at)[key])!==JSON.stringify(after[key]))set(at,key,after[key]);});});
+    var source=specValueAt(migration.spec,got.path);['views','defaultView','opening'].forEach(function(key){if(JSON.stringify(specValueAt(raw,got.path)[key])!==JSON.stringify(source[key]))set(got.path,key,source[key]);});
+  }
+  var working=JSON.parse(next),source=specValueAt(working,path),views=builderClone(source.views),index=views.findIndex(function(v){return v.id===id;});
+  if(index<0)index=views.findIndex(function(v){return v.id===source.defaultView;});if(index<0)index=0;
   var selected=views[index];if(!selected)return {error:'The selected View no longer exists.'};
-  var resultId=selected.id;
+  var sectionRef=source.id || sectionRecords(normalize(working))[section].reference,resultId=selected.id;
+  function independent(){
+    working=JSON.parse(next);var sectionSource=specValueAt(working,path);if(!sectionSource.diagram)return;
+    var d=sectionSource.diagram,prior=selected.layout || (sectionLayoutDefinition(d) || {}).id || 'flow';
+    var duplicated=planDuplicateSectionLayout(next,working,section,prior);if(duplicated.error)return duplicated;
+    next=duplicated.text;
+    // Promotion of default geometry must also pin siblings to the original.
+    var after=specValueAt(JSON.parse(next),path).diagram;
+    views.forEach(function(v){if(v!==selected && !v.layout)v.layout=d.layouts?((sectionLayoutDefinition(d) || {}).id):after.defaultLayout;});
+    selected.layout=duplicated.layoutId;
+  }
   if(action==='create' || action==='duplicate'){
     var stem=action==='create'?'view':selected.id.slice(0,54)+'-copy',serial=2,newId=stem;while(views.some(function(v){return v.id===newId;}))newId=stem+'-'+serial++;
-    selected=JSON.parse(JSON.stringify(selected));selected.id=newId;selected.name=action==='create'?'New View':(selected.name.slice(0,73)+' copy');views.splice(index+1,0,selected);resultId=newId;
+    selected=builderClone(selected);selected.id=newId;selected.name=action==='create'?'New View':selected.name.slice(0,73)+' copy';views.splice(index+1,0,selected);resultId=newId;
+    var error=independent();if(error)return error;
   }else if(action==='delete'){
-    if(views.length===1)return {error:'Keep at least one View in this Tab.'};views.splice(index,1);resultId=views[Math.min(index,views.length-1)].id;
-    var currentSource=specValueAt(JSON.parse(next),got.path);if(currentSource.defaultView===id)set(got.path,'defaultView',resultId);
-  }else if(action==='arrangement'){
-    var updatedRaw=JSON.parse(next),record=sectionRecords(normalize(updatedRaw))[section],member=selected.sections.find(function(member){return tabViewMemberReference(member)===record.section.id;});
-    if(!member || !record.section.diagram)return {error:'Select a diagram section included in this View.'};
-    var layoutId=typeof member==='object' && member.layout || (sectionLayoutDefinition(record.section.diagram) || {}).id || 'flow';
-    var duplicated=planDuplicateSectionLayout(next,updatedRaw,section,layoutId);if(duplicated.error)return duplicated;next=duplicated.text;
-    selected.sections=selected.sections.map(function(value){return tabViewMemberReference(value)===record.section.id?{section:record.section.id,layout:duplicated.layoutId}:value;});
+    if(views.length===1)return {error:'Keep at least one View in this section.'};views.splice(index,1);resultId=views[Math.min(index,views.length-1)].id;
+    if(source.defaultView===selected.id)set(path,'defaultView',resultId);
+    var opening=specValueAt(JSON.parse(next),got.path).opening;if(opening && opening.section===sectionRef && opening.view===selected.id)set(got.path,'opening',{section:sectionRef,view:resultId});
+  }else if(action==='arrangement'){var error=independent();if(error)return error;
   }else if(action==='name'){
     if(typeof value!=='string' || !value.trim() || value.trim().length>80)return {error:'Use a View name between 1 and 80 characters.'};selected.name=value.trim();
+  }else if(action==='visibility'){
+    // Unspecified arrangements are independent on first write. An explicit
+    // shared layout reference is intentional and continues to share edits.
+    if(!selected.layout){var error=independent();if(error)return error;}
+    var changed=planSectionDiagramVisibility(next,JSON.parse(next),section,selected.layout,value);if(changed.error)return changed;next=changed.text;selected.layout=changed.layoutId;
   }else if(action==='presentation')selected.presentation=value;
-  else if(action==='sections')selected.sections=value;
-  else if(action==='default')set(got.path,'defaultView',selected.id);
+  else if(action==='layout'){if(value)selected.layout=value;else delete selected.layout;}
+  else if(action==='up' || action==='down'){var to=index+(action==='up'?-1:1);if(to<0 || to>=views.length)return {error:'This View is already at the end.'};views.splice(index,1);views.splice(to,0,selected);}
+  else if(action==='default'){set(path,'defaultView',selected.id);set(got.path,'opening',{section:sectionRef,view:selected.id});}
   else return {error:'Unknown View action.'};
-  set(got.path,'views',views);
+  set(path,'views',views);
   var findings=builderValidateSource(JSON.parse(next),validateSource);if(findings.errors.length)return {error:findings.errors.join('\n')};
   return {text:next,viewId:resultId};
 }

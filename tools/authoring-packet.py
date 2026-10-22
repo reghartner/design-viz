@@ -23,7 +23,7 @@ CONTRACT = 'contract/authoring-contract.md'
 SKILL = '.claude/skills/hld-to-page/SKILL.md'
 REFS = '.claude/skills/hld-to-page/references/'
 WORKFLOW = REFS + 'authoring-workflow.md'
-COMMON = ['Output rules', 'Top-level shape', 'Tab-owned Views', 'Section shape', 'Diagram object',
+COMMON = ['Output rules', 'Top-level shape', 'Section-owned Views', 'Section shape', 'Diagram object',
           'view', 'autoplay', 'nodes', 'rows — left-to-right slots (no coordinates)',
           'floats — automatic or freely placed nodes', 'edges',
           'Edge kinds (protocols) and the legend', 'Validation behavior']
@@ -128,6 +128,7 @@ def infer(raw):
     page = raw.get('page', raw) if isinstance(raw, dict) else {}
     owners = [page] + [tab for block in page.get('blocks', page.get('sections', []))
                        if isinstance(block, dict) for tab in block.get('tabs', [])]
+    owners += [sec for owner in owners if isinstance(owner, dict) for sec in owner.get('sections', owner.get('blocks', [])) if isinstance(sec, dict) and 'tabs' not in sec]
     for owner in owners:
         views = owner.get('views') if isinstance(owner, dict) else None
         if isinstance(views, list):

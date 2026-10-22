@@ -160,7 +160,7 @@ function resolveHashTarget(st, manifest){
     return out;
   }
   function diagram(sec, legacy){
-    if (!sec || (!Array.isArray(sec.stepIds) && !sec.hasDiagram)) return {kind:'invalid'};
+    if (!sec || (!Array.isArray(sec.stepIds) && !sec.hasDiagram && !sec.hasSection)) return {kind:'invalid'};
     var mode = (st.m === 'step' || st.s != null) ? 'step' :
                (st.m === 'ambient' ? 'ambient' : null);
     if(!Array.isArray(sec.stepIds))mode=null;

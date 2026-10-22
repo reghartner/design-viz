@@ -120,6 +120,7 @@ function workbenchAgentReviewChanges(currentPage,proposedPage){
        workbenchAgentReviewSignature(workbenchAgentReviewWithout(aSection.diagram,['nodes','edges','panels','steps','paths','layouts']))!==workbenchAgentReviewSignature(workbenchAgentReviewWithout(bSection.diagram,['nodes','edges','panels','steps','paths','layouts']))) {
       workbenchAgentReviewMark(currentSide,a.index,'section',null,'modified');workbenchAgentReviewMark(proposedSide,b.index,'section',null,'modified');
     }
+    workbenchAgentReviewArray(aSection.views,bSection.views,currentSide,proposedSide,a.index,b.index,'views');
     workbenchAgentReviewObject(aDiagram.nodes,bDiagram.nodes,currentSide,proposedSide,a.index,b.index,'nodes');
     workbenchAgentReviewArray(aDiagram.edges,bDiagram.edges,currentSide,proposedSide,a.index,b.index,'edges',function(edge){
       return edge && edge.from!=null && edge.to!=null?'ends:'+String(edge.from)+'>'+String(edge.to)+'|'+String(edge.fromPort || '')+'>'+String(edge.toPort || ''):null;
@@ -166,7 +167,7 @@ function workbenchAgentReviewEntries(changes,pages,ledgerChanged){
     }
     if(kind==='views'){
       var owner=tabViewOwners(pages[side]).find(function(o){return o.records.some(function(r){return r.number===target.section+1;});});
-      value=owner && (owner.source.views || [])[target.key];
+      value=(sec.views || owner && owner.source.views || [])[target.key];
     }else value=(d[kind] || {})[target.key];
     var name=value && (value.title || value.name || value.label || value.text || value.id);
     if(!name && kind==='edges' && value)name=value.from+' → '+value.to;
@@ -295,7 +296,7 @@ function initWorkbenchAgentReview(opts){
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
     if(ctl.details)ctl.details.close(true);
     if(target.kind==='views' && ctl.views){
-      var owner=ctl.views.owner(rec),definition=owner && owner.source.views[target.key];
+      var owner=ctl.views.owner(rec),definition=(record.section.views || owner && owner.source.views || [])[target.key];
       visible=!!(definition && ctl.views.select(rec,definition.id,undefined,true));
       if(visible)rec=owner.selected || rec;
     }else if(ctl.views)visible=ctl.views.ensure(rec,undefined,true);

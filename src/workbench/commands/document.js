@@ -41,6 +41,7 @@ function planDocumentSource(text,raw,key,value){
 var BUILDER_SECTION_TEMPLATE = [
   '{',
   '  "heading": "New section",',
+  '  "views": [{"id":"standard","name":"Standard","presentation":"standard"}],',
   '  "accent": "cyan",',
   '  "text": ["What this flow does, in one or two sentences."],',
   '  "diagram": {',
@@ -272,7 +273,15 @@ function builderDocumentDetailResult(plan,raw,mapPath,copies){
   var doc=builderDocumentPage(raw),ownerPaths=doc?[doc.path]:[];
   specSectionPaths(raw).forEach(function(rec){var ti=rec.section.lastIndexOf('tabs');if(ti>=0){var path=rec.section.slice(0,ti+2);if(!ownerPaths.some(function(other){return JSON.stringify(path)===JSON.stringify(other);}))ownerPaths.push(path);}});
   ownerPaths.forEach(function(ownerPath){
-    var owner=specValueAt(raw,ownerPath);if(!owner || !Array.isArray(owner.views))return;
+    var owner=specValueAt(raw,ownerPath);if(!owner)return;
+    if(owner.opening){
+      var mapped=mapPath(ownerPath),nextOwner=mapped && specValueAt(nextRaw,mapped),before=records.find(function(r){return r.reference===owner.opening.section;}),targetPath=before && mapPath(before.path),after=targetPath && nextRecords.find(function(r){return JSON.stringify(r.path)===JSON.stringify(targetPath);});
+      if(nextOwner){var opening=after?{section:after.reference,view:owner.opening.view}:undefined;
+        if(opening && (!after.section.views || !after.section.views.some(function(v){return v.id===opening.view;})))opening=undefined;
+        if(JSON.stringify(opening)!==JSON.stringify(owner.opening)){var result=jsonSetField(out,mapped,'opening',opening?JSON.stringify(opening):null);if(result)out=result.text;}
+      }
+    }
+    if(!Array.isArray(owner.views))return;
     var nextPath=mapPath(ownerPath);if(!nextPath)return;var nextOwner=specValueAt(nextRaw,nextPath);if(!nextOwner || !Array.isArray(nextOwner.views))return;
     var changed=false,views=builderClone(owner.views).map(function(view){view.sections=view.sections.reduce(function(list,member){
       var id=tabViewMemberReference(member),before=records.find(function(rec){return rec.section.id===id;}),afterPath=before && mapPath(before.path),after=afterPath && nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(afterPath);});
@@ -351,9 +360,13 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
 }
 
 function planAddViewSection(text,raw,sectionIdx,viewId){
-  var got=builderTabViewOwner(raw,sectionIdx),ownerPath=got && got.path,owner=ownerPath && specValueAt(raw,ownerPath);if(!owner || !Array.isArray(owner.views))return null;
+  var got=builderTabViewOwner(raw,sectionIdx),ownerPath=got && got.path,owner=ownerPath && specValueAt(raw,ownerPath);if(!owner)return null;
+  if(!Array.isArray(owner.views)){
+    var key=ownerPath.indexOf('tabs')>=0?'sections':owner.blocks?'blocks':'sections',listPath=ownerPath.concat([key]),list=specValueAt(raw,listPath),insert=jsonInsertMember(text,listPath,null,BUILDER_SECTION_TEMPLATE);if(!insert)return {error:'Could not add the section.'};
+    var path=listPath.concat([list.length]),next=JSON.parse(insert.text),index=specSectionPaths(next).findIndex(function(r){return JSON.stringify(r.section)===JSON.stringify(path);}),range=jsonLocate(insert.text,path);return {text:insert.text,kind:'section',index:index,start:range.start,end:range.end};
+  }
   var view=owner.views.find(function(view){return view.id===viewId;}) || owner.views.find(function(view){return view.id===owner.defaultView;}) || owner.views[0];
-  var taken=Object.create(null);sectionRecords(normalize(raw)).forEach(function(rec){taken[rec.reference]=true;});var section=JSON.parse(BUILDER_SECTION_TEMPLATE);section.id=builderUniqueKey(taken,'section');
+  var taken=Object.create(null);sectionRecords(normalize(raw)).forEach(function(rec){taken[rec.reference]=true;});var section=JSON.parse(BUILDER_SECTION_TEMPLATE);section.id=builderUniqueKey(taken,'section');delete section.views;
   var key=ownerPath.indexOf('tabs')>=0?'sections':owner.blocks?'blocks':'sections',listPath=ownerPath.concat([key]),list=specValueAt(raw,listPath),insert=jsonInsertMember(text,listPath,null,JSON.stringify(section,null,2));if(!insert)return {error:'Could not add the section.'};
   var views=builderClone(owner.views),selected=views.find(function(v){return v.id===view.id;});selected.sections.push({section:section.id});var update=jsonSetField(insert.text,ownerPath,'views',JSON.stringify(views,null,2));if(!update)return {error:'Could not include the new section in this View.'};
   var next=JSON.parse(update.text),path=listPath.concat([list.length]),index=specSectionPaths(next).findIndex(function(rec){return JSON.stringify(rec.section)===JSON.stringify(path);}),range=jsonLocate(update.text,path);

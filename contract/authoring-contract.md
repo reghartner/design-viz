@@ -115,33 +115,30 @@ append them under "Company contract additions". See
   `"blocks"` when there are no tabs; or a bare diagram object (just
   `nodes` + `rows` + `edges`...) which is auto-wrapped in a one-section page.
 
-## Tab-owned Views
+## Section-owned Views
 
-Sections own their content (`diagram.nodes`, edges, steps, panels and prose).
-A Tab may define `views` and `defaultView` to present overlapping ordered subsets
-of those same sections. Each View has a stable `id`, a `name`,
-`presentation: "standard" | "explore"`, and nonempty `sections` references:
+Tabs contain sections. Sections own content (`diagram.nodes`, edges, steps,
+panels and prose) and `views:[{id,name,presentation,layout?}]`. Each View renders
+exactly its owning section. Standard and full Explore replace the main content
+area; paging enumerates sections and then their local Views. Reuse section
+content for Business and Data Views; do not copy content or create a membership
+list. View IDs are unique within the section. `section.defaultView` optionally
+selects its local default; `tab.opening` / `page.opening` can select an exact
+`{section,view}` pair. Detail domains are drilldown-only.
 
 ```json
-"views": [
-  {"id":"overview","name":"Overview","presentation":"standard","sections":["a","c"]},
-  {"id":"journey","name":"Journey","presentation":"explore","sections":["b","c"]}
-],
-"defaultView": "overview"
+{"id":"story", "text":["Shared notes"],
+ "views":[{"id":"business","name":"Business","presentation":"standard"},
+          {"id":"data","name":"Data","presentation":"explore"}]}
 ```
 
-Every referenced section needs a document-unique `id` and must belong to that
-Tab. Standard stacks the listed sections; Explore shows one listed section at a
-time. Omitted sections are unavailable in that View. Detail domains appear only
-through drilldown and must not be View members. Direct page sections support the
-same fields as an implicit Tab. Do not use a Tab-wide `presentation` field.
-
-Existing `diagram.layouts` remain section arrangements and legacy reading modes;
-loading older documents does not rewrite them. A membership reference can be
-`{"section":"a","layout":"arrangement-id"}` to select a saved arrangement for
-that section. See [Tab Views](../docs/tab-views.md) for validation, migration and
-Workbench authoring, and [section arrangements](../docs/section-layouts.md) for
-placement details.
+`layout` names a section arrangement in `diagram.layouts`, retaining geometry,
+visibility, filters, host profiles and cameras. View presentation overrides
+legacy arrangement presentation. Explicitly reusing one layout shares its
+arrangement edits. Workbench duplicate View copies the arrangement. Do not use
+Tab-wide presentation or tab-owned membership in new documents. Legacy input
+remains readable through a nondestructive adapter; see
+[section Views](../docs/tab-views.md) for the offline migration and its exceptions.
 
 ## Section object
 
@@ -1529,7 +1526,7 @@ perspectives" of one timeline). Types:
 - `homemap` — a 320×180 top-down home with independently patched devices.
   Panels never add Views or choose an opening presentation. To give a map or
   another panel the main space, author `diagram.layouts` geometry and reference
-  it from explicit `page.views` or Tab Views. Use tile visibility and control
+  it from explicit `section.views` through the local `layout` reference. Use tile visibility and control
   attachment to choose what each arrangement shows. Home and Data flow can be
   deliberately authored Views sharing one story; no collapsible graph or
   Sidebar/Centerpiece setting is generated. Older focus diagrams require the

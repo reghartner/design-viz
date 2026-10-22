@@ -1,107 +1,112 @@
-# Tabs, Views, and sections
+# Tabs, sections, and Views
 
-A section owns its diagram, nodes, edges, panels, prose, and steps. A Tab stores
-its sections once and defines any number of **Views** over that content. Each
-View has an ordered subset of section references and one presentation:
-
-- **Standard** stacks its member sections in the authored order.
-- **Explore** shows one member section at a time, including its prose and one
-  active playback group. Contents lists only that View’s members under it.
-
-The reader keeps a stable two-row header: a **Contents · N pages** toggle, active Tab label, visible View choices
-and utilities above centered **‹ Page n of m ›** controls. A page is one navigable section occurrence in one View. The count and ‹ › controls enumerate top-level Contents owners, then their declared Views, then each View’s ordered members. A section shared by two Views therefore contributes two pages, and paging selects the exact destination View and section. Drilldown-only and unreferenced sections do not count. Embedded readers stay scoped to their embedded section while counting each View that contains it.
-The numbered rail continues to identify top-level Contents entries rather than pages.
-View choices remain available when Contents is closed; on narrow screens they
-wrap within the first header bar. Arrow keys move between View choices, and
-Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**, with every Tab and View expanded when the page opens; full section titles appear
-under Standard Views and under expanded Explore Views. In Standard, a section title scrolls through the intact stack;
-in Explore it selects only the current View’s ordered members. Desktop Contents
-pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
-With Contents closed on desktop, a 44px rail at the left shows one numbered marker per part
-(the current one filled) and an n/m count; Contents numbers its entries to match. Resting the
-mouse on the rail for a moment shows Contents over the page without moving it, with only the
-current part expanded; it closes when the mouse leaves or on Escape. A marker click (or Enter)
-goes to that part and leaves Contents closed, with focus kept on the marker; the overlay’s **Pin**
-and the Contents toggle pin it open. Phones have no rail.
-Escape closes an open menu first, then Contents, returning focus to its trigger.
-The tree scrolls independently of its pinned theme footer. Zoom is separate from
-Section navigation; phones use the percentage menu at left and Fit at right. In
-Explore, the Zoom menu also retains Auto, Fit width, and Readable diagram sizing.
-
-The theme picker offers Aurora, Pastel, Blueprint, Terminal, Rose, Lavender, and
-Opus Lilac (`lilac`). Changes affect the live reader without rebuilding its
-sections or editing the source. Daylight and Editorial remain supported in saved
-specs, cookies and host APIs and remain correctly labeled when loaded, but are
-not offered as new choices. Lavender and Opus Lilac bundle Lora locally; the
-restricted Forge font profile retains its existing local font fallback.
-
-Backstage expansion enlarges the container and preserves the selected View’s
-presentation. Workbench retains its authoring navigation below app chrome, with
-compact Tab/View selectors and a horizontally scrollable section strip when
-needed. Its read-only page preview uses Contents.
+Tabs contain sections. A section owns its prose, diagram, nodes, edges, panels,
+steps and one or more **Views**. Each View renders exactly that section. The
+reader pages through Views; Standard and Explore replace the main content area.
+Explore is a full canvas, not an extra diagram below the Standard page.
 
 ```json
 {
   "label": "Product",
-  "defaultView": "overview",
-  "views": [
-    {"id": "overview", "name": "Standard A + C", "presentation": "standard", "sections": ["a", "c"]},
-    {"id": "engineering", "name": "Explore B + C", "presentation": "explore", "sections": ["b", "c"]},
-    {"id": "focus", "name": "Explore A", "presentation": "explore", "sections": ["a"]}
-  ],
+  "opening": {"section": "story", "view": "business"},
   "sections": [
-    {"id": "a", "heading": "Section A", "diagram": {"nodes": {"service": {}}, "rows": [["service"]]}},
-    {"id": "b", "heading": "Section B", "text": ["Section B notes"]},
-    {"id": "c", "heading": "Section C", "text": ["Section C notes"]}
+    {"id":"intro", "heading":"Introduction", "text":["Independent notes"],
+     "views":[{"id":"standard","name":"Reading","presentation":"standard"}]},
+    {"id":"story", "heading":"Shared story", "text":["Shared notes"],
+     "defaultView":"business",
+     "views":[
+       {"id":"business","name":"Business","presentation":"standard","layout":"business"},
+       {"id":"data","name":"Data","presentation":"explore","layout":"data"}
+     ],
+     "diagram": {"nodes":{"service":{}}, "rows":[["service"]], "layouts":[
+       {"id":"business","name":"Business arrangement","sectionLayout":{"columns":24,"default":[{"x":0,"y":0,"w":24,"h":16,"hidden":true}]}},
+       {"id":"data","name":"Data arrangement","sectionLayout":{"columns":24,"default":[{"x":0,"y":0,"w":24,"h":16}]}}
+     ]}}
   ]
 }
 ```
 
-The runnable [example](../examples/tab-views/tab-views.spec.json) adds diagram
-playback and nested domain drilldown. Editing Section C changes its content in
-both Views that reference it. There is no Tab-owned node registry.
+The runnable [section Views example](../examples/section-views/section-views.spec.json) demonstrates all three pages.
 
-View IDs are unique within their Tab, begin with a letter, and contain up to 64
-letters, digits, underscores, or hyphens. Names are nonempty and at most 80
-characters. `presentation` is required. `sections` is a nonempty ordered list
-of unique section IDs in that Tab. `defaultView`, if supplied, must name a View;
-otherwise the first View opens. Invalid membership, malformed lists, duplicate
-IDs, and missing defaults fail validation before rendering.
+The section content is stored once. Editing it updates every View of that
+section. A text-only section has a usable Standard View without any diagram.
+The optional `layout` references an arrangement in the same section's
+`diagram.layouts`; arrangements own geometry, visibility, path/step filtering,
+host profiles and Explore camera settings. **View presentation is authoritative**
+over an arrangement's legacy presentation. A bare `diagram.sectionLayout` is
+geometry and does not add a View.
 
-`detailOnly` sections and sections referenced by local node `detail.section`
-actions are domain definitions. They are excluded from normal stacks and View
-membership, including in Workbench; nodes and breadcrumbs open and close their
-drilldown. The explicit editor command for editing a detail remains available.
+## Identity, order and opening
 
-A member can use `{ "section": "a", "layout": "technical" }` to select an
-arrangement from that section’s `diagram.layouts`. Omitted `layout` uses the
-section’s default arrangement. Section arrangements own panel geometry,
-visibility, path/step filtering and Explore camera defaults. They never add
-other sections to a View. A View’s presentation overrides its members’ legacy
-arrangement presentation. Two Views may deliberately reference the same
-arrangement; their content remains shared either way.
+View IDs are unique **within a section**, begin with a letter and contain up to
+64 letters, digits, underscores or hyphens. Names are nonempty and at most 80
+characters. `presentation` is required (`standard` or `explore`). A View has no
+`sections` membership list. Section IDs remain document-unique; stable explicit
+IDs are recommended for links and opening destinations.
 
-In Workbench, open **View** to create, duplicate, rename or delete Views, change
-**View presentation**, select **Sections in this View**, order them with **Move
-… up**, and choose **Make opening View**. Every action is one Undo/Redo operation.
-**Independent section arrangement** copies only the selected section’s arrangement
-and points this View to it in one transaction. **Arrange selected section…**
-opens geometry, visibility and path/step controls. Camera commands appear when
-the section has a saved arrangement. Source changes invalidate stale controls.
+Canonical page order is owner order (direct page sections, then Tabs), section
+order within each owner, then that section's `views` order. Detail-only domains
+are excluded. `section.defaultView` optionally selects the local choice when
+navigating to that section; otherwise its first View opens. `tab.opening` or
+`page.opening` optionally selects `{section,view}` as the owner's opening page;
+otherwise the first section's default opens. The `section` value is its stable
+ID, or its canonical heading reference when it has no ID.
 
-Adding a section includes it in the active canonical View. Duplicating a section
-includes the copy after the original in every View that contained the original.
-Renaming a section ID repairs references; deleting a section removes its
-references and drops empty Views, repairing the default. The editor refuses to
-delete the last member of every View until another member exists. These repairs
-share the same Undo operation as the section action. Moving content in the
-section registry preserves the explicit View order.
+Contents, Page n of m, Previous/Next, links, native navigation and preview state
+retain the exact section + View identity. Header View choices belong to the
+selected section. A repeated View ID in another section or Tab is independent.
+Standalone links use `d=<section>&v=<view>`. Native
+`navigate({section,view})` rejects a mismatched pair. Detail domains remain
+available through node drilldown rather than ordinary paging.
 
-Standalone links use `d=<section ID>&v=<View ID>`. A destination section excluded
-from that View is routed to an eligible View, never displayed under the unrelated
-View. Native `navigate({section, view})` rejects a mismatched explicit pair;
-omitting `view` deliberately chooses an eligible View if needed. Native snapshots
-report the canonical View ID. Back/Forward retain View and member selection.
+## Desktop Workbench
+
+The section strip selects content. **View** creates, duplicates, renames,
+reorders or deletes Views within that section; it changes presentation,
+arrangement and the opening destination. There is no membership editor.
+Each logical edit is one Undo/Redo operation. Duplicating a View shares content
+and copies its arrangement. The first diagram-visibility edit on a View with
+an unspecified arrangement makes it independent. Explicit references to the
+same named arrangement deliberately share arrangement edits; use **Independent
+section arrangement** to separate them. Newly added sections have a Standard
+View. Section duplication copies its Views and content; moving a section moves
+its pages. Renaming/deleting sections repairs opening references. Deleting the
+opening View selects a surviving local View; the last View cannot be deleted.
+
+## Legacy input and explicit conversion
+
+Reading never rewrites source. The compatibility adapter accepts tab/page-owned
+Views, legacy named layouts/defaultLayout, direct sections and bare diagrams.
+An old multi-section View becomes one runtime occurrence per member, retaining
+its original View → member page order and old section/View links. Its original
+opening View opens at that View's first member. Standard no longer stacks several
+sections. `layout`/`flow` aliases and named arrangement links resolve within the
+addressed section. Geometry, profiles, filters and imported topology stay intact.
+
+The first explicit View edit converts that owner with source-field splices.
+The offline command validates both input and output and never overwrites input:
+
+```sh
+python3 tools/build.py
+node tools/migrate-section-views.cjs old.json --check
+node tools/migrate-section-views.cjs old.json --output converted.json
+```
+
+`--dry-run` is an alias for `--check`. Add `--provider provider.json` for imported
+topology. Conversion is deterministic and idempotent, keeps legacy View IDs and
+arrangement links, and reports the intentional regrouping into section/View
+order. It assigns stable section IDs where missing and records the exact old
+opening destination. It refreshes compatibility requirements using the standard
+stamper, retaining declared features and higher minimum versions; metadata-only
+updates also count as changes. Malformed compatibility metadata is rejected
+without changing the input. No library or diagram folder is rewritten automatically.
+
+**Migration exception:** a section omitted from every legacy View has no
+canonical page choice. Conversion refuses it with an explicit diagnostic rather
+than silently exposing or deleting content. Include it in a legacy View before
+conversion; mark it `detailOnly` only if it is genuinely a drilldown domain.
+Malformed containers, dangling references and mixed legacy/canonical ownership
+fail validation. Legacy files remain readable without conversion.
 
 ## Comments on claude.ai artifacts
 
@@ -129,30 +134,3 @@ The page then places comment pins itself (`src/viewer/artifact-comments.js`):
 Without that declaration — and in saved files, Backstage and Confluence, where
 `window.claude` is absent — the module is inert and the shell's default
 anchoring is used.
-
-## Existing documents and migration
-
-Loading old documents never rewrites source. Direct sections form an implicit
-Tab; new untabbed authoring may use `page.views` and `page.defaultView`. Bare
-diagrams remain readable, and their first explicit View edit wraps the exact
-original diagram source in a section.
-
-Legacy `diagram.layouts[].presentation`, `defaultLayout`, host profiles,
-geometry and filters remain intact. Runtime compatibility Views preserve those
-arrangements independently: an Explore arrangement includes only its own section.
-A default Standard compatibility View stacks eligible Standard sections. Panels never generate choices. For older automatic Home/Data flow
-presentations, use the [offline conversion](panel-view-migration.md). The first View-authoring action adds
-stable section IDs and canonical Views using source splices, retaining every
-existing section and arrangement. It creates one Undo entry. The experimental
-`tab.presentation` field is not authoritative and does not override legacy
-mixed presentations. New files should use the canonical View contract.
-
-A lone `diagram.sectionLayout` is default geometry, never a View definition.
-Saving Arrange does not add Layout/Data flow choices. Named `diagram.layouts`
-remain selectable; explicit canonical Views determine their own names and count.
-Legacy `v=layout` and `v=flow` links first honor an exact authored View ID,
-then an existing legacy arrangement choice. Otherwise they select the opening
-View if it contains the addressed section, or the first View that does. Links
-and navigation snapshots use the actual View ID or authored named-arrangement ID. An exact authored ID belonging
-to a different section is rejected by normal destination validation. Existing
-`{section,layout:"layout"}` (and the old `"default"` alias) members remain accepted for default geometry.

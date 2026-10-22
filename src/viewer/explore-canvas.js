@@ -17,7 +17,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     detailRoot=null;
     if(ctl.views && !ctl.views.ensure(rec,undefined,true))return;
     if(ctl.details)ctl.details.showSection(rec.reference);
-    if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
+    if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
     ctl.activeTarget={kind:'diagram',section:rec.number};
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active){

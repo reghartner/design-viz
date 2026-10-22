@@ -176,7 +176,7 @@ class AuthoringPacketTests(unittest.TestCase):
                         'views': [{'id': 'canvas', 'name': 'Canvas', 'presentation': 'explore', 'sections': ['notes']}]}}
         text, meta = packet.generate([], [], mode='edit', raw=raw)
         self.assertTrue({'layouts', 'explore'} <= set(meta['selected']['features']))
-        self.assertIn('## Tab-owned Views', text)
+        self.assertIn('## Section-owned Views', text)
         self.assertIn('docs/tab-views.md', text)
 
     def test_unknown_selection_and_output_collision_fail_without_mutating_source(self):

@@ -1,0 +1,108 @@
+{
+  "page": {
+    "title": "One section, two Views",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Product",
+            "sections": [
+              {
+                "id": "intro",
+                "heading": "Introduction",
+                "text": [
+                  "Independent text section"
+                ],
+                "views": [
+                  {
+                    "id": "standard",
+                    "name": "Read",
+                    "presentation": "standard"
+                  }
+                ]
+              },
+              {
+                "id": "story",
+                "heading": "Shared story",
+                "text": [
+                  "Shared section notes"
+                ],
+                "views": [
+                  {
+                    "id": "standard",
+                    "name": "Business",
+                    "presentation": "standard",
+                    "layout": "business"
+                  },
+                  {
+                    "id": "data",
+                    "name": "Data",
+                    "presentation": "explore",
+                    "layout": "data"
+                  }
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "service": {
+                      "title": "Shared service"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "service"
+                    ]
+                  ],
+                  "steps": [
+                    {
+                      "id": "ready",
+                      "text": "Shared step",
+                      "nodes": [
+                        "service"
+                      ]
+                    }
+                  ],
+                  "layouts": [
+                    {
+                      "id": "business",
+                      "name": "Business arrangement",
+                      "sectionLayout": {
+                        "columns": 24,
+                        "default": [
+                          {
+                            "x": 0,
+                            "y": 0,
+                            "w": 24,
+                            "h": 16,
+                            "hidden": true
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "data",
+                      "name": "Data arrangement",
+                      "sectionLayout": {
+                        "columns": 24,
+                        "default": [
+                          {
+                            "x": 0,
+                            "y": 0,
+                            "w": 24,
+                            "h": 16
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "description": "Read independent notes, then switch one shared story between Business and Data Views."
+  }
+}

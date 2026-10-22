@@ -74,15 +74,11 @@ source uses `\n`. Code remains literal, preserves indentation, and scrolls withi
 its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
-Each Tab defines **Views** over ordered subsets of its sections. **Standard**
-stacks its member sections; **Explore** shows one member at a time. The editor and
-reader share the same shell: Views across the top, centered Page controls below
-that count and navigate each ordered View member as a document page, and a collapsible **Contents** sidebar for Tabs,
-Views, and Explore members that leaves a numbered section rail when closed. The
-compact app bar keeps the document title visible; on phones, **More project
-actions** contains File, Undo/Redo, Appearance, Preview, Help, and Export. Content stays in
-sections and may appear in many Views. See [the View contract](tab-views.md) for
-authoring, migration and source ownership.
+Each Tab contains sections; each section owns **Views** that render its shared
+content in **Standard** or full **Explore**. Page navigation selects one exact
+section and View. The View popover edits local name, presentation, order,
+arrangement and opening destination. Duplicate View copies its arrangement and
+shares content. There is no section membership list. See [the View contract](tab-views.md).
 
 **Canvas zoom** in Standard scales the page arrangement. **Diagram zoom** stays
 inside the graph frame and changes only its graph; changing either leaves the

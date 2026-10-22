@@ -110,6 +110,29 @@ test('Workbench binds an existing card to an active wire with one Undo/Redo and 
  await root.locator('[data-dv-contract="legacy"] .cttitle>span').click({position:{x:5,y:5}});await guide.getByRole('button',{name:'Remove wire binding 1',exact:true}).click();await expect(marker(root)).toHaveCount(0);
 });
 
+for(const scenario of [
+ {name:'section contract in standard layout',raw:()=>fixture(),count:3,title:'Request'},
+ {name:'JSON contract in Explore layout',raw:()=>jsonFixture(true),count:2,title:'Step request',json:true}
+])test('Workbench selected-edge marker receives an ordinary pointer click and pins '+scenario.name,async({page,server})=>{
+ if(scenario.json)await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+ await page.goto(server.origin+'/workbench.html');await pastePage(page,JSON.stringify(scenario.raw(),null,2));const root=page.locator('#docview'),marks=marker(root),pop=preview(root);
+ await expect(marks).toHaveCount(scenario.count);
+ await root.locator('path.edge[data-dv-edge="0"]').click({force:true});await expect(root.locator('.dv-curve-editor')).toHaveCount(1);
+ const source=await page.locator('#src').inputValue(),undoDisabled=await page.locator('#undo-builder').isDisabled();
+ await marks.first().click();await expect(marks.first()).toHaveAttribute('aria-pressed','true');await expect(pop).toBeVisible();
+ await page.mouse.move(5,5);await expect(pop).toBeVisible();await expect(pop).toContainText(scenario.title);
+ expect(await page.locator('#src').inputValue()).toBe(source);expect(await page.locator('#undo-builder').isDisabled()).toBe(undoDisabled);
+ await expect(root.locator('path.edge[data-dv-edge="0"]')).toHaveClass(/dv-sel/);
+ await marks.first().focus();await marks.first().press('Tab');
+ if(scenario.json){
+  const copy=pop.getByRole('button',{name:'Copy JSON',exact:true});await expect(copy).toBeFocused();await page.keyboard.press('Enter');await expect(pop.getByRole('status')).toHaveText('JSON copied.');
+  expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(JSON.stringify({event:'button_press',retry:true,nested:[1,false,null]},null,2));
+  await page.keyboard.press('Tab');
+ }
+ await expect(pop.getByRole('button',{name:'Close wire contract'})).toBeFocused();await page.keyboard.press('Enter');await expect(pop).toBeHidden();await expect(marks.first()).toBeFocused();
+ await marks.first().press('Space');await expect(pop).toBeVisible();await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(pop).toBeHidden();
+});
+
 test('native Canvas keeps the full preview above its toolbar when no adjacent card fits',async({page,server})=>{
  await page.setViewportSize({width:1100,height:780});const root=await open(page,server,fixture(true),true);
  // A native embed near the bottom of its host page leaves too little visible
@@ -130,8 +153,8 @@ test('native Canvas keeps the full preview above its toolbar when no adjacent ca
  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });
 
-function jsonFixture(){
- const raw=fixture(),sec=raw.page.blocks[0].tabs[0].sections[0];delete sec.contract;delete sec.contracts;
+function jsonFixture(canvas=false){
+ const raw=fixture(canvas),sec=raw.page.blocks[0].tabs[0].sections[0];delete sec.contract;delete sec.contracts;
  sec.diagram.edges[0].contract={title:'Doorbell request',json:{event:'button_press',deviceId:'doorbell-7',unsafe:'</pre><img src=x onerror=alert(1)>'}};
  sec.diagram.edges[1].contract={json:null};
  sec.diagram.steps[0].contracts={'a->b':{title:'Step request',json:{event:'button_press',retry:true,nested:[1,false,null]}}};

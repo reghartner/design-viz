@@ -20,6 +20,28 @@ async function clocks(page){
   });
 }
 
+async function installDescendantMotion(page){
+  await page.locator('#docview .boardcanvas > svg').evaluate(svg=>{
+    const ns='http://www.w3.org/2000/svg';
+    const badge=document.createElementNS(ns,'g');badge.classList.add('runtime-node-badge','runtime-retry');
+    const circle=document.createElementNS(ns,'circle');circle.setAttribute('cx','8');circle.setAttribute('cy','8');circle.setAttribute('r','4');
+    const text=document.createElementNS(ns,'text');text.textContent='↻';
+    badge.append(circle,text);
+    const wire=document.createElementNS(ns,'path');wire.classList.add('wire-contract-pulse');wire.setAttribute('d','M 0 0 L 20 0');
+    svg.append(badge,wire);
+  });
+}
+
+async function descendantClocks(page){
+  return page.locator('#docview').evaluate(view=>{
+    const read=selector=>{
+      const element=view.querySelector(selector),style=getComputedStyle(element),animation=element.getAnimations()[0];
+      return {name:style.animationName,play:style.animationPlayState,time:animation?.currentTime};
+    };
+    return {runtime:read('.runtime-node-badge circle'),runtimeText:read('.runtime-node-badge text'),wire:read('.wire-contract-pulse')};
+  });
+}
+
 test('independent workbench owners freeze real CSS and SMIL clocks across blur, replacement and focus',async({context,server})=>{
   const first=await context.newPage(),second=await context.newPage();
   await openMotionWorkbench(first,server);await openMotionWorkbench(second,server);
@@ -76,6 +98,24 @@ test('reduced-motion CSS remains disabled through inactive and active transition
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await expect(page.locator('#docview')).not.toHaveClass(/dv-workbench-motion-paused/);
   expect((await clocks(page)).name).toBe('none');
+});
+
+test('inactive authoring freezes other real CSS animation clocks inside the graph',async({page,server})=>{
+  await openMotionWorkbench(page,server);await installDescendantMotion(page);
+  let a=await descendantClocks(page);await page.waitForTimeout(180);let b=await descendantClocks(page);
+  expect(a.runtime.name).toBe('runtime-pulse');expect(a.runtimeText.name).toBe('runtime-turn');expect(a.wire.name).toBe('wire-contract-pulse');
+  expect(b.runtime.time).toBeGreaterThan(a.runtime.time);expect(b.runtimeText.time).toBeGreaterThan(a.runtimeText.time);expect(b.wire.time).toBeGreaterThan(a.wire.time);
+
+  await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+  await expect(page.locator('#docview')).toHaveClass(/dv-workbench-motion-paused/);
+  a=await descendantClocks(page);await page.waitForTimeout(180);b=await descendantClocks(page);
+  expect(b.runtime.play).toBe('paused');expect(b.runtimeText.play).toBe('paused');expect(b.wire.play).toBe('paused');
+  expect(b.runtime.time).toBeCloseTo(a.runtime.time,3);expect(b.runtimeText.time).toBeCloseTo(a.runtimeText.time,3);expect(b.wire.time).toBeCloseTo(a.wire.time,3);
+
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('#docview')).not.toHaveClass(/dv-workbench-motion-paused/);
+  a=await descendantClocks(page);await page.waitForTimeout(180);b=await descendantClocks(page);
+  expect(b.runtime.time).toBeGreaterThan(a.runtime.time);expect(b.runtimeText.time).toBeGreaterThan(a.runtimeText.time);expect(b.wire.time).toBeGreaterThan(a.wire.time);
 });
 
 test('visibility boundary freezes clocks when browser hidden state is simulated',async({page,server})=>{

@@ -726,6 +726,97 @@ test('applySkinClasses layers overlays on Aurora, writes no build/skin label and
 });
 
 
+test('same-skin applications preserve notifications without class mutations or title refits',()=>{
+  let writes=0,refits=0,events=0;
+  const classes=new Set(['sk-aurora','sk-pastel']);
+  const el={classList:{contains:c=>classes.has(c),add:c=>{writes++;classes.add(c);},remove:c=>{writes++;classes.delete(c);}},
+    querySelector:()=>null,querySelectorAll:()=>[{_fitLaneTitles(){refits++;}}],dispatchEvent(){events++;}};
+  assert.strictEqual(C.applySkinClasses(el,el,'pastel'),true);
+  assert.deepStrictEqual({writes,refits,events},{writes:0,refits:0,events:1});
+  C.applySkinClasses(el,el,'daylight');
+  assert.ok(writes>0);assert.strictEqual(refits,1);assert.strictEqual(events,2);
+});
+
+test('title font identity tracks relevant faces, loading and replacement without invalidating unrelated fonts',()=>{
+  const face={family:'Test',status:'loaded'},other={family:'Other',status:'loaded'},faces=new Set([face,other]),doc={fonts:faces};
+  const identity=()=>JSON.stringify(C.laneTitleFontIdentity(C.laneTitleCache(doc),'"Test", sans-serif'));
+  const original=identity();
+  other.status='loading';assert.strictEqual(identity(),original);
+  face.status='loading';assert.notStrictEqual(identity(),original);
+  face.status='loaded';assert.strictEqual(identity(),original);
+  face.weight='700';assert.notStrictEqual(identity(),original);
+  faces.delete(face);faces.add({family:'Test',status:'loaded'});assert.notStrictEqual(identity(),original);
+});
+
+test('opaque host FontFace shims remain part of every family identity without requiring metadata',()=>{
+  const face={},faces=new Set([face]),doc={fonts:faces};
+  const identity=family=>JSON.stringify(C.laneTitleFontIdentity(C.laneTitleCache(doc),family));
+  const original=identity('First');
+  assert.strictEqual(C.laneTitleCache(doc).fontsIdentifiable,false,'opaque fonts use the normal fitting path');
+  assert.notStrictEqual(original,'[]','an unknown family cannot be assumed irrelevant');
+  assert.strictEqual(identity('Second'),original);
+  face.status='loaded';assert.notStrictEqual(identity('First'),original);
+  const loaded=identity('First');faces.clear();faces.add({});
+  assert.notStrictEqual(identity('First'),loaded,'replacing an opaque face invalidates fitted output');
+  faces.clear();faces.add({family:'Known',status:'loaded'});
+  assert.strictEqual(C.laneTitleCache(doc).fontsIdentifiable,true,'fully described fonts can reuse fits');
+});
+
+test('typography enumerates supported property names once per document while reading every label value',()=>{
+  let namesRead=0,valuesRead=0;
+  function documentWith(properties){
+    return {defaultView:{getComputedStyle(text){
+      return new Proxy({length:properties.length,fontFamily:'Test',getPropertyValue(name){valuesRead++;return text.values[name]||'normal';}},
+        {get(target,name){if(/^\d+$/.test(name)){namesRead++;return properties[Number(name)];}return target[name];}});
+    }}};
+  }
+  const properties=['color','font-family','font-weight','font-variation-settings','letter-spacing','white-space-collapse','--theme-font'];
+  const doc=documentWith(properties),state=C.laneTitleCache(doc);
+  const label=weight=>({ownerDocument:doc,closest:()=>null,values:{'font-family':'Test','font-weight':weight}});
+  const first=C.laneTitleTypography(label('600'),state);
+  for(let i=0;i<99;i++)C.laneTitleTypography(label('700'),state);
+  assert.strictEqual(namesRead,properties.length,'property enumeration does not scale with labels');
+  assert.strictEqual(valuesRead,500,'all five relevant values are read for every label');
+  assert.notDeepStrictEqual(C.laneTitleTypography(label('700'),state),first,'per-label typography remains distinct');
+  const other=documentWith([...properties,'word-spacing']);
+  C.laneTitleTypography({ownerDocument:other,closest:()=>null,values:{}},C.laneTitleCache(other));
+  assert.strictEqual(namesRead,properties.length*2+1,'a different document discovers its own supported names');
+  assert.ok(state.typographyProperties.every(name=>typeof name==='string'),'no computed styles or DOM owners retained');
+});
+
+test('fitted title outputs are bounded and reuse recent results across new node elements',()=>{
+  let measured=0;
+  const cache=new Map(),measurement={cache,typography:['test font'],visible:true};
+  function node(){
+    const attrs={x:'46',y:'25'},text={textContent:'',
+      get innerHTML(){return this.textContent;},set innerHTML(value){this.textContent=value;},
+      getAttribute:name=>attrs[name],hasAttribute:name=>Object.hasOwn(attrs,name),
+      setAttribute(name,value){attrs[name]=String(value);},
+      getComputedTextLength(){measured++;return this.textContent.length*6;}};
+    const card={getAttribute:()=>54};
+    return {querySelector:selector=>selector==='.t1'?text:selector==='.card'?card:null,querySelectorAll:()=>[],children:[]};
+  }
+  for(let i=0;i<513;i++)C.fitLaneNodeTitle(node(),'Short '+i,200,'',measurement);
+  assert.strictEqual(cache.size,512);assert.strictEqual(measured,513);
+  C.fitLaneNodeTitle(node(),'Short 512',200,'',measurement);assert.strictEqual(measured,513);
+  C.fitLaneNodeTitle(node(),'Short 0',200,'',measurement);assert.strictEqual(measured,514);
+  assert.strictEqual(cache.size,512);
+  for(const value of cache.values())assert.ok(Object.values(value).every(field=>typeof field!=='object'),'cache stores no DOM owners');
+});
+
+test('title observers and font listeners retire with their board, including already queued callbacks',()=>{
+  const listeners=new Map();let observed,disconnected=0,fits=0;
+  const core=loadCore({ResizeObserver:class{constructor(fn){observed=fn;}observe(){}disconnect(){disconnected++;}}});
+  const fonts={addEventListener:(type,fn)=>listeners.set(type,fn),removeEventListener:type=>listeners.delete(type)};
+  const svg={ownerDocument:{fonts},isConnected:true,_titlesPending:true,_fitLaneTitles(){fits++;}};
+  const owner=core.watchLaneTitles(svg),loaded=listeners.get('loadingdone');
+  loaded({});assert.strictEqual(fits,1);
+  observed([{contentRect:{width:200}}]);assert.strictEqual(fits,2);
+  owner.destroy();assert.strictEqual(listeners.size,0);assert.strictEqual(disconnected,1);
+  loaded({});observed([{contentRect:{width:200}}]);assert.strictEqual(fits,2);
+  assert.strictEqual(svg._fitLaneTitles,null);
+});
+
 /* ---------------- tab restore across re-render ---------------- */
 
 function tabBlockMock(slugs, active){

@@ -45,16 +45,21 @@ function skinClasses(name){
 
 function applySkinClasses(body, view, name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
+  var changed = false, wanted = skinClasses(name);
   [body, view].forEach(function(el){
     if (!el || !el.classList) return;
+    if (el.classList.contains && SKIN_NAMES.every(function(n){
+      return el.classList.contains('sk-' + n) === (wanted.indexOf('sk-' + n) >= 0);
+    })) return;
+    changed = true;
     SKIN_NAMES.forEach(function(n){ el.classList.remove('sk-' + n); });
-    skinClasses(name).forEach(function(cls){ el.classList.add(cls); });
+    wanted.forEach(function(cls){ el.classList.add(cls); });
   });
   if (view && view.querySelector){
     view.dispatchEvent(new CustomEvent('reader-skin-change',{detail:{skin:name}}));
   }
   var scope = body && body.querySelectorAll ? body : view;
-  if (scope && scope.querySelectorAll) scope.querySelectorAll('.boardcanvas>svg').forEach(refreshLaneTitles);
+  if (changed && scope && scope.querySelectorAll) scope.querySelectorAll('.boardcanvas>svg').forEach(refreshLaneTitles);
   return true;
 }
 
@@ -574,7 +579,7 @@ function showCommunicationFailures(board,failures,animate){
 
 /* Board popovers own their listeners outside the board's DOM too. */
 function destroyBoardLinks(el){
-  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails', '_frameWatch'].forEach(function(key){
+  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails', '_frameWatch', '_titleWatch'].forEach(function(key){
     var controller = el[key];
     el[key] = null;
     if (controller) controller.destroy();
@@ -786,31 +791,88 @@ function layoutCoinGroup(group){
 }
 /* Cards reserve two title lines without changing row heights. Measure the
    active skin's font, including the space occupied by links and drill-down. */
+/* Cache only plain fitted output, never DOM owners. Position-only edits replace
+   the SVG, so the cache belongs to its document and has a fixed entry bound. */
+var laneTitleCaches = new WeakMap();
+function laneTitleCache(doc){
+  var state = laneTitleCaches.get(doc);
+  if (!state){ state = {entries:new Map(),faceIds:new WeakMap(),nextFaceId:0,faces:[]}; laneTitleCaches.set(doc,state); }
+  /* Snapshot the actual faces, including already-loaded faces added by native
+     hosts. Unrelated UI font loads must not invalidate every board title. */
+  state.faces = []; state.fontsIdentifiable = true;
+  if (doc.fonts && doc.fonts.forEach) doc.fonts.forEach(function(face){
+    if (!state.faceIds.has(face)) state.faceIds.set(face,++state.nextFaceId);
+    // Non-layout hosts may expose only FontFace.load(). Unknown families
+    // conservatively affect every title and disable reuse until identifiable.
+    if (typeof face.family !== 'string') state.fontsIdentifiable = false;
+    state.faces.push({family:typeof face.family === 'string' ? face.family.trim().replace(/^["']|["']$/g,'').toLowerCase() : null,
+      identity:[state.faceIds.get(face),face.status,face.style,face.weight,face.stretch,face.unicodeRange,face.featureSettings,face.variationSettings,face.sizeAdjust,face.ascentOverride,face.descentOverride,face.lineGapOverride]});
+  });
+  return state;
+}
+function laneTitleFontIdentity(state,family){
+  var families=(family.match(/"[^"]*"|'[^']*'|[^,]+/g)||[]).map(function(name){return name.trim().replace(/^["']|["']$/g,'').toLowerCase();});
+  return state.faces.filter(function(face){return face.family === null || families.indexOf(face.family)>=0;}).map(function(face){return face.identity;});
+}
+function laneTitleTypography(text,state){
+  var win = text.ownerDocument && text.ownerDocument.defaultView;
+  if (!win || !win.getComputedStyle) return null;
+  var style = win.getComputedStyle(text), values = [];
+  /* The browser's supported standard property names are stable within this
+     document. Cache only that name list; values still come from each label's
+     own computed style, including inherited host and skin typography. Custom
+     properties cannot match this list; their resolved font values still do. */
+  if (!state.typographyProperties){
+    state.typographyProperties = [];
+    for (var i = 0; i < style.length; i++){
+      var property = style[i];
+      if (property.indexOf('font') === 0 || /^(letter-spacing|word-spacing|text-transform|text-rendering|white-space(?:-.+)?|text-wrap(?:-.+)?|text-spacing-trim|text-autospace|tab-size|unicode-bidi|direction|writing-mode|text-orientation|text-indent|text-anchor|zoom)$/.test(property)){
+        state.typographyProperties.push(property);
+      }
+    }
+  }
+  state.typographyProperties.forEach(function(property){values.push(property,style.getPropertyValue(property));});
+  var language = text.closest('[lang]');
+  values.push(language ? language.getAttribute('lang') : '',laneTitleFontIdentity(state,style.fontFamily));
+  return values;
+}
 function refreshLaneTitles(svg){
-  if (!svg._fitLaneTitles) return;
-  svg._fitLaneTitles();
-  /* Font loading and host skin changes can alter widths after the first
-     render. A replaced/destroyed board must not receive delayed updates. */
-  var fonts = svg.ownerDocument && svg.ownerDocument.fonts;
-  if (fonts && fonts.ready) fonts.ready.then(function(){
-    if (svg.isConnected && svg.parentNode && svg.parentNode.firstChild === svg) svg._fitLaneTitles();
-  });
+  if (svg._fitLaneTitles) svg._fitLaneTitles();
 }
-/* Boards in hidden Tabs or views render at display:none, where text measures
-   zero wide. Fit those again when the board is shown, not on every resize. */
+/* A board owns its font listener and visibility observer. No resolved
+   fonts.ready callback is scheduled on every render or same-skin update. */
 function watchLaneTitles(svg){
-  if (typeof ResizeObserver !== 'function') return;
-  var shown = false;
-  var observer = new ResizeObserver(function(entries){
-    if (!svg.isConnected){ observer.disconnect(); return; }
-    var wasShown = shown;
-    shown = entries[entries.length - 1].contentRect.width > 0;
-    if (shown && !wasShown && svg._titlesPending) svg._fitLaneTitles();
-  });
-  observer.observe(svg);
-  svg._titleObserver = observer;
+  var retired = false, shown = false, observer = null;
+  var fonts = svg.ownerDocument && svg.ownerDocument.fonts;
+  function loaded(){
+    if (retired || !svg.isConnected) return;
+    refreshLaneTitles(svg);
+  }
+  if (fonts && fonts.addEventListener){
+    fonts.addEventListener('loadingdone',loaded);
+    fonts.addEventListener('loadingerror',loaded);
+  }
+  if (typeof ResizeObserver === 'function'){
+    observer = new ResizeObserver(function(entries){
+      if (!svg.isConnected){ observer.disconnect(); return; }
+      if (retired) return;
+      var wasShown = shown;
+      shown = entries[entries.length - 1].contentRect.width > 0;
+      if (shown && !wasShown && svg._titlesPending) refreshLaneTitles(svg);
+    });
+    observer.observe(svg);
+  }
+  return {destroy:function(){
+    retired = true;
+    svg._fitLaneTitles = null;
+    if (observer) observer.disconnect();
+    if (fonts && fonts.removeEventListener){
+      fonts.removeEventListener('loadingdone',loaded);
+      fonts.removeEventListener('loadingerror',loaded);
+    }
+  }};
 }
-function fitLaneNodeTitle(node, title, width, subtitle){
+function fitLaneNodeTitle(node, title, width, subtitle, measurement){
   var text = node.querySelector('.t1'), sub = node.querySelector('.t2'), card = node.querySelector('.card');
   if (!text || !card) return true; /* handoff cards own their presentation */
   var x = Number(text.getAttribute('x')), right = width - 12, firstRight = right, secondRight = right;
@@ -836,6 +898,41 @@ function fitLaneNodeTitle(node, title, width, subtitle){
      and their single title line box needs the full card to clear it. */
   var twoLines = !(hasSub && Number(card.getAttribute('height')) < 54);
   if (!twoLines){ titleY = 27; subY = 43; }
+  var cache = measurement && measurement.cache, key = null, needsTip = false;
+  if (cache && measurement.typography){
+    key = JSON.stringify([title,subtitle,x,titleY,subY,firstRight,secondRight,subRight,!!hasSub,twoLines,measurement.typography]);
+    var hit = cache.get(key);
+    if (hit){
+      cache.delete(key); cache.set(key,hit);
+      if (node._laneTitleFit === hit) return true;
+      text.innerHTML = hit.titleHTML;
+      text.setAttribute('aria-label',title);
+      text.setAttribute('y',hit.titleY);
+      var oldTip = node.querySelector('title[data-dv-fit-title]');
+      if (oldTip) oldTip.remove();
+      if (hit.tip) exposeTitle();
+      if (sub){
+        sub.innerHTML = hit.subHTML;
+        sub.setAttribute('y',hit.subY);
+        if (hit.subLabel) sub.setAttribute('aria-label',subtitle);
+        else sub.removeAttribute('aria-label');
+      }
+      node._laneTitleFit = hit;
+      return true;
+    }
+  }
+  function remember(){
+    if (key !== null){
+      var result = {titleHTML:text.innerHTML,titleY:text.getAttribute('y'),
+        subHTML:sub ? sub.innerHTML : '',subY:sub ? sub.getAttribute('y') : '',
+        subLabel:!!(sub && sub.hasAttribute('aria-label')),tip:needsTip};
+      cache.set(key,result);
+      if (cache.size > 512) cache.delete(cache.keys().next().value);
+      node._laneTitleFit = result;
+    }
+    return true;
+  }
+  node._laneTitleFit = null;
   var target = text;
   function fits(value, available){
     target.textContent = value;
@@ -866,7 +963,7 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   /* Hidden boards (display:none) have no boxes and measure zero: keep the
      authored text until the board is shown. Checking boxes first also lays
      the text out before it is measured. */
-  if (!text.getClientRects().length) return false;
+  if (measurement ? !measurement.visible : !text.getClientRects().length) return false;
   if (hasSub){
     target = sub;
     if (!fits(subtitle, subRight - x)){
@@ -879,10 +976,11 @@ function fitLaneNodeTitle(node, title, width, subtitle){
     }
     target = text;
   }
-  if (fits(title, firstRight - x)) return true;
+  if (fits(title, firstRight - x)) return remember();
   /* A title cut with … shows its full text on hover; lane and image cards
      already render one. */
   function exposeTitle(){
+    needsTip = true;
     if (Array.prototype.some.call(node.children, function(child){ return child.tagName.toLowerCase() === 'title'; })) return;
     var full = document.createElementNS(SVGNS,'title');
     full.setAttribute('data-dv-fit-title','');
@@ -892,7 +990,7 @@ function fitLaneNodeTitle(node, title, width, subtitle){
   if (!twoLines){
     text.textContent = take(title, firstRight - x, true).trimEnd() + '…';
     exposeTitle();
-    return true;
+    return remember();
   }
   var first = take(title, firstRight - x, false), split = first.lastIndexOf(' ');
   if (split > 0) first = first.slice(0,split);
@@ -911,7 +1009,7 @@ function fitLaneNodeTitle(node, title, width, subtitle){
     span.setAttribute('x',x);span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
   });
   if (hasSub) sub.setAttribute('y', subY + 7);
-  return true;
+  return remember();
 }
 /* Measure complete graph ink in SVG coordinates, including transformed node
    groups, paths, labels and coins. Hidden story fragments retain their bounds.
@@ -1070,7 +1168,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   el.insertAdjacentHTML('afterbegin', s);
   var svg = el.firstChild;
   if (el._boardSVG){
-    if (el._boardSVG._titleObserver) el._boardSVG._titleObserver.disconnect();
     el._boardSVG.remove();
   }
   el._boardSVG = svg;
@@ -1091,14 +1188,26 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
   svg._fitLaneTitles = function(){
     svg._titlesPending = false;
+    var state = svg.ownerDocument ? laneTitleCache(svg.ownerDocument) : null;
+    var cache = state && state.fontsIdentifiable ? state.entries : null;
+    /* Read styles and visibility for all cards before any fitting writes.
+       Hidden cards must not populate the cache with zero-width measurements. */
+    var measurements = {};
+    Object.keys(fitEls).forEach(function(id){
+      var node = fitEls[id], text = node.querySelector('.t1'), sub = node.querySelector('.t2');
+      if (!text) return;
+      var visible = typeof text.getClientRects !== 'function' || !!text.getClientRects().length;
+      measurements[id] = {visible:visible,cache:visible ? cache : null,
+        typography:visible ? [laneTitleTypography(text,state),sub ? laneTitleTypography(sub,state) : null] : null};
+    });
     Object.keys(fitEls).forEach(function(id){
       var n = d.nodes[id];
       if (n.handoff || isTextBoxNode(n)) return;
-      if (!fitLaneNodeTitle(fitEls[id], n.title || id, L.pos[id].w, n.sub || (embeddedImageKind(n.image) ? 'Embedded image' : ''))) svg._titlesPending = true;
+      if (!fitLaneNodeTitle(fitEls[id], n.title || id, L.pos[id].w, n.sub || (embeddedImageKind(n.image) ? 'Embedded image' : ''), measurements[id])) svg._titlesPending = true;
     });
   };
+  el._titleWatch = watchLaneTitles(svg);
   refreshLaneTitles(svg);
-  watchLaneTitles(svg);
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix,options);
 

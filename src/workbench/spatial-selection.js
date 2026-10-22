@@ -7,25 +7,39 @@ function createBuilderSpatialSelection(opts){
   function active(){return !opts.isActive || opts.isActive();}
   function surface(el){return el && el.closest && el.closest('.section-viewport');}
   function snapshot(){var s=opts.session.snapshot();return !s.error && (s.renderedText==null || s.renderedText===s.text)?s:null;}
-  function resolvedNode(s,got,section,id){
-    var local=(got.d.nodes || {})[id];if(local)return {value:local,imported:false};
-    if(!opts.session.resolve)return null;
-    try{
-      var resolved=opts.session.resolve(s.raw),record=specSectionPaths(resolved)[section],diagram=record && specValueAt(resolved,record.diagram),value=diagram && (diagram.nodes || {})[id];
+  function traversal(s){
+    var paths=specSectionPaths(s.raw),diagrams=Object.create(null),resolvedReady=false,resolvedPaths=[],resolved=null;
+    function diagram(section){
+      var key=String(section);if(Object.prototype.hasOwnProperty.call(diagrams,key))return diagrams[key];
+      var record=paths[section],got;
+      if(!record)got={error:'no section to insert into — click a section first'};
+      else if(!jsonLocate(s.text,record.diagram))got={error:'this section has no diagram yet — add "diagram": {"nodes": {...}, "rows": [[...]]} inside it first'};
+      else got={path:record.diagram,d:specValueAt(s.raw,record.diagram)};
+      diagrams[key]=got;return got;
+    }
+    function node(got,section,id){
+      var local=(got.d.nodes || {})[id];if(local)return {value:local,imported:false};
+      if(!opts.session.resolve)return null;
+      if(!resolvedReady){
+        resolvedReady=true;
+        try{resolved=opts.session.resolve(s.raw);resolvedPaths=specSectionPaths(resolved);}catch(_){resolved=null;resolvedPaths=[];}
+      }
+      var record=resolvedPaths[section],resolvedDiagram=record && specValueAt(resolved,record.diagram),value=resolvedDiagram && (resolvedDiagram.nodes || {})[id];
       return value?{value:value,imported:true}:null;
-    }catch(_){return null;}
+    }
+    return {snapshot:s,diagram:diagram,node:node};
   }
-  function target(el){
+  function traversalTarget(el,lookup){
     var shell=surface(el),sec=shell && shell.closest('.doc-sec');if(!sec || el.closest('[data-dv-detail-preview]'))return null;
-    var section=Number(sec.getAttribute('data-dv-section')),s=snapshot();if(!s)return null;
-    var got=builderDiagram(s.text,s.raw,section);if(got.error)return null;
+    var section=Number(sec.getAttribute('data-dv-section')),got=lookup.diagram(section);if(got.error)return null;
     var panel=el.closest('.explore-canvas-objects [data-explore-panel]');
     if(panel){var id=panel.getAttribute('data-explore-panel'),index=(got.d.panels || []).findIndex(function(p){return p.id===id;});return index<0?null:{kind:'panel',id:id,index:index,section:section,el:panel};}
     var controls=el.closest('.explore-canvas-objects .explore-player');
     if(controls)return {kind:'step-controls',section:section,layoutId:controls.getAttribute('data-explore-layout'),el:controls};
-    var node=el.closest('[data-dv-node]'),id=node && node.getAttribute('data-dv-node'),record=node && resolvedNode(s,got,section,id);if(record)return {kind:'node',id:id,section:section,el:node,imported:record.imported};
+    var node=el.closest('[data-dv-node]'),id=node && node.getAttribute('data-dv-node'),record=node && lookup.node(got,section,id);if(record)return {kind:'node',id:id,section:section,el:node,imported:record.imported};
     var existing=opts.targetFromEvent({target:el});return existing && ['edge','group'].indexOf(existing.kind)>=0?existing:null;
   }
+  function target(el){if(!surface(el) || el.closest('[data-dv-detail-preview]'))return null;var s=snapshot();return s?traversalTarget(el,traversal(s)):null;}
   function restoreFocusNodes(){
     focusNodes.forEach(function(record){Object.keys(record.attrs).forEach(function(name){var value=record.attrs[name];if(value===null)record.el.removeAttribute(name);else record.el.setAttribute(name,value);});});
     focusNodes=[];
@@ -36,22 +50,15 @@ function createBuilderSpatialSelection(opts){
     // identity and before welcome reveals the editor. Mutation still uses the
     // stricter snapshot()/active() checks when the menu is actually invoked.
     var s=opts.session.snapshot();if(s.error)return;
-    var resolvedBySection=Object.create(null);
+    var lookup=traversal(s);
     Array.from(view.querySelectorAll('.section-viewport .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel],.viewport-explore .explore-canvas-objects .explore-player')).forEach(function(el){
       var section=el.closest('.doc-sec'),controls=el.classList.contains('explore-player'),panel=el.hasAttribute('data-explore-panel'),id=el.getAttribute(panel?'data-explore-panel':'data-dv-node');
       if(!section || el.closest('[data-dv-detail-preview]'))return;
-      var got=builderDiagram(s.text,s.raw,Number(section.getAttribute('data-dv-section')));
+      var sectionIndex=Number(section.getAttribute('data-dv-section')),got=lookup.diagram(sectionIndex);
       if(got.error)return;
       var nodeRecord;
       if(!controls && !panel){
-        var local=(got.d.nodes || {})[id];
-        if(local)nodeRecord={value:local,imported:false};
-        else{
-          if(!Object.prototype.hasOwnProperty.call(resolvedBySection,section.getAttribute('data-dv-section'))){
-            try{var resolved=opts.session.resolve(s.raw),path=specSectionPaths(resolved)[Number(section.getAttribute('data-dv-section'))];resolvedBySection[section.getAttribute('data-dv-section')]=path && specValueAt(resolved,path.diagram);}catch(_){resolvedBySection[section.getAttribute('data-dv-section')]=null;}
-          }
-          var diagram=resolvedBySection[section.getAttribute('data-dv-section')],importedValue=diagram && (diagram.nodes || {})[id];if(importedValue)nodeRecord={value:importedValue,imported:true};
-        }
+        nodeRecord=lookup.node(got,sectionIndex,id);
       }
       var value=controls?{title:'Step controls'}:panel?(got.d.panels || []).find(function(p){return p.id===id;}):nodeRecord && nodeRecord.value;if(!value)return;
       var help='Enter selects; Shift+Enter adds or removes; arrows move 10 graph units, Shift+arrows 50; release arrows to commit; Escape cancels; Shift+F10 opens actions.';
@@ -65,7 +72,7 @@ function createBuilderSpatialSelection(opts){
     });
     sync();
   }
-  function candidates(shell){return Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel],.explore-canvas-objects .explore-player')).map(target).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;});}
+  function candidates(shell){var elements=Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel],.explore-canvas-objects .explore-player'));if(!elements.length)return [];var s=snapshot(),lookup=s && traversal(s);return lookup?elements.map(function(el){return traversalTarget(el,lookup);}).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;}):[];}
   function activeSurface(){
     var section=view.querySelector('.doc-sec.workspace-active-section') || view.querySelector('.doc-sec[data-dv-section="'+opts.session.insertSection+'"]');
     if(!section)return null;

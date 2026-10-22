@@ -222,11 +222,16 @@ for(const presentation of ['standard','explore'])for(const direction of ['horizo
 }
 
 async function marqueeCorner(page,id){
-  const r=await node(page,id).boundingBox();
-  await page.keyboard.down('Alt');await page.mouse.move(r.x+r.width+10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width-4,r.y+6,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
+  const target=node(page,id),r=await target.boundingBox(),start={x:r.x+r.width+10,y:r.y-10},end={x:r.x+r.width-4,y:r.y+6};
+  const hits=await page.evaluate(({start,end})=>{
+    const startEl=document.elementFromPoint(start.x,start.y),endEl=document.elementFromPoint(end.x,end.y);
+    return {startCanvas:!!(startEl && startEl.closest('.boardcanvas')),startObject:!!(startEl && startEl.closest('[data-dv-node],[data-dv-edge],[data-dv-group],[data-dv-row],a,button,input,select,textarea,[contenteditable],[role="button"]')),endCanvas:!!(endEl && endEl.closest('.boardcanvas'))};
+  },{start,end});
+  expect(hits).toEqual({startCanvas:true,startObject:false,endCanvas:true});
+  await page.keyboard.down('Alt');await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(end.x,end.y,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
 }
 test('Standard Alt marquee follows fitted, zoomed, and scrolled node geometry without panning or editing',async({page,server},info)=>{
-  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture()));const board=page.locator('#docview .board'),svg=board.locator('.boardcanvas>svg');const original=await source(page),fittedWidth=(await svg.boundingBox()).width;
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture()));await closeTools(page);await page.evaluate(()=>document.fonts.ready);const board=page.locator('#docview .board'),svg=board.locator('.boardcanvas>svg');const original=await source(page),fittedWidth=(await svg.boundingBox()).width;
   for(const state of ['fitted','zoomed','scrolled']){
     if(state==='zoomed'){await board.getByRole('button',{name:'Readable',exact:true}).click();await expect(board).toHaveClass(/board-size-readable/);expect((await svg.boundingBox()).width).toBeGreaterThan(fittedWidth);}
     if(state==='scrolled')await board.evaluate(el=>{el.scrollLeft=Math.min(el.scrollWidth-el.clientWidth,el.scrollLeft+120);});

@@ -126,6 +126,8 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
   const metrics=await caption.evaluate(el=>({height:el.clientHeight,content:el.scrollHeight,box:el.getBoundingClientRect().toJSON()})),p=await player.boundingBox();
   expect(metrics.height).toBeGreaterThan(34);expect(metrics.content).toBeLessThanOrEqual(metrics.height);expect(metrics.box.bottom).toBeLessThanOrEqual(p.y+p.height);
  }
+ // This read-only layout contract measures a deliberately paused camera.
+ const follow=player.locator('.follow-active');await expect(follow).toHaveAttribute('aria-pressed','true');await follow.click();await expect(follow).toHaveAttribute('aria-pressed','false');
  await readable();const initial=await camera();await info.attach('dense-step-phone',{body:await page.screenshot(),contentType:'image/png'});
  await player.getByRole('button',{name:'Ambient',exact:true}).click();await expect(bar).toBeHidden();await separated();expect(await camera()).toEqual(initial);
  await expect(player.getByRole('button',{name:'Step',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
@@ -137,14 +139,14 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
  await player.getByRole('button',{name:'Step',exact:true}).click();await readable();
 });
 
-/* #577 contract: Step <-> Ambient must not move the Explore camera.
+/* #577 contract: with Follow paused, Step <-> Ambient must not move the Explore camera.
    row | fixture | assertion (scoped) | rejects
    1 viewBox | product-tour Backstage Explore, desktop, both skins | this board's own svg viewBox attribute equal in Step, Ambient, Step | a frame re-measured on the mode switch (late font/label ink) that grows 1-3 units
    2 camera | same | this board's scrollLeft/scrollTop equal in all three states | a camera re-fit or scroll jump on the switch
    3 on-screen graph | same | the first node's own client rect equal in all three states | a viewBox/fitted-size change that shifts the drawing under an unchanged scroll
    4 fitted size | same | this board's svg client width/height equal in all three states | a board resized by playback-only label state
    5 modes really switch | same | Step/Ambient aria-pressed and the termbar hidden only in Ambient | a test that never leaves Step */
-for(const skin of ['pastel','aurora'])test(`desktop Explore camera and viewBox stay fixed across Step, Ambient and Step (${skin})`,async({page,server})=>{
+for(const skin of ['pastel','aurora'])test(`desktop Explore camera and viewBox stay fixed across Step, Ambient and Step with follow paused (${skin})`,async({page,server})=>{
  await page.setViewportSize({width:1280,height:900});await page.emulateMedia({reducedMotion:'reduce'});
  const raw=JSON.parse(await readFile(path.join(repo,'examples/flowview-product-tour/flowview-product-tour.spec.json'),'utf8'));
  raw.page.skin=skin;const tab=raw.page.blocks[0].tabs[3],section=tab.sections[0];
@@ -156,9 +158,15 @@ for(const skin of ['pastel','aurora'])test(`desktop Explore camera and viewBox s
  const root=page.locator('#section-backstage'),player=root.locator('.explore-player'),bar=player.locator('.termbar'),board=root.locator('.explore-board'),step=player.getByRole('button',{name:'Step',exact:true}),ambient=player.getByRole('button',{name:'Ambient',exact:true});
  await expect(board).toBeVisible();await expect(step).toHaveAttribute('aria-pressed','true');await expect(bar).toBeVisible();
  const state=()=>board.evaluate(el=>{const svg=el.querySelector('.boardcanvas>svg'),box=svg.getBoundingClientRect(),node=svg.querySelector('[data-dv-node]').getBoundingClientRect();return {viewBox:svg.getAttribute('viewBox'),x:el.scrollLeft,y:el.scrollTop,width:box.width,height:box.height,node:{x:node.x,y:node.y,width:node.width,height:node.height}};});
+ const follow=player.locator('.follow-active');await expect(follow).toHaveAttribute('aria-pressed','true');await follow.click();await expect(follow).toHaveAttribute('aria-pressed','false');
  const initial=await state();
  await ambient.click();await expect(ambient).toHaveAttribute('aria-pressed','true');await expect(bar).toBeHidden();expect(await state()).toEqual(initial);
  await step.click();await expect(step).toHaveAttribute('aria-pressed','true');await expect(bar).toBeVisible();expect(await state()).toEqual(initial);
+ await expect(follow).toHaveAttribute('aria-pressed','false');
+ // Enabled Follow deliberately frames Step; Ambient itself has no active target.
+ await ambient.click();await follow.click();await expect(follow).toHaveAttribute('aria-pressed','true');expect(await state()).toEqual(initial);
+ await step.click();await expect.poll(async()=>(await state()).width).toBeGreaterThan(initial.width);
+ expect((await state()).viewBox).toBe(initial.viewBox);
 });
 
 for(const width of [870,1280])for(const authored of [false,true])test(`reader View reordering preserves the ${authored?'authored':'default'} camera before Fit at ${width}px`,async({page,server},info)=>{

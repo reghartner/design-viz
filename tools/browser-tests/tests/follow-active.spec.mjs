@@ -170,3 +170,83 @@ test.describe('Desktop touchscreen takeover',()=>{
   await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();await touch.detach();
  });
 });
+
+function pathFixture(presentation){
+ const data=fixture(presentation),d=data.page.sections[0].diagram;
+ // Authored frames remeasure SVG ink after each path render. Repeated equal
+ // viewBox writes used to cancel normal Follow before its first camera tick.
+ d.graphFrame={x:-600,y:-300,w:3500,h:1700};
+ d.steps=[{id:'entry',nodes:['a'],text:'Entry'},{id:'local',edge:'a->b',text:'Local route'},{id:'remote',edge:'b->c',text:'Remote route'}];
+ d.paths=[{id:'local',label:'Local route',steps:['entry','local']},{id:'remote',label:'Remote route',steps:['remote']}];
+ return data;
+}
+
+// Opening overview and explicit first selection have separate camera ownership.
+test('Explore reader opening fit keeps follow enabled',async({page,server})=>{
+ await open(page,server,'explore',true);await frames(page,8);
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ const overview=await camera(page);await frames(page,8);expect(await camera(page)).toEqual(overview);
+ await section(page).locator('.schip').first().click();await fit(page,['[data-dv-node=a]']);
+ expect((await camera(page)).w).toBeGreaterThan(overview.w*1.5);
+});
+for(const presentation of ['standard','explore'])for(const reducedMotion of ['reduce','no-preference'])test(`${presentation} first explicit step and different path click frame immediately (${reducedMotion})`,async({page,server})=>{
+ await page.emulateMedia({reducedMotion});
+ const data=pathFixture(presentation);
+ const input=await open(page,server,presentation,false,data);await frames(page,8);
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ const overview=await camera(page);
+ await section(page).locator('.schip[data-step-source="0"]').first().click();
+ await fit(page,['[data-dv-node=a]']);await frames(page,reducedMotion==='reduce'?4:50);
+ expect((await camera(page)).w).toBeGreaterThan(overview.w*1.5);
+ const first=await camera(page);
+ await section(page).locator('.path-chip[data-dv-path="remote"]').click();
+ await expect(section(page).locator('[data-dv-node=c]')).toHaveClass(/lit/);
+ await fit(page,['[data-dv-node=b]','[data-dv-node=c]','text[data-dv-edge="1"]']);await frames(page,reducedMotion==='reduce'?4:50);
+ expect(await camera(page)).not.toEqual(first);
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+for(const presentation of ['standard','explore'])for(const reducedMotion of ['reduce','no-preference'])test(`${presentation} reader first selection after tab arrival frames current step and changed path (${reducedMotion})`,async({page,server})=>{
+ await page.emulateMedia({reducedMotion});
+ const data=pathFixture(presentation),target=data.page.sections[0],other=structuredClone(target);other.id='other';other.heading='Other';
+ data.page.blocks=[{tabs:[{label:'Target tab',sections:[target]},{label:'Other tab',sections:[other]}]}];delete data.page.sections;
+ await open(page,server,presentation,true,data);await frames(page,8);
+ const nav=page.locator('#docview>.explore-navigation');
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ await nav.getByRole('button',{name:'Next page',exact:true}).click();await frames(page,5);
+ await nav.getByRole('button',{name:'Previous page',exact:true}).click();await frames(page,5);
+ const overview=await camera(page);await frames(page,8);expect(await camera(page)).toEqual(overview);
+ await section(page).locator('.schip[data-step-source="0"]').click();await fit(page,['[data-dv-node=a]']);await frames(page,reducedMotion==='reduce'?4:50);
+ expect((await camera(page)).w).toBeGreaterThan(overview.w*1.5);const before=await camera(page);
+ await section(page).locator('.path-chip[data-dv-path="remote"]').click();
+ await expect(section(page).locator('[data-dv-node=c]')).toHaveClass(/lit/);
+ await fit(page,['[data-dv-node=b]','[data-dv-node=c]','text[data-dv-edge="1"]']);await frames(page,reducedMotion==='reduce'?4:50);
+ expect(await camera(page)).not.toEqual(before);
+ await nav.getByRole('button',{name:'Next page',exact:true}).click();await frames(page,5);
+ await nav.getByRole('button',{name:'Previous page',exact:true}).click();await frames(page,5);
+ const arrived=await camera(page);await frames(page,50);expect(await camera(page)).toEqual(arrived);
+ await section(page).locator('.schip[data-step-source="0"]').click();await fit(page,['[data-dv-node=a]']);await frames(page,reducedMotion==='reduce'?4:50);
+ expect((await camera(page)).w).toBeGreaterThan(arrived.w*1.5);
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+});
+for(const presentation of ['standard','explore'])for(const reader of [false,true])test(`${presentation} ${reader?'reader':'editor'} first step click after section and View navigation survives path render`,async({page,server})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const data=pathFixture(presentation),other=structuredClone(data.page.sections[0]);other.id='other';other.heading='Other section';data.page.sections.push(other);
+ data.page.views=[{id:'main',name:'Main',presentation,sections:['follow','other']},{id:'alternate',name:'Alternate',presentation,sections:['follow']}];
+ const input=await open(page,server,presentation,reader,data),nav=page.locator('#docview>.explore-navigation');await frames(page,8);
+ await nav.getByRole('button',{name:'Next page',exact:true}).click();await frames(page,5);
+ await nav.getByRole('button',{name:'Previous page',exact:true}).click();await frames(page,5);
+ const overview=await camera(page);await frames(page,8);expect(await camera(page)).toEqual(overview);
+ await section(page).locator('.schip[data-step-source="0"]').click();await fit(page,['[data-dv-node=a]']);await frames(page,50);
+ expect((await camera(page)).w).toBeGreaterThan(overview.w*1.5);
+ await section(page).locator('.path-chip[data-dv-path="remote"]').click();await fit(page,['[data-dv-node=b]','[data-dv-node=c]']);await frames(page,50);
+ await nav.getByRole('tab',{name:'Alternate',exact:true}).click();await frames(page,5);
+ const arrived=await camera(page);await frames(page,50);expect(await camera(page)).toEqual(arrived);
+ await section(page).locator('.schip[data-step-source="0"]').click();await fit(page,['[data-dv-node=a]']);await frames(page,50);
+ expect((await camera(page)).w).toBeGreaterThan(arrived.w*1.5);await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ // Automatic opening/layout work must preserve an explicit pause too.
+ await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','false');
+ await nav.getByRole('tab',{name:'Main',exact:true}).click();await frames(page,5);await expect(follow(page)).toHaveAttribute('aria-pressed','false');
+ const paused=await camera(page);await section(page).locator('.path-chip[data-dv-path="remote"]').click();await frames(page,50);expect(await camera(page)).toEqual(paused);
+ if(!reader){await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();}
+});

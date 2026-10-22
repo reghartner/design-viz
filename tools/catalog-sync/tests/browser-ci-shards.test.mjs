@@ -20,7 +20,7 @@ test('browser CI uses isolated, test-balanced, internally serialized shards',()=
   assert.equal(shards.strategy['fail-fast'],false);
   assert.deepEqual(shards.strategy.matrix.shard,[1,2,3,4,5,6,7,8,9,10,11,12]);
   assert.equal(shards.name,'Browser contracts (shard ${{ matrix.shard }}/12)');
-  assert.equal(stepByUse(shards,'actions/setup-node@v7').with['node-version'],24);
+  assert.equal(stepByUse(shards,'actions/setup-node@v7').with['node-version'],'24.22.1');
   assert.equal(stepByName(shards,'Install the lockfile-pinned Playwright Chromium and Linux dependencies').run,
     'npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium');
   assert.equal(stepByName(shards,'Required browser contracts (serialized shard, no retries or missing-browser skips)').run,
@@ -50,7 +50,7 @@ test('aggregate browser check merges useful reports and propagates every shard r
   assert.equal(aggregate['runs-on'],'ubuntu-24.04');
   assert.equal(aggregate.if,'always()');
   assert.equal(aggregate.needs,'browser-contract-shards');
-  assert.equal(stepByUse(aggregate,'actions/setup-node@v7').with['node-version'],24);
+  assert.equal(stepByUse(aggregate,'actions/setup-node@v7').with['node-version'],'24.22.1');
 
   const download=stepByUse(aggregate,'actions/download-artifact@v8');
   assert.equal(download.name,'Download every shard report and diagnostic');

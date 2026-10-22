@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: |
             tools/browser-tests/package-lock.json
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: tools/browser-tests/package-lock.json
       - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - run: python3 tools/build.py --runtime-only
       - run: node --test examples/backstage-e2e/tests/*.test.mjs
 
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: tools/catalog-sync/package-lock.json
       - run: npm ci --prefix tools/catalog-sync --ignore-scripts --no-fund --no-audit
@@ -127,7 +127,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: apps/backstage/package-lock.json
       - run: npm ci --no-fund --no-audit
@@ -157,7 +157,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
           cache: npm
           cache-dependency-path: apps/confluence/package-lock.json
       - run: npm ci --no-fund --no-audit
@@ -173,7 +173,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - name: Rebuild HTML before tests
         run: python3 tools/build.py
       - name: Run Python tests with structured diagnostics
@@ -193,7 +193,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - name: Rebuild HTML before tests
         run: python3 tools/build.py
       # *.test.js glob keeps local (any node >=20) and CI invocations identical;
@@ -219,7 +219,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - name: Generate HTML and backend runtime from source
         run: python3 tools/build.py
       - name: Install locked thumbnail renderer
@@ -248,7 +248,7 @@ jobs:
         run: git diff --exit-code
       - name: Build and smoke-test the source-based nginx image
         run: |
-          docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
+          docker build --pull -f deploy/workbench/Dockerfile -t flowview-workbench .
           docker run -d --name flowview-workbench-test -p 8080:80 flowview-workbench
           trap 'docker rm -f flowview-workbench-test' EXIT
           curl --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 -fsSL http://localhost:8080/ -o /tmp/workbench.html

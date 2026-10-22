@@ -748,6 +748,20 @@ test('title font identity tracks relevant faces, loading and replacement without
   faces.delete(face);faces.add({family:'Test',status:'loaded'});assert.notStrictEqual(identity(),original);
 });
 
+test('opaque host FontFace shims remain part of every family identity without requiring metadata',()=>{
+  const face={},faces=new Set([face]),doc={fonts:faces};
+  const identity=family=>JSON.stringify(C.laneTitleFontIdentity(C.laneTitleCache(doc),family));
+  const original=identity('First');
+  assert.strictEqual(C.laneTitleCache(doc).fontsIdentifiable,false,'opaque fonts use the normal fitting path');
+  assert.notStrictEqual(original,'[]','an unknown family cannot be assumed irrelevant');
+  assert.strictEqual(identity('Second'),original);
+  face.status='loaded';assert.notStrictEqual(identity('First'),original);
+  const loaded=identity('First');faces.clear();faces.add({});
+  assert.notStrictEqual(identity('First'),loaded,'replacing an opaque face invalidates fitted output');
+  faces.clear();faces.add({family:'Known',status:'loaded'});
+  assert.strictEqual(C.laneTitleCache(doc).fontsIdentifiable,true,'fully described fonts can reuse fits');
+});
+
 test('typography enumerates supported property names once per document while reading every label value',()=>{
   let namesRead=0,valuesRead=0;
   function documentWith(properties){

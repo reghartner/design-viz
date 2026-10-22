@@ -36,6 +36,16 @@ it('ships trusted static code and embedded assets, with no frame, runtime code c
   expect(viewer.root.querySelector('img[src^="https:"]')).toBeNull();
   expect(document.getElementById('i-cloud')).toBeNull();expect(viewer.root.getElementById('i-cloud')).toBeTruthy();
 });
+it('preserves authored node titles with metadata-free FontFace shims and no SVG text measurement',()=>{
+  // The shared setup deliberately provides only FontFace.load(), matching a
+  // non-layout host: optional font metadata must not prevent rendering.
+  const raw=spec(),title='A long authored service title that cannot be measured in jsdom';
+  raw.page.sections[0].diagram.nodes.cloud.title=title;
+  const viewer=boot(raw),label=viewer.root.querySelector('.node .t1');
+  expect(label?.textContent).toBe(title);
+  expect(label?.getAttribute('aria-label')).toBe(title);
+  expect(viewer.root.querySelector('.node .card')).not.toBeNull();
+});
 it('uses real core identity and view state for hidden alternate and numeric source-step navigation',()=>{
   const raw=spec(),before=JSON.stringify(raw),viewer=boot(raw);
   viewer.navigate({section:'recording',path:'failed',step:'failure'});

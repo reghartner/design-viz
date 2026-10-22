@@ -799,17 +799,20 @@ function laneTitleCache(doc){
   if (!state){ state = {entries:new Map(),faceIds:new WeakMap(),nextFaceId:0,faces:[]}; laneTitleCaches.set(doc,state); }
   /* Snapshot the actual faces, including already-loaded faces added by native
      hosts. Unrelated UI font loads must not invalidate every board title. */
-  state.faces = [];
+  state.faces = []; state.fontsIdentifiable = true;
   if (doc.fonts && doc.fonts.forEach) doc.fonts.forEach(function(face){
     if (!state.faceIds.has(face)) state.faceIds.set(face,++state.nextFaceId);
-    state.faces.push({family:face.family.trim().replace(/^["']|["']$/g,'').toLowerCase(),
+    // Non-layout hosts may expose only FontFace.load(). Unknown families
+    // conservatively affect every title and disable reuse until identifiable.
+    if (typeof face.family !== 'string') state.fontsIdentifiable = false;
+    state.faces.push({family:typeof face.family === 'string' ? face.family.trim().replace(/^["']|["']$/g,'').toLowerCase() : null,
       identity:[state.faceIds.get(face),face.status,face.style,face.weight,face.stretch,face.unicodeRange,face.featureSettings,face.variationSettings,face.sizeAdjust,face.ascentOverride,face.descentOverride,face.lineGapOverride]});
   });
   return state;
 }
 function laneTitleFontIdentity(state,family){
   var families=(family.match(/"[^"]*"|'[^']*'|[^,]+/g)||[]).map(function(name){return name.trim().replace(/^["']|["']$/g,'').toLowerCase();});
-  return state.faces.filter(function(face){return families.indexOf(face.family)>=0;}).map(function(face){return face.identity;});
+  return state.faces.filter(function(face){return face.family === null || families.indexOf(face.family)>=0;}).map(function(face){return face.identity;});
 }
 function laneTitleTypography(text,state){
   var win = text.ownerDocument && text.ownerDocument.defaultView;
@@ -1186,7 +1189,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   svg._fitLaneTitles = function(){
     svg._titlesPending = false;
     var state = svg.ownerDocument ? laneTitleCache(svg.ownerDocument) : null;
-    var cache = state && state.entries;
+    var cache = state && state.fontsIdentifiable ? state.entries : null;
     /* Read styles and visibility for all cards before any fitting writes.
        Hidden cards must not populate the cache with zero-width measurements. */
     var measurements = {};

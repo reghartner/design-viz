@@ -1,6 +1,8 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict');
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
+const {readSource}=require('../tools/source-loader.cjs');
 const B=require('./workbench-command-context.cjs')(['graph','layout']);
+for(const name of ['workbench/lifetime.js','workbench/spatial-selection.js'])vm.runInContext(readSource(name),B);
 function fixture(){return {page:{title:'Keep exact outside',sections:[{diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['b']],floats:[{id:'a',x:100,y:80}],panels:[{id:'p',type:'state',states:['idle'],initial:{state:'idle'}}],layouts:[{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{panel:'p',x:0,y:0,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',canvas:{panels:[{panel:'p',x:300,y:200,w:240,h:900}]}}}]}}]}};}
 const targets=[{kind:'node',section:0,id:'a'},{kind:'panel',section:0,index:0,id:'p'}];
 const rects=[{x:40,y:50,w:120,h:60},{x:300,y:200,w:240,h:80}];
@@ -92,4 +94,45 @@ test('point insertions preserve unrelated geometry and place canvas panels only 
  assert.deepEqual(d.floats,raw.page.sections[0].diagram.floats);assert.deepEqual(ex.canvas.panels[0],raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0]);assert.deepEqual(ex.canvas.panels.at(-1),{panel:p.id,x:point.x,y:point.y,w:320,h:240});assert.deepEqual(ex.panelPlacements.at(-1),{panel:p.id,placement:'canvas'});
  const standard=B.planAddPanel(text,raw,0,'state',{point,explore:false});assert.deepEqual(JSON.parse(standard.text).page.sections[0].diagram.layouts,raw.page.sections[0].diagram.layouts);
  assert.match(B.planAddPanel(text,raw,0,'state',{...destination,chapter:'missing'}).error,/view changed/);assert.match(B.planAddTextBox(text,raw,0,{x:NaN,y:2}).error,/coordinates/);assert.equal(JSON.stringify(raw,null,2),text);
+});
+
+function spatialElement(tag='div'){
+ const attrs={},listeners={},el={tagName:tag.toUpperCase(),className:'',children:[],parentNode:null,style:{},isConnected:true,
+  addEventListener(type,fn){(listeners[type] ||= []).push(fn);},removeEventListener(type,fn){listeners[type]=(listeners[type] || []).filter(item=>item!==fn);},
+  appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+  setAttribute(name,value){attrs[name]=String(value);},getAttribute(name){return Object.hasOwn(attrs,name)?attrs[name]:null;},hasAttribute(name){return Object.hasOwn(attrs,name);},removeAttribute(name){delete attrs[name];},
+  matches(selector){return selector.split(',').some(part=>{part=part.trim();const tagName=part.match(/^[a-z]+/i),classes=[...part.matchAll(/\.([\w-]+)/g)].map(match=>match[1]),properties=[...part.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g)];return (!tagName || this.tagName===tagName[0].toUpperCase()) && classes.every(name=>this.className.split(/\s+/).includes(name)) && properties.every(match=>match[2]==null?this.hasAttribute(match[1]):this.getAttribute(match[1])===match[2]);});},
+  closest(selector){for(let current=this;current;current=current.parentNode)if(current.matches(selector))return current;return null;},
+  querySelectorAll(selector){return this.children.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);},querySelector(selector){return this.querySelectorAll(selector)[0] || null;},
+  getBoundingClientRect(){return {left:0,top:0,right:120,bottom:60,width:120,height:60};},getClientRects(){return [{}];},remove(){this.isConnected=false;if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(child=>child!==this);}};
+ el.classList={contains(name){return el.className.split(/\s+/).includes(name);},add(name){if(!this.contains(name))el.className+=(el.className?' ':'')+name;},remove(name){el.className=el.className.split(/\s+/).filter(item=>item!==name).join(' ');}};
+ return el;
+}
+
+test('selection refresh and batch candidates scan once per section and discard traversal state between operations',()=>{
+ const sections=Array.from({length:4},(_,section)=>{const nodes={};for(let index=0;index<50;index++)nodes['s'+section+'n'+index]={title:'Section '+section+' node '+index,...(index===1?{locked:true}:{})};return {diagram:{nodes,rows:[Object.keys(nodes).slice(1)],floats:[{id:'s'+section+'n0',x:100,y:80}]}};}),raw={page:{sections}},resolved=JSON.parse(JSON.stringify(raw));
+ resolved.page.sections.forEach((section,index)=>{section.diagram.nodes['provider::s'+index]={title:'Imported '+index};});
+ let currentRaw=raw,currentText=JSON.stringify(raw),currentResolved=resolved,snapshots=0,resolutions=0,selected=[];
+ const doc=spatialElement('document'),view=spatialElement(),win=spatialElement('window');doc.getElementById=()=>null;doc.createElement=spatialElement;
+ const all=[],shells=[];
+ sections.forEach((section,sectionIndex)=>{const host=view.appendChild(spatialElement());host.className='doc-sec'+(sectionIndex===0?' workspace-active-section':'');host.setAttribute('data-dv-section',sectionIndex);const shell=host.appendChild(spatialElement());shell.className='section-viewport';shells.push(shell);
+  for(const id of [...Object.keys(section.diagram.nodes),'provider::s'+sectionIndex]){const node=shell.appendChild(spatialElement('g'));node.className='node';node.setAttribute('data-dv-node',id);all.push(node);}
+ });
+ const refreshSelector='.section-viewport .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel],.viewport-explore .explore-canvas-objects .explore-player',candidateSelector='.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel],.explore-canvas-objects .explore-player';
+ view.querySelectorAll=selector=>selector===refreshSelector?all:[];view.querySelector=selector=>selector==='.doc-sec.workspace-active-section'?view.children[0]:null;
+ shells.forEach(shell=>{shell.querySelectorAll=selector=>selector===candidateSelector?shell.children:selector==='.boardcanvas [data-dv-node]'?shell.children:[];shell.querySelector=selector=>selector==='.boardcanvas [data-dv-node]'?shell.children[0]:null;});
+ const session={insertSection:0,snapshot(){snapshots++;return {raw:currentRaw,text:currentText,renderedText:currentText};},resolve(){resolutions++;return currentResolved;},text(){return currentText;}};
+ const originalLocate=B.jsonLocate;let scans=0;B.jsonLocate=function(){scans++;return originalLocate.apply(this,arguments);};
+ const spatial=B.createBuilderSpatialSelection({document:doc,window:win,view,src:spatialElement('textarea'),session,targetFromEvent:()=>null,selection:()=>selected,select(value){selected=value;},toggle(){},find(){},apply(){},busy:()=>false,inspect(){}});
+ try{
+  all[0].setAttribute('role','img');all[0].setAttribute('title','Original title');spatial.refresh();
+  assert.equal(scans,4,'refresh source scans must scale with section count');assert.equal(snapshots,1);assert.equal(resolutions,1);assert.ok(all.every(node=>node.getAttribute('tabindex')==='0'));
+  assert.match(all[1].getAttribute('aria-description'),/Position locked/);assert.match(all[2].getAttribute('aria-description'),/Row nodes/);assert.match(all[50].getAttribute('aria-description'),/imported node/);
+
+  scans=0;snapshots=0;resolutions=0;assert.equal(spatial.selectAllNodes(),true);assert.equal(scans,1,'candidate traversal must scan the active section once');assert.equal(snapshots,1);assert.equal(resolutions,1);assert.equal(selected.length,51);assert.equal(selected.at(-1).imported,true);
+
+  const nextRaw=JSON.parse(JSON.stringify(raw));delete nextRaw.page.sections[0].diagram.nodes.s0n49;currentRaw=nextRaw;currentText=JSON.stringify(nextRaw);currentResolved=JSON.parse(currentText);scans=0;snapshots=0;resolutions=0;assert.equal(spatial.selectAllNodes(),true);assert.equal(scans,1);assert.equal(snapshots,1);assert.equal(resolutions,1);assert.equal(selected.length,49,'a later operation must not reuse prior source or provider resolution');
+  assert.equal(spatial.target(shells[0].children.at(-1)),null);currentResolved=resolved;assert.equal(spatial.target(shells[0].children.at(-1)).imported,true);assert.equal(snapshots,3,'standalone targets must take a fresh snapshot for every user action');assert.equal(resolutions,3);
+ }finally{spatial.destroy();B.jsonLocate=originalLocate;}
+ assert.equal(all[0].getAttribute('role'),'img');assert.equal(all[0].getAttribute('title'),'Original title');assert.equal(all[0].getAttribute('tabindex'),null);
 });

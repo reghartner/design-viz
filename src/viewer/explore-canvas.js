@@ -11,7 +11,7 @@ function initViewerExploreCanvas(ctl,view,opts){
   }),fitRecord=null,fitDefinition=null,fitKey=null;
   var refitObserver=opts && opts.refitOnResize?new ResizeObserver(function(entries){
     if(refitFrame || !active || !entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))return;
-    refitFrame=requestAnimationFrame(function(){refitFrame=0;if(active && active.viewport)active.viewport.fitCanvas(opts.fitInsets);});
+    refitFrame=requestAnimationFrame(function(){refitFrame=0;if(active && active.viewport)active.viewport.fitCanvas(opts.fitInsets,null,null,false,true);});
   }):null;
   function selectSection(rec){
     detailRoot=null;
@@ -37,7 +37,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     var board=rec.sectionEl.querySelector('.board');
     if(!board || !board.clientWidth || !board.clientHeight){if(board)fitObserver.observe(board);return;}
     cancelFirstFit();seen.add(key);
-    if(opts && opts.forceFit || !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas(opts && opts.fitInsets || {left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180});
+    if(opts && opts.forceFit || !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas(opts && opts.fitInsets || {left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180},null,null,false,true);
   }
   function show(rec){
     cancelFirstFit();

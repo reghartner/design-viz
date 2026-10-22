@@ -1289,7 +1289,11 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var ink=boardContentBounds(svg);
     if(ink){
       vb=unionGraphFrame(vb,[ink],0);
-      svg.setAttribute('viewBox',vb.x+' '+vb.y+' '+vb.w+' '+vb.h);
+      // First-visible/font/coin measurements can report the same frame after
+      // an explicit path selection has started Follow. Do not publish a fake
+      // geometry change that cancels that camera's in-flight animation.
+      var frame=vb.x+' '+vb.y+' '+vb.w+' '+vb.h;
+      if(svg.getAttribute('viewBox')!==frame)svg.setAttribute('viewBox',frame);
       svg.querySelectorAll('rect.dv-board-ground,rect.dv-board-grid').forEach(function(r){
         r.setAttribute('x',vb.x);r.setAttribute('y',vb.y);r.setAttribute('width',vb.w);r.setAttribute('height',vb.h);
       });

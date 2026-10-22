@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - name: Generate the static backend before importing Canon tools
         run: python3 tools/build.py --runtime-only
       - name: Check configuration

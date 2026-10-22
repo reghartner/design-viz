@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24.22.1'
       - name: Generate the static backend before importing Canon tools
         run: python3 tools/build.py --runtime-only
       - run: npm ci --prefix tools/catalog-sync --ignore-scripts --no-fund --no-audit

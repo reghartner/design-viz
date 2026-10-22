@@ -217,6 +217,15 @@ HTML. Its runtime-only package uses `Dockerfile.prebuilt`, installed as its
 ordinary Dockerfile by the packager; company source forks use the default
 source-building Dockerfile.
 
+As of 2026-10-22, both Dockerfiles pin patched Node 24.22.1 and nginx 1.30.6
+releases; CI uses the same Node patch version. Maintainers should keep the Node
+pins aligned when updating them.
+These updates address the separate [Node security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
+and [nginx advisories](https://nginx.org/en/security_advisories.html). The
+static deployment has no PHP runtime, so the [2026-10-21 PHP fixes](https://www.php.net/archive/2026.php#2026-10-21-5)
+do not apply to this image. Rebuild images with `docker build --pull` and
+redeploy them so the pinned base images are present in the running service.
+
 `deploy/cloudflare/deploy.sh` is the smaller standalone option: it builds locally
 with `--no-library --no-catalog`, copies the editor, starters, export template and an empty library index into an
 ignored `deploy/cloudflare/site/` directory, and uploads them to Cloudflare Workers

@@ -375,7 +375,17 @@ test('short float cards grow so the full-size icon has equal space above and bel
 // CI checks work avoided, not a machine-dependent elapsed-time threshold.
 async function countTitleMeasurements(page){
   await page.addInitScript(()=>{
-    window.titleMeasures=0;
+    window.titleMeasures=0;window.titleStyleNames=0;window.titleStyleValues=0;
+    const computed=window.getComputedStyle;
+    window.getComputedStyle=function(element,...args){
+      const style=computed.call(this,element,...args);
+      if(!element.matches('.t1,.t2'))return style;
+      return new Proxy(style,{get(target,name){
+        if(typeof name==='string' && /^\d+$/.test(name))window.titleStyleNames++;
+        if(name==='getPropertyValue')return property=>{window.titleStyleValues++;return target.getPropertyValue(property);};
+        const value=Reflect.get(target,name,target);return typeof value==='function'?value.bind(target):value;
+      }});
+    };
     const original=SVGTextContentElement.prototype.getComputedTextLength;
     SVGTextContentElement.prototype.getComputedTextLength=function(...args){
       if(this.matches('.t1,.t2'))window.titleMeasures++;
@@ -413,17 +423,20 @@ test('position edits reuse all 50 fitted titles across replaced boards and same-
   await expect(board.locator('.node.dv-sel')).toHaveCount(2);
   await page.locator('#editor-tab-inspect').click();
   await settledFonts(page);
-  const counts=[];
+  expect(await page.evaluate(()=>window.titleStyleNames)).toBeGreaterThan(0);
+  const counts=[],styleCounts=[];
   for(const name of ['Align horizontal','Align vertical']){
-    await board.evaluate(svg=>{window.retiredTitleBoard=svg;window.titleMeasures=0;});
+    await board.evaluate(svg=>{window.retiredTitleBoard=svg;window.titleMeasures=0;window.titleStyleNames=0;window.titleStyleValues=0;});
     const oldSource=await page.locator('#src').inputValue();
     await page.getByRole('button',{name,exact:true}).click();await settledFonts(page);
     expect(await page.locator('#src').inputValue()).not.toBe(oldSource);
     counts.push(await page.evaluate(()=>window.titleMeasures));
+    styleCounts.push(await page.evaluate(()=>({names:window.titleStyleNames,values:window.titleStyleValues})));
     expect(await labelSnapshot(board)).toEqual(before);
     expect(await page.evaluate(()=>({connected:window.retiredTitleBoard.isConnected,fit:typeof window.retiredTitleBoard._fitLaneTitles}))).toEqual({connected:false,fit:'object'});
   }
   expect(counts,'no SVG text measurements for unchanged title typography/geometry').toEqual([0,0]);
+  for(const counts of styleCounts){expect(counts.names,'no repeated CSS property enumeration').toBe(0);expect(counts.values,'computed values are still read for every label').toBeGreaterThanOrEqual(100);}
   const sameSkin=await page.evaluate(()=>{
     let events=0;const view=document.querySelector('#docview');
     const observe=new MutationObserver(()=>{});observe.observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
@@ -433,7 +446,7 @@ test('position edits reuse all 50 fitted titles across replaced boards and same-
     return {classes,events,measures:window.titleMeasures};
   });
   expect(sameSkin).toEqual({classes:0,events:1,measures:0});
-  await info.attach('measurement-counts',{body:JSON.stringify({cold,alignment:counts,sameSkin}),contentType:'application/json'});
+  await info.attach('measurement-counts',{body:JSON.stringify({cold,alignment:counts,styleCounts,sameSkin}),contentType:'application/json'});
 });
 
 test('font completion and inherited typography invalidate cached titles while hidden boards wait for reveal',async({page,server},info)=>{

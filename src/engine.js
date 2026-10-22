@@ -815,14 +815,20 @@ function laneTitleTypography(text,state){
   var win = text.ownerDocument && text.ownerDocument.defaultView;
   if (!win || !win.getComputedStyle) return null;
   var style = win.getComputedStyle(text), values = [];
-  /* Include font variants/features/variation axes as well as the shorthand.
-     Color and translation do not change SVG-local text advances. */
-  for (var i = 0; i < style.length; i++){
-    var property = style[i];
-    if (property.indexOf('font') === 0 || /^(letter-spacing|word-spacing|text-transform|text-rendering|white-space(?:-.+)?|text-wrap(?:-.+)?|text-spacing-trim|text-autospace|tab-size|unicode-bidi|direction|writing-mode|text-orientation|text-indent|text-anchor|zoom)$/.test(property)){
-      values.push(property,style.getPropertyValue(property));
+  /* The browser's supported standard property names are stable within this
+     document. Cache only that name list; values still come from each label's
+     own computed style, including inherited host and skin typography. Custom
+     properties cannot match this list; their resolved font values still do. */
+  if (!state.typographyProperties){
+    state.typographyProperties = [];
+    for (var i = 0; i < style.length; i++){
+      var property = style[i];
+      if (property.indexOf('font') === 0 || /^(letter-spacing|word-spacing|text-transform|text-rendering|white-space(?:-.+)?|text-wrap(?:-.+)?|text-spacing-trim|text-autospace|tab-size|unicode-bidi|direction|writing-mode|text-orientation|text-indent|text-anchor|zoom)$/.test(property)){
+        state.typographyProperties.push(property);
+      }
     }
   }
+  state.typographyProperties.forEach(function(property){values.push(property,style.getPropertyValue(property));});
   var language = text.closest('[lang]');
   values.push(language ? language.getAttribute('lang') : '',laneTitleFontIdentity(state,style.fontFamily));
   return values;

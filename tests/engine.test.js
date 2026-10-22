@@ -748,6 +748,28 @@ test('title font identity tracks relevant faces, loading and replacement without
   faces.delete(face);faces.add({family:'Test',status:'loaded'});assert.notStrictEqual(identity(),original);
 });
 
+test('typography enumerates supported property names once per document while reading every label value',()=>{
+  let namesRead=0,valuesRead=0;
+  function documentWith(properties){
+    return {defaultView:{getComputedStyle(text){
+      return new Proxy({length:properties.length,fontFamily:'Test',getPropertyValue(name){valuesRead++;return text.values[name]||'normal';}},
+        {get(target,name){if(/^\d+$/.test(name)){namesRead++;return properties[Number(name)];}return target[name];}});
+    }}};
+  }
+  const properties=['color','font-family','font-weight','font-variation-settings','letter-spacing','white-space-collapse','--theme-font'];
+  const doc=documentWith(properties),state=C.laneTitleCache(doc);
+  const label=weight=>({ownerDocument:doc,closest:()=>null,values:{'font-family':'Test','font-weight':weight}});
+  const first=C.laneTitleTypography(label('600'),state);
+  for(let i=0;i<99;i++)C.laneTitleTypography(label('700'),state);
+  assert.strictEqual(namesRead,properties.length,'property enumeration does not scale with labels');
+  assert.strictEqual(valuesRead,500,'all five relevant values are read for every label');
+  assert.notDeepStrictEqual(C.laneTitleTypography(label('700'),state),first,'per-label typography remains distinct');
+  const other=documentWith([...properties,'word-spacing']);
+  C.laneTitleTypography({ownerDocument:other,closest:()=>null,values:{}},C.laneTitleCache(other));
+  assert.strictEqual(namesRead,properties.length*2+1,'a different document discovers its own supported names');
+  assert.ok(state.typographyProperties.every(name=>typeof name==='string'),'no computed styles or DOM owners retained');
+});
+
 test('fitted title outputs are bounded and reuse recent results across new node elements',()=>{
   let measured=0;
   const cache=new Map(),measurement={cache,typography:['test font'],visible:true};

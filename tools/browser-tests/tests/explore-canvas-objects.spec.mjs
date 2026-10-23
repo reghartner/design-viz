@@ -445,9 +445,9 @@ test('Standard chapters remain usable before and after canvas step controls acti
  const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
  await expect(page.locator('.doc-sec[data-view-id=home-story]')).toBeVisible();await expect(page.locator('.explore-stage')).toBeHidden();
- await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();const original=await source(page);
- await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toBeVisible();
+ await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toHaveCount(0);const original=await source(page);
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();const fitButton=page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true});await expect(fitButton).toBeVisible();await fitButton.click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true})).toHaveCount(0);
  await expect(page.locator('#src')).toHaveValue(original);
 });
 

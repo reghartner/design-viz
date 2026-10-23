@@ -1022,7 +1022,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true})).toBeHidden();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
-    const zoom=view.locator('.explore-zoom'),beforeZoom=await zoom.innerText();
+    const zoom=view.locator('.reader-zoom-menu>summary'),beforeZoom=await zoom.innerText();
     await view.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();await expect(zoom).not.toHaveText(beforeZoom);
     await view.locator('.reader-toolbar').getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();
     await view.getByRole('button',{name:'Next step',exact:true}).click();

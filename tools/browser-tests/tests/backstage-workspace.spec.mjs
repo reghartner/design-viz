@@ -46,7 +46,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   const board=await dialog.locator('.explore-board').boundingBox();
   expect(shell).toEqual({x:284,y:desktop.nav.y+desktop.nav.height,width:1600-284,height:1000-desktop.nav.y-desktop.nav.height});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
   expect(desktop.row.y+desktop.row.height).toBeLessThanOrEqual(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.nav.y+desktop.nav.height);
-  await dialog.locator('.reader-zoom-menu>summary').click();for(const name of ['Auto','Fit width','Readable'])await expect(dialog.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toBeVisible();await dialog.locator('.reader-zoom-menu>summary').click();
+  await dialog.locator('.reader-zoom-menu>summary').click();for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(dialog.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toHaveCount(0);await dialog.locator('.reader-zoom-menu>summary').click();
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
   expect(desktop.actions.y).toBe(desktop.nav.y);expect(desktop.nav.x).toBe(0);

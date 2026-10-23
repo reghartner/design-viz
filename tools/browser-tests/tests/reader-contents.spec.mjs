@@ -229,7 +229,7 @@ for(const width of [1440,390,320,286])test('Contents geometry, overlay and bound
   await page.keyboard.press('Escape');await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();await expect(root.locator('.reader-contents')).toBeVisible();
   if(width<=670){await expect(root.locator('.reader-scrim')).toBeVisible();await page.keyboard.press('Escape');await expect(root.locator('.reader-contents')).toBeHidden();await expect(root.locator('.reader-top>button')).toBeFocused();await root.locator('.reader-top>button').click();await choose(root,'explore');}
   else{await choose(root,'explore');const canvas=await root.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.x).toBe(284);}
-  await root.locator('.reader-zoom-menu>summary').click();await expect(root.locator('.reader-zoom-options').getByRole('button',{name:'Readable',exact:true})).toBeVisible();
+  await root.locator('.reader-zoom-menu>summary').click();for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(root.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toHaveCount(0);
   const zoomBox=await root.locator('.reader-zoom-options').boundingBox();expect(zoomBox.x).toBeGreaterThanOrEqual(0);expect(zoomBox.x+zoomBox.width).toBeLessThanOrEqual(width);expect(zoomBox.y+zoomBox.height).toBeLessThanOrEqual(844);
 });
 
@@ -434,7 +434,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
    K1 click navigates only (#681) | real click on marker 4 while the overlay is open | toggle aria-expanded=false; rail visible; marker 4 current, count "4/6"; tab label "Smart motion"; pager "Page 7 of 9"; the hovered panel is still the overlay; the overlay tree expands only part 4 | a marker click that pins Contents open
    P1 overlay Pin pins | real click on the overlay's "Pin Contents open" | toggle aria-expanded=true; panel without .reader-contents-overlay at the navigation's left; rail hidden; every Contents Tab aria-expanded=true (#607) | a pinned panel that keeps the overlay tree
-   K2 keyboard (#681) | Fit focused, real Tab presses | Tab from the toolbar's last control lands on marker 1, Tab ×4 on marker 5; Enter → toggle aria-expanded=false, rail visible, pager "Page 8 of 9", marker 5 current and focused | mouse-only markers; a marker that pins Contents; focus lost when the rail redraws
+   K2 keyboard (#681) | the Standard toolbar's last visible control focused, real Tab presses | Fit is absent; Tab lands on marker 1, then Tab ×4 lands on marker 5; Enter → toggle aria-expanded=false, rail visible, pager "Page 8 of 9", marker 5 current and focused | a hidden Fit left in the tab order; mouse-only markers; a marker that pins Contents; focus lost when the rail redraws
    G1 pager unit | Contents closed on part 4 | pager group "Document pages"; Previous → "Page 6 of 9" with tab label "Answer and talk", marker 3 current, count "3/6"; Previous ×5 → "Page 1 of 9", Previous disabled; Next ×8 → "Page 9 of 9", Next disabled | a pager that deduplicates sections shared by Views
    X1 Explore accepts the rail | Answer map (Explore) with Contents closed | .viewer-diagram-canvas left = rail right | a canvas under the rail
    X2 canvas drag | real mouse down on the canvas, drag onto marker 2, hold 600ms, release | overlay never shown | opening from drags that pass over the rail
@@ -513,7 +513,7 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(Array(6).fill('true'));
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,3);
-  await root.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
+  const toolbar=root.locator('.reader-toolbar');await expect(toolbar.getByRole('button',{name:'Fit',exact:true})).toHaveCount(0);await toolbar.getByRole('button',{name:'Next page',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
   for(let i=0;i<4;i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(4)).toBeFocused();await page.keyboard.press('Enter');
   await expect(label).toHaveText('Page 8 of 9');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,4);await expect(marksOf(root).nth(4)).toBeFocused();

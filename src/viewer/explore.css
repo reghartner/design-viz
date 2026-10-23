@@ -13,8 +13,7 @@
 .explore-tools>*{pointer-events:auto;}
 .explore-tools .lg{position:static;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid color-mix(in srgb,var(--acc) 25%,transparent);border-radius:9px;background:var(--explore-bg,#fff);max-width:100%;box-sizing:border-box;box-shadow:0 2px 10px #1728480b;}
 .explore-tools .lg>.li{display:none;}
-.explore-tools .board-size{flex-basis:auto;font-size:10px;gap:3px;}
-.explore-tools .board-size>span:first-child,.explore-tools .board-pan{display:none;}
+.explore-tools .board-size{display:none;}
 .explore-tools .mbtn{padding:5px 9px;}
 .explore-zoom-group{display:flex;align-items:center;gap:3px;padding:4px;background:var(--explore-bg,#fff);border:1px solid var(--explore-border);border-radius:9px;box-shadow:0 2px 10px #1728480b;}
 .explore-zoom-title{padding:0 6px;font:600 11px 'IBM Plex Sans',sans-serif;color:var(--dtext);white-space:nowrap;}
@@ -22,6 +21,7 @@
 .explore-overlay-value{min-width:52px;font-variant-numeric:tabular-nums;}
 .explore-zoom-group button:disabled{opacity:.4;cursor:default;}
 .explore-zoom{font:600 11px 'IBM Plex Mono',monospace;color:var(--dtext);background:var(--explore-bg,#fff);border-radius:6px;padding:6px;}
+.has-reader-contents .explore-diagram-zoom{display:none!important;}
 .section-viewport,.explore-navigation{--explore-bg:#fff;--explore-border:#dce1f1;}
 .sk-aurora .section-viewport,.sk-aurora .explore-navigation{--explore-bg:#101a2c;--explore-border:#294658;}
 .sk-pastel .section-viewport,.sk-pastel .explore-navigation,.sk-daylight .section-viewport,.sk-daylight .explore-navigation{--explore-bg:#fff;--explore-border:#dce1f1;}
@@ -497,13 +497,6 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
 @media screen{
  .has-reader-contents.explore-full-window .explore-active-section>:is(.detail-head,.handoff-breadcrumb){left:calc(var(--reader-left,0px) + var(--reader-inset,0px) + 12px);max-width:calc(var(--reader-width,100vw) - var(--reader-inset,0px) - 24px);box-sizing:border-box;}
  .reader-utility-options .copyfallback{min-width:0;max-width:100%;width:100%;flex-basis:100%;}
-}
-
-@media screen{
- .reader-zoom-options:has(.board-size){min-width:215px;}
- .reader-zoom-options .board-size{display:flex!important;flex-wrap:wrap;gap:4px;margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid var(--explore-border);}
- .reader-zoom-options .board-size>span,.reader-zoom-options .board-pan{display:none;}
- .reader-zoom-options .board-size>.mbtn{font-size:11px;padding:5px 7px;}
 }
 
 .reader-document-links{flex:none;padding:10px 12px;border-top:1px solid var(--explore-border);display:grid;gap:8px;}

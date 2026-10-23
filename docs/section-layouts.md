@@ -446,7 +446,7 @@ notes move and scale with diagram zoom; manual zoom-out makes their text smaller
 Saved placement declares `layout.explore-prose-placement`.
 
 The **Step controls** placement selector in Panels, also available in the step
-controls inspector, independently saves `exploreLayout.controlsPlacement` as
+controls inspector while Explore is active, independently saves `exploreLayout.controlsPlacement` as
 `"floating"` (the default) or `"canvas"`. Existing files keep floating playback.
 `exploreLayout.controls` retains its viewport-fraction rectangle;
 `exploreLayout.canvas.controls` stores a separate `{x,y,w,h}` graph rectangle
@@ -572,7 +572,7 @@ The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported 
 
 ### Step-control layout and content size
 
-Select step controls in either Standard or Explore and use **Inspect** for **Play buttons** (Auto, Above steps, Beside steps), **Path label width** (160–360 px), **Placement** (View default, Floating, On canvas), and **Caption position** (Below, Above, Left, Right). These settings follow the selected arrangement even when the active tab View overrides its legacy presentation flag. Use **Panels → Step controls** for overall content size (50–125%); clicking its percentage resets to 100%. The inspector no longer exposes step-control Text size. Standard authoring retains its stacked sections, prose and grid panels. View default restores the original grid controls in Standard (and Floating controls in Explore). An explicit Floating placement uses a section-local surface at the original controls position; On canvas attaches controls to that section’s graph and follows its zoom. Standard grid readers preserve their original grid placement while honoring authored caption direction and explicit control size.
+Select step controls in Standard or Explore and use **Inspect** for **Play buttons** (Auto, Above steps, Beside steps), **Path label width** (160–360 px), and **Caption position** (Below, Above, Left, Right). Explore also offers **Placement** (View default, Floating, On canvas). These settings follow the selected arrangement even when the active canonical View overrides its legacy presentation flag. Use **Panels → Step controls** for overall content size (50–125%); clicking its percentage resets to 100%. The inspector no longer exposes step-control Text size. Standard retains stacked sections, prose, grid panels and grid step controls regardless of saved Explore placement or rectangles. It preserves those values so switching back to Explore restores Floating or On canvas exactly; View navigation does not rewrite the document. Standard still honors authored caption direction and explicit control size.
 
 In Explore, select **Section notes** and use **Inspect → Text size (%)** (75–175%). Clear the field or choose **Reset text size** for 100%. Notes size remains independent of panel and control sizing. Settings survive Undo/Redo, arrangement duplication, JSON, standalone HTML and Backstage rendering.
 

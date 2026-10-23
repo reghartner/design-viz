@@ -27,10 +27,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
-  var workbenchFocus=false,standardAnchor=null,standardSurface=null,standardCanvas=null,standardMinHeight='';
-  var standardObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){paintStandardControls();}):null;
-  // Stepping may replace the SVG; the board owns its current zoom ratio.
-  board.addEventListener('board-scale-change',paintStandardControls);
+  var workbenchFocus=false;
   var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
   var fitFrame=0,cameraRevision=0,followMotion=createCameraMotion();
   function manualCamera(){followMotion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
@@ -116,9 +113,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       bar.style.zoom=layout.controlsScale!==undefined?String(layout.controlsScale):'';
       var scale=controlsContentScale();
       controlsLabel.textContent=Math.round(scale*100)+'%';controlsOut.disabled=scale<=.5;controlsIn.disabled=scale>=1.25;
-      controlsPlacementLabel.hidden=!definition || !document.getElementById('workspace-canvas');controlsPlacement.value=layout.controlsPlacement || 'default';
+      controlsPlacement.value=layout.controlsPlacement || 'default';
     }
-    mountStandardControls();
+    controlsPlacementLabel.hidden=true;
     choices.replaceChildren();summary.textContent='Panels';overlayZoom.hidden=true;controlsZoom.hidden=!bar || !definition;placementLabel.hidden=true;
     Array.prototype.forEach.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'),function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index];if(!panel)return;var label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=!card.hidden;check.addEventListener('change',function(){card.hidden=!check.checked;});label.appendChild(check);var title=document.createElement('span');title.textContent=panel.title || panel.id;label.appendChild(title);choices.appendChild(label);});
     if(prose){var label=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span');check.type='checkbox';check.checked=!prose.collapsed;text.textContent='Section notes';check.addEventListener('change',function(){setProseCollapsed(prose,!check.checked,false,window);});label.appendChild(check);label.appendChild(text);choices.appendChild(label);}
@@ -177,7 +174,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   // Notes retain readable text and independent geometry when panels are scaled.
   // Dormant canvas controls sizing must never resize floating panel content.
-  function controlsContentScale(){if(!active){var layout=definition && definition.exploreLayout || {};return layout.controlsScale!==undefined?layout.controlsScale:document.getElementById('workspace-canvas') && layout.controlsPlacement==='floating' && layout.overlayScale!==undefined?layout.overlayScale:1;}return memory.layout.controlsScale!==undefined?memory.layout.controlsScale:canvasWindow(playerWindow)?1:overlayScale();}
+  function controlsContentScale(){if(!active){var layout=definition && definition.exploreLayout || {};return layout.controlsScale!==undefined?layout.controlsScale:1;}return memory.layout.controlsScale!==undefined?memory.layout.controlsScale:canvasWindow(playerWindow)?1:overlayScale();}
   function windowScale(w){return w.prose?1:w===playerWindow?controlsContentScale():floatingOverlayScale();}
   function zoomFloor(){
     if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
@@ -224,7 +221,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     overlayZoom.hidden=!hasFloatingPanels();controlsZoom.hidden=false;
   }
   function changePlacement(value,w){
-    if(!active && w===playerWindow){editStandardControls('controlsPlacement',value==='default'?null:value);return;}
     if(!active || retired || (w?windowPlacement(w):memory.layout.panelPlacement || 'floating')===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true,w===playerWindow);if(token===false){mountWindows();return;}
     selectCanvasWindow(null);var firstCanvas=value==='canvas' && (!onCanvas() || w===playerWindow && !(memory.layout.canvas && memory.layout.canvas.controls));
@@ -355,7 +351,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function available(w){if(w===playerWindow)return !!bar || !!player.querySelector('.playback-mode-rail');return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
   function visible(w){if(workbenchFocus)return false;if(w===playerWindow)return available(w);return available(w) && !w.state.hidden && !memory.focus;}
   function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
-  function bounds(){return standardAnchor && !active?{w:grid.clientWidth,h:Math.max(340,window.innerHeight*.65)}:{w:stage.clientWidth,h:stage.clientHeight};}
+  function bounds(){return {w:stage.clientWidth,h:stage.clientHeight};}
   function fitHeight(){
     if(!active || retired)return;
     /* Stable across page scroll and refresh; no document-position feedback. */
@@ -396,52 +392,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(canvasWindow(w))return graphRect(r);
     var scale=windowScale(w),s=inverse?1/scale:scale,controls=w===playerWindow;
     return {x:r.x,y:r.y,w:controls?r.w:r.w*s,h:controls?r.h*s:32+(r.h-32)*s};
-  }
-  // Standard authoring keeps the page grid. Only the controls move: either a
-  // section-local floating surface or graph coordinates in the existing board.
-  function unmountStandardControls(){
-    if(!standardAnchor)return;
-    if(standardObserver)standardObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
-    if(standardAnchor.parentNode)standardAnchor.parentNode.replaceChild(bar,standardAnchor);
-    if(standardSurface)standardSurface.remove();
-    if(standardCanvas)standardCanvas.style.minHeight=standardMinHeight;
-    standardAnchor=standardSurface=standardCanvas=null;stage.appendChild(player);
-    player.classList.remove('standard-controls-player');player.style.transform='';player.style.left='';player.style.top='';player.removeAttribute('data-step-text-position');player.removeAttribute('data-explore-layout');
-  }
-  function mountStandardControls(){
-    var layout=definition && definition.exploreLayout;
-    if(active || !bar || !definition || definition.presentation!=='standard' || !document.getElementById('workspace-canvas') || !layout || !layout.controlsPlacement){unmountStandardControls();return;}
-    if(!standardAnchor){
-      standardAnchor=document.createComment('standard controls position');bar.parentNode.insertBefore(standardAnchor,bar);
-      standardSurface=document.createElement('div');standardSurface.className='standard-controls-surface';standardAnchor.parentNode.insertBefore(standardSurface,standardAnchor);
-      player.appendChild(bar);player.classList.add('standard-controls-player');bar.classList.remove('standard-controls-layout');bar.style.zoom='';
-      standardCanvas=board.querySelector('.boardcanvas');standardMinHeight=standardCanvas.style.minHeight;
-      if(standardObserver){standardObserver.observe(grid);standardObserver.observe(standardCanvas.querySelector('svg'));}
-      if(tracksObserver)tracksObserver.observe(bar,{childList:true,subtree:true,characterData:true});
-    }
-    bar.classList.remove('standard-controls-layout');bar.style.zoom='';
-    (layout.controlsPlacement==='canvas'?standardCanvas:standardSurface).appendChild(player);
-    paintStandardControls();
-  }
-  function paintStandardControls(){
-    if(active || retired || !standardAnchor)return;
-    var layout=definition.exploreLayout || {},onGraph=layout.controlsPlacement==='canvas',svg=standardCanvas.querySelector('svg'),scale=controlsContentScale(),b=bounds();
-    if(!b.w || !svg)return;
-    var gridScale=grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;
-    var graph=svg.getBoundingClientRect(),canvasRect=standardCanvas.getBoundingClientRect(),graphZoom=graph.width/gridScale/svg.viewBox.baseVal.width || 1;
-    var saved=onGraph?layout.canvas && layout.canvas.controls:layout.controls;
-    var r=onGraph?Object.assign({x:0,y:svg.viewBox.baseVal.height+40,w:720,h:220},saved):saved?{x:saved.x*b.w,y:0,w:saved.w*b.w,h:saved.h*b.h*scale}:{x:0,y:0,w:b.w,h:146*scale};
-    player.hidden=bar.hidden;playerWindow.state={};player.style.transform='';
-    player.style.setProperty('--explore-overlay-scale',String(scale));player.setAttribute('data-explore-layout',definition.id);player.setAttribute('data-step-text-position',layout.steps && layout.steps.textPosition || 'below');
-    r=fittedControlsRect(r,{top:0,bottom:0},false);apply(playerWindow,r);
-    if(onGraph){
-      if(boardSize && boardSize.refresh)boardSize.refresh();graph=svg.getBoundingClientRect();canvasRect=standardCanvas.getBoundingClientRect();
-      player.style.left=((graph.left-canvasRect.left)/gridScale+standardCanvas.scrollLeft+r.x*graphZoom)+'px';player.style.top=((graph.top-canvasRect.top)/gridScale+standardCanvas.scrollTop+r.y*graphZoom)+'px';
-      player.style.transform='scale('+graphZoom+')';player.style.transformOrigin='top left';standardSurface.style.height='0px';
-      standardCanvas.style.minHeight=Math.max(svg.clientHeight,(r.y+r.h)*graphZoom)+'px';
-    }else{
-      player.style.left=r.x+'px';player.style.top='0px';standardSurface.style.height=r.h+'px';standardCanvas.style.minHeight=standardMinHeight;
-    }
   }
   function editStandardControls(key,value){
     if(retired || !definition)return;
@@ -562,7 +512,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return r;
   }
   function paint(){
-    if(!active){paintStandardControls();return;}
+    if(!active)return;
     if(retired)return;
     var b=bounds();if(!b.w || !b.h)return;
     if(selectedCanvasWindow && (!canvasWindow(selectedCanvasWindow) || !visible(selectedCanvasWindow)))selectCanvasWindow(null);
@@ -844,7 +794,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function enter(){
     cancelDeferredFit();
     if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
-    unmountStandardControls();
     if(boardSize && boardSize.suspend)boardSize.suspend();
     active=true;choices.replaceChildren();memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
@@ -871,7 +820,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
   }
   function leave(holdNavigation){
-    unmountStandardControls();
     // Composition temporarily reparents the board through hidden grids. Keep
     // the regular camera suspended until the destination layout is mounted.
     cancelDeferredFit();
@@ -1126,6 +1074,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(standardObserver)standardObserver.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(bar)bar.removeEventListener('dv:pathlayout',paint);clearScrollEdit();author=null;if(sizingControls)sizingControls.removeEventListener('click',onLegendClick);board.removeEventListener('board-scale-change',paintStandardControls);board.removeEventListener('pointerdown',panStart);board.removeEventListener('scroll',rememberStableCamera);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(bar)bar.removeEventListener('dv:pathlayout',paint);clearScrollEdit();author=null;if(sizingControls)sizingControls.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('scroll',rememberStableCamera);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

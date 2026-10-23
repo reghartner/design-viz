@@ -2765,17 +2765,8 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    var controls=canvas.querySelector('.standard-controls-player:not([hidden])');
-    if(controls){
-      var r={};['x','y','w','h'].forEach(function(key){r[key]=parseFloat(controls.style.getPropertyValue('--float-'+key));});
-      if(Object.keys(r).every(function(key){return Number.isFinite(r[key]);})){
-        var left=Math.min(ink.x,box.x+r.x),top=Math.min(ink.y,box.y+r.y);
-        ink={x:left,y:top,w:Math.max(ink.x+ink.w,box.x+r.x+r.w)-left,h:Math.max(ink.y+ink.h,box.y+r.y+r.h)-top};
-      }else controls=null;
-    }
-    // SVG ink clips at its viewBox; attached controls may extend beyond it.
     function axis(start,size,full,length,available,legacy){
-      var from=controls?start:Math.max(start,full),to=controls?start+size:Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
+      var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
       // Follow needs half a viewport of runway at either end so an edge node
@@ -2796,7 +2787,7 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function down(ev){
     suppressClick=false;
-    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('.standard-controls-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     manual();
     // Desktop touchscreens pan natively. Relinquish Follow before returning,
     // without preventing scrolling or capturing the pointer for a mouse drag.

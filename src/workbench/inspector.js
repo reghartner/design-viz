@@ -2566,6 +2566,8 @@ function renderMultiInspector(multiSel){
   }
   function stepControlsForm(val,ctx){
     var target=Object.assign({},session.target),layout=val.exploreLayout && typeof val.exploreLayout==='object' && !Array.isArray(val.exploreLayout)?val.exploreLayout:{};
+    var targetEl=findTargetEl(target),section=targetEl && targetEl.closest('.doc-sec'),viewport=section && section.querySelector('.section-viewport');
+    var explorePlacement=viewport?viewport.classList.contains('explore-text-sizing'):val.presentation==='explore';
     var playback=selectControl(['auto','above','beside'],sectionPlaybackPosition(val.playbackPosition),function(value){
       return commitCascade(function(raw){return planSectionPlaybackPosition(session.text(),raw,target.section,target.layoutId,value);},{after:refreshFormSoon});
     });
@@ -2605,7 +2607,7 @@ function renderMultiInspector(multiSel){
     position.setAttribute('aria-label','Caption position');
     Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
     var note=document.createElement('p');note.className='fnote';note.textContent='Use Panels → Step controls to size all control content. In Explore, resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
-    return [playbackRow,widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note];
+    return [playbackRow,widthRow,widthNote].concat(explorePlacement?[frow('Placement',placement)]:[],[frow('Caption position',position),note]);
   }
 
 function renderInspector(){

@@ -442,6 +442,8 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  .reader-tree-sections{margin:4px 0 12px 14px;padding:0 0 0 8px;border-left:1px solid var(--explore-border);list-style:none;}
  body .reader-navigation .reader-tree-section{display:flex;gap:12px;width:100%;padding:10px 8px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
  .reader-tree-section:before{content:attr(data-page-number);min-width:12px;font-variant-numeric:tabular-nums;}
+ .reader-tree-section.reader-tree-single-view:before{content:'▤';font-size:13px;line-height:1.5;}
+ .reader-tree-section.reader-tree-single-view[data-explore-view=true]:before{content:'⛶';}
  .reader-tree-details{margin:2px 0 4px 32px;padding:0;list-style:none;font-size:12px;line-height:1.5;}
  .reader-tree-detail{padding:4px 8px;color:var(--dfaint);overflow-wrap:anywhere;}
  .reader-tree-detail:before{content:'↳ ';}

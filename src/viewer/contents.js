@@ -159,7 +159,13 @@ function createReaderContents(ctl,nav,actions,options){
         if(!group){group={record:record,definitions:[]};groups.push(group);}group.definitions.push(definition);
       });
       groups.forEach(function(group){
-        var rec=group.record.runtime,sections=element('div','reader-tree-sections',null,tab),heading=button(title(rec),title(rec),sections,function(){choose(item,sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-section',rec.reference);heading.setAttribute('data-reader-key',item.path+':section:'+rec.number);heading.setAttribute('aria-current',item===owner && current===rec?'page':'false');
+        var rec=group.record.runtime,single=group.definitions.length===1,definition=single && group.definitions[0],selected=single && item===owner && item.current===definition,sections=element('div','reader-tree-sections',null,tab),heading=button(title(rec),title(rec),sections,function(){choose(item,definition || sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-section',rec.reference);heading.setAttribute('data-reader-key',single?item.path+':'+definition.key:item.path+':section:'+rec.number);heading.setAttribute('aria-current',single?selected?'page':'false':item===owner && current===rec?'page':'false');
+        if(single){
+          heading.classList.add('reader-tree-single-view');heading.setAttribute('data-tab-view',definition.id);heading.setAttribute('data-owner-selected',String(item.current===definition));heading.setAttribute('aria-pressed',String(selected));
+          if(definition.presentation==='explore'){heading.setAttribute('data-explore-view','true');heading.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+          if(selected){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,sections);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}
+          return;
+        }
         var views=element('div','reader-tree-views',null,sections);
         group.definitions.forEach(function(definition){
           var key=item.path+':'+definition.key,selected=item===owner && item.current===definition,explore=definition.presentation==='explore';

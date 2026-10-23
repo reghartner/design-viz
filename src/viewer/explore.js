@@ -61,11 +61,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var group=document.createElement('div');group.className='explore-zoom-group '+cls;group.setAttribute('role','group');group.setAttribute('aria-label',label);
     var title=document.createElement('span');title.className='explore-zoom-title';title.textContent=label;group.appendChild(title);tools.appendChild(group);return group;
   }
-  var diagramZoom=zoomGroup('Diagram','explore-diagram-zoom');
+  // Compact renderers such as the Workbench welcome example do not install
+  // reader contents. Keep ordinary zoom and the single Explore Fit action
+  // available there; reader surfaces use their shared toolbar instead.
+  var diagramZoom=zoomGroup('Zoom','explore-diagram-zoom');
   var zoomOut=button('−',function(){changeZoom(.8);},diagramZoom);zoomOut.setAttribute('aria-label','Zoom out');
   var zoomLabel=document.createElement('span');zoomLabel.className='explore-zoom';diagramZoom.appendChild(zoomLabel);
   var zoomIn=button('+',function(){changeZoom(1.25);},diagramZoom);zoomIn.setAttribute('aria-label','Zoom in');
-  var fitButton=button('Fit diagram',function(){fitCanvas();},diagramZoom);
+  button('Fit',function(){fitCanvas();},diagramZoom);
   var overlayZoom=zoomGroup('Floating panels','explore-overlay-zoom');
   var overlayOut=button('−',function(){changeOverlayScale(sizingScale()-.1);},overlayZoom);overlayOut.setAttribute('aria-label','Shrink floating panels');
   var overlayLabel=button('100%',function(){changeOverlayScale(1);},overlayZoom,'mbtn explore-overlay-value');overlayLabel.setAttribute('aria-label','Reset floating panels size');overlayLabel.title='Reset floating panels to 100%';
@@ -214,9 +217,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     (canvasControls?objectLayer:stage).appendChild(player);
     controlsPlacement.value=memory.layout.controlsPlacement || 'default';controlsPlacementLabel.hidden=false;
     syncCanvasWindow(playerWindow);
-    var mode=onCanvas();
     placement.value=memory.layout.panelPlacement || 'floating';placementLabel.hidden=false;stack.hidden=!hasFloating();
-    fitButton.textContent=mode?'Fit canvas':'Fit diagram';
     overlayZoom.hidden=!hasFloatingPanels();controlsZoom.hidden=false;
   }
   function changePlacement(value,w){
@@ -653,9 +654,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(!active || retired)return;manualCamera();cancelDeferredFit();clearScrollEdit();var token=beginEdit();if(token===false)return;
     zoom=clamp((graphPixels || graphWidth())/graphWidth()*factor,zoomFloor(),4);sizeGraph(true);saveCamera(token);
   }
-  function onLegendClick(ev){if(!active || retired)return;if(ev.target.closest('.board-size>.mbtn:not(.board-pan-button)')){var token=beginEdit();if(token===false)return;zoom=null;sizeGraph(true);saveCamera(token);}}
-  var sizingControls=legend && legend.querySelector('.board-size');
-  if(sizingControls)sizingControls.addEventListener('click',onLegendClick);
   function raise(w){w.el.style.zIndex=String(++z);}
   function finish(cancel){
     if(!gesture)return;var g=gesture;gesture=null;
@@ -899,7 +897,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
   function fitCanvas(insets,selection,extraObstacles,follow,automatic){
-      if(!active)return;if(!follow && !automatic)manualCamera();cancelDeferredFit();var revision=cameraRevision;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
+      if(!active)return;if(!follow && !automatic)manualCamera();cancelDeferredFit();var revision=cameraRevision;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:24,top:24,bottom:24});
       insets=Object.assign({},insets);
       if(onCanvas() && !selection)insets.right=24;
       // Subtract fixed overlays into free rectangles, then choose the rectangle
@@ -933,7 +931,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         followMotion.move(camera(),target,function(c){zoom=c.zoom;sizeGraph(false);positionCamera(c);},function(){return active && !retired && !gesture && !document.hidden && board.isConnected && !!board.clientWidth && graph===board.querySelector('.boardcanvas>svg') && revision===cameraRevision;});
         return;
       }
-      zoom=clamp(Math.min(w/extent.w,h/extent.h,1.5),zoomFloor(),4);sizeGraph(false);
+      zoom=clamp(Math.min(w/extent.w,h/extent.h),zoomFloor(),4);sizeGraph(false);
       var svg=board.querySelector('.boardcanvas>svg'),origin=selection && svg?svg.viewBox.baseVal:{x:0,y:0};
       // Selection bounds use SVG coordinates. A graph containing far-negative
       // authored nodes expands its viewBox origin, while canvas overlays keep
@@ -1073,6 +1071,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(bar)bar.removeEventListener('dv:pathlayout',paint);clearScrollEdit();author=null;if(sizingControls)sizingControls.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('scroll',rememberStableCamera);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(bar)bar.removeEventListener('dv:pathlayout',paint);clearScrollEdit();author=null;board.removeEventListener('pointerdown',panStart);board.removeEventListener('scroll',rememberStableCamera);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

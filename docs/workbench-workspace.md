@@ -87,13 +87,12 @@ section and View. The View popover edits local name, presentation, order,
 arrangement and opening destination. Duplicate View copies its arrangement and
 shares content. There is no section membership list. See [the View contract](tab-views.md).
 
-**Canvas zoom** in Standard scales the page arrangement. **Diagram zoom** stays
-inside the graph frame and changes only its graph; changing either leaves the
-other scale alone. **Fit canvas** resets the Standard page scale, while **Fit
-diagram** frames the graph inside its frame. In Explore, **Canvas zoom / Fit
-canvas** includes objects placed On canvas. When there are no on-canvas objects,
-that control reads **Diagram zoom / Fit diagram**. Floating panels keep their
-independent **Panels** size controls.
+The shared zoom bar's **− / +** buttons and percentage menu scale the selected
+View. Its **Fit** action appears only in Explore, where it frames the full graph
+and every object placed On canvas around the actual floating panels and controls.
+Standard Views keep their diagram-local zoom and sizing controls inside each
+graph frame. Floating Explore panels keep their independent **Panels** size
+controls.
 
 Use **Focus diagram** for temporary desktop editing space. It enlarges the active
 diagram, collapses Contents and tucks supporting prose, panels and open tools;
@@ -105,7 +104,7 @@ separate from authored Standard/Explore Views: it changes no source, saved
 presentation, export or Undo history. Editing and Undo can continue while focused.
 Selecting another section or View, or opening another project, ends Focus.
 
-In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
+In Explore, use **Pan** (or hold Space), zoom, and **Fit** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
 **Fit selection** works in Standard and Explore. After finding an object in Outline,
 use it to frame the selected nodes and on-canvas panels
 inside the free viewport around Inspect, floating panels, and navigation controls.
@@ -119,7 +118,7 @@ Text fields, panel widgets, playback and resize handles retain their own shortcu
 Choose **Help → Keyboard shortcuts**, or press **?** outside a text field, for the
 complete canvas key sheet. With canvas focus, **⌘/Ctrl A** selects every visible
 node in the active section, including referenced read-only nodes; ordinary
-`type:"text"` nodes participate like every other node. **F** runs Fit diagram,
+`type:"text"` nodes participate like every other node. **F** runs Fit,
 **Shift F** runs Fit selection, and **F2** opens Inspect for the current selection
 and focuses its first editable field. Enter keeps its existing focused-object and
 text-field behavior. These shortcuts pause for native fields, selected prose,
@@ -150,7 +149,7 @@ Camera and panel state follow matched sections through source edits; new project
 start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named View
 retains its own camera for the session.
-Canvas panning, zooming and **Fit diagram** remain temporary navigation and do
+Canvas panning, zooming and **Fit** remain temporary navigation and do
 not add Undo entries or change the saved opening camera. Use **View → Use current camera as opening view** to save the current framing explicitly, or **Reset opening camera** to restore automatic fitting. Each is one Undo operation.
 
 Choose a named View above the graph to work on it. The **View → View presentation**
@@ -246,7 +245,7 @@ returns their space to the canvas. **Focus diagram** also releases a dock when
 it hides that tool; **Return to page** restores the dock and its reserved space.
 Docking and floating keep the selected object
 in the usable canvas, preserving its screen position where it fits. They never
-automatically fit the diagram; use **Fit diagram** when you want to reframe it.
+automatically fit the diagram; use **Fit** when you want to reframe it.
 
 Tools stay clear of the measured Contents, rail, navigation and canvas controls.
 Inspect temporarily chooses a nearby position away from the selected object when

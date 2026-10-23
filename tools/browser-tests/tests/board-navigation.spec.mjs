@@ -178,9 +178,7 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
   const initial={width:await width(board),scroll:await scroll(board)};
   for(const edit of [false,true]){
     await page.getByRole('button',{name:'Explore',exact:true}).click();
-    if(surface==='standalone')await page.locator('.reader-zoom-menu>summary').click();
-    await page.getByRole('button',{name:'Fit diagram',exact:true}).click();
-    if(surface==='standalone')await page.keyboard.press('Escape');
+    await page.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).click();
     await board.evaluate(el=>{el.scrollLeft+=300;el.scrollTop+=400;});
     if(edit && surface==='workbench'){
       const edited=text.replace('Regular navigation','Renamed navigation');

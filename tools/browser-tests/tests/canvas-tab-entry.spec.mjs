@@ -178,7 +178,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  for(const id of ['s0','s1'])await expect(page.locator('#section-standard [data-dv-node="'+id+'"]').first()).toBeInViewport();
  const nav=await navigation.boundingBox(),stage=await page.locator('.explore-active-section .explore-stage').boundingBox(),toolbar=await page.locator('.reader-toolbar').boundingBox();
  expect(stage.y).toBe(nav.y+nav.height);expect(toolbar.y+toolbar.height).toBeLessThanOrEqual(stage.y);expect(toolbar.width).toBe(nav.width);
- await page.locator('.reader-zoom-menu>summary').click();for(const name of ['Auto','Fit width','Readable'])await expect(page.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toBeVisible();
+ await page.locator('.reader-zoom-menu>summary').click();for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(page.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toHaveCount(0);
  await info.attach('explore-navigation-narrow',{body:await page.screenshot(),contentType:'image/png'});
 });
 

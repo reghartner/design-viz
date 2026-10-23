@@ -29,7 +29,7 @@ async function open(page,server,host){
  }
  await page.goto(server.origin+'/toolbar.html');return page.locator('#docview');
 }
-for(const host of ['standalone','embed','native inline','native canvas'])test(host+' reader keeps sizing modes, zoom and panel sizing reachable at both widths',async({page,server},info)=>{
+for(const host of ['standalone','embed','native inline','native canvas'])test(host+' reader keeps Explore zoom and panel sizing reachable at both widths',async({page,server},info)=>{
  const root=await open(page,server,host),nav=root.locator('.reader-navigation'),row=nav.locator('.reader-toolbar'),zoom=nav.locator('.reader-zoom-menu'),panelMenu=nav.locator('.explore-panel-menu');
  await expect(root.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await expect(root.getByRole('button',{name:/Edit in Workbench/i})).toHaveCount(0);
@@ -37,29 +37,38 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);await expect(row).toBeVisible();
   const geometry=await row.evaluate(el=>{const r=el.getBoundingClientRect(),p=el.querySelector('.reader-page-index').getBoundingClientRect();return {height:r.height,center:(p.left+p.right-r.left-r.right)/2};});
   expect(geometry.height).toBe(45);expect(Math.abs(geometry.center)).toBeLessThan(1);
+  const graph=root.locator('.explore-board .boardcanvas>svg'),initial=await graph.evaluate(el=>el.getBoundingClientRect().width);
   await zoom.locator('summary').click();await zoom.getByRole('button',{name:'Zoom 150%',exact:true}).click();
-  const graph=root.locator('.explore-board .boardcanvas>svg');const zoomed=await graph.evaluate(el=>el.getBoundingClientRect().width);
+  const zoomed=await graph.evaluate(el=>el.getBoundingClientRect().width);expect(zoomed).toBeGreaterThan(initial);
   await zoom.locator('summary').click();
-  for(const name of ['Readable','Fit width','Auto']){
-   const button=zoom.getByRole('button',{name,exact:true});await button.focus();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(button).toBeInViewport();
-   if(name==='Readable'){const size=await graph.evaluate(el=>({width:el.getBoundingClientRect().width,natural:el.viewBox.baseVal.width}));expect(size.width).toBeCloseTo(size.natural,0);expect(size.width).toBeLessThan(zoomed);}
-  }
+  for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(zoom.getByRole('button',{name,exact:true})).toHaveCount(0);
   await page.keyboard.press('Escape');await panelMenu.locator('summary').click();
   const panel=panelMenu.getByRole('button',{name:'Shrink floating panels',exact:true}),overlayValue=panelMenu.locator('.explore-overlay-value');
   const initialScale=Number((await overlayValue.textContent()).replace('%',''));await panel.click();await expect(panel).toBeInViewport();await expect(overlayValue).toHaveText((initialScale-10)+'%');
   await panelMenu.getByRole('button',{name:'Reset floating panels size',exact:true}).click();await page.keyboard.press('Escape');await row.getByRole('button',{name:/^Fit(?: canvas| diagram)?$/,exact:true}).click();
   await info.attach(host+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
- await chooseNavigation(nav,'View','Overview');await expect(row).toBeVisible();if(host!=='native canvas')await expect(root.locator('.explore-board')).toHaveCount(0);
- await chooseNavigation(nav,'View','Engineering');await panelMenu.locator('summary').click();await expect(panelMenu.locator('.explore-overlay-value')).toHaveText('100%');
+ await page.setViewportSize({width:1440,height:1000});
+ await chooseNavigation(nav,'View','Overview');await expect(row).toBeVisible();await expect(row.getByRole('button',{name:'Fit',exact:true})).toHaveCount(0);if(host!=='native canvas'){await expect(root.locator('.explore-board')).toHaveCount(0);await expect(root.locator('.board-size').getByRole('button',{name:'Fit diagram',exact:true})).toBeVisible();await expect(root.locator('.board-size').getByRole('button',{name:'Fit width',exact:true})).toBeVisible();}
+ await chooseNavigation(nav,'View','Engineering');await expect(row.getByRole('button',{name:'Fit',exact:true})).toBeVisible();await expect(root.locator('.explore-diagram-zoom')).toBeHidden();await panelMenu.locator('summary').click();await expect(panelMenu.locator('.explore-overlay-value')).toHaveText('100%');
 });
 
-test('Page preview keeps live reader sizing while Workbench retains its own controls',async({page,server})=>{
+test('Explore Fit uses the available desktop canvas beyond 150% without overlapping floating controls',async({page,server},info)=>{
+ await page.setViewportSize({width:2560,height:1400});const root=await open(page,server,'standalone'),row=root.locator('.reader-toolbar'),graph=root.locator('.explore-board .boardcanvas>svg');await page.evaluate(()=>document.fonts.ready);
+ await row.locator('.reader-zoom-menu>summary').click();await row.getByRole('button',{name:'Zoom 50%',exact:true}).click();const small=await graph.boundingBox();
+ await row.getByRole('button',{name:'Fit',exact:true}).click();const fitted=await graph.boundingBox(),scale=await graph.evaluate(el=>el.getBoundingClientRect().width/el.viewBox.baseVal.width),stage=await root.locator('.explore-stage').boundingBox();
+ expect(fitted.width).toBeGreaterThan(small.width);expect(scale).toBeGreaterThan(1.5);expect(fitted.x).toBeGreaterThanOrEqual(stage.x-2);expect(fitted.y).toBeGreaterThanOrEqual(stage.y-2);expect(fitted.x+fitted.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(fitted.y+fitted.height).toBeLessThanOrEqual(stage.y+stage.height+2);
+ for(const obstacle of await root.locator('.explore-window:visible,.explore-player:visible').all()){const r=await obstacle.boundingBox();expect(fitted.x<r.x+r.width+10 && fitted.x+fitted.width+10>r.x && fitted.y<r.y+r.height+10 && fitted.y+fitted.height+10>r.y).toBe(false);}
+ await page.screenshot({path:'/tmp/explore-fit-tight-desktop.png'});await info.attach('explore-fit-tight-desktop',{body:await page.screenshot(),contentType:'image/png'});
+});
+
+test('Page preview keeps live reader zoom while Workbench retains its own controls',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const source=JSON.stringify(story(),null,2);await paste(page,source);await closeTools(page);
  await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true})).toBeVisible();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),nav=preview.locator('.reader-navigation');await expect(nav.locator('.reader-toolbar')).toBeVisible();
- await nav.locator('.reader-zoom-menu>summary').click();await nav.getByRole('button',{name:'Readable',exact:true}).click();await expect(nav.getByRole('button',{name:'Readable',exact:true})).toHaveAttribute('aria-pressed','true');await page.keyboard.press('Escape');
+ await nav.locator('.reader-zoom-menu>summary').click();await nav.getByRole('button',{name:'Zoom 150%',exact:true}).click();await expect(nav.locator('.reader-zoom-menu>summary')).toContainText('150%');
+ await nav.locator('.reader-zoom-menu>summary').click();for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(nav.getByRole('button',{name,exact:true})).toHaveCount(0);await page.keyboard.press('Escape');
  await nav.locator('.explore-panel-menu>summary').click();await nav.getByRole('button',{name:'Shrink floating panels',exact:true}).click();await expect(nav.locator('.explore-overlay-value')).toHaveText('90%');
  await expect(preview.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await page.locator('#close-page-preview').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();

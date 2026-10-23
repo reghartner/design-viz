@@ -353,7 +353,7 @@ body .docview.has-document-navigation>.explore-navigation .embedcopy{width:34px;
 body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display:none;}
 .explore-panel-body .mbtn,.explore-panel-body select{box-sizing:border-box;min-height:30px;font:500 12px/18px 'IBM Plex Sans',sans-serif;padding:5px 8px;border:1px solid var(--explore-border);border-radius:6px;background:var(--explore-bg);color:var(--dtext);}
 .explore-panel-body .explore-panel-choices{display:block;}
-.explore-panel-body .explore-panel-choices .explore-panel-choice>label:first-child{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:start;gap:7px;box-sizing:border-box;margin:0;padding:7px 0;font:400 12px/16px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-panel-body.explore-panel-body .explore-panel-choices>label,.explore-panel-body .explore-panel-choices .explore-panel-choice>label:first-child{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:start;gap:7px;box-sizing:border-box;margin:0;padding:7px 0;font:400 12px/16px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .explore-panel-body .explore-panel-choices input[type="checkbox"]{appearance:auto;box-sizing:border-box;width:16px;height:16px;min-height:16px;margin:0;padding:0;border:0;border-radius:0;background:transparent;accent-color:var(--daccent);}
 .explore-panel-body .explore-panel-choices small{grid-column:2;line-height:1.35;}
 .explore-panel-body.explore-panel-body label.explore-placement{display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;margin:0;padding:4px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}

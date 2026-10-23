@@ -17,13 +17,15 @@ function sharedPlacementFixture(placement){
  story.diagram.layouts=[{id:'shared',name:'Imported shared arrangement',presentation:'explore',sectionLayout:{columns:24,default:[{controls:'steps',x:0,y:0,w:24,h:6},{x:0,y:6,w:24,h:16}]},exploreLayout:{controlsPlacement:placement,controlsScale:.9,controls:{x:.04,y:.72,w:.9,h:.2},canvas:{controls:{x:-120,y:420,w:840,h:220}},steps:{textPosition:'right'},camera:{zoom:.8,x:.4,y:.6}}}];
  return raw;
 }
-test('Contents uses one icon row for singleton Views and named subrows for multiple Views',async({page,server},info)=>{
+test('Contents uses one plain row for singleton Views and named subrows for multiple Views',async({page,server},info)=>{
  const root=await standalone(page,server),contents=nav(root).locator('.reader-contents');
+ const pseudo=(row,part='::before')=>row.evaluate((el,part)=>getComputedStyle(el,part).content,part);
  const intro=contents.locator('.reader-tree-single-view[data-reader-section="intro"]');
  await expect(intro).toHaveText('Introduction');await expect(intro).toHaveAttribute('data-tab-view','standard');await expect(intro).not.toHaveAttribute('data-explore-view','true');await expect(intro).toHaveAttribute('aria-current','page');
  await expect(contents.locator('.reader-tree-sections').filter({has:intro}).locator('.reader-tree-view')).toHaveCount(0);
- const story=contents.locator('.reader-tree-section[data-reader-section="story"]').locator('..');
- await expect(story.locator('.reader-tree-view')).toHaveText(['Business','Data']);
+ const tab=contents.locator('.reader-tree-tab'),storyHeading=contents.locator('.reader-tree-section[data-reader-section="story"]'),story=storyHeading.locator('..');
+ const views=story.locator('.reader-tree-view');await expect(views).toHaveText(['Business','Data']);
+ expect(await pseudo(tab)).toBe('none');expect(await pseudo(tab,'::after')).toContain('⌄');expect(await pseudo(intro)).toBe('none');expect(await pseudo(storyHeading)).toBe('none');expect(await pseudo(views.first())).toBe('none');expect(await pseudo(views.last())).toBe('none');
  await story.locator('.reader-tree-view[data-tab-view="data"]').click();await intro.focus();await page.keyboard.press('Enter');
  await expect(intro).toBeFocused();await expect(intro).toHaveAttribute('aria-current','page');await expect(page).toHaveURL(/d=intro.*v=standard/);
  await info.attach('singleton-standard-and-multi-view-contents',{body:await page.screenshot(),contentType:'image/png'});
@@ -31,6 +33,7 @@ test('Contents uses one icon row for singleton Views and named subrows for multi
  const exploreRaw=fixture();exploreRaw.page.blocks[0].tabs[0].sections[0].views[0].presentation='explore';
  await standalone(page,server,exploreRaw);const explore=nav(root).locator('.reader-tree-single-view[data-reader-section="intro"]');
  await expect(explore).toHaveAttribute('data-explore-view','true');await expect(explore).toHaveAttribute('aria-description','Explore: pan and zoom the graph.');
+ expect(await pseudo(explore)).toBe('none');
  await expect(nav(root).locator('.reader-tree-sections').filter({has:explore}).locator('.reader-tree-view')).toHaveCount(0);
  await info.attach('singleton-explore-contents',{body:await page.screenshot(),contentType:'image/png'});
 });

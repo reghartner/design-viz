@@ -329,3 +329,48 @@ Device app); `ancillarySelector` identifies audio/caption content outside that
 aspect. These are trusted, panel-owned selectors, never spec-provided code.
 See [the experiment and limits](panel-placement-training.md#round-3-panel-sizing-contracts)
 for measured calibration, fallbacks, provenance and verification.
+
+### Automatic fork contract troubleshooting
+
+Fork panels automatically receive the [desktop panel contracts](company-overlay.md#automatic-desktop-panel-contracts).
+Failures identify the type, source and rule, with a concrete repair suggestion.
+The generated browser document starts with the template or company example's
+first rendered state and places its target panel visibly and unlocked.
+
+- **responsive-content:** inspect the panel's content, not only its title or
+  outside border. Let a renderer-owned wrapper follow the available width.
+  `width:100%`, `box-sizing:border-box` and `min-width:0` commonly belong on that
+  wrapper. A fixed-size chart/table can live inside a responsive scroll region;
+  labels and icons do not need to stretch. Inspect narrow and large allocations
+  in the saved Chromium trace before changing intentional geometry.
+- **standard-height-tile/card:** remove fixed height overrides on the Standard
+  tile or card so both follow the grid allocation. Short intrinsic content can
+  retain its height, and longer content can remain reachable through scrolling.
+- **reachable-overflow:** use `min-height:0` on shrinking flex children and
+  `overflow:auto` on the content region that should scroll. Remove accidental
+  `overflow:hidden`/`clip` on meaningful content, and compact `max-height` caps
+  that prevent a panel from using its allocated space. Keep intentional
+  screen-reader captions and decorative clipping semantically identified.
+- **pointer-move-x/y** or **keyboard-move-x/y:** preserve the shared Explore grip
+  and its pointer/arrow-key events. Check company CSS for overrides of window
+  positioning or `--float-x`/`--float-y`, and handlers that swallow gestures.
+  `canvasSizing.resizeAxis:'width'` controls **resizing**, not movement: vertical
+  resize input changes the canonical width, while dragging still changes both
+  coordinates independently.
+- **fixed-aspect** or **content-fit-height:** use an SVG `viewBox`, appropriate
+  `aspect-ratio` or your renderer's fitting implementation for artwork. Declare
+  a positive `aspect` for fixed-aspect canvas sizing. Content-fit cards expose
+  their intrinsic `scrollHeight`, with an optional positive `maxHeight` cap
+  (the shared canvas enforces a 72px minimum). A renderer-owned ResizeObserver
+  belongs in `mounted`; disconnect it in idempotent `host._panelMotionCleanup`
+  and support remount after cleanup. A declaration alone cannot repair fixed
+  internal CSS geometry.
+- **sample/validation/fold:** provide a valid template or company example with
+  visible content. Keep registration DOM-free and allocate listeners/observers
+  only at mount time. Validate without mutating the declaration, and fold pure
+  absolute snapshots from supplied state/steps, including one snapshot for an
+  empty story. Use local validation contexts and clone values before mutation.
+
+The harness has no per-type opt-out or upstream allowlist. It does not replace
+panel-specific visual, accessibility, motion or editor tests, and never imposes
+mobile document editing requirements.

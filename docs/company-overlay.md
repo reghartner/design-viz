@@ -278,3 +278,60 @@ the viewer. Flowview appends `?diagram=<existing-id>` and supported section/view
 fragments. Builds include this default in the shared runtime and agent context;
 Workbench HTML snapshots also save it in `page.documentLinks.siteBaseUrl`.
 Do not use a transient artifact sandbox URL as a persistent destination.
+
+### Automatic desktop panel contracts
+
+Every discovered `company/panels/types/*.js` runs through
+`tests/company-panel-contracts.test.js` and
+`tools/browser-tests/tests/company-panel-contracts.spec.mjs`. No upstream type
+list or browser-spec edit is needed when a fork adds a panel. Discovery uses the
+checkout's source loader, including company helpers and icons. These files are
+picked up by the normal Node suite and required, sharded Chromium CI suite.
+An empty overlay is supported; scratch forks still run responsive, scrolling,
+SVG fixed-aspect and content-fit positive probes, and deliberately frozen,
+clipped and horizontal-only negative probes. Scratch forks never write to the
+checkout's `company/` or replace its build outputs.
+
+Supply a valid `authoring.template`, or at least one matching declaration in
+`company/examples/**/*.spec.json`. If both exist, both are exercised. Missing
+samples fail with the panel type, source file and repair guidance. Use useful
+starting content: a blank sample cannot demonstrate visible sizing. Examples
+retain their diagram context and patches, while browser contracts replace their
+layout with controlled, visible, unlocked allocations. Each sample and placement
+is a separate browser test, so larger forks remain shardable.
+
+Run the focused contracts from the repository root:
+
+```sh
+node --test tests/company-panel-contracts.test.js
+npm test --prefix tools/browser-tests -- company-panel-contracts.spec.mjs
+```
+
+Install the locked browser/host dependencies and matching Chromium first as
+shown in [browser test setup](../tools/browser-tests/README.md). The browser
+command rebuilds the actual workbench and uses the existing strict console,
+page-error and network audit. It uses desktop viewports (1440 and 1100 CSS pixels
+wide); document editing on phones is outside this contract.
+
+The Node checks cover DOM-free registration, presence of a renderer, valid
+samples, deterministic and nonmutating validation/folding, empty-story snapshots
+and supported `canvasSizing` values. Optional validators/folders remain optional;
+the normal shared defaults are exercised. Browser checks cover renderer-owned
+content width response, measured Standard tile/card height shrink/grow, Explore pointer resizing,
+independent horizontal/vertical pointer and keyboard movement, and reachable
+scroll offsets. Declared canvas policies also run **On canvas**, where those
+policies actually apply. Fixed-aspect visuals retain their proportions and fitted
+cards follow intrinsic height and any declared cap.
+
+These are structural regression checks, not a universal visual-quality proof.
+They inspect initial rendered states, not every animation frame, skin, authored
+state or custom editor. The width oracle measures direct renderer-owned children
+of `.pbody`; individual labels and icons may stay fixed, and fixed intrinsic
+content may use a responsive scroll wrapper. Intentional screen-reader-only
+captions, `aria-hidden` decoration and ellipsis are excluded from clipping
+failures, including overflow those decorative descendants contribute to a clipping ancestor. The fixed-aspect check uses `layout.sectionSizing.contentSelector` when
+provided, otherwise the first SVG/image/canvas/video or direct content child.
+Keep focused panel-specific tests for artwork, meaningful internal targets,
+custom interactions and lifecycle cleanup beyond these measurable invariants.
+See [panel contract troubleshooting](panel-modularity.md#automatic-fork-contract-troubleshooting)
+for common repairs.

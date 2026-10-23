@@ -197,8 +197,8 @@ test('#564 buttons share one UI font, never fall back to Arial, and keep monospa
  const reader=page.locator('#docview .explore-navigation');if(!await reader.locator('.reader-contents').isVisible())await reader.locator('.reader-top>button').click();
  await expect(page.locator('#docview')).not.toHaveClass(/sk-terminal/);await reader.locator('.reader-contents .reader-theme-menu>summary').click();await reader.getByRole('menuitemradio',{name:'Terminal',exact:true}).click();
  await expect(page.locator('#docview')).toHaveClass(/sk-terminal/);
- const viewerButtons=await page.locator('#docview').evaluate(root=>{const out={};for(const el of root.querySelectorAll('button')){if(!el.getClientRects().length)continue;const f=getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'');(out[f]??=[]).push(String(el.className));}return out;});
- expect(Object.values(viewerButtons).flat().length).toBeGreaterThanOrEqual(5);expect(Object.keys(viewerButtons)).toEqual(['IBM Plex Mono']);
+ const viewerControls=await page.locator('#docview').evaluate(root=>{const out={};for(const el of root.querySelectorAll('button,.explore-tour-count')){if(!el.getClientRects().length)continue;const f=getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,'');(out[f]??=[]).push(String(el.className));}return out;});
+ expect(Object.values(viewerControls).flat().length).toBeGreaterThanOrEqual(5);expect(Object.keys(viewerControls)).toEqual(['IBM Plex Mono']);
 
  await page.goto(server.origin+'/workbench.html');const welcome=page.locator('#workbench-welcome');if(!await welcome.isVisible())await page.locator('#workspace-home').click();await expect(welcome).toBeVisible();
  await page.locator('#welcome-agent').click();const connect=page.locator('#folder-agent-connect');await expect(connect).toBeVisible();

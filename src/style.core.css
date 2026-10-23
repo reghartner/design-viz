@@ -752,7 +752,7 @@ body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-t
   .sec-eyebrow{color:#555555;}
 }
 @media print{
-  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-tour-replay, .dv-shortcuts, .reader-shortcuts{display:none !important;}
+  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-shortcuts, .reader-shortcuts{display:none !important;}
 }
 @media print{
   .sec-prose[hidden]{display:block !important;}

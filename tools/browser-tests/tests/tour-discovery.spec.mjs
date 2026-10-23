@@ -17,7 +17,8 @@ function library(){
     spec:{page:{title:id,skin:'pastel',canon:{version:1,id,kind:'canonical',owner:'group:default/home'},sections:[{heading:'Delivery',diagram:d}]}}}))};
 }
 async function publish(page){await page.route('**/diagrams.json',route=>route.fulfill({json:library()}));}
-const prompt=page=>page.locator('.dv-tour-discovery');
+const launcher=page=>page.locator('.explore-navigation .explore-tour-button');
+const badge=page=>launcher(page).locator('.explore-tour-count');
 const heading=page=>page.locator('.dv-tour-ui .dv-tour-heading');
 async function walk(page){
   const titles=[];
@@ -39,45 +40,45 @@ test('learning a simple Canon tour offers only new branching topics on a richer 
   expect(seen).toContain('mode-step');expect(seen).not.toContain('branching-split');
   await page.goto(server.origin+'/workbench.html?diagram=rich');
   await expect(page.locator('.dv-tour')).toHaveCount(0);
-  await expect(prompt(page)).toHaveText('New features to explore · 2');
+  await expect(launcher(page)).toHaveText('TOUR2');await expect(badge(page)).toHaveText('2');
   const before=await page.locator('#canon-reader .schip[aria-current=true]:visible').allTextContents();
   await info.attach('new-topics-prompt',{body:await page.screenshot(),contentType:'image/png'});
-  await prompt(page).click();
+  await launcher(page).click();
   expect(await walk(page)).toEqual(['Flows can split','And they come back together','You’re caught up']);
-  await expect(prompt(page)).toBeHidden();
+  await expect(badge(page)).toHaveCount(0);
   expect(await page.locator('#canon-reader .schip[aria-current=true]:visible').allTextContents()).toEqual(before);
-  await page.reload();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(prompt(page)).toBeHidden();
-  await page.locator('.dv-tour-replay').click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  await page.reload();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(badge(page)).toHaveCount(0);
+  await launcher(page).click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
 });
 
 test('skipping new-topic tips records only the displayed topic and offers the rest later',async({page,server})=>{
   await publish(page);await seed(page,['mode-ambient','mode-step','expand']);
   await page.goto(server.origin+'/workbench.html?diagram=rich');
-  await expect(prompt(page)).toContainText('2');await prompt(page).click();
+  await expect(badge(page)).toHaveText('2');await launcher(page).click();
   await expect(heading(page)).toHaveText('Flows can split');await expect(page.locator('.dv-tour-ui')).toBeVisible();
   await page.getByRole('button',{name:'Skip tour',exact:true}).click();
-  await expect(prompt(page)).toHaveText('New features to explore · 1');
+  await expect(badge(page)).toHaveText('1');
   const seen=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).seen,key);
   expect(seen).toContain('branching-split');expect(seen).not.toContain('branching-rejoin');
-  await prompt(page).click();expect(await walk(page)).toEqual(['And they come back together','You’re caught up']);
+  await launcher(page).click();expect(await walk(page)).toEqual(['And they come back together','You’re caught up']);
 });
 
 test('discovery honors the chosen audience, legacy completion, deep links and suppression',async({page,server})=>{
   await publish(page);await seed(page,['mode-step','expand','branching-split','branching-rejoin'],'ux');
   await page.goto(server.origin+'/workbench.html?diagram=rich');
-  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(prompt(page)).toBeHidden();
+  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(badge(page)).toHaveCount(0);
   await page.goto(server.origin+'/standalone.html#m=step&s=2');
-  await expect(page.locator('.dv-tour-replay')).toBeVisible();await expect(prompt(page)).toBeHidden();
+  await expect(launcher(page)).toBeVisible();await expect(badge(page)).toHaveCount(0);
   await page.goto(server.origin+'/workbench.html?diagram=rich#tour=0');
-  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(prompt(page)).toBeHidden();
+  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await expect(badge(page)).toHaveCount(0);
 });
 
 test('a prompt on a legacy-completed standalone page never opens an overlay or steals state',async({page,server})=>{
   await page.goto(server.origin+'/standalone.html');
-  await expect(prompt(page)).toBeVisible();await expect(page.locator('.dv-tour')).toHaveCount(0);
+  await expect(badge(page)).toBeVisible();await expect(page.locator('.dv-tour')).toHaveCount(0);
   const hash=new URL(page.url()).hash;
-  await prompt(page).click();const titles=await walk(page);expect(titles.at(-1)).toBe('You’re caught up');
-  expect(new URL(page.url()).hash).toBe(hash);await expect(prompt(page)).toBeHidden();
+  await launcher(page).click();const titles=await walk(page);expect(titles.at(-1)).toBe('You’re caught up');
+  expect(new URL(page.url()).hash).toBe(hash);await expect(badge(page)).toHaveCount(0);
 });
 
 test('custom page tours keep their authored sequence and do not mark built-in topics learned',async({page,server})=>{
@@ -86,8 +87,17 @@ test('custom page tours keep their authored sequence and do not mark built-in to
   const input=path.join(server.root,'custom-progress.json'),output=path.join(server.root,'custom-progress.html');
   await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
   await page.goto(server.origin+'/custom-progress.html#tour=1');
-  await expect(heading(page)).toHaveText('Company lesson');await expect(prompt(page)).toHaveCount(0);await walk(page);
+  await expect(heading(page)).toHaveText('Company lesson');await expect(badge(page)).toHaveCount(0);await walk(page);
   expect(await page.evaluate(key=>localStorage.getItem(key),key)).toBeNull();
+});
+
+test('a prose-only page keeps one navbar Tour launcher for its custom walkthrough',async({page,server})=>{
+  const raw={page:{title:'Prose guide',sections:[{id:'notes',heading:'Notes',text:'Read this first.'}],tour:{version:1,steps:[{id:'done',kind:'done',copy:{heading:'Prose tour',body:'This walkthrough does not need a diagram.'}}]}}};
+  const input=path.join(server.root,'tour-prose-only.json'),output=path.join(server.root,'tour-prose-only.html');
+  await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/tour-prose-only.html#tour=0');
+  const tour=page.locator('.explore-navigation .explore-tour-button');await expect(tour).toBeVisible();await expect(tour).toHaveCount(1);await expect(page.locator('.diagram-views')).toHaveCount(0);
+  await tour.click();await expect(heading(page)).toHaveText('Prose tour');
 });
 
 
@@ -103,15 +113,18 @@ test('standalone reader utilities stay reachable below navigation in both presen
     await page.setViewportSize({width,height:900});
     for(const name of ['Standard','Explore']){
       await chooseNavigation(page.locator('#docview>.explore-navigation'),'View',name);
+      await expect(page.locator('.reader-page-actions .presentbtn')).toBeVisible({visible:name==='Standard'});
       await expect.poll(()=>page.locator('.reader-page-actions>.tbtn').evaluateAll(buttons=>{
         const nav=document.querySelector('#docview>.explore-navigation').getBoundingClientRect();
-        return buttons.filter(button=>!button.hidden).every(button=>{
+        return buttons.filter(button=>button.getClientRects().length && getComputedStyle(button).visibility!=='hidden').every(button=>{
           const r=button.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
           return r.top>=nav.bottom && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth && button.contains(hit);
         });
       })).toBe(true);
-      await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
-      await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+      if(!await launcher(page).isVisible())await page.locator('#docview>.explore-navigation .reader-utilities>summary').click();
+      await expect(launcher(page)).toBeVisible();
+      await launcher(page).click();
+      await expect(page.locator('.dv-tour-ui')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.locator('.dv-tour')).toBeHidden();
     }

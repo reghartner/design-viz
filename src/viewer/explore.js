@@ -47,8 +47,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=true;
   var legendSummary=document.createElement('summary');legendSummary.textContent='Legend';legendMenu.appendChild(legendSummary);
   var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
-  // Shown only when the reader's tour opts in (body.dv-tour-button); the tour owns the click.
-  var tourButton=button('TOUR',function(){},actions,'mbtn explore-tour-button');tourButton.setAttribute('aria-label','Start the guided tour');
   var panelBody=document.createElement('div');panelBody.className='explore-panel-body';menu.appendChild(panelBody);panelBody.appendChild(choices);
   var placementLabel=document.createElement('label');placementLabel.className='explore-placement';placementLabel.textContent='Default placement';
   var placement=document.createElement('select');placement.setAttribute('aria-label','Default panel placement');
@@ -78,7 +76,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var controlsLabel=button('100%',function(){changeControlsScale(1);},controlsZoom,'mbtn explore-controls-value');controlsLabel.setAttribute('aria-label','Reset step controls size');controlsLabel.title='Reset step controls to 100%';
   var controlsIn=button('+',function(){changeControlsScale(controlsContentScale()+.1);},controlsZoom);controlsIn.setAttribute('aria-label','Enlarge step controls');
   panelBody.appendChild(controlsZoom);
-  if(document.getElementById('workspace-canvas')){button('Saved visibility…',function(){var chapter=box.querySelector('.section-view-options');if(chapter){chapter.open=true;menu.open=false;chapter.querySelector('summary').focus();}},panelBody);}
+  var savedVisibility=null;
+  if(document.getElementById('workspace-canvas')){savedVisibility=button('Saved visibility…',function(){var chapter=box.querySelector('.section-view-options');if(chapter){chapter.open=true;menu.open=false;chapter.querySelector('summary').focus();}},panelBody);savedVisibility.hidden=true;}
   var playerGrip=button('⠿',function(){},player,'explore-player-grip');
   playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
   var playerResize=button('◢',function(){},player,'explore-window-resize');
@@ -1012,7 +1011,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     setPresentation:function(value){if(presentationOverride===value)return;presentationOverride=value;if(!definition)definition={id:'flow',presentation:'standard'};if(definition.presentation===value)return;leave(true);definition=Object.assign({},definition,{presentation:value});standardPanels();enter();if(!active && boardSize && boardSize.resume)boardSize.resume();},
     setView:function(view,tiles,sourceGrid){leave(true);definition=presentationOverride?Object.assign({},view,{presentation:presentationOverride}):view;items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
-    setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
+    setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;if(savedVisibility)savedVisibility.hidden=!author;},
     adoptLayout:function(id,value){
       if(retired || !active || !author || definition.id!==id)return false;
       var normalized=sectionExploreLayout(d,value);

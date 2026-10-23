@@ -2251,8 +2251,11 @@ function syncNavigationPopover(details){
   if(!body.matches(':popover-open'))body.showPopover();
   var summary=details.querySelector('summary'),r=summary.getBoundingClientRect(),root=details.getRootNode(),host=root.host && root.host.getBoundingClientRect();
   var left=host?Math.max(0,host.left):0,right=host?Math.min(window.innerWidth,host.right):window.innerWidth,bottom=host?Math.min(window.innerHeight,host.bottom):window.innerHeight;
-  var width=Math.min(body.offsetWidth || 330,right-left-24);
-  body.style.position='fixed';body.style.margin='0';body.style.inset='auto';body.style.width=width+'px';body.style.left=Math.max(left+12,Math.min(right-width-12,r.right-width))+'px';body.style.top=Math.min(bottom-48,r.bottom+6)+'px';body.style.maxHeight=Math.max(80,bottom-r.bottom-18)+'px';
+  var margin=12,gap=6,width=Math.min(body.offsetWidth || 330,right-left-margin*2);
+  var below=Math.max(0,bottom-r.bottom-gap-margin),above=Math.max(0,r.top-(host?host.top:0)-gap-margin);
+  var natural=Math.max(80,Math.min(body.scrollHeight || 330,Math.max(below,above))),openAbove=below<Math.min(natural,180) && above>below;
+  var available=openAbove?above:below,height=Math.min(natural,Math.max(80,available));
+  body.style.position='fixed';body.style.margin='0';body.style.inset='auto';body.style.width=width+'px';body.style.left=Math.max(left+margin,Math.min(right-width-margin,r.right-width))+'px';body.style.maxHeight=Math.max(80,available)+'px';body.style.top=(openAbove?Math.max((host?host.top:0)+margin,r.top-gap-height):r.bottom+gap)+'px';
   if(body.classList.contains('workspace-canvas-tools-body')){body.style.maxHeight=Math.max(80,r.top-24)+'px';body.style.top=Math.max(12,r.top-body.scrollHeight-6)+'px';}
 }
 function createExploreNavigation(ctl,options){
@@ -2264,6 +2267,7 @@ function createExploreNavigation(ctl,options){
   diagrams.className='explore-navigation-group explore-navigation-diagrams';
   chapters.className='explore-navigation-group explore-navigation-chapters';
   actions.className='explore-navigation-actions';
+  var tourButton=doc.createElement('button');tourButton.type='button';tourButton.className='mbtn explore-tour-button';tourButton.textContent='TOUR';tourButton.setAttribute('aria-label','Start the guided tour');actions.appendChild(tourButton);
   function title(text){var label=doc.createElement('span');label.className='explore-navigation-label';label.textContent=text;return label;}
   tabs.appendChild(title('Tabs'));diagrams.appendChild(title('Sections'));chapters.appendChild(title('Views'));
   function picker(label,host){var select=doc.createElement('select');select.className='navigation-picker';select.setAttribute('aria-label',label);host.appendChild(select);return select;}
@@ -2388,9 +2392,10 @@ function createExploreNavigation(ctl,options){
     /* The chapter heading sits behind the full-window Explore surface. Keep
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
-    if(!options.singleShareAction)move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
+    if(!options.singleShareAction || options.allowEmbedShare)move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
     move(host && host.querySelector('.section-view-settings'),actions);
     move(host && host.querySelector('.viewport-actions'),actions);
+    actions.appendChild(tourButton);
     actions.hidden=false;
     // Prepare top-layer bodies before a click opens their details element. A
     // deferred toggle otherwise paints one frame at the old section anchor.
@@ -4018,9 +4023,10 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       sec.sectionEl.querySelector('.embedcopy') : null;
     if (embedBtn){
       if(!manageHistory){
-        var chapterLabel=(embedBtn.getAttribute('aria-label') || String(sec.reference)).replace(/^Copy embed link for /,'').replace(/ —.*$/,'');
-        embedBtn.innerHTML=COPY_ICON;embedBtn.title='Copy link';embedBtn.setAttribute('aria-label','Copy link to section '+chapterLabel);
-        bindCopy(embedBtn,function(){var state=cloneState(fragmentState);state.diagramSection=sec.number;return stateHash(state);});
+        bindCopy(embedBtn,function(){
+          var state=cloneState(fragmentState);state.diagramSection=sec.number;
+          return '#embed='+encodeURIComponent(String(sec.reference))+'&'+stateHash(state).replace(/^#/,'');
+        });
       }else bindCopyControl(win, embedBtn, function(){
         var view=linkedView(sec);
         return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference))+

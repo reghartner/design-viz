@@ -23,11 +23,12 @@ function wireTour(ctl, view, win, config, options){
   if (doc.body.classList.contains('dv-embed')) return null;
   if (!tourUsableConfig(config)) return null;
   options = options || {};
+  var launcherEnabled=options.replay!==false;
   var request = options.request !== undefined ? options.request :
     tourHashRequest(win.location.hash);
 
   var progress=config===TOUR_DEFAULT_CONFIG?createTourProgress(win):null;
-  var discoveryMode=false, discovery=null;
+  var discoveryMode=false,unseenCount=0;
 
   function storageDone(){
     try { if (win.localStorage && win.localStorage.getItem(TOUR_STORAGE_KEY) === 'done') return true; }
@@ -1009,7 +1010,7 @@ function wireTour(ctl, view, win, config, options){
       var unseen=unseenTourSteps(steps,progress.read());
       if(!unseen.length)return [];
       return unseen.concat([{id:'discovery-done',kind:'done',copy:{
-        heading:'You’re caught up',body:'Keep exploring this diagram. The ? button always offers the full walkthrough.'}}]);
+        heading:'You’re caught up',body:'Keep exploring this diagram. The TOUR button always offers the full walkthrough.'}}]);
     }
     /* one chooser, always first; extras are dropped (lint warns) */
     var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
@@ -1287,7 +1288,6 @@ function wireTour(ctl, view, win, config, options){
     active = true;
     discoveryMode=!!onlyNew && !!progress;
     persona = discoveryMode?progress.read().persona:null;
-    if(discovery)discovery.hidden=true;
     fullScrim(); /* the overlay opens on a fully dimmed page */
     ctl.suppressFragmentWrites = true;
     takeSnapshot();
@@ -1321,28 +1321,28 @@ function wireTour(ctl, view, win, config, options){
       try { handoff.focus({preventScroll: true}); } catch (ex) { handoff.focus(); }
     }
     else if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
-    else if (replay && replay.isConnected) replay.focus();
+    else {var launcher=view.querySelector('.explore-tour-button');if(launcher && launcher.isConnected)launcher.focus();}
     if(options.onFinish)options.onFinish(!!done);
   }
 
-  /* ---- replay affordance + autostart ---- */
-  var replay = doc.createElement('button');
-  replay.type = 'button';
-  replay.className = 'tbtn dv-tour-replay';
-  replay.textContent = 'Tour';
-  replay.setAttribute('aria-label', 'Replay the tour');
-  replay.addEventListener('click', function(){ disabled = false; guarded(start); });
-  var pageActions=readerPageActions(view,ctl);
-  pageActions.appendChild(replay);
-  if(options.replay===false)replay.hidden=true;
-
+  /* ---- navbar launcher + autostart ---- */
   function updateDiscovery(){
-    if(!discovery || destroyed || active || request==='suppress' || options.deepLink)return;
-    var state=progress.read();
-    var unseen=unseenTourSteps(tourStepsForPersona(plannedConfig,state.persona),state);
-    discovery.hidden=!unseen.length;
-    discovery.textContent='New features to explore · '+unseen.length;
-    discovery.title=unseen.map(function(step){return step.copy.heading;}).join(' · ');
+    if(!launcherEnabled || destroyed || active)return;
+    var unseen=[];
+    if(progress && request!=='suppress' && !options.deepLink && plannedConfig){
+      var state=progress.read();unseen=unseenTourSteps(tourStepsForPersona(plannedConfig,state.persona),state);
+    }
+    unseenCount=unseen.length;
+    view.querySelectorAll('.explore-tour-button').forEach(function(button){
+      var badge=button.querySelector('.explore-tour-count');
+      if(unseenCount){
+        if(!badge){badge=doc.createElement('span');badge.className='explore-tour-count';badge.setAttribute('aria-hidden','true');button.appendChild(badge);}
+        badge.textContent=String(unseenCount);button.setAttribute('aria-label','Explore '+unseenCount+' new tour '+(unseenCount===1?'topic':'topics'));
+        button.title=unseen.map(function(step){return step.copy.heading;}).join(' · ');
+      }else{
+        if(badge)badge.remove();button.setAttribute('aria-label','Start the guided tour');button.title='Start the full guided tour';
+      }
+    });
   }
   function offerDiscovery(){
     // Probe all sections/views as the normal tour does, preserving the reader's
@@ -1352,17 +1352,11 @@ function wireTour(ctl, view, win, config, options){
     try{planDefaultTour();}
     finally{restoreReader().then(function(){if(!destroyed)updateDiscovery();});}
   }
-  if(progress){
-    discovery=doc.createElement('button');discovery.type='button';
-    discovery.className='tbtn dv-tour-discovery';discovery.hidden=true;
-    discovery.addEventListener('click',function(){disabled=false;guarded(function(){start(true);});});
-    replay.insertAdjacentElement('afterend',discovery);
-  }
-
   function onTourButton(ev){
-    if(ev.target.closest && ev.target.closest('.explore-tour-button')){disabled=false;guarded(start);}
+    var button=ev.target.closest && ev.target.closest('.explore-tour-button');
+    if(button && view.contains(button)){disabled=false;guarded(function(){start(unseenCount>0);});}
   }
-  if(options.tourButton){doc.body.classList.add('dv-tour-button');doc.addEventListener('click',onTourButton);}
+  if(launcherEnabled){doc.body.__dvTourButtonOwners=(doc.body.__dvTourButtonOwners || 0)+1;doc.body.classList.add('dv-tour-button');doc.addEventListener('click',onTourButton);}
 
   var previousStart=win.dvStartTour;
   var startPublic=function(){ if(destroyed)return false;disabled=false;guarded(start);return true; };
@@ -1376,19 +1370,19 @@ function wireTour(ctl, view, win, config, options){
     /* The owning reader retires ctl next. Do not restore playback, focus or
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
-    if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
-    if(options.tourButton){doc.body.classList.remove('dv-tour-button');doc.removeEventListener('click',onTourButton);}
-    if(!pageActions.children.length){if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();pageActions.remove();}
+    if(overlay)overlay.remove();
+    if(launcherEnabled){doc.removeEventListener('click',onTourButton);doc.body.__dvTourButtonOwners=Math.max(0,(doc.body.__dvTourButtonOwners || 1)-1);if(!doc.body.__dvTourButtonOwners)doc.body.classList.remove('dv-tour-button');}
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
     }
   }
 
   if (request === 'force') guarded(start);
-  else if (request !== 'suppress' && !options.deepLink && options.autostart !== false){
-    if(!storageDone())guarded(start);
+  else if (request !== 'suppress' && !options.deepLink){
+    if(!storageDone() && options.autostart !== false)guarded(start);
     else if(progress)guarded(offerDiscovery);
   }
+  updateDiscovery();
 
   return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy,
     refresh:function(){if(active)guarded(function(){if(options.controller)ctl=options.controller();renderStep(list[at],true);schedule();});}};

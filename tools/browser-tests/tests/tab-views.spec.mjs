@@ -59,7 +59,7 @@ test('compound contract routes retain the second member navigation through tour 
  for(const route of ['#d=c&v=standard-ac&c=c','#d=c&v=standard-ac&c=c&r=1','#c=c']){
   await page.goto(url+route);await assertContext();
   const hash=new URL(page.url()).hash;
-  await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
+  await nav(root).locator('.explore-tour-button').click();
   await expect(page.locator('.dv-tour-ui .dv-tour-heading')).toHaveText('Visit A');
   await page.keyboard.press('Escape');await expect(page.locator('.dv-tour')).toBeHidden();await assertContext();
   expect(new URL(page.url()).hash).toBe(hash);
@@ -85,7 +85,7 @@ for(const width of [320,390])test(`reader menus and utilities stay reachable at 
  await separated();
  // A longer discovery label forces another row and exercises the live dock
  // measurement, including resize/font-layout changes rather than a fixed inset.
- await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await separated();
+ await dock.locator('.dv-shortcuts').evaluate(el=>el.textContent='Keyboard shortcuts and recently added controls');await separated();
  await page.setViewportSize({width:width+90,height:760});await separated();
  await page.setViewportSize({width,height:900});await separated();
  await chooseView(root,'Explore A');expect(await navigation.boundingBox()).toEqual(before);
@@ -133,7 +133,7 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
  await expect(player.getByRole('button',{name:'Step',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
  await player.getByRole('button',{name:'Step',exact:true}).click();await readable();expect(await camera()).toEqual(initial);
  // Wrapped utility rows and a shorter viewport must reserve their actual space.
- await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await readable();
+ await dock.locator('.dv-shortcuts').evaluate(el=>el.textContent='Keyboard shortcuts and recently added controls');await readable();
  await page.setViewportSize({width:390,height:740});await readable();
  await player.getByRole('button',{name:'Ambient',exact:true}).click();await expect(bar).toBeHidden();await separated();
  await player.getByRole('button',{name:'Step',exact:true}).click();await readable();

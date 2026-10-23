@@ -91,7 +91,7 @@ test('Try the controls gives keyboard arrows to the highlighted panel grip',asyn
   await page.goto(url+'#d=flow&v=engineering&m=step&s=ready');
   const grip=panel(page,'status').locator('.explore-window-grip');
   await grip.focus();await grip.press('Shift+ArrowLeft');await grip.press('Shift+ArrowLeft');
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   await expect(heading(page)).toHaveText('Move this panel');
   await page.getByRole('button',{name:'Try the controls',exact:true}).click();
   await expect(grip).toBeFocused();
@@ -131,7 +131,7 @@ test('Escape restores paused playback, the selected stop, panel geometry and vis
   await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
   const before=await panelRect(page,'status'),zoom=await page.locator('.reader-zoom-menu>summary').textContent(),hash=new URL(page.url()).hash;
   await expect(page.locator('.termbar')).toHaveAttribute('data-playback','paused');
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   await expect(heading(page)).toHaveText('Try the workspace');
   await expect(selectedStep(page)).toHaveText('1');
   await page.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}).click();
@@ -158,7 +158,7 @@ test('starting playback during a tour cannot leave an originally paused stop pla
   const url=await build(server,[spot('Try playback','.step-transport',{presentation:'explore',step:'ready'})]);
   await page.goto(url+'#d=flow&v=engineering&m=step&s=ready');
   await expect(page.locator('.termbar')).toHaveAttribute('data-playback','paused');
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   await expect(heading(page)).toHaveText('Try playback');
   await page.getByRole('button',{name:'Play',exact:true}).click();
   await expect(page.locator('.termbar')).toHaveAttribute('data-playback','playing');

@@ -299,7 +299,7 @@ function initWorkbenchLibrary(opts){
     title.title=title.textContent;headerTitle.append(title,toolbar);headerTitle.hidden=false;
   }
   function retireViewer(){
-    if(headerObserver)headerObserver.disconnect();headerObserver=null;document.body.classList.remove('canon-reader-active');retireHeader();reader.style.removeProperty('--flowview-navigation-top');reader.style.removeProperty('--flowview-navigation-bottom');
+    if(headerObserver)headerObserver.disconnect();headerObserver=null;document.body.classList.remove('canon-reader-active','dv-embed');retireHeader();reader.style.removeProperty('--flowview-navigation-top');reader.style.removeProperty('--flowview-navigation-bottom');
     if(positionChange && ctl && ctl.onChange===positionChange.wrapped)ctl.onChange=positionChange.prior;
     positionChange=null;
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
@@ -387,6 +387,13 @@ function initWorkbenchLibrary(opts){
       if(signal.aborted)throw new Error('Detail request cancelled.');
       var loaded=await loadSpec(entry);if(signal.aborted)throw new Error('Detail request cancelled.');return loaded.spec;
     }};
+  }
+  function applyCanonEmbedMode(){
+    var req=embedRequestFromHash(location.hash);if(!req)return;
+    var route=parseHash(location.hash).d,target=embedTargetSection(ctl,route || req.section) || embedTargetSection(ctl,req.section);
+    if(!target){if(window.console)console.warn('flowspec: #embed section "'+req.section+'" not found');return;}
+    if(target.tabBlock != null && target.tab != null){var block=ctl.tabBlocks[target.tabBlock-1];if(block)block.select(target.tab,false,false);}
+    document.body.classList.add('dv-embed');target.sectionEl.classList.add('dv-embed-target');
   }
   function selectedSkin(page){return typeof opts.skin==='function'?opts.skin(page):resolveSkin('',page && page.skin);}
   function setSkin(name){
@@ -560,6 +567,7 @@ function initWorkbenchLibrary(opts){
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
       ctl=renderPage(reader,page,selectedSkin(page),null,readerOptions());
+      applyCanonEmbedMode();
       var remembered=opts.position && opts.position();
       if(remembered){
         try{applyWorkspaceTarget(ctl,page,remembered);}
@@ -580,7 +588,7 @@ function initWorkbenchLibrary(opts){
       var header=document.querySelector('.workbench-header');
       function headerSize(){var height=header?Math.ceil(header.getBoundingClientRect().height):0;reader.style.setProperty('--flowview-navigation-top',height+'px');var nav=reader.querySelector('.explore-navigation');if(nav)reader.style.setProperty('--flowview-navigation-bottom',Math.ceil(height+nav.getBoundingClientRect().height+8)+'px');}
       headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}
-      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy],singleShareAction:true});
+      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy],singleShareAction:true,allowEmbedShare:true});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
       shortcuts=wireReaderShortcuts(ctl,reader,window);
       if(opts.savePosition){

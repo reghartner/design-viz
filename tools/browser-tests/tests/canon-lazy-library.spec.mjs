@@ -670,7 +670,9 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
         }),
         viewsUnclipped:viewChoices.every(node=>node.scrollWidth<=node.clientWidth),
         separated:actionBounds.every(a=>viewBounds.every(v=>a.right<=v.left+1 || v.right<=a.left+1 || a.bottom<=v.top+1 || v.bottom<=a.top+1)),
-        rowHeightOk:top.getBoundingClientRect().height<=(width>1100?56:88)
+        // TOUR and embed stay visible. Four long authored View labels need the
+        // existing two-row desktop header below 1200px; controls remain compact.
+        rowHeightOk:top.getBoundingClientRect().height<=(width>=1200?56:88)
       };
     },width)).toEqual({labels:['Edit in Workbench →','Copy link to current position'],compact:true,viewsUnclipped:true,separated:true,rowHeightOk:true});
     await expect(nav.locator('.reader-utility-options button[aria-label^="Copy link"]')).toHaveCount(1);
@@ -678,7 +680,7 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
       const bounds=el.getBoundingClientRect(),controls=Array.from(el.querySelectorAll('.reader-top select,.reader-top button,.reader-top summary,.reader-toolbar button,.reader-toolbar summary')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({node,rect:node.getBoundingClientRect()}));
       return controls.every(({node,rect:r})=>r.left>=bounds.left && r.right<=bounds.right && r.top>=bounds.top && r.bottom<=bounds.bottom && node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)));
     })).toBe(true);
-    if([1440,1200,900,390,320].includes(width))await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
+    if([1440,1200,1120,900,390,320].includes(width))await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
   }
   for(const width of [1201,1200,1120,1101,1100,900]){
     await page.setViewportSize({width,height:1000});

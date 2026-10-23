@@ -149,8 +149,14 @@ function boot(raw){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
     pendingLinkBase = null;
   }
-  initViewerExploreCanvas(ctl,view);
+  var artifactHost=tourArtifactHost(window.location.hostname) || !!window.claude,guideAction=null;
+  if(artifactHost && typeof initWorkbenchHumanGuide==='function'){
+    guideAction=document.createElement('button');guideAction.type='button';guideAction.className='mbtn explore-guide-button';guideAction.textContent='User guide';
+    guideAction.setAttribute('data-open-human-guide','');guideAction.setAttribute('aria-haspopup','dialog');
+  }
+  initViewerExploreCanvas(ctl,view,{action:guideAction});
   wirePresenter(ctl, view, window);
+  if(guideAction)initWorkbenchHumanGuide();
   /* Published as a claude.ai artifact: page-owned comment anchors so a
      comment records its Tab/View and "Go to" can switch to it. Inert when
      window.claude or the declared capability is absent. */
@@ -161,10 +167,9 @@ function boot(raw){
   if (typeof wireTour === 'function' && !embedRequest){
     var tourConfig = tourUsableConfig(page.tour) ? page.tour :
       (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
-    var artifactHost = tourArtifactHost(window.location.hostname);
     wireTour(ctl, view, window, tourConfig,
              {request: tourRequest, deepLink: tourDeferredByLink,
-              autostart: !artifactHost, tourButton: artifactHost});
+              autostart: !artifactHost});
   }
   /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
   if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);

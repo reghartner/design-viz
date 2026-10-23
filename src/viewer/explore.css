@@ -85,10 +85,11 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 .explore-panel-choices label{display:grid;grid-template-columns:20px 1fr;gap:3px;padding:7px 0;cursor:pointer;}
 .explore-panel-choices small{grid-column:2;color:var(--dfaint);}
 .explore-panel-choices small:empty{display:none;}
-.explore-tour-button{display:none!important;}
-body.dv-tour-button .explore-tour-button{display:inline-block!important;border:1px solid #9a3412!important;background:#c2410c!important;color:#fff!important;font:700 12px 'IBM Plex Sans',sans-serif!important;letter-spacing:.06em;padding:7px 12px!important;border-radius:8px!important;white-space:nowrap;cursor:pointer;}
+.explore-tour-button{display:none!important;align-items:center!important;gap:7px;}
+body.dv-tour-button .explore-tour-button{display:inline-flex!important;border:1px solid #9a3412!important;background:#c2410c!important;color:#fff!important;font-family:inherit!important;font-size:12px!important;font-weight:700!important;line-height:normal!important;letter-spacing:.06em;padding:7px 12px!important;border-radius:8px!important;white-space:nowrap;cursor:pointer;}
 body.dv-tour-button .explore-tour-button:hover{background:#9a3412!important;}
 body.dv-tour-button .explore-tour-button:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+.explore-tour-count{display:inline-grid;place-items:center;min-width:19px;height:19px;box-sizing:border-box;padding:0 5px;border-radius:999px;background:#fff;color:#9a3412;font-family:inherit;font-size:11px;font-weight:800;line-height:19px;letter-spacing:0;}
 @media print{body.dv-tour-button .explore-tour-button{display:none!important;}}
 .explore-legend-menu{font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .explore-legend-menu>summary{cursor:pointer;border:1px solid var(--explore-border);border-radius:8px;padding:7px 10px;background:var(--explore-bg);white-space:nowrap;}
@@ -155,8 +156,6 @@ body.dv-tour-button .explore-tour-button:focus-visible{outline:2px solid var(--a
  .native-canvas .explore-navigation{margin-left:0;margin-top:var(--flowview-host-actions-block-offset,0px);min-height:0;}
 }
 
-
-@media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}
 
 @media screen{
  .explore-full-window .explore-active-section>:is(.detail-head,.handoff-breadcrumb){display:block;container-type:normal;position:fixed;top:var(--flowview-navigation-bottom,8px);left:12px;z-index:90;max-width:calc(100vw - 24px);padding:8px 12px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
@@ -352,9 +351,14 @@ body .docview.has-document-navigation>.explore-navigation :is(.tabbtn,.mbtn,summ
 body .docview.has-document-navigation>.explore-navigation .explore-section-arrow{width:28px;min-width:28px;padding:4px;font-size:20px;}
 body .docview.has-document-navigation>.explore-navigation .embedcopy{width:34px;min-width:34px;padding:6px;}
 body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display:none;}
-body .docview.has-document-navigation>.explore-navigation .explore-panel-body .mbtn,.explore-panel-body select{min-height:30px;font:500 12px/18px 'IBM Plex Sans',sans-serif;padding:5px 8px;border-radius:6px;}
+.explore-panel-body .mbtn,.explore-panel-body select{box-sizing:border-box;min-height:30px;font:500 12px/18px 'IBM Plex Sans',sans-serif;padding:5px 8px;border:1px solid var(--explore-border);border-radius:6px;background:var(--explore-bg);color:var(--dtext);}
 .explore-panel-body .explore-panel-choices{display:block;}
-.explore-panel-body .explore-panel-choices label{padding-top:5px;padding-bottom:5px;}
+.explore-panel-body.explore-panel-body .explore-panel-choices>label,.explore-panel-body .explore-panel-choices .explore-panel-choice>label:first-child{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:start;gap:7px;box-sizing:border-box;margin:0;padding:7px 0;font:400 12px/16px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-panel-body .explore-panel-choices input[type="checkbox"]{appearance:auto;box-sizing:border-box;width:16px;height:16px;min-height:16px;margin:0;padding:0;border:0;border-radius:0;background:transparent;accent-color:var(--daccent);}
+.explore-panel-body .explore-panel-choices small{grid-column:2;line-height:1.35;}
+.explore-panel-body.explore-panel-body label.explore-placement{display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;margin:0;padding:4px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-panel-body.explore-panel-body .explore-panel-choice>label.explore-placement{padding:0 0 6px 23px;}
+.explore-panel-body .explore-placement select{box-sizing:border-box;width:auto;min-width:105px;max-width:145px;min-height:30px;margin:0;padding:5px 8px;}
 
 @media screen{
  body .docview.has-document-navigation>.explore-navigation.navigation-narrow .viewport-expand{width:34px;min-width:34px;padding:5px;font-size:0;}
@@ -363,6 +367,10 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
 
 /* Host actions stay compact when the reader moves them into its utility menu. */
 .explore-navigation-actions .welcome-button{flex:none;min-height:34px;padding:6px 10px;white-space:nowrap;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+.explore-navigation-actions .explore-guide-button{flex:none;min-height:34px;padding:6px 10px;white-space:nowrap;}
+
+/* Explore already provides an in-surface Expand control. */
+.explore-full-window>.reader-page-actions .presentbtn{display:none;}
 
 /* Contents is a reader shell. Workbench retains its shared navigation lanes. */
 @media screen{

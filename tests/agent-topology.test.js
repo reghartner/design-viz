@@ -9,12 +9,12 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   const disk=new Map(),hits=[],hosts=[],updates=[];let gate=null,text=JSON.stringify({page:{title:'Draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']]}}]}}),ledger='Before',saved,number=0,applies=0;
-  const c={TextEncoder,URL,Response,SyntaxError,location:new URL(origin),window:{crypto:webcrypto},fetch:async url=>{
+  const c={setTimeout:()=>0,clearTimeout(){},TextEncoder,URL,Response,SyntaxError,location:new URL(origin),window:{crypto:webcrypto},fetch:async url=>{
     const name=new URL(url).pathname.slice(1);hits.push(name);hosts.push(new URL(url).host);if(gate)await gate(name);
     if(missingIndex && name==='diagrams.json')return new Response('',{status:404});
     return new Response(JSON.stringify(name==='diagrams.json'?catalog:providers.find(spec=>name===spec.page.canon.id+'.json')));
   }};
-  vm.createContext(c);vm.runInContext(composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/session.js','workbench/agent-merge.js','workbench/agent-session.js','workbench/folder-agent.js']),c);
+  vm.createContext(c);vm.runInContext(composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/session.js','workbench/lifetime.js','workbench/agent-merge.js','workbench/agent-session.js','workbench/folder-agent.js']),c);
   const session=c.createBuilderSession({source:{read:()=>text,write:value=>text=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(source,baseline,artifacts)=>saved=copy(artifacts || {})},render(){session.resolve(JSON.parse(text));}});
   session.replaceProject(text);
   const files={read:async name=>disk.has(name)?copy(disk.get(name)):null,readText:async name=>disk.has(name)?String(disk.get(name)):null,write:async(name,value)=>disk.set(name,copy(value))};

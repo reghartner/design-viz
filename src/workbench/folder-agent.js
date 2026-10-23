@@ -111,9 +111,61 @@ function folderAgentPilotHealth(value,identity,now){
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
+  var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
+  // Heartbeats must not wait behind artifact saves or proposal preparation.
+  // All writes to editor.json share this small queue, including retirement.
+  function editorSerial(action){var job=editorChain.then(action);editorChain=job.catch(function(){});return job;}
+  function stopHeartbeat(){life.cancelDelay(heartbeatTimer);heartbeatTimer=null;}
+  function folderError(ex){pilotStatus=null;if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});}
+  function identityMatches(value,owner){return value && owner && value.sessionId===owner.sessionId && value.connectionId===owner.connectionId;}
+  function writeDisconnected(owner){
+    return editorSerial(async function(){
+      async function guard(){if(!identityMatches(await files.read('session.json'),owner)){var ex=Error('Folder ownership changed.');ex.name='HeartbeatRetiredError';throw ex;}}
+      try{await guard();await files.write('editor.json',Object.assign({},owner,{connected:false,at:now()}),guard);}
+      catch(ex){if(ex.name!=='HeartbeatRetiredError')throw ex;}
+    });
+  }
+  function retire(status,write){
+    var owner=manifest && {sessionId:manifest.sessionId,connectionId:manifest.connectionId};
+    connected=false;heartbeatReady=false;pending=null;epoch++;stopHeartbeat();clearReview();publish({status:status,listening:false});
+    return write && owner?writeDisconnected(owner):Promise.resolve();
+  }
+  function scheduleHeartbeat(){
+    stopHeartbeat();if(connected && heartbeatReady && !disposed)heartbeatTimer=life.delay(function(){heartbeatTimer=null;heartbeat().catch(function(){});},1000);
+  }
+  function heartbeat(force){
+    if(heartbeatJob)return heartbeatJob;
+    if(!connected || !heartbeatReady || disposed)return Promise.resolve(false);
+    stopHeartbeat();
+    var token=epoch,owner={sessionId:manifest.sessionId,connectionId:manifest.connectionId};
+    heartbeatJob=editorSerial(async function(){
+      function retired(){var ex=Error('Heartbeat retired.');ex.name='HeartbeatRetiredError';throw ex;}
+      function current(){
+        if(!alive(token))retired();
+        var snap=opts.snapshot();
+        if(!snap.open || snap.project!==project){retire('Disconnected — open the same project and reconnect to continue.',true).catch(function(){});retired();}
+      }
+      async function guard(){
+        current();var saved=await files.read('session.json');current();
+        if(!identityMatches(saved,owner)){retire('Another connection owns this folder. Reconnect explicitly.',false);retired();}
+        var editor=await files.read('editor.json');current();
+        if(!identityMatches(editor,owner) || editor.connected!==true){retire('The folder connection was closed. Reopen it to continue.',false);retired();}
+      }
+      current();if(!force && now()-lastHeartbeat<1000)return true;
+      await guard();
+      await files.write('editor.json',Object.assign({},owner,{connected:true,at:now()}),guard);
+      current();lastHeartbeat=now();return true;
+    }).catch(function(ex){if(ex.name==='HeartbeatRetiredError')return false;if(alive(token))folderError(ex);throw ex;}).finally(function(){heartbeatJob=null;scheduleHeartbeat();});
+    return heartbeatJob;
+  }
+  function wakeHeartbeat(){if(connected && !disposed)heartbeat(true).catch(function(){});}
+  var heartbeatDocument=opts.document || (typeof document!=='undefined'?document:null);
+  var heartbeatWindow=heartbeatDocument && heartbeatDocument.defaultView;
+  life.listen(heartbeatWindow,'focus',wakeHeartbeat);
+  life.listen(heartbeatDocument,'visibilitychange',function(){if(heartbeatDocument.visibilityState==='visible')wakeHeartbeat();});
   function publish(state){
     var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
     var phase=!connected?'disconnected':!pending?(activity.length?'complete':'idle'):activity.length && activity[activity.length-1].phase==='permission-needed'?'permission-needed':quietSeconds>=30?'quiet':lastAgentAt===null?'waiting':'responding';
@@ -163,12 +215,10 @@ function createFolderAgentClient(opts){
   async function snapshot(token){
     var current=await files.read('session.json');
     if(!alive(token))return null;
-    if(!belongs(current)){connected=false;epoch++;publish({status:'Another connection owns this folder. Reconnect explicitly.'});return null;}
+    if(!belongs(current)){retire('Another connection owns this folder. Reconnect explicitly.',false);return null;}
     var sent=exchange.request();
     if(sent.snapshot.project!==project || !sent.snapshot.open){
-      connected=false;epoch++;
-      await files.write('editor.json',envelope({connected:false,at:now()}));
-      publish({status:'Disconnected — open the same project and reconnect to continue.'});return null;
+      await retire('Disconnected — open the same project and reconnect to continue.',true);return null;
     }
     if(files.checkArtifacts)await files.checkArtifacts();
     var serialized=JSON.stringify(sent.snapshot);
@@ -182,9 +232,7 @@ function createFolderAgentClient(opts){
       else await files.write('story.spec.json',sent.snapshot.source);if(!alive(token))return null;
       lastState=serialized;
     }else if(files.flushArtifacts && opts.artifactStatus)opts.artifactStatus(lastArtifactState,lastArtifactState==='paused'?'Repair the JSON. The last valid spec and ledger are unchanged.':'');
-    if(now()-lastHeartbeat>=1000){
-      await files.write('editor.json',envelope({connected:true,at:now()}));lastHeartbeat=now();
-    }
+    await heartbeat();
     return alive(token)?sent:null;
   }
   function preparationError(message){var error=Error(message);error.name='RequestPreparationError';return error;}
@@ -249,7 +297,7 @@ function createFolderAgentClient(opts){
     pilotStatus=folderAgentPilotHealth(health,manifest,now());
     if(pilotStatus){
       var healthOwner=await files.read('session.json');if(!alive(token) || turn!==turnEpoch)return;
-      if(!belongs(healthOwner)){pilotStatus=null;connected=false;epoch++;publish({status:'Another connection owns this folder. Reconnect explicitly.'});return;}
+      if(!belongs(healthOwner)){pilotStatus=null;retire('Another connection owns this folder. Reconnect explicitly.',false);return;}
     }
     if(opts.workflow==='external'){
       var incoming=await readOptional('agent-request.json');if(!alive(token) || turn!==turnEpoch)return;
@@ -361,6 +409,7 @@ function createFolderAgentClient(opts){
   return {
     start:function(resume,choice,renewal){var started=epoch;return serial(async function(){
       if(disposed || started!==epoch)throw Error('Session was closed.');
+      await editorChain;if(disposed || started!==epoch)throw Error('Session was closed.');
       var opening=opts.snapshot();
       if(connected)throw Error('Disconnect before starting another session.');
       var existing=await files.read('session.json'),preview=null;
@@ -457,7 +506,7 @@ function createFolderAgentClient(opts){
         await files.write('state.json',envelope(initial.snapshot),checkOwner);await checkOwner();
         if(files.flushArtifacts)await files.flushArtifacts(initial.snapshot.source,initial.snapshot.ledger,checkOwner);
         else await files.write('story.spec.json',initial.snapshot.source,checkOwner);await checkOwner();
-        await files.write('editor.json',envelope({connected:true,at:now()}),checkOwner);await checkOwner();
+        await editorSerial(function(){return files.write('editor.json',envelope({connected:true,at:now()}),checkOwner);});await checkOwner();
         var committed=Object.assign({},manifest);delete committed.recoveryState;delete committed.claimAt;
         await files.write('session.json',committed,checkOwner);await checkOwner();manifest=committed;
         lastState=JSON.stringify(initial.snapshot);lastHeartbeat=now();
@@ -467,7 +516,8 @@ function createFolderAgentClient(opts){
         // Carry the workbench history over to the renewed session id.
         if(renewal){await saveTranscript();await saveChanges();}
         if(!alive(token))throw Error('Session was closed.');
-      }catch(ex){connected=false;epoch++;publish({listening:false});throw ex;}
+      }catch(ex){connected=false;epoch++;stopHeartbeat();publish({listening:false});throw ex;}
+      heartbeatReady=true;scheduleHeartbeat();
       publish({status:'Paste the connection instructions into Claude.',listening:false});
       return manifest;
     });},
@@ -548,12 +598,13 @@ function createFolderAgentClient(opts){
     });},
     // Standalone folder autosave renews ownership without processing agent input.
     flush:function(){var token=epoch;return serial(function(){if(!alive(token))throw Error('The folder is disconnected. Reopen it to resume file saving.');return snapshot(token);}).catch(function(ex){if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);throw ex;});},
-    poll:function(){return serial(poll).catch(function(ex){pilotStatus=null;if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},
+    poll:function(){return serial(poll).catch(function(ex){folderError(ex);throw ex;});},
     disconnect:function(){
-      connected=false;pending=null;epoch++;clearReview();publish({status:'Disconnected. Files and conversation remain in your folder.',listening:false});
-      return serial(async function(){if(manifest && belongs(await files.read('session.json')))await files.write('editor.json',envelope({connected:false,at:now()}));});
+      var closing=retire('Disconnected. Files and conversation remain in your folder.',true);
+      // Callers can release their folder lock only after outstanding saves drain.
+      return Promise.allSettled([closing,chain]).then(function(results){if(results[0].status==='rejected')throw results[0].reason;});
     },
-    destroy:function(){connected=false;disposed=true;epoch++;clearReview();},
+    destroy:function(){connected=false;heartbeatReady=false;disposed=true;epoch++;stopHeartbeat();life.destroy();clearReview();},
     manifest:function(){return manifest;}
   };
 }

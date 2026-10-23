@@ -1,8 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 function harness(extra={}){
-  const context={TextEncoder,TextDecoder,SyntaxError};vm.createContext(context);
-  for(const file of ['agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
+  const timers=new Map();let timerId=0;
+  const context={TextEncoder,TextDecoder,SyntaxError,setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id)};vm.createContext(context);
+  for(const file of ['lifetime.js','agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
   const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
   // Like the directory adapter, guards learn whether this write created the file.
@@ -12,7 +13,7 @@ function harness(extra={}){
   const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,open,selection,views}),busy:()=>busy,
     apply(text){writes.push(text);source=text;return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
   let client=context.createFolderAgentClient(options);
-  const h={disk,writes,updates,files,context,client,get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
+  const h={disk,writes,updates,files,context,client,timers,async heartbeat(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());for(let n=0;n<50;n++)await Promise.resolve();},get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
     level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
     envelope:value=>({...client.manifest(),...value}),proposal:(extra={})=>h.disk.set('proposal.json',h.envelope({id:'proposal-1',requestId:h.disk.get('request.json').id,baseRevision:h.disk.get('state.json').revision,source:'{"title":"after"}',...extra})),
     reply:(extra={})=>h.disk.set('reply.json',h.envelope({id:'reply-1',requestId:h.disk.get('request.json').id,text:'Done <script>unsafe()</script>',...extra}))};
@@ -781,4 +782,69 @@ test('a project switch during paired flushing aborts before commit and reports f
 test('flush-only writer refuses a disconnected owner instead of reporting a silent save',async()=>{
   const states=[],h=harness({artifactStatus:(state,detail)=>states.push({state,detail})});
   await h.client.start();await h.client.disconnect();await assert.rejects(h.client.flush(),/disconnected/);assert.equal(states.at(-1).state,'failed');
+});
+
+for(const held of ['paired save','proposal preparation'])test('independent heartbeat stays fresh through a held '+held+' and retains the request',async()=>{
+  let release,entered;const gate=new Promise(resolve=>release=resolve),hit=new Promise(resolve=>entered=resolve);
+  const h=harness({reviewMode:true,prepare:async()=>{entered();await gate;return {};}});await h.client.start();await h.client.send('Keep this turn');
+  const identity=JSON.stringify(h.client.manifest()),request=h.last.pending;
+  let working;
+  if(held==='paired save'){
+    h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();entered();await gate;await guard();};h.type('{"title":"held save"}');working=h.client.flush();
+  }else{h.proposal();working=h.client.poll();}
+  await hit;
+  for(let n=0;n<20;n++){h.advance(1000);await h.heartbeat();assert.equal(h.disk.get('editor.json').at,101000+n*1000);assert.equal(h.timers.size,1);}
+  assert.equal(h.last.pending,request);assert.equal(JSON.stringify(h.client.manifest()),identity);
+  release();await working;assert.equal(h.last.pending,request);assert.equal(h.disk.get('editor.json').connected,true);h.client.destroy();assert.equal(h.timers.size,0);
+});
+
+for(const change of ['disconnect','destroy','project','owner','closed lease'])test('held heartbeat cannot publish after '+change,async()=>{
+  const h=harness();await h.client.start();const before=h.disk.get('editor.json');h.advance(20000);
+  let release,entered;const hit=new Promise(resolve=>entered=resolve);
+  h.writeGate(name=>name==='editor.json'?new Promise(resolve=>{release=resolve;entered();}):undefined);
+  const renewing=h.heartbeat();await hit;let closing;
+  if(change==='disconnect')closing=h.client.disconnect();
+  if(change==='destroy')h.client.destroy();
+  if(change==='project')h.project();
+  if(change==='owner'){h.disk.set('session.json',{...h.client.manifest(),connectionId:'replacement'});h.disk.set('editor.json',{sessionId:'other',connectionId:'replacement',connected:true,at:120000});}
+  if(change==='closed lease')h.disk.set('editor.json',{...before,connected:false});
+  h.writeGate(null);release();await renewing;await closing;for(let n=0;n<50;n++)await Promise.resolve();
+  const editor=h.disk.get('editor.json');
+  if(change==='owner')assert.equal(editor.connectionId,'replacement');
+  else if(change==='destroy')assert.deepEqual(editor,before);
+  else assert.equal(editor.connected,false);
+  assert.equal(h.timers.size,0);
+});
+
+function heartbeatEvents(){const document=new EventTarget();document.defaultView=new EventTarget();document.visibilityState='visible';return document;}
+test('focus and visibility coalesce a held heartbeat and never renew an unfinished startup',async()=>{
+  const document=heartbeatEvents(),h=harness({document});let release,entered;const hit=new Promise(resolve=>entered=resolve);
+  h.writeGate(name=>name==='state.json'?new Promise(resolve=>{release=resolve;entered();}):undefined);
+  const starting=h.client.start();await hit;
+  document.defaultView.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));
+  for(let n=0;n<50;n++)await Promise.resolve();assert.equal(h.disk.has('editor.json'),false);assert.equal(h.timers.size,0);
+  h.writeGate(null);release();await starting;
+  let writes=0;const next=new Promise(resolve=>entered=resolve);
+  h.writeGate(name=>{if(name==='editor.json'){writes++;return new Promise(resolve=>{release=resolve;entered();});}});
+  h.advance(20000);document.defaultView.dispatchEvent(new Event('focus'));await next;
+  for(let n=0;n<10;n++){document.defaultView.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));}
+  for(let n=0;n<50;n++)await Promise.resolve();assert.equal(writes,1);assert.equal(h.timers.size,0);
+  h.writeGate(null);release();for(let n=0;n<50;n++)await Promise.resolve();assert.equal(h.disk.get('editor.json').at,120000);assert.equal(h.timers.size,1);
+  h.client.destroy();document.defaultView.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));
+  for(let n=0;n<50;n++)await Promise.resolve();assert.equal(writes,1);assert.equal(h.timers.size,0);
+});
+test('disconnect marks the lease closed promptly but still drains an outstanding paired save',async()=>{
+  const h=harness();await h.client.start();let release,entered,drained=false;const hit=new Promise(resolve=>entered=resolve);
+  h.files.flushArtifacts=async(source,ledger,guard)=>{entered();await new Promise(resolve=>release=resolve);await guard();};h.type('{"title":"held"}');
+  const saving=h.client.flush();await hit;const closing=h.client.disconnect().then(()=>drained=true);
+  for(let n=0;n<50;n++)await Promise.resolve();assert.equal(h.disk.get('editor.json').connected,false);assert.equal(drained,false);
+  release();await assert.rejects(saving,/Connection changed/);await closing;assert.equal(drained,true);
+});
+test('a failed disconnect write still drains the old save before releasing its caller',async()=>{
+  const h=harness();await h.client.start();let release,entered,settled=false;const hit=new Promise(resolve=>entered=resolve);
+  h.files.flushArtifacts=async(source,ledger,guard)=>{entered();await new Promise(resolve=>release=resolve);await guard();};h.type('{"title":"held"}');
+  const saving=h.client.flush();await hit;h.fail('editor.json');
+  const closing=h.client.disconnect().then(()=>{settled=true;},error=>{settled=true;return error.message;});
+  for(let n=0;n<50;n++)await Promise.resolve();assert.equal(settled,false);
+  release();await assert.rejects(saving,/Connection changed/);assert.equal(await closing,'Disk unavailable');
 });

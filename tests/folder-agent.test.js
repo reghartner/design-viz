@@ -817,6 +817,20 @@ for(const change of ['disconnect','destroy','project','owner','closed lease'])te
 });
 
 function heartbeatEvents(){const document=new EventTarget();document.defaultView=new EventTarget();document.visibilityState='visible';return document;}
+test('heartbeat listeners retire across replacement clients, same-client resume, disconnect and destroy',async()=>{
+  const {getEventListeners}=require('node:events'),document=heartbeatEvents(),h=harness({document});
+  const counts=()=>[getEventListeners(document.defaultView,'focus').length,getEventListeners(document,'visibilitychange').length];
+  let client=h.client;await client.start();
+  for(let cycle=0;cycle<3;cycle++){
+    assert.deepEqual(counts(),[1,1]);h.disk.set('editor.json',{...h.disk.get('editor.json'),connected:false});
+    h.advance(1000);await h.heartbeat();assert.equal(h.last.connected,false);assert.deepEqual(counts(),[0,0]);assert.equal(h.timers.size,0);
+    client=cycle===0?client:h.fresh();await client.start(true);
+    const before=h.disk.get('editor.json').at;h.advance(20000);document.defaultView.dispatchEvent(new Event('focus'));
+    for(let n=0;n<50;n++)await Promise.resolve();assert.equal(h.disk.get('editor.json').at,before+20000);
+  }
+  assert.deepEqual(counts(),[1,1]);await client.disconnect();assert.deepEqual(counts(),[0,0]);
+  await client.start(true);assert.deepEqual(counts(),[1,1]);client.destroy();assert.deepEqual(counts(),[0,0]);assert.equal(h.timers.size,0);
+});
 test('focus and visibility coalesce a held heartbeat and never renew an unfinished startup',async()=>{
   const document=heartbeatEvents(),h=harness({document});let release,entered;const hit=new Promise(resolve=>entered=resolve);
   h.writeGate(name=>name==='state.json'?new Promise(resolve=>{release=resolve;entered();}):undefined);

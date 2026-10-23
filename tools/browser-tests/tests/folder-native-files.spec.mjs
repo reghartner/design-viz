@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,trackResources,resources} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 
 // Real Chromium FileSystemDirectoryHandle/FileSystemFileHandle semantics in OPFS.
@@ -31,6 +31,32 @@ async function sessionFile(page,name){
     catch(error){if(error.name==='NotFoundError' || error.name==='NotReadableError')return null;throw error;}
   },name);
 }
+
+test('desktop repeated native connection retirement and resume release wake listeners',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});await page.addInitScript(trackResources);
+  await page.addInitScript(()=>{window.showDirectoryPicker=async()=>navigator.storage.getDirectory();});
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.locator('#editor-tab-agent').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  const connectedListeners=(await resources(page)).listeners;
+  let previous=await sessionFile(page,'session.json');
+  for(let cycle=0;cycle<3;cycle++){
+    await page.evaluate(async()=>{
+      const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent'),handle=await meta.getFileHandle('editor.json');
+      const value=JSON.parse(await(await handle.getFile()).text()),writer=await handle.createWritable();
+      await writer.write(JSON.stringify({...value,connected:false}));await writer.close();
+    });
+    await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
+    await expect.poll(async()=>(await resources(page)).listeners).toBe(connectedListeners-2);
+    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-resume').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+    await expect.poll(async()=>(await resources(page)).listeners).toBe(connectedListeners);
+    const next=await sessionFile(page,'session.json');expect(next.sessionId).toBe(previous.sessionId);expect(next.connectionId).not.toBe(previous.connectionId);previous=next;
+  }
+  await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
+  await expect.poll(async()=>(await resources(page)).listeners).toBe(connectedListeners-2);
+});
 
 test('desktop heartbeat and resume events stay live during a held native artifact save and retire on disconnect',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});await page.clock.install();

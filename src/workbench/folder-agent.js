@@ -111,7 +111,7 @@ function folderAgentPilotHealth(value,identity,now){
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
-  var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,editorChain=Promise.resolve();
+  var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
@@ -119,6 +119,7 @@ function createFolderAgentClient(opts){
   // All writes to editor.json share this small queue, including retirement.
   function editorSerial(action){var job=editorChain.then(action);editorChain=job.catch(function(){});return job;}
   function stopHeartbeat(){life.cancelDelay(heartbeatTimer);heartbeatTimer=null;}
+  function stopHeartbeatListeners(){heartbeatListeners.forEach(function(remove){remove();});heartbeatListeners=[];}
   function folderError(ex){pilotStatus=null;if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});}
   function identityMatches(value,owner){return value && owner && value.sessionId===owner.sessionId && value.connectionId===owner.connectionId;}
   function writeDisconnected(owner){
@@ -130,7 +131,7 @@ function createFolderAgentClient(opts){
   }
   function retire(status,write){
     var owner=manifest && {sessionId:manifest.sessionId,connectionId:manifest.connectionId};
-    connected=false;heartbeatReady=false;pending=null;epoch++;stopHeartbeat();clearReview();publish({status:status,listening:false});
+    connected=false;heartbeatReady=false;pending=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
     return write && owner?writeDisconnected(owner):Promise.resolve();
   }
   function scheduleHeartbeat(){
@@ -164,8 +165,13 @@ function createFolderAgentClient(opts){
   function wakeHeartbeat(){if(connected && !disposed)heartbeat(true).catch(function(){});}
   var heartbeatDocument=opts.document || (typeof document!=='undefined'?document:null);
   var heartbeatWindow=heartbeatDocument && heartbeatDocument.defaultView;
-  life.listen(heartbeatWindow,'focus',wakeHeartbeat);
-  life.listen(heartbeatDocument,'visibilitychange',function(){if(heartbeatDocument.visibilityState==='visible')wakeHeartbeat();});
+  function listenHeartbeat(){
+    // Retired clients can be replaced without destroy(). Only a live connection
+    // owns global wake listeners; a successful restart installs a fresh pair.
+    stopHeartbeatListeners();
+    heartbeatListeners=[life.listen(heartbeatWindow,'focus',wakeHeartbeat),
+      life.listen(heartbeatDocument,'visibilitychange',function(){if(heartbeatDocument.visibilityState==='visible')wakeHeartbeat();})];
+  }
   function publish(state){
     var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
     var phase=!connected?'disconnected':!pending?(activity.length?'complete':'idle'):activity.length && activity[activity.length-1].phase==='permission-needed'?'permission-needed':quietSeconds>=30?'quiet':lastAgentAt===null?'waiting':'responding';
@@ -516,8 +522,8 @@ function createFolderAgentClient(opts){
         // Carry the workbench history over to the renewed session id.
         if(renewal){await saveTranscript();await saveChanges();}
         if(!alive(token))throw Error('Session was closed.');
-      }catch(ex){connected=false;epoch++;stopHeartbeat();publish({listening:false});throw ex;}
-      heartbeatReady=true;scheduleHeartbeat();
+      }catch(ex){connected=false;heartbeatReady=false;epoch++;stopHeartbeat();stopHeartbeatListeners();publish({listening:false});throw ex;}
+      heartbeatReady=true;listenHeartbeat();scheduleHeartbeat();
       publish({status:'Paste the connection instructions into Claude.',listening:false});
       return manifest;
     });},
@@ -604,7 +610,7 @@ function createFolderAgentClient(opts){
       // Callers can release their folder lock only after outstanding saves drain.
       return Promise.allSettled([closing,chain]).then(function(results){if(results[0].status==='rejected')throw results[0].reason;});
     },
-    destroy:function(){connected=false;heartbeatReady=false;disposed=true;epoch++;stopHeartbeat();life.destroy();clearReview();},
+    destroy:function(){connected=false;heartbeatReady=false;disposed=true;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
     manifest:function(){return manifest;}
   };
 }

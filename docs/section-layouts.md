@@ -574,6 +574,16 @@ The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported 
 
 Select step controls in either Standard or Explore and use **Inspect** for **Play buttons** (Auto, Above steps, Beside steps), **Path label width** (160–360 px), **Placement** (View default, Floating, On canvas), and **Caption position** (Below, Above, Left, Right). These settings follow the selected arrangement even when the active tab View overrides its legacy presentation flag. Use **Panels → Step controls** for overall content size (50–125%); clicking its percentage resets to 100%. The inspector no longer exposes step-control Text size. Standard authoring retains its stacked sections, prose and grid panels. View default restores the original grid controls in Standard (and Floating controls in Explore). An explicit Floating placement uses a section-local surface at the original controls position; On canvas attaches controls to that section’s graph and follows its zoom. Standard grid readers preserve their original grid placement while honoring authored caption direction and explicit control size.
 
+For a partial content import, keep the destination arrangement and placement
+instead of copying the source `exploreLayout`. A new Standard View assembled from
+copied content uses View default unless Floating or On canvas was requested, so
+omit or remove `exploreLayout.controlsPlacement`; `"default"` is not a valid saved
+value, and `presentation:"standard"` does not reset an existing override. If the
+arrangement is shared with a source or sibling whose placement is intentional,
+make an independent destination arrangement before removing only
+`controlsPlacement`. Retain other `exploreLayout` geometry and settings. Faithful
+layout copies and ordinary edits preserve explicit placement.
+
 In Explore, select **Section notes** and use **Inspect → Text size (%)** (75–175%). Clear the field or choose **Reset text size** for 100%. Notes size remains independent of panel and control sizing. Settings survive Undo/Redo, arrangement duplication, JSON, standalone HTML and Backstage rendering.
 
 `exploreLayout.controlsScale` is the explicit whole-control scale. For example, `{"controlsScale": 0.9, "steps": {"textPosition": "right"}}` renders controls at 90% with the caption on the right. It scales transport, paths, step circles and caption content together. Floating controls retain their horizontal span; their frame fits the scaled content. On-canvas controls retain graph-unit geometry and also follow graph zoom. Malformed imported scales warn and fall back independently of valid geometry and typography.

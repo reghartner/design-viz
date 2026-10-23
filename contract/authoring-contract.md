@@ -140,6 +140,17 @@ Tab-wide presentation or tab-owned membership in new documents. Legacy input
 remains readable through a nondestructive adapter; see
 [section Views](../docs/tab-views.md) for the offline migration and its exceptions.
 
+Partial content imports preserve the destination arrangement and controls
+placement; copy a source arrangement/`exploreLayout` only when layout copying
+was requested. A new Standard View assembled from copied content uses View
+default unless Floating or On canvas was requested: omit
+`exploreLayout.controlsPlacement` (`"default"` is invalid; use only
+`"floating"` / `"canvas"`). `presentation:"standard"` does not clear that
+override. If a source/sibling shares the arrangement and needs its placement,
+first make the destination independent; remove only `controlsPlacement` and
+retain other settings and Views. Ordinary edits and faithful copies preserve
+explicit placement.
+
 ## Section object
 
 ### Shared topology references

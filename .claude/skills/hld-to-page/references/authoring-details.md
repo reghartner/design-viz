@@ -181,6 +181,17 @@ in Explore). Save `exploreLayout.controlsPlacement` as `"floating"` or
 `"canvas"`. Preserve the Floating viewport-fraction rectangle in
 `exploreLayout.controls` and the separate `{x,y,w,h}` graph rectangle in
 `exploreLayout.canvas.controls` (finite values within ±10000, positive sizes).
+
+When importing only selected content, preserve the destination arrangement and
+placement; do not copy the source `exploreLayout` wholesale. A new Standard View
+assembled from copied content uses View default controls unless Floating or On
+canvas was requested: omit/remove `controlsPlacement`, never serialize
+`"default"`. `presentation:"standard"` does not clear that override. If its
+arrangement is shared with a source or sibling that intentionally uses the
+placement, first create an independent destination arrangement, then remove only
+`controlsPlacement` and retain the other `exploreLayout` settings. Ordinary edits
+and faithful layout copies preserve deliberate placement.
+
 On-canvas controls move and zoom with the graph; select them for move/resize
 handles. Fit canvas includes them without reserving viewport overlay space. A section’s
 paragraphs and nested bullets become one **Section notes** window using the same

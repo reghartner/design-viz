@@ -3,6 +3,7 @@ import base64
 import gzip
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -255,8 +256,8 @@ class FolderAgentTests(unittest.TestCase):
 
     def test_native_begin_timeout_withdraws_its_request(self):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
-        # Deterministically cross the deadline without waiting eight real seconds.
-        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 9]):
+        # Deterministically cross the deadline without waiting 90 real seconds.
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 91]):
             with self.assertRaisesRegex(ValueError, 'withdrawn'):
                 helper.main()
         self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
@@ -284,6 +285,187 @@ class FolderAgentTests(unittest.TestCase):
             if process.poll() is None:
                 process.kill()
                 process.communicate()
+
+    def test_native_begin_permission_failure_during_acknowledgement_is_immediate_and_withdrawn(self):
+        for filename in ('request.json', 'transcript.json', 'editor.json'):
+            with self.subTest(filename=filename):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': []})
+                registered = [False]
+                original_read, original_write = helper.read, helper.write
+                def write(folder, name, value, guard=None):
+                    original_write(folder, name, value, guard)
+                    if name == 'agent-request.json' and not value.get('withdrawn'):
+                        self.put('request.json', {**value, 'revision': 'connection-1'})
+                        registered[0] = True
+                def read(folder, name):
+                    if registered[0] and name == filename:
+                        raise PermissionError(f'Access denied reading {filename}')
+                    return original_read(folder, name)
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Denied acknowledgement']), patch.object(helper, 'write', side_effect=write), patch.object(helper, 'read', side_effect=read), patch.object(helper.time, 'sleep', side_effect=AssertionError('Terminal acknowledgement errors must not retry')) as sleeping, patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+                    with self.assertRaisesRegex(PermissionError, f'Access denied reading {filename}'):
+                        helper.main()
+                    sleeping.assert_not_called()
+                self.assertEqual(output.getvalue(), '')
+                self.assertIn(f'Access denied reading {filename}', errors.getvalue())
+                self.assertNotIn('in time', errors.getvalue())
+                self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+                self.assertEqual(helper.read(self.folder, 'agent-request.json')['expiresAt'], 0)
+
+    def test_native_begin_terminal_change_inside_acknowledgement_is_not_retried(self):
+        for change in ('cancel', 'owner', 'request identity', 'malformed transcript'):
+            with self.subTest(change=change):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                (self.folder/'cancel.json').unlink(missing_ok=True)
+                original_read, original_write = helper.read, helper.write
+                registered = [False]
+                def write(folder, name, value, guard=None):
+                    original_write(folder, name, value, guard)
+                    if name == 'agent-request.json' and not value.get('withdrawn'):
+                        self.put('request.json', {**value, 'revision': 'connection-1'})
+                        registered[0] = True
+                def read(folder, name):
+                    value = original_read(folder, name)
+                    if registered[0] and name == 'request.json':
+                        registered[0] = False
+                        if change == 'cancel':
+                            self.put('cancel.json', {**self.owner, 'requestId': value['id']})
+                        elif change == 'owner':
+                            self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'replacement'})
+                            self.put('agent-request.json', {'id': 'replacement-request'})
+                        elif change == 'request identity':
+                            self.put('request.json', {**value, 'connectionId': 'replacement'})
+                        else:
+                            (self.folder/'transcript.json').write_text('{broken')
+                    return value
+                errors = io.StringIO()
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Terminal change']), patch.object(helper, 'write', side_effect=write), patch.object(helper, 'read', side_effect=read), patch.object(helper.time, 'sleep', side_effect=AssertionError('Terminal acknowledgement errors must not retry')) as sleeping, patch.object(sys, 'stderr', errors):
+                    with self.assertRaises(ValueError):
+                        helper.main()
+                    sleeping.assert_not_called()
+                self.assertIn('Workbench acknowledgement failed', errors.getvalue())
+                self.assertNotIn('in time', errors.getvalue())
+                attempt = helper.read(self.folder, 'agent-request.json')
+                if change == 'owner':
+                    self.assertEqual(attempt, {'id': 'replacement-request'})
+                    self.assertIn('Withdrawal could not be confirmed', errors.getvalue())
+                else:
+                    self.assertTrue(attempt['withdrawn'])
+
+    def test_native_begin_retries_only_missing_or_empty_acknowledgement_files(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        (self.folder/'request.json').unlink()
+        step = [0]
+        def sleep(seconds):
+            step[0] += 1
+            if step[0] == 1:
+                (self.folder/'request.json').write_text('')
+            elif step[0] == 2:
+                self.put('request.json', {**helper.read(self.folder, 'agent-request.json'), 'revision': 'connection-1'})
+            elif step[0] == 3:
+                (self.folder/'transcript.json').write_text('')
+            elif step[0] == 4:
+                request = helper.read(self.folder, 'agent-request.json')
+                self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id']}]})
+            else:
+                self.fail('Acknowledgement should have completed')
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Pending files']), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stdout', output):
+            helper.main()
+        self.assertEqual(step[0], 4)
+        self.assertEqual(json.loads(output.getvalue())['id'], helper.read(self.folder, 'agent-request.json')['id'])
+        self.assertNotIn('withdrawn', helper.read(self.folder, 'agent-request.json'))
+
+    def test_stale_commands_recover_after_background_heartbeat_without_rotating_ids(self):
+        for command in ('progress', 'reply', 'propose'):
+            with self.subTest(command=command):
+                now = [1000.0]
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
+                def sleep(seconds):
+                    now[0] += seconds
+                    if now[0] >= 1060:
+                        self.put('editor.json', {**self.owner, 'connected': True, 'at': now[0]*1000})
+                args = ['--file', 'candidate.spec.json', '--revision', 'connection-1'] if command == 'propose' else ['--text', 'Recovered']
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), command, '--request', 'request', *args]), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+                    helper.main()
+                filename = 'proposal.json' if command == 'propose' else command + '.json'
+                self.assertEqual(json.loads(output.getvalue())['written'], filename)
+                self.assertIn('waiting up to 90 seconds', errors.getvalue())
+                self.assertEqual(now[0], 1060)
+                self.assertEqual(helper.identity(self.folder), self.owner)
+                self.assertEqual(helper.read(self.folder, filename)['requestId'], 'request')
+
+    def test_stale_recovery_is_bounded_and_does_not_publish(self):
+        now = [1000.0]
+        self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
+        def sleep(seconds):
+            now[0] += seconds
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'reply', '--request', 'request', '--text', 'Do not publish']), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stderr', io.StringIO()):
+            with self.assertRaisesRegex(helper.HeartbeatPausedError, 'existing Workbench tab.*same session and request IDs'):
+                helper.main()
+        self.assertEqual(now[0], 1090)
+        self.assertFalse((self.folder/'reply.json').exists())
+
+    def test_recovery_stops_immediately_for_terminal_changes_and_permission_errors(self):
+        for change in ('owner', 'request', 'cancel', 'disconnect', 'editor identity', 'permission'):
+            with self.subTest(change=change):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner})
+                self.put('request.json', {**self.owner, 'id': 'request'})
+                (self.folder/'cancel.json').unlink(missing_ok=True)
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
+                def sleep(seconds):
+                    if change == 'owner':
+                        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'replacement'})
+                    elif change == 'request':
+                        self.put('request.json', {**self.owner, 'id': 'replacement'})
+                    elif change == 'cancel':
+                        self.put('cancel.json', {**self.owner, 'requestId': 'request'})
+                    elif change == 'disconnect':
+                        self.put('editor.json', {**self.owner, 'connected': False, 'at': 0})
+                    elif change == 'editor identity':
+                        self.put('editor.json', {**self.owner, 'connectionId': 'replacement', 'connected': True, 'at': 0})
+                    else:
+                        raise PermissionError('Folder permission denied')
+                with patch.object(helper.time, 'sleep', side_effect=sleep) as sleeping, patch.object(sys, 'stderr', io.StringIO()):
+                    with self.assertRaises((ValueError, PermissionError)) as error:
+                        helper.wait_for_editor(self.folder, self.owner, 'request')
+                    self.assertNotIsInstance(error.exception, helper.HeartbeatPausedError)
+                    self.assertEqual(sleeping.call_count, 1)
+                self.assertFalse((self.folder/'reply.json').exists())
+
+    def test_publication_guard_never_waits_or_accepts_a_stale_lease(self):
+        self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
+        with patch.object(helper.time, 'sleep') as sleeping:
+            with self.assertRaises(helper.HeartbeatPausedError):
+                helper.write(self.folder, 'reply.json', {}, guard=lambda: helper.active_request(self.folder, self.owner, 'request'))
+            sleeping.assert_not_called()
+        self.assertFalse((self.folder/'reply.json').exists())
+        self.assertEqual(list(self.folder.glob('.reply.json-*')), [])
+
+    def test_native_begin_tolerates_separate_minute_delays_for_heartbeat_and_acknowledgement(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
+        now = [1000.0]
+        def sleep(seconds):
+            now[0] += seconds
+            if now[0] >= 1060 and now[0] < 1061 or now[0] >= 1120:
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': now[0]*1000})
+            if now[0] >= 1120:
+                request = helper.read(self.folder, 'agent-request.json')
+                self.put('request.json', {**request, 'revision': 'connection-1'})
+                self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id'], 'text': request['text']}]})
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Background request']), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+            helper.main()
+        request = helper.read(self.folder, 'request.json')
+        self.assertEqual(json.loads(output.getvalue())['id'], request['id'])
+        self.assertEqual(request['expiresAt'], 1150000)
+        self.assertGreaterEqual(now[0], 1120)
+        self.assertLess(now[0], 1121)
+        self.assertEqual(helper.identity(self.folder), self.owner)
+        self.assertIn('acknowledgement', errors.getvalue())
 
     def test_watcher_ignores_stale_heartbeat_and_old_connection(self):
         self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})

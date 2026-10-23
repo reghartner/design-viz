@@ -149,7 +149,10 @@ test('both registered routes edit seeded request candidates and keep the legacy 
   for(const workflow of ['external','embedded']){
     const prompt=context.folderAgentInstructions('Doorbell','mixed',false,identity,workflow);
     assert.match(prompt,/prepare\. Read \.flowview-agent\/authoring\/docs\/folder-agent-existing-edit\.md first/);
-    assert.match(prompt,/verify both connection identities, the request id, editor\.connected and a heartbeat less than 15 seconds old/);
+    assert.match(prompt,/verify both connection identities, the request id and editor\.connected/);
+    assert.match(prompt,/requires a fresh heartbeat at publication and waits up to 90 seconds/);
+    assert.match(prompt,/retry the same command with the same session and request IDs/);
+    assert.match(prompt,/Do not re-establish solely for a stale heartbeat/);
     assert.match(prompt,/request\.candidate names them/);assert.match(prompt,/Edit those copies instead of regenerating unrelated source/);
     assert.match(prompt,/inherited state, neighboring steps and supporting ledger evidence/);
     assert.match(prompt,/do not open the accepted files just to recreate them/);

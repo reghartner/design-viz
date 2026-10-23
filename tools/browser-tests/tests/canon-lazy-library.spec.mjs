@@ -653,12 +653,10 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   const edit=page.locator('#canon-reader-edit'),nav=page.locator('#canon-reader .explore-navigation');
   async function reachableEdit(close=true){const menu=nav.locator('.reader-utilities');if(!await edit.isVisible())await menu.locator('summary').click();await expect(edit).toBeInViewport();await edit.click({trial:true});if(close && await menu.getAttribute('open')!==null)await menu.locator('summary').click();}
   await expect(edit).toBeEnabled();await expect(nav.locator('#canon-reader-edit')).toBeVisible();const original=await edit.elementHandle();
-  const topHeights=new Map();
-  for(const width of [1440,1201,1200,1120,1101,1100,900,390,320]){
-    await page.setViewportSize({width,height:1000});await reachableEdit();
-    await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
-    topHeights.set(width,await nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height));
-    if(width>670)await expect.poll(()=>nav.evaluate((el,width)=>{
+  await page.evaluate(()=>document.fonts.ready);
+  const topHeight=()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height),topHeights=new Map();
+  async function desktopHeader(width){
+    await expect.poll(()=>nav.evaluate((el,width)=>{
       const top=el.querySelector('.reader-top'),views=el.querySelector('.reader-view-strip');
       const hostActions=Array.from(el.querySelectorAll('.reader-utility-options>.welcome-button'));
       const viewChoices=Array.from(views.children),actionBounds=hostActions.map(node=>node.getBoundingClientRect()),viewBounds=viewChoices.map(node=>node.getBoundingClientRect());
@@ -675,19 +673,34 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
         rowHeightOk:top.getBoundingClientRect().height<=(width>=1200?56:88)
       };
     },width)).toEqual({labels:['Edit in Workbench →','Copy link to current position'],compact:true,viewsUnclipped:true,separated:true,rowHeightOk:true});
-    await expect(nav.locator('.reader-utility-options button[aria-label^="Copy link"]')).toHaveCount(1);
+  }
+  async function reachableControls(){
     await expect.poll(()=>nav.evaluate(el=>{
       const bounds=el.getBoundingClientRect(),controls=Array.from(el.querySelectorAll('.reader-top select,.reader-top button,.reader-top summary,.reader-toolbar button,.reader-toolbar summary')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({node,rect:node.getBoundingClientRect()}));
       return controls.every(({node,rect:r})=>r.left>=bounds.left && r.right<=bounds.right && r.top>=bounds.top && r.bottom<=bounds.bottom && node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)));
     })).toBe(true);
+  }
+  for(const width of [1440,1201,1200,1120,1101,1100,900,390,320]){
+    await page.setViewportSize({width,height:1000});await reachableEdit();
+    await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
+    if(width>670)await desktopHeader(width);
+    await expect(nav.locator('.reader-utility-options button[aria-label^="Copy link"]')).toHaveCount(1);
+    await reachableControls();topHeights.set(width,await topHeight());
     if([1440,1200,1120,900,390,320].includes(width))await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
   }
   for(const width of [1201,1200,1120,1101,1100,900]){
     await page.setViewportSize({width,height:1000});
-    await chooseNavigation(nav,'View','Overview');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await reachableEdit();
-    await expect.poll(()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height)).toBe(topHeights.get(width));
-    await chooseNavigation(nav,'View','Engineering');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
-    await expect.poll(()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height)).toBe(topHeights.get(width));
+    let overviewHeight;
+    // Presentations have different action widths (Panels versus Panels · 0).
+    // Each must settle to its own height independent of navigation history.
+    // At 1100px a stale compact-toggle cache added a third View row on return.
+    for(let round=0;round<([1100,1120].includes(width)?2:1);round++){
+      await chooseNavigation(nav,'View','Overview');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await reachableEdit();
+      await desktopHeader(width);await reachableControls();
+      if(round===0)overviewHeight=await topHeight();else await expect.poll(topHeight).toBe(overviewHeight);
+      await chooseNavigation(nav,'View','Engineering');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+      await desktopHeader(width);await reachableControls();await expect.poll(topHeight).toBe(topHeights.get(width));
+    }
   }
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:1000});

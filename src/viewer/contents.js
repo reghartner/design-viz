@@ -90,9 +90,11 @@ function createReaderContents(ctl,nav,actions,options){
     fitToggle(rect.width);
   }
   // A crowded header keeps its row height: the toggle drops its label before
-  // the View strip would wrap. Measured only when the width or labels change.
+  // the View strip would wrap. Recheck when width, labels or action bounds change;
+  // panel counts and control visibility can change between presentations.
   function fitToggle(width){
-    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
+    var actionBounds=actions.getBoundingClientRect();
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
     top.classList.remove('reader-toggle-compact');if(narrow)return;
     var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
     if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');

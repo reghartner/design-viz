@@ -111,6 +111,78 @@ def active_request(folder, owner, request_id):
     return request
 
 
+def pending_object(folder, name):
+    """Only absence or an empty native-file placeholder means pending publication."""
+    try:
+        (folder / name).lstat()
+        value = read(folder, name)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError as error:
+        if not error.doc:
+            return None
+        raise
+    if not isinstance(value, dict):
+        raise ValueError(f'Invalid Workbench protocol file: {name}')
+    return value
+
+
+def require_available_request(folder, owner):
+    """Do not replace an acknowledged turn that still needs its completion reply."""
+    def owned(value):
+        return value is not None and all(value.get(k) == v for k, v in owner.items())
+
+    request = pending_object(folder, 'request.json')
+    if not owned(request):
+        return
+    request_id = request.get('id')
+    if not isinstance(request_id, str) or not re.fullmatch(r'[\w-]{1,120}', request_id, re.ASCII):
+        raise ValueError('Invalid Workbench protocol file: request.json')
+    transcript = pending_object(folder, 'transcript.json')
+    if not transcript or transcript.get('sessionId') != owner['sessionId']:
+        return
+    messages = transcript.get('messages', [])
+    if not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages):
+        raise ValueError('Invalid Workbench protocol file: transcript.json')
+    turn = [item for item in messages if item.get('requestId') == request_id]
+    if not any(item.get('role') == 'user' and not item.get('cancelled') for item in turn):
+        return
+    if any(item.get('role') == 'assistant' for item in turn):
+        return
+    cancel = pending_object(folder, 'cancel.json')
+    if owned(cancel) and cancel.get('requestId') == request_id:
+        return
+    proposal = pending_object(folder, 'proposal.json')
+    result = pending_object(folder, 'result.json')
+    reply = pending_object(folder, 'reply.json')
+    proposing = owned(proposal) and proposal.get('requestId') == request_id
+    if proposing and (not isinstance(proposal.get('id'), str) or not re.fullmatch(r'[\w-]{1,120}', proposal['id'], re.ASCII)):
+        raise ValueError('Invalid Workbench protocol file: proposal.json')
+    resolved = (proposing and owned(result) and result.get('requestId') == request_id and
+                result.get('id') == proposal.get('id'))
+    if resolved and result.get('status') not in ('applied', 'unchanged', 'rejected'):
+        raise ValueError('Invalid Workbench protocol file: result.json')
+    # A valid published receipt can be waiting for the browser's next poll.
+    # Let begin wait for that poll instead of falsely calling the prior turn stuck.
+    replying = (owned(reply) and reply.get('requestId') == request_id and
+                isinstance(reply.get('id'), str) and re.fullmatch(r'[\w-]{1,120}', reply['id'], re.ASCII) and
+                isinstance(reply.get('text'), str) and len(reply['text'].encode('utf-16-le')) <= 64000)
+    assert_owner(folder, owner)
+    if pending_object(folder, 'request.json') != request:
+        raise ValueError('Workbench request changed while checking the active turn. Retry begin.')
+    if replying and (not proposing or resolved):
+        return
+    if proposing and not resolved:
+        action = 'Wait for its matching proposal result before continuing or finishing that request.'
+    elif resolved and result.get('status') in ('applied', 'unchanged'):
+        action = 'Its proposal was accepted, but acceptance does not finish the request. Verify the accepted artifacts and send its completion reply when the work is complete.'
+    else:
+        action = 'Continue that request, including any proposal corrections, and send its completion reply only when the work is complete.'
+    raise ValueError(f'Previous Workbench request {request_id} is still active. {action} '
+                     f'When that work is complete, use reply --request {request_id} --text "Completion receipt", then retry begin. '
+                     'Keep the existing connection; no new request was submitted.')
+
+
 def preflight(folder, monitor='unverified'):
     """Report existing prerequisites. Do not install, run tools, or expand access."""
     owner = identity(folder)
@@ -350,8 +422,14 @@ def main():
         if not args.text.strip() or len(args.text) > 16000:
             raise ValueError('Enter a request of at most 16000 characters.')
         wait_for_editor(folder, owner)
+        def ready_to_begin():
+            connected_editor(folder, owner)
+            require_available_request(folder, owner)
+            connected_editor(folder, owner)
+
+        ready_to_begin()
         request_id = uuid.uuid4().hex
-        write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text, 'expiresAt': int(time.time() * 1000) + ACKNOWLEDGEMENT_SECONDS * 1000}, guard=lambda: connected_editor(folder, owner))
+        write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text, 'expiresAt': int(time.time() * 1000) + ACKNOWLEDGEMENT_SECONDS * 1000}, guard=ready_to_begin)
         def still_ours():
             assert_owner(folder, owner)
             if read(folder, 'agent-request.json').get('id') != request_id:
@@ -365,23 +443,6 @@ def main():
             except (OSError, ValueError):
                 return False
 
-        def pending_file(name):
-            # Native file creation exposes an empty placeholder until close.
-            # Only absence/that placeholder means publication is still pending;
-            # permission, unsafe paths and malformed nonempty data are errors.
-            try:
-                (folder / name).lstat()
-                value = read(folder, name)
-            except FileNotFoundError:
-                return None
-            except json.JSONDecodeError as error:
-                if not error.doc:
-                    return None
-                raise
-            if not isinstance(value, dict):
-                raise ValueError(f'Invalid Workbench acknowledgement file: {name}')
-            return value
-
         deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
         announced = False
         request_seen = False
@@ -394,7 +455,7 @@ def main():
                 if not announced and deadline - time.monotonic() <= ACKNOWLEDGEMENT_SECONDS - 1:
                     print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement. Bring its existing tab to the front if it is suspended.', file=sys.stderr, flush=True)
                     announced = True
-                request = pending_file('request.json')
+                request = pending_object(folder, 'request.json')
                 if request and request.get('id') == request_id:
                     request_seen = True
                     try:
@@ -405,7 +466,7 @@ def main():
                     # request.json precedes browser acceptance. Only its accepted
                     # transcript entry acknowledges the turn; old history may
                     # remain while that entry is being published.
-                    transcript = pending_file('transcript.json')
+                    transcript = pending_object(folder, 'transcript.json')
                     if transcript is not None:
                         messages = transcript.get('messages', [])
                         if not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages):

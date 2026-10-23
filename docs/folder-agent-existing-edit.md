@@ -82,8 +82,7 @@ scope. Fully specified edits need no new questions or worksheet. Use the
   or hand it back. Use the packet's `--rearrange` flow for structural node rearrangement.
 - Submit `propose` with your candidate pair and base revision per `CONNECT.md`;
   require full preview, explicit **Commit update**, then matching `result.json`.
-- After acceptance, check the accepted pair including merged edits. Put routine
-  acceptance/closed-review notes in the completion reply. If the accepted
+- After acceptance, check the accepted pair including merged edits. Put acceptance notes in the completion reply. If the accepted
   spec and ledger disagree, submit a correction and wait for paired approval/result.
 - Commit does not refresh compatibility metadata; verify accepted
   `page.flowview` before claiming it was stamped.
@@ -91,6 +90,6 @@ scope. Fully specified edits need no new questions or worksheet. Use the
   pair and revision and reconcile them and any feedback into your candidates
   without discarding their edits; never relabel an old proposal. Load the full
   folder session for other recovery.
-- Send completion `reply` only after the matching result; do not release the
-  request before it.
+- Acceptance keeps the request active. After verification and matching result,
+  send completion `reply` before the next `begin`.
 - Git commit or publish needs separate user authorization.

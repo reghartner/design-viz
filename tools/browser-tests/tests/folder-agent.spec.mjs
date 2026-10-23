@@ -1340,10 +1340,49 @@ test('copy and paste Agent window drops Copy request, Stop, Focus/Detail and its
   }finally{await page.close();await h.cleanup();}
 });
 
+test('accepted proposals require a completion receipt and consecutive completed turns retain their connection',async({page})=>{
+  const h=await setup(page);let stalled,release;
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+    const owner=await h.read('session.json');
+    async function accept(request,title){
+      const candidate=JSON.parse(await readFile(path.join(h.session,request.candidate.spec),'utf8'));candidate.page.blocks[0].diagram.nodes.b.title=title;
+      await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate,null,2));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\nRenamed the service to '+title+'.\n');
+      h.run('propose','--request',request.id,'--revision',request.revision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary',title);
+      await page.locator('#agent-update-open').click();await page.locator('#agent-update-commit').click();
+      await expect.poll(async()=>{try{const r=await h.read('result.json');return r.requestId===request.id&&r.status;}catch{return null;}}).toBe('applied');
+    }
+    let request=await askAgent(page,h,'First accepted update');await accept(request,'First accepted service');
+    const incoming=await h.read('agent-request.json'),accepted=await h.read('result.json');
+    // Bound the regression itself: the old helper would wait its entire 90s
+    // acknowledgement deadline and overwrite incoming with a doomed request.
+    const failure=await new Promise(resolve=>{
+      stalled=spawn('python3',[path.join(h.session,'folder-agent.py'),'begin','--text','Followup before completion receipt'],{cwd:h.folder,stdio:['ignore','pipe','pipe']});let stdout='',stderr='';
+      const deadline=setTimeout(()=>stalled.kill(),5000);stalled.stdout.on('data',d=>stdout+=d);stalled.stderr.on('data',d=>stderr+=d);
+      stalled.on('close',(code,signal)=>{clearTimeout(deadline);resolve({code,signal,stdout,stderr});});
+    });
+    expect(failure.signal).toBeNull();expect(failure.code).toBe(1);expect(failure.stdout).toBe('');
+    expect(failure.stderr).toContain('Previous Workbench request '+request.id+' is still active');expect(failure.stderr).toContain('acceptance does not finish');expect(failure.stderr).not.toMatch(/Re-establish|did not acknowledge/);
+    expect(await h.read('agent-request.json')).toEqual(incoming);expect(await h.read('request.json')).toEqual(request);expect(await h.read('result.json')).toEqual(accepted);
+    expect(await h.read('editor.json')).toMatchObject({sessionId:owner.sessionId,connectionId:owner.connectionId,connected:true});
+    // Hold consumption of a valid completion receipt. A new begin must publish
+    // and wait for the browser to drain it, not misdiagnose another active turn.
+    let entered;const held=new Promise(r=>release=r),reading=new Promise(r=>entered=r);h.readGate(name=>{if(name==='agent-request.json'){entered();return held;}});await reading;
+    h.run('reply','--request',request.id,'--text','Verified and finished the first accepted update.');
+    const next=h.begin('Second accepted update');
+    await expect.poll(async()=>(await h.read('agent-request.json')).id).not.toBe(request.id);
+    h.readGate(null);release();release=null;const begun=await next;request=await h.read('request.json');expect(request.id).toBe(begun.id);
+    for(let i=0;i<3;i++){
+      await accept(request,'Completed service '+i);h.run('reply','--request',request.id,'--text','Verified accepted update '+i);
+      // No wait for the UI to consume reply before the next native command.
+      const begun=await h.begin('Immediate followup '+i);request=await h.read('request.json');expect(request.id).toBe(begun.id);
+    }
+    h.run('reply','--request',request.id,'--text','Finished');await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    expect(await h.read('session.json')).toEqual(owner);expect(h.errors).toEqual([]);
+  }finally{h.readGate(null);release?.();stalled?.kill();await page.close();await h.cleanup();}
+});
+
 test('Re-establish session releases a stuck request and hands the agent fresh ids the helper accepts',async({page})=>{
-  // Exercise the real 90-second acknowledgement expiry plus setup and recovery.
-  // Keep this allowance local; ordinary browser contracts retain their budget.
-  test.setTimeout(150000);
   const h=await setup(page);
   try{
     await page.setViewportSize({width:1440,height:900});
@@ -1353,10 +1392,9 @@ test('Re-establish session releases a stuck request and hands the agent fresh id
     const old=await h.read('session.json'),files=old.artifacts;expect(files).toMatchObject({spec:expect.any(String),ledger:expect.any(String)});
     const pair=async(mapping=files)=>({spec:await readFile(path.join(h.folder,mapping.spec),'utf8'),ledger:await readFile(path.join(h.folder,mapping.ledger),'utf8')});
     const stuck=await askAgent(page,h,'This request will get stuck.');
-    await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/did not acknowledge/);
-    const withdrawn=await h.read('agent-request.json');
-    expect(withdrawn).toMatchObject({sessionId:old.sessionId,connectionId:old.connectionId,withdrawn:true,expiresAt:0});
-    expect(withdrawn.id).not.toBe(stuck.id);
+    const incoming=await h.read('agent-request.json');
+    await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/Previous Workbench request .* is still active/);
+    expect(await h.read('agent-request.json')).toEqual(incoming);
     expect(await h.read('request.json')).toMatchObject({id:stuck.id,sessionId:old.sessionId,connectionId:old.connectionId});
     await expect(page.locator('#folder-agent-working')).toBeVisible();const before=await pair();
     await openAgent(page);

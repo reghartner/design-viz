@@ -1341,6 +1341,9 @@ test('copy and paste Agent window drops Copy request, Stop, Focus/Detail and its
 });
 
 test('Re-establish session releases a stuck request and hands the agent fresh ids the helper accepts',async({page})=>{
+  // Exercise the real 90-second acknowledgement expiry plus setup and recovery.
+  // Keep this allowance local; ordinary browser contracts retain their budget.
+  test.setTimeout(150000);
   const h=await setup(page);
   try{
     await page.setViewportSize({width:1440,height:900});
@@ -1351,6 +1354,10 @@ test('Re-establish session releases a stuck request and hands the agent fresh id
     const pair=async(mapping=files)=>({spec:await readFile(path.join(h.folder,mapping.spec),'utf8'),ledger:await readFile(path.join(h.folder,mapping.ledger),'utf8')});
     const stuck=await askAgent(page,h,'This request will get stuck.');
     await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/did not acknowledge/);
+    const withdrawn=await h.read('agent-request.json');
+    expect(withdrawn).toMatchObject({sessionId:old.sessionId,connectionId:old.connectionId,withdrawn:true,expiresAt:0});
+    expect(withdrawn.id).not.toBe(stuck.id);
+    expect(await h.read('request.json')).toMatchObject({id:stuck.id,sessionId:old.sessionId,connectionId:old.connectionId});
     await expect(page.locator('#folder-agent-working')).toBeVisible();const before=await pair();
     await openAgent(page);
     const renew=page.locator('#editor-agent').getByRole('button',{name:'Re-establish session',exact:true});

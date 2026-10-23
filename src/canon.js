@@ -21,6 +21,76 @@ var FlowCanon = (function(){
     walk(p.blocks || p.sections);
     return out;
   }
+  /* Authored reader text only: keep search independent of geometry, IDs,
+     bindings, evidence URLs and source JSON. Used by the publisher and v1
+     embedded libraries. Add new reader text fields here as the schema grows. */
+  function contentSearchText(raw){
+    var texts=[],seen=new Set();
+    function text(value){
+      if(typeof value!=='string' || !value.trim() || seen.has(value))return;
+      seen.add(value);texts.push(value);
+    }
+    function fields(value,keys){if(object(value))keys.forEach(function(key){text(value[key]);});}
+    function list(value,visit){if(Array.isArray(value))value.forEach(visit);}
+    function records(value,visit){if(object(value))Object.keys(value).sort().forEach(function(key){visit(value[key],key);});}
+    function bullets(value){list(value,function(item){text(item);fields(item,['text']);if(object(item))bullets(item.sub);});}
+    function contract(value){
+      fields(value,['title','note']);
+      if(object(value))list(value.fields,function(field){fields(field,['k','v','g']);});
+    }
+    // Panel declarations and playback patches share these authored content
+    // shapes. Traverse explicit collections, never arbitrary object properties.
+    function panel(value,declaration){
+      if(!object(value))return;
+      declaration=object(declaration)?declaration:value;
+      fields(value,['title','subtitle','name','label','text','caption','note','detail','message','body','alt','unit','fieldLabel','state','app','appName','service','date','clock','site','videoLabel','videoReason','zone','operator','incident','agency','callsign','location','dispatcher','eta','device','badgeText','value','reason','tradeoff','period','assumptions']);
+      ['states','log','notify','notifications','columns','fields','rows','items','checks','stages','lanes','series','events','spans','rooms','devices','subjects','zones','screens','tiles','messages','segments','routes','replicas','signals','leds','sensors','responders','metrics','sources','start','layers'].forEach(function(key){
+        list(value[key],function(item){text(item);panel(item);});
+      });
+      ['results','highlights','values'].forEach(function(key){records(value[key],panel);});
+      records(value.cells,text);
+      ['banner','alert','notify','notification','brand','cadence'].forEach(function(key){text(value[key]);panel(value[key]);});
+      // Audio source is a displayed speaker label, unlike document/evidence URLs.
+      fields(value.audio,['text','source','reason']);
+      if(declaration.type==='queue')fields(value,['from','to']);
+      var keyed={security:'sensors',dispatch:'responders',deviceapp:'fields',homemap:'devices'}[declaration.type];
+      if(keyed)list(declaration[keyed],function(item){if(object(item) && typeof item.id==='string' && Object.hasOwn(value,item.id))panel(value[item.id]);});
+      ['initial','enterOnce'].forEach(function(key){panel(value[key],declaration);});
+    }
+    function diagram(value){
+      if(!object(value))return;
+      fields(value,['title']);
+      records(value.nodes,function(node){fields(node,['title','sub','text','alt']);});
+      records(value.groups,function(group){fields(group,['title']);});
+      list(value.edges,function(edge){fields(edge,['label']);});
+      list(value.floats,function(item){fields(item,['title','text','label','sub']);});
+      list(value.paths,function(item){fields(item,['label']);});
+      list(value.layouts,function(item){fields(item,['name']);});
+      list(value.panels,panel);
+      list(value.steps,function(step){
+        fields(step,['title','text','caption']);
+        if(object(step))records(step.panels || step.patch,function(patch,id){
+          var declaration=(Array.isArray(value.panels)?value.panels:[]).find(function(item){return object(item) && item.id===id;});
+          panel(patch,declaration);
+        });
+      });
+    }
+    function blocks(value){list(value,function(block){
+      if(!object(block))return;
+      fields(block,['heading','text']);list(block.views,function(view){fields(view,['name']);});list(block.text,text);bullets(block.bullets);
+      contract(block.contract);list(block.contracts,contract);diagram(block.diagram);
+      list(block.tabs,function(tab){if(object(tab)){fields(tab,['label']);list(tab.views,function(view){fields(view,['name']);});blocks(tab.sections || tab.blocks);}});
+    });}
+    var page=pageOf(raw);
+    if(object(page)){
+      fields(page,['title','subtitle']);list(page.views,function(view){fields(view,['name']);});
+      records(page.protocols,function(item){fields(item,['label']);});
+      records(page.lanes,function(item){fields(item,['label','title']);});
+      blocks(page.blocks || page.sections);
+      if(!page.blocks && !page.sections)diagram(page);
+    }
+    return texts.join('\n');
+  }
   /* One service per catalog identity. Count each incident edge once in each
      section, including self-loops and edges between two nodes of that service. */
   function serviceSummaries(raw){
@@ -200,6 +270,6 @@ var FlowCanon = (function(){
     (value && Array.isArray(value.codeRefs) ? value.codeRefs : []).forEach(function(ref){add('Code · '+(ref.label || ref.id),codeUrl(ref));});
     return out;
   }
-  return {version:1,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

@@ -350,3 +350,73 @@ test('publisher summarizes resolved imported bindings while preserving legacy un
   assert.ok(entry.services.includes('Unbound store'));assert.ok(entry.services.includes('Source title'));
   assert.equal(entry.spec,undefined);assert.deepEqual(plain(context.parseCanonLibrary(library).find(entry=>entry.id==='consumer').boundServices),entry.boundServices);
 });
+
+test('content index extracts authored text across tabs, prose, graph and panel playback without source internals',()=>{
+  const raw={page:{title:'Public title',source:{url:'private-source-url'},protocols:{wire:{label:'Protocol legend',color:'private-color'}},blocks:[
+    {heading:'Prose chapter',text:['Paragraph phrase'],bullets:[{text:'Parent point',sub:['Nested point']}],contracts:[{title:'Message contract',fields:[{k:'Customer field',v:'Example value',g:'Field gloss',link:'private-field-url'}],note:'Contract footer'}]},
+    {tabs:[{label:'Recovery tab',sections:[{heading:'Hidden chapter',views:[{id:'privateViewId',name:'Section view'}],diagram:{title:'Graph heading',nodes:{privateNodeId:{title:'Router name',sub:'Private retry queue',link:'private-node-url',binding:{label:'private-binding-label'}},b:{title:'Store name'}},groups:{privateGroupId:{title:'Boundary name'}},rows:[['privateNodeId','b']],edges:[{from:'privateNodeId',to:'b',label:'Retry envelope'}],paths:[{id:'privatePathId',label:'Recovery route',steps:['privateStepId']}],layouts:[{id:'privateLayoutId',name:'Review view'}],panels:[
+      {id:'privatePanelId',type:'table',title:'Ledger panel',columns:[{id:'privateColumnId',label:'Account column'}],initial:{rows:[{id:'privateRowId',cells:{privateColumnId:'Pending approval'}}]}},
+      {id:'phone',type:'phone',initial:{notify:{app:'Delivery app',title:'Visitor arrived',text:'Package at door'}}},
+      {id:'trace',type:'trace',spans:[{id:'privateSpanId',service:'Payments service',name:'Authorize purchase'}]},
+    ],steps:[{id:'privateStepId',text:'Wait for acknowledgement',panels:{privatePanelId:{rows:[{id:'privateRowId',cells:{privateColumnId:'Approved amount'}}]},phone:{notify:[{app:'Delivery app',title:'Delivery complete',text:'Signed by recipient'}]}}}],graphFrame:{x:123456789,y:0,w:10,h:10},topologyProvenance:{title:'private-provenance-title'}}}]}]},
+  ]}};
+  const before=JSON.stringify(raw),text=C.contentSearchText(raw);
+  for(const phrase of ['Public title','Protocol legend','Prose chapter','Paragraph phrase','Parent point','Nested point','Message contract','Customer field','Example value','Field gloss','Contract footer','Recovery tab','Hidden chapter','Section view','Graph heading','Router name','Private retry queue','Boundary name','Retry envelope','Recovery route','Review view','Ledger panel','Account column','Pending approval','Approved amount','Wait for acknowledgement','Delivery app','Visitor arrived','Package at door','Payments service','Authorize purchase','Delivery complete','Signed by recipient'])assert.ok(text.includes(phrase),phrase);
+  for(const internal of ['private-source-url','private-color','private-field-url','private-node-url','private-binding-label','privateNodeId','privateGroupId','privatePathId','privateLayoutId','privateViewId','privatePanelId','privateColumnId','privateRowId','privateStepId','privateSpanId','123456789','private-provenance-title'])assert.ok(!text.includes(internal),internal);
+  assert.equal(JSON.stringify(raw),before);assert.equal(C.contentSearchText(raw),text);
+  assert.equal(text.split('\n').filter(line=>line==='Delivery app').length,1);
+});
+
+test('publisher refreshes deterministic content text from the resolved reader snapshot',async t=>{
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs'),f=discoveryFixture(t);
+  const provider=namedSpec('provider'),d=provider.page.sections[0].diagram;
+  d.nodes={a:{title:'Public node',sub:'Exported subtitle'},b:{title:'Other node'},hidden:{title:'Unexported secret'}};d.rows=[['a','b','hidden']];d.edges=[{from:'a',to:'b',label:'Exported connection'}];d.steps=[];
+  d.topologyExports={core:{nodes:['a','b'],edges:['a->b']}};
+  const consumer=namedSpec('consumer');delete consumer.page.views;delete consumer.page.opening;delete consumer.page.defaultView;consumer.page.sections=[{heading:'Local chapter',text:['Searchable paragraph'],diagram:{nodes:{local:{title:'Local'}},rows:[['local']],edges:[],topologyImports:[{spec:'provider',export:'core',as:'remote'}]}}];
+  f.write('provider.json',provider);f.write('consumer.json',consumer);
+  const first=await buildLibraryFromDirectory(f.directory),entry=first.diagrams.find(entry=>entry.id==='consumer');
+  for(const value of ['Searchable paragraph','Exported subtitle','Exported connection'])assert.ok(entry.contentText.includes(value),value);
+  assert.ok(!entry.contentText.includes('Unexported secret'));assert.equal(entry.spec,undefined);
+  assert.deepEqual(await buildLibraryFromDirectory(f.directory),first);
+  d.nodes.a.sub='Updated provider subtitle';f.write('provider.json',provider);
+  const updated=(await buildLibraryFromDirectory(f.directory)).diagrams.find(entry=>entry.id==='consumer');
+  assert.ok(updated.contentText.includes('Updated provider subtitle'));assert.ok(!updated.contentText.includes('Exported subtitle'));
+  assert.equal(updated.revision,entry.revision,'consumer authored revision stays unchanged when its provider changes');
+  consumer.page.sections[0].text=['Changed paragraph'];f.write('consumer.json',consumer);
+  const changed=(await buildLibraryFromDirectory(f.directory)).diagrams.find(entry=>entry.id==='consumer');
+  assert.ok(changed.contentText.includes('Changed paragraph'));assert.ok(!changed.contentText.includes('Searchable paragraph'));
+});
+
+test('optional content text tolerates older indexes and malformed values; v1 extracts embedded content',async()=>{
+  const {buildLibrary}=await import('../tools/canon/library.mjs');
+  const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
+  for(const version of [2,3])for(const contentText of [undefined,null,7,['ignored'],{text:'ignored'}]){
+    const entry=context.parseCanonLibrary({...raw,version,diagrams:[{...raw.diagrams[0],contentText}]})[0];
+    assert.equal(entry.contentText,'');assert.equal(entry.title,raw.diagrams[0].title);assert.equal(entry.spec,undefined);
+    assert.ok(context.diagramSearchText([entry.title,entry.description,entry.contentText]).includes(entry.title.toLowerCase()));
+  }
+  assert.equal(context.parseCanonLibrary(raw)[0].contentText,raw.diagrams[0].contentText);
+  const legacy=manifest();legacy.diagrams[0].spec.page.sections[0].text=['Legacy embedded prose'];
+  assert.ok(context.parseCanonLibrary(legacy)[0].contentText.includes('Legacy embedded prose'));
+  assert.ok(!context.diagramSearchText(['Template name'],legacy.diagrams[0].spec).includes('legacy embedded prose'),'template search retains its labels and node titles scope');
+});
+
+test('published content includes valid operational panel text, keyed items, audio and one-shot patches',async t=>{
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs'),f=discoveryFixture(t);
+  const raw={page:{title:'Operational story',canon:{version:1,id:'operations',kind:'canonical',owner:'group:default/team'},sections:[{diagram:{nodes:{a:{title:'Entry'}},rows:[['a']],edges:[],panels:[
+    {id:'security',type:'security',title:'Monitor',site:'Juniper observatory',videoLabel:'Northern entrance feed',sensors:[{id:'privateSensorId',kind:'door',label:'Vestibule contact',zone:'Western annex'}],initial:{video:'unavailable',videoReason:'Lens obscured by snowfall',operator:'Mira reviewing',privateSensorId:{health:'online',alarm:'clear',detail:'Seal intact at dusk'},audio:{output:'speech',text:'Identify the visitor',source:'Control desk speaker',reason:'Intercom check'}}},
+    {id:'dispatch',type:'dispatch',agency:'Juniper response desk',responders:[{id:'privateResponderId',kind:'security',label:'Night patrol',callsign:'Juniper seven'}],initial:{location:'Observatory service gate',dispatcher:'Evening coordinator',incident:'Unlatched vestibule',privateResponderId:{status:'enroute',eta:'Three illustrative minutes',detail:'Approaching northern road'}}},
+    {id:'app',type:'deviceapp',device:'Observatory handset',fields:[{id:'privateFieldId',kind:'text',label:'Entrance report',badgeMode:'custom',badgeText:'Desk verified'}],initial:{privateFieldId:{value:'Vestibule secure',status:'ready',detail:'Contact report received'}}},
+    {id:'budget',type:'budget',metrics:[{id:'privateMetricId',label:'Intercom allowance',unit:'spoken messages',max:20}],initial:{values:{privateMetricId:3}}},
+    {id:'timeline',type:'timeline',span:'6h',cadence:{every:'30m',label:'Observatory heartbeat'}},
+  ],steps:[{nodes:['a'],text:'Check the entrance',panels:{security:{privateSensorId:{health:'online',alarm:'triggered',detail:'Entry opened after dusk'},enterOnce:{videoReason:'Feed awaiting technician',audio:{output:'speech',text:'Please wait in the vestibule',source:'Night supervisor',reason:'Identity confirmation'}}},dispatch:{privateResponderId:{status:'onscene',detail:'Patrol reached the gate'}},app:{privateFieldId:{value:'Entrance under review',badgeMode:'custom',badgeText:'Operator checking',detail:'Second contact report'}},timeline:{enterOnce:{events:[{at:'1h',label:'Patrol checkpoint'}]}}}}]}}]}};
+  const validated=C.validateSpec(raw);assert.deepEqual(validated.errors,[]);assert.deepEqual(validated.warnings,[]);
+  f.write('operations.json',raw);
+  const entry=(await buildLibraryFromDirectory(f.directory)).diagrams[0],text=entry.contentText;
+  for(const phrase of ['Juniper observatory','Northern entrance feed','Vestibule contact','Western annex','Lens obscured by snowfall','Mira reviewing','Seal intact at dusk','Identify the visitor','Control desk speaker','Intercom check','Juniper response desk','Night patrol','Juniper seven','Observatory service gate','Evening coordinator','Unlatched vestibule','Three illustrative minutes','Approaching northern road','Observatory handset','Entrance report','Desk verified','Vestibule secure','Contact report received','Intercom allowance','spoken messages','Observatory heartbeat','Entry opened after dusk','Feed awaiting technician','Please wait in the vestibule','Night supervisor','Identity confirmation','Patrol reached the gate','Entrance under review','Operator checking','Second contact report','Patrol checkpoint'])assert.ok(text.includes(phrase),phrase);
+  for(const id of ['privateSensorId','privateResponderId','privateFieldId','privateMetricId'])assert.ok(!text.includes(id),id);
+  const search=context.diagramSearchText([context.parseCanonLibrary({version:3,diagrams:[entry]})[0].contentText]);
+  assert.ok(search.includes('identify the visitor'));assert.ok(search.includes('patrol reached the gate'));
+  const legacy=structuredClone(raw);legacy.page.sections[0].diagram.steps[0].patch=legacy.page.sections[0].diagram.steps[0].panels;delete legacy.page.sections[0].diagram.steps[0].panels;
+  assert.equal(C.contentSearchText(legacy),text,'legacy step.patch content matches step.panels');
+});

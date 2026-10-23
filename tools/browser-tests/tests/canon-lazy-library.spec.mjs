@@ -993,3 +993,34 @@ test('all-invalid service summaries retain legacy facets while valid empty summa
   await expect(first).toBeHidden();await expect(second).toBeVisible();
   await expect(page).toHaveURL(fixture.url);expect(requests).toEqual([]);
 });
+
+// Content search reads only the published index, including inactive tabs and
+// playback patches. Metadata and facets remain independent of content matches.
+test('Browse diagrams searches published content across tabs and panels with facets and no spec fetches',async({page,server})=>{
+  const fixture=await describedFixture(server);
+  const first=fixture.specs.first.page.blocks[0],second=fixture.specs.second.page.blocks[0];
+  first.text=['An amber retry envelope awaits acknowledgement.'];
+  first.diagram.nodes.a.sub='Quiescent transmitter';first.diagram.edges[0].label='Resend receipt';
+  first.diagram.steps[0].text='Confirm the amber retry envelope';
+  first.diagram.panels.push({id:'monitor',type:'security',site:'Juniper observatory',videoLabel:'Northern entrance feed',sensors:[{id:'entry',kind:'door',label:'Vestibule contact',zone:'Western annex'}],initial:{video:'unavailable',videoReason:'Lens obscured by snowfall',audio:{output:'speech',text:'Identify the visitor'}}});
+  first.diagram.steps[0].panels={monitor:{entry:{health:'online',alarm:'triggered',detail:'Entry opened after dusk'},enterOnce:{audio:{output:'speech',text:'Please wait in the vestibule'}}}};
+  second.text=['An amber retry envelope reaches the ledger.'];
+  fixture.specs.first.page.blocks.push({tabs:[{label:'Deferred recovery',sections:[{heading:'Recovery notes',bullets:[{text:'Recovery checklist',sub:['Escalate to the custodian']}],diagram:{nodes:{a:{title:'Recovery worker'}},rows:[['a']],edges:[],panels:[{id:'audit',type:'log',title:'Audit trail'}],steps:[{nodes:['a'],text:'Write audit',panels:{audit:{log:[{text:'Custodian approved the retry'}]}}}]}}]}]});
+  for(const id of ['first','second'])await writeFile(path.join(fixture.root,'diagrams',id,id+'.spec.json'),JSON.stringify(fixture.specs[id]));
+  const index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  for(const entry of index.diagrams){const {contentText,...metadata}=entry;expect(JSON.stringify(metadata).toLowerCase()).not.toContain('amber retry envelope');}
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const search=page.getByRole('searchbox',{name:'Search diagrams'}),count=page.locator('#welcome-library-count');
+  await expect(count).toHaveText('2 of 2 diagrams');
+  await search.fill('AMBER RETRY ENVELOPE');await expect(count).toHaveText('2 of 2 diagrams');
+  await page.getByLabel('Topic',{exact:true}).selectOption('hallway');await expect(count).toHaveText('1 of 2 diagrams');expect(await visibleLibraryTitles(page)).toEqual(['First story']);
+  await page.getByLabel('Topic',{exact:true}).selectOption('billing');await expect(count).toHaveText('1 of 2 diagrams');expect(await visibleLibraryTitles(page)).toEqual(['Second story']);
+  await page.locator('#welcome-library-clear').click();
+  for(const query of ['quiescent transmitter','resend receipt','deferred recovery','escalate to the custodian','CUSTODIAN APPROVED THE RETRY','Juniper observatory','Northern entrance feed','Western annex','Identify the visitor','Entry opened after dusk','Please wait in the vestibule']){
+    await search.fill(query);await expect(count).toHaveText('1 of 2 diagrams');expect(await visibleLibraryTitles(page)).toEqual(['First story']);
+  }
+  await page.getByLabel('Topic',{exact:true}).selectOption('billing');await expect(count).toHaveText('0 of 2 diagrams');
+  await page.locator('#welcome-library-clear').click();await expect(count).toHaveText('2 of 2 diagrams');
+  expect(requests).toEqual([]);
+});

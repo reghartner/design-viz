@@ -287,6 +287,7 @@ def main() -> int:
         }
         if name == 'standalone':
             mapping['DEMO_SPEC'] = read('flowview.demo.json').strip()
+            mapping['HUMAN_GUIDE'] = human_guide()
         else:
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
             mapping['WORKBENCH_CANON'] = workbench_canon()

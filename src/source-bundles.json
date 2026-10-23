@@ -139,7 +139,8 @@
         "viewer/artifact-comments.js",
         "viewer/tour-progress.js",
         "tour.config.js",
-        "tour.flowview.js"
+        "tour.flowview.js",
+        "human-guide.workbench.js"
       ],
       "boot": "boot.flowview.js",
       "styles": [
@@ -276,6 +277,7 @@
     "sharedStyles": {
       "core": [
         "viewer/explore.css",
+        "viewer/human-guide.css",
         "icons/library.css",
         "icons/brand.css"
       ],

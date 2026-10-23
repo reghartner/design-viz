@@ -52,7 +52,7 @@ function expectContiguous(lessons){
   expect(lessons.map(x=>x.current)).toEqual(lessons.map((_,i)=>i+1));
   expect(lessons.map(x=>x.total)).toEqual(lessons.map(()=>lessons.length));
 }
-async function startBoth(page){await page.locator('.dv-tour-replay').click();await page.getByRole('button',{name:/Show me both/}).click();}
+async function startBoth(page){await page.evaluate(()=>window.dvStartTour());await page.getByRole('button',{name:/Show me both/}).click();}
 
 test('the built-in tour finds later-tab capabilities and numbers only the lessons it can show',async({page,server},info)=>{
   const warnings=tourWarnings(page),url=await build(server,spec());await page.goto(url);

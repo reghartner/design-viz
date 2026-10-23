@@ -23,18 +23,19 @@ or the built-in reader lessons, whose targets must exist in the read-only viewer
 Opening **Browse diagrams → View diagram** on the launch page offers the tour
 on the first visit. Published `?diagram=<id>` links and the offline bundled
 example behave the same way. Skip or finish once to dismiss automatic offers;
-the **?** button replays it. Add `#tour=1` before opening a diagram to force it,
+the red **TOUR** button replays it. Add `#tour=1` before opening a diagram to force it,
 or `#tour=0` to suppress automatic opening. Leaving the reader, using browser
 Back, or choosing **Edit in Workbench** disposes the tour without changing the
 draft or marking an unfinished tour complete.
 
 ## New topics for returning readers
 
-After the initial tour, a **New features to explore · N** button appears when
-the current diagram can demonstrate built-in topics the reader has not seen.
-It opens a short tour of those topics, followed by a closing card. It never
-opens an overlay automatically. The **?** button and `#tour=1` still offer the
-full available walkthrough. `#tour=0` and links to a specific viewer state
+After the initial tour, the red **TOUR** button shows the number of built-in
+topics the current diagram can demonstrate that the reader has not seen.
+Choosing it with that badge opens a short tour of those topics, followed by a
+closing card. It never opens an overlay automatically. Choosing **TOUR** without
+a badge, or using `#tour=1`, offers the full available walkthrough. `#tour=0`
+and links to a specific viewer state
 suppress the new-topic offer as well as automatic first-visit opening.
 
 A topic is learned when its narration is displayed. Skipping, navigating away,

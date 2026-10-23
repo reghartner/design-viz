@@ -18,7 +18,7 @@ const ringsMatchHoles=page=>page.evaluate(()=>{
 
 test('seeded completion flag keeps the tour off and controls clickable',async({page,server})=>{
   await page.goto(server.origin+'/standalone.html');
-  await expect(page.locator('.dv-tour-replay')).toHaveAttribute('aria-label','Replay the tour');
+  await expect(page.locator('.explore-navigation .explore-tour-button')).toBeVisible();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
   const chip=page.locator('.schip').first();
   await chip.click();
@@ -28,14 +28,14 @@ test('seeded completion flag keeps the tour off and controls clickable',async({p
 test('#tour=0 suppresses auto-start even without the flag',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/standalone.html#tour=0');
-  await expect(page.locator('.dv-tour-replay')).toBeVisible();
+  await expect(page.locator('.explore-navigation .explore-tour-button')).toBeVisible();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
 });
 
-test('a deep link defers the tour to the ? pill',async({page,server})=>{
+test('a deep link defers the tour to the navbar button',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/standalone.html#m=step&s=2');
-  await expect(page.locator('.dv-tour-replay')).toBeVisible();
+  await expect(page.locator('.explore-navigation .explore-tour-button')).toBeVisible();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
 });
 
@@ -48,7 +48,7 @@ test('#tour=1 forces the tour; finishing restores state and unblocks the page',a
   expect(hash).toContain('m=step');
   // Force the tour over the deep-linked state via the pill (same code path
   // as #tour=1's start; the fragment must survive the whole tour).
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   const overlay=page.locator('.dv-tour');
   await expect(overlay).toBeVisible();
   await expect(page.locator('.dv-tour-chooser')).toBeVisible();
@@ -291,7 +291,7 @@ test('replaying from a non-first tab still resolves first-tab steps',async({page
   await expect(page.locator('.dv-tour')).toHaveCount(0); // seeded done
   await chooseNavigation(page.locator('.reader-navigation'),'Tab','Two');
   await expect(page.locator('.tabbtn[aria-selected=true]')).toHaveText('Two');
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   await expect(page.locator('.dv-tour-heading')).toHaveText('Play the story');
   await expect(page.locator('.tabbtn[aria-selected=true]')).toHaveText('One');
   await page.keyboard.press('Escape');
@@ -316,7 +316,7 @@ test('an internal render error tears the tour down and leaves the page usable',a
       return orig.apply(this,arguments);
     };
   });
-  await page.locator('.dv-tour-replay').click();
+  await page.locator('.explore-navigation .explore-tour-button').click();
   await expect(page.locator('.dv-tour')).toBeHidden();
   await expect(page.locator('.doc-title')).toBeVisible();
   // Tab 1 opens in ambient mode (no step chips): prove the page is usable
@@ -349,11 +349,11 @@ test('overlapping cutouts never cancel: nested ring and target-inside-reveal sta
 
 test('Skip returns focus to where the reader was',async({page,server})=>{
   await page.goto(server.origin+'/standalone.html');
-  await page.locator('.dv-tour-replay').click();
+  const tourButton=page.locator('.explore-navigation .explore-tour-button');await tourButton.click();
   await expect(page.locator('.dv-tour')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.dv-tour')).toBeHidden();
-  await expect(page.locator('.dv-tour-replay')).toBeFocused();
+  await expect(tourButton).toBeFocused();
 });
 
 // #563: one skip control, one label ("Skip tour"), chooser and steps alike.
@@ -664,8 +664,8 @@ test('a malformed page.tour fails open: page renders, no stuck scrim',async({pag
 // 3 key opens the SAME sheet | same, Esc first closes it (dialog closed = contrasting precondition) | real keyboard.press('?'): the single open dialog has the id from row 2's aria-controls; no tour, no guide | key unwired, or key opens a different sheet (e.g. the Workbench editing sheet)
 // 4 sheet lists the reader's real keys | same | ordered [dt, dd] pairs of that dialog's dl rows equal READER_KEYS (engine.js presenter/step keys, tab-bar keys, Esc) | the Workbench editing roster, an empty sheet, invented keys
 // 5 Esc closes, focus returns | same, opened by the button | dialog closed; the "?" button is focused | a sheet that traps the reader
-// 6 Tour is separately labelled | same | the tour replay control (.dv-tour-replay) inside the reader page actions: textContent exactly "Tour", accessible name contains "tour"; it is not the row-1 button | tour replay still "?"
-// 7 Tour still replays | same | real click on row 6's control shows .dv-tour-chooser | relabel drops the handler
+// 6 Tour is separately labelled | same | the red navbar control text starts with "TOUR", accessible name contains "tour"; it is not the row-1 button | tour replay still "?"
+// 7 Tour still launches | same | real click on row 6's badged control shows .dv-tour-ui | relabel drops the handler
 // 8 User guide labelled (canon) | canon reader | #canon-reader-guide textContent AND accessible name exactly "User guide"; real click opens #human-guide | guide entry still "?" or removed
 // 9 linking untouched | same | page.url() and history.length after opening/closing the sheet by button AND by key equal the values before (no hash/query write, no history entry) | a "?" handler that writes #?/?help or pushes history, breaking the copied/position link
 //   Cross-document link following (Claude artifact, hosted site, Backstage) stays with its own specs, which CI runs unchanged:
@@ -710,8 +710,8 @@ async function readerShortcutContract(page,chrome,extra={}){
   await quiet();
   await page.keyboard.press('Escape');await expect(sheet).not.toHaveAttribute('open','');
   expect(page.url()).toBe(url);expect(await page.evaluate(()=>window.history.length)).toBe(history);
-  const tour=chrome.locator('.reader-page-actions .dv-tour-replay');
-  await expect(tour).toBeVisible();await expect(tour).toHaveText('Tour');
+  const tour=chrome.locator('.explore-navigation .explore-tour-button');
+  await expect(tour).toBeVisible();await expect(tour).toContainText('TOUR');
   await expect(tour).toHaveAccessibleName(/tour/i);
   expect(await tour.evaluate((el,id)=>el.getAttribute('aria-controls')!==id,sheetId)).toBe(true);
   return {tour};
@@ -721,7 +721,20 @@ test('viewer: "?" button and key open the same reader shortcut sheet; Tour is it
   await page.goto(server.origin+'/standalone.html');
   await expect(page.locator('.dv-tour')).toHaveCount(0);
   const {tour}=await readerShortcutContract(page,page.locator('#docview'));
-  await tour.click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  await tour.click();await expect(page.locator('.dv-tour-ui')).toBeVisible();
+});
+test('artifact reader keeps Tour, Panels and the bundled User guide in its navbar',async({page,server},info)=>{
+  await page.addInitScript(()=>{window.claude={use:()=>Promise.resolve(null)};});
+  await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/standalone.html');
+  const nav=page.locator('#docview>.explore-navigation'),tour=nav.locator('.explore-tour-button'),guide=nav.getByRole('button',{name:'User guide',exact:true});
+  await expect(tour).toBeVisible();await expect(guide).toBeVisible();await expect(page.locator('.dv-tour-replay,.dv-tour-discovery')).toHaveCount(0);
+  await guide.click();const dialog=page.locator('#human-guide');await expect(dialog).toBeVisible();await expect(dialog.getByRole('heading',{name:'Make the system make sense.',exact:true})).toBeVisible();
+  expect(await dialog.evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(600);
+  await page.locator('#human-guide-close').click();await expect(guide).toBeFocused();
+  const panels=nav.locator('.explore-panel-menu');await panels.locator('summary').click();const body=panels.locator('.explore-panel-body');await expect(body).toBeVisible();
+  const visual=await body.evaluate(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {left:r.left,right:r.right,bottom:r.bottom,bg:s.backgroundColor,radius:s.borderRadius,font:s.fontFamily};});
+  expect(visual.left).toBeGreaterThanOrEqual(12);expect(visual.right).toBeLessThanOrEqual(1428);expect(visual.bottom).toBeLessThanOrEqual(888);expect(visual.radius).toBe('10px');expect(visual.bg).not.toBe('rgba(0, 0, 0, 0)');
+  await info.attach('artifact-navbar',{body:await page.screenshot(),contentType:'image/png'});
 });
 test('canon reader: one "?" opens the reader shortcut sheet; Tour and User guide are labelled',async({page,server})=>{
   const spec=editorSpec();spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
@@ -739,5 +752,5 @@ test('canon reader: one "?" opens the reader shortcut sheet; Tour and User guide
   await expect(guideButton).toHaveAccessibleName('User guide');
   await guideButton.click();await expect(guide).toHaveAttribute('open','');
   await page.locator('#human-guide-close').click();await expect(guide).not.toHaveAttribute('open','');
-  await tour.click();await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  await tour.click();await expect(page.locator('.dv-tour-ui')).toBeVisible();
 });

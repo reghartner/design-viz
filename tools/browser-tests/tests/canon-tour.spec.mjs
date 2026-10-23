@@ -23,7 +23,7 @@ async function openReader(page){
 test('launch-page Canon visit offers the tour once, replays, and leaves the draft untouched',async({page,server},info)=>{
   const data=library();await publish(page,data);await fresh(page);
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
-  await expect(page.locator('.dv-tour-replay,.dv-tour')).toHaveCount(0);
+  await expect(page.locator('.explore-tour-button:visible,.dv-tour')).toHaveCount(0);
   await page.locator('#workspace-home').click();await openReader(page);
   await expect(page.locator('.dv-tour-chooser')).toBeVisible();
   await info.attach('canon-first-visit-tour',{body:await page.screenshot(),contentType:'image/png'});
@@ -33,14 +33,14 @@ test('launch-page Canon visit offers the tour once, replays, and leaves the draf
   await expect(page.locator('.dv-tour')).toBeHidden();
   await expect(page.locator('#src')).toHaveValue(source);
   expect(await page.evaluate(()=>localStorage.getItem('dv_tour_v1'))).toBe('done');
-  await page.goBack();await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
-  await page.goForward();await expect(page.locator('#canon-reader .dv-tour-replay')).toBeVisible();
+  await page.goBack();await expect(page.locator('.dv-tour,.explore-tour-button:visible')).toHaveCount(0);
+  await page.goForward();await expect(page.locator('#canon-reader .explore-tour-button')).toBeVisible();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
-  await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
+  await page.evaluate(()=>window.dvStartTour());
   await expect(page.locator('.dv-tour-chooser')).toBeVisible();
   await page.keyboard.press('Escape');await page.locator('#canon-reader-edit').click();
   await expect(page.locator('#workbench-workspace')).toBeVisible();
-  await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
+  await expect(page.locator('.dv-tour,.explore-tour-button:visible')).toHaveCount(0);
   expect(await page.evaluate(()=>typeof window.dvStartTour)).toBe('undefined');
   await expect(page.locator('#src')).toHaveValue(JSON.stringify(data.diagrams[0].spec,null,2));
   await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
@@ -49,7 +49,7 @@ test('launch-page Canon visit offers the tour once, replays, and leaves the draf
   await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
   await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract ·/}).click();
   await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
-  await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
+  await expect(page.locator('.dv-tour,.explore-tour-button:visible')).toHaveCount(0);
 });
 
 test('leaving a running demo cancels tour work and an unfinished tour can open again',async({page,server})=>{
@@ -74,7 +74,7 @@ test('leaving a running demo cancels tour work and an unfinished tour can open a
   await expect(page.locator('#canon-reader .schip[aria-current=true]:visible')).toHaveText('2');
   await page.evaluate(()=>{window.retiredTourStart=window.dvStartTour;});
   await page.goBack();await expect(page.locator('#welcome-library-screen')).toBeVisible();
-  await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
+  await expect(page.locator('.dv-tour,.explore-tour-button:visible')).toHaveCount(0);
   expect(await page.evaluate(()=>({start:typeof window.dvStartTour,retired:window.retiredTourStart(),done:localStorage.getItem('dv_tour_v1')})))
     .toEqual({start:'undefined',retired:false,done:null});
   await expect.poll(resources).toEqual(baseline);
@@ -92,10 +92,10 @@ test('published direct Canon links honor force and suppress flags without offeri
   await expect(page.locator('.dv-tour-chooser')).toBeVisible();
   await page.goto(server.origin+'/workbench.html?diagram=delivery#tour=0');
   await page.reload(); // the flag is read when the reader mounts
-  await expect(page.locator('#canon-reader .dv-tour-replay')).toBeVisible();
+  await expect(page.locator('#canon-reader .explore-tour-button')).toBeVisible();
   await expect(page.locator('.dv-tour')).toHaveCount(0);
   await page.locator('#canon-reader-edit').click();
-  await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
+  await expect(page.locator('.dv-tour,.explore-tour-button:visible')).toHaveCount(0);
 });
 
 test('the offline Canon example shares the complete default tour and its styling',async({page,server})=>{

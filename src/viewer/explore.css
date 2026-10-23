@@ -575,10 +575,3 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"]{
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="above"]{grid-template-areas:"caption" "transport" "tracks";}
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="left"]{grid-template-columns:minmax(140px,1fr) minmax(0,1fr);grid-template-areas:"caption transport" "caption tracks";}
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="right"]{grid-template-columns:minmax(0,1fr) minmax(140px,1fr);grid-template-areas:"transport caption" "tracks caption";}
-
-/* A Standard section keeps its grid and prose while its controls use a local
-   floating surface or the board's existing graph coordinate space. */
-.standard-controls-surface{position:relative;min-width:0;width:100%;grid-column:1/-1;}
-.standard-controls-player{z-index:2;}
-.standard-controls-player>.explore-player-grip,.standard-controls-player>.explore-window-resize{display:none;}
-.docview .boardcanvas:has(>.standard-controls-player){position:relative;}

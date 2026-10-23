@@ -140,16 +140,11 @@ Tab-wide presentation or tab-owned membership in new documents. Legacy input
 remains readable through a nondestructive adapter; see
 [section Views](../docs/tab-views.md) for the offline migration and its exceptions.
 
-Partial content imports preserve the destination arrangement and controls
-placement; copy a source arrangement/`exploreLayout` only when layout copying
-was requested. A new Standard View assembled from copied content uses View
-default unless Floating or On canvas was requested: omit
-`exploreLayout.controlsPlacement` (`"default"` is invalid; use only
-`"floating"` / `"canvas"`). `presentation:"standard"` does not clear that
-override. If a source/sibling shares the arrangement and needs its placement,
-first make the destination independent; remove only `controlsPlacement` and
-retain other settings and Views. Ordinary edits and faithful copies preserve
-explicit placement.
+`exploreLayout.controlsPlacement` and its floating/canvas rectangles apply only
+when the effective View presentation is Explore. Standard always renders step
+controls in its `sectionLayout` grid, while still honoring shared control size,
+caption, playback and path-label settings. Switching Standard/Explore Views does
+not rewrite the arrangement; returning to Explore restores its saved placement.
 
 ## Section object
 
@@ -1567,7 +1562,7 @@ perspectives" of one timeline). Types:
   resize, zoom and temporary visibility controls as panels.
   `layouts[].exploreLayout.controlsScale` optionally sizes the complete step-control
   content from 0.5 to 1.25. **Panels → Step controls** edits it in both Standard
-  and Explore, floating or on canvas; clicking the percentage resets to 100%.
+  and Explore; clicking the percentage resets to 100%.
   Transport, paths, step circles and captions scale together. On-canvas controls
   also follow diagram zoom. Floating width keeps its chosen horizontal span.
   `overlayScale` (0.5–1.25) and **Panels → Floating panels** size floating widgets
@@ -1585,15 +1580,14 @@ perspectives" of one timeline). Types:
   Undo/Redo, JSON, HTML and native rendering preserve them. The selected arrangement
   owns the values even when a canonical tab View overrides its old presentation flag.
 
-  View default leaves Standard controls in their original grid and Explore controls
-  Floating; selecting it removes the explicit placement override.
-  In desktop Standard authoring, an explicit Floating control placement uses a
-  section-local surface at the original control location. On canvas attaches controls
-  to that section graph and follows its zoom. Both retain stacked sections, grid
-  panels and prose. Standard readers retain grid placement while honoring saved
-  caption direction and explicit control size. **Inspect** exposes Play buttons
-  (auto/above/beside), Path label width (160–360), Placement and Caption position
-  (below/above/left/right) in both Views and placements. Mobile editing is not supported.
+  In Explore, View default is Floating; selecting it removes the explicit placement
+  override. Standard ignores Explore placement and rectangle settings without
+  removing them, keeps controls in the section grid, and honors saved caption
+  direction and explicit control size. **Inspect** exposes Play buttons
+  (auto/above/beside), Path label width (160–360) and Caption position
+  (below/above/left/right) in both Views; Placement appears only in Explore.
+  The canonical View presentation is authoritative over an arrangement's legacy
+  presentation flag. Mobile editing is not supported.
 
   An Explore chapter can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
   or `"floating"` (default). Preserve the separate Floating rectangles when authoring

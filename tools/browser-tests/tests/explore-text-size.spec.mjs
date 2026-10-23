@@ -24,9 +24,10 @@ async function open(page,server,spec,host='reader'){
 const notes=page=>page.locator('[data-explore-content=prose]');
 const player=page=>page.locator('.explore-player');
 async function typeMetrics(page){return page.locator('.doc-sec').first().evaluate(stage=>{
- const note=stage.querySelector('[data-explore-content=prose]') || stage.querySelector('.sec-prose'),controls=stage.querySelector('.explore-player');
+ const note=stage.querySelector('[data-explore-content=prose]') || stage.querySelector('.sec-prose'),explore=stage.querySelector('.explore-player'),controls=explore && explore.querySelector('.termbar')?explore:stage.querySelector('.termbar');
  function metric(el,frame){return {logical:parseFloat(getComputedStyle(el).fontSize),physical:parseFloat(getComputedStyle(el).fontSize)*frame.getBoundingClientRect().width/frame.offsetWidth};}
- return {notes:metric(note.querySelector('.sec-text'),note),caption:metric(controls.querySelector('.stepline'),controls.querySelector('.termbar')),chip:metric(controls.querySelector('.path-chip'),controls.querySelector('.termbar')),transport:metric(controls.querySelector('.tbtn'),controls.querySelector('.termbar')),scale:controls.getBoundingClientRect().width/controls.offsetWidth};
+ const bar=controls.matches('.termbar')?controls:controls.querySelector('.termbar');
+ return {notes:metric(note.querySelector('.sec-text'),note),caption:metric(controls.querySelector('.stepline'),bar),chip:metric(controls.querySelector('.path-chip'),bar),transport:metric(controls.querySelector('.tbtn'),bar),scale:controls.getBoundingClientRect().width/controls.offsetWidth};
 });}
 async function checkControls(page){
  await expect.poll(()=>player(page).evaluate(el=>{
@@ -170,46 +171,47 @@ for(const presentation of ['standard','explore'])for(const placement of ['floati
  d.panels=[{id:'status',type:'state',title:'Status',states:['Ready'],initial:{state:'Ready'}}];
  raw.page.views=[{id:'active',name:'Active',presentation,sections:[{section:'story',layout:'explore'}]}];raw.page.defaultView='active';
  await page.setViewportSize({width:1920,height:1200});await open(page,server,raw,'workbench');
- const source=page.locator('#src'),initial=await source.inputValue();
- await player(page).locator('.path-chip').nth(1).click();await player(page).getByRole('button',{name:'Next step',exact:true}).click();
- const selectedStep=await player(page).locator('.stepid').textContent();
- await player(page).locator('.stepline').click();await page.locator('#editor-tab-inspect').click();
+ const source=page.locator('#src'),initial=await source.inputValue(),controls=presentation==='standard'?page.locator('.termbar').first():player(page);
+ if(presentation==='standard')await expect(page.locator('.standard-controls-player')).toHaveCount(0);
+ await controls.locator('.path-chip').nth(1).click();await controls.getByRole('button',{name:'Next step',exact:true}).click();
+ const selectedStep=await controls.locator('.stepid').textContent();
+ if(presentation==='standard')await controls.locator('.schips').click({position:{x:2,y:2}});else await controls.locator('.stepline').click();await page.locator('#editor-tab-inspect').click();
  await expect(page.getByRole('textbox',{name:'Step controls text size',exact:true})).toHaveCount(0);
  const width=page.getByRole('textbox',{name:'Path label width',exact:true});await width.fill('300');await width.press('Enter');
- await expect.poll(()=>player(page).locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
- await expect.poll(()=>player(page).locator('.path-chip').first().evaluate(el=>el.offsetWidth)).toBeGreaterThan(220);
+ await expect.poll(()=>controls.locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
+ await expect.poll(()=>controls.locator('.path-chip').first().evaluate(el=>el.offsetWidth)).toBeGreaterThan(220);
  for(const transport of ['above','beside'])for(const caption of ['above','left','right','below']){
   await page.getByRole('combobox',{name:'Play buttons',exact:true}).selectOption(transport);
   await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption(caption);
-  await expect.poll(()=>player(page).evaluate((el,{transport,caption})=>{
+  await expect.poll(()=>controls.evaluate((el,{transport,caption})=>{
    const t=el.querySelector('.step-transport').getBoundingClientRect(),c=el.querySelector('.schips').getBoundingClientRect(),p=el.querySelector('.stepline:not(.dv-caption-old)').getBoundingClientRect();
    return (transport==='above'?t.bottom<=c.top+1:t.right<=c.left+1) && (caption==='left'?p.right<=c.left+1:caption==='right'?p.left>=c.right-1:caption==='above'?p.bottom<=c.top+1:p.top>=c.bottom-1);
   },{transport,caption})).toBe(true);
-  await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+  await expect(controls.locator('.stepid')).toHaveText(selectedStep);
  }
  await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption('right');
- const beforePlacement=await source.inputValue();
- await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption(placement==='canvas'?'floating':'canvas');
- await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[0].exploreLayout.controlsPlacement).toBe(placement==='canvas'?'floating':'canvas');
- await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforePlacement);await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+ if(presentation==='standard')await expect(page.getByRole('combobox',{name:'Step controls placement',exact:true})).toHaveCount(0);
+ else {
+  const beforePlacement=await source.inputValue();await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption(placement==='canvas'?'floating':'canvas');
+  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[0].exploreLayout.controlsPlacement).toBe(placement==='canvas'?'floating':'canvas');
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforePlacement);await expect(controls.locator('.stepid')).toHaveText(selectedStep);
+ }
  await closeTools(page);await panelsOptions(page);const before=await typeMetrics(page),beforeSize=await source.inputValue();
+ if(presentation==='standard')await expect(page.getByRole('combobox',{name:'Step controls placement',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();
  const after=await source.inputValue(),saved=JSON.parse(after),layout=saved.page.sections[0].diagram.layouts[0].exploreLayout;
- expect(layout.controlsScale).toBe(placement==='canvas'?.9:.7);expect(layout.textScale.controls).toBe(1.25);
+ const nextScale=presentation==='standard'?.9:placement==='canvas'?.9:.7,initialControlScale=presentation==='standard' || placement==='canvas'?1:.8;
+ expect(layout.controlsScale).toBe(nextScale);expect(layout.textScale.controls).toBe(1.25);
  expect(layout.controls).toEqual(d.layouts[0].exploreLayout.controls);expect(layout.canvas).toEqual(d.layouts[0].exploreLayout.canvas);
  expect(saved.page.views).toEqual(raw.page.views);expect(saved.page.sections[0].diagram.layouts[1]).toEqual(d.layouts[1]);
- const scaled=await typeMetrics(page);for(const key of ['caption','chip','transport'])expect(scaled[key].physical).toBeCloseTo(before[key].physical*(placement==='canvas'?.9:.7/.8),1);
- await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeSize);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);await expect(player(page).locator('.stepid')).toHaveText(selectedStep);
+ const scaled=await typeMetrics(page);for(const key of ['caption','chip','transport'])expect(scaled[key].physical).toBeCloseTo(before[key].physical*nextScale/initialControlScale,1);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeSize);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);await expect(controls.locator('.stepid')).toHaveText(selectedStep);
  await closeTools(page);await panelsOptions(page);
  if(presentation==='explore'){
   const prior=await typeMetrics(page);await page.getByRole('button',{name:'Shrink floating panels',exact:true}).click();const panelSized=await typeMetrics(page);
   for(const key of ['caption','chip','transport'])expect(panelSized[key].physical).toBeCloseTo(prior[key].physical,1);
  }
  await page.keyboard.press('Escape');
- if(presentation==='standard' && placement==='canvas'){
-  const prior=await typeMetrics(page);await page.locator('.board-zoom').getByRole('button',{name:'Diagram zoom out',exact:true}).click();
-  await expect.poll(async()=>(await typeMetrics(page)).caption.physical).toBeCloseTo(prior.caption.physical*.8,1);
- }
  await page.screenshot({path:info.outputPath('controls.png')});
  expect(initial).not.toBe(after);
  await open(page,server,saved); // HTML roundtrip, including the normal Standard grid reader.
@@ -220,7 +222,7 @@ for(const presentation of ['standard','explore'])for(const placement of ['floati
  }else {const exported=await typeMetrics(page);expect(exported.caption.logical).toBe(20);await checkControls(page);}
 });
 
-test('Standard first placement and sizing keep independent section pages, grid panels and prose with exact Undo',async({page,server})=>{
+test('Standard sizing keeps independent section pages, grid controls, panels and prose with exact Undo',async({page,server})=>{
  const raw=fixture(),first=raw.page.sections[0];first.id='first';first.diagram.layouts[0].presentation='standard';delete first.diagram.layouts[0].exploreLayout.controlsPlacement;
  first.diagram.panels=[{id:'status',type:'state',title:'Status',states:['Ready'],initial:{state:'Ready'}}];
  const second=structuredClone(first);second.id='second';second.heading='Second section';raw.page.sections.push(second);
@@ -230,31 +232,24 @@ test('Standard first placement and sizing keep independent section pages, grid p
  await panelsOptions(page);await page.getByRole('button',{name:'Shrink step controls',exact:true}).click();
  const sized=await source.inputValue();expect(JSON.parse(sized).page.sections[0].diagram.layouts[0].exploreLayout.controlsScale).toBe(.9);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(sized);
- await closeTools(page);await panelsOptions(page);await page.locator('.explore-panel-menu[open]').getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('canvas');
- await expect(page.locator('.standard-controls-player')).toHaveCount(1);await expect(page.locator('.standard-controls-player')).toBeVisible();
+ await closeTools(page);await panelsOptions(page);await expect(page.locator('.explore-panel-menu[open]').getByRole('combobox',{name:'Step controls placement',exact:true})).toHaveCount(0);
+ await expect(page.locator('.standard-controls-player')).toHaveCount(0);
  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(page.locator('.doc-sec')).toHaveCount(2);
  for(let i=0;i<2;i++){
   await chooseAddDestination(page,i);const sec=page.locator('.doc-sec[data-dv-section="'+i+'"]');await expect(page.locator('.doc-sec:visible')).toHaveCount(1);await expect(sec).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel]')).toBeVisible();await expect(sec.locator('.sec-prose')).toBeVisible();
   await expect(sec.locator('.explore-stage')).toBeHidden();await expect(sec.locator('.explore-window')).toHaveCount(0);
  }
  await chooseAddDestination(page,0);
- await page.locator('#undo-builder').click();await expect(source).toHaveValue(sized);await expect(page.locator('.standard-controls-player')).toHaveCount(0);
- await page.locator('#redo-builder').click();await expect(page.locator('.standard-controls-player')).toHaveCount(1);
- await closeTools(page);await page.locator('.standard-controls-player .stepline').click();await page.locator('#editor-tab-inspect').click();
- await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('floating');await expect(page.locator('.standard-controls-surface>.standard-controls-player')).toHaveCount(1);
- await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption('left');await expect(page.locator('.standard-controls-player')).toHaveAttribute('data-step-text-position','left');
- await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('default');await expect(page.locator('.standard-controls-player')).toHaveCount(0);
- await page.getByRole('combobox',{name:'Step controls placement',exact:true}).selectOption('floating');await expect(page.locator('.standard-controls-surface>.standard-controls-player')).toHaveCount(1);
+ await closeTools(page);await page.locator('.doc-sec:visible .section-layout-grid .schips').click({position:{x:2,y:2}});await page.locator('#editor-tab-inspect').click();
+ await expect(page.getByRole('combobox',{name:'Step controls placement',exact:true})).toHaveCount(0);
+ await page.getByRole('combobox',{name:'Caption position',exact:true}).selectOption('left');await expect(page.locator('.doc-sec:visible .section-layout-grid .termbar')).toHaveAttribute('data-step-text-position','left');
+ const captioned=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(sized);await page.locator('#redo-builder').click();await expect(source).toHaveValue(captioned);
 });
 
-test('Standard canvas control extents remain reachable after graph zoom with negative saved coordinates',async({page,server})=>{
+test('Standard grid controls ignore negative saved canvas coordinates and graph zoom',async({page,server})=>{
  const raw=fixture('canvas'),d=raw.page.sections[0].diagram;d.layouts[0].presentation='standard';d.layouts[0].exploreLayout.canvas.controls={x:-400,y:-100,w:900,h:220};
  await page.setViewportSize({width:1800,height:1200});await open(page,server,raw,'workbench');const source=page.locator('#src'),before=await source.inputValue();
- const prior=await player(page).boundingBox();await page.locator('.board-zoom').getByRole('button',{name:'Diagram zoom out',exact:true}).click();
- await expect.poll(()=>player(page).evaluate(el=>{
-  const r=el.getBoundingClientRect(),c=el.parentElement.getBoundingClientRect();
-  return r.left>=c.left-1 && r.top>=c.top-1 && r.right<=c.right+1 && r.bottom<=c.bottom+1;
- })).toBe(true);
- expect((await player(page).boundingBox()).width).toBeCloseTo(prior.width*.8,0);await expect(source).toHaveValue(before);
- await player(page).scrollIntoViewIfNeeded();await expect(player(page).locator('.stepline')).toBeInViewport();
+ const controls=page.locator('.section-layout-grid .termbar');await expect(page.locator('.standard-controls-player')).toHaveCount(0);const prior=await controls.boundingBox();
+ await page.locator('.board-zoom').getByRole('button',{name:'Diagram zoom out',exact:true}).click();expect((await controls.boundingBox()).width).toBeCloseTo(prior.width,0);await expect(source).toHaveValue(before);
+ await controls.scrollIntoViewIfNeeded();await expect(controls.locator('.stepline')).toBeInViewport();
 });

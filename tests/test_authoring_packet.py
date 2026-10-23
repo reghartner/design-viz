@@ -131,9 +131,9 @@ class AuthoringPacketTests(unittest.TestCase):
         # Baselines captured from exact origin/main before the guidance change.
         # Portable document-link schema and its recipe pointer add at most 512 bytes.
         # Preset node styles (#610) add one `style` field bullet: at most 384 bytes.
-        # Partial-import arrangement guidance in the common View contract adds at most 1,024 bytes.
-        budgets = {'new': 78_744 + 1_024 + 512 + 384 + 1_024,
-                   'edit': 67_458 + 1_024 + 512 + 384 + 1_024}
+        # Explore-only placement guidance in the common View contract adds at most 512 bytes.
+        budgets = {'new': 78_744 + 1_024 + 512 + 384 + 512,
+                   'edit': 67_458 + 1_024 + 512 + 384 + 512}
         for mode, maximum in budgets.items():
             text, _ = packet.generate([], [], mode=mode)
             self.assertLessEqual(len(text.encode()), maximum)

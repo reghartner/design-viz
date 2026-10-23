@@ -175,22 +175,17 @@ story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
 for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
 resizable, hideable panels at its edges, and defaults step controls to viewport-pinned
-Floating placement. Each chapter can choose On canvas in Panels or the controls
-inspector. View default removes the override (grid controls in Standard, Floating
-in Explore). Save `exploreLayout.controlsPlacement` as `"floating"` or
+Floating placement. Each Explore chapter can choose On canvas in Panels or the controls
+inspector. View default removes the override. Save `exploreLayout.controlsPlacement` as `"floating"` or
 `"canvas"`. Preserve the Floating viewport-fraction rectangle in
 `exploreLayout.controls` and the separate `{x,y,w,h}` graph rectangle in
 `exploreLayout.canvas.controls` (finite values within ±10000, positive sizes).
 
-When importing only selected content, preserve the destination arrangement and
-placement; do not copy the source `exploreLayout` wholesale. A new Standard View
-assembled from copied content uses View default controls unless Floating or On
-canvas was requested: omit/remove `controlsPlacement`, never serialize
-`"default"`. `presentation:"standard"` does not clear that override. If its
-arrangement is shared with a source or sibling that intentionally uses the
-placement, first create an independent destination arrangement, then remove only
-`controlsPlacement` and retain the other `exploreLayout` settings. Ordinary edits
-and faithful layout copies preserve deliberate placement.
+Standard always uses its section-grid controls and does not expose placement
+editing. It ignores these Explore placement values without deleting them, so
+switching Views restores the saved Floating or On canvas geometry exactly. The
+canonical View presentation, rather than the arrangement's legacy presentation
+flag, decides which behavior renders; navigation does not rewrite the spec.
 
 On-canvas controls move and zoom with the graph; select them for move/resize
 handles. Fit canvas includes them without reserving viewport overlay space. A section’s
@@ -227,7 +222,7 @@ editor surface, with one Undo action per gesture. Full-browser panning, zooming
 and fitting remain temporary. Use **Back to page** to author the opening camera
 through pans and zoom changes in the contained Explore view. Floating windows use viewport fractions; canvas controls use graph coordinates. `camera` uses
 `zoom` plus center `x`/`y` as fractions of the SVG viewBox. Duplicate view keeps
-these defaults. **Panels → Step controls** sizes transport, paths, step circles and captions together in Standard and Explore, floating or on canvas. Author `exploreLayout.controlsScale` from 0.5 to 1.25; on-canvas content also follows graph zoom. **Panels → Floating panels** controls `overlayScale` independently. Floating controls retain their horizontal span. Existing `textScale.controls` and old scale fallbacks remain compatible, but the inspector no longer exposes a control-text-size multiplier. Section notes retain their own Text size (%) inspector. Use `exploreLayout.steps.textPosition` (below/above/left/right), `playbackPosition` (auto/above/beside), and `pathLabelWidth` (160–360) on the selected arrangement; the active tab View may override its legacy presentation. Standard grid readers honor authored caption direction and explicit scale without changing their grid placement. Workbench authoring is desktop-only. Adjustments save with Undo; click the size percentage to reset to 100%. Reader overrides and temporary Hide panels remain session-only.
+these defaults. **Panels → Step controls** sizes transport, paths, step circles and captions together in Standard and Explore. Author `exploreLayout.controlsScale` from 0.5 to 1.25; on-canvas Explore content also follows graph zoom. **Panels → Floating panels** controls `overlayScale` independently. Floating controls retain their horizontal span. Existing `textScale.controls` and old scale fallbacks remain compatible, but the inspector no longer exposes a control-text-size multiplier. Section notes retain their own Text size (%) inspector. Use `exploreLayout.steps.textPosition` (below/above/left/right), `playbackPosition` (auto/above/beside), and `pathLabelWidth` (160–360) on the selected arrangement; the active tab View may override its legacy presentation. Standard grid readers honor authored caption direction and explicit scale without changing their grid placement. Workbench authoring is desktop-only. Adjustments save with Undo; click the size percentage to reset to 100%. Reader overrides and temporary Hide panels remain session-only.
 See `docs/section-layouts.md` for the contract and an example.
 Duplicate view and Swap places
 can replace Home with the diagram while retaining supporting panels and controls.

@@ -280,10 +280,10 @@ test('diagram routing edits the selected section or bare diagram with exact undo
   }
 });
 
-for(const presentation of ['standard','explore'])test(presentation+' step controls inspector edits caption placement without changing steps or sibling layout defaults',()=>{
+for(const presentation of ['standard','explore'])test(presentation+' step controls inspector edits effective controls without changing steps or sibling layout defaults',()=>{
   const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
     id:'explore',name:'Explore',presentation,sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]},
-    exploreLayout:{overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18}}
+    exploreLayout:{overlayScale:.8,controlsPlacement:'floating',controls:{x:.05,y:.75,w:.8,h:.18}}
   }]};
   const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
   assert.match(h.guide.querySelector('b').textContent,/Step controls/);
@@ -292,16 +292,20 @@ for(const presentation of ['standard','explore'])test(presentation+' step contro
   assert.equal(h.guide.querySelectorAll('button').some(button=>button.textContent==='delete step-controls'),false);
   control.value='right';control.fire('change');h.flush();
   const next=JSON.parse(h.text);assert.deepEqual(next.layouts[0].exploreLayout,{
-    overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18},steps:{textPosition:'right'}
+    overlayScale:.8,controlsPlacement:'floating',controls:{x:.05,y:.75,w:.8,h:.18},steps:{textPosition:'right'}
   });
   assert.deepEqual(next.steps,spec.steps);assert.equal(h.session.undo(),true);assert.equal(h.text,before);assert.equal(h.session.redo(),true);
   h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
   const reset=aria(h.guide,'Caption position');reset.value='below';reset.fire('change');h.flush();
   assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.steps,undefined);
-  h.inspector.render();let placement=aria(h.guide,'Step controls placement');assert.equal(placement.value,'default');
-  placement.value='floating';placement.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,'floating');
-  h.inspector.render();placement=aria(h.guide,'Step controls placement');placement.value='default';placement.fire('change');h.flush();
-  assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,undefined);assert.deepEqual(JSON.parse(h.text).layouts[0].exploreLayout.controls,spec.layouts[0].exploreLayout.controls);
+  h.inspector.render();let placement=aria(h.guide,'Step controls placement');
+  if(presentation==='standard'){
+    assert.equal(placement,null);assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,'floating');
+  }else{
+    assert.equal(placement.value,'floating');placement.value='canvas';placement.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,'canvas');
+    h.inspector.render();placement=aria(h.guide,'Step controls placement');placement.value='default';placement.fire('change');h.flush();
+    assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.controlsPlacement,undefined);assert.deepEqual(JSON.parse(h.text).layouts[0].exploreLayout.controls,spec.layouts[0].exploreLayout.controls);
+  }
 });
 
 test('commit helper keeps blur opt-in, textarea Enter native, unchanged policy and rejected retry explicit',()=>{

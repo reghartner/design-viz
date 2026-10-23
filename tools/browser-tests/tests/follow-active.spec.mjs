@@ -132,17 +132,15 @@ test('Standard follows inside outer canvas zoom and Fit returns to the overview'
  await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
-test('Standard on-canvas step controls follow the active camera scale without editing the arrangement',async({page,server})=>{
+test('Standard grid controls ignore saved canvas placement and active camera scale without editing the arrangement',async({page,server})=>{
  const data=fixture(),layout=data.page.sections[0].diagram.layouts[0];
  layout.exploreLayout={controlsPlacement:'canvas',controlsScale:.9,canvas:{controls:{x:0,y:0,w:720,h:220}}};
- const input=await open(page,server,'standard',false,data),controls=section(page).locator('.standard-controls-player');
- await expect(controls).toBeVisible();
+ const input=await open(page,server,'standard',false,data),controls=section(page).locator('.section-layout-grid .termbar');
+ await expect(section(page).locator('.standard-controls-player')).toHaveCount(0);await expect(controls).toBeVisible();await expect(controls).toHaveCSS('zoom','0.9');
+ const controlsBefore=await controls.boundingBox();
  const before=await camera(page);await next(page).click();await frames(page,4);await fit(page,['[data-dv-node=c]']);
  expect((await camera(page)).w).toBeGreaterThan(before.w);
- await expect.poll(()=>board(page).evaluate(el=>{
-  const svg=el.querySelector('.boardcanvas>svg'),controls=el.querySelector('.standard-controls-player');
-  return Math.abs(controls.getBoundingClientRect().width/parseFloat(controls.style.getPropertyValue('--float-w'))-svg.getBoundingClientRect().width/svg.viewBox.baseVal.width);
- })).toBeLessThan(.01);
+ expect((await controls.boundingBox()).width).toBeCloseTo(controlsBefore.width,0);
  await expect(follow(page)).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

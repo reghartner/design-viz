@@ -1,0 +1,1 @@
+contractFixture('contract-responsive', 'responsive');

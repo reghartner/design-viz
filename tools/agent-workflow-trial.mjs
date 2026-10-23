@@ -163,6 +163,19 @@ async function commit(session,proposal,name) {
   assert.equal(result.status,'applied');return result;
 }
 async function finish(session) {
+  const owner=await session.read('session.json'),request=await session.read('request.json'),result=await session.read('result.json');
+  if(owner.workflow==='external' && result?.requestId===request?.id && ['applied','unchanged'].includes(result.status)){
+    assert.equal(result.sessionId,owner.sessionId);assert.equal(result.connectionId,owner.connectionId);
+    assert.equal(result.requestCompleted,true,'External Accept must complete without waking the idle agent for a reply');
+    await waitFor(async()=>{
+      const transcript=await session.read('transcript.json');
+      return transcript?.sessionId===owner.sessionId && transcript.messages.some(message=>message.role==='user' && message.requestId===request.id &&
+        !message.cancelled && message.completion?.id===result.id && message.completion.connectionId===owner.connectionId && message.completion.requestCompleted===true);
+    },'durable external acceptance completion',15000);
+    await expect(session.page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    return;
+  }
+  // Embedded answers and work without an accepted proposal still need a reply.
   await session.agent.pending;
   if((await session.read('reply.json'))?.requestId!==(await session.read('request.json'))?.id)
     session.agent.send('I committed the preview. Read the accepted spec and ledger and matching result.json. If merged human edits require a ledger correction, submit a ledger-only paired proposal for my review; otherwise give the brief completion receipt through the helper, then wait.');
@@ -201,7 +214,7 @@ try {
     const proposal=await preview(session);await expect(page.locator('#agent-update-view')).toContainText('Checked archive');
     await commit(session,proposal,'native-retry');await finish(session);
     assert.equal(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.c.title,'Checked archive');
-    await passed('retry receives browser acknowledgement and completes real Claude proposal, preview, commit and receipt');
+    await passed('retry receives browser acknowledgement and completes real Claude proposal, preview and automatic acceptance');
   }else{
   const external=await connect('external','external'),page=external.page,agent=external.agent;
   await agent.turn(external.instructions+'\n\nFor now use copy/paste only, without starting Monitor. Connect and read the kit, then wait for my request. All work stays inside this temporary trial project.');

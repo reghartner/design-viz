@@ -1875,17 +1875,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function updateCaption(s, tween){
     clearCaptionTween();
-    if (tween && captionLine && captionLine.cloneNode && captionLine.getBoundingClientRect){
-      var lineRect = captionLine.getBoundingClientRect();
-      var barRect = bar.getBoundingClientRect();
+    if (tween && captionLine && captionLine.cloneNode){
       captionGhost = captionLine.cloneNode(true);
       captionGhost.classList.add('dv-caption-old');
       captionGhost.setAttribute('aria-hidden', 'true');
       captionGhost.removeAttribute('data-comment-target'); captionGhost.setAttribute('data-uncommentable', '');
-      captionGhost.style.left = (lineRect.left - barRect.left) + 'px';
-      captionGhost.style.top = (lineRect.top - barRect.top) + 'px';
-      captionGhost.style.width = lineRect.width + 'px';
-      captionGhost.style.height = lineRect.height + 'px';
+      // The live line is a direct child of this positioned bar. Offset metrics
+      // stay in the bar's local CSS coordinate space through zoom/transforms;
+      // viewport rectangles do not. Clear its grid placement so these offsets
+      // remain relative to the whole bar instead of the caption grid area.
+      captionGhost.style.gridArea = 'auto';
+      captionGhost.style.left = captionLine.offsetLeft + 'px';
+      captionGhost.style.top = captionLine.offsetTop + 'px';
+      captionGhost.style.width = captionLine.offsetWidth + 'px';
+      captionGhost.style.height = captionLine.offsetHeight + 'px';
       bar.appendChild(captionGhost);
     }
     var visible=stops();stepN.textContent = 'STEP ' + (visible.indexOf(cur) + 1) + '/' + visible.length;

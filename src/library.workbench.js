@@ -71,7 +71,7 @@ function parseCanonLibrary(raw){
     var title=typeof entry.title==='string' && entry.title.trim()?entry.title:entry.id;
     if(raw.version===1){
       var spec=canonLibrarySpec(entry.spec,{id:entry.id});
-      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),boundServices:FlowCanon.serviceSummaries(spec),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
+      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),contentText:FlowCanon.contentSearchText(spec),boundServices:FlowCanon.serviceSummaries(spec),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
     }
     if(!entry.canon || entry.canon.id!==entry.id || FlowCanon.validate({page:{canon:entry.canon}}).length)throw new Error('Invalid diagram membership: '+entry.id);
     canonLibrarySpecURL(entry.specUrl,'https://library.invalid/workbench/diagrams.json');
@@ -79,7 +79,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),contentText:libraryDescription(entry.contentText),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -475,7 +475,7 @@ function initWorkbenchLibrary(opts){
     var labels=Array.from(serviceLabels.entries());
     labels.forEach(function(pair){if(labels.some(function(other){return other[0]!==pair[0] && other[1]===pair[1];}))serviceLabels.set(pair[0],pair[1]+' · '+pair[0]);});
     entries.forEach(function(entry){
-      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description].concat(entry.tags || [],entry.serviceNames,(entry.boundServices || []).flatMap(function(service){return [service.label,service.entityRef];})));
+      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description,entry.contentText].concat(entry.tags || [],entry.serviceNames,(entry.boundServices || []).flatMap(function(service){return [service.label,service.entityRef];})));
       var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
       var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
       var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);

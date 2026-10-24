@@ -257,11 +257,292 @@ class FolderAgentTests(unittest.TestCase):
     def test_native_begin_timeout_withdraws_its_request(self):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
         # Deterministically cross the deadline without waiting 90 real seconds.
-        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 91]):
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 0, 91]):
             with self.assertRaisesRegex(ValueError, 'withdrawn'):
                 helper.main()
         self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
         self.assertEqual(helper.read(self.folder, 'agent-request.json')['expiresAt'], 0)
+
+    def active_native_turn(self, status=None):
+        for name in ('cancel.json', 'proposal.json', 'result.json', 'reply.json'):
+            (self.folder/name).unlink(missing_ok=True)
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        self.put('request.json', {**self.owner, 'id': 'request', 'text': 'Original request'})
+        self.put('agent-request.json', {**self.owner, 'id': 'request', 'text': 'Original request'})
+        self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': 'request'}]})
+        if status is not None:
+            self.put('proposal.json', {**self.owner, 'id': 'proposal', 'requestId': 'request'})
+            if status != 'pending':
+                self.put('result.json', {**self.owner, 'id': 'proposal', 'requestId': 'request', 'status': status})
+
+    def test_native_begin_reports_active_previous_turn_without_publishing(self):
+        for status, message in ((None, 'Continue that request'),
+                                ('applied', 'older Workbench'), ('rejected', 'proposal corrections')):
+            with self.subTest(status=status):
+                self.active_native_turn(status)
+                before = {p.name: p.read_bytes() for p in self.folder.glob('*.json')}
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'sleep', side_effect=AssertionError('An unfinished turn must fail immediately')):
+                    with self.assertRaisesRegex(ValueError, 'Previous Workbench request request is still active') as error:
+                        helper.main()
+                self.assertIn(message, str(error.exception))
+                self.assertIn('reply --request request', str(error.exception))
+                self.assertNotIn('Re-establish', str(error.exception))
+                self.assertEqual(before, {p.name: p.read_bytes() for p in self.folder.glob('*.json')})
+
+    def completion(self, request_id='request'):
+        return {**self.owner, 'id': 'proposal', 'requestId': request_id, 'status': 'applied',
+                'revision': 'connection-2', 'requestCompleted': True}
+
+    def test_begin_waits_for_acceptance_publication_then_returns_previous_result(self):
+        self.active_native_turn('pending')
+        ticks = []
+        def browser(seconds):
+            ticks.append(seconds)
+            incoming = helper.read(self.folder, 'agent-request.json')
+            if incoming['id'] == 'request':
+                # No replacement request while approval/publication is unresolved.
+                self.put('result.json', self.completion())
+            else:
+                self.put('request.json', {**incoming, 'revision': 'connection-2'})
+                self.put('transcript.json', {'sessionId': 'session', 'messages': [
+                    {'role': 'user', 'requestId': 'request', 'completion': self.completion()},
+                    {'role': 'user', 'requestId': incoming['id']}]})
+        output, errors = io.StringIO(), io.StringIO()
+        with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'sleep', side_effect=browser), patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+            helper.main()
+        self.assertEqual(json.loads(output.getvalue())['previousResult'], self.completion())
+        self.assertEqual(len(ticks), 2)
+        self.assertIn('awaiting approval or its saved result', errors.getvalue())
+
+    def test_unapproved_proposal_wait_is_bounded_and_never_registers_or_approves(self):
+        self.active_native_turn('pending')
+        before = {p.name: p.read_bytes() for p in self.folder.glob('*.json')}
+        clock = [0]
+        def advance(seconds):
+            clock[0] += seconds
+            self.put('editor.json', {**self.owner, 'connected': True, 'at': time.time()*1000})
+        with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(helper.time, 'sleep', side_effect=advance), patch.object(sys, 'stderr', io.StringIO()):
+            with self.assertRaisesRegex(helper.ProposalPendingError, 'awaiting approval'):
+                helper.main()
+        self.assertEqual(clock[0], 90)
+        self.assertEqual(before['agent-request.json'], (self.folder/'agent-request.json').read_bytes())
+        self.assertFalse((self.folder/'result.json').exists())
+
+    def test_heartbeat_and_approval_wait_share_one_registration_budget(self):
+        self.active_native_turn('pending')
+        clock, epoch = [0], time.time()
+        self.put('editor.json', {**self.owner, 'connected': True, 'at': (epoch-16)*1000})
+        def advance(seconds):
+            clock[0] += seconds
+            if clock[0] >= 45:
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': (epoch+clock[0])*1000})
+        errors = io.StringIO()
+        with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'time', side_effect=lambda: epoch+clock[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(helper.time, 'sleep', side_effect=advance), patch.object(sys, 'stderr', errors):
+            with self.assertRaises(helper.ProposalPendingError):
+                helper.main()
+        self.assertEqual(clock[0], 90)
+        self.assertEqual(helper.read(self.folder, 'agent-request.json')['id'], 'request')
+        self.assertIn('heartbeat paused', errors.getvalue())
+        self.assertIn('awaiting approval', errors.getvalue())
+
+    def test_acceptance_history_is_connection_bound_and_ignores_late_proposal_replacement(self):
+        self.active_native_turn('applied')
+        result = self.completion()
+        self.put('result.json', result)
+        self.put('proposal.json', {**self.owner, 'id': 'late', 'requestId': 'request'})
+        self.assertEqual(helper.require_available_request(self.folder, self.owner), result)
+        self.put('transcript.json', {'sessionId': 'session', 'messages': [{'role': 'user', 'requestId': 'request', 'completion': result}]})
+        self.put('result.json', {**self.completion('next'), 'id': 'next-proposal'})
+        self.assertEqual(helper.accepted_completion(self.folder, self.owner, 'request'), result)
+        for change in ({'connectionId': 'old'}, {'requestId': 'other'}, {'status': 'rejected'}, {'requestCompleted': False}, {'revision': 'old-1'}):
+            self.put('transcript.json', {'sessionId': 'session', 'messages': [{'role': 'user', 'requestId': 'request', 'completion': {**result, **change}}]})
+            self.assertIsNone(helper.accepted_completion(self.folder, self.owner, 'request'))
+
+    def test_late_reply_is_idempotent_after_accept_and_after_next_request(self):
+        for next_turn in (False, True):
+            with self.subTest(next_turn=next_turn):
+                self.active_native_turn('applied')
+                self.put('result.json', self.completion())
+                self.put('transcript.json', {'sessionId': 'session', 'messages': [{'role': 'user', 'requestId': 'request', 'completion': self.completion()}]})
+                if next_turn:
+                    self.put('request.json', {**self.owner, 'id': 'next'})
+                    self.put('result.json', self.completion('next'))
+                self.put('reply.json', {**self.owner, 'id': 'next-reply', 'requestId': 'next', 'text': 'Keep me'})
+                before = {p.name: p.read_bytes() for p in self.folder.glob('*.json')}
+                reply = self.run_helper('reply', '--request', 'request', '--text', 'Legacy receipt')
+                self.assertEqual(reply.returncode, 0, reply.stderr)
+                self.assertTrue(json.loads(reply.stdout)['requestCompleted'])
+                self.assertEqual(before, {p.name: p.read_bytes() for p in self.folder.glob('*.json')})
+                for command, args in [('progress', ['--text', 'Late']), ('propose', ['--file', 'candidate.spec.json', '--revision', 'connection-1'])]:
+                    late = self.run_helper(command, '--request', 'request', *args)
+                    self.assertNotEqual(late.returncode, 0)
+                self.assertEqual(before, {p.name: p.read_bytes() for p in self.folder.glob('*.json')})
+
+    def test_output_publication_rechecks_terminal_state_after_completion_reads(self):
+        for change in ('owner', 'request', 'cancel', 'disconnect'):
+            with self.subTest(change=change):
+                self.active_native_turn()
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': time.time()*1000})
+                self.put('result.json', {})
+                original, changed = helper.read, [False]
+                replacement = {**self.owner, 'id': 'preserve-new-proposal', 'requestId': 'new-request'}
+                def read(folder, name):
+                    value = original(folder, name)
+                    if name == 'result.json' and not changed[0]:
+                        changed[0] = True
+                        if change == 'owner':
+                            self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'new-owner'})
+                        elif change == 'request':
+                            self.put('request.json', {**self.owner, 'id': 'new-request'})
+                        elif change == 'cancel':
+                            self.put('cancel.json', {**self.owner, 'requestId': 'request'})
+                        else:
+                            self.put('editor.json', {**self.owner, 'connected': False})
+                        self.put('proposal.json', replacement)
+                    return value
+                with patch.object(helper, 'read', side_effect=read):
+                    with self.assertRaises(ValueError):
+                        helper.write(self.folder, 'proposal.json', {**self.owner, 'id': 'old-proposal', 'requestId': 'request'},
+                                     guard=lambda: helper.active_request(self.folder, self.owner, 'request'))
+                self.assertEqual(original(self.folder, 'proposal.json'), replacement)
+
+    def test_completed_reply_rechecks_cancellation_after_trailing_editor_read(self):
+        self.active_native_turn('applied')
+        self.put('result.json', self.completion())
+        original, inspected = helper.read, [False]
+        def read(folder, name):
+            value = original(folder, name)
+            if name == 'result.json':
+                inspected[0] = True
+            if name == 'editor.json' and inspected[0]:
+                self.put('cancel.json', {**self.owner, 'requestId': 'request'})
+            return value
+        with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'reply', '--request', 'request', '--text', 'Late']), patch.object(helper, 'read', side_effect=read):
+            with self.assertRaisesRegex(ValueError, 'stopped'):
+                helper.main()
+        self.assertFalse((self.folder/'reply.json').exists())
+
+    def test_reply_racing_acceptance_is_idempotent_without_overwriting_next_reply(self):
+        self.active_native_turn()
+        original = helper.write
+        def publish(folder, name, value, guard=None):
+            self.put('result.json', self.completion())
+            original(folder, name, value, guard)
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'reply', '--request', 'request', '--text', 'Done']), patch.object(helper, 'write', side_effect=publish), patch.object(sys, 'stdout', output):
+            helper.main()
+        self.assertTrue(json.loads(output.getvalue())['requestCompleted'])
+        self.assertFalse((self.folder/'reply.json').exists())
+
+    def test_completed_reply_keeps_disconnect_cancel_permission_and_owner_guards(self):
+        for change in ('disconnect', 'cancel', 'owner', 'permission', 'malformed'):
+            with self.subTest(change=change):
+                self.active_native_turn('applied')
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': time.time()*1000})
+                self.put('result.json', self.completion())
+                original = helper.read
+                def read(folder, name):
+                    if name == 'result.json':
+                        if change == 'permission':
+                            raise PermissionError('Receipt permission denied')
+                        if change == 'owner':
+                            self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'other'})
+                        if change == 'cancel':
+                            self.put('cancel.json', {**self.owner, 'requestId': 'request'})
+                        if change == 'disconnect':
+                            self.put('editor.json', {**self.owner, 'connected': False})
+                        if change == 'malformed':
+                            self.put('result.json', [])
+                    return original(folder, name)
+                with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'reply', '--request', 'request', '--text', 'Late']), patch.object(helper, 'read', side_effect=read):
+                    with self.assertRaises((ValueError, PermissionError)):
+                        helper.main()
+                self.assertFalse((self.folder/'reply.json').exists())
+
+    def test_native_begin_allows_completion_receipt_to_drain_before_acknowledgement(self):
+        self.active_native_turn('applied')
+        self.put('reply.json', {**self.owner, 'id': 'completion', 'requestId': 'request', 'text': 'Done'})
+        def browser_poll(seconds):
+            attempt = helper.read(self.folder, 'agent-request.json')
+            self.assertNotEqual(attempt['id'], 'request')
+            self.put('request.json', {**attempt, 'revision': 'connection-2'})
+            self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [
+                {'role': 'user', 'requestId': 'request'}, {'role': 'assistant', 'requestId': 'request'},
+                {'role': 'user', 'requestId': attempt['id']}]})
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'sleep', side_effect=browser_poll) as sleeping, patch.object(sys, 'stdout', output):
+            helper.main()
+        sleeping.assert_called_once()
+        self.assertEqual(json.loads(output.getvalue())['id'], helper.read(self.folder, 'request.json')['id'])
+
+    def test_active_turn_check_does_not_accept_invalid_or_blocked_completion_receipts(self):
+        self.active_native_turn('applied')
+        receipt = {**self.owner, 'id': 'completion', 'requestId': 'request', 'text': 'Done'}
+        for change in ({'connectionId': 'other'}, {'requestId': 'other'}, {'id': '!'}, {'text': None}, {'text': '\U0001f600'*16001}):
+            with self.subTest(change=list(change)):
+                self.put('reply.json', {**receipt, **change})
+                with self.assertRaisesRegex(ValueError, 'still active'):
+                    helper.require_available_request(self.folder, self.owner)
+        self.put('reply.json', receipt)
+        (self.folder/'result.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'matching proposal result'):
+            helper.require_available_request(self.folder, self.owner)
+
+    def test_active_turn_check_distinguishes_finished_cancelled_and_other_owner_history(self):
+        for kind in ('finished', 'cancelled', 'cancel receipt', 'other connection', 'other session'):
+            with self.subTest(kind=kind):
+                self.active_native_turn('applied')
+                (self.folder/'cancel.json').unlink(missing_ok=True)
+                if kind == 'finished':
+                    self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': 'request'}, {'role': 'assistant', 'requestId': 'request'}]})
+                elif kind == 'cancelled':
+                    self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': 'request', 'cancelled': True}]})
+                elif kind == 'cancel receipt':
+                    self.put('cancel.json', {**self.owner, 'requestId': 'request'})
+                elif kind == 'other connection':
+                    self.put('request.json', {**self.owner, 'id': 'request', 'connectionId': 'other'})
+                else:
+                    self.put('transcript.json', {'sessionId': 'other', 'messages': [{'role': 'user', 'requestId': 'request'}]})
+                helper.require_available_request(self.folder, self.owner)
+
+    def test_native_begin_rechecks_active_turn_before_publication(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        original_write = helper.write
+        def publish(folder, name, value, guard=None):
+            self.active_native_turn('applied')
+            original_write(folder, name, value, guard)
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Racing request']), patch.object(helper, 'write', side_effect=publish):
+            with self.assertRaisesRegex(ValueError, 'Previous Workbench request request'):
+                helper.main()
+        self.assertEqual(helper.read(self.folder, 'agent-request.json')['id'], 'request')
+
+    def test_active_turn_check_reports_malformed_access_and_owner_changes(self):
+        for filename in ('request.json', 'transcript.json', 'cancel.json', 'proposal.json', 'result.json', 'reply.json'):
+            with self.subTest(filename=filename):
+                self.active_native_turn('applied')
+                self.put(filename, [])
+                with self.assertRaisesRegex(ValueError, 'Invalid Workbench protocol file'):
+                    helper.require_available_request(self.folder, self.owner)
+                (self.folder/filename).unlink()
+        self.active_native_turn('applied')
+        read = helper.read
+        for change in ('permission', 'owner', 'request'):
+            with self.subTest(change=change):
+                self.active_native_turn('applied')
+                def racing_read(folder, name):
+                    if name == 'reply.json':
+                        if change == 'permission':
+                            raise PermissionError('Cannot read completion receipt')
+                        if change == 'owner':
+                            self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'replacement'})
+                        else:
+                            self.put('request.json', {**self.owner, 'id': 'replacement'})
+                    return read(folder, name)
+                self.put('reply.json', {})
+                with patch.object(helper, 'read', side_effect=racing_read):
+                    with self.assertRaises((PermissionError, ValueError)) as error:
+                        helper.require_available_request(self.folder, self.owner)
+                self.assertNotIn('still active', str(error.exception))
 
     def test_native_begin_waits_for_editor_ack_and_refuses_embedded_workflow(self):
         self.assertIn('external', self.run_helper('begin', '--text', 'Change the story').stderr.lower().replace('work in your agent', 'external'))
@@ -317,6 +598,7 @@ class FolderAgentTests(unittest.TestCase):
         for change in ('cancel', 'owner', 'request identity', 'malformed transcript'):
             with self.subTest(change=change):
                 self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                (self.folder/'transcript.json').unlink(missing_ok=True)
                 (self.folder/'cancel.json').unlink(missing_ok=True)
                 original_read, original_write = helper.read, helper.write
                 registered = [False]

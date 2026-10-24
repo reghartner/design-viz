@@ -191,3 +191,18 @@ test('all newly routed authoring guides use the complete browser-free composer',
     assert.doesNotMatch(text,/then (?:manually )?author (?:the |its )?panel\/control|author the panel\/control `sectionLayout` rectangles/,name);
   }
 });
+
+test('shipped external handoffs finish accepted requests without a reply and keep later verification honest',()=>{
+  for(const resume of [false,true])for(const owner of [identity,{sessionId:'session',connectionId:'connection'}]){
+    const external=context.folderAgentInstructions('Doorbell','mixed',resume,owner,'external');
+    assert.match(external,/Accept changes automatically finishes this request after saving both artifacts and its result; no helper reply is needed/);
+    assert.match(external,/previousResult/);assert.match(external,/no automatic notification to an idle agent/);
+    assert.match(external,/begin a fresh request and submit a corrected pair/);
+    assert.match(external,/Acceptance does not claim agent verification or a Git commit/);
+    assert.match(external,/Only to finish a request without an accepted proposal, use python3 [^\n]+ reply --request/);
+    assert.doesNotMatch(external,/acceptance does not finish|Accept changes does not release|completion receipt still releases|Give the answer here and also write/);
+    const embedded=context.folderAgentInstructions('Doorbell','mixed',resume,owner,'embedded');
+    assert.match(embedded,/Write the final answer using python3 [^\n]+ reply --request/);
+    assert.doesNotMatch(embedded,/Accept changes automatically finishes/);
+  }
+});

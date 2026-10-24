@@ -113,7 +113,7 @@ function createFolderAgentClient(opts){
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
   var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
-  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
+  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,pendingAcceptance=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   // Heartbeats must not wait behind artifact saves or proposal preparation.
   // All writes to editor.json share this small queue, including retirement.
@@ -131,7 +131,7 @@ function createFolderAgentClient(opts){
   }
   function retire(status,write){
     var owner=manifest && {sessionId:manifest.sessionId,connectionId:manifest.connectionId};
-    connected=false;heartbeatReady=false;pending=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
+    connected=false;heartbeatReady=false;pending=null;pendingAcceptance=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
     return write && owner?writeDisconnected(owner):Promise.resolve();
   }
   function scheduleHeartbeat(){
@@ -183,8 +183,8 @@ function createFolderAgentClient(opts){
   function alive(token){return connected && !disposed && token===epoch;}
   var validId=folderAgentValidId;
   function validText(value){return value && typeof value.id==='string' && /^[\w-]{1,120}$/.test(value.id) && typeof value.text==='string' && value.text.length<=32000;}
-  async function saveTranscript(){await files.write('transcript.json',{sessionId:manifest.sessionId,messages:transcript.slice(-100)});}
-  async function saveChanges(){await files.write('changes.json',{sessionId:manifest.sessionId,changes:changes.slice(-100)});changesDirty=false;}
+  async function saveTranscript(guard){await files.write('transcript.json',{sessionId:manifest.sessionId,messages:transcript.slice(-100)},guard);}
+  async function saveChanges(guard){await files.write('changes.json',{sessionId:manifest.sessionId,changes:changes.slice(-100)},guard);changesDirty=false;}
   function receipt(result,proposal,requestId){
     if(changes.some(function(item){return item.id===result.id;}))return;
     var entry={id:result.id,requestId:requestId,status:result.status,summary:String(proposal.summary || result.message || 'Story update').slice(0,1000),
@@ -216,9 +216,9 @@ function createFolderAgentClient(opts){
     publish({status:preview.ok?'Agent updates are ready to preview. Your current story is unchanged.':'Agent update needs attention. Copy the feedback to your agent to resolve it.'});
     return 'wait';
   }
-  function clearReceipt(){pendingReviewResult=null;if(exchange){var ack=exchange.request();if(ack.result)exchange.receive({acknowledged:ack.result.id},ack);}}
+  function clearReceipt(){pendingReviewResult=null;pendingAcceptance=null;if(exchange){var ack=exchange.request();if(ack.result)exchange.receive({acknowledged:ack.result.id},ack);}}
 
-  async function snapshot(token){
+  async function snapshot(token,publicationGuard){
     var current=await files.read('session.json');
     if(!alive(token))return null;
     if(!belongs(current)){retire('Another connection owns this folder. Reconnect explicitly.',false);return null;}
@@ -229,13 +229,13 @@ function createFolderAgentClient(opts){
     if(files.checkArtifacts)await files.checkArtifacts();
     var serialized=JSON.stringify(sent.snapshot);
     if(serialized!==lastState){
-      await files.write('state.json',envelope(sent.snapshot));if(!alive(token))return null;
+      await files.write('state.json',envelope(sent.snapshot),publicationGuard);if(!alive(token))return null;
       if(files.flushArtifacts){
         var invalid=sent.snapshot.parseError;try{if(!invalid && opts.validate)invalid=opts.validate(sent.snapshot.source);}catch(ex){invalid=ex.message;}
         if(invalid){lastArtifactState='paused';if(opts.artifactStatus)opts.artifactStatus('paused','Repair the JSON. The last valid spec and ledger are unchanged.');publish({status:'Your JSON needs repair. The last valid spec and ledger remain in the diagram folder; your unfinished draft stays in the workbench.'});}
-        else {if(opts.artifactStatus)opts.artifactStatus('saving');await files.flushArtifacts(sent.snapshot.source,sent.snapshot.ledger,async function(){var latest=opts.snapshot();if(!alive(token) || !latest.open || latest.project!==project || !belongs(await files.read('session.json')) || !alive(token))throw Error('Connection changed.');});lastArtifactState='saved';if(opts.artifactStatus){var latest=opts.snapshot();opts.artifactStatus(latest.source===sent.snapshot.source && latest.ledger===sent.snapshot.ledger?'saved':'pending');}}
+        else {if(opts.artifactStatus)opts.artifactStatus('saving');await files.flushArtifacts(sent.snapshot.source,sent.snapshot.ledger,async function(){if(publicationGuard)await publicationGuard();var latest=opts.snapshot();if(!alive(token) || !latest.open || latest.project!==project || !belongs(await files.read('session.json')) || !alive(token))throw Error('Connection changed.');});lastArtifactState='saved';if(opts.artifactStatus){var latest=opts.snapshot();opts.artifactStatus(latest.source===sent.snapshot.source && latest.ledger===sent.snapshot.ledger?'saved':'pending');}}
       }
-      else await files.write('story.spec.json',sent.snapshot.source);if(!alive(token))return null;
+      else await files.write('story.spec.json',sent.snapshot.source,publicationGuard);if(!alive(token))return null;
       lastState=serialized;
     }else if(files.flushArtifacts && opts.artifactStatus)opts.artifactStatus(lastArtifactState,lastArtifactState==='paused'?'Repair the JSON. The last valid spec and ledger are unchanged.':'');
     await heartbeat();
@@ -295,9 +295,46 @@ function createFolderAgentClient(opts){
       throw ex;
     }
   }
+  // An explicit external Accept owns this frozen outcome until both the saved
+  // pair and its completion history are durable. A later proposal cannot replace
+  // it during a retry, and no synthetic agent reply claims verification.
+  async function finishAcceptance(token,turn){
+    var accepted=pendingAcceptance;if(!accepted)return;
+    async function guard(){
+      function current(){if(!alive(token) || turn!==turnEpoch || pending!==accepted.requestId)throw Error('Accepted request changed before completion.');
+        var current=opts.snapshot();if(!current.open || current.project!==project)throw Error('Project changed before completion.');}
+      current();var owner=await files.read('session.json');current();
+      var editor=await files.read('editor.json');current();
+      var request=await files.read('request.json');current();
+      var cancel=await files.read('cancel.json');current();
+      if(!belongs(owner) || !belongs(editor) || editor.connected!==true || !belongs(request) || request.id!==accepted.requestId || belongs(cancel) && cancel.requestId===accepted.requestId)
+        throw Error('Accepted request ownership or cancellation changed before completion.');
+    }
+    await guard();
+    // The result identifies the accepted operation, but saves always follow the
+    // current draft. Replaying its older snapshot could erase human edits that
+    // were already saved while this acceptance was waiting to recover.
+    await snapshot(token,guard);await guard();
+    if(!accepted.saved && lastArtifactState!=='saved')throw Error('The current files must be saved before this request can finish.');
+    accepted.saved=true;
+    receipt(accepted.result,accepted.proposal,accepted.requestId);await saveChanges(guard);await guard();
+    var result=envelope(Object.assign({},accepted.result,{requestId:accepted.requestId,at:accepted.at,requestCompleted:true}));
+    await files.write('result.json',result,guard);await guard();
+    var message=transcript.find(function(item){return item.role==='user' && item.requestId===accepted.requestId && !item.cancelled;});
+    if(!message)throw Error('The accepted request is missing its conversation record.');
+    var completedMessages=transcript.map(function(item){return item===message?Object.assign({},item,{completion:result}):item;});
+    await files.write('transcript.json',{sessionId:manifest.sessionId,messages:completedMessages.slice(-100)},guard);await guard();
+    await snapshot(token,guard);await guard();
+    message.completion=result;
+    seen.add(accepted.result.id);exchange.receive({acknowledged:accepted.result.id},exchange.request());
+    pendingAcceptance=null;pendingReviewResult=null;pending=null;turnEpoch++;clearReview();
+    publish({status:'Update accepted and saved. Continue in your agent.',progress:''});
+  }
   async function poll(){
     if(!connected || disposed)return;
-    var token=epoch,turn=turnEpoch,requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
+    var token=epoch,turn=turnEpoch;
+    if(pendingAcceptance){await finishAcceptance(token,turn);if(!alive(token))return;turn=turnEpoch;}
+    var requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
     var health=null;try{health=await files.read('pilot-status.json');}catch(ignored){}
     if(!alive(token) || turn!==turnEpoch)return;
     pilotStatus=folderAgentPilotHealth(health,manifest,now());
@@ -368,6 +405,10 @@ function createFolderAgentClient(opts){
           if(ack.result)ack.result.baseRevision=proposal.baseRevision;
         }else message=ack.result.message;
         if(ack.result){
+          if(opts.workflow==='external' && accepted && ['applied','unchanged'].includes(ack.result.status)){
+            pendingAcceptance={result:Object.assign({},ack.result),proposal:proposal,requestId:requestId,at:now(),saved:false};
+            await finishAcceptance(token,turn);return;
+          }
           if(files.flushArtifacts && ['applied','unchanged'].includes(ack.result.status)){pendingReviewResult=ack.result;await snapshot(token);if(!alive(token) || turn!==turnEpoch)return;}
           clearReview();receipt(ack.result,proposal,requestId);
           await saveChanges();if(!alive(token) || turn!==turnEpoch)return;
@@ -464,7 +505,7 @@ function createFolderAgentClient(opts){
       }
       manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing && !renewal?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
-      pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
+      pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;pendingAcceptance=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
@@ -610,7 +651,7 @@ function createFolderAgentClient(opts){
       // Callers can release their folder lock only after outstanding saves drain.
       return Promise.allSettled([closing,chain]).then(function(results){if(results[0].status==='rejected')throw results[0].reason;});
     },
-    destroy:function(){connected=false;heartbeatReady=false;disposed=true;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
+    destroy:function(){connected=false;heartbeatReady=false;disposed=true;pendingAcceptance=null;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
     manifest:function(){return manifest;}
   };
 }

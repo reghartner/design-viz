@@ -27,10 +27,38 @@ test('a new connection and explicit resume use native buffered filesystem handle
 
 async function sessionFile(page,name){
   return page.evaluate(async name=>{
-    try{const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');return JSON.parse(await(await(await directory.getFileHandle(name)).getFile()).text());}
+    try{
+      const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');
+      const text=await(await(await directory.getFileHandle(name)).getFile()).text();
+      return text===''?null:JSON.parse(text);
+    }
     catch(error){if(error.name==='NotFoundError' || error.name==='NotReadableError')return null;throw error;}
   },name);
 }
+
+test('native session observations wait for publication but reject malformed JSON and denied access',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');
+  expect(await sessionFile(page,'probe.json')).toBeNull();
+  await page.evaluate(async()=>{
+    const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent',{create:true}),handle=await meta.getFileHandle('probe.json',{create:true});
+    window.probeWriter=await handle.createWritable();await window.probeWriter.write('{"id":"published"}');
+  });
+  expect(await sessionFile(page,'probe.json')).toBeNull();
+  await page.evaluate(()=>window.probeWriter.close());expect(await sessionFile(page,'probe.json')).toEqual({id:'published'});
+  for(const text of ['{',' ']){
+    await page.evaluate(async text=>{const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent'),writer=await(await meta.getFileHandle('probe.json')).createWritable();await writer.write(text);await writer.close();},text);
+    await expect(sessionFile(page,'probe.json')).rejects.toThrow(/SyntaxError/);
+  }
+  // Fault injection checks exception classification, not native permission grants.
+  await page.evaluate(()=>{
+    const get=FileSystemFileHandle.prototype.getFile;window.restoreProbeReader=()=>{FileSystemFileHandle.prototype.getFile=get;};
+    FileSystemFileHandle.prototype.getFile=async function(){throw new DOMException('Probe read failed',window.probeReadError);};
+  });
+  try{
+    await page.evaluate(()=>window.probeReadError='NotReadableError');expect(await sessionFile(page,'probe.json')).toBeNull();
+    await page.evaluate(()=>window.probeReadError='NotAllowedError');await expect(sessionFile(page,'probe.json')).rejects.toThrow(/NotAllowedError/);
+  }finally{await page.evaluate(()=>window.restoreProbeReader());}
+});
 
 test('desktop repeated native connection retirement and resume release wake listeners',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});await page.addInitScript(trackResources);
@@ -65,10 +93,28 @@ test('desktop heartbeat and resume events stay live during a held native artifac
   await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
   const manifest=await sessionFile(page,'session.json');
+  await page.evaluate(()=>{
+    const create=FileSystemFileHandle.prototype.createWritable;
+    FileSystemFileHandle.prototype.createWritable=async function(...args){
+      const stream=await create.apply(this,args);
+      if(this.name==='request.json'){
+        const close=stream.close.bind(stream);stream.close=async()=>{window.requestPublicationHeld=true;await new Promise(resolve=>window.releaseRequest=resolve);return close();};
+      }
+      return stream;
+    };
+    window.restoreRequestWriter=()=>{FileSystemFileHandle.prototype.createWritable=create;};
+  });
   await page.evaluate(async owner=>{
     const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent'),handle=await meta.getFileHandle('agent-request.json',{create:true}),writer=await handle.createWritable();
     await writer.write(JSON.stringify({...owner,id:'background-request',text:'Keep this request while saving',expiresAt:Date.now()+90000}));await writer.close();
   },manifest);
+  try{
+    await expect.poll(()=>page.evaluate(()=>window.requestPublicationHeld)).toBe(true);
+    // A native create exposes a genuinely empty file until buffered close.
+    // The observation must wait for publication, not fail parsing that placeholder.
+    expect(await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent');return (await(await meta.getFileHandle('request.json')).getFile()).size;})).toBe(0);
+    expect(await sessionFile(page,'request.json')).toBeNull();
+  }finally{await page.evaluate(()=>{window.restoreRequestWriter();window.releaseRequest?.();});}
   await expect.poll(async()=>(await sessionFile(page,'request.json'))?.id).toBe('background-request');
   await expect.poll(async()=>(await sessionFile(page,'transcript.json'))?.messages.at(-1)?.requestId).toBe('background-request');
   await page.evaluate(()=>{

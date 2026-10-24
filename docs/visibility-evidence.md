@@ -47,7 +47,9 @@ truth. Already-authorized rendered captures can supply visual evidence; this
 obligation grants no browser, server, installation or delegation permission.
 A preview proposal may carry honest unverified checks; it must not claim those
 requirements proved or the visual work complete. Follow paired preview/approval
-and the matching result before a completion reply.
+and the matching result. Copy/paste Accept finishes the request automatically;
+Beta still needs a final reply. Corrections after copy/paste acceptance start a
+fresh request.
 
 ## Expectation format and eligibility
 

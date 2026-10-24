@@ -18,7 +18,7 @@ run a blocked operation or bypass host safeguards; continue authoring.
 
 ## New and edited diagrams
 
-Inspect the request, source and candidate/ledger context. From VIZ,
+Inspect the request and candidate pair. From VIZ,
 run `python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit
 --out <scratch>/packet.md` and read that packet before JSON edits. For a new or
 materially changed story use `--mode new`; without a spec, select planned
@@ -29,7 +29,7 @@ The [compact skill router](../.claude/skills/hld-to-page/SKILL.md) covers other
 starting materials. Do not preload the full workflow, contract, examples, session
 manual or helper implementation, except pilot helper inspection to verify capture
 scope. Fully specified edits need no new questions or worksheet. Use the
-[folder session](folder-agent-session.md) for protocol questions or recovery.
+[folder session](folder-agent-session.md) for protocol or recovery.
 
 ## Protocol
 
@@ -53,7 +53,7 @@ scope. Fully specified edits need no new questions or worksheet. Use the
 6. Never overwrite accepted spec/ledger or edit `state.json`,
    `request.json`, `transcript.json`, `session.json` or `editor.json`. Use the
    helper for proposals/replies; this grants no extra permissions.
-7. Selection paths do not prove an isolated change.
+7. Selection paths do not prove isolation.
 
 ## Semantics
 
@@ -81,16 +81,16 @@ scope. Fully specified edits need no new questions or worksheet. Use the
 - Clipping/readability feedback authorizes scoped tile sizing; do not ask again
   or hand it back. Use the packet's `--rearrange` flow for structural node rearrangement.
 - Submit `propose` with your candidate pair and base revision per `CONNECT.md`;
-  require full preview, explicit **Commit update**, then matching `result.json`.
-- After acceptance, check the accepted pair including merged edits. Put routine
-  acceptance/closed-review notes in the completion reply. If the accepted
-  spec and ledger disagree, submit a correction and wait for paired approval/result.
+  require full preview, explicit **Accept changes**, then matching `result.json`.
+- After acceptance, check the pair including merged edits before claiming verification.
+  If it disagrees, begin a fresh request and propose a correction.
 - Commit does not refresh compatibility metadata; verify accepted
   `page.flowview` before claiming it was stamped.
 - On rejection, stale revision or conflict, reread `state.json` for the current
   pair and revision and reconcile them and any feedback into your candidates
   without discarding their edits; never relabel an old proposal. Load the full
   folder session for other recovery.
-- Send completion `reply` only after the matching result; do not release the
-  request before it.
+- Copy/paste Accept saves the pair and automatically finishes the request. No reply
+  is needed. Next `begin` reports `previousResult`; idle agents are not notified.
+  Use `reply` to finish requests without accepted proposals. Beta still needs replies.
 - Git commit or publish needs separate user authorization.

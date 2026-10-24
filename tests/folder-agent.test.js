@@ -862,3 +862,118 @@ test('a failed disconnect write still drains the old save before releasing its c
   for(let n=0;n<50;n++)await Promise.resolve();assert.equal(settled,false);
   release();await assert.rejects(saving,/Connection changed/);assert.equal(await closing,'Disk unavailable');
 });
+
+async function externalTurn(h,id='external-first'){
+  h.disk.set('agent-request.json',h.envelope({id,text:'Update the story',expiresAt:999999}));await h.client.poll();
+  assert.equal(h.last.pending,id);return h.disk.get('request.json');
+}
+for(const status of ['applied','unchanged'])test('explicit external Accept durably completes '+status+' work without an agent reply',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();const owner=h.client.manifest();await externalTurn(h);
+  h.proposal(status==='unchanged'?{source:h.disk.get('state.json').source}:{});await h.client.poll();assert.equal(h.last.pending,'external-first');
+  await h.client.acceptReview();assert.equal(h.last.pending,null);
+  const result=h.disk.get('result.json');assert.equal(result.status,status);assert.equal(result.requestCompleted,true);
+  assert.deepEqual(h.disk.get('transcript.json').messages[0].completion,result);assert.equal(h.disk.has('reply.json'),false);
+  h.advance(30000);await h.client.poll();await externalTurn(h,'external-next');
+  h.proposal({id:'late-proposal',requestId:'external-first',source:'{"title":"late"}'});h.reply({requestId:'external-first'});await h.client.poll();
+  assert.equal(h.last.pending,'external-next');assert.equal(h.disk.get('result.json').id,result.id);assert.equal(h.writes.length,status==='applied'?1:0);
+  assert.deepEqual(h.client.manifest(),owner);
+});
+for(const failing of ['pair','changes.json','result.json','transcript.json'])test('external Accept retries '+failing+' without reapplying or losing the accepted proposal identity',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});let failPair=false,pair;
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();if(failPair){failPair=false;throw Error('Pair unavailable');}pair={source,ledger};};
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();
+  if(failing==='pair')failPair=true;else h.fail(failing);
+  await assert.rejects(h.client.acceptReview(),/unavailable/);assert.equal(h.last.pending,'external-first');assert.equal(h.writes.length,1);
+  assert.equal(h.disk.get('transcript.json').messages[0].completion,undefined);
+  if(failing==='pair')assert.equal(h.disk.get('result.json'),undefined);
+  h.proposal({id:'late-replacement',source:'{"title":"never apply"}'});
+  await h.client.poll();assert.equal(h.last.pending,null);assert.equal(h.writes.length,1);assert.equal(pair.source,'{"title":"after"}');
+  assert.equal(h.disk.get('result.json').id,'proposal-1');assert.equal(h.disk.get('result.json').requestCompleted,true);
+  assert.equal(h.disk.get('transcript.json').messages[0].completion.id,'proposal-1');
+  assert.equal(h.disk.get('changes.json').changes.length,1);
+});
+for(const stage of ['pair','result.json','transcript.json'])for(const interruption of ['cancel','disconnect','destroy','project','owner','closed lease'])test('external completion at '+stage+' respects '+interruption,async()=>{
+  const h=harness({workflow:'external',reviewMode:true});h.files.flushArtifacts=async()=>{};
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();
+  let release,entered;const hit=new Promise(r=>entered=r),held=new Promise(r=>release=r);
+  if(stage==='pair')h.files.flushArtifacts=async(source,ledger,guard)=>{entered();await held;await guard();};
+  else h.writeGate(name=>{if(name===stage){entered();return held;}});
+  const accepting=h.client.acceptReview();await hit;
+  let stopping;
+  if(interruption==='cancel')stopping=h.client.cancel();
+  if(interruption==='disconnect')stopping=h.client.disconnect();
+  if(interruption==='destroy')h.client.destroy();
+  if(interruption==='project')h.project();
+  if(interruption==='owner')h.disk.set('session.json',{...h.client.manifest(),connectionId:'new-owner'});
+  if(interruption==='closed lease')h.disk.set('editor.json',h.envelope({connected:false}));
+  h.writeGate(null);release();await assert.rejects(accepting,/changed|Connection/);if(stopping)await stopping;
+  assert.equal(h.disk.get('transcript.json').messages[0].completion,undefined);
+  if(stage!=='transcript.json')assert.equal(h.disk.has('result.json'),false);
+});
+test('rejected, busy and unapproved external proposals stay active; explicit corrected Accept finishes',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();await h.client.poll();
+  assert.equal(h.disk.has('result.json'),false);assert.equal(h.last.pending,'external-first');
+  await h.client.rejectReview('Please correct it');assert.equal(h.disk.get('result.json').status,'rejected');assert.equal(h.disk.get('result.json').requestCompleted,undefined);assert.equal(h.last.pending,'external-first');
+  h.proposal({id:'corrected'});await h.client.poll();h.busy(true);await h.client.acceptReview();assert.equal(h.last.pending,'external-first');h.busy(false);await h.client.poll();assert.equal(h.writes.length,0);
+  await h.client.acceptReview();assert.equal(h.last.pending,null);assert.equal(h.disk.get('result.json').id,'corrected');
+});
+test('embedded Accept still waits for the agent final reply',async()=>{
+  const h=harness({workflow:'embedded',reviewMode:true});await h.client.start();await h.client.send('Explain and update');h.proposal();await h.client.poll();await h.client.acceptReview();
+  assert.ok(h.last.pending);assert.equal(h.disk.get('result.json').requestCompleted,undefined);h.reply();await h.client.poll();assert.equal(h.last.pending,null);assert.equal(h.last.transcript.at(-1).role,'assistant');
+});
+
+test('acceptance retry preserves later human edits already saved before result/history recovery',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});let fail=false,pair;
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();if(fail){fail=false;throw Error('Pair failed');}pair=source;};
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();fail=true;
+  await assert.rejects(h.client.acceptReview(),/Pair failed/);
+  h.type('{"title":"after","human":"keep me"}');await h.client.flush();assert.match(pair,/keep me/);
+  h.fail('result.json');await assert.rejects(h.client.poll(),/Disk/);assert.match(pair,/keep me/);assert.equal(h.last.pending,'external-first');
+  await h.client.poll();assert.equal(h.last.pending,null);assert.match(pair,/keep me/);assert.match(h.disk.get('state.json').source,/keep me/);assert.equal(h.writes.length,1);
+});
+test('acceptance with held completion history saves human edits before releasing the request',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});let pair;
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();pair=source;};
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();
+  let release,entered;const hit=new Promise(r=>entered=r),held=new Promise(r=>release=r);
+  h.writeGate(name=>{if(name==='transcript.json'){entered();return held;}});const accepting=h.client.acceptReview();await hit;
+  h.type('{"title":"after","human":"during history write"}');h.writeGate(null);release();await accepting;
+  assert.equal(h.last.pending,null);assert.match(pair,/during history write/);assert.equal(h.writes.length,1);
+});
+test('retirement after a failed acceptance publication cannot replay it on same-client resume',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();h.fail('result.json');await assert.rejects(h.client.acceptReview(),/Disk/);
+  const old=h.client.manifest();await h.client.disconnect();await h.client.start(true);await h.client.poll();
+  assert.notEqual(h.client.manifest().connectionId,old.connectionId);assert.equal(h.last.pending,null);assert.equal(h.disk.has('result.json'),false);assert.equal(h.writes.length,1);
+});
+
+for(const laterDraft of [false,true])test('acceptance retry never rewinds durable human edits when '+(laterDraft?'a newer draft save fails':'the same pair would fail to write again'),async()=>{
+  const h=harness({workflow:'external',reviewMode:true});let pair,phase='normal';const saved=[];
+  const human='{"title":"after","human":"already durable"}',later='{"title":"after","human":"new draft"}';
+  h.files.flushArtifacts=async(source,ledger,guard)=>{
+    await guard();
+    if(phase==='first failure'){phase='normal';throw Error('Initial pair write failed');}
+    if(phase==='retry' && source===(laterDraft?later:human))throw Error('Current draft write failed during recovery');
+    pair=source;saved.push(source);
+  };
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();phase='first failure';
+  await assert.rejects(h.client.acceptReview(),/Initial pair/);
+  h.type(human);await h.client.flush();assert.equal(pair,human);
+  phase='retry';if(laterDraft)h.type(later);
+  let error;try{await h.client.poll();}catch(ex){error=ex;}
+  assert.equal(pair,human,'Recovery must never replace an already durable human pair with the older accepted version');
+  assert.deepEqual(saved,['{"title":"before"}',human]);
+  if(laterDraft){
+    assert.match(error?.message,/Current draft/);assert.equal(h.last.pending,'external-first');assert.equal(h.disk.has('result.json'),false);
+    phase='normal';await h.client.poll();assert.equal(pair,later);
+  }else assert.equal(error,undefined,'An already durable pair needs no rewrite');
+  assert.equal(h.last.pending,null);assert.equal(h.disk.get('result.json').id,'proposal-1');assert.equal(h.writes.length,1);
+});
+
+test('an invalid current draft cannot falsely complete an acceptance whose pair never saved',async()=>{
+  const h=harness({workflow:'external',reviewMode:true,validate:source=>{try{JSON.parse(source);}catch{return 'Invalid JSON';}}});let pair,fail=false;
+  h.files.flushArtifacts=async(source,ledger,guard)=>{await guard();if(fail){fail=false;throw Error('Initial pair failed');}pair=source;};
+  await h.client.start();await externalTurn(h);h.proposal();await h.client.poll();fail=true;
+  await assert.rejects(h.client.acceptReview(),/Initial pair/);h.type('{ unfinished human edit');
+  await assert.rejects(h.client.poll(),/must be saved/);assert.equal(pair,'{"title":"before"}');assert.equal(h.disk.has('result.json'),false);assert.equal(h.last.pending,'external-first');
+  h.type('{"title":"after","human":"repaired"}');await h.client.poll();assert.equal(h.last.pending,null);assert.match(pair,/repaired/);assert.equal(h.disk.get('result.json').id,'proposal-1');
+});

@@ -355,11 +355,12 @@ proposal waiting, **Decline** rejects it, and neither candidate is accepted unti
 **Accept changes**. One Undo/Redo restores both. This saves local
 artifacts; it does not make a Git commit. The agent should reread the accepted
 pair after approval, especially after a merge, and submit a correction if the
-ledger no longer describes the accepted diagram. Record routine acceptance and
-closed-review bookkeeping in the completion reply rather than submitting another
-spec/ledger proposal solely for that bookkeeping. If merged edits or verification
-reveal an actual spec/ledger mismatch, submit a real correction proposal and wait
-for its paired approval and matching result. Never write accepted files directly
+ledger no longer describes the accepted diagram. In copy/paste, successful Accept
+automatically finishes the request after the paired files and result are saved;
+corrections start with a fresh `begin`. Acceptance records the human decision,
+not agent verification or a Git commit. Do not submit another spec/ledger proposal
+solely for acceptance bookkeeping. Beta conversation requests still need the final
+agent reply; corrections there can use the active request. Never write accepted files directly
 or release the request before its result. Commit or publish only with user
 authorization. A missing ledger is unfinished work, not a successful delivery.
 
@@ -411,12 +412,16 @@ python3 /path/to/diagram/.flowview-agent/folder-agent.py begin --text "The reque
 Wait for browser acknowledgement before working. `begin` waits for both the request
 file and its accepted transcript entry; it withdraws after 90 seconds without
 acknowledgement. Before registering, it also waits up to 90 seconds for a paused
-heartbeat to refresh (at most three minutes across the two phases). These waits
+heartbeat to refresh or an existing proposal to be approved and saved. These
+share one 90-second pre-registration budget (at most three minutes across both phases).
+Unapproved proposals are never automatically applied or replaced; rejected and
+other unfinished requests remain active for correction. These waits
 allow for delayed background browser timers, and report progress on stderr while
 keeping JSON stdout unchanged. Keep the helper running; bringing the existing
 Workbench tab to the front can shorten the wait. One
-request is active at a time; the agent finishes it with its proposal result and
-completion `reply`.
+request is active at a time. Successful explicit Accept with an `applied` or
+`unchanged` result finishes an external request automatically. No agent reply,
+reset or changed connection is needed, even if the agent is idle.
 
 A stale heartbeat alone does not require a new session. Commands for an existing
 request wait up to 90 seconds for the same connected editor to refresh, preserving
@@ -444,15 +449,28 @@ boundaries). Progress retains up to 100 events with a 512 KiB budget. Use shell-
 quoting or `--file answer.txt` for longer content. Replies/progress are plain text,
 not executable UI. Permission prompts stay in the agent app.
 For copy/paste, report progress and errors in the agent app; periodic helper
-progress is unnecessary and is not displayed. Still submit proposals and send
-the completion `reply` to release the request after its proposal result.
+progress is unnecessary and is not displayed. Submit proposals normally. A saved
+acceptance publishes `result.json` with `requestCompleted: true`, then records
+that connection-bound result on the original user transcript entry before
+releasing the active request. Interrupted saves/result/history writes retry the
+same accepted outcome; no failed save or rejection completes the request.
 
 Embedded questions and answers use `reply`; an answer completes that request so
-the user can respond. External conversations keep discussion in the agent app
-and use `reply` as a completion receipt. `request.replySurface` overrides the
-workflow default for direct messages. A proposal must receive its matching result
-before another proposal or final reply. Rejected proposals can be revised while
-the request remains active. Completion releases the request.
+the user can respond. External conversations keep discussion in the agent app;
+use `reply` to finish a request without an accepted proposal. A late reply to a
+completed accepted request is an idempotent acknowledgement and never overwrites
+a newer reply. Late progress/proposals cannot revive it. `request.replySurface`
+overrides the workflow default for direct messages. Rejected proposals can be
+revised on the same request; wait for matching results before further proposals
+or replies.
+
+Copy/paste has no notification transport or background watcher to wake an idle
+agent. Its next successful `begin` returns the usual `id` and `revision`, plus
+optional `previousResult` containing the prior accepted result. The agent can
+also inspect `result.json`. Completion history is bounded to the saved 100
+transcript messages and is tied to the accepting connection. Old Workbench
+versions without `requestCompleted` still require their completion reply; refresh
+the page and folder setup to use automatic completion.
 
 ## Monitor and recovery
 

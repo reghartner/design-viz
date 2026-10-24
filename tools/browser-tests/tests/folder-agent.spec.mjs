@@ -14,7 +14,7 @@ const origin='https://flowview-folder.test';
 // validation, rendering, history and conversation are real. It is not evidence
 // that a human granted native browser permission or that Claude's Monitor ran.
 async function setup(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0,readGate=null,listener;const requests=[],errors=[],writes=[];
+  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0,readGate=null,writeGate=null,listener;const requests=[],errors=[],writes=[];
   const listenerActive=()=>listener && listener.exitCode===null && listener.signalCode===null;
   async function stopListener(){
     if(!listenerActive())return;
@@ -27,6 +27,7 @@ async function setup(page){
     if(operation==='entries')return (await readdir(target,{withFileTypes:true})).map(e=>({name:e.name,kind:e.isDirectory()?'directory':'file'}));
     if(operation==='mkdir'){if(!value?.create){try{return (await stat(target)).isDirectory();}catch(e){if(e.code==='ENOENT')return false;throw e;}}await mkdir(target,{recursive:true});sessionFolder=target;return true;}
     if(operation==='write'){
+      if(writeGate)await writeGate(path.basename(target));
       writes.push(name);
       if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}
       // createWritable buffers writes until close; readers see a complete file.
@@ -58,7 +59,7 @@ async function setup(page){
     return route.fulfill({contentType:'application/json',body:'[]'});
   });
   await page.goto(origin+'/index.html');
-  return {folder,requests,errors,writes,readGate:gate=>readGate=gate,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
+  return {folder,requests,errors,writes,readGate:gate=>readGate=gate,writeGate:gate=>writeGate=gate,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
     read:async name=>JSON.parse(await readFile(path.join(sessionFolder,name),'utf8')),
     run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
     // The agent registers a request from its own conversation; begin waits for the editor.
@@ -937,7 +938,10 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-view')).toContainText('My story');await expect(page.locator('#agent-update-commit')).toBeDisabled();
     await page.locator('#agent-update-proposed').click();await page.locator('#agent-update-commit').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');h.run('reply','--request',request.id,'--text','Ready for our next question here.');
-    await expect.poll(async()=> (await h.read('transcript.json')).messages.at(-1).role).toBe('assistant');
+    // The legacy reply above is idempotent; acceptance records a Workbench
+    // outcome on the original request, without inventing an agent answer.
+    await expect.poll(async()=> (await h.read('transcript.json')).messages.at(-1).completion?.requestCompleted).toBe(true);
+    expect((await h.read('transcript.json')).messages.at(-1).role).toBe('user');
     // A subsequent request can originate in the native conversation without going through embedded chat.
     native=spawn('python3',[path.join(h.session,'folder-agent.py'),'begin','--text','Rename backend'],{stdio:['ignore','pipe','pipe']});
     let output='',errors='';native.stdout.on('data',d=>output+=d);native.stderr.on('data',d=>errors+=d);
@@ -1340,10 +1344,85 @@ test('copy and paste Agent window drops Copy request, Stop, Focus/Detail and its
   }finally{await page.close();await h.cleanup();}
 });
 
+test('Accept finishes external requests after idle dwell and consecutive updates keep the same connection',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+    const owner=await h.read('session.json');
+    async function accept(request,title){
+      const candidate=JSON.parse(await readFile(path.join(h.session,request.candidate.spec),'utf8'));candidate.page.blocks[0].diagram.nodes.b.title=title;
+      await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate,null,2));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\nRenamed the service to '+title+'.\n');
+      h.run('propose','--request',request.id,'--revision',request.revision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary',title);
+      await page.locator('#agent-update-open').click();await page.locator('#agent-update-commit').click();
+      await expect.poll(async()=>{try{const r=await h.read('result.json');return r.requestId===request.id&&r.status;}catch{return null;}}).toBe('applied');
+    }
+    let request=await askAgent(page,h,'First accepted update');await accept(request,'First accepted service');
+    // The reported failure persists after spending time on the visible page.
+    // Do not send a completion reply or renew the connection during this dwell.
+    await page.waitForTimeout(20000);
+    for(let i=0;i<3;i++){
+      const previous=request.id,begun=await h.begin('Followup without a reply '+i);request=await h.read('request.json');
+      expect(request.id).toBe(begun.id);expect(begun.previousResult).toMatchObject({requestId:previous,status:'applied',requestCompleted:true});
+      await accept(request,'Accepted service '+i);
+    }
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    expect(await h.read('session.json')).toEqual(owner);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+for(const heldFile of ['pair','result.json','transcript.json'])test('next begin waits through Accept publication at '+heldFile+' without reply or reset',async({page})=>{
+  const h=await setup(page);let release;
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+    const owner=await h.read('session.json'),request=await askAgent(page,h,'Accept while next request starts');
+    const candidate=JSON.parse(await readFile(path.join(h.session,request.candidate.spec),'utf8'));candidate.page.blocks[0].diagram.nodes.b.title='Accepted during save';
+    await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate,null,2));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\nUpdated service.\n');
+    h.run('propose','--request',request.id,'--revision',request.revision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary','Update service');
+    await page.locator('#agent-update-open').click();
+    let entered;const hit=new Promise(r=>entered=r),held=new Promise(r=>release=r),target=heldFile==='pair'?owner.artifacts.spec:heldFile;
+    h.writeGate(name=>{if(name===target){entered();return held;}});
+    await page.locator('#agent-update-commit').click();await hit;
+    let finished=false;const next=h.begin('Follow up during the save').then(value=>{finished=true;return value;});
+    // Actual helper and browser I/O, no fake clock. The prior incoming remains
+    // untouched before the durable result, while completion-history I/O may
+    // already have allowed registration; acknowledgement must wait in all cases.
+    await page.waitForTimeout(500);expect(finished).toBe(false);
+    if(heldFile!=='transcript.json')expect((await h.read('agent-request.json')).id).toBe(request.id);
+    h.writeGate(null);release();release=null;
+    const begun=await next;expect(begun.previousResult).toMatchObject({requestId:request.id,requestCompleted:true,status:'applied'});
+    expect(await h.read('request.json')).toMatchObject({id:begun.id,sessionId:owner.sessionId,connectionId:owner.connectionId});
+    // Old helper writes that were already in flight cannot mutate this next turn.
+    await writeFile(path.join(h.session,'proposal.json'),JSON.stringify({...owner,id:'late-old-proposal',requestId:request.id,baseRevision:request.revision,source}));
+    await writeFile(path.join(h.session,'reply.json'),JSON.stringify({...owner,id:'late-old-reply',requestId:request.id,text:'Old completion'}));
+    const receipt=JSON.parse(h.run('reply','--request',request.id,'--text','Legacy completion'));expect(receipt.requestCompleted).toBe(true);
+    h.run('reply','--request',begun.id,'--text','Done without a proposal');await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    expect(await page.locator('#src').inputValue()).toContain('Accepted during save');expect(await h.read('session.json')).toEqual(owner);expect(h.errors).toEqual([]);
+  }finally{h.writeGate(null);release?.();await page.close();await h.cleanup();}
+});
+
+test('Decline keeps the external request active for correction and corrected Accept finishes it',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+    const request=await askAgent(page,h,'Review then correct');
+    async function propose(title){
+      const candidate=JSON.parse(source);candidate.page.blocks[0].diagram.nodes.b.title=title;
+      await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate,null,2));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\n'+title+'.\n');
+      h.run('propose','--request',request.id,'--revision',request.revision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary',title);
+      await page.locator('#agent-update-open').click();
+    }
+    await propose('Decline this');
+    const waiting=h.begin('Do not replace the unapproved request').then(()=>null,error=>error);
+    await page.waitForTimeout(500);expect((await h.read('agent-request.json')).id).toBe(request.id);
+    await page.locator('#agent-update-discard').click();expect((await waiting).message).toMatch(/Previous Workbench request .* is still active/);
+    expect(await h.read('result.json')).toMatchObject({requestId:request.id,status:'rejected'});expect((await h.read('result.json')).requestCompleted).toBeUndefined();
+    await propose('Corrected accepted service');await page.locator('#agent-update-commit').click();
+    const next=await h.begin('Continue after corrected acceptance');expect(next.previousResult).toMatchObject({requestId:request.id,requestCompleted:true,status:'applied'});
+    h.run('reply','--request',next.id,'--text','No further changes');await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
 test('Re-establish session releases a stuck request and hands the agent fresh ids the helper accepts',async({page})=>{
-  // Exercise the real 90-second acknowledgement expiry plus setup and recovery.
-  // Keep this allowance local; ordinary browser contracts retain their budget.
-  test.setTimeout(150000);
   const h=await setup(page);
   try{
     await page.setViewportSize({width:1440,height:900});
@@ -1353,10 +1432,9 @@ test('Re-establish session releases a stuck request and hands the agent fresh id
     const old=await h.read('session.json'),files=old.artifacts;expect(files).toMatchObject({spec:expect.any(String),ledger:expect.any(String)});
     const pair=async(mapping=files)=>({spec:await readFile(path.join(h.folder,mapping.spec),'utf8'),ledger:await readFile(path.join(h.folder,mapping.ledger),'utf8')});
     const stuck=await askAgent(page,h,'This request will get stuck.');
-    await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/did not acknowledge/);
-    const withdrawn=await h.read('agent-request.json');
-    expect(withdrawn).toMatchObject({sessionId:old.sessionId,connectionId:old.connectionId,withdrawn:true,expiresAt:0});
-    expect(withdrawn.id).not.toBe(stuck.id);
+    const incoming=await h.read('agent-request.json');
+    await expect(h.begin('A second request while the first is stuck')).rejects.toThrow(/Previous Workbench request .* is still active/);
+    expect(await h.read('agent-request.json')).toEqual(incoming);
     expect(await h.read('request.json')).toMatchObject({id:stuck.id,sessionId:old.sessionId,connectionId:old.connectionId});
     await expect(page.locator('#folder-agent-working')).toBeVisible();const before=await pair();
     await openAgent(page);

@@ -54,7 +54,9 @@ ID, or its canonical heading reference when it has no ID.
 
 Contents, Page n of m, Previous/Next, links, native navigation and preview state
 retain the exact section + View identity. Header View choices belong to the
-selected section. A repeated View ID in another section or Tab is independent.
+selected section. In Contents, a section with one View is one title row;
+sections with multiple Views show named View subrows.
+A repeated View ID in another section or Tab is independent.
 Standalone links use `d=<section>&v=<view>`. Native
 `navigate({section,view})` rejects a mismatched pair. Detail domains remain
 available through node drilldown rather than ordinary paging.

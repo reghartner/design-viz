@@ -17,6 +17,26 @@ function sharedPlacementFixture(placement){
  story.diagram.layouts=[{id:'shared',name:'Imported shared arrangement',presentation:'explore',sectionLayout:{columns:24,default:[{controls:'steps',x:0,y:0,w:24,h:6},{x:0,y:6,w:24,h:16}]},exploreLayout:{controlsPlacement:placement,controlsScale:.9,controls:{x:.04,y:.72,w:.9,h:.2},canvas:{controls:{x:-120,y:420,w:840,h:220}},steps:{textPosition:'right'},camera:{zoom:.8,x:.4,y:.6}}}];
  return raw;
 }
+test('Contents uses one plain row for singleton Views and named subrows for multiple Views',async({page,server},info)=>{
+ const root=await standalone(page,server),contents=nav(root).locator('.reader-contents');
+ const pseudo=(row,part='::before')=>row.evaluate((el,part)=>getComputedStyle(el,part).content,part);
+ const intro=contents.locator('.reader-tree-single-view[data-reader-section="intro"]');
+ await expect(intro).toHaveText('Introduction');await expect(intro).toHaveAttribute('data-tab-view','standard');await expect(intro).not.toHaveAttribute('data-explore-view','true');await expect(intro).toHaveAttribute('aria-current','page');
+ await expect(contents.locator('.reader-tree-sections').filter({has:intro}).locator('.reader-tree-view')).toHaveCount(0);
+ const tab=contents.locator('.reader-tree-tab'),storyHeading=contents.locator('.reader-tree-section[data-reader-section="story"]'),story=storyHeading.locator('..');
+ const views=story.locator('.reader-tree-view');await expect(views).toHaveText(['Business','Data']);
+ expect(await pseudo(tab)).toBe('none');expect(await pseudo(tab,'::after')).toContain('⌄');expect(await pseudo(intro)).toBe('none');expect(await pseudo(storyHeading)).toBe('none');expect(await pseudo(views.first())).toBe('none');expect(await pseudo(views.last())).toBe('none');
+ await story.locator('.reader-tree-view[data-tab-view="data"]').click();await intro.focus();await page.keyboard.press('Enter');
+ await expect(intro).toBeFocused();await expect(intro).toHaveAttribute('aria-current','page');await expect(page).toHaveURL(/d=intro.*v=standard/);
+ await info.attach('singleton-standard-and-multi-view-contents',{body:await page.screenshot(),contentType:'image/png'});
+
+ const exploreRaw=fixture();exploreRaw.page.blocks[0].tabs[0].sections[0].views[0].presentation='explore';
+ await standalone(page,server,exploreRaw);const explore=nav(root).locator('.reader-tree-single-view[data-reader-section="intro"]');
+ await expect(explore).toHaveAttribute('data-explore-view','true');await expect(explore).toHaveAttribute('aria-description','Explore: pan and zoom the graph.');
+ expect(await pseudo(explore)).toBe('none');
+ await expect(nav(root).locator('.reader-tree-sections').filter({has:explore}).locator('.reader-tree-view')).toHaveCount(0);
+ await info.attach('singleton-explore-contents',{body:await page.screenshot(),contentType:'image/png'});
+});
 test('section pages replace the main surface, repeat local IDs safely and restore exact links/history',async({page,server},info)=>{
  const root=await standalone(page,server);await expect(nav(root).locator('.reader-page-label')).toHaveText('Page 1 of 3');await expect(root.locator('#section-intro')).toBeVisible();await expect(root.locator('#section-story')).toBeHidden();await expect(nav(root)).toHaveAttribute('data-reader-multiple-views','false');
  await nav(root).getByRole('button',{name:'Next page',exact:true}).click();await expect(nav(root).locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(nav(root)).toHaveAttribute('data-reader-multiple-views','true');await expect(root.locator('#section-intro')).toBeHidden();await expect(root.locator('#section-story')).toBeVisible();await expect(root.locator('#section-story .board')).toBeHidden();
@@ -27,6 +47,7 @@ test('section pages replace the main surface, repeat local IDs safely and restor
 });
 test('desktop Workbench local View edits, shared content, independent visibility and Undo',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));await closeTools(page);const root=page.locator('#docview'),source=page.locator('#src');
+ await expect(nav(root).locator('.reader-tree-single-view[data-reader-section="intro"]')).toHaveAttribute('data-tab-view','standard');await expect(nav(root).locator('.reader-tree-view[data-reader-section="story"]')).toHaveCount(2);
  await nav(root).getByRole('button',{name:'Shared story',exact:true}).first().click();await choose(root,'Data');
  const before=await source.inputValue();await viewOptions(root);await nav(root).getByRole('button',{name:'Duplicate View',exact:true}).click();let raw=JSON.parse(await source.inputValue()),section=raw.page.blocks[0].tabs[0].sections[1];expect(section.views).toHaveLength(3);expect(section.views[1].layout).not.toBe(section.views[2].layout);expect(section.diagram.nodes.service.title).toBe('Shared service');
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await choose(root,'Data copy');
@@ -53,6 +74,7 @@ for(const placement of ['floating','canvas'])test(`canonical Standard ignores sa
 });
 test('native section View navigation isolates host state and rejects cross-section local IDs',async({page,server})=>{
  await writeFile(path.join(server.root,'section-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'section-native.html'),'<style>.host{height:700px;overflow:auto;position:relative;width:48%;display:inline-block;vertical-align:top}</style><div class="host" id="one"></div><div class="host" id="two"></div><script type="module">import {mountNativeViewer} from "./section-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/section-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.first=mount(document.querySelector('#one'),raw);window.second=mount(document.querySelector('#two'),raw);first.setCanvas(true);},fixture());
+ await expect(page.locator('#one .reader-tree-single-view[data-reader-section="intro"]')).toHaveAttribute('data-tab-view','standard');await expect(page.locator('#one .reader-tree-view[data-reader-section="story"]')).toHaveCount(2);
  await page.evaluate(()=>first.navigate({section:'story',view:'data'}));expect(await page.evaluate(()=>first.snapshot())).toMatchObject({section:'story',view:'data'});expect(await page.evaluate(()=>second.snapshot())).toMatchObject({section:'intro',view:'standard'});await expect(page.locator('#one #section-story .explore-board')).toBeVisible();await expect(page.locator('#two #section-intro')).toBeVisible();
  expect(await page.evaluate(()=>{try{first.navigate({section:'intro',view:'data'});return false;}catch{return true;}})).toBe(true);expect(await page.evaluate(()=>first.snapshot())).toMatchObject({section:'story',view:'data'});
  await page.evaluate(()=>first.navigate({section:'intro',view:'standard'}));await expect(page.locator('#one #section-intro')).toBeVisible();await page.evaluate(()=>{first.destroy();second.destroy();});await expect(page.locator('.explore-navigation')).toHaveCount(0);

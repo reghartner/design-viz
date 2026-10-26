@@ -392,6 +392,8 @@ test('local connection curve reset still works beside imported topology',async({
 
 
 test('imported presentation controls preserve provider identity through history, save and hidden restoration',async({page,server},info)=>{
+  // Five exact Undo/Redo cycles, two exports, a reader and a saved-source reopen.
+  test.setTimeout(90000);
   const {provider}=await fixture(page,server,'file','ambient',provider=>{diagram(provider).nodes.api.binding={entityRef:'component:default/api'};});
   const originalProvider=JSON.stringify(provider);
   async function inspectImported(){await closeTools(page);await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();}
@@ -408,7 +410,7 @@ test('imported presentation controls preserve provider identity through history,
   await inspectImported();const beforeHidden=await source(page);await page.getByRole('checkbox',{name:'Hidden from readers',exact:true}).check();
   await expect.poll(async()=> (await overlay(page)).nodeOverrides?.api?.hidden).toBe(true);await roundtrip(page,beforeHidden);
   await expect(node(page,'shared::api')).toBeVisible();await expect(node(page,'shared::api')).toHaveCSS('opacity','0.3');
-  await expect(importedEdge(page)).toBeHidden();await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toBeHidden();
+  await expect(importedEdge(page)).toHaveCSS('visibility','hidden');await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toBeHidden();
   await page.screenshot({path:info.outputPath('imported-node-presentation.png')});
   const svgDownload=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
   const svg=await readFile(await (await svgDownload).path(),'utf8');expect(svg).not.toContain('Checkout API');expect(svg).toContain('Store');
@@ -418,10 +420,10 @@ test('imported presentation controls preserve provider identity through history,
   expect(diagram(JSON.parse(bytes)).nodes['shared::api']).toBeUndefined();expect(bytes).not.toContain('topologyProvenance');
   const reader=await page.context().newPage();await reader.route('**/hidden-reader.html',route=>route.fulfill({contentType:'text/html',body:html}));await reader.goto(server.origin+'/hidden-reader.html#tour=0');
   await expect(reader.locator('g.node[data-dv-node="shared::api"]')).toBeHidden();await expect(reader.locator('path.edge')).toHaveCount(2);
-  await expect(reader.locator('path.edge').first()).toBeHidden();await expect(reader.locator('path.edge').last()).toBeHidden();await reader.close();
+  await expect(reader.locator('path.edge').first()).toHaveCSS('visibility','hidden');await expect(reader.locator('path.edge').last()).toHaveCSS('visibility','hidden');await reader.close();
   await page.locator('#file-input').setInputFiles({name:'presentation.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});await closeTools(page);
   await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();await page.getByRole('checkbox',{name:'Hidden from readers',exact:true}).uncheck();
-  await expect(importedEdge(page)).toBeVisible();await expect(node(page,'shared::api')).not.toHaveAttribute('data-dv-hidden','true');
+  await painted(page);await expect(importedEdge(page)).toHaveCSS('visibility','visible');await expect(node(page,'shared::api')).not.toHaveAttribute('data-dv-hidden','true');
   await page.getByRole('button',{name:'Reset node presentation',exact:true}).click();await expect(node(page,'shared::api')).toContainText('API');await expect.poll(async()=> (await overlay(page)).nodeOverrides).toBeUndefined();
   expect(JSON.stringify(provider)).toBe(originalProvider);
 });

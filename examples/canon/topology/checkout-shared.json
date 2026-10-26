@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Checkout shared boundary",
+    "canon": {
+      "version": 1,
+      "id": "checkout-shared",
+      "kind": "design",
+      "owner": "group:default/checkout"
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "heading": "Checkout shared boundary",
+        "diagram": {
+          "topologyImports": [
+            {
+              "spec": "platform",
+              "export": [
+                "entry",
+                "persistence"
+              ],
+              "as": "platform",
+              "position": {
+                "x": 200,
+                "y": 200
+              },
+              "nodeOverrides": {
+                "api": {
+                  "title": "Checkout API",
+                  "sub": "Shared service, checkout wording",
+                  "style": "moss"
+                }
+              },
+              "edgeOverrides": {
+                "api->store": {
+                  "label": "Save order"
+                }
+              }
+            }
+          ],
+          "topologyExports": {
+            "checkout": {
+              "nodes": [
+                "platform::api",
+                "platform::store"
+              ],
+              "edges": [
+                "platform::api->platform::store"
+              ]
+            }
+          },
+          "steps": [
+            {
+              "id": "persist",
+              "edge": "platform::api->platform::store",
+              "text": "The merged boundary preserves the provider connection between the two exports."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -379,7 +379,7 @@ function fragmentVisible(fragment, stepIdx, stepMode){
 }
 function fragmentAttrs(fragment){
   fragment = fragment || {};
-  var attrs = '';
+  var attrs = fragment.hidden===true?' data-dv-hidden="true"':'';
   if (validRevealIndex(fragment.revealAt) || validRevealIndex(fragment.hideAt)){
     attrs += ' data-dv-fragment=""';
     if (validRevealIndex(fragment.revealAt)) attrs += ' data-dv-reveal-at="' + fragment.revealAt + '"';
@@ -388,6 +388,7 @@ function fragmentAttrs(fragment){
   return attrs;
 }
 function markFragmentElement(el, fragment){
+  if(el && fragment && fragment.hidden===true)el.setAttribute('data-dv-hidden','true');
   if (!el || (!validRevealIndex(fragment && fragment.revealAt) &&
               !validRevealIndex(fragment && fragment.hideAt))) return;
   el.setAttribute('data-dv-fragment', '');
@@ -537,7 +538,7 @@ function settleCommunicationFailures(board){
 function showCommunicationFailures(board,failures,animate){
   Object.keys(failures || {}).forEach(function(key){
     var info = board.edgeIds[key], path = info && info.pathEl;
-    if (!path || path.classList.contains('dv-fragment-hidden')) return;
+    if (!path || info.e.hidden===true || path.classList.contains('dv-fragment-hidden')) return;
     var length = path.getTotalLength();
     if (!Number.isFinite(length) || length <= 0) return;
     var mode = failures[key], split = communicationBreak(length,mode), point = path.getPointAtLength(split.stop);
@@ -1034,6 +1035,9 @@ function boardContentBounds(svg){
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
+  // Visibility is presentation only: retain identities, layout and story data.
+  // Work on a private projection so hidden endpoints also hide edge decorations.
+  d=Object.assign({},d,{edges:(d.edges || []).map(function(edge){return (d.nodes[edge.from] || {}).hidden===true || (d.nodes[edge.to] || {}).hidden===true?Object.assign({},edge,{hidden:true}):edge;})});
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
   var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
@@ -1100,10 +1104,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var nodeStyle = NODE_STYLE_SET.indexOf(n.style) >= 0 ? n.style : null;
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
-    var nodeTitle = n.title || id;
+    var nodeTitle = n.title || id,hiddenAttrs=n.hidden===true?' data-dv-hidden="true"':'';
     if(isTextBoxNode(n)){
       var ts=textBoxStyle(n),tx=ts.align==='center'?p.w/2:ts.align==='right'?p.w-8:8;
-      s+='<g class="node node-text" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'" data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
+      s+='<g class="node node-text" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'"'+hiddenAttrs+' data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
         '<rect class="text-box-hit" width="'+p.w+'" height="'+p.h+'" fill="transparent" pointer-events="all"/>'+
         '<text xml:space="preserve" font-family="'+esc(ts.fontFamily)+'" font-size="'+ts.fontSize+'" font-weight="'+(ts.bold?'700':'400')+'" font-style="'+(ts.italic?'italic':'normal')+'" text-decoration="'+(ts.underline?'underline':'none')+'" fill="'+(ts.color || 'var(--dtext)')+'" text-anchor="'+({left:'start',center:'middle',right:'end'}[ts.align])+'">'+
         textBoxLines(n).map(function(line,i){return '<tspan x="'+tx+'" y="'+(8+ts.fontSize+i*ts.fontSize*1.25)+'">'+esc(line)+'</tspan>';}).join('')+'</text></g>';
@@ -1133,7 +1137,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
         '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
     }
-    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
+    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' + hiddenAttrs +
          (nodeStyle ? ' data-dv-style="' + nodeStyle + '"' : '') +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +

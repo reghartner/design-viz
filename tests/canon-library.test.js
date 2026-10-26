@@ -173,7 +173,7 @@ test('version 2 and 3 indexes validate metadata and URLs without embedding or mu
   assert.equal(context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],exports:undefined}]})[0].exports,undefined);
   const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs'),topology=path.join(__dirname,'../examples/canon/topology');
   const published=(await buildLibraryFromDirectory(topology)).diagrams;
-  assert.deepEqual(published.find(item=>item.id==='platform').exports,['core']);
+  assert.deepEqual(published.find(item=>item.id==='platform').exports,['core','entry','persistence']);
   assert.deepEqual(published.find(item=>item.id==='checkout').exports,[]);
   const original=structuredClone(spec);original.page.canon={id:'old',kind:'design'};
   const before=JSON.stringify(original),resolved=context.canonLibrarySpec(original,entry);

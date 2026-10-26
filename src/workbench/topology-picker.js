@@ -8,14 +8,16 @@ function initTopologyPicker(opts){
   var snapshot=null,loader=null,loaderKey=null,catalogContext=null,loaded=null,records=[],nodes=new Set(),edges=new Set(),invalid=false,generation=0,plan=null;
   function message(value){el('status').textContent=value || '';}
   function same(){var now=opts.context();return snapshot && !now.error && snapshot.project===now.project && snapshot.text===now.text && snapshot.section===now.section && snapshot.chapter===now.chapter;}
-  function selectedExport(){var record=records[Number(section.value)];return record && record.diagram.topologyExports[exportChoice.value];}
-  function reference(){return {spec:provider.value,export:exportChoice.value,as:namespace.value.trim(),nodes:Array.from(nodes),edges:Array.from(edges)};}
+  function selectedNames(){return Array.from(exportChoice.selectedOptions).map(function(option){return option.value;});}
+  function selectedExport(){var record=records[Number(section.value)],names=selectedNames();if(!record || !names.length)return null;var provider=FlowCanon.sections(loaded.resolved)[record.resolvedIndex].diagram;return names.length===1?record.diagram.topologyExports[names[0]]:FlowTopology.mergeExports(Object.assign({},provider,{topologyExports:record.diagram.topologyExports}),names);}
+  function reference(){return {spec:provider.value,export:selectedNames().length===1?selectedNames()[0]:selectedNames(),as:namespace.value.trim(),nodes:Array.from(nodes),edges:Array.from(edges)};}
   function refresh(){
     if(!dialog.open)return;
     if(!same())invalid=true;
     plan=null;el('add').disabled=true;
     if(invalid){message('The source or project changed, or its destination changed. Close and reopen the picker.');return;}
-    if(!loaded || !selectedExport())return;
+    if(!loaded)return;
+    if(!selectedExport()){message('Choose at least one named export.');return;}
     var ref=reference(),exp=selectedExport();
     // Select-all uses the stable full-export shorthand, not an accidental pin.
     if(exp.nodes.length===nodes.size && exp.edges.length===edges.size){delete ref.nodes;delete ref.edges;}
@@ -24,7 +26,7 @@ function initTopologyPicker(opts){
     el('add').disabled=!!plan.error;
   }
   function options(select,items){
-    select.replaceChildren();items.forEach(function(item){var option=doc.createElement('option');option.value=item.value;option.textContent=item.label;select.appendChild(option);});
+    select.replaceChildren();items.forEach(function(item){var option=doc.createElement('option');option.value=item.value;option.textContent=item.label;select.appendChild(option);if(select.multiple && select.options.length===1)option.selected=true;});
   }
   function contents(){
     var exp=selectedExport();el('nodes').replaceChildren();el('edges').replaceChildren();

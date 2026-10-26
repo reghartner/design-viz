@@ -1,1 +1,29 @@
-{"version":1,"diagrams":[{"id":"platform","path":"platform.json"},{"id":"checkout","path":"checkout.json"},{"id":"checkout-positioned","path":"checkout-positioned.json"},{"id":"checkout-subset","path":"checkout-subset.json"}]}
+{
+  "version": 1,
+  "diagrams": [
+    {
+      "id": "platform",
+      "path": "platform.json"
+    },
+    {
+      "id": "checkout",
+      "path": "checkout.json"
+    },
+    {
+      "id": "checkout-positioned",
+      "path": "checkout-positioned.json"
+    },
+    {
+      "id": "checkout-subset",
+      "path": "checkout-subset.json"
+    },
+    {
+      "id": "checkout-shared",
+      "path": "checkout-shared.json"
+    },
+    {
+      "id": "checkout-nested",
+      "path": "checkout-nested.json"
+    }
+  ]
+}

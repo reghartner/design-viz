@@ -1,4 +1,5 @@
-import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
+import {readFile} from 'node:fs/promises';
+import {projectFiles,projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,closeTools,pastePage} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
 
@@ -387,4 +388,53 @@ test('local connection curve reset still works beside imported topology',async({
   await page.getByRole('button',{name:'Reset curve',exact:true}).click();
   await expect.poll(async()=>diagram(JSON.parse(await source(page))).edges[0].curvePoints).toBeUndefined();await roundtrip(page,before);
   expect((await overlay(page)).edgeOverrides).toBeUndefined();
+});
+
+
+test('imported presentation controls preserve provider identity through history, save and hidden restoration',async({page,server},info)=>{
+  const {provider}=await fixture(page,server,'file','ambient',provider=>{diagram(provider).nodes.api.binding={entityRef:'component:default/api'};});
+  const originalProvider=JSON.stringify(provider);
+  async function inspectImported(){await closeTools(page);await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();}
+  await inspectImported();
+  for(const [name,value,field] of [['Display name','Checkout API','title'],['Display subtitle','This flow only','sub']]){
+    await inspectImported();const before=await source(page),control=page.getByRole('textbox',{name,exact:true});await control.fill(value);await control.press('Enter');
+    await expect.poll(async()=> (await overlay(page)).nodeOverrides?.api?.[field]).toBe(value);await roundtrip(page,before);
+  }
+  await inspectImported();const beforeTint=await source(page);await page.getByRole('combobox',{name:'Icon color',exact:true}).selectOption('data');
+  await expect.poll(async()=> (await overlay(page)).nodeOverrides?.api?.tint).toBe('data');await roundtrip(page,beforeTint);
+  await expect(node(page,'shared::api')).toContainText('Checkout API');await expect(node(page,'shared::api')).toHaveClass(/tint-data/);
+  await inspectImported();const beforeStyle=await source(page);await page.locator('#guide .node-style-browse').click();await page.locator('.node-style-tile[data-style-id="moss"]').click();
+  await expect.poll(async()=> (await overlay(page)).nodeOverrides?.api?.style).toBe('moss');await roundtrip(page,beforeStyle);await expect(node(page,'shared::api')).toHaveClass(/ns-moss/);
+  await inspectImported();const beforeHidden=await source(page);await page.getByRole('checkbox',{name:'Hidden from readers',exact:true}).check();
+  await expect.poll(async()=> (await overlay(page)).nodeOverrides?.api?.hidden).toBe(true);await roundtrip(page,beforeHidden);
+  await expect(node(page,'shared::api')).toBeVisible();await expect(node(page,'shared::api')).toHaveCSS('opacity','0.3');
+  await expect(importedEdge(page)).toBeHidden();await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toBeHidden();
+  await page.screenshot({path:info.outputPath('imported-node-presentation.png')});
+  const svgDownload=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
+  const svg=await readFile(await (await svgDownload).path(),'utf8');expect(svg).not.toContain('Checkout API');expect(svg).toContain('Store');
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await download),bytes=Object.entries(files).find(([name])=>name.endsWith('.spec.json'))[1];
+  const html=Object.entries(files).find(([name])=>name.endsWith('.html'))[1];
+  expect(diagram(JSON.parse(bytes)).nodes['shared::api']).toBeUndefined();expect(bytes).not.toContain('topologyProvenance');
+  const reader=await page.context().newPage();await reader.route('**/hidden-reader.html',route=>route.fulfill({contentType:'text/html',body:html}));await reader.goto(server.origin+'/hidden-reader.html#tour=0');
+  await expect(reader.locator('g.node[data-dv-node="shared::api"]')).toBeHidden();await expect(reader.locator('path.edge')).toHaveCount(2);
+  await expect(reader.locator('path.edge').first()).toBeHidden();await expect(reader.locator('path.edge').last()).toBeHidden();await reader.close();
+  await page.locator('#file-input').setInputFiles({name:'presentation.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});await closeTools(page);
+  await node(page,'shared::api').click();await page.locator('#editor-tab-inspect').click();await page.getByRole('checkbox',{name:'Hidden from readers',exact:true}).uncheck();
+  await expect(importedEdge(page)).toBeVisible();await expect(node(page,'shared::api')).not.toHaveAttribute('data-dv-hidden','true');
+  await page.getByRole('button',{name:'Reset node presentation',exact:true}).click();await expect(node(page,'shared::api')).toContainText('API');await expect.poll(async()=> (await overlay(page)).nodeOverrides).toBeUndefined();
+  expect(JSON.stringify(provider)).toBe(originalProvider);
+});
+
+test('imported display label control saves only its overlay and resets without changing layout',async({page,server},info)=>{
+  await fixture(page,server,'file','ambient',(_,consumer)=>{diagram(consumer).topologyImports[0].edgeOverrides={'api->store':{labelDx:25}};});
+  const before=await source(page);await importedEdge(page).dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  const label=page.getByRole('textbox',{name:'Display label',exact:true});await label.fill('Commit checkout');await label.press('Enter');
+  await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']).toEqual({labelDx:25,label:'Commit checkout'});await roundtrip(page,before);
+  await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toContainText('Commit checkout');
+  await page.screenshot({path:info.outputPath('imported-display-label.png')});
+  await closeTools(page);await importedEdge(page).dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  const resetBefore=await source(page);await page.getByRole('button',{name:'Reset imported display label',exact:true}).click();
+  await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']).toEqual({labelDx:25});await roundtrip(page,resetBefore);
+  await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toContainText('Persist');
 });

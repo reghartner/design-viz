@@ -66,7 +66,7 @@ test('materializes closed, namespaced topology with consumer narrative and bindi
   assert.deepEqual(out.map(s=>C.validateSpec(s).errors),[[],[]]);
 });
 test('removed exported node referenced by consumer edge fails with consumer/import/export/identity',()=>{
-  const specs=source(),d=diagram(specs[0]);delete d.nodes.api;d.rows=[['store']];d.edges=[];d.topologyExports.core={nodes:['store'],edges:[]};
+  const specs=source(),d=diagram(specs[0]);delete d.nodes.api;d.rows=[['store']];d.edges=[];d.topologyExports={core:{nodes:['store'],edges:[]}};
   assert.throws(()=>resolve(specs),/checkout.*import platform.*platform export core.*missing node platform::api/);
 });
 test('float-only exported fragments preserve relative coordinates without importing the provider row anchor',()=>{

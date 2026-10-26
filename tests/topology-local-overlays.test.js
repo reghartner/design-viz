@@ -40,7 +40,7 @@ test('resolved imported edge index writes only geometry overlay, alternate curve
 });
 test('overlay planners reject stale source, wrong identity, snapshots, unknown fields and malformed geometry',()=>{
   const f=fixtures(),t=JSON.stringify(f.source),key='shared::api->shared::store';
-  for(const patch of [{from:'other'},{kind:'rpc'},{label:'changed'},{labelDx:Infinity},{labelAt:2},{fromPort:{side:'top',offset:.5,extra:true}},{curvePoints:[{t:.5,dx:NaN,dy:0}]}])assert.ok(c.planEdgeLayout(t,f.source,0,1,key,patch,f.context).error);
+  for(const patch of [{from:'other'},{kind:'rpc'},{label:42},{labelDx:Infinity},{labelAt:2},{fromPort:{side:'top',offset:.5,extra:true}},{curvePoints:[{t:.5,dx:NaN,dy:0}]}])assert.ok(c.planEdgeLayout(t,f.source,0,1,key,patch,f.context).error);
   assert.match(c.planEdgeLayout(t+' ',{...f.source,extra:1},0,1,key,{labelDx:1},f.context).error,/source changed/);
   assert.match(c.planEdgeLayout(t,f.source,0,0,key,{labelDx:1},f.context).error,/connection changed/);
   const snapshot=c.FlowTopology.resolveSource(f.source,f.context);
@@ -75,4 +75,39 @@ test('provider refresh retains local additions and only masks explicitly overrid
   const effective=d(c.FlowTopology.resolveSource(f.source,f.context));
   assert.deepEqual(plain(effective.nodes['shared::api'].codeRefs),[ref('new-inherited'),ref('local')]);assert.equal(effective.edges[1].labelDx,44);assert.equal(effective.edges[1].labelDy,17);assert.equal(effective.edges[1].curveControls,undefined);
   d(f.provider).topologyExports.core.edges=[];assert.throws(()=>c.FlowTopology.resolveSource(f.source,f.context),/edgeOverrides identity/);
+});
+
+test('presentation overlays preserve semantic metadata and source, reset independently from geometry',()=>{
+  const f=fixtures(),before=plain(f.context);d(f.provider).nodes.api.binding={entityRef:'component:default/api'};d(f.provider).nodes.api.status='decided';d(f.provider).nodes.api.link='https://example.com/api';
+  const patch={title:'Checkout API',sub:'Consumer wording',style:'moss',tint:'data',hidden:true};
+  const changed=apply(f,(t,r)=>c.planTopologyNodeOverride(t,r,0,'shared::api',patch,f.context));
+  const effective=d(c.FlowTopology.resolveSource(changed,f.context)).nodes['shared::api'];
+  for(const [key,value] of Object.entries(patch))assert.equal(effective[key],value);
+  assert.deepEqual(plain(effective.binding),d(f.provider).nodes.api.binding);assert.equal(effective.status,'decided');assert.equal(effective.link,'https://example.com/api');
+  assert.deepEqual(plain(effective.codeRefs),[ref('inherited')]);assert.equal(d(changed).nodes['shared::api'],undefined);
+  const cleared=apply({...f,source:changed},(t,r)=>c.planTopologyNodeOverride(t,r,0,'shared::api',null,f.context));
+  assert.equal(d(c.FlowTopology.resolveSource(cleared,f.context)).nodes['shared::api'].title,'API');
+  let label=apply(f,(t,r)=>c.planEdgeLayout(t,r,0,1,'shared::api->shared::store',{label:'Save checkout',labelDx:22},f.context));
+  label=apply({...f,source:label},(t,r)=>c.planResetTopologyEdgeLayout(t,r,0,1,'shared::api->shared::store',f.context));
+  assert.deepEqual(d(label).topologyImports[0].edgeOverrides,{'api->store':{label:'Save checkout'}});
+  label=apply({...f,source:label},(t,r)=>c.planResetTopologyEdgeLabel(t,r,0,1,'shared::api->shared::store',f.context));
+  assert.equal(d(label).topologyImports[0].edgeOverrides,undefined);
+  assert.equal(d(f.provider).nodes.api.title,'API');assert.deepEqual(d(f.source),d(before.specs[1]));
+});
+test('presentation override shapes, semantic fields, stale identities and scalar types are rejected',()=>{
+  const f=fixtures(),text=JSON.stringify(f.source);
+  for(const patch of [{id:'x'},{group:'g'},{binding:{}},{codeRefs:[]},{icon:'gear'},{hidden:'true'},{title:3},{sub:{}},{style:'invalid'},{tint:'red'},{presentation:'invalid'},[]]){
+    assert.ok(c.planTopologyNodeOverride(text,f.source,0,'shared::api',patch,f.context).error,JSON.stringify(patch));
+  }
+  for(const overrides of [{missing:{title:'Lost'}},[],{api:[]},{api:{unknown:true}}]){
+    const source=plain(f.source);d(source).topologyImports[0].nodeOverrides=overrides;
+    assert.throws(()=>c.FlowTopology.resolveSource(source,f.context),/nodeOverrides|expected an object/);
+  }
+  const source=plain(f.source);d(source).topologyImports[0].nodeOverrides={api:{title:null,sub:null,hidden:false}};
+  assert.equal(d(c.FlowTopology.resolveSource(source,f.context)).nodes['shared::api'].title,undefined);
+  assert.match(c.planTopologyNodeOverride(text,{...f.source,x:1},0,'shared::api',{title:'x'},f.context).error,/source changed/);
+});
+test('baseline import presentation lowers onto members and permits per-node inheritance suppression',()=>{
+  const f=fixtures();d(f.source).topologyImports[0].presentation='baseline';d(f.source).topologyImports[0].nodeOverrides={api:{presentation:null}};
+  const effective=d(c.FlowTopology.resolveSource(f.source,f.context));assert.equal(effective.nodes['shared::api'].presentation,undefined);assert.equal(effective.nodes['shared::store'].presentation,'baseline');assert.equal(effective.edges[1].presentation,'baseline');
 });

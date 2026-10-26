@@ -12,7 +12,11 @@
         "groups": {"backend":{"label":"Platform"}},
         "rows": [["api", "store"]],
         "edges": [{"from":"api", "to":"store", "kind":"https", "label":"Persist"}],
-        "topologyExports": {"core":{"nodes":["api","store"], "edges":["api->store"]}}
+        "topologyExports": {
+          "core":{"nodes":["api","store"], "edges":["api->store"]},
+          "entry":{"nodes":["api"], "edges":[]},
+          "persistence":{"nodes":["store"], "edges":[]}
+        }
       }
     }]
   }

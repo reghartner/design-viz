@@ -35,9 +35,10 @@ function providerSpec(){
     {id:'archive',heading:'Archive section',diagram:{nodes:{archive:{title:'Archive'}},rows:[['archive']],edges:[],topologyExports:{archive:{nodes:['archive'],edges:[]}}}}
   ]}};
 }
-async function pickerFixture(page,server){
+async function pickerFixture(page,server,configure){
   const fixture=await publish(server);
   fixture.provider=providerSpec();
+  if(configure)configure(fixture.provider);
   await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.provider));
   fixture.specs.second.page.blocks.push({id:'destination',heading:'Another destination',diagram:{nodes:{local:{title:'Second local'}},rows:[['local']],edges:[]}});
   await writeFile(path.join(fixture.root,'diagrams/second/second.spec.json'),JSON.stringify(fixture.specs.second));
@@ -1038,4 +1039,22 @@ test('Browse diagrams searches published content across tabs and panels with fac
   await page.getByLabel('Topic',{exact:true}).selectOption('billing');await expect(count).toHaveText('0 of 2 diagrams');
   await page.locator('#welcome-library-clear').click();await expect(count).toHaveText('2 of 2 diagrams');
   expect(requests).toEqual([]);
+});
+
+
+test('reference picker combines same-section exports with crossing connections and exact Undo',async({page,server},info)=>{
+  await pickerFixture(page,server,provider=>{
+    provider.page.sections[0].diagram.topologyExports={dispatch:{nodes:['dispatch'],edges:[]},channels:{nodes:['push','email','sms'],edges:[]}};
+  });
+  const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-export').selectOption(['dispatch','channels']);
+  await expect(page.locator('#topology-nodes input')).toHaveCount(4);await expect(page.locator('#topology-edges input')).toHaveCount(3);
+  await page.locator('#topology-namespace').fill('merged');await page.screenshot({path:info.outputPath('merged-export-picker.png')});
+  await page.locator('#topology-add').click();
+  const after=await page.locator('#src').inputValue(),imp=JSON.parse(after).page.blocks[0].diagram.topologyImports[0];
+  expect(imp).toEqual({spec:'first',export:['dispatch','channels'],as:'merged'});
+  await expect(page.locator('#docview g.node[data-dv-node="merged::dispatch"]')).toHaveCount(1);
+  await expect(page.locator('#docview path.edge')).toHaveCount(4);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+  await page.reload();await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#docview path.edge')).toHaveCount(4);
 });

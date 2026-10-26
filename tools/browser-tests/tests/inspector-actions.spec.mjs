@@ -82,7 +82,7 @@ test('node inspector keeps ordinary edits clear and expert source data in Advanc
   const original=await start(page,server,raw),guide=page.locator('#guide'),src=page.locator('#src');
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
   await expect(guide.locator('.inspector-title')).toHaveText('Node · '+long);
-  await expect(guide.locator('.iform>.frow>.flab')).toHaveText(['Name','Subtitle','Icon','Node style','Placement','Group','Keep position fixed','Link','Show change marker']);
+  await expect(guide.locator('.iform>.frow>.flab')).toHaveText(['Name','Subtitle','Icon','Node style','Placement','Review status','Baseline context','Group','Keep position fixed','Link','Show change marker']);
   const advanced=guide.locator('.node-advanced');await expect(advanced).not.toHaveAttribute('open');
   await expect(src).toHaveValue(original);
   const color=guide.getByLabel('Icon color',{exact:true});

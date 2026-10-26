@@ -20,7 +20,7 @@ async function expectTabReachable(page,locator,label,limit=30){
   const visited=[];
   for(let i=0;i<limit;i++){
     await page.keyboard.press('Tab');
-    if(await locator.evaluate(el=>document.activeElement===el))return;
+    if(await locator.evaluate(el=>document.activeElement===el)){await expectCenterHit(locator,label+' after Tab');return;}
     visited.push(await page.evaluate(()=>document.activeElement && (document.activeElement.id || document.activeElement.getAttribute('aria-label') || document.activeElement.tagName)));
   }
   expect(await locator.evaluate(el=>document.activeElement===el),label+' is reachable with Tab; visited '+visited.join(', ')).toBe(true);
@@ -124,15 +124,26 @@ test('Steps opens on rows and preserves the list while filtering, inspecting and
     return {listHeight:list.height,paneScrollHeight:pane.scrollHeight,paneClientHeight:pane.clientHeight};
   });
   expect(expanded.listHeight).toBeGreaterThanOrEqual(120);expect(expanded.paneScrollHeight).toBeLessThanOrEqual(expanded.paneClientHeight+1);
-  const expandedControls=['steps-path-label','steps-path-color','steps-path-save','steps-path-remove','steps-add','steps-duplicate','steps-fork','steps-inspect'];
-  for(const id of expandedControls)await expectCenterHit(page.locator('#'+id),id+' with Path settings expanded');
+  const expandedControls=['steps-path-label','steps-path-color','steps-path-base','steps-path-save','steps-path-remove'];
+  for(const id of expandedControls){await page.locator('#'+id).scrollIntoViewIfNeeded();await expectCenterHit(page.locator('#'+id),id+' with Path settings expanded');}
+  for(const id of ['steps-add','steps-duplicate','steps-fork','steps-inspect'])await expectCenterHit(page.locator('#'+id),id+' with Path settings expanded');
   await expectCenterHit(more,'More step actions with Path settings expanded');
   const pathLabel=page.locator('#steps-path-label'),pathColor=page.locator('#steps-path-color'),pathSave=page.locator('#steps-path-save'),pathRemove=page.locator('#steps-path-remove');
   await expectTabReachable(page,pathLabel,'Path label');await expectTabReachable(page,pathColor,'Path color');
+  await expectTabReachable(page,page.locator('#steps-path-base'),'Compare path with');
   await expectTabReachable(page,pathSave,'Update path');await expectTabReachable(page,pathRemove,'Remove alternate');
   for(const id of ['steps-add','steps-duplicate','steps-fork','steps-inspect'])await expectTabReachable(page,page.locator('#'+id),id);
   await expectTabReachable(page,more,'More step actions');
   await testInfo.attach('steps-alternate-path-settings',{body:await win.screenshot(),contentType:'image/png'});
+  const playback=page.locator('.playback-settings');await playback.locator('summary').scrollIntoViewIfNeeded();await playback.locator('summary').click();
+  await expect(playback).toHaveAttribute('open','');
+  for(const id of ['steps-opening-view','steps-show-ids','steps-autoplay',...expandedControls]){
+    await page.locator('#'+id).scrollIntoViewIfNeeded();await expectCenterHit(page.locator('#'+id),id+' with both settings expanded');
+  }
+  expect((await list.boundingBox()).height).toBeGreaterThanOrEqual(120);
+  for(const id of ['steps-add','steps-duplicate','steps-fork','steps-inspect'])await expectCenterHit(page.locator('#'+id),id+' with both settings expanded');
+  await expectCenterHit(more,'More step actions with both settings expanded');
+  await testInfo.attach('steps-both-settings-1280x720',{body:await win.screenshot(),contentType:'image/png'});
   await page.setViewportSize({width:1440,height:900});await page.locator('#editor-tab-file').click();
   await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-reset').click();await page.locator('#workspace-window-file .workspace-window-close').click();
   await expect(list.locator('.story-step')).toHaveCount(5);expect((await win.boundingBox()).height).toBeGreaterThan(600);

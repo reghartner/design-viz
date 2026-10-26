@@ -1717,4 +1717,4 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 #docview [data-dv-para]:focus-visible,#docview [data-dv-bullet-path]:focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
 
 /* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */
-body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3;}
+body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3!important;}

@@ -2,7 +2,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const commandContext=require('./workbench-command-context.cjs');
-const c={URL};vm.createContext(c);vm.runInContext(readSource('validator.js')+'\n'+readSource('engine.js'),c);
+const reviewImports=require('./fixtures/design-review-imports.cjs');
+const c={URL};vm.createContext(c);vm.runInContext(readSource('canon.js')+'\n'+readSource('validator.js')+'\n'+readSource('engine.js'),c);
 const fixture=()=>structuredClone(require('../examples/design-review/design-review.spec.json'));
 const diagram=spec=>spec.page.sections[0].diagram;
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -84,4 +85,16 @@ test('Home device positions carry independently, invalid partial pairs do not mo
   const warnings=[];c.homemapPatchWarnings({gateway:{x:'bad',y:'bad'}},'patch',{devices:{gateway:panel.devices[0]},subjects:{}},warnings);assert.equal(warnings.length,1);
   const outside=c.homemapModel(panel,{gateway:{x:400,y:-12}});assert.equal(outside.devices[0].x,320);assert.equal(outside.devices[0].y,0);
   assert.equal(JSON.stringify(spec,null,2),source);
+});
+test('merged export arrays resolve baseline unions and nested closure without mutating providers',()=>{
+  const raw=reviewImports(),before=JSON.stringify(raw),effective=c.FlowTopology.materialize(raw),d=diagram(effective[0]);
+  assert.deepEqual(Object.keys(d.nodes),['local','shared::base::api','shared::base::store','shared::base::old']);
+  assert.equal(d.edges.length,3);effective.forEach(spec=>assert.deepEqual(plain(c.validate(c.normalize(spec)).errors),[]));
+  for(const id of ['api','store','old'])assert.equal(d.nodes['shared::base::'+id].presentation,'baseline');
+  assert.equal(d.nodes['shared::base::store'].status,'decided');assert.equal(d.nodes['shared::base::old'].hidden,true);
+  assert.equal(d.nodes['shared::base::api'].title,'Event intake service');assert.equal(c.layout(d).pos['shared::base::api'].h,58);
+  assert.equal(c.reviewEdgeBaseline(d,d.edges[0]),false);for(const edge of d.edges.slice(1))assert.equal(c.reviewEdgeBaseline(d,edge),true);
+  assert.equal(JSON.stringify(raw),before);
+  const incomplete=reviewImports();diagram(incomplete[1]).topologyExports.storage.nodes=['base::store'];
+  assert.throws(()=>c.FlowTopology.materialize(incomplete),/endpoint|closed|closure/);
 });

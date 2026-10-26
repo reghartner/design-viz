@@ -1,8 +1,11 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
+import reviewImports from '../../../tests/fixtures/design-review-imports.cjs';
+import C from '../../canon/core.cjs';
+import {digest} from '../../canon/drift.mjs';
 const source=await readFile(path.join(repo,'examples/design-review/design-review.spec.json'),'utf8');
 const diagram=s=>s.page.sections[0].diagram;
 const chip=(root,index)=>root.locator('.schip[data-step-source="'+index+'"]').first();
@@ -75,4 +78,34 @@ test('desktop author can change review controls and move a Home device at one st
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
   await page.locator('#steps-list [data-step-index="3"]').click();
   await page.screenshot({path:testInfo.outputPath('review-home-editor.png')});
+});
+
+test('merged nested import unions keep baseline paint, hidden exports and desktop restoration',async({page,server},info)=>{
+  const raw=reviewImports(),source=JSON.stringify(raw[0],null,2),prefix='shared::base::';
+  const node=(root,id)=>root.locator('.node[data-dv-node="'+prefix+id+'"]');
+  let root=await standalone(page,server,C.materializeTopology(raw)[0]);await page.mouse.move(0,0);
+  await expect(node(root,'api')).toBeVisible();await expect(node(root,'api')).toHaveCSS('opacity','0.55');
+  await expect(node(root,'store').locator('.node-review-badge')).toContainText('Decided');
+  await expect(node(root,'old')).toBeHidden();
+  const board=node(root,'api').locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," board ")][1]');
+  await expect(board.locator('path.edge[data-dv-edge="1"]')).toHaveCSS('opacity','0.55');
+  await expect(board.locator('path.edge[data-dv-edge="2"]')).toHaveCSS('visibility','hidden');
+  const geometry=await node(root,'api').evaluate(n=>{const title=n.querySelector('.t1'),sub=n.querySelector('.t2');return {title:title.textContent,lines:title.querySelectorAll('tspan').length,titleBottom:title.getBBox().y+title.getBBox().height,subTop:sub.getBBox().y,subBottom:sub.getBBox().y+sub.getBBox().height,height:+n.querySelector('.card').getAttribute('height')};});
+  expect(geometry.title).toBe('Event intake service');expect(geometry.lines).toBe(2);expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.subTop);expect(geometry.subBottom).toBeLessThan(geometry.height);
+  await page.screenshot({path:info.outputPath('merged-import-reader.png')});
+  await page.emulateMedia({media:'print'});await expect(node(root,'api')).toHaveCSS('opacity','0.55');await expect(board.locator('path.edge[data-dv-edge="1"]')).toHaveCSS('opacity','0.55');await expect(node(root,'old')).toBeHidden();
+  const catalog={version:3,diagrams:raw.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:3,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
+  await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+  for(const spec of raw)await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
+  await page.emulateMedia({media:'screen'});await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(source)});await expect(page.locator('#src')).toHaveValue(source);await closeTools(page);root=page.locator('#docview');
+  await expect(node(root,'old')).toBeVisible();await expect(node(root,'old')).toHaveCSS('opacity','0.3');
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
+  const svg=await readFile(await (await download).path(),'utf8');expect(svg).not.toContain('Hidden audit storage');expect(svg).toContain('Event intake service');
+  await closeTools(page);await node(root,'old').click();await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('checkbox',{name:'Hidden from readers',exact:true}).uncheck();
+  const edited=JSON.parse(await page.locator('#src').inputValue());expect(diagram(edited).topologyImports[0].nodeOverrides['base::old'].hidden).toBe(false);expect(diagram(edited).nodes).toEqual(diagram(raw[0]).nodes);
+  await expect(node(root,'old')).not.toHaveAttribute('data-dv-hidden','true');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(node(root,'old')).toHaveCSS('opacity','0.3');
+  await page.screenshot({path:info.outputPath('merged-import-recovery.png')});
 });

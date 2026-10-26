@@ -218,6 +218,10 @@ function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
       if(!metadata || typeof metadata.label!=='string' || !metadata.label.trim() || !isHex(metadata.color))
         return {error:'Give the path a label and a hex color.'};
       p.label=metadata.label.trim();p.color=metadata.color;
+      if(Object.prototype.hasOwnProperty.call(metadata,'basedOn')){
+        if(metadata.basedOn==='')delete p.basedOn;
+        else p.basedOn=metadata.basedOn;
+      }
       if(at<0) resultIndex=steps.findIndex(function(s){return s.id===p.steps[0];});
     } else if(action === 'remove'){
       if(d.paths.length<2 || d.paths[0]===p) return {error:'Keep the primary path; remove an alternate instead.'};

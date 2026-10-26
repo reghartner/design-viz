@@ -163,6 +163,16 @@ function validatePaths(d, path, errors){
       seen.add(id);
     });
   });
+  d.paths.forEach(function(p,i){
+    if(!p || typeof p!=='object' || Array.isArray(p) || p.basedOn===undefined)return;
+    var at=path+'.paths['+i+'].basedOn';
+    if(typeof p.basedOn!=='string' || !pathIds.has(p.basedOn)){errors.push(at+': must reference an existing path ID');return;}
+    var seen=new Set([p.id]),next=p;
+    while(next && next.basedOn!==undefined){
+      if(seen.has(next.basedOn)){errors.push(at+': comparison paths cannot form a cycle');break;}
+      seen.add(next.basedOn);next=d.paths.find(function(candidate){return candidate && candidate.id===next.basedOn;});
+    }
+  });
 }
 
 function sectionLayoutProfileWarnings(d, v, path, warnings){
@@ -335,6 +345,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   sectionLayoutWarnings(d, DP, warnings);
   if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
     warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
+  if(d.showStepIds!==undefined && typeof d.showStepIds!=='boolean')errors.push(DP+'.showStepIds: expected true or false');
   if (d.primaryPanel !== undefined) warnings.push(DP + '.primaryPanel: retired; use tools/migrate-panel-views.cjs to preserve the old presentations as explicit arrangements');
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
@@ -387,6 +398,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    reviewMetadataErrors(n, DP+'.nodes.'+id, errors);
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
@@ -409,6 +421,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    reviewMetadataErrors(e, EP, errors);
     if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
@@ -456,6 +469,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
     deltaWarnings(st, DP + '.steps[' + ti + ']', warnings);
+    if(st.verdict!==undefined && (typeof st.verdict!=='string' || !Object.prototype.hasOwnProperty.call(STEP_VERDICTS,st.verdict)))errors.push(DP+'.steps['+ti+'].verdict: use keep, replace, or open');
+    if(st.ref!==undefined && typeof st.ref!=='string')errors.push(DP+'.steps['+ti+'].ref: expected text');
     if(st && st.color!=null && !stepCircleColor(st))
       warnings.push(DP+'.steps['+ti+'].color: use #RGB or #RRGGBB for the step circles — using the default');
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')

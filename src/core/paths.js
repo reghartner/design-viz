@@ -57,7 +57,7 @@ function diagramPathList(d){
       p.steps.every(function(id){ return byId.has(id); });
   }).map(function(p,i){
     return {id:p.id, label:p.label || (i ? p.id : 'Happy path'), color:isHex(p.color) ? p.color : colors[i % colors.length],
-      indices:p.steps.map(function(id){ return byId.get(id); })};
+      basedOn:typeof p.basedOn==='string'?p.basedOn:null, indices:p.steps.map(function(id){ return byId.get(id); })};
   }) : [];
   return paths.length ? paths : [{id:'happy',label:'Happy path',color:colors[0],indices:steps.map(function(s,i){return i;})}];
 }

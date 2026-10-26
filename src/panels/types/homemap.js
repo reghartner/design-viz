@@ -31,6 +31,7 @@ function homemapDevicePatchValid(kind, value) {
         : k === 'thermal' ? HOMEMAP_THERMAL.indexOf(value[k]) >= 0
         : k === 'spotlight' ? HOMEMAP_SPOTLIGHT.indexOf(value[k]) >= 0
         : k === 'icon' ? homemapIconValid(value[k])
+        : k === 'x' || k === 'y' ? homemapSubjectPosition(value)
         : k === 'audio' && homemapAudioValid(value[k]);
     })
   );
@@ -139,7 +140,11 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
     } else {
       var vocab = HOMEMAP_STATES[devices[k].kind];
       if (panelObject(obj[k])) {
+        var hasPosition=Object.prototype.hasOwnProperty.call(obj[k],'x') || Object.prototype.hasOwnProperty.call(obj[k],'y');
+        if(hasPosition && !homemapSubjectPosition(obj[k]))warnings.push(path + '.' + k + ': device position needs finite x and y — position ignored');
+        else if(hasPosition && (obj[k].x<0 || obj[k].x>320 || obj[k].y<0 || obj[k].y>180))warnings.push(path + '.' + k + ': device position outside x 0–320, y 0–180 — clamped to the map frame');
         Object.keys(obj[k]).forEach(function (field) {
+          if (field === 'x' || field === 'y') return;
           if (field === 'audio') {
             FlowAudio.clean(obj[k].audio, path + '.' + k + '.audio', warnings);
             return;
@@ -326,6 +331,7 @@ function foldHomemapStates(panel, steps) {
           var allowed = field === 'state' ? HOMEMAP_STATES[devices[k].kind] : field === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
           if (allowed.indexOf(update[field]) >= 0) next[field] = update[field];
         });
+        if (homemapSubjectPosition(update)) { next.x=update.x;next.y=update.y; }
         if (Object.prototype.hasOwnProperty.call(update, 'audio')) {
           var audio = FlowAudio.clean(update.audio);
           if (audio !== undefined) next.audio = audio;
@@ -394,10 +400,11 @@ function homemapModel(panel, state) {
     seen[d.id] = true;
     if (!homemapDeviceValid(d)) return;
     var vocab = HOMEMAP_STATES[d.kind];
-    var x = clamp(d.x, 0, 320),
-      y = clamp(d.y, 0, 180);
-    var floorDoor = d.kind === 'entry' && d.display === 'door';
     var devicePatch = Object.prototype.hasOwnProperty.call(state, d.id) ? state[d.id] : undefined;
+    var position = homemapSubjectPosition(devicePatch) ? devicePatch : d;
+    var x = clamp(position.x, 0, 320),
+      y = clamp(position.y, 0, 180);
+    var floorDoor = d.kind === 'entry' && d.display === 'door';
     var operating = panelObject(devicePatch) ? devicePatch.state : devicePatch;
     var facing =
       fin(d.facing) != null
@@ -1580,7 +1587,7 @@ function planHomemapDeviceAttribute(
   attribute,
   value
 ) {
-  if (['state', 'thermal', 'spotlight', 'audio', 'icon'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
+  if (['state', 'thermal', 'spotlight', 'audio', 'icon', 'position'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
   var got =
     stepIdx === null
       ? builderDiagram(text, raw, sectionIdx)
@@ -1597,7 +1604,7 @@ function planHomemapDeviceAttribute(
   var subject = homemapSubjects(panel).find(function (sub) { return sub.id === key; });
   if (!device && !(subject && ['audio','icon'].indexOf(attribute) >= 0)) return { error: 'Device or subject not found.' };
   var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : attribute === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
-  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : attribute === 'icon' ? !homemapIconValid(value) : allowed.indexOf(value) < 0))
+  if (value !== undefined && (attribute === 'position' ? !homemapSubjectPosition(value) : attribute === 'audio' ? !homemapAudioValid(value) : attribute === 'icon' ? !homemapIconValid(value) : allowed.indexOf(value) < 0))
     return { error: 'Choose a valid ' + attribute + '.' };
   var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
   var current = patch && patch[key];
@@ -1608,7 +1615,10 @@ function planHomemapDeviceAttribute(
     : typeof current === 'string'
     ? { state: current }
     : {};
-  if (value === undefined) delete next[attribute];
+  if(attribute==='position'){
+    delete next.x;delete next.y;
+    if(value!==undefined){next.x=value.x;next.y=value.y;}
+  } else if (value === undefined) delete next[attribute];
   else next[attribute] = attribute === 'audio' ? FlowAudio.clean(value) : value;
   var result = Object.keys(next).length ? next : undefined;
   if (stepIdx !== null)
@@ -1637,8 +1647,10 @@ function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, valu
   });
   if (!device && !subject && key !== 'signals') return { error: 'Unknown homemap field.' };
   if (value !== undefined) {
+    if(device && homemapSubjectPosition(value) && (value.x<0 || value.x>320 || value.y<0 || value.y>180))
+      return {error:'Use a position within the map: x 0–320, y 0–180.'};
     if (device && !homemapDevicePatchValid(device.kind, value))
-      return { error: 'Choose a valid device state, temperature, spotlight, icon, or audio snapshot.' };
+      return { error: 'Choose a valid device state, position, temperature, spotlight, icon, or audio snapshot.' };
     if (
       subject &&
       value !== null &&
@@ -2236,12 +2248,9 @@ PanelRegistry.extend('homemap', {
                   attribute,
                   value
                 );
-              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key])) {
-                value = Object.assign({}, value);
-                ['audio','icon'].forEach(function(field) {
-                  if (Object.prototype.hasOwnProperty.call(snapshot.patch[key], field) && !Object.prototype.hasOwnProperty.call(value, field))
-                    value[field] = snapshot.patch[key][field];
-                });
+              if (homemapSubjectPosition(value)) {
+                var existing=snapshot.patch[key];
+                value = Object.assign({}, panelObject(existing)?existing:typeof existing==='string'?{state:existing}:{}, value);
               }
               return planStepHomemapField(
                 context.source(),
@@ -2292,7 +2301,7 @@ PanelRegistry.extend('homemap', {
           return select;
         }
         note(
-          'Operating state, temperature, spotlight, icon, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
+          'Operating state, temperature, spotlight, icon, and audio carry independently. Inherit removes only that attribute at this step. Device and subject positions carry; signals last for this step only.'
         );
         var body = document.createElement('div');
         body.className = 'home-edit-body';
@@ -2323,6 +2332,16 @@ PanelRegistry.extend('homemap', {
             commit(d.id, v === '' ? undefined : v, null, 'state');
           });
           deviceControls[d.id] = ctl;
+          var positionRow=document.createElement('div');positionRow.className='home-position';
+          ['x','y'].forEach(function(axis){
+            var input=context.controls.number(d[axis],function(value){
+              if(value==null){context.error('Enter a coordinate, or choose Inherit position.');return false;}
+              var position={x:d.x,y:d.y};position[axis]=value;return commit(d.id,position);
+            });
+            input.setAttribute('aria-label',d.label+' '+axis);positionRow.appendChild(context.controls.row(axis,input));
+          });
+          positionRow.appendChild(button('Inherit position',function(){return commit(d.id,undefined,null,'position');}));
+          fields.appendChild(positionRow);
           fields.appendChild(context.controls.row(d.label, ctl));
           var thermalPairs = [['', 'Inherit · ' + before.thermal]].concat(
             HOMEMAP_THERMAL.map(function (v) {
@@ -2355,7 +2374,7 @@ PanelRegistry.extend('homemap', {
         });
         var armedSubject = null;
         var placementHint =
-          'Drag devices or room borders/labels to change the layout for all steps. Rooms move independently of their contents. Click a device to edit its state.';
+          'Drag devices or people to move them at this step. Drag room borders/labels to change the shared layout. Click a device to edit its state.';
         var placementNote = note(placementHint, fields);
         snapshot.model.subjects.forEach(function (sub, i) {
           var group = document.createElement('div');
@@ -2438,7 +2457,7 @@ PanelRegistry.extend('homemap', {
         function previewMove(move) {
           var previewPanel = panel,
             state = snapshot.state;
-          if (move && move.kind === 'subject') {
+          if (move && (move.kind === 'subject' || move.kind === 'device')) {
             state = Object.assign(Object.create(null), state);
             state[move.key] = Object.assign({}, panelObject(state[move.key]) ? state[move.key] : {}, move.point);
           } else if (move) {
@@ -2520,7 +2539,7 @@ PanelRegistry.extend('homemap', {
           cancelMove();
           if (done.changed) {
             swallowClick = true;
-            commit(done.key, done.point, done.kind === 'subject' ? null : done.kind);
+            commit(done.key, done.point, done.kind === 'room' ? 'room' : null);
           }
         });
         listen(map,'pointercancel', cancelMove);

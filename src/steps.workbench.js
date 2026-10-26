@@ -46,9 +46,12 @@ function initWorkbenchStepList(opts){
   var pathSettings=document.getElementById('steps-path-settings');
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
+  var pathBase=document.getElementById('steps-path-base');
   var pathSignature='';
+  var showStepIdsInput=document.getElementById('steps-show-ids');
   var autoplayInput = document.getElementById('steps-autoplay'), openingView = document.getElementById('steps-opening-view');
   function playbackSettings(){
+    if(showStepIdsInput)showStepIdsInput.checked=!chosen || chosen.diagram.showStepIds!==false;
     if (autoplayInput) autoplayInput.checked = !!chosen && chosen.diagram.autoplay === true;
     if (openingView) openingView.value = chosen && VIEW_SET.indexOf(chosen.diagram.view) >= 0 ? chosen.diagram.view : 'ambient';
   }
@@ -58,6 +61,7 @@ function initWorkbenchStepList(opts){
     if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
     if (opts.configure && opts.configure(plan, chosen.section)) refresh(); else playbackSettings();
   }
+  if(showStepIdsInput)life.listen(showStepIdsInput,'change',function(){configurePlayback('showStepIds',showStepIdsInput.checked);});
   if (autoplayInput) life.listen(autoplayInput,'change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
   if (openingView) life.listen(openingView,'change', function(){ configurePlayback('view', openingView.value); });
   var inspectButton = document.getElementById('steps-inspect');
@@ -110,6 +114,11 @@ function initWorkbenchStepList(opts){
     pathSelect.innerHTML='';
     paths.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=p.label;pathSelect.appendChild(o);});
     if(selected){pathSelect.value=selected.id;pathLabel.value=selected.label;pathColor.value=selected.color.length===4 ? '#' + selected.color.slice(1).split('').map(function(c){return c+c;}).join('') : selected.color;}
+    if(pathBase){
+      pathBase.innerHTML='<option value="">No comparison</option>';
+      paths.filter(function(p){return !selected || p.id!==selected.id;}).forEach(function(p){var option=document.createElement('option');option.value=p.id;option.textContent=p.label;pathBase.appendChild(option);});
+      pathBase.value=selected && selected.basedOn || '';
+    }
     pathSignature=selected ? selected.id : '';
   }
   ['add','duplicate','earlier','later','previous','next'].forEach(function(name){ buttons[name] = document.getElementById('steps-' + name); });
@@ -121,6 +130,8 @@ function initWorkbenchStepList(opts){
     var selected=route(), index = selected ? selected.indices.indexOf(current()) : -1, count=selected ? selected.indices.length : 0;
     var blocked = stale || opts.locked() || !chosen;
     select.disabled = blocked; search.disabled = blocked;
+    if(pathBase)pathBase.disabled=blocked;
+    if(showStepIdsInput)showStepIdsInput.disabled=blocked;
     if (autoplayInput) autoplayInput.disabled = blocked || chosen.diagram.view === 'ambient-only';
     if (openingView) openingView.disabled = blocked;
     if(pathSelect){pathSelect.disabled=blocked;pathLabel.disabled=blocked;pathColor.disabled=blocked;savePath.disabled=blocked;
@@ -295,7 +306,7 @@ function initWorkbenchStepList(opts){
     });
     function pathEdit(action){
       if(!ready() || !chosen) return;
-      var plan=planPathStepEdit(indexedText,raw,chosen.section,route().id,current(),action,{label:pathLabel.value,color:pathColor.value});
+      var plan=planPathStepEdit(indexedText,raw,chosen.section,route().id,current(),action,Object.assign({label:pathLabel.value,color:pathColor.value},pathBase?{basedOn:pathBase.value}:{}));
       if(plan.error){status.textContent=plan.error;return;}
       if(opts.apply(plan,chosen.section)){search.value='';refresh();}
     }

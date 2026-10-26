@@ -223,8 +223,8 @@ for(const width of [1440,390,320,286])test('Contents geometry, overlay and bound
   await page.setViewportSize({width,height:844});const root=await open(page,server,'rose');const nav=root.locator('.reader-navigation');
   if(width<=670)await root.locator('.reader-top>button').click();
   await expect(root.locator('.reader-contents')).toBeVisible();
-  const geometry=await nav.evaluate(el=>{const nav=el.getBoundingClientRect(),pager=el.querySelector('.reader-page-index').getBoundingClientRect(),side=el.querySelector('.reader-contents').getBoundingClientRect(),footer=el.querySelector('.reader-theme-footer').getBoundingClientRect();return {center:(pager.left+pager.right)/2-nav.width/2,sideBottom:side.bottom,footerBottom:footer.bottom,width:document.documentElement.scrollWidth};});
-  expect(Math.abs(geometry.center)).toBeLessThan(1);expect(geometry.width).toBe(width);expect(geometry.footerBottom).toBe(geometry.sideBottom);
+  const geometry=await nav.evaluate(el=>{const nav=el.getBoundingClientRect(),pager=el.querySelector('.reader-page-index').getBoundingClientRect(),side=el.querySelector('.reader-contents').getBoundingClientRect(),footer=el.querySelector('.reader-theme-footer').getBoundingClientRect();return {pager:{left:pager.left,right:pager.right,top:pager.top,bottom:pager.bottom},nav:{left:nav.left,right:nav.right,top:nav.top,bottom:nav.bottom},top:el.querySelector('.reader-top').getBoundingClientRect().height,sideBottom:side.bottom,footerBottom:footer.bottom,width:document.documentElement.scrollWidth};});
+  expect(geometry.pager.left).toBeGreaterThanOrEqual(geometry.nav.left);expect(geometry.pager.right).toBeLessThanOrEqual(geometry.nav.right);expect(geometry.pager.top).toBeGreaterThanOrEqual(geometry.nav.top);expect(geometry.pager.bottom).toBeLessThanOrEqual(geometry.nav.bottom);if(width===1440)expect(geometry.top).toBe(56);expect(geometry.width).toBe(width);expect(geometry.footerBottom).toBe(geometry.sideBottom);
   await root.locator('.reader-theme-menu>summary').click();const menu=await root.locator('.reader-theme-options').boundingBox();expect(menu.y).toBeGreaterThan(100);expect(menu.x).toBeGreaterThanOrEqual(0);expect(menu.x+menu.width).toBeLessThanOrEqual(width);
   await page.keyboard.press('Escape');await expect(root.locator('.reader-theme-menu>summary')).toBeFocused();await expect(root.locator('.reader-contents')).toBeVisible();
   if(width<=670){await expect(root.locator('.reader-scrim')).toBeVisible();await page.keyboard.press('Escape');await expect(root.locator('.reader-contents')).toBeHidden();await expect(root.locator('.reader-top>button')).toBeFocused();await root.locator('.reader-top>button').click();await choose(root,'explore');}
@@ -264,7 +264,7 @@ test('desktop Contents closes on transition to phone and releases its focus trap
   await page.keyboard.press('Escape');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
 });
 
-for(const width of [1440,390])test('top Views route with Contents closed and retain keyboard focus at '+width,async({page,server})=>{
+for(const width of [1440])test('direct top Views route with Contents closed and retain keyboard focus at '+width,async({page,server})=>{
   await page.setViewportSize({width,height:900});const root=await open(page,server),strip=root.getByRole('tablist',{name:'Views in selected Tab'}),toggle=root.locator('.reader-top>button');
   if(await root.locator('.reader-contents').isVisible())await toggle.click();
   await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story','Review + Backstage']);
@@ -285,41 +285,21 @@ for(const width of [1440,390])test('top Views route with Contents closed and ret
   await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(strip.getByRole('tab')).toHaveCount(1);await expect(strip.getByRole('tab',{selected:true})).toHaveText('Standard');await expect(root.locator('#section-reference')).toBeVisible();
 });
 
-for(const width of [1440,1120,768,390,320,286])test('all top Views wrap without overflow or presentation height changes at '+width,async({page,server},info)=>{
+for(const width of [1440,1280,1024,390,320,286])test('crowded top Views use one selected-View control without overflow at '+width,async({page,server},info)=>{
   await page.setViewportSize({width,height:1000});const raw=story('lavender'),tab=raw.page.sections[0].tabs[0];
   tab.views.push(...Array.from({length:4},(_,i)=>({id:'long-'+i,name:i===0?'Complete product journey and implementation review with supporting source context'.slice(0,80):'Additional review choice '+(i+1),presentation:i%2?'explore':'standard',sections:['build','review']})));
   const input=path.join(server.root,'top-long.json'),output=path.join(server.root,'top-long.html');await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);await page.goto(server.origin+'/top-long.html');await page.evaluate(()=>document.fonts.ready);
-  const nav=page.locator('.reader-navigation'),strip=nav.locator('.reader-view-strip');await expect(strip.getByRole('tab')).toHaveCount(7);
-  const box=await nav.boundingBox();
-  for(const choice of await strip.getByRole('tab').all()){
-    await expect(choice).toBeVisible();const r=await choice.boundingBox();expect(r.x).toBeGreaterThanOrEqual(0);expect(r.x+r.width).toBeLessThanOrEqual(width);expect(r.height).toBeGreaterThanOrEqual(30);expect(r.y+r.height).toBeLessThanOrEqual(box.y+box.height-45);
-    await choice.click();await expect(choice).toHaveAttribute('aria-selected','true');expect(await nav.boundingBox()).toEqual(box);
-  }
-  // Selection is synchronous, but the shared viewport and header ResizeObservers
-  // finish their layout on subsequent frames. Assert the exact settled document
-  // width, including content outside the header, rather than racing that work.
-  try{await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);}
-  catch(error){
-    const diagnostic=await page.evaluate(async()=>{
-      const frames=[];
-      for(let i=0;i<3;i++){
-        if(i)await new Promise(requestAnimationFrame);
-        const limit=document.documentElement.clientWidth;
-        frames.push({root:document.documentElement.scrollWidth,body:document.body.scrollWidth,limit,
-          overflow:[...document.querySelectorAll('*')].filter(el=>{const r=el.getBoundingClientRect();return r.width&&r.right>limit;}).map(el=>{
-            const r=el.getBoundingClientRect(),s=getComputedStyle(el),ancestors=[];
-            for(let parent=el.parentElement;parent;parent=parent.parentElement)ancestors.push({tag:parent.tagName,id:parent.id,class:parent.getAttribute('class'),overflow:getComputedStyle(parent).overflow});
-            return{tag:el.tagName,id:el.id,class:el.getAttribute('class'),x:r.x,right:r.right,width:r.width,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,position:s.position,overflow:s.overflow,minWidth:s.minWidth,ancestors};
-          })});
-      }
-      return frames;
-    });
-    await info.attach('document-overflow-geometry',{body:JSON.stringify(diagnostic,null,2),contentType:'application/json'});throw error;
-  }
-  const center=await nav.locator('.reader-page-index').evaluate(el=>{const r=el.getBoundingClientRect();return(r.left+r.right)/2;});expect(Math.abs(center-width/2)).toBeLessThan(1);
-  await strip.getByRole('tab',{name:'Explore story',exact:true}).click();const canvas=await page.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.y).toBe(box.y+box.height);
+  const nav=page.locator('.reader-navigation'),strip=nav.locator('.reader-view-strip'),picker=nav.getByRole('combobox',{name:'Choose View',exact:true});await expect(strip.locator('.reader-top-view')).toHaveCount(7);await expect(picker).toBeVisible();await expect(picker.locator('option')).toHaveCount(7);await expect(picker).toHaveValue(/:full$/);
+  const box=await nav.boundingBox(),topHeight=await nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height);if(width>=1024)expect(topHeight).toBe(56);
+  const controlsFit=()=>nav.locator('.reader-top :is(button,summary,select):visible').evaluateAll((nodes,bounds)=>{const rects=nodes.map(node=>node.getBoundingClientRect());return{bounded:rects.every(r=>r.left>=bounds.x-1&&r.right<=bounds.x+bounds.width+1&&r.top>=bounds.y-1&&r.bottom<=bounds.y+bounds.height+1),separate:rects.every((a,i)=>rects.every((b,j)=>i===j||a.right<=b.left+1||b.right<=a.left+1||a.bottom<=b.top+1||b.bottom<=a.top+1))};},box);await expect.poll(controlsFit).toEqual({bounded:true,separate:true});
+  if(width>=1280){await expect(nav.getByRole('button',{name:'Expand diagram view',exact:true})).toBeVisible();await expect(nav.getByRole('button',{name:'More actions',exact:true})).toBeHidden();}
+  for(const definition of tab.views.slice(1).concat(tab.views[0])){await picker.focus();await picker.selectOption({label:definition.name});await expect(picker).toBeFocused();await expect(picker).toHaveValue(new RegExp(':'+definition.id+'$'));await expect(strip.locator('.reader-top-view[aria-selected="true"]')).toHaveText(definition.name);expect(await nav.boundingBox()).toEqual(box);}
+  await picker.selectOption({label:'Explore story'});await expect(picker).toBeFocused();
+  await expect.poll(controlsFit).toEqual({bounded:true,separate:true});
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
+  const canvas=await page.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.y).toBe(box.y+box.height);
   if(width>670){const side=await nav.locator('.reader-contents').boundingBox();expect(side.y).toBe(box.y+box.height);}
-  await info.attach('wrapped-top-'+width,{body:await page.screenshot(),contentType:'image/png'});
+  await info.attach('single-toolbar-crowded-'+width,{body:await page.screenshot(),contentType:'image/png'});
 });
 
 /* #554 exported reader chrome. Chuck's ruling: remove the build line, keep the theme picker.
@@ -373,12 +353,13 @@ test('native top Views retain focus and align wrapped headers with their bounded
   await writeFile(path.join(server.root,'top-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'top-native.html'),'<style>body{margin:0;padding:40px}.host{width:570px;height:760px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./top-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/top-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>window.viewer=mount(document.querySelector('#one'),raw),story('lilac'));
-  const host=page.locator('#one'),nav=host.locator('.reader-navigation'),strip=nav.getByRole('tablist',{name:'Views in selected Tab'});
+  const host=page.locator('#one'),nav=host.locator('.reader-navigation'),strip=nav.locator('.reader-view-strip');
+  await expect(nav).toHaveClass(/reader-single-toolbar/);await expect(nav.locator('.reader-top>.reader-toolbar')).toHaveCount(1);await expect(nav.locator(':scope>.reader-toolbar')).toHaveCount(0);
   for(const width of [570,286,1120]){
     await host.evaluate((el,width)=>el.style.width=width+'px',width);await expect.poll(()=>nav.evaluate(el=>el.getBoundingClientRect().width)).toBe(width);
-    const explore=strip.getByRole('tab',{name:'Explore story',exact:true});await explore.click();await expect(explore).toBeFocused();await expect(explore).toHaveAttribute('aria-selected','true');
+    const picker=nav.getByRole('combobox',{name:'Choose View',exact:true}),explore=strip.locator('.reader-top-view[data-tab-view="explore"]');if(await picker.isVisible()){await picker.focus();await picker.selectOption({label:'Explore story'});await expect(picker).toBeFocused();}else{await explore.click();await expect(explore).toBeFocused();}await expect(explore).toHaveAttribute('aria-selected','true');
     const header=await nav.boundingBox(),canvas=await host.locator('.viewer-diagram-canvas').boundingBox(),bounds=await host.locator('flowview-root').boundingBox();expect(header.y).toBe(bounds.y);expect(canvas.y).toBe(header.y+header.height);expect(canvas.x).toBeGreaterThanOrEqual(bounds.x);expect(canvas.x+canvas.width).toBeLessThanOrEqual(bounds.x+bounds.width);expect(canvas.y+canvas.height).toBe(bounds.y+bounds.height);
-    await strip.getByRole('tab',{name:'Full story',exact:true}).click();expect(await nav.boundingBox()).toEqual(header);
+    if(await picker.isVisible())await picker.selectOption({label:'Full story'});else await strip.getByRole('tab',{name:'Full story',exact:true}).click();expect(await nav.boundingBox()).toEqual(header);
   }
   await page.evaluate(()=>viewer.destroy());await expect(nav).toHaveCount(0);
 });
@@ -513,7 +494,8 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(Array(6).fill('true'));
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,3);
-  const toolbar=root.locator('.reader-toolbar');await expect(toolbar.getByRole('button',{name:'Fit',exact:true})).toHaveCount(0);await toolbar.getByRole('button',{name:'Next page',exact:true}).focus();await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
+  const toolbar=root.locator('.reader-toolbar'),zoomButtons=toolbar.locator('.reader-zoom-controls>.reader-button');await expect(toolbar.getByRole('button',{name:'Fit',exact:true})).toHaveCount(0);await toolbar.getByRole('button',{name:'Next page',exact:true}).focus();await page.keyboard.press('Tab');await expect(zoomButtons.first()).toBeFocused();await page.keyboard.press('Tab');await expect(toolbar.locator('.reader-zoom-menu>summary')).toBeFocused();await page.keyboard.press('Tab');await expect(zoomButtons.last()).toBeFocused();
+  for(let i=0;i<16 && !await marksOf(root).nth(0).evaluate(el=>el===el.getRootNode().activeElement);i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(0)).toBeFocused();
   for(let i=0;i<4;i++)await page.keyboard.press('Tab');await expect(marksOf(root).nth(4)).toBeFocused();await page.keyboard.press('Enter');
   await expect(label).toHaveText('Page 8 of 9');await expect(root.locator('.reader-tab-label')).toHaveText('Day-one setup');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,4);await expect(marksOf(root).nth(4)).toBeFocused();

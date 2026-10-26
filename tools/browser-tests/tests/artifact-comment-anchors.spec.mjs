@@ -53,6 +53,7 @@ const composeCount=page=>page.evaluate(()=>window.__comments.compose.length);
 test('step captions anchor to the shown step button; Tabs, Views and step controls stay navigable',async({page,server})=>{
  await page.addInitScript(stubClaude);
  const root=await open(page,server),nav=root.locator('.explore-navigation').first(),viewStrip=nav.locator('.reader-view-strip');
+ await expect(nav).toHaveClass(/reader-single-toolbar/);await expect(nav.locator('.reader-top > .reader-toolbar')).toHaveCount(1);await expect(nav.locator(':scope > .reader-toolbar')).toHaveCount(0);
  const ring=root.locator('#section-ring'),ringLine=ring.locator('.stepline:not(.dv-caption-old)'),chip=n=>ring.locator('.schip').nth(n-1);
  const tab=name=>nav.getByRole('tab',{name,exact:true,includeHidden:true});
  await expect.poll(()=>page.evaluate(()=>window.__comments.placed.length)).toBeGreaterThan(0);

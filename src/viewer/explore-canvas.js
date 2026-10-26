@@ -29,7 +29,7 @@ function initViewerExploreCanvas(ctl,view,opts){
       }
     }
   }
-  var navigation=createExploreNavigation(ctl,{contents:true,container:container,initialOpen:opts && opts.initialContentsOpen,selectSection:selectSection,action:opts && opts.action,singleShareAction:!!(opts && opts.singleShareAction),allowEmbedShare:!!(opts && opts.allowEmbedShare),isCanvas:function(){return !!active;}});
+  var navigation=createExploreNavigation(ctl,{contents:true,singleReaderToolbar:true,container:container,initialOpen:opts && opts.initialContentsOpen,selectSection:selectSection,action:opts && opts.action,singleShareAction:!!(opts && opts.singleShareAction),allowEmbedShare:!!(opts && opts.allowEmbedShare),isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;

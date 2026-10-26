@@ -36,6 +36,7 @@ function harness() {
         return node.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]);
       },
       querySelector(selector) { return node.querySelectorAll(selector)[0] || null; },
+      getElementById(id) { return node.children.find(child => child.getAttribute('id') === id) || node.children.map(child => child.getElementById(id)).find(Boolean) || null; },
       focus() { node.focusCount++; document.activeElement = node; node.emit('focus'); },
       getBoundingClientRect() { return {left: 100, top: 40, bottom: 60, width: 20}; },
     };

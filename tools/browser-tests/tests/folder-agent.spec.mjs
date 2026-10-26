@@ -1081,6 +1081,63 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
   }finally{await page.close();await h.cleanup();}
 });
 
+test('agent review keeps moved-node edge labels and step coins on its own board',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.setViewportSize({width:1440,height:900});
+    const raw={page:{title:'Moved connections',blocks:[{heading:'Delivery',diagram:{
+      nodes:{a:{title:'Device'},b:{title:'Service'},c:{title:'Storage'}},rows:[[]],
+      floats:[{id:'a',x:150,y:180},{id:'b',x:650,y:180},{id:'c',x:650,y:480}],
+      edges:[{from:'a',to:'b',label:'Request',labelDx:12,labelDy:-17},{from:'b',to:'c',label:'Store recording',labelDx:-7,labelDy:-23}],
+      steps:[{edge:'a->b',text:'Send request'},{edge:'b->c',text:'Store recording'}],autoplay:false,
+      layouts:[{id:'explore',name:'Explore',presentation:'explore'}],defaultLayout:'explore'
+    }}]}};
+    // Authored offsets bypass host-specific automatic collision nudges so the
+    // reader/editor comparison checks the actual path geometry exactly.
+    const original=JSON.stringify(raw,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
+    const editor=page.locator('#docview');
+    async function geometry(view){return view.locator('.board svg').first().evaluate(svg=>({
+      nodes:Array.from(svg.querySelectorAll('[data-dv-node]')).map(node=>[node.getAttribute('data-dv-node'),node.getAttribute('transform')]),
+      edges:Array.from(svg.querySelectorAll('path.edge')).map(edge=>{
+        const index=edge.getAttribute('data-dv-edge'),mid=edge.getPointAtLength(edge.getTotalLength()/2),label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');
+        return {id:edge.id,path:edge.getAttribute('d'),mid:{x:mid.x,y:mid.y},label:{x:Number(label.getAttribute('x')),y:Number(label.getAttribute('y'))},
+          coins:Array.from(svg.querySelectorAll('.coin[data-dv-coin-edge="'+index+'"]')).map(coin=>({x:Number(coin.querySelector('circle').getAttribute('cx')),y:Number(coin.querySelector('circle').getAttribute('cy')),transform:coin.getAttribute('transform')}))};
+      })
+    }));}
+    const before=await geometry(editor);
+    await connectExternal(page);await askAgent(page,h,'Move the service and storage without changing the connections.');
+    const request=await h.read('request.json'),state=await h.read('state.json');
+    raw.page.blocks[0].diagram.floats[1]={id:'b',x:1100,y:520};raw.page.blocks[0].diagram.floats[2]={id:'c',x:400,y:700};
+    const proposed=JSON.stringify(raw,null,2);
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nMoved service and storage; the same requests still connect them.\n');
+    h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Move connected nodes');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    const view=page.locator('#agent-update-view'),candidate=await geometry(view);
+    // Both mounted documents deliberately share IDs: measurement must use the
+    // preview's paths, even while the editor retains the accepted coordinates.
+    expect(candidate.edges[0].id).toBe(before.edges[0].id);expect(candidate.edges[0].path).not.toBe(before.edges[0].path);
+    expect(candidate.edges[0].label.x).toBeCloseTo(candidate.edges[0].mid.x+12,3);
+    expect(candidate.edges[0].label.y).toBeCloseTo(candidate.edges[0].mid.y-16-17,3);
+    expect(candidate.edges[1].label.x).toBeCloseTo(candidate.edges[1].mid.x-7,3);
+    expect(candidate.edges[1].label.y).toBeCloseTo(candidate.edges[1].mid.y-16-23,3);
+    for(const edge of candidate.edges){
+      expect(edge.coins[0].x).toBeCloseTo(edge.mid.x,3);expect(edge.coins[0].y).toBeCloseTo(edge.mid.y,3);
+    }
+    expect(await geometry(editor)).toEqual(before);await expect(page.locator('#src')).toHaveValue(original);
+    await page.screenshot({path:info.outputPath('moved-edge-labels-proposed.png')});
+    await page.locator('#agent-update-current').click();expect(await geometry(view)).toEqual(before);
+    await expect(page.locator('#agent-update-commit')).toBeDisabled();
+    await page.locator('#agent-update-proposed').click();expect(await geometry(view)).toEqual(candidate);
+    await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
+    expect(await geometry(editor)).toEqual(candidate);
+    await page.screenshot({path:info.outputPath('moved-edge-labels-accepted.png')});
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);expect(await geometry(editor)).toEqual(before);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(proposed);expect(await geometry(editor)).toEqual(candidate);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
 test('copy and paste treats the folder as connected without Monitor and keeps conversation output out of the panel',async({page},info)=>{
   const h=await setup(page);
   try{

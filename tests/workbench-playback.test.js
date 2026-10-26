@@ -38,6 +38,7 @@ function stepperHarness(options, reducedMotion=false, diagramSettings={}){
     clearTimeout:id=>timeouts.delete(id)};
   vm.createContext(context); vm.runInContext(code,context);
   const sec=element(), boardDiv=element(), board={svg:element(),nodeEls:{},edgeIds:{}};
+  board.svg.getElementById=id=>ids[id] || null;
   const term=Object.fromEntries(['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl',
     'btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus'].map(k=>[k,element()]));
   term.bar.appendChild(element()).appendChild(term.stepN);
@@ -52,7 +53,7 @@ function stepperHarness(options, reducedMotion=false, diagramSettings={}){
     {id:'third',text:'Third'}],...diagramSettings};
   const stepper=context.attachStepper(sec,boardDiv,term,diagram,'fs0',board,{},
     {setStep:(index,tween)=>paints.push({index,tween})},null,options);
-  return {context,stepper,term,intervals,timeouts,paints,animation,boardDiv,
+  return {context,stepper,term,intervals,timeouts,paints,animation,boardDiv,board,
     visibilityListeners,
     visibility(hidden){ context.document.hidden=hidden; visibilityListeners.forEach(fn=>fn()); },
     tick(){ for(const fn of [...intervals.values()]) fn(); }};
@@ -67,6 +68,19 @@ test('workbench step entry and tab reveal stay paused; explicit Play advances an
   h.tick(); h.tick(); assert.equal(s.current().id,'first');
   s.onHide(); s.onShow(); assert.equal(h.intervals.size,0);
   assert.equal(h.term.btnPlay.attrs['aria-label'],'Play');
+});
+
+test('step lighting and packet playback resolve IDs inside their own board',()=>{
+  const h=stepperHarness({autoplay:false}),lookup=h.board.svg.getElementById,ids=[];
+  h.board.svg.getElementById=id=>{ids.push(id);return lookup(id);};
+  h.context.document.getElementById=()=>{throw Error('A sibling preview can own the same ID');};
+  h.stepper.enterStep(true);h.term.btnNext.fire('click');
+  assert.ok(ids.includes('edge0'),'edge focus belongs to this board');
+  assert.ok(ids.includes('fs0-coin-2'),'step coin belongs to this board');
+  assert.ok(ids.includes('fs0-am-0'),'packet animation belongs to this board');
+  for(const callback of [...h.timeouts.values()])callback();
+  assert.equal(h.animation.starts,1);
+  h.stepper.destroy();
 });
 
 test('autoplay is opt-in, manual navigation stays paused across tabs, and reduced motion blocks only the automatic start',()=>{

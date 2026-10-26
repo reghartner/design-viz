@@ -23,6 +23,7 @@ recursively expand other logical bundles. Panel registration stays DOM-free.
 | `core/document.js` | Guarded normalization, blocks and all-section records; uses navigation for canonical references |
 | `core/navigation.js` | Hash grammar, section/tab/step references and route resolution; link-base canonicalization uses `URL` |
 | `core/paths.js` | Step patches, path projection and exact source-step lookup; uses shared `isHex()` and navigation `stepIndexOf()` |
+| `core/design-review.js` | Authored design statuses, baseline presentation and ordinal path comparison; never folds or inherits runtime state |
 | `core/section-layout.js` | Named views, host profiles, tile placement and visibility; uses path projection and registered panel capabilities |
 | `core/visibility-evidence.js` | Read-only explicit expectation targets, view/stop reachability and panel-owned presentation eligibility; no DOM or source-truth proof |
 | `core/state.js` | Node-tone folding and panel-state dispatch; uses shared `TONE_SET`, step patches and the panel registry |

@@ -358,9 +358,12 @@ identity, groups, binding, code references, icons, navigation and semantic field
 cannot be overridden through this map. Existing `nodeCodeRefs` remains the separate
 additive evidence contract. Optional import-level `presentation: "baseline"`
 copies baseline presentation metadata onto imported nodes and connections; a
-node-level presentation override can suppress it. This prepares the import
-contract for baseline rendering; this import change alone does not add visual
-dimming. The convenience does not modify providers.
+node-level presentation override can suppress it. Imported baseline nodes and
+connections fade in Ambient, Step and print, and remain readable when focused.
+An explicit connection baseline takes precedence over its review status. Hidden
+members stay hidden in readers and exports; the editor keeps a faint selectable
+card for restoration. The convenience does not modify providers. See
+[design reviews](design-review.md) for statuses, verdicts and path comparisons.
 
 All override maps use full provider-relative paths for nested members on the direct
 import: `inner::api` or `inner::api->inner::store`. Keys must remain selected and

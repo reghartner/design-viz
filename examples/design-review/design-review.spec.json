@@ -1,0 +1,214 @@
+{
+  "page": {
+    "title": "Doorbell routing review",
+    "skin": "daylight",
+    "sections": [
+      {
+        "heading": "Current and proposed routing",
+        "text": "Choose Proposed, then expand Compare with Today. Faded components are baseline context. Design status badges remain separate from connection protocols and runtime warning tones.",
+        "diagram": {
+          "title": "Doorbell routing design review",
+          "view": "step",
+          "showStepIds": false,
+          "nodes": {
+            "button": {
+              "title": "Doorbell",
+              "icon": "sensor",
+              "presentation": "baseline"
+            },
+            "gateway": {
+              "title": "Device gateway",
+              "sub": "Current command path",
+              "icon": "router",
+              "presentation": "baseline",
+              "status": "decided"
+            },
+            "router": {
+              "title": "Event intake service",
+              "sub": "Proposed routing",
+              "icon": "gear",
+              "status": "proposed"
+            },
+            "archive": {
+              "title": "Event archive",
+              "icon": "db",
+              "status": "open"
+            }
+          },
+          "rows": [
+            [
+              "button",
+              "gateway"
+            ],
+            [
+              "archive"
+            ]
+          ],
+          "floats": [
+            {
+              "id": "router",
+              "x": 740,
+              "y": 268
+            }
+          ],
+          "edges": [
+            {
+              "from": "button",
+              "to": "gateway",
+              "kind": "https",
+              "label": "Existing dispatch"
+            },
+            {
+              "from": "gateway",
+              "to": "archive",
+              "kind": "int",
+              "label": "Save event",
+              "status": "decided"
+            },
+            {
+              "from": "button",
+              "to": "router",
+              "kind": "https",
+              "label": "New dispatch",
+              "status": "proposed"
+            },
+            {
+              "from": "router",
+              "to": "archive",
+              "kind": "int",
+              "label": "Save normalized event",
+              "status": "open"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "Gateway placement",
+              "devices": [
+                {
+                  "id": "gateway",
+                  "kind": "hub",
+                  "label": "Gateway",
+                  "x": 80,
+                  "y": 90
+                },
+                {
+                  "id": "archive",
+                  "kind": "sensor",
+                  "label": "Archive",
+                  "x": 245,
+                  "y": 90
+                }
+              ]
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "nodes": [
+                "button"
+              ],
+              "text": "A resident presses the doorbell.",
+              "verdict": "keep"
+            },
+            {
+              "id": "today-dispatch",
+              "edge": "button->gateway",
+              "text": "The gateway accepts the raw event.",
+              "panels": {
+                "home": {
+                  "gateway": "rx"
+                }
+              }
+            },
+            {
+              "id": "today-save",
+              "edge": "gateway->archive",
+              "text": "The archive stores the unmodified event.",
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "gateway",
+                      "to": "archive"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "proposed-dispatch",
+              "edge": "button->router",
+              "text": "The intake service validates the event before forwarding it.",
+              "verdict": "replace",
+              "ref": "decision 4",
+              "panels": {
+                "home": {
+                  "gateway": {
+                    "state": "rx",
+                    "x": 190,
+                    "y": 60
+                  }
+                }
+              }
+            },
+            {
+              "id": "proposed-save",
+              "edge": "router->archive",
+              "text": "Decide whether normalized events need a separate retention policy.",
+              "verdict": "open",
+              "ref": "decision 5",
+              "tone": {
+                "archive": "warn"
+              },
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "gateway",
+                      "to": "archive"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "proposed-ack",
+              "nodes": [
+                "router"
+              ],
+              "text": "Return a receipt after durable storage.",
+              "verdict": "keep",
+              "tone": {
+                "archive": "ok"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "today",
+              "label": "Today",
+              "steps": [
+                "press",
+                "today-dispatch",
+                "today-save"
+              ]
+            },
+            {
+              "id": "proposed",
+              "label": "Proposed",
+              "basedOn": "today",
+              "steps": [
+                "press",
+                "proposed-dispatch",
+                "proposed-save",
+                "proposed-ack"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

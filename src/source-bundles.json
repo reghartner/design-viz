@@ -8,6 +8,7 @@
     "core/document.js",
     "core/contracts.js",
     "core/paths.js",
+    "core/design-review.js",
     "core/story-time.js",
     "core/section-layout.js",
     "core/state.js",
@@ -31,6 +32,7 @@
   ],
   "engine.js": [
     "viewer/prose.js",
+    "viewer/design-review.js",
     "viewer/contracts.js",
     "viewer/path-timeline.js",
     "viewer/follow-active.js",

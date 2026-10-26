@@ -167,8 +167,9 @@ cross-diagram behavior; step overrides stay with the original objects.
 You can also drag any device marker or its label in the inspector's placement
 map. Camera coverage and signal endpoints follow the device while you drag.
 Drag a room's border or label to move its rectangle; its contents keep their
-positions. Device and room moves edit the shared layout for **all steps and
-paths**, while subject moves belong to the selected step. Items stay inside the
+positions. Device and subject moves in the step inspector belong to that step
+and carry along its path. **Inherit position** removes only the selected device’s
+x/y patch. Room moves edit the shared layout for **all steps and paths**. Items stay inside the
 320×180 frame. Each completed drag is one undo action; Escape or a cancelled
 pointer gesture restores the original layout. For precise keyboard edits, use
 the panel's **devices** and **rooms** coordinate tables.

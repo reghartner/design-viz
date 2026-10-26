@@ -21,6 +21,7 @@ topology, notification or outcome without evidence.
 | Small embedded screenshots or illustrations | `cookbook/embedded-images.md` |
 | Engineering and business views of one timeline | `cookbook/two-perspectives.md`, `docs/section-layouts.md` |
 | Named views, Standard/Explore presentation, selected playback stops, host profiles | `docs/section-layouts.md` |
+| Current/proposed designs, baseline context, decision status and step verdicts | `docs/design-review.md`, `examples/design-review/design-review.spec.json` |
 | Color-coded phases in one timeline | `docs/step-colors.md` |
 | Several message contracts in one section or step wire payload previews | `docs/contract-blocks.md` |
 | Domain overview with focused internals | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md` (`mode: "focus"` only) |

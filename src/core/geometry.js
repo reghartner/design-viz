@@ -249,7 +249,7 @@ function layout(spec){
       var cx = f.noSpread===true ? f.x : xs[spreadIndex++] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
       if(positionedFloat(f)){cx=f.x;cy=f.y;}
-      var floatNode=spec.nodes[f.id],floatSize=floatNode && floatNode.type==='text' && (Object.prototype.hasOwnProperty.call(floatNode,'text') || Object.prototype.hasOwnProperty.call(floatNode,'textStyle'))?textBoxSize(floatNode):{w:150,h:FLOAT_H};
+      var floatNode=spec.nodes[f.id],floatSize=floatNode && floatNode.type==='text' && (Object.prototype.hasOwnProperty.call(floatNode,'text') || Object.prototype.hasOwnProperty.call(floatNode,'textStyle'))?textBoxSize(floatNode):{w:150,h:floatNode && (floatNode.sub || floatNode.image)?58:FLOAT_H};
       pos[f.id] = {cx:cx, cy:cy, w:floatSize.w, h:floatSize.h, row:-1, flow:-1, stack:false, float:true};
       if(positionedFloat(f))pos[f.id].free=true;
     });
@@ -268,7 +268,7 @@ function layout(spec){
     });
     var insertX=existingRight+160,occupied=Object.keys(pos).map(function(id){return pos[id];});
     inserted.forEach(function(f){
-      var sizedNode=spec.nodes[f.id],size=sizedNode && sizedNode.type==='text' && (Object.prototype.hasOwnProperty.call(sizedNode,'text') || Object.prototype.hasOwnProperty.call(sizedNode,'textStyle'))?textBoxSize(sizedNode):{w:150,h:FLOAT_H};
+      var sizedNode=spec.nodes[f.id],size=sizedNode && sizedNode.type==='text' && (Object.prototype.hasOwnProperty.call(sizedNode,'text') || Object.prototype.hasOwnProperty.call(sizedNode,'textStyle'))?textBoxSize(sizedNode):{w:150,h:sizedNode && (sizedNode.sub || sizedNode.image)?58:FLOAT_H};
       var y=42+size.h/2;
       while(occupied.some(function(p){
         return Math.abs(insertX-p.cx)<(size.w+p.w)/2+24 && Math.abs(y-p.cy)<(size.h+p.h)/2+24;
@@ -318,7 +318,7 @@ function layout(spec){
   var H = lastRow.top + lastRow.height + 40;
   if (lanes) H += (laneCounts[rowsMeta.length - 1] || 0) * 8;
   floats.forEach(function(f){
-    if (f && (f.side === 'below' || f.noSpread===true) && pos[f.id]) H = Math.max(H, pos[f.id].cy + FLOAT_H/2 + 24);
+    if (f && (f.side === 'below' || f.noSpread===true) && pos[f.id]) H = Math.max(H, pos[f.id].cy + pos[f.id].h/2 + 24);
   });
   Object.keys(groupBoxes).forEach(function(g){
     var b = groupBoxes[g];

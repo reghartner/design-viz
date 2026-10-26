@@ -186,3 +186,10 @@ readers need to choose paths.
 Copied links include the path: `#d=command-delivery&m=step&p=drop&s=lost`.
 Links without `p` open the default path. Previously generated HTML must be
 rebuilt with the updated engine to understand `paths`.
+
+## Current and proposed comparisons
+
+A path may set `basedOn: "today"` to compare its explicit step sequence with an
+existing path. Step `verdict` and `ref` annotate the design decision without
+changing state. See [design reviews](design-review.md) for ordinal alignment,
+shared-step semantics and the working Today/Proposed example.

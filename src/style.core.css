@@ -3987,6 +3987,41 @@ body .docview .termbar[data-playback-position="beside"]>.step-transport{max-widt
 body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.schips{grid-area:tracks;min-width:0;max-width:100%;overflow:auto;}
 body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{grid-area:caption;min-width:0;}
 body .docview .termbar[data-playback-position][hidden]{display:none;}
-
 /* Presentation hiding retains graph identity and geometry for story references. */
 [data-dv-hidden="true"]{visibility:hidden!important;pointer-events:none!important;}
+/* Design-review annotations are orthogonal to protocol paint and runtime tones. */
+.board :is(.node,.edge,.lbl,.pkt).review-baseline{opacity:.55 !important;}
+.board .halo.review-baseline{opacity:.025 !important;}
+.board.stepmode :is(.edge,.lbl).review-baseline.lit{opacity:.82 !important;}
+.board.stepmode .node.review-baseline:not(.lit){opacity:.25 !important;}
+.board.stepmode :is(.edge,.lbl).review-baseline:not(.lit){opacity:.15 !important;}
+.board.stepmode .node.review-baseline.lit{opacity:.82 !important;}
+.board .node.review-baseline:is(:hover,:focus-within),.board.stepmode .node.review-baseline:is(:hover,:focus-within){opacity:.9 !important;}
+.board.stepmode :is(.edge,.lbl,.pkt,.halo).review-baseline.comm-hidden{opacity:0 !important;}
+.review-badge{display:inline-block;padding:2px 7px;border:1px solid currentColor;border-radius:5px;font:600 11px/1.35 'IBM Plex Sans',sans-serif;white-space:nowrap;}
+.review-proposed,.review-replace{color:#087f9b;}
+.review-open{color:#9a6900;}
+.review-decided,.review-keep{color:#298249;}
+.sk-aurora .review-proposed,.sk-aurora .review-replace{color:#67d7ee;}
+.sk-aurora .review-open{color:#f4c86b;}
+.sk-aurora .review-decided,.sk-aurora .review-keep{color:#89d7a0;}
+.node-review-badge rect{fill:var(--dv-board-ground,#fff);stroke:currentColor;stroke-width:1;}
+.node-review-badge text{fill:currentColor;font:600 10px 'IBM Plex Sans',sans-serif;}
+.review-edge-status{font-weight:650;}
+.review-ref{margin-left:6px;font-size:11px;color:inherit;}
+.review-baseline-key{opacity:.65;}
+.step-review:empty{display:none;}
+.path-review{box-sizing:border-box;width:100%;min-width:0;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px;font:13px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.path-review[hidden]{display:none;}
+.path-review summary{cursor:pointer;font-weight:600;}
+.path-review table{width:100%;table-layout:fixed;border-collapse:collapse;margin:8px 0;}
+.path-review th,.path-review td{padding:8px;vertical-align:top;border:1px solid var(--line);overflow-wrap:anywhere;text-align:left;}
+.path-review th:first-child{width:42px;}
+.path-review .review-current{background:color-mix(in srgb,var(--acc) 12%,transparent);}
+.review-alignment,.review-targets,.review-no-step{font-size:11px;opacity:.75;}
+.review-targets{margin-top:5px;}
+@media print{
+  .board :is(.node,.edge,.lbl).review-baseline,.board.stepmode :is(.node,.edge,.lbl).review-baseline:is(.lit,:not(.lit)),.board.stepmode :is(.edge,.lbl,.pkt,.halo).review-baseline.comm-hidden{opacity:.55 !important;}
+  .node-review-badge rect{fill:#fff;}
+  .node-review-badge,.review-badge{color:#333 !important;}
+}

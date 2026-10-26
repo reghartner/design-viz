@@ -458,6 +458,25 @@ for boards without a meaningful sequence). One diagram spec always supports
 both modes — repeating the same diagram in another tab with `"view": "step"`
 gives readers a guided version at zero extra authoring cost.
 
+### Design review metadata
+
+Nodes and connections accept `status: "proposed" | "open" | "decided"` and
+`presentation: "baseline"`. Status adds a named badge and automatic legend;
+baseline fades context in Ambient, Step, named Views and print. Connections
+between baseline nodes also fade unless marked Proposed or Open; explicit edge
+baseline presentation wins over status. Neither field changes protocol colors,
+runtime node tones, topology or state folding.
+
+A path's optional `basedOn` references another existing path. Both retain
+explicit step-ID sequences in the shared registry. The comparison aligns full
+path ordinals, before View filters, and marks missing tail cells as ended paths.
+Missing references and cycles are errors. No steps or patches are inherited.
+Steps accept `verdict: "keep" | "replace" | "open"` and optional plain text `ref`.
+Shared bodies share these annotations; make a step independent to change one
+path's verdict. `diagram.showStepIds: false` hides IDs from reader captions;
+omitting it preserves existing behavior. Deep links still use stable IDs.
+See [design reviews](../docs/design-review.md) and its executable example.
+
 ### autoplay
 
 Optional boolean on `diagram`, default `false`. Set `"autoplay": true` to
@@ -1670,6 +1689,11 @@ perspectives" of one timeline). Types:
   `normal` (default), `warm`, `hot`, `cold`, or `freezing`. Warm/hot add rising
   heat waves and a thermometer; cold/freezing add frost and a snowflake.
   The condition is independent of operation, so its overlay survives shutdown.
+  Device position patches use a finite x/y pair, for example
+  `{"cam":{"x":190,"y":60,"state":"scan"}}`. Positions carry along the
+  selected path, including through scalar state changes. Signals and coverage
+  use the effective position. Out-of-frame positions warn and render clamped;
+  the desktop editor rejects positions outside x 0–320, y 0–180.
   Object attributes carry independently. An initial/step `icon` may be any known
   library ID, or `null` to restore the declaration/kind default. For example
   `{"cam":{"icon":"camera-off"}}` changes only the marker. Omitted `icon`
@@ -1760,9 +1784,10 @@ perspectives" of one timeline). Types:
   the changed field, supports device state and icon selectors, subject drag/tap placement
   and coordinates, hide/show/inherit, and device-to-device signals. Resetting
   to Inherit removes that field from this step. Shared source steps affect
-  every path that references them. Dragging a device or room border/label in
-  the placement map updates its declaration coordinates across all steps/paths,
-  without changing any step patch or room occupants. Moves stay in the frame
+  every path that references them. Device drags and x/y controls in the step
+  map write a position patch; Inherit position removes only that patch’s x/y.
+  Room border/label moves update the declaration across all steps/paths without
+  moving occupants. Edit shared home layout changes starting positions. Moves stay in the frame
   and commit as one undo action; Escape cancels. See [the editing guide](../docs/homemap-workbench.md).
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",

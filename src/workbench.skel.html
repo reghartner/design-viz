@@ -214,6 +214,7 @@
               <label>Open diagram in<select class="fctl" id="steps-opening-view" aria-label="Open diagram in">
                 <option value="ambient">Ambient view</option><option value="step">Step view</option><option value="ambient-only">Ambient only</option>
               </select></label>
+              <label class="playback-setting-check"><input type="checkbox" id="steps-show-ids" checked> Show step IDs in captions</label>
               <label class="playback-setting-check"><input type="checkbox" id="steps-autoplay"> Autoplay when opened</label>
               <p class="fnote">Applies to this section and all its paths when entering step view. Off by default; plays every 3 seconds when on. The editor preview always starts paused.</p>
             </details>
@@ -222,6 +223,7 @@
               <div class="path-settings-content">
                 <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
                 <label>Path color<input class="fctl" id="steps-path-color" type="color" aria-label="Path color"></label>
+                <label>Compare with<select class="fctl" id="steps-path-base" aria-label="Compare path with"></select></label>
                 <div class="story-actions"><button class="bbtn" id="steps-path-save">Update path</button><button class="bbtn" id="steps-path-remove">Remove alternate</button></div>
               </div>
             </details>

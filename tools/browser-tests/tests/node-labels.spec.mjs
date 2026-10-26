@@ -319,7 +319,7 @@ test('card icons keep their size and share a row height with or without controls
 
 /* #549 follow-up (Chuck): short (float) cards grow so the full-size icon has equal room above and below.
    row | fixture | assertion (scoped) | rejects
-   19 short card taller | cumulus Sentinel Auth (Command path) and Frozen (OTA rollout) floats | that card's .card height is 50 (was 44) | keeping 44 and squeezing the icon against the bottom edge
+   19 subtitled float taller | cumulus Sentinel Auth (Command path) and Frozen (OTA rollout) floats | that card's .card height is 58 for two title lines plus subtitle | squeezing labels or icons into the title-only 50-high card
    20 regular cards unchanged | every non-float card on both boards | .card height stays 54 | growing every card
    21 equal icon gaps | Sentinel Auth and Frozen | icon top − control-row bottom equals card bottom − icon bottom (±1), both ≥ 2 | icon touching the control row or the card edge
    22 icon full size | same | .icbg 26×26 | shrinking the icon instead
@@ -352,7 +352,7 @@ test('short float cards grow so the full-size icon has equal space above and bel
       return {cards,hitBottom:Math.max(...hits),iconY:Number(bg.getAttribute('y')),iconW:bg.getBBox().width,iconH:bg.getBBox().height,ends};
     },{floatId,edgeIds});
     const short=g.cards.find(c=>c.id===floatId);
-    expect.soft(short.h,`${label}: ${floatId} card is 50 high`).toBe(50);
+    expect.soft(short.h,`${label}: ${floatId} reserves 58 for title and subtitle`).toBe(58);
     for(const c of g.cards.filter(c=>!floats.has(c.id)))expect.soft(c.h,`${label}: ${c.id} keeps 54`).toBe(54);
     expect(g.hitBottom,`${label}: ${floatId} has its controls`).toBeGreaterThan(0);
     const top=g.iconY-g.hitBottom,bottom=short.h-(g.iconY+g.iconH);
@@ -367,6 +367,8 @@ test('short float cards grow so the full-size icon has equal space above and bel
     }
     const hit=(a,b)=>a.left<b.right-0.5&&a.right>b.left+0.5&&a.top<b.bottom-0.5&&a.bottom>b.top+0.5;
     g.cards.forEach((a,i)=>g.cards.slice(i+1).forEach(b=>expect.soft(hit(a.box,b.box),`${label}: ${a.id} and ${b.id} do not overlap`).toBe(false)));
+    const labels=await expectBoundedLabels(board,authoredOf(diagram));
+    expect.soft(labels.failures,`${label}: title lines and subtitles remain separate and bounded`).toEqual([]);
     await board.screenshot({path:info.outputPath(`short-${floatId}.png`)});
   }
 });

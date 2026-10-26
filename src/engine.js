@@ -895,9 +895,9 @@ function fitLaneNodeTitle(node, title, width, subtitle, measurement){
     secondRight = Math.min(secondRight, Number(detail.getAttribute('x')) - 4);
     subRight = Math.min(subRight, Number(detail.getAttribute('x')) - 4);
   }
-  /* Short (float) cards have no room for two title lines above a subtitle,
-     and their single title line box needs the full card to clear it. */
-  var twoLines = !(hasSub && Number(card.getAttribute('height')) < 54);
+  /* Layout reserves 58px for floats with subtitles. Keep the fallback for
+     older/custom short card geometry supplied directly to the fitter. */
+  var twoLines = Number(card.getAttribute('height')) >= 54 || !hasSub;
   if (!twoLines){ titleY = 27; subY = 43; }
   var cache = measurement && measurement.cache, key = null, needsTip = false;
   if (cache && measurement.typography){
@@ -1078,7 +1078,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   s += '<g>';
   (d.edges || []).forEach(function(e, i){
     var k = protos[e.kind] ? e.kind : 'int';
-    s += '<path class="halo dv-protocol-stroke' + (e.delta === true ? ' dvd' : '') + '" data-dv-edge="' + i + '"' + fragmentAttrs(e) +
+    s += '<path class="halo dv-protocol-stroke' + (e.delta === true ? ' dvd' : '') + (reviewEdgeBaseline(d,e) ? ' review-baseline' : '') + '" data-dv-edge="' + i + '"' + fragmentAttrs(e) +
          ' style="' + protocolColorStyle(protos, k) + '" stroke="' +
          kindColor(protos, k, skinBase(skin)) + '" d="' + edgePath(e, L, ADJ[i]) + '"/>';
   });
@@ -1087,7 +1087,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
     if (L.routing === 'lanes') s += '<path class="lane-bridge" data-dv-edge="'+i+'"'+fragmentAttrs(e)+' stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
-    s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
+    s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + (reviewEdgeBaseline(d,e) ? ' review-baseline' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +
          '" stroke="' + kindColor(protos, k, skinBase(skin)) +
@@ -1099,7 +1099,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   Object.keys(d.nodes).forEach(function(id){
     var n = d.nodes[id] || {}, p = L.pos[id];
     if (!p) return;
-    var small = p.h === FLOAT_H;
+    var small = p.float === true;
     var icon = ICON_SET.indexOf(n.icon) >= 0 ? n.icon : 'gear';
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var nodeStyle = NODE_STYLE_SET.indexOf(n.style) >= 0 ? n.style : null;
@@ -1107,8 +1107,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var nodeTitle = n.title || id,hiddenAttrs=n.hidden===true?' data-dv-hidden="true"':'';
     if(isTextBoxNode(n)){
       var ts=textBoxStyle(n),tx=ts.align==='center'?p.w/2:ts.align==='right'?p.w-8:8;
-      s+='<g class="node node-text" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'"'+hiddenAttrs+' data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
-        '<rect class="text-box-hit" width="'+p.w+'" height="'+p.h+'" fill="transparent" pointer-events="all"/>'+
+      s+='<g class="node node-text'+(reviewBaseline(n)?' review-baseline':'')+'" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'"'+hiddenAttrs+' data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
+        nodeReviewBadge(n,p.w)+'<rect class="text-box-hit" width="'+p.w+'" height="'+p.h+'" fill="transparent" pointer-events="all"/>'+
         '<text xml:space="preserve" font-family="'+esc(ts.fontFamily)+'" font-size="'+ts.fontSize+'" font-weight="'+(ts.bold?'700':'400')+'" font-style="'+(ts.italic?'italic':'normal')+'" text-decoration="'+(ts.underline?'underline':'none')+'" fill="'+(ts.color || 'var(--dtext)')+'" text-anchor="'+({left:'start',center:'middle',right:'end'}[ts.align])+'">'+
         textBoxLines(n).map(function(line,i){return '<tspan x="'+tx+'" y="'+(8+ts.fontSize+i*ts.fontSize*1.25)+'">'+esc(line)+'</tspan>';}).join('')+'</text></g>';
       return;
@@ -1124,9 +1124,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var controlCount=(hasNodeLink?1:0)+(hasReferences?1:0)+(siblingPages.length?1:0),slot=0;
     /* Cards: an 18-wide hit area per control from the top edge down to the
        icon, which keeps one position on every card of a size. */
-    /* Short cards: 12-high control row, then the icon with equal room above
-       and below it (50 - 12 - 26 = 2 × 6). */
-    var iconY=small?18:14,hitH=small?12:14,controlY=n.handoff?14:hitH/2;
+    /* Floats reserve the control row, then center the full-size icon in the
+       remaining height. Subtitled floats have more room than title-only ones. */
+    var hitH=small?12:14,iconY=small?hitH+(p.h-hitH-26)/2:14,controlY=n.handoff?14:hitH/2;
     function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
     var linkX=hasNodeLink?controlX(p.w-15):0;
     var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
@@ -1137,7 +1137,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
         '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
     }
-    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' + hiddenAttrs +
+    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + (reviewBaseline(n) ? ' review-baseline' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' + hiddenAttrs +
          (nodeStyle ? ' data-dv-style="' + nodeStyle + '"' : '') +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
@@ -1149,8 +1149,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<text class="t2" x="' + textX + '" y="' + (small?41:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
            '<rect class="icbg" x="12" y="' + iconY + '" width="26" height="26" rx="8"/>' +
            '<use href="#i-' + icon + '" x="17" y="' + (iconY+5) + '" width="16" height="16"/>' +
-           '<text class="t1" x="' + textX + '" y="' + (small?28:25) + '">' + esc(nodeTitle) + '</text>' +
-           '<text class="t2" x="' + textX + '" y="' + (small?43:41) + '">' + esc(n.sub || '') + '</text>')) +
+           '<text class="t1" x="' + textX + '" y="' + (small?27:25) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="' + textX + '" y="' + (small?43:41) + '">' + esc(n.sub || '') + '</text>')) + nodeReviewBadge(n,p.w) +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            controlHit(linkX,9) +
@@ -1181,7 +1181,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     if (node){
       nodeEls[id] = node;
       /* Cards with controls above the icon carry the marker at the other corner. */
-      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, !d.nodes[id].handoff && node.querySelector && node.querySelector('.nlink,.nbackref') ? L.pos[id].w - 4 : 4, -6);
+      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, !reviewStatus(d.nodes[id]) && !d.nodes[id].handoff && node.querySelector && node.querySelector('.nlink,.nbackref') ? L.pos[id].w - 4 : 4, -6);
     }
   });
   /* Fit this board's own cards: another board may reuse the same prefix. */
@@ -1283,21 +1283,22 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
       });
     }
-    if (e.label){
+    var status=reviewStatus(e),edgeLabel=(status?DESIGN_STATUS[status].symbol+' '+DESIGN_STATUS[status].label+(e.label?' · ':''):'')+(e.label || '');
+    if (edgeLabel){
       var lx = mid.x + (e.labelDx || 0), ly = mid.y - (stepN ? 16 : 9) + (e.labelDy || 0);
       var anchor = 'middle';
       var lt = document.createElementNS(SVGNS, 'text');
-      lt.setAttribute('class', 'lbl' + (e.delta === true ? ' dvd' : '')); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
+      lt.setAttribute('class', 'lbl' + (e.delta === true ? ' dvd' : '') + (reviewEdgeBaseline(d,e)?' review-baseline':'') + (status?' review-edge-status':'')); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
       lt.setAttribute('text-anchor', anchor);
       lt.setAttribute('data-dv-edge', String(info.idx));
-      lt.textContent = e.label;
+      lt.textContent = edgeLabel;
       markFragmentElement(lt, e);
       svg.appendChild(lt);
       labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy), badge: e.delta === true, coined: edgeSteps.length > 1});
       info.labelEl = lt; /* stepper lights the label together with its edge */
     }
     if (e.delta === true){
-      if (e.label){
+      if (edgeLabel){
         /* labeled edges wear the badge at the label's top-right; created
            after the collision pass so it sits on the label's FINAL position
            (author labelDx/labelDy nudges included — a committed label drag
@@ -1320,6 +1321,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     Object.keys(d.nodes).forEach(function(id){
       var p = L.pos[id];
       if (p) obstacles.push({x: p.cx - p.w/2 - 2, y: p.cy - p.h/2 - 2, w: p.w + 4, h: p.h + 4});
+      if(p && reviewStatus(d.nodes[id]))obstacles.push({x:p.cx+p.w/2-82,y:p.cy-p.h/2-12,w:84,h:21});
       if (p && d.nodes[id] && d.nodes[id].delta === true)
         obstacles.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
     });
@@ -1375,6 +1377,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   (function(){
     Object.keys(d.nodes).forEach(function(id){
       var p = L.pos[id];
+      if(p && reviewStatus(d.nodes[id]))deltaRects.push({x:p.cx+p.w/2-80,y:p.cy-p.h/2-10,w:80,h:17});
       if (p && d.nodes[id].delta === true) deltaRects.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
     });
     if (!coinRects.length && !deltaRects.length) return;
@@ -1430,7 +1433,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
     var dot = document.createElementNS(SVGNS, 'circle');
-    dot.setAttribute('class', cls + ' dv-protocol-fill' + (info.e.delta === true ? ' dvd' : ''));
+    dot.setAttribute('class', cls + ' dv-protocol-fill' + (info.e.delta === true ? ' dvd' : '') + (reviewEdgeBaseline(d,info.e)?' review-baseline':''));
     dot.setAttribute('r', SK.glow ? 4 : 3.4);
     dot.setAttribute('fill', col);
     dot.setAttribute('style', protocolColorStyle(protos, info.kind));
@@ -1647,7 +1650,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
             text: (st && st.text) || '',
             link: (st && typeof st.link === 'string') ? st.link : null,
-            codeRefs:st && st.codeRefs,conditions:st && st.conditions};
+            verdict:st && st.verdict,ref:st && st.ref,codeRefs:st && st.codeRefs,conditions:st && st.conditions};
   }); }
   var steps = playbackSteps(d);
   var N = steps.length;
@@ -1906,6 +1909,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.borderColor = lm.color;
     }
     stepText.innerHTML = proseMarkup(s.text);
+    if(termbar.reviewVerdict)termbar.reviewVerdict.innerHTML=reviewBadgeHTML(s,true)+(typeof s.ref==='string'?'<span class="review-ref">'+esc(s.ref)+'</span>':'');
+    renderPathReview(termbar.reviewComparison,source,selectedPath.id,cur);
     if(termbar.sharedStatus){
       var sharing=pathStepSharing(filteredPaths(true)).get(selectedPath.indices[cur]);
       termbar.sharedStatus.hidden=!(sharing && sharing.downstream);
@@ -1921,7 +1926,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
     if (termbar.stepIdEl){
       termbar.stepIdEl.textContent = s.id || '';
-      termbar.stepIdEl.hidden = !s.id;
+      termbar.stepIdEl.hidden = !s.id || source.showStepIds===false;
     }
     if (s.link){ termbar.srcA.href = s.link; termbar.srcA.hidden = false; }
     else { termbar.srcA.hidden = true; }
@@ -2063,6 +2068,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function enterAmbient(){
     if (destroyed) return;
+    if(termbar.reviewComparison)termbar.reviewComparison.hidden=true;
     mode = 'ambient';
     clearWireContracts();
     stopAuto();
@@ -3114,7 +3120,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   }
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
-  lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
+  lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos) + reviewLegendHTML(d);
   result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
@@ -3206,6 +3212,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   copyStep.innerHTML = COPY_ICON; copyStep.title = 'Copy link';
   copyStep.setAttribute('aria-label', 'Copy link to this diagram step');
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
+  var reviewVerdict=document.createElement('span');reviewVerdict.className='step-review';line.appendChild(reviewVerdict);
   line.appendChild(failureStatus);line.appendChild(sharedStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   line.appendChild(evidenceLinks);
@@ -3218,6 +3225,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   playbackStatus.title = 'Shows whether the steps advance automatically. Animations within the current step can continue while paused.';
   transport.appendChild(playbackStatus); bar.appendChild(transport);
   bar.appendChild(chips); bar.appendChild(line);
+  var reviewComparison=document.createElement('details');reviewComparison.className='path-review';reviewComparison.hidden=true;box.appendChild(reviewComparison);
   boardLayout.controlsHost.appendChild(bar);
 
   /* print-only numbered caption list (C4) */
@@ -3230,7 +3238,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     (diagram.steps || []).forEach(function(st){
       if(printFilter && printFilter.indexOf(st.id)<0)return;
       var li = document.createElement('li');
-      li.innerHTML = esc(st && st.lane ? '[' + st.lane + '] ' : '') + proseMarkup(st && st.text) +
+      li.innerHTML = reviewBadgeHTML(st,true)+(typeof st.ref==='string'?'<span class="review-ref">'+esc(st.ref)+'</span>':'')+esc(st && st.lane ? '[' + st.lane + '] ' : '') + proseMarkup(st && st.text) +
         esc(Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
       ol.appendChild(li);
     });
@@ -3239,7 +3247,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
+    bar:bar, chips:chips, reviewVerdict:reviewVerdict,reviewComparison:reviewComparison,stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow)result.follow.update();},viewSteps:function(ids,pathIds){
     var pathSteps=null;

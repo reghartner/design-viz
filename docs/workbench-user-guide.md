@@ -50,7 +50,8 @@ Start with **Your first diagram** for a complete walkthrough. The chapter list
 then covers the workspace, rows and free placement, quick connections, step
 playback, alternate paths, panels, Home editing, named views, catalogs and code
 evidence, copying, sharing, and working with an agent. The **Alternate outcomes**
-chapter illustrates a shared prefix, independent failure/recovery beats, and a
+chapter also covers Today/Proposed comparisons, review verdicts and decision
+references (see [design reviews](design-review.md)). It illustrates a shared prefix, independent failure/recovery beats, and a
 shared suffix, and explains when to make a step independent. **Steps & playback**
 explains story time: the section's start and formats, each step's time,
 battery drain rates, and device-app report times whose "Updated … ago" text the

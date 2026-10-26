@@ -559,6 +559,8 @@ function nodeForm(val, ctx){
         nodeColorControl(val.tint,function(v){return commitSimple('tint',v==null?null:JSON.stringify(v));})),
       frow('Node style', nodeStyleControl(val.style,function(v){return commitSimple('style',v==null?null:JSON.stringify(v));})),
       frow('Placement', floatControl),
+      frow('Review status',selectControl(Object.keys(DESIGN_STATUS),val.status || '',function(v){return commitSimple('status',v?JSON.stringify(v):null);},true)),
+      frow('Baseline context',checkboxControl(reviewBaseline(val),function(on){return commitSimple('presentation',on?JSON.stringify('baseline'):null);})),
       frow('Group', groupControl(val.group, function(v){
         return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
@@ -836,6 +838,8 @@ function edgeForm(val, ctx){
       frow('to', endpoint('to'))
     ].concat(portRows('fromPort','Exit'),portRows('toPort','Entry'),[portHint,
       frowBlock('Connection type',vocabularyControl('protocols',ctx.page,val.kind || 'int',t)),
+      frow('Review status',selectControl(Object.keys(DESIGN_STATUS),val.status || '',function(v){return commitSimple('status',v?JSON.stringify(v):null);},true)),
+      frow('Baseline context',checkboxControl(reviewBaseline(val),function(on){return commitSimple('presentation',on?JSON.stringify('baseline'):null);})),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val),
@@ -891,6 +895,8 @@ function stepForm(val, ctx){
       },{placeholder:'optional stable-step-id'})),
       frowBlock('text', proseControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {key:'text',label:'text'}))
     ].concat(stepTimeRows(val,ctx,t));
+    rows.push(frow('Review verdict',selectControl(Object.keys(STEP_VERDICTS),val.verdict || '',function(v){return commitSimple('verdict',v?JSON.stringify(v):null);},true)));
+    rows.push(frow('Decision reference',textControl(val.ref,function(v){return commitSimple('ref',v==null?null:JSON.stringify(v));},{placeholder:'decision 4'})));
     var colorBox=document.createElement('div');colorBox.className='step-color-control';
     function commitColor(value){
       if(value!=null && !stepCircleColor({color:value})){formError('Use a color like #38bdf8 or #abc.');return false;}

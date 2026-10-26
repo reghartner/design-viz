@@ -391,7 +391,8 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .story-tools label{display:block;font-size:11px;color:var(--sub);min-width:0;}
 .story-tools .fctl{display:block;width:100%;box-sizing:border-box;margin:3px 0;}
 .story-context{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px;flex:none;}
-.story-settings{display:flex;gap:6px;flex-wrap:wrap;flex:none;margin:4px 0;}
+/* Expanded settings scroll independently so step rows and actions stay reachable. */
+.story-settings{display:flex;gap:6px;flex-wrap:wrap;flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;margin:4px 0;}
 .story-settings>details,.story-more-actions,.story-sharing{font-size:11px;color:var(--sub);}
 .story-settings>details>summary,.story-sharing>summary{cursor:pointer;font-weight:600;}
 .story-settings>details[open]{flex:1 0 100%;box-sizing:border-box;}
@@ -1717,4 +1718,4 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 #docview [data-dv-para]:focus-visible,#docview [data-dv-bullet-path]:focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
 
 /* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */
-body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3;}
+body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3!important;}

@@ -1175,9 +1175,11 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     el._boardSVG.remove();
   }
   el._boardSVG = svg;
+  /* The editor and its read-only previews can share SVG IDs. Keep
+     geometry and playback references inside this board. */
   var nodeEls = {};
   Object.keys(d.nodes).forEach(function(id){
-    var node = document.getElementById(prefix + '-n-' + id);
+    var node = svg.getElementById(prefix + '-n-' + id);
     if (node){
       nodeEls[id] = node;
       /* Cards with controls above the icon carry the marker at the other corner. */
@@ -1237,7 +1239,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   }
   (d.edges || []).forEach(function(e){
     var info = edgeIds[e.from + '->' + e.to];
-    var path = document.getElementById(info.domId);
+    var path = svg.getElementById(info.domId);
     info.pathEl = path;
     info.haloEl = svg.querySelector('path.halo[data-dv-edge=\"' + info.idx + '\"]');
     var len = path.getTotalLength();
@@ -1329,7 +1331,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     deltaRects.forEach(function(r){ obstacles.push(r); });
     (d.edges || []).forEach(function(e){
       var info = edgeIds[e.from + '->' + e.to];
-      var path = document.getElementById(info.domId);
+      var path = svg.getElementById(info.domId);
       var len = path.getTotalLength();
       for (var t = 18; t < len - 8; t += 36){
         var pt = path.getPointAtLength(t);
@@ -1459,7 +1461,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     stepDeliveredKeys(st).forEach(function(k, j){
       var info = edgeIds[k];
       if (!info) return;
-      var path = document.getElementById(info.domId);
+      var path = svg.getElementById(info.domId);
       var dur = Math.max(1.6, path.getTotalLength() / 260);
       var dot = makeDot(info, 'pkt loopdot');
       dot.appendChild(motion(info.domId, dur, (-(i * 0.7 + j * 0.35)).toFixed(2) + 's', false));
@@ -1474,7 +1476,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var info = edgeIds[k];
       if (!info || manualDone[k]) return;
       manualDone[k] = true;
-      var path = document.getElementById(info.domId);
+      var path = svg.getElementById(info.domId);
       var dur = clamp(path.getTotalLength() / 450, 0.8, 1.6);
       var dot = makeDot(info, 'pkt cpkt');
       dot.appendChild(motion(info.domId, dur, 'indefinite', true, prefix + '-am-' + info.idx));
@@ -1837,7 +1839,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     keys.forEach(function(key){
       var info = board.edgeIds[key];
       if (!info) return;
-      var pe = document.getElementById(info.domId);
+      var pe = svg.getElementById(info.domId);
       if (pe) pe.classList.add('lit');
       if (info.labelEl) info.labelEl.classList.add('lit');
     });
@@ -1864,7 +1866,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function fireDot(key, delayMs){
     var info = board.edgeIds[key];
     if (!info || RM) return;
-    var am = document.getElementById(prefix + '-am-' + info.idx);
+    var am = svg.getElementById(prefix + '-am-' + info.idx);
     if (!am) return;
     var go = function(){
       if (destroyed) return;
@@ -1966,7 +1968,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     } else {
       s.keys.forEach(function(key, j){ fireDot(key, j * 450); });
     }
-    var coin = document.getElementById(prefix + '-coin-' + (cur + 1));
+    var coin = svg.getElementById(prefix + '-coin-' + (cur + 1));
     if (coin) coin.classList.add('lit');
     syncPathControls();
     updateCaption(s, tween);

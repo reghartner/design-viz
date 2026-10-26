@@ -105,7 +105,7 @@ function place(nodes, inputEdges, options={}) {
   const t=topology(n,edges),aspect=options.aspectRatio??1.45;
   t.scoreMasks=[];t.distanceCosts=[];t.feedbackEdges=edges.map(([a,b])=>t.feedback.has(a+','+b));
   t.disjointEdges=edges.map(([a,b],ei)=>edges.map((e,i)=>i).filter(ej=>{const [c,d]=edges[ej];return ei!==ej&&a!==c&&a!==d&&b!==c&&b!==d&&c!==d;}));
-  const xStep=Math.max(...nodes.map(n=>n.width))+ (options.columnGap??76),yStep=Math.max(...nodes.map(n=>n.height))+(options.rowGap??88);
+  const xStep=Math.max(...nodes.map(n=>n.width))+ (options.columnGap??176),yStep=Math.max(...nodes.map(n=>n.height))+(options.rowGap??138);
   const strideRatio=xStep/yStep,baseCols=Math.max(2,Math.round(Math.sqrt(n*1.6*aspect/strideRatio)));
   const restarts=options.restarts??4,iterations=options.iterations??defaultIterations(n);
   let best=null;const candidates=[];

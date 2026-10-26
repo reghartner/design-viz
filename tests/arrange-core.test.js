@@ -74,6 +74,16 @@ test('dimension API separates mixed rectangular cards and ignores supplied coord
   const changed=structuredClone(input);changed.nodes.forEach(n=>{n.x=0;n.y=0;});assert.deepEqual(result.positions,arrangeGraph(changed,quick).positions);
 });
 
+test('placement defaults add room between columns and rows while explicit gaps remain exact',()=>{
+  const context={};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/arrange/placement.js'),'utf8'),context);
+  const place=context.FlowArrangePlacement.place,nodes=[{id:'a',width:100,height:40},{id:'b',width:100,height:40}],edges=[[0,1]],options={seed:71,restarts:1,iterations:200};
+  function gaps(extra){const positions=place(nodes,edges,{...options,...extra}).positions;return {x:Math.abs(positions[0].x-positions[1].x)-100,y:Math.abs(positions[0].y-positions[1].y)-40};}
+  assert.equal(gaps({aspectRatio:4}).x,176);
+  assert.equal(gaps({aspectRatio:.25}).y,138);
+  assert.equal(gaps({aspectRatio:4,columnGap:76,rowGap:88}).x,76);
+  assert.equal(gaps({aspectRatio:.25,columnGap:76,rowGap:88}).y,88);
+});
+
 test('cycles and nonplanar topology produce complete valid native diagrams',()=>{
   const cycle=diagram(['a','b','c','d','e'],[['a','b'],['b','c'],['c','d'],['d','a'],['a','c'],['c','e']]);
   const bipartite=diagram(['a','b','c','d','e','f'],['a','b','c'].flatMap(a=>['d','e','f'].map(b=>[a,b])));

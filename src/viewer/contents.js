@@ -21,6 +21,8 @@ function createReaderContents(ctl,nav,actions,options){
   var viewPicker=options.singleReaderToolbar?element('select','reader-view-picker',null,viewSwitcher):null;if(viewPicker){viewPicker.setAttribute('aria-label','Choose View');viewPicker.hidden=true;}top.appendChild(actions);
   var utilities=element('details','reader-utilities',null,actions),utilitySummary=element('summary','reader-button','⋯',utilities);utilitySummary.setAttribute('aria-label','More actions');
   var utilityBody=element('div','reader-utility-options',null,utilities);
+  var pageUtilities=element('details','reader-page-utilities',null,actions),pageUtilitySummary=element('summary','reader-button','⋯',pageUtilities);pageUtilitySummary.setAttribute('aria-label','More page actions');
+  var pageUtilityBody=element('div','reader-utility-options reader-page-utility-options',null,pageUtilities);pageUtilities.hidden=true;actions.insertBefore(pageUtilities,utilities);
   var toolbar=element('div','reader-toolbar',null,nav),zoomGroup=element('div','reader-zoom-controls',null,toolbar);
   var zoomScope=options.zoomLabels?element('span','reader-zoom-scope','Canvas zoom',zoomGroup):null;
   var minus=button('Zoom out','−',zoomGroup,function(){zoomBy(.8);});
@@ -102,13 +104,13 @@ function createReaderContents(ctl,nav,actions,options){
     if(value && !overflowActions){
       var node=actions.querySelector(':scope > .viewport-actions');if(!node)return;
       var focused=activeElement(),restore=node.contains(focused)?focused:null;if(!restore)closeNestedMenus(node);
-      var anchor=doc.createComment('reader overflow actions'),entry={node:node,anchor:anchor};node.before(anchor);utilityBody.appendChild(node);moved.push(entry);overflowActions=entry;utilities.classList.add('reader-utilities-collapsed');utilities.hidden=false;
-      if(restore){utilities.open=true;reopenNestedMenus(node);restore.focus({preventScroll:true});}
+      var anchor=doc.createComment('reader overflow actions'),entry={node:node,anchor:anchor};node.before(anchor);pageUtilityBody.appendChild(node);moved.push(entry);overflowActions=entry;pageUtilities.hidden=false;
+      if(restore){pageUtilities.open=true;reopenNestedMenus(node);restore.focus({preventScroll:true});}
     }
     else if(!value && overflowActions){
-      var entry=overflowActions,index=moved.indexOf(entry),focused=activeElement(),restore=entry.node.contains(focused)?focused:null,summaryFocused=focused===utilitySummary;
-      if(entry.anchor.parentNode && utilityBody.contains(entry.node))entry.anchor.before(entry.node);entry.anchor.remove();if(index>=0)moved.splice(index,1);overflowActions=null;utilities.classList.remove('reader-utilities-collapsed');utilities.open=false;utilities.hidden=!utilityBody.children.length;
-      if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !utilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
+      var entry=overflowActions,index=moved.indexOf(entry),focused=activeElement(),restore=entry.node.contains(focused)?focused:null,summaryFocused=focused===pageUtilitySummary;
+      if(entry.anchor.parentNode && pageUtilityBody.contains(entry.node))entry.anchor.before(entry.node);entry.anchor.remove();if(index>=0)moved.splice(index,1);overflowActions=null;pageUtilities.open=false;pageUtilities.hidden=true;
+      if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !pageUtilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
     }
   }
   function fitToggle(width){
@@ -116,14 +118,16 @@ function createReaderContents(ctl,nav,actions,options){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
       function settle(){
-        top.classList.remove('reader-toggle-compact');viewStrip.hidden=false;viewPicker.hidden=true;
-        function viewOverflow(){var stripRect=viewStrip.getBoundingClientRect(),clipped=Array.from(viewStrip.children).some(function(choice){return choice.scrollWidth>choice.clientWidth+1;});return clipped || viewStrip.scrollWidth>viewStrip.clientWidth+1 || stripRect.height>38 || top.scrollWidth>top.clientWidth+1;}
+        top.classList.remove('reader-toggle-compact');viewSwitcher.style.removeProperty('max-width');viewStrip.hidden=false;viewPicker.hidden=true;
+        function toolbarOverlap(){if(width<=900)return false;var center=toolbar.getBoundingClientRect(),fitBounds=fit.hidden?center:fit.getBoundingClientRect(),left=Math.min(center.left,fitBounds.left),right=Math.max(center.right,fitBounds.right);return [viewSwitcher,actions].some(function(node){var rect=node.getBoundingClientRect();return rect.width && rect.right>left-6 && rect.left<right+6;});}
+        function fitViewSwitcher(){if(width<=900)return;var center=toolbar.getBoundingClientRect(),rect=viewSwitcher.getBoundingClientRect(),available=Math.floor(center.left-rect.left-6);if(rect.right>center.left-6 && available>0)viewSwitcher.style.maxWidth=Math.max(80,available)+'px';}
+        function viewOverflow(){var stripRect=viewStrip.getBoundingClientRect(),clipped=Array.from(viewStrip.children).some(function(choice){return choice.scrollWidth>choice.clientWidth+1;});return clipped || viewStrip.scrollWidth>viewStrip.clientWidth+1 || stripRect.height>38 || top.scrollWidth>top.clientWidth+1 || toolbarOverlap();}
         if(!narrow && viewOverflow())top.classList.add('reader-toggle-compact');
-        var needs=viewStrip.children.length>1 && viewOverflow();if(needs){viewStrip.hidden=true;viewPicker.hidden=false;}
+        fitViewSwitcher();var needs=viewStrip.children.length>1 && viewOverflow();if(needs){viewStrip.hidden=true;viewPicker.hidden=false;fitViewSwitcher();}
         if(!narrow && top.scrollWidth>top.clientWidth+1)top.classList.add('reader-toggle-compact');return needs;
       }
       var needsPicker=settle();
-      if(!overflowActions && (top.scrollWidth>top.clientWidth+1 || needsPicker && viewSwitcher.getBoundingClientRect().width<120)){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
+      if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || needsPicker && viewSwitcher.getBoundingClientRect().width<120 || Math.max(toolbar.getBoundingClientRect().right,fit.hidden?0:fit.getBoundingClientRect().right)>actions.getBoundingClientRect().left-6)){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;
@@ -279,7 +283,7 @@ function createReaderContents(ctl,nav,actions,options){
   function updateZoom(){var value=zoom(),explore=!!(owner && owner.current && owner.current.presentation==='explore');zoomSummary.textContent=(Number.isFinite(value)?Math.round(value*100):100)+'% ⌄';minus.disabled=plus.disabled=!current;fit.disabled=!current;fit.hidden=!explore;
     if(zoomScope){var vp=viewportRecord && viewportRecord.viewport,scope=vp && vp.isExplore() && vp.panelPlacement()!=='canvas'?'Diagram':'Canvas';zoomScope.textContent=scope+' zoom';zoomSummary.setAttribute('aria-label',scope+' zoom');minus.setAttribute('aria-label',scope+' zoom out');plus.setAttribute('aria-label',scope+' zoom in');}
   }
-  function release(){moved.slice().reverse().forEach(function(entry){if(nav.contains(entry.node) && entry.anchor.parentNode)entry.anchor.before(entry.node);entry.anchor.remove();});moved=[];overflowActions=null;actionAttemptWidth=null;utilities.classList.remove('reader-utilities-collapsed');}
+  function release(){moved.slice().reverse().forEach(function(entry){if(nav.contains(entry.node) && entry.anchor.parentNode)entry.anchor.before(entry.node);entry.anchor.remove();});moved=[];overflowActions=null;actionAttemptWidth=null;pageUtilities.open=false;pageUtilities.hidden=true;}
   function refresh(rec,actual){
     if(retired)return;
     current=rec;viewportRecord=actual || rec;owner=ctl.views && ctl.views.owner(rec);members=ctl.views?ctl.views.members(rec):[];if(embedded())members=members.filter(function(member){return member===embedded();});
@@ -300,8 +304,9 @@ function createReaderContents(ctl,nav,actions,options){
     // Tab bar's real copy control; a host-owned share action consolidates it.
     release();
     if(!options.singleShareAction && !options.skipTabShare && owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
+    if(options.singleReaderToolbar){var pageActions=actions.querySelector(':scope > .viewport-actions');if(pageActions)Array.from(actions.querySelectorAll(':scope > .embedcopy')).filter(function(node){return node!==copy;}).forEach(function(node){var anchor=doc.createComment('reader page action');node.before(anchor);pageActions.appendChild(node);moved.push({node:node,anchor:anchor});});}
     Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
-    var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}
+    if(!options.singleReaderToolbar){var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}}
     utilities.hidden=!utilityBody.children.length;
     scrollHeld=true;cancelAnimationFrame(holdFrame);holdFrame=requestAnimationFrame(function(){scrollHeld=false;pinnedTop=current && current.sectionEl.getBoundingClientRect().top;});
     drawViews();drawTree();updateZoom();updateTheme();geometry();

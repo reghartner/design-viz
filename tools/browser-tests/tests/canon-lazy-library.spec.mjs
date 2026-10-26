@@ -647,7 +647,7 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
     {id:'incidents',name:'Incident response',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}
   ];d.defaultLayout='canvas';
   const other=structuredClone(section);other.id='alternate';other.heading='Alternate diagram';
-  source.page.sections=[{tabs:[{label:'First tab',sections:[section]},{label:'Second tab',sections:[other]}]}];
+  source.page.sections=[{tabs:[{label:'First tab',sections:[section]},{label:'Second tab',sections:[other]},{label:'Context',sections:[{id:'context',heading:'Context only',text:'A prose-only page has no diagram actions.'}]}]}];
   const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('checkout'),workspace=snapshot.loadWorkspace('checkout');
   await page.route('**/api/canon/context?*',route=>route.fulfill({json:{spec,...workspace,catalog:{version:1,services:[]}}}));
   const handoff={version:1,id:'checkout',revision:digest(spec),action:handoffAction || 'view'};
@@ -658,6 +658,10 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   await expect(edit).toBeEnabled();await expect(nav.locator('#canon-reader-edit')).toBeVisible();const original=await edit.elementHandle();
   await page.evaluate(()=>document.fonts.ready);
   const topHeight=()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height),topHeights=new Map();
+  const stableGeometry=()=>nav.evaluate(el=>{
+    const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right};},bounds=el.getBoundingClientRect(),pager=box(el.querySelector('.reader-page-index')),zoom=box(el.querySelector('.reader-zoom-controls'));
+    return {navCenter:bounds.x+bounds.width/2,coreCenter:(pager.x+zoom.right)/2,pagerX:pager.x,zoomX:zoom.x,common:['canon-reader-edit','canon-reader-copy'].map(id=>box(el.querySelector('#'+id)).x).concat(box(el.querySelector('.explore-tour-button')).x)};
+  }),stableGeometries=new Map();
   async function desktopHeader(width){
     await expect.poll(()=>nav.evaluate((el,width)=>{
       const top=el.querySelector('.reader-top'),views=el.querySelector('.reader-view-strip');
@@ -680,15 +684,15 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   async function reachableControls(){
     await expect.poll(()=>nav.evaluate(el=>{
       const bounds=el.getBoundingClientRect(),controls=Array.from(el.querySelectorAll('.reader-top select,.reader-top button,.reader-top summary,.reader-toolbar button,.reader-toolbar summary')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({node,rect:node.getBoundingClientRect()}));
-      return controls.every(({node,rect:r})=>r.left>=bounds.left && r.right<=bounds.right && r.top>=bounds.top && r.bottom<=bounds.bottom && node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)));
-    })).toBe(true);
+      return controls.filter(({node,rect:r})=>r.left<bounds.left || r.right>bounds.right || r.top<bounds.top || r.bottom>bounds.bottom || !node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))).map(({node,rect:r})=>({width:innerWidth,label:node.getAttribute('aria-label') || node.textContent.trim(),left:r.left,right:r.right,top:r.top,bottom:r.bottom,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.getAttribute('aria-label') || document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.textContent.trim()}));
+    })).toEqual([]);
   }
   for(const width of [1440,1201,1200,1120,1101,1100,900,390,320]){
     await page.setViewportSize({width,height:1000});await reachableEdit();
     await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
     if(width>670)await desktopHeader(width);
     await expect(nav.locator('.reader-utility-options button[aria-label^="Copy link"]')).toHaveCount(1);
-    await reachableControls();topHeights.set(width,await topHeight());
+    await reachableControls();topHeights.set(width,await topHeight());if(width>900)stableGeometries.set(width,await stableGeometry());
     if([1440,1200,1120,900,390,320].includes(width))await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
   }
   for(const width of [1201,1200,1120,1101,1100,900]){
@@ -699,10 +703,10 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
     // At 1100px a stale compact-toggle cache added a third View row on return.
     for(let round=0;round<([1100,1120].includes(width)?2:1);round++){
       await chooseNavigation(nav,'View','Overview');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await reachableEdit();
-      await desktopHeader(width);await reachableControls();
+      await desktopHeader(width);await reachableControls();if(width>900)expect(await stableGeometry()).toEqual(stableGeometries.get(width));
       if(round===0)overviewHeight=await topHeight();else await expect.poll(topHeight).toBe(overviewHeight);
       await chooseNavigation(nav,'View','Engineering');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
-      await desktopHeader(width);await reachableControls();await expect.poll(topHeight).toBe(topHeights.get(width));
+      await desktopHeader(width);await reachableControls();if(width>900)expect(await stableGeometry()).toEqual(stableGeometries.get(width));await expect.poll(topHeight).toBe(topHeights.get(width));
     }
   }
   for(const width of [1440,390,320]){
@@ -713,6 +717,11 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
     await chooseNavigation(nav,'View','Engineering');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
     await expect.poll(()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height)).toBe(topHeights.get(width));
     expect(await original.evaluate(el=>el===document.querySelector('#canon-reader-edit'))).toBe(true);
+  }
+  for(const width of [1440,1200,1100]){
+    await page.setViewportSize({width,height:1000});await chooseNavigation(nav,'Tab','Context');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(nav.locator('.viewport-actions')).toHaveCount(0);
+    const proseGeometry=await stableGeometry(),diagramGeometry=stableGeometries.get(width);expect(proseGeometry).toEqual(diagramGeometry);expect(proseGeometry.coreCenter).toBeCloseTo(proseGeometry.navCenter,0);
+    await chooseNavigation(nav,'Tab','First tab');await chooseNavigation(nav,'View','Engineering');
   }
   await page.setViewportSize({width:1440,height:1000});const copy=nav.getByRole('button',{name:'Copy link to current position',exact:true});await copy.click();
   const copied=new URL(await page.evaluate(()=>window.__copiedCanonLinks.at(-1)));expect(copied.searchParams.get('diagram')).toBe('checkout');expect(copied.hash).toContain('t=first-tab');expect(copied.hash).toContain('d='+section.id);expect(copied.hash).toContain('v=canvas');

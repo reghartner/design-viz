@@ -17,6 +17,34 @@ async function openRaw(page,server,raw,name='contents'){
 }
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
+test('desktop reader keeps common navigation and utilities fixed when diagram actions appear',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const diagram=story().page.sections[0].tabs[0].sections[0].diagram;
+  const raw={page:{title:'Stable reader toolbar',sections:[{tabs:[{label:'Only tab',defaultView:'journey',views:[{id:'journey',name:'Journey',presentation:'explore',sections:['prose','diagram']}],sections:[
+    {id:'prose',heading:'Context only',text:'This page intentionally has no diagram controls.'},
+    {id:'diagram',heading:'Interactive diagram',text:'Diagram context.',diagram}
+  ]}]}]}};
+  const root=await openRaw(page,server,raw,'stable-reader-toolbar'),nav=root.locator('.reader-navigation');await page.evaluate(()=>document.fonts.ready);
+  const positions=()=>nav.evaluate(el=>{
+    const rect=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+    const bounds=rect(el),pager=rect(el.querySelector('.reader-page-index')),zoom=rect(el.querySelector('.reader-zoom-controls'));
+    const common=Array.from(el.querySelectorAll('.reader-utility-options>:is(button,.embedcopy),.reader-utility-options>.explore-tour-button')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({label:node.getAttribute('aria-label') || node.textContent.trim(),...rect(node)}));
+    return {bounds,pager,zoom,common,coreCenter:(pager.x+zoom.right)/2};
+  });
+  const prose=await positions();expect(prose.coreCenter).toBeCloseTo(prose.bounds.x+prose.bounds.width/2,0);expect(prose.common[0].label).toBe('Copy link to tab Only tab');expect(prose.common[1].label).toMatch(/tour/i);
+  await nav.getByRole('button',{name:'Next page',exact:true}).click();await expect(nav.locator('.reader-page-label')).toHaveText('Page 2 of 2');
+  await expect(nav.locator('.viewport-actions')).toBeVisible();await expect(nav.locator('.viewport-actions').getByRole('button',{name:/Expand/i})).toBeVisible();
+  const activeViewportControls=nav.locator('.viewport-actions :is(button,summary):visible');expect(await activeViewportControls.count()).toBeGreaterThan(1);
+  const diagramPage=await positions();expect(diagramPage.coreCenter).toBeCloseTo(diagramPage.bounds.x+diagramPage.bounds.width/2,0);
+  expect(diagramPage.pager.x).toBeCloseTo(prose.pager.x,0);expect(diagramPage.zoom.x).toBeCloseTo(prose.zoom.x,0);
+  expect(diagramPage.common).toEqual(prose.common);
+  const overlap=await nav.evaluate(el=>{
+    const common=Array.from(el.querySelectorAll('.reader-page-index,.reader-zoom-controls,.reader-utility-options>:is(button,.embedcopy),.reader-utility-options>.explore-tour-button')).filter(node=>node.checkVisibility({visibilityProperty:true}));
+    const variable=Array.from(el.querySelectorAll('.viewport-actions :is(button,summary)')).filter(node=>node.checkVisibility({visibilityProperty:true}));
+    return variable.some(a=>common.some(b=>{const x=a.getBoundingClientRect(),y=b.getBoundingClientRect();return x.left<y.right && x.right>y.left && x.top<y.bottom && x.bottom>y.top;}));
+  });expect(overlap).toBe(false);
+});
+
 test('one section rendered by two Views is two document pages in standalone, native and Workbench readers',async({page,server},info)=>{
   const base=story().page.sections[0].tabs[0].sections[0];
   const raw={page:{title:'Repeated section pages',sections:[{tabs:[{label:'Only Tab',defaultView:'first',views:[

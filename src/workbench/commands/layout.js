@@ -1056,28 +1056,55 @@ function builderMovableSpatial(text,raw,targets,layoutId,rects){
   got.noop=!targets.some(function(t){return t.kind!=='node' || !builderNodePositionLocked(got.d,t.id);});
   return got;
 }
-function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas){
+function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas,options){
   var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
   if(got.noop)return {noop:true};
   if(deltas.every(function(delta){return Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001;}))return {error:'The selected objects are already in position.'};
   if(targets.every(function(t,i){return t.kind==='node' && builderNodePositionLocked(got.d,t.id) || Math.abs(deltas[i].x)<.00001 && Math.abs(deltas[i].y)<.00001;}))return {noop:true};
-  var positions=layout(got.d).pos;
+  var positions=layout(got.d).pos,preserve=options && options.preserveEffectivePositions,selectedNodes=Object.create(null);
+  targets.forEach(function(t){if(t.kind==='node' && Object.prototype.hasOwnProperty.call(got.d.nodes || {},t.id))selectedNodes[t.id]=true;});
   return builderRewrite(text,raw,got.path,function(d){
     builderFreezeLockedPositions(d,positions);
+    function coordinate(value){var tenth=Math.round(value*10)/10;return Math.abs(value-tenth)<.0001?tenth:value;}
+    function assign(object,key,value){value=coordinate(value);if(!Number.isFinite(object[key]) || Math.abs(object[key]-value)>=.0001)object[key]=value;}
+    function remove(object,key){if(Object.prototype.hasOwnProperty.call(object,key))delete object[key];}
     var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
+    var automaticChanged=false;
     for(var i=0;i<targets.length;i++){
       var t=targets[i],r=rects[i],delta=deltas[i],x=r.x+delta.x,y=r.y+delta.y;
       if(t.kind==='node' && builderNodePositionLocked(got.d,t.id))continue;
       if(!floatCoordinate(x) || !floatCoordinate(y) || !floatCoordinate(x+r.w/2) || !floatCoordinate(y+r.h/2))return {error:'Movement is outside the supported canvas coordinates.'};
-      if(Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001)continue;
       if(t.kind==='node'){
         var f=d.floats.find(function(f){return f.id===t.id;});
-        if(delta.x){f.x=x+r.w/2;delete f.dx;}
-        if(delta.y){f.y=y+r.h/2;delete f.dy;}
+        if(preserve && !positionedFloat(f)){
+          // Spacing is measured from rendered centers. Pin both axes for an
+          // automatic float, including an anchored first lane, so rerendering
+          // cannot change either the expanded axis or its untouched axis.
+          assign(f,'x',x+r.w/2);assign(f,'y',y+r.h/2);remove(f,'dx');remove(f,'dy');automaticChanged=true;
+        }else{
+          if(delta.x){f.x=x+r.w/2;delete f.dx;}
+          if(delta.y){f.y=y+r.h/2;delete f.dy;}
+        }
       }else{
+        if(Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001)continue;
         var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),panels=canvas.panels || (canvas.panels=[]);
         var p=panels.find(function(p){return p.panel===t.id;});if(!p){p=Object.assign({panel:t.id},r);panels.push(p);}
         if(delta.x)p.x=x;if(delta.y)p.y=y;
+      }
+    }
+    // Pin only automatic, unselected floats that the selected automatic
+    // conversions would otherwise displace. Iterate because one pin can
+    // change a later automatic sibling's computed center.
+    if(automaticChanged){
+      for(var pass=0;pass<(d.floats || []).length;pass++){
+        var after=layout(d).pos,preserved=false;
+        (d.floats || []).forEach(function(f){
+          if(!f || selectedNodes[f.id] || positionedFloat(f))return;
+          var before=positions[f.id],next=after[f.id];
+          if(!before || !next || Math.abs(before.cx-next.cx)<.0001 && Math.abs(before.cy-next.cy)<.0001)return;
+          assign(f,'x',before.cx);assign(f,'y',before.cy);remove(f,'dx');remove(f,'dy');preserved=true;
+        });
+        if(!preserved)break;
       }
     }
   });
@@ -1099,6 +1126,23 @@ function planDistributeSpatial(text,raw,targets,layoutId,direction,rects){
   var cursor=first[axis],deltas=targets.map(function(){return {x:0,y:0};});
   order.forEach(function(item,index){if(index>0 && index<order.length-1)deltas[item.i][axis]=cursor-item.r[axis];cursor+=item.r[size]+gap;});
   return builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas);
+}
+function planExpandSpatial(text,raw,targets,layoutId,direction,rects){
+  var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
+  if(['column','row'].indexOf(direction)<0)return {error:'Choose column or row spacing.'};
+  var movable=[];targets.forEach(function(t,i){if(t.kind!=='node' || !builderNodePositionLocked(got.d,t.id))movable.push(i);});
+  if(movable.length<2)return {error:'Select at least two unlocked objects to increase spacing.'};
+  var axis=direction==='column'?'x':'y',size=direction==='column'?'w':'h',tolerance=.1;
+  var ordered=movable.map(function(i){return {i:i,center:rects[i][axis]+rects[i][size]/2};}).sort(function(a,b){return a.center-b.center;});
+  var lanes=[];ordered.forEach(function(item){
+    var lane=lanes[lanes.length-1];
+    if(!lane || Math.abs(item.center-lane.center)>tolerance){lane={center:item.center,items:[]};lanes.push(lane);}
+    lane.items.push(item.i);
+  });
+  if(lanes.length<2)return {error:'Select unlocked objects in at least two distinct '+direction+' positions.'};
+  var deltas=targets.map(function(){return {x:0,y:0};});
+  lanes.forEach(function(lane,index){lane.items.forEach(function(i){deltas[i][axis]=index*50;});});
+  return builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas,{preserveEffectivePositions:true});
 }
 function planDuplicateSpatial(text,raw,targets,layoutId,rects){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;

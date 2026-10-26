@@ -233,7 +233,9 @@ Workbench Standard and Explore views support Alt/Option-drag marquee selection
 of nodes and a shared right-click action menu. Explore also includes on-canvas
 panels and step controls. The Nodes & connections chapter explains mixed
 selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap
-distribution, Fit selection, Free placement, position locks, and Undo. A node's
+distribution, row/column spacing expansion, Fit selection, Free placement, position
+locks, and Undo. Spacing expansion adds 50 graph units between successive selected
+center lanes per click while keeping the first movable lane fixed. A node's
 right-click menu locks or unlocks its position; selected-node menus name the bulk
 actions explicitly. Locked members stay selected and fixed during a mixed drag,
 with a local lock cue instead of an Inspector error. Locking moves no other node,

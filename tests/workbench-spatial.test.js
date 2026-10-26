@@ -82,6 +82,48 @@ test('nudge applies one graph delta to mixed objects, keeps panel dimensions and
  assert.match(B.planNudgeSpatial(text,raw,targets,'explore',rects,Infinity,0).error,/finite/);assert.match(B.planNudgeSpatial(text,raw,targets,'explore',rects,0,0).error,/already/);
 });
 
+function expansion(){
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.nodes.b={title:'B'};d.nodes.c={title:'C'};d.rows=[[]];d.floats=[{id:'a',x:100,y:100},{id:'b',x:100,y:300},{id:'c',x:500,y:300}];
+ d.layouts[0].exploreLayout.canvas.panels[0]={panel:'p',x:180,y:60,w:200,h:80};
+ const byId={a:{target:{kind:'node',section:0,id:'a'},rect:{x:50,y:70,w:100,h:60}},b:{target:{kind:'node',section:0,id:'b'},rect:{x:25,y:260,w:150,h:80}},c:{target:{kind:'node',section:0,id:'c'},rect:{x:440,y:250,w:120,h:100}},p:{target:{kind:'panel',section:0,id:'p',index:0},rect:{x:180,y:60,w:200,h:80}}};
+ const ids=['c','a','p','b'];return {raw,targets:ids.map(id=>byId[id].target),rects:ids.map(id=>byId[id].rect),byId};
+}
+test('spacing expansion uses measured center lanes, mixed sizes and stable ordering on both axes',()=>{
+ for(const direction of ['column','row']){
+  const {raw,targets,rects,byId}=expansion(),text=JSON.stringify(raw,null,2).replace('"title": "Keep exact outside"','"title" :  "Keep exact outside"'),before=JSON.stringify(raw);
+  const plan=B.planExpandSpatial(text,raw,targets,'explore',direction,rects);assert.ok(!plan.error,plan.error);assert.ok(plan.text.includes('"title" :  "Keep exact outside"'));assert.equal(JSON.stringify(raw),before);
+  const d=JSON.parse(plan.text).page.sections[0].diagram,p=d.layouts[0].exploreLayout.canvas.panels[0],floats=Object.fromEntries(d.floats.map(f=>[f.id,f]));
+  if(direction==='column'){
+   assert.deepEqual(floats,{a:{id:'a',x:100,y:100},b:{id:'b',x:100,y:300},c:{id:'c',x:600,y:300}});assert.deepEqual(p,{panel:'p',x:230,y:60,w:200,h:80});
+  }else{
+   assert.deepEqual(floats,{a:{id:'a',x:100,y:100},b:{id:'b',x:100,y:350},c:{id:'c',x:500,y:350}});assert.deepEqual(p,{panel:'p',x:180,y:60,w:200,h:80});
+  }
+  const reversedTargets=targets.toReversed(),reversedRects=rects.toReversed(),reversed=B.planExpandSpatial(text,raw,reversedTargets,'explore',direction,reversedRects);assert.ok(!reversed.error,reversed.error);assert.deepEqual(JSON.parse(reversed.text),JSON.parse(plan.text));
+  const next=JSON.parse(plan.text),repeatRects=rects.map((r,i)=>({...r,[direction==='column'?'x':'y']:r[direction==='column'?'x':'y']+(direction==='column'?(targets[i].id==='p'?50:targets[i].id==='c'?100:0):(targets[i].id==='b'||targets[i].id==='c'?50:0))}));
+  const repeat=B.planExpandSpatial(plan.text,next,targets,'explore',direction,repeatRects);assert.ok(!repeat.error,repeat.error);const repeated=JSON.parse(repeat.text).page.sections[0].diagram;
+  assert.equal(direction==='column'?repeated.floats.find(f=>f.id==='c').x:repeated.floats.find(f=>f.id==='c').y,direction==='column'?700:400);
+ }
+});
+test('spacing expansion excludes locks from lane ordering and gives actionable refusals',()=>{
+ const {raw,targets,rects}=expansion(),d=raw.page.sections[0].diagram,text=()=>JSON.stringify(raw);d.nodes.c.locked=true;
+ const plan=B.planExpandSpatial(text(),raw,targets,'explore','column',rects);assert.ok(!plan.error,plan.error);const next=JSON.parse(plan.text).page.sections[0].diagram;
+ assert.equal(next.floats.find(f=>f.id==='c').x,500);assert.equal(next.layouts[0].exploreLayout.canvas.panels[0].x,230,'the locked far-right lane must not increase movable lane indexes');
+ d.nodes.a.locked=true;d.nodes.b.locked=true;assert.match(B.planExpandSpatial(text(),raw,targets.filter(t=>t.kind==='node'), 'explore','column',rects.filter((_,i)=>targets[i].kind==='node')).error,/at least two unlocked/);
+ const same=expansion();same.rects=same.rects.map(r=>({...r,x:100-r.w/2}));assert.match(B.planExpandSpatial(JSON.stringify(same.raw),same.raw,same.targets,'explore','column',same.rects).error,/two distinct column positions/);
+ const row=expansion();row.raw.page.sections[0].diagram.rows=[['a']];row.raw.page.sections[0].diagram.floats=row.raw.page.sections[0].diagram.floats.filter(f=>f.id!=='a');assert.match(B.planExpandSpatial(JSON.stringify(row.raw),row.raw,row.targets,'explore','row',row.rects).error,/Free placement/);
+ const invalid=expansion();assert.match(B.planExpandSpatial(JSON.stringify(invalid.raw),invalid.raw,invalid.targets,'explore','diagonal',invalid.rects).error,/column or row/);assert.match(B.planExpandSpatial(JSON.stringify(invalid.raw),invalid.raw,invalid.targets,'explore','column',invalid.rects.slice(1)).error,/Render all selected/);
+ const limit=B.planExpandSpatial(JSON.stringify(invalid.raw),invalid.raw,[invalid.byId.a.target,invalid.byId.c.target],'explore','column',[invalid.byId.a.rect,{x:99940,y:250,w:100,h:100}]);assert.match(limit.error,/outside the supported/);assert.equal(limit.text,undefined);assert.equal(JSON.stringify(invalid.raw),JSON.stringify(expansion().raw));
+ assert.match(B.planExpandSpatial(JSON.stringify(invalid.raw),invalid.raw,[{kind:'step-controls',section:0}], 'explore','column',[{x:0,y:0,w:10,h:10}]).error,/nodes and canvas panels/);
+});
+test('spacing expansion pins automatic selected axes and preserves unselected automatic positions',()=>{
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.nodes.r={};d.nodes.b={};d.nodes.c={};d.nodes.z={};d.rows=[['r']];d.floats=[{id:'a',side:'below',noSpread:true,custom:'keep'},{id:'b',side:'below',noSpread:true},{id:'c',side:'below',noSpread:true},{id:'z',x:1450,y:160,custom:'explicit'}];
+ const originalLayout=B.layout(d).pos,before=originalLayout.c,explicitBefore=originalLayout.z,text=JSON.stringify(raw),targets=[{kind:'node',section:0,id:'b'},{kind:'node',section:0,id:'a'}],rects=[{x:1265,y:123,w:150,h:50},{x:1125,y:39,w:150,h:50}];
+ const plan=B.planExpandSpatial(text,raw,targets,'explore','column',rects);assert.ok(!plan.error,plan.error);assert.equal(JSON.stringify(raw),text);const next=JSON.parse(plan.text),floats=next.page.sections[0].diagram.floats,laid=B.layout(next.page.sections[0].diagram);
+ assert.deepEqual(floats.find(f=>f.id==='a'),{id:'a',side:'below',noSpread:true,custom:'keep',x:1200,y:64});assert.deepEqual(floats.find(f=>f.id==='b'),{id:'b',side:'below',noSpread:true,x:1390,y:148});
+ assert.equal(laid.pos.c.cx,before.cx);assert.equal(laid.pos.c.cy,before.cy);assert.equal(laid.pos.a.cy,64);assert.equal(laid.pos.b.cy,148);
+ assert.deepEqual(floats.find(f=>f.id==='z'),{id:'z',x:1450,y:160,custom:'explicit'});assert.equal(laid.pos.z.cx,explicitBefore.cx);assert.equal(laid.pos.z.cy,explicitBefore.cy);
+});
+
 test('point insertions preserve unrelated geometry and place canvas panels only in the captured view',()=>{
  const raw=fixture(),text=JSON.stringify(raw,null,2),point={x:-120.5,y:890.25};
  for(const plan of [B.planAddNode(text,raw,0,null,point),B.planAddTextBox(text,raw,0,point)]){

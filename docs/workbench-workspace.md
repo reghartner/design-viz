@@ -128,6 +128,11 @@ Inspect and the shared object menu offer **Distribute horizontally/vertically** 
 three or more free objects. They equalize rendered edge-to-edge gaps, preserving
 outer bounds, dimensions and the other axis, with one Undo action. Disabled controls
 explain too few objects, row placement or insufficient space.
+**Increase column spacing** and **Increase row spacing** work in Standard and Explore
+for two or more unlocked free objects. Each click adds 50 graph units between
+successive selected center lanes while keeping the leftmost or topmost movable lane
+fixed. Objects sharing a lane stay together, locked selections stay fixed, and each
+click is one Undo action.
 
 Moving or resizing a data panel or the step controls saves that View's floating
 defaults in the source, so the placement survives HTML export. Standard keeps

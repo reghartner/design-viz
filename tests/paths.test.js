@@ -137,20 +137,21 @@ test('story and effective-state inspection use source indices with selected-path
 });
 
 function harness(d=fixture()){
-  const intervals=new Map(),paints=[],rendered=[],navigation=[],ids={};let seq=0,folded,currentBoard;
+  const intervals=new Map(),paints=[],rendered=[],navigation=[];let seq=0,folded,currentBoard;
   function el(){
     const attrs={},events={},classes=new Set();
     const e={children:[],style:{setProperty(k,v){this[k]=v;}},
       classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k),toggle(k,on){if(on)classes.add(k);else classes.delete(k);}},
       appendChild(n){this.children.push(n);n.parentNode=this;return n;},removeChild(n){this.children.splice(this.children.indexOf(n),1);},
       setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,removeAttribute(k){delete attrs[k];},
+      getElementById(id){return descendants(this).find(n=>n.getAttribute('id')===id) || null;},
       addEventListener(k,fn){(events[k]??=[]).push(fn);},fire(k){(events[k]||[]).forEach(fn=>fn({stopPropagation(){}}));},
       dispatchEvent(event){if(event.type==='dv:pathchange')navigation.push(event.type);},
       querySelectorAll(selector){return descendants(this).filter(n=>selector[0]==='.' && n.classList.contains(selector.slice(1)));},
       getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
     Object.defineProperty(e,'firstChild',{get(){return this.children[0];}});return e;
   }
-  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,createElementNS:el,getElementById:id=>ids[id]||null},window:{matchMedia:()=>({matches:true}),
+  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,createElementNS:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
     setInterval(fn){intervals.set(++seq,fn);return seq;},clearInterval:id=>intervals.delete(id)},
     setTimeout:()=>1,clearTimeout(){}});
   // Enable timer logic but keep geometry/animation irrelevant to the test.
@@ -160,7 +161,7 @@ function harness(d=fixture()){
     Object.keys(diagram.nodes||{}).forEach(id=>{nodeEls[id]=svg.appendChild(el());});
     (diagram.edges||[]).forEach(function(edge,index){
       const pathEl=svg.appendChild(el()),labelEl=svg.appendChild(el()),domId='test-e'+index;
-      pathEl.classList.add('edge');labelEl.classList.add('elabel');ids[domId]=pathEl;
+      pathEl.classList.add('edge');labelEl.classList.add('elabel');pathEl.setAttribute('id',domId);
       edgeIds[edge.from+'->'+edge.to]={domId,e:edge,idx:index,pathEl,labelEl};
     });
     currentBoard={svg,nodeEls,edgeIds};return currentBoard;

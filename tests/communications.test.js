@@ -40,6 +40,7 @@ function element(tag='div'){
       toggle(k,force){const on=force===undefined?!classes.has(k):force;if(on)classes.add(k);else classes.delete(k);return on;}},
     setAttribute(k,v){attrs[k]=String(v);if(k==='class'){classes.clear();String(v).split(/\s+/).forEach(c=>classes.add(c));}},
     getAttribute:k=>attrs[k]??null,
+    getElementById(id){return descendants(this).find(n=>n.getAttribute('id')===id) || null;},
     appendChild(n){this.children.push(n);n.parentNode=this;return n;},
     removeChild(n){this.children.splice(this.children.indexOf(n),1);n.parentNode=null;return n;},
     addEventListener(k,fn){events[k]=fn;},dispatchEvent(){},
@@ -54,6 +55,7 @@ function boardFor(d){
   for(const id of Object.keys(d.nodes)) nodeEls[id]=svg.appendChild(element('g'));
   d.edges.forEach((e,idx)=>{
     const pathEl=svg.appendChild(element('path'));
+    pathEl.setAttribute('id','test-e'+idx);
     pathEl.getTotalLength=()=>200;
     pathEl.getPointAtLength=t=>({x:t,y:idx*80});
     edgeIds[e.from+'->'+e.to]={e,idx,domId:'test-e'+idx,pathEl,
@@ -111,11 +113,11 @@ test('blocked and reduced-motion outcomes retain a static marker with no packet;
 test('playback suppresses explicit successful packets on failed hops and cleans up on later steps, paths, ambient and disposal',()=>{
   const d=fixture();d.paths=[{id:'happy',steps:['send','wait']},{id:'failed',steps:['fail','wait']}];
   const b=boardFor(d),ams=[element('animateMotion'),element('animateMotion')];
-  ams.forEach(am=>b.svg.appendChild(element('circle')).appendChild(am));
+  ams.forEach((am,index)=>{am.setAttribute('id','test-am-'+index);b.svg.appendChild(element('circle')).appendChild(am);});
   const term={};for(const k of ['bar','chips','stepN','stepText','failureStatus','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep']) term[k]=element();
   term.bar.appendChild(element()).appendChild(term.stepN);
   const c=load({CustomEvent:function(){},document:{createElement:()=>element(),createElementNS:(_,tag)=>element(tag),
-    getElementById:id=>id==='test-am-0'?ams[0]:id==='test-am-1'?ams[1]:null},
+    getElementById:()=>null},
     window:{matchMedia:()=>({matches:true}),setInterval:()=>1,clearInterval(){}},setTimeout:()=>1,clearTimeout(){}});
   c.RM=false;
   const sp=c.attachStepper(element(),element(),term,d,'test',b,{},null,null,{autoplay:false});

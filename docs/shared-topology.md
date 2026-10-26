@@ -397,8 +397,11 @@ Canon source; export never discovers or fetches providers. Missing or broken
 references stop export before either file is written. Keep the authored JSON
 for editing and reopen Canon to obtain a later approved provider revision.
 Maintained Canon/reference-backed diagrams use complete Canon validation and
-Workbench. Reserve `tools/page_build.py` for explicitly requested standalone
-workflows with ordinary local specs; it does not resolve authored topology.
+Workbench. For a standalone local build, `tools/page_build.py <spec.json>
+--resolve-imports <folder-or-registry>` derives membership and resolves the
+complete registered import closure before validation and injection, preserving
+authored references. See [local repository authoring](local-repository-authoring.md)
+for the build command and desktop folder-opening workflow.
 
 The earlier generated-snapshot/copy-changes-back workflow is superseded: **do not
 edit or publish a flattened snapshot as source**. Review and commit the authored consumer

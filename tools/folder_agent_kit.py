@@ -38,7 +38,8 @@ def folder_agent_kit(root, runtime):
                              'narrow the folder\'s .agent-kit globs') from error
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/company_overlay.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs', 'tools/authoring-packet.py', 'tools/visibility-check.cjs',
-                 'tools/compatibility.js', 'tools/canon/core.cjs']:
+                 'tools/compatibility.js', 'tools/canon/core.cjs',
+                 'tools/canon/manifest.cjs', 'tools/canon/local-imports.mjs']:
         files[name] = (root / name).read_text()
     trace_cli = (root / 'tools/trace2spec.js').read_text()
     source_path = '../src/trace-import.js'

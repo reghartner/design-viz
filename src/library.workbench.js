@@ -207,6 +207,7 @@ async function prepareTopologyProposal(raw,context){
   if(!context)context=await connectTopologyRepository({page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}});
   var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
   if(!missing.length)return context;
+  if(context.local)throw new Error('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
   var loader=createTopologyCatalogLoader(context),prepared=context;
   for(var id of missing)prepared=(await loader.load(id,prepared)).context;
   return prepared;
@@ -221,7 +222,7 @@ async function prepareAuthoredTopology(raw,context){
   if(!dependencies.length)return sameConsumer?context:null;
   var scaffold={page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}};
   if(!context)context=await connectTopologyRepository(scaffold);
-  else if((!context.catalog || context.catalog.version!==3) && dependencies.some(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});})){
+  else if(!context.local && (!context.catalog || context.catalog.version!==3) && dependencies.some(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});})){
     // A backend snapshot may be complete without a catalog. Only a missing
     // provider needs this site's index; all prior provider bytes stay frozen.
     var repository=await connectTopologyRepository(scaffold);

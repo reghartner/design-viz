@@ -573,7 +573,7 @@ function initWorkbenchBuilder(opts){
   async function chooseWorkingFolder(){
     if(!workingBrowser.pickDirectory){inspectorMessage('Writable folder access requires desktop Chrome or Edge over HTTPS. Browser recovery remains available.');return;}
     var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,startup=null,unlock=null;
-    function check(){var now=session.snapshot();if(!life.alive() || token!==workingOperation || now.project!==expected.project || now.text!==expected.text)throw Error('The document changed while choosing its folder. Choose it again.');}
+    function check(){if(!life.alive() || token!==workingOperation || opts.isActive && !opts.isActive())throw new DOMException('Folder opening cancelled.','AbortError');var now=session.snapshot();if(now.project!==expected.project || now.text!==expected.text || now.topologyRevision!==expected.topologyRevision)throw Error('The document changed while choosing its folder. Choose it again.');}
     try{
       var directory=await workingBrowser.pickDirectory({mode:'readwrite',id:'flowview-working'});check();
       await releaseWorking();check();
@@ -581,7 +581,8 @@ function initWorkbenchBuilder(opts){
       check();
       var found=await openFolderAgentProject(directory);check();
       if(found.selectionRequired){var name=await chooseWorkingName(found.specs);check();if(!name)return;found=await openFolderAgentProject(directory,name);check();}
-      var previousLedger=agentLedger,source=found.source===null?expected.text:found.source,context=await prepareAuthoredTopology(JSON.parse(source),session.topologyContext());check();
+      directory=found.directory || directory;
+      var previousLedger=agentLedger,source=found.source===null?expected.text:found.source,context=await prepareLocalFolderTopology(source,found,session.topologyContext());check();
       var findings=session.validate(JSON.parse(source),context);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       var project=await found.initialize(check);check();
       if((project.source===null?expected.text:project.source)!==source)throw Error('The saved source changed. Choose the folder again.');
@@ -1506,7 +1507,7 @@ function initWorkbenchBuilder(opts){
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
-    if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen Canon to load a later deployment; this session never refreshes automatically.';}
+    if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen the source repository to load later provider changes; this session never refreshes automatically.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
@@ -1547,7 +1548,7 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
-    prepareFolder:function(text){return prepareAuthoredTopology(JSON.parse(text),session.topologyContext());},
+    prepareFolder:function(text,found){return prepareLocalFolderTopology(text,found,session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal,context){
       var snapshot=session.snapshot();

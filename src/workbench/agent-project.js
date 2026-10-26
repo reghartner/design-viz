@@ -1,5 +1,8 @@
 /* Durable diagram artifacts; transport files are private to .flowview-agent/. */
-async function openFolderAgentProject(directory, filename){
+async function openFolderAgentProject(directory, filename, diagramOnly){
+  if(!diagramOnly && typeof openLocalRepositoryFolder==='function'){
+    var repository=await openLocalRepositoryFolder(directory,filename);if(repository)return repository;
+  }
   var root=createFolderAgentFiles(directory),metadata,legacy=false,config=null;
   try{metadata=await directory.getDirectoryHandle('.flowview-agent');}catch(ex){if(ex.name!=='NotFoundError')throw ex;}
   if(!metadata){

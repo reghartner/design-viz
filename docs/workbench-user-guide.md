@@ -293,3 +293,13 @@ In the desktop editor, select the step controls and open **Inspect → Play butt
 **Follow active**, beside **Ambient / Step**, pans and zooms the diagram to the current step’s nodes and complete connections, including their labels. Selecting a path chip frames the highlighted route; selecting a step returns to that step. Standard moves only the diagram panel. Explore moves the canvas, keeping floating panels and controls clear.
 
 Movement takes about 720 ms, with breathing room and a maximum automatic zoom of 135%. Reduced-motion preferences apply immediately. Pan, zoom, Fit, or start editing a diagram object to pause; **Resume follow** frames the current activity again. Empty steps and Ambient hold the camera. Opening or restoring a view preserves its existing camera until the next step action. Following and its toggle do not change the document or create Undo entries.
+
+### Local repositories and shared topology
+
+For an imported diagram stored in a local checkout, use **File → Choose working folder…**
+and select the repository root containing `canon.json`, then choose the registered
+diagram. The Workbench freezes its local provider closure and keeps authored
+references, local presentation, positions, Undo and browser recovery. Select the
+root again to load changed providers; a browser cannot discover the parent of a
+nested folder. See [local repository authoring](local-repository-authoring.md)
+for setup, diagnostics and the import-aware build command.

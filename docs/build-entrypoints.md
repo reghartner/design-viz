@@ -173,6 +173,11 @@ check concurrently with tests or other builds in the same checkout.
 `node tools/check-generated.mjs --tracking-only` rejects tracked files anywhere in
 the generated directory, the backend runtime and the portable HTML/index paths.
 `tools/page_build.py` generates missing template/backend inputs before validation.
+Its `--resolve-imports <folder-or-registry>` option rebuilds current inputs and
+resolves the registered dependency closure before validation and injection;
+see [local repository authoring](local-repository-authoring.md). Page builds
+also detect and rebuild stale template branding. Build logs warn when
+`company/brand.json` exists but default branding is active.
 Direct validator, compatibility, state-walk and Canon commands use the static backend;
 run `python3 tools/build.py` after checkout/update first. Downloaded kits are prebuilt.
 Builds leave tracked files unchanged. After updating an older branch, remove any

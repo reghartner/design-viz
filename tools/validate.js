@@ -3,7 +3,7 @@
 const core = require('./canon/core.cjs');
 /* validate.js — flowspec validator + lint CLI.
 
-   Usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]
+   Usage: node tools/validate.js [--quiet] [--resolve-imports <folder-or-registry>] <spec.json> [<spec.json> ...]
 
    Prints errors, warnings, and lint findings with field paths, one per line,
    prefixed by the file name. Exit 1 when any file has errors (or fails to
@@ -36,12 +36,20 @@ function topologyDiagnosticFile(entries, error){
   return (matched || entries.find(entry => hasTopologyDeclarations(entry.raw)) || entries[0]).file;
 }
 
-function main(argv){
+async function main(argv){
   const args = argv.slice(2);
   const quiet = args.includes('--quiet');
-  const files = args.filter(a => a !== '--quiet');
+  const files = [];let resolveImports=null;
+  for(let index=0;index<args.length;index++){
+    if(args[index]==='--quiet')continue;
+    if(args[index]==='--resolve-imports'){
+      resolveImports=args[++index];
+      if(!resolveImports || resolveImports.startsWith('--')){console.error('--resolve-imports requires a repository folder or registry JSON');return 2;}
+    }else if(args[index].startsWith('--')){console.error('Unknown option: '+args[index]);return 2;}
+    else files.push(args[index]);
+  }
   if (!files.length){
-    console.error('usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]');
+    console.error('usage: node tools/validate.js [--quiet] [--resolve-imports <folder-or-registry>] <spec.json> [<spec.json> ...]');
     return 2;
   }
   const C = core.viewerRouting();
@@ -51,9 +59,9 @@ function main(argv){
   for (const file of files){
     let raw;
     try {
-      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      raw = resolveImports ? (await (await import('./canon/local-imports.mjs')).resolveLocalImports(file,resolveImports)).resolved : JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (ex){
-      console.log(file + ': ERROR JSON parse: ' + ex.message);
+      console.log(file + (resolveImports ? ': ERROR ' : ': ERROR JSON parse: ') + ex.message);
       console.log(file + ': 1 errors, 0 warnings');
       anyErrors = true;
       continue;
@@ -62,7 +70,7 @@ function main(argv){
   }
 
   let resolved = entries.map(entry => entry.raw);
-  if (entries.some(entry => hasTopologyDeclarations(entry.raw))){
+  if (!resolveImports && entries.some(entry => hasTopologyDeclarations(entry.raw))){
     try {
       resolved = core.materializeTopology(resolved);
     } catch (error){
@@ -93,4 +101,4 @@ function main(argv){
   return anyErrors ? 1 : 0;
 }
 
-process.exit(main(process.argv));
+main(process.argv).then(code=>{process.exitCode=code;}).catch(error=>{console.error(error.message);process.exitCode=1;});

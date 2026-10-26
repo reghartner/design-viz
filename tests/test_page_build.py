@@ -41,6 +41,42 @@ class PageBuildTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def local_repository(self):
+        for name in ["platform", "checkout"]:
+            raw = json.loads((ROOT / "examples/canon/topology" / (name + ".json")).read_text())
+            del raw["page"]["canon"]
+            folder = self.tmp / "diagrams/team" / name
+            folder.mkdir(parents=True)
+            (folder / (name + ".spec.json")).write_text(json.dumps(raw))
+        (self.tmp / "canon.json").write_text(json.dumps({"version": 1, "diagrams": [
+            {"folder": "diagrams/team/" + name, "owner": "group:default/local"}
+            for name in ["platform", "checkout"]]}))
+        return self.tmp / "diagrams/team/checkout/checkout.spec.json"
+
+    def test_import_resolution_and_validation_preserve_source_and_fail_before_outputs(self):
+        source = self.local_repository()
+        before = source.read_bytes()
+        validated = subprocess.run(["node", str(ROOT / "tools/validate.js"), "--resolve-imports", str(self.tmp), str(source)],
+                                   capture_output=True, text=True)
+        self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+        result = run_tool(str(source), "--resolve-imports", str(self.tmp), "--root", str(self.root), "--allow-warnings")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        html = (self.root / "checkout.html").read_text()
+        embedded = json.loads(re.search(r'<script type="application/json" id="flowspec">\n(.*?)\n</script>', html, re.S)[1])
+        self.assertEqual(embedded["page"]["canon"]["id"], "checkout")
+        self.assertEqual(embedded["page"]["canon"]["owner"], "group:default/local")
+        self.assertIn("platform::api", embedded["page"]["sections"][0]["diagram"]["nodes"])
+        self.assertEqual(source.read_bytes(), before)
+        self.assertEqual((self.root / source.name).read_bytes(), before)
+        broken = json.loads(before)
+        broken["page"]["sections"][0]["diagram"]["topologyImports"][0]["spec"] = "missing-provider"
+        source.write_text(json.dumps(broken))
+        failed_root = self.tmp / "failed-output"
+        result = run_tool(str(source), "--resolve-imports", str(self.tmp), "--root", str(failed_root))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing spec missing-provider", result.stdout + result.stderr)
+        self.assertFalse(failed_root.exists())
+
     def test_first_page_build_generates_absent_runtime_and_template(self):
         checkout = self.tmp / 'source'
         checkout.mkdir()
@@ -61,12 +97,16 @@ class PageBuildTest(unittest.TestCase):
         runtime = checkout / 'tools/canon/generated-runtime.cjs'
         self.assertFalse(runtime.exists())
         self.assertFalse((checkout / 'template/flowview.html').exists())
-        result = subprocess.run(['python3', str(checkout / 'tools/page_build.py'), str(self.spec),
+        source = self.local_repository()
+        before = source.read_bytes()
+        result = subprocess.run(['python3', str(checkout / 'tools/page_build.py'), str(source),
+                                 '--resolve-imports', str(self.tmp), '--allow-warnings',
                                  '--root', str(self.root)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(runtime.is_file())
         self.assertTrue((checkout / 'template/flowview.html').is_file())
-        self.assertTrue((self.root / 'temp.html').is_file())
+        self.assertTrue((self.root / 'checkout.html').is_file())
+        self.assertEqual(source.read_bytes(), before)
 
     def test_no_slug_builds_beside_spec_without_copy_or_subdirectory(self):
         before = self.spec.read_bytes()

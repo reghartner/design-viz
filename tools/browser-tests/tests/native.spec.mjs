@@ -16,7 +16,7 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   await page.evaluate(()=>document.fonts.ready);
   const leftPanel=alpha.locator('[data-explore-panel="state"]'),rightPanel=beta.locator('[data-explore-panel="state"]');
   const openUtilities=async scope=>{
-    const utilities=scope.locator('.reader-navigation .reader-utilities');
+    const pageUtilities=scope.locator('.reader-navigation .reader-page-utilities'),utilities=await pageUtilities.locator(':scope>summary').isVisible()?pageUtilities:scope.locator('.reader-navigation .reader-utilities');
     if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
   };
   const clickUtility=async(scope,name)=>{
@@ -170,15 +170,19 @@ test('native viewers: "?" opens each viewer\'s own reader shortcut sheet listing
   expect(await rows(sheets.alpha.sheet)).toEqual(NATIVE_KEYS);
   await page.keyboard.press('Escape');
   await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');await expect(board).toBeFocused();
-  const views=alpha.getByRole('tablist',{name:'Views in selected Tab',exact:true});
-  const business=views.getByRole('tab',{name:'Business',exact:true});
+  const views=alpha.locator('.reader-view-strip');
+  const business=views.locator('.reader-top-view').filter({hasText:'Business'});
   await expect(business).toHaveAttribute('aria-selected','true');
-  await business.click();await expect(business).toBeFocused();
-  const second=views.getByRole('tab',{name:'Explore',exact:true});
-  await page.keyboard.press('ArrowRight');await expect(second).toBeFocused();
-  await page.keyboard.press('ArrowLeft');await expect(business).toBeFocused();
-  await page.keyboard.press('End');await expect(second).toBeFocused();
-  await page.keyboard.press('Home');await expect(business).toBeFocused();await expect(business).toHaveAttribute('aria-selected','true');
+  const second=views.locator('.reader-top-view').filter({hasText:'Explore'}),picker=alpha.getByRole('combobox',{name:'Choose View',exact:true});
+  if(await business.isVisible()){
+    await business.click();await expect(business).toBeFocused();
+    await page.keyboard.press('ArrowRight');await expect(second).toBeFocused();
+    await page.keyboard.press('ArrowLeft');await expect(business).toBeFocused();
+    await page.keyboard.press('End');await expect(second).toBeFocused();
+    await page.keyboard.press('Home');await expect(business).toBeFocused();await expect(business).toHaveAttribute('aria-selected','true');
+  }else{
+    await expect(picker).toBeVisible();await picker.focus();await picker.selectOption({label:'Explore'});await expect(second).toHaveAttribute('aria-selected','true');await picker.selectOption({label:'Business'});await expect(business).toHaveAttribute('aria-selected','true');await expect(picker).toBeFocused();
+  }
   await sheets.beta.help.click();
   await expect(sheets.beta.sheet).toHaveAttribute('open','');await expect(sheets.alpha.sheet).not.toHaveAttribute('open','');
   await expect(sheets.beta.sheet).toHaveAccessibleName('Keyboard shortcuts');expect(await rows(sheets.beta.sheet)).toEqual(NATIVE_KEYS);

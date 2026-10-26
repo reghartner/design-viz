@@ -1063,7 +1063,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.setViewportSize({width:1024,height:800});await contained();
     const legendSummary=view.locator('.explore-legend-menu>summary');
     if(!await legendSummary.isVisible()){
-      const utilities=view.locator('.reader-utilities');
+      const utilities=view.locator('.reader-page-utilities');
       if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
       await expect(legendSummary).toBeVisible();
     }
@@ -1927,7 +1927,7 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await page.locator('#agent-update-proposed').click();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(priorScroll);
     await page.locator('#agent-update-changes').click();
     const list=page.locator('#agent-update-change-list'),view=page.locator('#agent-update-view'),position=page.locator('#agent-update-position');
-    await list.getByRole('button',{name:/modified · Delivery · View Recovery/}).click();await expect(view.getByRole('tab',{name:'Recovery review',exact:true})).toHaveAttribute('aria-selected','true');
+    await list.getByRole('button',{name:/modified · Delivery · View Recovery/}).click();await expect(view.locator('.reader-top-view').filter({hasText:'Recovery review'})).toHaveAttribute('aria-selected','true');
     await list.getByRole('button',{name:/modified · Recovery · Path Failure/}).click();await expect(view.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
     await list.getByRole('button',{name:/modified · Recovery · Step Exact hidden failure/}).click();
     await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');

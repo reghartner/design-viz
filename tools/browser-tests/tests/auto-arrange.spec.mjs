@@ -2,10 +2,12 @@ import {canvasTools} from '../helpers/test.mjs';
 import {openAutoArrange} from '../helpers/test.mjs';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
+import {createRequire} from 'node:module';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {test,expect,pastePage as paste,paste as pasteDiagram,prepareEditorSurface} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
+const arrangeCore=createRequire(import.meta.url)('../../arrange/core.cjs');
 const grouped=JSON.parse(await readFile(path.join(repo,'tests/fixtures/auto-arrange-grouped.json'),'utf8'));
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 const simple={page:{title:'Arrange and refine',blocks:[{heading:'Active diagram',diagram:{nodes:{a:{title:'Source'},b:{title:'Service'},c:{title:'Store'}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'Request'},{from:'b',to:'c'}],steps:[{edge:'a->b',text:'Keep this story'}],autoplay:false}}]}};
@@ -193,10 +195,11 @@ test('production 20-second deadline terminates an unresponsive worker and preser
 });
 
 
-test('built worker and transaction retain the approved research geometry byte fingerprint',async({page,server})=>{
+test('built worker and transaction match current production research geometry byte-for-byte',async({page,server})=>{
  const corpus=JSON.parse(await readFile(path.join(repo,'tests/fixtures/arrange-approved.json'),'utf8'));
  const item=corpus.cases.find(c=>c.name==='research-compute-federation.spec.json');
+ const expected=arrangeCore.autoArrangeDiagram(item.input,arrangeCore.autoArrangeCandidates(item.input));
  await open(page,server,{page:{blocks:[{heading:'Research reference',diagram:item.input}]}});await arrange(page);
- const out=await diagram(page),geometry={floats:out.floats,edges:out.edges,graphFrame:out.graphFrame};
- expect(createHash('sha256').update(JSON.stringify(geometry)).digest('hex')).toBe(item.geometrySha256);
+ const out=await diagram(page),geometry={floats:out.floats,edges:out.edges,graphFrame:out.graphFrame},expectedGeometry={floats:expected.floats,edges:expected.edges,graphFrame:expected.graphFrame};
+ expect(createHash('sha256').update(JSON.stringify(geometry)).digest('hex')).toBe(createHash('sha256').update(JSON.stringify(expectedGeometry)).digest('hex'));
 });

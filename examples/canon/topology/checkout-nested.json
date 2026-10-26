@@ -1,0 +1,44 @@
+{
+  "page": {
+    "title": "Nested checkout consumer",
+    "canon": {
+      "version": 1,
+      "id": "checkout-nested",
+      "kind": "design",
+      "owner": "group:default/checkout"
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "heading": "Nested checkout consumer",
+        "diagram": {
+          "topologyImports": [
+            {
+              "spec": "checkout-shared",
+              "export": "checkout",
+              "as": "checkout",
+              "nodeOverrides": {
+                "platform::store": {
+                  "sub": "Consumer-local storage caption",
+                  "tint": "data"
+                }
+              },
+              "edgeOverrides": {
+                "platform::api->platform::store": {
+                  "label": "Commit checkout"
+                }
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "commit",
+              "edge": "checkout::platform::api->checkout::platform::store",
+              "text": "This flow uses the checkout re-export, retaining the platform service identities and both provenance levels."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -3987,3 +3987,6 @@ body .docview .termbar[data-playback-position="beside"]>.step-transport{max-widt
 body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.schips{grid-area:tracks;min-width:0;max-width:100%;overflow:auto;}
 body .docview .termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{grid-area:caption;min-width:0;}
 body .docview .termbar[data-playback-position][hidden]{display:none;}
+
+/* Presentation hiding retains graph identity and geometry for story references. */
+[data-dv-hidden="true"]{visibility:hidden!important;pointer-events:none!important;}

@@ -1715,3 +1715,6 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-node-editor .dv-inline-input{height:36px;padding:4px 6px;font:16px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}
 #docview [data-dv-para]:focus-visible,#docview [data-dv-bullet-path]:focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
+
+/* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */
+body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3;}

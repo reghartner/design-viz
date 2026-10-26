@@ -2645,7 +2645,7 @@ function renderInspector(){
       var authoredRecord=specSectionPaths(parsed.raw)[t.section],authoredDiagram=authoredRecord && specValueAt(parsed.raw,authoredRecord.diagram);
       var hasAuthoredImport=(authoredDiagram && authoredDiagram.topologyImports || []).some(function(imp){return imp.as===imported.as;});
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s arrangement, additional code references, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s presentation, arrangement, additional code references, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
       documentDestinations(imported.destination || {spec:imported.spec},null,(normalize(parsed.raw).documentLinks || {}).siteBaseUrl).forEach(function(item){var link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open source diagram · '+item.label;guide.appendChild(link);});
       if(t.kind==='node'){
@@ -2661,6 +2661,20 @@ function renderInspector(){
       }
       if(hasAuthoredImport && t.kind==='node'){
         var localImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeNode=t.id.slice(imported.as.length+2);
+        var presentationContext=session.topologyContext(),presentationContextKey=JSON.stringify(presentationContext);
+        function commitPresentation(patch){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==presentationContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var ok=applyPlan(planTopologyNodeOverride(parsed.text,parsed.raw,t.section,t.id,patch,presentationContext),null,parsed);
+          if(ok)refreshFormSoon();return ok;
+        }
+        guide.appendChild(frow('Display name',textControl(resolvedValue.title,function(value){return commitPresentation({title:value});})));
+        guide.appendChild(frow('Display subtitle',textControl(resolvedValue.sub,function(value){return commitPresentation({sub:value});})));
+        guide.appendChild(frow('Node style',nodeStyleControl(resolvedValue.style,function(value){return commitPresentation({style:value});})));
+        guide.appendChild(frow('Node tint',nodeColorControl(resolvedValue.tint,function(value){return commitPresentation({tint:value});})));
+        guide.appendChild(frow('Hidden from readers',checkboxControl(resolvedValue.hidden===true,function(value){return commitPresentation({hidden:value});})));
+        var resetPresentation=actionButton('Reset node presentation',function(){return commitPresentation(null);});
+        resetPresentation.disabled=!Object.prototype.hasOwnProperty.call(localImport.nodeOverrides || {},relativeNode);guide.appendChild(resetPresentation);
+        var presentationNote=document.createElement('p');presentationNote.className='fnote';presentationNote.textContent='Display changes apply only here. Hidden nodes remain faintly visible in the editor so you can restore them; readers also hide their incident connections. Reset restores provider presentation.';guide.appendChild(presentationNote);
         var additions=(localImport.nodeCodeRefs || {})[relativeNode] || [],inherited=(resolvedValue.codeRefs || []).slice(0,(resolvedValue.codeRefs || []).length-additions.length);
         var inheritedControl=document.createElement('textarea');inheritedControl.readOnly=true;inheritedControl.className='fctl';inheritedControl.value=JSON.stringify(inherited,null,2);
         var inheritedRow=frow('Inherited code references (read only)',inheritedControl);inheritedRow.classList.add('topology-code-refs');guide.appendChild(inheritedRow);
@@ -2675,14 +2689,26 @@ function renderInspector(){
       }
       if(hasAuthoredImport && t.kind==='edge'){
         var edgeContext=session.topologyContext(),edgeContextKey=JSON.stringify(edgeContext),edgeKey=builderEdgeKey(resolvedValue);
-        var edgeNote=document.createElement('p');edgeNote.className='fnote';edgeNote.textContent='Drag the label, arrow curve, or endpoint handles to customize this flow. Reset restores all provider label and routing geometry.';guide.appendChild(edgeNote);
+        guide.appendChild(frow('Display label',textControl(resolvedValue.label,function(value){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==edgeContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var ok=applyPlan(planEdgeLayout(parsed.text,parsed.raw,t.section,t.index,edgeKey,{label:value},edgeContext),null,parsed);
+          if(ok)refreshFormSoon();return ok;
+        })));
+        var resetLabel=actionButton('Reset imported display label',function(){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==edgeContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var ok=applyPlan(planResetTopologyEdgeLabel(parsed.text,parsed.raw,t.section,t.index,edgeKey,edgeContext),null,parsed);
+          if(ok)refreshFormSoon();return ok;
+        });guide.appendChild(resetLabel);
+        var edgeNote=document.createElement('p');edgeNote.className='fnote';edgeNote.textContent='Drag the label, arrow curve, or endpoint handles to customize this flow. Layout reset restores provider label position and routing geometry, keeping the display label.';guide.appendChild(edgeNote);
         var resetConnection=actionButton('Reset imported connection layout',function(){
           if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==edgeContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
           var ok=applyPlan(planResetTopologyEdgeLayout(parsed.text,parsed.raw,t.section,t.index,edgeKey,edgeContext),null,parsed);
           if(ok)refreshFormSoon();return ok;
         });
         var edgeImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeEdge=edgeKey.split('->').map(function(id){return id.slice(imported.as.length+2);}).join('->');
-        resetConnection.disabled=!Object.prototype.hasOwnProperty.call(edgeImport.edgeOverrides || {},relativeEdge);
+        var edgeOverlay=(edgeImport.edgeOverrides || {})[relativeEdge] || {};
+        resetLabel.disabled=!Object.prototype.hasOwnProperty.call(edgeOverlay,'label');
+        resetConnection.disabled=!Object.keys(edgeOverlay).some(function(key){return key!=='label';});
         guide.appendChild(resetConnection);
       }
       var arrangementContextKey=JSON.stringify(session.topologyContext());

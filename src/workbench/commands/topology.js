@@ -171,6 +171,14 @@ function topologyLocalPlan(text,raw,target,field,id,value,context){
   try{FlowTopology.resolveSource(JSON.parse(plan.text),context);}catch(ex){return {error:ex.message};}
   return plan;
 }
+function planTopologyNodeOverride(text,raw,section,id,patch,context){
+  var t=topologyLocalTarget(text,raw,section,'nodes',id,context);if(t.error)return t;
+  if(!t.owner)return {error:'Choose a node in an authored topology import.'};
+  if(patch===null)return topologyLocalPlan(text,raw,t,'nodeOverrides',t.relative,null,context);
+  try{FlowTopology.validateNodeOverride(patch,'node presentation');}catch(ex){return {error:ex.message};}
+  var previous=(t.got.d.topologyImports[t.index].nodeOverrides || {})[t.relative] || {};
+  return topologyLocalPlan(text,raw,t,'nodeOverrides',t.relative,Object.assign({},previous,patch),context);
+}
 function planTopologyNodeCodeRefs(text,raw,section,id,refs,context){
   var t=topologyLocalTarget(text,raw,section,'nodes',id,context);if(t.error)return t;
   if(!t.owner)return {error:'Choose a node in an authored topology import.'};
@@ -200,5 +208,15 @@ function planEdgeLayout(text,raw,section,index,key,patch,context){
 function planResetTopologyEdgeLayout(text,raw,section,index,key,context){
   var t=builderEdgeLayoutTarget(text,raw,section,index,key,context);if(t.error)return t;
   if(!t.owner)return {error:'Choose an imported connection.'};
-  return topologyLocalPlan(text,raw,t,'edgeOverrides',t.relative,null,context);
+  var previous=(t.got.d.topologyImports[t.index].edgeOverrides || {})[t.relative] || {};
+  var retained=Object.prototype.hasOwnProperty.call(previous,'label')?{label:previous.label}:null;
+  return topologyLocalPlan(text,raw,t,'edgeOverrides',t.relative,retained,context);
+}
+
+function planResetTopologyEdgeLabel(text,raw,section,index,key,context){
+  var t=builderEdgeLayoutTarget(text,raw,section,index,key,context);if(t.error)return t;
+  if(!t.owner)return {error:'Choose an imported connection.'};
+  var previous=builderClone((t.got.d.topologyImports[t.index].edgeOverrides || {})[t.relative] || {});
+  delete previous.label;
+  return topologyLocalPlan(text,raw,t,'edgeOverrides',t.relative,Object.keys(previous).length?previous:null,context);
 }

@@ -188,3 +188,42 @@ for(const failure of ['network','403','malformed JSON','revision mismatch'])test
   assert.equal(diagram(frozen.resolved).nodes['child::a'].title,'A');assert.notEqual(frozen.source.page.title,'Later nested deployment');
   assert.deepEqual(hits,['nested','provider','provider'],'successful provider snapshots stay cached');
 });
+
+test('merged exports deduplicate nodes, include cross-export connections, retain subsets and stable provenance',()=>{
+  const specs=fixtures(),provider=diagram(specs[0]);
+  provider.topologyExports={front:{nodes:['a','b'],edges:['a->b']},back:{nodes:['b','c'],edges:[]}};
+  diagram(specs[1]).topologyImports=[{spec:'provider',export:['front','back'],as:'shared'}];
+  const before=clone(specs),resolved=C.materializeTopology(specs),d=diagram(resolved[1]);
+  assert.deepEqual(Object.keys(d.nodes),['local','shared::a','shared::b','shared::c']);
+  assert.deepEqual(d.edges.map(e=>e.from+'->'+e.to),['shared::a->shared::b','shared::b->shared::c']);
+  assert.equal(d.edges[0].kind,'custom');assert.deepEqual(resolved[1].page.protocols,specs[0].page.protocols);
+  assert.deepEqual(d.topologyProvenance.imports[0].export,['front','back']);assert.deepEqual(specs,before);
+  // Resolved snapshots must accept the same array provenance shape.
+  assert.deepEqual(C.materializeTopology(resolved),resolved);
+  diagram(specs[1]).topologyImports[0].edges=['b->c'];
+  assert.deepEqual(diagram(C.materializeTopology(specs)[1]).edges.map(e=>e.from+'->'+e.to),['shared::b->shared::c']);
+  diagram(specs[1]).topologyImports[0].edges=[];assert.equal(diagram(C.materializeTopology(specs)[1]).edges.length,0);
+  diagram(specs[1]).topologyImports[0]={spec:'provider',export:'back',as:'shared'};
+  assert.equal(diagram(C.materializeTopology(specs)[1]).edges.length,0,'scalar exports do not acquire undeclared connections');
+});
+test('merged exports reject invalid arrays, cross-section geometry and stale subset/override keys',()=>{
+  for(const value of [[],['public','public'],['public',3],['public','missing'],{},null]){
+    const specs=fixtures();diagram(specs[1]).topologyImports=[{spec:'provider',export:value,as:'shared'}];assert.throws(()=>C.materializeTopology(specs),/Topology/);
+  }
+  const specs=fixtures();specs[0].page.sections.push({id:'elsewhere',diagram:{nodes:{a:{}},rows:[['a']],topologyExports:{elsewhere:{nodes:['a'],edges:[]}}}});
+  diagram(specs[1]).topologyImports=[{spec:'provider',export:['public','elsewhere'],as:'shared'}];
+  assert.throws(()=>C.materializeTopology(specs),/different provider sections/);
+  diagram(specs[1]).topologyImports=[{spec:'provider',export:['public'],as:'shared',nodes:['a'],edges:[],nodeOverrides:{b:{hidden:true}}}];
+  assert.throws(()=>C.materializeTopology(specs),/nodeOverrides identity is not selected\/exported: b/);
+});
+test('merged export re-export resolves nested imports, namespaces, protocols, presentation and navigation aliases',()=>{
+  const specs=fixtures(),provider=diagram(specs[0]);
+  provider.topologyExports={front:{nodes:['a','b'],edges:['a->b']},back:{nodes:['c'],edges:[]}};
+  provider.nodes.a.link='https://example.com/api';
+  diagram(specs[1]).topologyImports=[{spec:'provider',export:['front','back'],as:'inner',nodeOverrides:{a:{title:'Consumer API'}}}];
+  diagram(specs[1]).topologyExports={relay:{nodes:['inner::a','inner::b','inner::c'],edges:['inner::a->inner::b','inner::b->inner::c']}};
+  const outer=clone(specs[1]);outer.page.canon.id='outer';outer.page.sections[0].diagram={topologyImports:[{spec:'consumer',export:'relay',as:'outer',nodeOverrides:{'inner::b':{sub:'Nested display'}}}]};specs.push(outer);
+  const result=C.materializeTopology(specs),d=diagram(result[2]);
+  assert.equal(d.nodes['outer::inner::a'].title,'Consumer API');assert.equal(d.nodes['outer::inner::b'].sub,'Nested display');assert.equal(d.nodes['outer::inner::a'].link,'https://example.com/api');
+  assert.equal(d.edges.length,2);assert.equal(d.edges[0].kind,'custom');assert.deepEqual(d.topologyProvenance.imports.map(p=>p.as),['outer','outer::inner']);
+});

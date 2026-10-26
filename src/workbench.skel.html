@@ -686,7 +686,7 @@
       <button type="button" class="bbtn" id="topology-refresh" hidden>Use the latest published library</button>
       <label class="catalog-field">Provider diagram<select id="topology-provider"></select></label>
       <p id="topology-owner" class="catalog-note"></p>
-      <div class="topology-choices"><label class="catalog-field">Provider section<select id="topology-section"></select></label><label class="catalog-field">Named export<select id="topology-export"></select></label></div>
+      <div class="topology-choices"><label class="catalog-field">Provider section<select id="topology-section"></select></label><label class="catalog-field">Named exports (⌘/Ctrl-click to combine)<select id="topology-export" multiple size="3"></select></label></div>
       <div id="topology-contents" hidden>
         <div class="catalog-toolbar"><button type="button" class="bbtn" id="topology-all">Select all</button><span>Connections require both selected endpoints.</span></div>
         <div class="topology-choices"><fieldset><legend>Nodes</legend><div id="topology-nodes" class="topology-checks"></div></fieldset><fieldset><legend>Connections</legend><div id="topology-edges" class="topology-checks"></div></fieldset></div>
@@ -696,7 +696,7 @@
       <div class="catalog-field"><label for="topology-destination">Import destination section</label><select id="topology-destination"></select></div>
       <label class="catalog-field">Namespace<input id="topology-namespace" type="text" autocomplete="off" spellcheck="false"></label>
       <p class="catalog-note">IDs become <code>namespace::node</code>. Choose a unique namespace. Imported internals remain provider-owned; your steps and local connections may reference them.</p>
-      <p class="catalog-note">The child starts as a floating block. Drag any imported node to position the whole child. Providers stay frozen until you reopen Canon.</p>
+      <p class="catalog-note">The child starts as a floating block. Drag a node to arrange it locally; drag the reference handle to move the whole child. Providers stay frozen until you reopen Canon.</p>
       <p id="topology-status" class="catalog-summary" role="status" aria-live="polite"></p>
     </section>
   </div>

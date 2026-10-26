@@ -13,7 +13,7 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   'animate','animateMotion','animateTransform','set','.pkt','.comm-failure',
   '.dv-connect-preview','.dv-free-edge-preview','.dv-topology-boundary',
   '.dv-topology-handle','.dv-rowgrab','.dv-rowline','.dv-slotline',
-  '.dv-position-lock-badge',
+  '.dv-position-lock-badge','[data-dv-hidden="true"]',
   '.nlink','.nbackref','.nrefs-trigger','.detail-trigger'
   ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit'
 ].join(',');

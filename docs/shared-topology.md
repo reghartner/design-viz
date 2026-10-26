@@ -39,6 +39,25 @@ occupy it. Edge keys naturally become `as::from->as::to`. Different imports in
 one diagram require distinct namespaces. Nested imports are allowed; cycles
 are rejected. Stable attachment aliases/ports are not part of this version.
 
+Consumers can merge multiple exports from the **same provider diagram section**
+into one namespace:
+
+```json
+{"spec":"platform", "export":["entry","persistence"], "as":"platform",
+ "nodeOverrides":{"api":{"title":"Checkout API","sub":"Consumer wording","style":"moss"}},
+ "edgeOverrides":{"api->store":{"label":"Save order"}}}
+```
+
+The array must be nonempty and contain unique export names. Shared nodes and
+connections are included once. Array imports also include provider connections
+whose endpoints both belong to the union, including connections spanning exports.
+A scalar export keeps its declared edge boundary unchanged. Exports from different
+sections cannot be merged: use separate imports and namespaces instead.
+Optional `nodes`/`edges` subsets select from that union; explicit `edges: []` still
+selects no connections, and an explicit edge list remains exact. Reducing `nodes`
+without reducing incident edges is an endpoint-closure error, just as for scalar
+imports. Source IDs, namespace paths, groups and protocol meanings stay stable.
+
 Consumers can select a **subset inside a named export** with optional `nodes` and
 `edges` arrays of provider-local stable IDs/edge keys:
 
@@ -191,7 +210,8 @@ Callers must reject stale source/project/selection before accepting the plan.
 
 In a deployed Canon v3 editor, choose **Add to diagram → Referenced topology**.
 Search by provider name, ID or owner, then choose its page section and named
-export. Only that export's nodes and connections are offered. All start selected;
+exports (⌘/Ctrl-click selects more than one). Their union and connecting provider
+edges are offered. All start selected;
 uncheck unwanted objects, keeping both endpoints of each selected connection.
 Closure errors and namespace collisions disable insertion and explain what to
 fix. Choose a destination diagram section and a unique namespace. **Add reference**
@@ -283,7 +303,8 @@ a source node (or choose **Connect from this node** in its Inspector), then clic
 the destination. The connection Inspector’s **from** and **to** lists include
 imported nodes; changing an endpoint also retargets the consumer’s story references
 in the same Undo action. Only the consumer connection is saved. Provider-owned
-connection semantics remain read-only; their layout can be customized locally. Edit shared structure in the provider. Drag an
+connection endpoints and protocol semantics remain read-only; their display labels
+and layout can be customized locally. Edit shared structure in the provider. Drag an
 imported node to rearrange just that node; drag the reference’s **⋯** handle to
 move the whole block with its custom arrangement (a nested handle moves the
 containing direct reference). Click the handle for reference
@@ -311,19 +332,37 @@ consumer import. Both inherited and appended entries obey the existing code
 reference validation, including immutable revision SHAs and identity conflicts.
 
 Imported edge labels, curve points and endpoint attachment handles can be dragged
-on the desktop canvas. **Reset imported connection layout** restores the provider
-label and routing. These edits use `edgeOverrides`, keyed by provider-relative
+on the desktop canvas. **Reset imported connection layout** restores provider
+label position and routing while preserving any local display label. These edits use `edgeOverrides`, keyed by provider-relative
 edge identity, for example `"edgeOverrides":{"api->store":{"labelDx":24}}`.
-Allowed fields are `labelDx`, `labelDy`, `curvePoints`, `curveControls`,
+Allowed fields are `label` (display text), `labelDx`, `labelDy`, `curvePoints`, `curveControls`,
 `bend`, `fromPort` and `toPort`. Numeric offsets
 are finite and within ±100000; port offsets are between 0 and 1.
 Ports and curves use their normal validated shapes. A field set to `null`
 suppresses its inherited value (for example, a new through-point curve clears
 inherited cubic controls); an omitted field inherits the provider value. Removing
-the whole edge override restores all provider geometry. Semantic endpoints,
-label text, kind and other structure cannot be overridden.
+the whole edge override restores provider presentation. The Inspector has separate
+resets for display label and connection layout; each preserves the other. Semantic
+endpoints, kind and other structure cannot be overridden.
 
-Both maps use full provider-relative paths for nested members on the direct
+`nodeOverrides` stores consumer presentation on stable provider-relative node
+IDs. Allowed fields are `title`, `sub` (the existing subtitle field), `style`,
+`tint`, `hidden`, and `presentation: "baseline"`. Titles/subtitles are strings;
+style and tint use the normal supported tokens; hidden is a boolean. An omitted
+field inherits the provider value; `null` suppresses it. **Reset node presentation**
+removes that node's overlay and restores provider values. Hidden nodes retain
+identity, geometry and narrative references; readers hide the card and incident
+connections, while the desktop editor shows a faint selectable card for recovery.
+The Inspector exposes display name/subtitle, style/tint and hidden controls. Source
+identity, groups, binding, code references, icons, navigation and semantic fields
+cannot be overridden through this map. Existing `nodeCodeRefs` remains the separate
+additive evidence contract. Optional import-level `presentation: "baseline"`
+copies baseline presentation metadata onto imported nodes and connections; a
+node-level presentation override can suppress it. This prepares the import
+contract for baseline rendering; this import change alone does not add visual
+dimming. The convenience does not modify providers.
+
+All override maps use full provider-relative paths for nested members on the direct
 import: `inner::api` or `inner::api->inner::store`. Keys must remain selected and
 exported, just like `nodePositions`; removed or deselected keys fail validation.
 On provider refresh, inherited references update before the retained additions;
@@ -370,11 +409,13 @@ explicit reload/reopen; an already-open consumer never updates automatically.
 
 [`examples/canon/topology`](../examples/canon/topology/registry.json) includes a
 platform provider, default-floating checkout consumer, explicitly positioned
-`checkout-positioned` consumer, and node-only `checkout-subset` consumer:
+`checkout-positioned` consumer, node-only `checkout-subset` consumer, merged-export `checkout-shared` re-exporting
+its imported platform identities, and `checkout-nested` consuming that re-export
+with an additional presentation overlay:
 
 ```sh
 python3 tools/build.py
-node tools/validate.js examples/canon/topology/checkout.json examples/canon/topology/platform.json
+node tools/validate.js examples/canon/topology/platform.json examples/canon/topology/checkout-shared.json examples/canon/topology/checkout-nested.json
 node tools/canon/library.mjs --registry examples/canon/topology/registry.json --out .local/topology/diagrams.json
 node --test tests/canon-topology.test.js
 ```

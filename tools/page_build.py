@@ -46,6 +46,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 from crossrefs import (
     CrossrefError,
@@ -55,6 +56,7 @@ from crossrefs import (
     page_backlinks,
 )
 from spec_diff import compare_specs, format_summary
+from build import warn_unused_brand
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "template" / "flowview.html"
@@ -140,6 +142,7 @@ def main() -> int:
     ap.add_argument("--tags", default=None)
     ap.add_argument("--root", default=None)
     ap.add_argument("--allow-warnings", action="store_true")
+    ap.add_argument("--resolve-imports", metavar="FOLDER_OR_REGISTRY", help="derive membership and resolve imports using folder/canon.json or an explicit registry JSON")
     ap.add_argument(
         "--diff-prev", action="store_true",
         help="report changes from the previous successfully built spec state",
@@ -226,15 +229,37 @@ def main() -> int:
 
     # Source-checkout authoring is a single command even before the first build.
     # Installed validators/kits already carry a static backend and never build it.
-    if not TEMPLATE.is_file() or not (ROOT / "tools/canon/generated-runtime.cjs").is_file():
-        built = subprocess.run([sys.executable, str(ROOT / "tools/build.py")],
+    warn_unused_brand()
+    brand = subprocess.run(["node", str(ROOT / "tools/source-loader.cjs"), "--sources", "company-brand.config.js"],
+                           capture_output=True, text=True, cwd=ROOT)
+    if brand.returncode:
+        fail("could not read configured branding:\n" + brand.stderr)
+    stale_brand = TEMPLATE.is_file() and brand.stdout.strip() not in TEMPLATE.read_text()
+    if stale_brand:
+        print("WARNING: stale template branding detected; rebuilding from current company configuration.", file=sys.stderr)
+    if a.resolve_imports or stale_brand or not TEMPLATE.is_file() or not (ROOT / "tools/canon/generated-runtime.cjs").is_file():
+        built = subprocess.run([sys.executable, str(ROOT / "tools/build.py"), "--template-only"],
                                capture_output=True, text=True, cwd=ROOT)
         if built.returncode:
             fail("could not generate page build inputs:\n" + built.stdout + built.stderr)
 
+    # A temporary resolved snapshot is the validation/injection input only.
+    # Authored source, destination source copies and diff baselines retain refs.
+    resolved_file = None
+    build_spec_path = spec_path
+    if a.resolve_imports:
+        result = subprocess.run(["node", str(ROOT / "tools/canon/local-imports.mjs"),
+                                 str(spec_path), str(absolute(pathlib.Path(a.resolve_imports)))],
+                                capture_output=True, text=True, cwd=ROOT)
+        if result.returncode:
+            fail("local import resolution failed:\n" + result.stderr + result.stdout)
+        resolved_file = tempfile.TemporaryDirectory(prefix="flowview-resolved-")
+        build_spec_path = pathlib.Path(resolved_file.name) / spec_path.name
+        build_spec_path.write_text(result.stdout)
+
     # 1. validate
     r = subprocess.run(
-        ["node", str(ROOT / "tools" / "validate.js"), str(spec_path)],
+        ["node", str(ROOT / "tools" / "validate.js"), str(build_spec_path)],
         capture_output=True, text=True, cwd=ROOT,
     )
     out = (r.stdout + r.stderr).strip()
@@ -308,7 +333,7 @@ def main() -> int:
 
         r2 = subprocess.run(
             ["python3", str(ROOT / "tools" / "inject.py"),
-             str(spec_path), str(TEMPLATE), str(html_path)],
+             str(build_spec_path), str(TEMPLATE), str(html_path)],
             capture_output=True, text=True, cwd=ROOT,
         )
         if r2.returncode != 0:

@@ -230,3 +230,28 @@ test('site.baseUrl is configured once, validated and embedded in runtime and age
   write('company.json',{version:1,site:{baseUrl}});assert.throws(()=>loader.companyConfig(),/site.baseUrl/);
  }
 });
+
+test('page builds warn for unwired brand files and rebuild stale configured template branding',t=>{
+  const checkout=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-brand-page-'));
+  t.after(()=>fs.rmSync(checkout,{recursive:true,force:true}));copyCheckout(checkout);
+  const {spawnSync}=require('node:child_process');
+  const run=(tool,args=[])=>spawnSync('python3',[tool,...args],{cwd:checkout,encoding:'utf8',timeout:120000,maxBuffer:20*1024*1024});
+  fs.writeFileSync(path.join(checkout,'company/brand.json'),JSON.stringify({companyName:'Local Brand',logo:'LB',primaryColor:'#123456'}));
+  let result=run('tools/build.py');assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stderr,/WARNING:.*DEFAULT BRANDING/);
+  fs.writeFileSync(path.join(checkout,'company/company.json'),JSON.stringify({version:1,brand:'brand.json'}));
+  const source=fs.readFileSync(path.join(checkout,'cookbook/temperature.md'),'utf8').match(/```json\n(.*?)\n```/s)[1];
+  fs.writeFileSync(path.join(checkout,'brand-test.spec.json'),source);
+  result=run('tools/page_build.py',['brand-test.spec.json']);assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stderr,/stale template branding/);
+  const html=fs.readFileSync(path.join(checkout,'brand-test.html'),'utf8');assert.match(html,/FLOWVIEW_COMPANY_BRAND_CONFIG = Object.freeze\(\{"companyName":"Local Brand"/);
+  assert.doesNotMatch(html,/companyName: 'YOUR COMPANY'/);
+  result=run('tools/page_build.py',['brand-test.spec.json']);assert.equal(result.status,0,result.stdout+result.stderr);assert.doesNotMatch(result.stderr,/stale template branding|DEFAULT BRANDING/);
+  result=run('tools/build.py',['--no-config']);assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stderr,/WARNING:.*DEFAULT BRANDING/);
+  for(const value of ['{',JSON.stringify({version:1,brand:'missing.json'})]){
+    fs.writeFileSync(path.join(checkout,'company/company.json'),value);
+    for(const [tool,args] of [['tools/page_build.py',['brand-test.spec.json']],['tools/build.py',['--runtime-only']]]){
+      result=run(tool,args);assert.notEqual(result.status,0);assert.match(result.stderr,/BUILD FAIL: Invalid company config/);
+      assert.doesNotMatch(result.stderr,/Traceback|CalledProcessError|at companyConfig/);
+      if(value!=='{')assert.match(result.stderr,/brand file not found: missing.json/);
+    }
+  }
+});

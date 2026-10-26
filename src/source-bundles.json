@@ -77,6 +77,8 @@
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",
+    "../tools/canon/manifest.cjs",
+    "workbench/local-repository.js",
     "workbench/agent-project.js",
     "workbench/agent-recovery.js",
     "workbench/agent-review.js",

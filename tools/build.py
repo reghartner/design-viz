@@ -245,9 +245,32 @@ def fill(skel: str, mapping: dict) -> str:
     return out
 
 
+def warn_unused_brand() -> None:
+    """A fork-owned brand file must never be silently replaced by sample branding."""
+    if not (ROOT / "company/brand.json").is_file():
+        return
+    result = subprocess.run(["node", str(ROOT / "tools/source-loader.cjs"), "--company"],
+                            capture_output=True, text=True)
+    if result.returncode:
+        # The loader supplies the field/path to repair. Do not hide that reason
+        # in CalledProcessError or expose its JavaScript stack as a Python one.
+        diagnostic = re.search(r"^Error: (Invalid company config .+)$", result.stderr, re.MULTILINE)
+        raise SystemExit("BUILD FAIL: " + (diagnostic.group(1) if diagnostic else
+                         (result.stderr or result.stdout).strip()))
+    company = json.loads(result.stdout)
+    brand = (company or {}).get("brand") or {}
+    if not brand or not brand.get("companyName") or brand.get("companyName") == "YOUR COMPANY":
+        print('WARNING: company/brand.json exists but DEFAULT BRANDING is active. '
+              'Set "brand": "brand.json" in company/company.json, configure companyName in the company or brand file, and rebuild; '
+              'remove --no-config / FLOWVIEW_COMPANY_IDENTITY=off to use configured branding.',
+              file=sys.stderr)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runtime-only", action="store_true", help="build packaged backend and measurement runtimes only")
+    outputs = parser.add_mutually_exclusive_group()
+    outputs.add_argument("--runtime-only", action="store_true", help="build packaged backend and measurement runtimes only")
+    outputs.add_argument("--template-only", action="store_true", help="build standalone template and backend without publishing the repository library")
     config = parser.add_mutually_exclusive_group()
     config.add_argument('--config', type=pathlib.Path, help='company site JSON; spec paths resolve relative to this file')
     config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json and company/company.json')
@@ -262,9 +285,10 @@ def main() -> int:
         os.environ['FLOWVIEW_COMPANY_IDENTITY'] = 'off'
     if args.runtime_only and args.config is not None:
         parser.error('--config requires an HTML build')
+    warn_unused_brand()
     runtime = canon_runtime()
-    landing = None if args.runtime_only else workbench_landing(args.config, no_config=args.no_config, runtime=runtime)
-    examples = None if args.runtime_only else workbench_examples(args.config, no_config=args.no_config)
+    landing = None if args.runtime_only or args.template_only else workbench_landing(args.config, no_config=args.no_config, runtime=runtime)
+    examples = None if args.runtime_only or args.template_only else workbench_examples(args.config, no_config=args.no_config)
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
@@ -275,6 +299,8 @@ def main() -> int:
         ('standalone', 'flowview.skel.html', ROOT / 'template/flowview.html'),
         ('workbench', 'workbench.skel.html', ROOT / 'workbench/flowspec.html'),
     ]:
+        if args.template_only and name != 'standalone':
+            continue
         entry = entrypoint(name)
         assets = entrypoint_assets(name)
         styles = {style['key']: style['source'].rstrip() for style in assets['styles']}
@@ -301,6 +327,10 @@ def main() -> int:
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(fill(read(skeleton), mapping))
+
+    if args.template_only:
+        print("built template/flowview.html and tools/canon/generated-runtime.cjs")
+        return 0
 
     # Publish against the runtime just built, so newly added panels validate.
     subprocess.run([

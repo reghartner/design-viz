@@ -52,7 +52,7 @@ function initWorkbenchAgentChat(opts){
   var selectionFeedback=null,selectionFeedbackTimer=null;
   var state={connected:false,pending:null,transcript:[],changes:[],listening:false,pilotStatus:null},pilotRequested=false;
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
-  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
+  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,activeRepository=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
   var workingIndicator=get('working');
   var kitNode=doc.getElementById('flowview-folder-kit'),kit=null;
@@ -199,7 +199,7 @@ function initWorkbenchAgentChat(opts){
   }
   function resetConversationForProject(current){
     composeEpoch++;copying=false;copyFallback.hidden=true;copyPreview.value='';handoff.hidden=true;handoffText.value='';activeFiles=null;
-    cacheReady=false;seenProject=current.project;activeFolder=null;accessLost=false;lastSaved='';
+    cacheReady=false;seenProject=current.project;activeFolder=null;activeRepository=null;accessLost=false;lastSaved='';
     Object.assign(state,{connected:false,pending:null,listening:false,transcript:[],changes:[],activity:[],activityPhase:'idle',review:null,preflight:null});
     get('input').value='';get('instructions').value='';get('pilot-capture').checked=false;
     get('folder').textContent='';get('guide-folder-name').textContent='';
@@ -497,9 +497,11 @@ function initWorkbenchAgentChat(opts){
     var connectingClient=client,identity=await connectingClient.start(resume,choice,renewal?{renewSession:true,expectedSessionId:renewal.previous.sessionId,expectedConnectionId:renewal.previous.connectionId}:undefined);
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'saved');
+    if(!renewal)activeRepository=parent || directory;
     activeFolder=directory;activeFiles=files;accessLost=false;cacheReady=true;freshProject=null;
     // Store only a browser-owned handle. Access is requested later by a click.
-    recovery.remember(directory,identity.sessionId).then(function(saved){if(life.alive() && token===generation && saved)rememberedHandle={handle:directory,sessionId:identity.sessionId};});
+    var rememberDirectory=activeRepository || directory;
+    recovery.remember(rememberDirectory,identity.sessionId).then(function(saved){if(life.alive() && token===generation && saved)rememberedHandle={handle:rememberDirectory,sessionId:identity.sessionId};});
     status('Preparing the authoring instructions in your folder…');
     await files.write('folder-agent.py',kit.watcher);
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
@@ -557,7 +559,7 @@ function initWorkbenchAgentChat(opts){
     var preparedSource,preparedContext;
     async function prepareSource(value){
       checkOpening();
-      preparedContext=opts.prepareFolder?await opts.prepareFolder(value):undefined;
+      preparedContext=opts.prepareFolder?await opts.prepareFolder(value,found):undefined;
       checkOpening();
       var invalid=opts.validate && (opts.prepareFolder?opts.validate(value,preparedContext):opts.validate(value));
       if(invalid)throw Error('The saved spec needs repair before opening: '+invalid);
@@ -596,6 +598,7 @@ function initWorkbenchAgentChat(opts){
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
         if(intent==='new' && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or agent connection. Select a new, empty diagram folder to start fresh. Existing files were not changed.');
         if(intent==='resume' && !found.hasSession)throw Error('This folder does not contain an existing agent build. Select the diagram folder used by the earlier build.');
+        directory=found.directory || directory;
         await prepareSource(found.source===null?opening.source:found.source);
         projectFolder=await found.initialize(checkOpening);
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';

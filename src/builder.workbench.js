@@ -1377,8 +1377,8 @@ function initWorkbenchBuilder(opts){
       if(opts.isActive && !opts.isActive())return {error:'Open an editable project before arranging.'};
       if(interactions.adding() || interactions.connecting())return {error:'Finish adding or connecting nodes before arranging.'};
       if(snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return {error:'Render the current source before arranging.'};
-      var got=builderDiagram(snapshot.text,snapshot.raw,session.insertSection);if(got.error)return got;
-      return Object.assign(snapshot,{section:session.insertSection,diagram:got.d,label:builderInsertTargetText(snapshot.raw,session.insertSection).replace(/^into /,'')});
+      var context=session.topologyContext(),got=builderArrangementSource(snapshot.text,snapshot.raw,session.insertSection,context);if(got.error)return got;
+      return Object.assign(snapshot,{topologyContext:context,section:session.insertSection,diagram:got.effective,label:builderInsertTargetText(snapshot.raw,session.insertSection).replace(/^into /,'')});
     },
     commit:function(plan,snapshot){return applyPlan(plan,{after:function(){
       clearMultiSelect();setSelected(null);

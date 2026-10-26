@@ -364,40 +364,53 @@ function planResetTopologyArrangement(text,raw,sectionIdx,namespace){
 /* Resolve node ownership without ever treating provider-derived nodes/floats as
    authored consumer structure. A direct import owns nested imported members too;
    their nodePositions key is the identity relative to that direct namespace. */
-function builderNodeArrangementTargets(text,raw,targets,context){
-  if(!Array.isArray(targets) || !targets.length)return {error:'Select nodes to arrange.'};
-  var section=targets[0].section;
-  if(targets.some(function(t){return t.kind!=='node' || t.section!==section;}))
-    return {error:'Choose nodes from a single section.'};
+function builderArrangementSource(text,raw,section,context){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
-  var ids=targets.map(function(t){return t.id;});
-  if(new Set(ids).size!==ids.length)return {error:'Select each node only once.'};
   var hasImports=Array.isArray(got.d.topologyImports) && got.d.topologyImports.length;
-  var needsProvider=ids.some(function(id){return !Object.prototype.hasOwnProperty.call(got.d.nodes || {},id);});
-  if(needsProvider && !context)return {error:'Open this authored spec from Canon to load its frozen provider context.'};
+  if(hasImports && !context)return {error:'Open this spec from Canon to arrange imported nodes.'};
   var effectiveRaw=raw;
-  if(hasImports && context){
+  if(hasImports){
     if(typeof FlowTopology==='undefined')return {error:'Topology provider resolution is unavailable.'};
     try{effectiveRaw=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}
   }
-  var effectiveRecord=specSectionPaths(effectiveRaw)[section],effective=effectiveRecord && specValueAt(effectiveRaw,effectiveRecord.diagram);
-  if(!effective)return {error:'An object changed. Render and select it again.'};
-  var positions=layout(effective).pos,records=[];
+  var record=specSectionPaths(effectiveRaw)[section];
+  got.effective=record && specValueAt(effectiveRaw,record.diagram);
+  if(!got.effective)return {error:'An object changed. Render and select it again.'};
+  return got;
+}
+function builderArrangementOwner(got,kind,id){
+  if(typeof FlowTopology!=='undefined' && FlowTopology.origin(got.d,kind,id))
+    return {error:'Open the authored consumer from Canon to arrange imported nodes.'};
+  var owner=typeof FlowTopology!=='undefined' && FlowTopology.origin(got.effective,kind,id);
+  if(!owner)return {local:true};
+  var indexes=[];(got.d.topologyImports || []).forEach(function(imp,j){if(imp && imp.as===owner.as)indexes.push(j);});
+  if(indexes.length!==1 || !owner.position)return {error:'Open the authored consumer from Canon to arrange imported nodes.'};
+  return {local:false,owner:owner,importIndex:indexes[0],relative:id.split('->').map(function(part){return part.slice(owner.as.length+2);}).join('->')};
+}
+function builderNodeArrangementTargets(text,raw,targets,context){
+  if(!Array.isArray(targets) || !targets.length)return {error:'Select nodes to arrange.'};
+  var section=targets[0].section;
+  if(targets.some(function(t){return t.kind!=='node' || t.section!==section;}))return {error:'Choose nodes from a single section.'};
+  var got=builderArrangementSource(text,raw,section,context);if(got.error)return got;
+  var ids=targets.map(function(t){return t.id;});
+  if(new Set(ids).size!==ids.length)return {error:'Select each node only once.'};
+  var positions=layout(got.effective).pos,records=[];
   for(var i=0;i<ids.length;i++){
-    var id=ids[i],materializedOwner=typeof FlowTopology!=='undefined' && FlowTopology.origin(got.d,'nodes',id);
-    if(materializedOwner)return {error:'Open the authored consumer from Canon to arrange imported nodes.'};
-    var local=Object.prototype.hasOwnProperty.call(got.d.nodes || {},id),owner=null,index=-1;
-    if(!local){
-      owner=typeof FlowTopology!=='undefined' && FlowTopology.origin(effective,'nodes',id);
-      if(!owner)return {error:'An object changed. Render and select it again.'};
-      var indexes=[];(got.d.topologyImports || []).forEach(function(imp,j){if(imp && imp.as===owner.as)indexes.push(j);});
-      if(indexes.length!==1 || !owner.position)return {error:'Open the authored consumer from Canon to arrange this imported node.'};
-      index=indexes[0];
-    }
-    var p=positions[id];if(!p && !local)return {error:'Render the selected nodes before arranging them.'};
-    records.push({id:id,local:local,owner:owner,importIndex:index,position:p});
+    var id=ids[i],record=builderArrangementOwner(got,'nodes',id);if(record.error)return record;
+    if(!Object.prototype.hasOwnProperty.call(got.effective.nodes || {},id))return {error:'An object changed. Render and select it again.'};
+    var p=positions[id];if(!p && !record.local)return {error:'Render the selected nodes before arranging them.'};
+    records.push(Object.assign(record,{id:id,position:p}));
   }
-  got.ids=ids;got.records=records;got.effective=effective;return got;
+  got.ids=ids;got.records=records;return got;
+}
+/* Coordinates stay relative to the direct import, including nested identities.
+   Freeze the resolved origin before a local placement can change its default. */
+function builderWriteImportedPosition(d,record,position){
+  var origin=record.owner.position,relative={x:position.x-origin.x,y:position.y-origin.y};
+  if(!floatCoordinate(relative.x) || !floatCoordinate(relative.y))return {error:'Relative node position exceeds the supported coordinate range.'};
+  var imp=d.topologyImports[record.importIndex];imp.position=builderClone(origin);
+  if(!imp.nodePositions)imp.nodePositions={};
+  Object.defineProperty(imp.nodePositions,record.relative,{value:relative,enumerable:true,writable:true,configurable:true});
 }
 function builderSelectedFloats(text,raw,targets,context){
   if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
@@ -442,10 +455,7 @@ function planTransformFloats(text,raw,targets,change,context){
         if(Math.abs(record.position.cx-next.x)>=.0001 || Math.abs(record.position.cy-next.y)>=.0001)localChanged=true;
         f.x=next.x;f.y=next.y;delete f.dx;delete f.dy;return;
       }
-      var imp=d.topologyImports[record.importIndex],origin=record.owner.position;
-      imp.position=builderClone(origin);if(!imp.nodePositions)imp.nodePositions={};
-      var relative={x:Math.round((next.x-origin.x)*10)/10,y:Math.round((next.y-origin.y)*10)/10};
-      Object.defineProperty(imp.nodePositions,record.id.slice(record.owner.as.length+2),{value:relative,enumerable:true,writable:true,configurable:true});
+      builderWriteImportedPosition(d,record,next);
     });
     // Moving a local float can change the automatic origin chosen for later
     // imports. Freeze those current origins so unrelated rendered placement is
@@ -922,26 +932,47 @@ function sectionLayoutDetachSteps(d,items){
   return sectionLayoutPack(next,'steps');
 }
 
-function planAutoArrange(text,raw,section,result){
-  var got=builderDiagram(text,raw,section);if(got.error)return got;
-  var locked=builderLockedNodeIds(got.d);if(locked.length===Object.keys(got.d.nodes || {}).length)return {noop:true};
+function planAutoArrange(text,raw,section,result,context){
+  var got=builderArrangementSource(text,raw,section,context);if(got.error)return got;
   try{
-    var ids=autoArrangeInput(got.d);
+    var ids=autoArrangeInput(got.effective),locked=builderLockedNodeIds(got.effective);
+    var nodes=builderNodeArrangementTargets(text,raw,ids.map(function(id){return {kind:'node',section:section,id:id};}),context);
+    if(nodes.error)return nodes;
+    if(locked.length===ids.length)return {noop:true};
     if(!result || !Array.isArray(result.positions) || result.positions.length!==ids.length ||
-      !Array.isArray(result.edges) || result.edges.length!==(got.d.edges || []).length || !validGraphFrame(result.frame) ||
+      !Array.isArray(result.edges) || result.edges.length!==(got.effective.edges || []).length || !validGraphFrame(result.frame) ||
       new Set(result.positions.map(function(p){return p.id;})).size!==ids.length ||
       result.positions.some(function(p){return ids.indexOf(p.id)<0 || !floatCoordinate(p.x) || !floatCoordinate(p.y);}) ||
       result.edges.some(function(e){return !e || typeof e!=='object' || Array.isArray(e) ||
         !validCurveControls(e.curveControls) || !validEdgePort(e.fromPort) || !validEdgePort(e.toPort) ||
         ['labelDx','labelDy'].some(function(k){return e[k]!=null && !floatCoordinate(e[k]);});}))
       return {error:'The layout returned invalid geometry. The source is unchanged.'};
-    var before=layout(got.d).pos,byId=new Map(result.positions.map(function(p){return [p.id,p];}));
+    var before=layout(got.effective).pos,byId=new Map(result.positions.map(function(p){return [p.id,p];}));
     if(locked.some(function(id){var a=before[id],b=byId.get(id);return !a || !b || Math.abs(a.cx-b.x)>.0001 || Math.abs(a.cy-b.y)>.0001;}))
       return {error:'Auto arrange did not preserve every locked node position. The source is unchanged.'};
     // Only a fixed geometry allowlist crosses the worker/transaction boundary.
     var clean={positions:result.positions,frame:{x:result.frame.x,y:result.frame.y,w:result.frame.w,h:result.frame.h},edges:result.edges.map(function(e){var out={};
       ['curveControls','fromPort','toPort','labelDx','labelDy'].forEach(function(k){if(e[k]!=null)out[k]=e[k];});return out;})};
-    return planReplaceValue(text,raw,got.path,JSON.stringify(autoArrangeDiagram(got.d,clean),null,2));
+    var edgeRecords=(got.effective.edges || []).map(function(e){return builderArrangementOwner(got,'edges',builderEdgeKey(e));});
+    var error=edgeRecords.find(function(record){return record.error;});if(error)return error;
+    // The raw adapter only receives authored nodes and edges. Provider geometry
+    // is projected into import overlays after the ordinary local writeback.
+    var localEdges=clean.edges.filter(function(_,i){return edgeRecords[i].local;});
+    var copy=autoArrangeDiagram(got.d,{positions:clean.positions.filter(function(p){return Object.prototype.hasOwnProperty.call(got.d.nodes || {},p.id);}),edges:localEdges,frame:clean.frame});
+    for(var i=0;i<nodes.records.length;i++){
+      var record=nodes.records[i];if(record.local)continue;
+      var written=builderWriteImportedPosition(copy,record,byId.get(record.id));if(written && written.error)return written;
+    }
+    edgeRecords.forEach(function(record,i){
+      if(record.local)return;
+      var imp=copy.topologyImports[record.importIndex];if(!imp.edgeOverrides)imp.edgeOverrides={};
+      var patch=Object.assign({},imp.edgeOverrides[record.relative]);
+      AUTO_ARRANGE_EDGE_FIELDS.forEach(function(key){patch[key]=clean.edges[i][key]==null?null:clean.edges[i][key];});
+      Object.defineProperty(imp.edgeOverrides,record.relative,{value:patch,enumerable:true,writable:true,configurable:true});
+    });
+    var plan=planReplaceValue(text,raw,got.path,JSON.stringify(copy,null,2));
+    if(!plan.error && context)FlowTopology.resolveSource(JSON.parse(plan.text),context);
+    return plan;
   }catch(error){return {error:error.message};}
 }
 

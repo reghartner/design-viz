@@ -182,7 +182,7 @@ Optional `nodeCodeRefs: {providerNodeId: [codeReference, ...]}` appends consumer
 references after inherited references; it never replaces inherited evidence.
 Optional `edgeOverrides: {"providerFrom->providerTo": geometry}` changes only
 `labelDx`, `labelDy`, `curvePoints`, `curveControls`, `bend`, `fromPort`,
-`toPort`. Null suppresses an inherited field;
+`toPort`, `fromDx`, `fromDy`, `toDx`, `toDy`. Null suppresses an inherited field;
 omission inherits it. Remove the edge override to restore provider geometry.
 Both maps require selected exported identities, including full nested paths.
 All effective code references and geometry are validated. Numeric geometry is

@@ -206,7 +206,7 @@ test('right-click spatial alignment supports imported-only and mixed nodes with 
   }
   {
     const {raw,ctx}=importedAlignment(),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx)),ids=['platform::api','platform::store'],selected=importedTargets(...ids),rects=nodeRects(resolved,ids);
-    assert.match(C.planAlignSpatial(source,raw,selected,null,'vertical',rects,0).error,/frozen provider context/);
+    assert.equal(C.planAlignSpatial(source,raw,selected,null,'vertical',rects,0).error,'Open this spec from Canon to arrange imported nodes.');
     assert.ok(C.planAlignSpatial(source,raw,selected,null,'vertical',rects,0,{version:1,id:'checkout',specs:[]}).error);
     assert.equal(JSON.stringify(raw),source);
   }

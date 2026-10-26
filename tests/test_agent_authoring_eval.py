@@ -225,13 +225,32 @@ class AuthorEvalTests(unittest.TestCase):
         namespace = {'__name__': 'bounded_author_tools_test', '__file__': str(script)}
         exec(compile(eval.AUTHOR_TOOLS, str(script), 'exec'), namespace)
         def invoke(*args):
-            stdout, stderr = mock.Mock(), mock.Mock()
-            stdout.buffer, stderr.buffer = io.BytesIO(), io.BytesIO()
-            with mock.patch.object(eval.sys, 'argv', [str(script), *args]), \
-                    mock.patch.object(eval.sys, 'stdout', stdout), mock.patch.object(eval.sys, 'stderr', stderr):
-                result = namespace['main']()
-            return result, stdout.buffer.getvalue(), stderr.buffer.getvalue()
+            with tempfile.TemporaryFile() as stdout_buffer, tempfile.TemporaryFile() as stderr_buffer:
+                stdout = io.TextIOWrapper(stdout_buffer, encoding='utf-8', write_through=True)
+                stderr = io.TextIOWrapper(stderr_buffer, encoding='utf-8', write_through=True)
+                try:
+                    with mock.patch.object(eval.sys, 'argv', [str(script), *args]), \
+                            mock.patch.object(eval.sys, 'stdout', stdout), \
+                            mock.patch.object(eval.sys, 'stderr', stderr):
+                        result = namespace['main']()
+                    stdout.flush()
+                    stderr.flush()
+                    stdout_buffer.seek(0)
+                    stderr_buffer.seek(0)
+                    return result, stdout_buffer.read(), stderr_buffer.read()
+                finally:
+                    stdout.detach()
+                    stderr.detach()
         return session, invoke
+
+    def test_wrapper_captures_binary_output_without_color_environment_overrides(self):
+        _, invoke = self.wrapper()
+        self.run.side_effect = None
+        self.run.return_value = subprocess.CompletedProcess([], 0, b'documentation', b'diagnostic')
+        with mock.patch.dict(eval.os.environ, {'TERM': 'xterm'}):
+            for name in ('FORCE_COLOR', 'NO_COLOR', 'PYTHON_COLORS'):
+                eval.os.environ.pop(name, None)
+            self.assertEqual(invoke('widget', '--list'), (0, b'documentation', b'diagnostic'))
 
     def test_wrapper_rejects_external_paths_extra_options_and_malformed_checks_before_process(self):
         _, invoke = self.wrapper()

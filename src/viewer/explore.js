@@ -597,7 +597,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       apply(w,r);
     });
     player.hidden=workbenchFocus || !bar && !player.querySelector('.playback-mode-rail');
-    player.classList.toggle('player-ambient',!!bar && bar.hidden);
     var automaticControls=!controls;
     if(!controls){
       var controlLeft=workbenchCanvas?84:12,right=12,minControls=minimum(playerWindow);

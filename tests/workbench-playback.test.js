@@ -120,6 +120,20 @@ test('single-step stories have an explained disabled Play; ambient mode cannot s
   const ambient=stepperHarness();ambient.stepper.toggleAuto();assert.equal(ambient.intervals.size,0);
 });
 
+test('Ambient keeps neutral controls visible and every direct transport action enters Step without implicit playback',()=>{
+  const h=stepperHarness(),s=h.stepper;
+  assert.equal(s.mode(),'ambient');assert.equal(h.term.bar.hidden,undefined);
+  assert.equal(h.term.bar.attrs['data-mode'],'ambient');assert.equal(h.term.playbackStatus.textContent,'Ambient · choose a step or use playback');
+  assert.equal(h.term.stepN.parentNode.hidden,true);
+  assert.ok(h.term.chips.children.every(button=>button.attrs['aria-current']==='false'));
+  h.term.chips.children[1].fire('click');
+  assert.equal(s.mode(),'step');assert.equal(s.current().id,'second');assert.equal(h.term.stepN.parentNode.hidden,false);assert.equal(h.intervals.size,0);
+  s.enterAmbient();h.term.btnNext.fire('click');
+  assert.equal(s.mode(),'step');assert.equal(s.current().id,'third');assert.equal(h.intervals.size,0);
+  s.enterAmbient();h.term.btnPlay.fire('click');
+  assert.equal(s.mode(),'step');assert.equal(s.current().id,'first');assert.equal(h.intervals.size,1,'Play is the only Ambient action that starts playback');
+});
+
 test('presenter Space is an explicit Play command even when automatic step entry is off',()=>{
   const h=stepperHarness(), handlers={}, view=element();
   const doc={body:element(),documentElement:{},createElement:element,addEventListener:(name,fn)=>handlers[name]=fn};

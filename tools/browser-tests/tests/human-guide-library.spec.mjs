@@ -265,14 +265,14 @@ test('Canon edit and browser Back preserve Ambient mode while stale modes use th
   const reader=page.locator('#canon-reader'),editor=page.locator('#docview');
   await reader.getByRole('button',{name:'Ambient',exact:true}).click();
   await expect(reader.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(reader.locator('.termbar')).toBeHidden();
+  await expect(reader.locator('.termbar')).toBeVisible();await expect(reader.locator('.stepline')).toBeHidden();await expect(reader.locator('.schip[aria-current="true"]')).toHaveCount(0);
 
   await page.locator('#canon-reader-edit').click();
   await expect(editor.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(editor.locator('.termbar')).toBeHidden();
+  await expect(editor.locator('.termbar')).toBeVisible();await expect(editor.locator('.stepline')).toBeHidden();await expect(editor.locator('.schip[aria-current="true"]')).toHaveCount(0);
   await page.goBack();await expect(page.locator('#welcome-reader-screen')).toBeVisible();
   await expect(reader.getByRole('button',{name:'Ambient',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(reader.locator('.termbar')).toBeHidden();
+  await expect(reader.locator('.termbar')).toBeVisible();await expect(reader.locator('.stepline')).toBeHidden();await expect(reader.locator('.schip[aria-current="true"]')).toHaveCount(0);
 
   await page.evaluate(()=>{
     const state=structuredClone(history.state);

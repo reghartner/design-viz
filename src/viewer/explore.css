@@ -476,9 +476,9 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
 @media screen{
  /* Read-only delivery surfaces share one desktop toolbar. The editor omits this
     class and retains its established header plus toolbar rows. */
- .reader-single-toolbar .reader-top{position:relative;grid-template-columns:max-content minmax(80px,240px) minmax(0,1fr) max-content;}
+ .reader-single-toolbar .reader-top{position:relative;grid-template-columns:max-content minmax(80px,190px) minmax(0,1fr) max-content;}
  .reader-single-toolbar .reader-view-strip{flex-wrap:nowrap;overflow:hidden;}
- .reader-single-toolbar .reader-view-strip>.reader-top-view{flex:0 1 auto;}
+ .reader-single-toolbar .reader-view-strip>.reader-top-view{flex:0 1 auto;padding-inline:7px;}
  .reader-single-toolbar .reader-toolbar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:auto;min-height:34px;display:flex;align-items:center;gap:6px;padding:0;background:transparent;min-width:0;}
  .reader-single-toolbar .reader-zoom-controls{order:2;}
  .reader-single-toolbar .reader-zoom-menu>summary{width:68px;text-align:center;}

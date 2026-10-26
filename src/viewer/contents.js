@@ -117,17 +117,22 @@ function createReaderContents(ctl,nav,actions,options){
     if(options.singleReaderToolbar){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
+      function centerBounds(){var center=toolbar.getBoundingClientRect(),fitBounds=fit.hidden?center:fit.getBoundingClientRect();return{left:Math.min(center.left,fitBounds.left),right:Math.max(center.right,fitBounds.right)};}
+      function overlapsCenter(node){var rect=node.getBoundingClientRect(),center=centerBounds();return rect.width && rect.right>center.left-6 && rect.left<center.right+6;}
+      // Page-specific controls yield before either set of common controls changes
+      // shape. Re-measure the View control only after that space is reclaimed.
+      if(!overflowActions && width>900 && overlapsCenter(actions)){overflowViewportActions(true);actionAttemptWidth=width;}
       function settle(){
         top.classList.remove('reader-toggle-compact');viewSwitcher.style.removeProperty('max-width');viewStrip.hidden=false;viewPicker.hidden=true;
-        function toolbarOverlap(){if(width<=900)return false;var center=toolbar.getBoundingClientRect(),fitBounds=fit.hidden?center:fit.getBoundingClientRect(),left=Math.min(center.left,fitBounds.left),right=Math.max(center.right,fitBounds.right);return [viewSwitcher,actions].some(function(node){var rect=node.getBoundingClientRect();return rect.width && rect.right>left-6 && rect.left<right+6;});}
-        function fitViewSwitcher(){if(width<=900)return;var center=toolbar.getBoundingClientRect(),rect=viewSwitcher.getBoundingClientRect(),available=Math.floor(center.left-rect.left-6);if(rect.right>center.left-6 && available>0)viewSwitcher.style.maxWidth=Math.max(80,available)+'px';}
-        function viewOverflow(){var stripRect=viewStrip.getBoundingClientRect(),clipped=Array.from(viewStrip.children).some(function(choice){return choice.scrollWidth>choice.clientWidth+1;});return clipped || viewStrip.scrollWidth>viewStrip.clientWidth+1 || stripRect.height>38 || top.scrollWidth>top.clientWidth+1 || toolbarOverlap();}
+        function visibleViewOverlap(){var center=centerBounds(),controls=viewPicker.hidden?Array.from(viewStrip.children):[viewPicker];return controls.some(function(control){var rect=control.getBoundingClientRect();return rect.width && rect.right>center.left-6 && rect.left<center.right+6;});}
+        function fitViewSwitcher(){if(width<=900)return;var center=centerBounds(),rect=viewSwitcher.getBoundingClientRect(),available=Math.floor(center.left-rect.left-6);if(available>0)viewSwitcher.style.maxWidth=Math.max(48,available)+'px';}
+        function viewOverflow(){var stripRect=viewStrip.getBoundingClientRect(),clipped=Array.from(viewStrip.children).some(function(choice){return choice.scrollWidth>choice.clientWidth+1;});return clipped || viewStrip.scrollWidth>viewStrip.clientWidth+1 || stripRect.height>38 || top.scrollWidth>top.clientWidth+1 || visibleViewOverlap();}
         if(!narrow && viewOverflow())top.classList.add('reader-toggle-compact');
-        fitViewSwitcher();var needs=viewStrip.children.length>1 && viewOverflow();if(needs){viewStrip.hidden=true;viewPicker.hidden=false;fitViewSwitcher();}
+        var needs=viewStrip.children.length>1 && viewOverflow();if(needs){viewStrip.hidden=true;viewPicker.hidden=false;fitViewSwitcher();}
         if(!narrow && top.scrollWidth>top.clientWidth+1)top.classList.add('reader-toggle-compact');return needs;
       }
       var needsPicker=settle();
-      if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || needsPicker && viewSwitcher.getBoundingClientRect().width<120 || Math.max(toolbar.getBoundingClientRect().right,fit.hidden?0:fit.getBoundingClientRect().right)>actions.getBoundingClientRect().left-6)){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
+      if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;

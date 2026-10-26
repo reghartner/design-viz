@@ -54,11 +54,13 @@ test('one section rendered by two Views is two document pages in standalone, nat
   const assertPager=async root=>{
     const label=root.locator('.reader-page-label'),toggle=root.locator('.reader-top>button');
     const previous=root.getByRole('button',{name:'Previous page',exact:true}),next=root.getByRole('button',{name:'Next page',exact:true});
+    const selectView=async name=>{const tab=root.getByRole('tab',{name,exact:true});if(await tab.isVisible())await tab.click();else await root.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:name});};
+    const selectedView=name=>root.locator('.reader-top-view').filter({hasText:name});
     await expect(toggle).toHaveText(/^Contents\s*·\s*2 pages$/);await expect(root.locator('.reader-page-index')).toHaveAttribute('aria-label','Document pages');
     await expect(label).toHaveText('Page 1 of 2');await expect(previous).toBeDisabled();
-    await root.getByRole('tab',{name:'Second View',exact:true}).click();await expect(label).toHaveText('Page 2 of 2');await expect(next).toBeDisabled();
-    await previous.click();await expect(label).toHaveText('Page 1 of 2');await expect(root.getByRole('tab',{name:'First View',exact:true})).toHaveAttribute('aria-selected','true');
-    await next.click();await expect(label).toHaveText('Page 2 of 2');await expect(root.getByRole('tab',{name:'Second View',exact:true})).toHaveAttribute('aria-selected','true');
+    await selectView('Second View');await expect(label).toHaveText('Page 2 of 2');await expect(next).toBeDisabled();
+    await previous.click();await expect(label).toHaveText('Page 1 of 2');await expect(selectedView('First View')).toHaveAttribute('aria-selected','true');
+    await next.click();await expect(label).toHaveText('Page 2 of 2');await expect(selectedView('Second View')).toHaveAttribute('aria-selected','true');
   };
   const root=await openRaw(page,server,raw,'repeated-section-pages');await assertPager(root);await page.screenshot({path:info.outputPath('two-views-one-section-page-2.png')});
   await page.goto(server.origin+'/repeated-section-pages.html#d=only&v=second');await page.reload();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 2');

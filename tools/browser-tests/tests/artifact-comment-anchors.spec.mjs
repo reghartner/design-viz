@@ -64,7 +64,7 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
  await ring.getByRole('button',{name:'Next step'}).click();
  await expect(ringLine).toContainText(/STEP 3\/5\s*Camera wakes/);
  await ring.locator('.mtoggle .mbtn',{hasText:'Ambient'}).click();
- await expect(ring.locator('.termbar')).toBeHidden();
+ await expect(ring.locator('.termbar')).toBeVisible();await expect(ringLine).toBeHidden();await expect(ring.locator('.schip[aria-current="true"]')).toHaveCount(0);
  await ring.locator('.mtoggle .mbtn',{hasText:'Step'}).click();
  await expect(ringLine).toBeVisible();
  await chip(2).click();

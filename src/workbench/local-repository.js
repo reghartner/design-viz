@@ -1,5 +1,5 @@
 /* Local repository access is bounded by the explicitly selected directory
-   handle. Browsers cannot discover its parent; never fall back to the network. */
+   handle. A registered local context never falls back to deployed providers. */
 async function openLocalRepositoryFolder(directory, filename){
   var manifest;
   try{manifest=await directory.getFileHandle('canon.json');}catch(error){if(error.name==='NotFoundError' || error.name==='TypeMismatchError')return null;throw error;}
@@ -51,10 +51,14 @@ function prepareLocalFolderTopology(text,found,context){
   if(local){FlowTopology.resolveSource(raw,local);return local;}
   var dependencies=authoredTopologyDependencies(raw);
   if(dependencies.length){
+    var rootHelp='Choose the repository root containing canon.json, then select this diagram. Browsers cannot read a parent folder without your selection.';
+    // Ordinary folders retain the deployed-Canon workflow when no context is
+    // available. A failed lookup also explains how to grant local providers.
+    if(!context)return prepareAuthoredTopology(raw,null).catch(function(error){throw Error(error.message+'\n'+rootHelp);});
     // Reuse an already approved frozen context. Online contexts retain their
     // existing preparation policy; local contexts may never fetch missing IDs.
     if(context && (!context.local || dependencies.every(function(id){return context.specs.some(function(spec){return spec.page.canon.id===id;});})))return prepareAuthoredTopology(raw,context);
-    throw Error('This folder has topology imports but no accessible canon.json. Choose the repository root containing canon.json, then select this diagram. Browsers cannot read a parent folder without your selection.');
+    throw Error('The frozen local repository snapshot is missing a required provider. '+rootHelp);
   }
   return prepareAuthoredTopology(raw,context);
 }

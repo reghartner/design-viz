@@ -57,7 +57,8 @@ test('missing IDs and cycles fail before folder metadata creation',async t=>{
 });
 test('nested-folder import diagnostic explains the required root grant',async t=>{
   const h=await setup(t);h.ctx.authoredTopologyDependencies=raw=>h.ctx.FlowTopology.dependencies(raw);
-  assert.throws(()=>h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null),/Choose the repository root.*Browsers cannot read a parent/);
+  h.ctx.prepareAuthoredTopology=async()=>{throw Error('Missing authored provider middle');};
+  await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null),/Missing authored provider middle\nChoose the repository root.*Browsers cannot read a parent/);
 });
 test('explicit registries retain their identity contract and reject escaped provider paths',async t=>{
   const h=await setup(t),{resolveLocalImports}=await import('../tools/canon/local-imports.mjs');
@@ -101,6 +102,17 @@ test('ordinary folder opening reuses approved frozen contexts and refuses missin
   }
   const context=JSON.parse(JSON.stringify(found.topologyContext));context.specs=context.specs.filter(s=>s.page.canon.id!=='middle');
   assert.throws(()=>h.ctx.prepareLocalFolderTopology(found.source,{},context),/Choose the repository root/);assert.equal(fetches,0);
+  const transitive=JSON.parse(JSON.stringify(found.topologyContext));transitive.specs=transitive.specs.filter(s=>s.page.canon.id!=='base');
+  const prepared=await h.ctx.prepareLocalFolderTopology(found.source,{},transitive);
+  assert.throws(()=>h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared),/missing spec/i);assert.equal(fetches,0);
+});
+test('ordinary folders without a frozen context retain deployed provider acquisition',async t=>{
+  const h=await setup(t),found=await h.ctx.openFolderAgentProject(h.handle,'diagrams/team/consumer/consumer.spec.json');
+  vm.runInContext(readSource('library.workbench.js'),h.ctx);
+  let fetches=0;h.ctx.connectTopologyRepository=async()=>{fetches++;return {...JSON.parse(JSON.stringify(found.topologyContext)),local:false};};
+  const prepared=await h.ctx.prepareLocalFolderTopology(found.source,{},null);
+  assert.equal(fetches,1);assert.equal(prepared.local,false);
+  assert.equal(h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared).page.sections[0].diagram.nodes['shared::base::api'].title,'Shared API');
 });
 test('unreadable unrelated entries do not block a valid closure; unreadable providers retain their filesystem error',async t=>{
   for(const failure of ['ENOTDIR','ELOOP']){

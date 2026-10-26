@@ -64,10 +64,12 @@ Provider edits on disk do not alter an already-open or recovered session; reopen
 the repository root to load them. A new import outside the frozen closure also
 requires reopening the root after updating the authored source on disk.
 
-Browsers cannot discover a selected folder's parent. Selecting a nested consumer
-folder that needs providers therefore shows an instruction to select the root
-containing `canon.json`. Ordinary folders and valid empty registries remain compatible. A folder with
-imports can reuse providers already frozen in the current session; otherwise
-select the repository root. Malformed or unsupported registry files remain errors,
+Browsers cannot discover a selected folder's parent. Select the repository root
+to resolve local providers. Ordinary folders and valid empty registries remain
+compatible: imports reuse providers already frozen in the current session, or
+use this Workbench's deployed Canon when no context exists. Failed deployed
+lookups also explain how to select the local root containing `canon.json`.
+An incomplete frozen local context never substitutes deployed providers.
+Malformed or unsupported registry files remain errors,
 and browser registry files are limited to 4 MiB. Cancelled or superseded folder reads cannot replace a
 newer document or initialize its folder metadata.

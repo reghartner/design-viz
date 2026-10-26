@@ -50,6 +50,9 @@ test('local repository imports render offline and retain editable positions, sou
 });
 
 test('nested folder diagnostics and late local provider reads preserve the current document',async({page,server})=>{
+  // No local root has been granted yet, so ordinary-folder adoption may consult
+  // the deployed catalog. It has no copy of these local providers.
+  await page.route('**/diagrams.json',route=>route.fulfill({json:{version:3,diagrams:[]}}));
   await setup(page,server);await page.evaluate(()=>{window.pickNested=true;});await filePanel(page);await page.locator('#working-folder-open').click();
   await expect(page.locator('#guide')).toContainText('Choose the repository root containing canon.json');await expect(page.locator('#src')).toHaveValue(starter);
   await page.evaluate(()=>{
@@ -82,6 +85,17 @@ test('empty registry preserves an ordinary folder and nested imports reuse the e
   await page.evaluate(()=>{window.pickNested=true;});await filePanel(page);await page.locator('#working-folder-open').click();
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext?.ephemeral)).toBe(true);
   await expect(page.locator('#workbench-working-status')).toContainText('Saved to consumer/consumer.spec.json');await expect(node(page)).toBeVisible();
+  await expect(page.locator('#src')).toHaveValue(consumer);expect(requests).toEqual([]);
+  // A newly requested provider cannot be filled from the deployed library when
+  // the current document owns a frozen local context.
+  await page.evaluate(async()=>{
+    let dir=await navigator.storage.getDirectory();for(const segment of ['diagrams','team','consumer'])dir=await dir.getDirectoryHandle(segment);
+    const handle=await dir.getFileHandle('consumer.spec.json'),raw=JSON.parse(await(await handle.getFile()).text());
+    raw.page.sections[0].diagram.topologyImports[0].spec='outside-frozen-closure';
+    const stream=await handle.createWritable();await stream.write(JSON.stringify(raw));await stream.close();
+  });
+  await filePanel(page);await page.locator('#working-folder-open').click();
+  await expect(page.locator('#guide')).toContainText('frozen local repository snapshot is missing');
   await expect(page.locator('#src')).toHaveValue(consumer);expect(requests).toEqual([]);
   await page.evaluate(async source=>{
     const root=await navigator.storage.getDirectory();window.pickNested=false;

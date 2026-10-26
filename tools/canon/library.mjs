@@ -42,7 +42,7 @@ async function libraryFromEntries(entries,output){
     // Optional author-owned discovery metadata; validated above with the spec.
     const {description,tags}=entry.spec.page;
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
-      ...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
+      ...(entry.folder?{folder:entry.folder}:{}),...(description!=null?{description}:{}),...(tags!=null?{tags}:{}),
       contentText:C.contentSearchText(rendered),canon:entry.spec.page.canon,counts,services,boundServices:C.serviceSummaries(rendered),exports:Array.from(exports).sort(),specUrl,revision:digest(entry.spec)};
   }))};
 }
@@ -51,7 +51,7 @@ export async function buildLibrary(registryPath,output='workbench/diagrams.json'
 /* Only regular JSON files under the chosen directory are inputs. Never follow
    symlinks into another repository or publish files merely because they exist. */
 async function directoryEntries(directory){
-  const entries=[];
+  const entries=[],root=await realpath(directory);
   async function walk(folder){
     const children=await readdir(folder,{withFileTypes:true});
     children.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0);
@@ -63,10 +63,10 @@ async function directoryEntries(directory){
       try{spec=JSON.parse(await readFile(filename,'utf8'));}
       catch(error){throw new Error(filename+': '+error.message);}
       if(!spec?.page || !Object.hasOwn(spec.page,'canon'))continue;
-      entries.push({filename,id:spec.page.canon?.id,spec});
+      entries.push({filename,folder:path.relative(root,folder).split(path.sep).join('/'),id:spec.page.canon?.id,spec});
     }
   }
-  await walk(await realpath(directory));
+  await walk(root);
   return entries;
 }
 

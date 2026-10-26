@@ -273,6 +273,12 @@ An opener with `data-open-human-guide="hg-agent"` targets that chapter; an empty
 attribute opens the guide at its existing reading position. Keep agent authoring
 instructions here; the [reader tour](tour.md) runs only on read-only diagrams.
 
+In **Browse diagrams**, use folder breadcrumbs and child folders to explore the
+repository hierarchy. Folder selection includes descendants and combines with
+search, Team, Service, and Topic filters. Cards keep the authored title prominent
+and show clickable parent folders below it. **All folders** returns to the root;
+returning from a reader keeps your folder and filters for the current page session.
+
 The [canon library guide](workbench-canon-library.md) explains how a company
 ships its reviewed diagrams beside the editor.
 

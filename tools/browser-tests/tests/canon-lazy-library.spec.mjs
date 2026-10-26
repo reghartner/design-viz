@@ -1069,3 +1069,58 @@ test('reference picker combines same-section exports with crossing connections a
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
   await page.reload();await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#docview path.edge')).toHaveCount(4);
 });
+
+// Folder navigation is metadata-only, independent of diagram IDs and titles.
+test('Browse folders follows source namespaces, composes filters and survives reader navigation in grid and list',async({page,server},info)=>{
+  const fixture=await publish(server),definitions=[
+    ['features/recordings/extensions','Extensions','recording','home'],
+    ['features/recordings/deep/archive','Archived recordings','recording','home'],
+    ['features/recordings/playback','Play a recording','playback','media'],
+    ['features/recordings-extra/export','Export recordings','recording','home'],
+    ['overview','Overview','overview','home'],
+    ['legacy','Legacy story','overview','home'],
+  ],membership=[];
+  for(const [relative,title,topic,owner] of definitions){
+    const id=relative.split('/').at(-1),spec=structuredClone(fixture.specs.first),folder='diagrams/'+relative;
+    spec.page.title=title;spec.page.tags=[topic];spec.page.blocks[0].diagram.nodes.a.binding={entityRef:'component:default/recorder',label:'Recorder'};
+    await mkdir(path.join(fixture.root,folder),{recursive:true});await writeFile(path.join(fixture.root,folder,id+'.spec.json'),JSON.stringify(spec));
+    membership.push({folder,owner:'group:default/'+owner});
+  }
+  await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:membership}));
+  const index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  index.diagrams.find(entry=>entry.id==='legacy').folder='diagrams/../invalid/legacy';
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(index));
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const grid=mainLibrary(page),extension=grid.locator('[data-id="extensions"]'),folders=page.getByRole('region',{name:'Browse folders'}),children=page.locator('#welcome-library-folder-children'),current=page.locator('#welcome-library-folder-path'),count=page.locator('#welcome-library-count');
+  await expect(count).toHaveText('6 of 6 diagrams');await expect(extension.locator('.canon-library-open>strong')).toHaveText('Extensions');
+  await expect(extension.getByRole('navigation',{name:'Diagram folder'}).locator('button')).toHaveText(['features','recordings']);
+  await expect(grid.locator('[data-id="overview"] nav,[data-id="legacy"] nav')).toHaveCount(0);
+  await expect(children.locator('button')).toHaveText(['features4 diagrams']);
+  await expect(grid.locator('a button,button a')).toHaveCount(0);
+  await page.screenshot({path:info.outputPath('folders-grid.png')});
+  await children.getByRole('button',{name:'Browse folder: features',exact:true}).click();
+  await expect(count).toHaveText('4 of 6 diagrams');await expect(children.locator('button')).toHaveText(['recordings3 diagrams','recordings-extra1 diagram']);
+  await children.getByRole('button',{name:'Browse folder: features / recordings',exact:true}).focus();await page.keyboard.press('Enter');
+  await expect(current.locator('[aria-current]')).toBeFocused();await expect(current.locator('button')).toHaveText(['All folders','features','recordings']);
+  await expect(count).toHaveText('3 of 6 diagrams');await expect(grid.locator('[data-id="export"]')).toBeHidden();await expect(children.locator('button')).toHaveText(['deep1 diagram']);
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('recording');
+  await page.getByLabel('Team',{exact:true}).selectOption('group:default/home');
+  await page.getByLabel('Service',{exact:true}).selectOption('entity:component:default/recorder');
+  await page.getByLabel('Topic',{exact:true}).selectOption('recording');
+  await expect(count).toHaveText('2 of 6 diagrams');
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('Extensions');await expect(count).toHaveText('1 of 6 diagrams');await expect(children.locator('button')).toHaveText(['deep0 diagrams']);
+  await children.locator('button').click();await expect(count).toHaveText('0 of 6 diagrams');await expect(page.locator('#welcome-library-empty')).toContainText('in features / recordings / deep');
+  await page.locator('#welcome-library-clear').click();await expect(current.locator('[aria-current]')).toHaveText('deep');await expect(count).toHaveText('1 of 6 diagrams');
+  await current.getByRole('button',{name:'Browse folder: features / recordings',exact:true}).click();
+  await page.getByRole('button',{name:'List',exact:true}).click();await expect(grid).toHaveClass(/canon-library-list/);
+  await expect(extension.getByRole('navigation',{name:'Diagram folder'})).toBeVisible();await page.screenshot({path:info.outputPath('folders-list.png')});
+  expect(requests).toEqual([]);
+  await extension.locator('.canon-library-open').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await page.goBack();await expect(current.locator('[aria-current]')).toHaveText('recordings');await expect(count).toHaveText('3 of 6 diagrams');await expect(grid).toHaveClass(/canon-library-list/);
+  await expect(page.locator('#welcome-library-recent-items')).toContainText('Extensions');
+  await page.goForward();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();
+  await extension.getByRole('button',{name:'Browse folder: features',exact:true}).click();await expect(count).toHaveText('4 of 6 diagrams');
+  await current.getByRole('button',{name:'Browse folder: All folders',exact:true}).click();await expect(count).toHaveText('6 of 6 diagrams');await expect(folders).toBeVisible();
+  expect(requests.length).toBeGreaterThan(0);expect(requests.every(url=>url.endsWith('/features/recordings/extensions/extensions.spec.json'))).toBe(true);
+});

@@ -35,16 +35,28 @@ edge data, IDs, edge order, groups, steps, paths, panels, named views and other
 sections are preserved. Existing float metadata also survives. Graph geometry
 is shared by named views; Auto arrange does not repack panel rectangles.
 
+For diagrams with `topologyImports`, open the authored spec from Canon so the
+Workbench has its frozen provider context. Auto arrange includes all resolved
+nodes and connections, including diagrams with no local nodes. Imported node
+positions are saved in each direct import's `position` and `nodePositions`;
+imported routes use `edgeOverrides`. Nested identities remain relative to their
+direct import. Provider nodes and edges are never copied into the authored
+consumer, and provider snapshots remain unchanged. Null geometry overrides
+suppress inherited bends, endpoint nudges and replaced curves. Local nodes and
+connections continue to use authored floats and edge geometry.
+
 Drag cards or curve handles to refine the result, or use the inspector's
 position/port controls. The selected ports stay pinned when moving cards;
 choose automatic attachment or Reset curve when appropriate. Undo restores the
 complete previous source, including its previous frame and routes.
 
-The public limit is **80 nodes and 160 connections per diagram**. The worker
+The public limit is **80 nodes and 160 connections per diagram**, counting the
+full resolved graph, including imports. The worker
 has a **20-second deadline**; a timeout, blocked local worker, invalid result or
 routing failure leaves the source unchanged. Cancel, source edits, a section
 switch, project replacement and editor teardown retire pending calculations.
-The workbench commits only to the exact source/project/section that started it.
+The workbench commits only to the exact source, project, section and frozen
+provider-context revision that started it.
 Large graphs can reach the deadline on slower hardware; split a complex story
 into meaningful diagram sections if it cannot finish. The CLI uses the same
 bounded search without the UI deadline.

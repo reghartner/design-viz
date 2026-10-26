@@ -27,7 +27,7 @@ function createAutoArrangeController(opts){
   var confirm=dialog.querySelector('[data-arrange-confirm]'),cancel=dialog.querySelector('[data-arrange-cancel]'),status=dialog.querySelector('[data-arrange-status]');
   var activity=dialog.querySelector('[data-arrange-activity]'),details=dialog.querySelector('[data-arrange-details]'),title=dialog.querySelector('h2');
   function calculating(active){activity.hidden=!active;details.hidden=active;title.textContent=active?'Arranging diagram':'Auto arrange this diagram?';}
-  function fresh(){var now=opts.context();return !invalid && !now.error && now.text===snapshot.text && now.project===snapshot.project && now.section===snapshot.section;}
+  function fresh(){var now=opts.context();return !invalid && !now.error && now.text===snapshot.text && now.project===snapshot.project && now.section===snapshot.section && now.topologyRevision===snapshot.topologyRevision;}
   function stop(){calculating(false);if(job){job.cancel();job=null;}snapshot=null;invalid=false;button.disabled=false;button.textContent='Auto arrange';if(dialog.open)dialog.close();}
   function stale(){if(!snapshot)return;calculating(false);invalid=true;if(job)job.cancel();status.textContent='The diagram or active section changed. Close this dialog and try again.';confirm.disabled=true;}
   life.listen(button,'click',function(){
@@ -47,7 +47,7 @@ function createAutoArrangeController(opts){
       var result=await running.promise;
       if(!life.alive() || job!==running)return;
       if(!fresh()){stale();return;}
-      var plan=planAutoArrange(captured.text,captured.raw,captured.section,result);
+      var plan=planAutoArrange(captured.text,captured.raw,captured.section,result,captured.topologyContext);
       if(plan.error)throw new Error(plan.error);
       if(!opts.commit(plan,captured))throw new Error('The source changed. Auto arrange cancelled.');
       stop();opts.message('Diagram arranged. Drag nodes and curve handles to refine it. Undo restores the previous layout.');

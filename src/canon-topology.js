@@ -58,7 +58,7 @@ var FlowTopology = (function(){
     return id;
   }
 
-  var edgeLayoutFields=['label','labelDx','labelDy','fromPort','toPort','curvePoints','curveControls','bend'];
+  var edgeLayoutFields=['label','labelDx','labelDy','fromPort','toPort','curvePoints','curveControls','bend','fromDx','fromDy','toDx','toDy'];
   function validateEdgeOverride(value,at){
     shape(value,edgeLayoutFields,at);
     Object.keys(value).forEach(function(key){

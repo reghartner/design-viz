@@ -56,6 +56,7 @@ function autoArrangeAroundLocked(d,result){
   var bottom=Math.max.apply(null,finalPositions.map(function(p){return p.y+p.height/2;}).concat(boxes.map(function(b){return b.y+b.h;}),routed.bounds?[routed.bounds.bottom]:[]))+32;
   return {positions:finalPositions,edges:routes,frame:{x:Math.floor(left),y:Math.floor(top),w:Math.ceil(right)-Math.floor(left),h:Math.ceil(bottom)-Math.floor(top)},metrics:Object.assign({},result.metrics,routed.metrics)};
 }
+var AUTO_ARRANGE_EDGE_FIELDS=['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy'];
 function autoArrangeDiagram(d,result){
   var copy=JSON.parse(JSON.stringify(d)),oldFloats=new Map((copy.floats || []).map(function(f){return [f.id,f];}));
   copy.rows=[[]];copy.floats=result.positions.map(function(p){
@@ -65,7 +66,7 @@ function autoArrangeDiagram(d,result){
     return entry;
   });
   copy.edges=(copy.edges || []).map(function(e,i){
-    ['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy'].forEach(function(k){delete e[k];});
+    AUTO_ARRANGE_EDGE_FIELDS.forEach(function(k){delete e[k];});
     // Only geometry can replace authored edge data, even for direct API callers.
     ['fromPort','toPort','curveControls','labelDx','labelDy'].forEach(function(k){if(result.edges[i][k]!=null)e[k]=result.edges[i][k];});return e;
   });

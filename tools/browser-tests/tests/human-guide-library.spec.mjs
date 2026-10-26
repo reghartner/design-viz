@@ -401,7 +401,7 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
   });
   await page.goto(server.origin+'/workbench.html?diagram=delivery&canon=old&review=secret');
   await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');expect(backendCalls).toBe(0);
-  await page.setViewportSize({width:390,height:800});const utilities=page.locator('#canon-reader .reader-utilities');await utilities.locator('summary').click();
+  await page.setViewportSize({width:390,height:800});const utilities=page.locator('#canon-reader .reader-utilities');await utilities.locator(':scope>summary').click();
   await page.getByRole('button',{name:'Copy link to current position',exact:true}).click();
   const fallback=page.getByRole('textbox',{name:'Copy this link manually'});await expect(fallback).toHaveValue(/\?diagram=delivery#.*d=delivery/);const fallbackURL=new URL(await fallback.inputValue());
   expect(fallbackURL.origin+fallbackURL.pathname+fallbackURL.search).toBe(server.origin+'/workbench.html?diagram=delivery');expect(fallbackURL.hash).toContain('d=delivery');

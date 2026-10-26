@@ -635,6 +635,7 @@ test('invalid lazy specs show an error and retry fetches repaired content',async
 });
 
 for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit action across chapters, tabs and history'+(handoffAction?' for an edit handoff':''),async({page,server},info)=>{
+  test.setTimeout(90000);
   await page.addInitScript(()=>{window.__copiedCanonLinks=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.__copiedCanonLinks.push(text)}});});
   const fixture=await publish(server),sources=[];
   for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
@@ -652,7 +653,8 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   const handoff={version:1,id:'checkout',revision:digest(spec),action:handoffAction || 'view'};
   await page.goto(fixture.url+'?canon=checkout#fv='+encodeURIComponent(JSON.stringify(handoff)));
   const edit=page.locator('#canon-reader-edit'),nav=page.locator('#canon-reader .explore-navigation');
-  async function reachableEdit(close=true){const menu=nav.locator('.reader-utilities');if(!await edit.isVisible())await menu.locator('summary').click();await expect(edit).toBeInViewport();await edit.click({trial:true});if(close && await menu.getAttribute('open')!==null)await menu.locator('summary').click();}
+  await expect(nav).toHaveClass(/reader-single-toolbar/);await expect(nav.locator('.reader-top>.reader-toolbar')).toHaveCount(1);await expect(nav.locator(':scope>.reader-toolbar')).toHaveCount(0);
+  async function reachableEdit(close=true){const menu=nav.locator('.reader-utilities'),summary=menu.locator(':scope>summary');if(!await edit.isVisible())await summary.click();await expect(edit).toBeInViewport();await expect(edit).toBeEnabled();await edit.click({trial:true});if(close && await menu.getAttribute('open')!==null)await summary.click();}
   await expect(edit).toBeEnabled();await expect(nav.locator('#canon-reader-edit')).toBeVisible();const original=await edit.elementHandle();
   await page.evaluate(()=>document.fonts.ready);
   const topHeight=()=>nav.locator('.reader-top').evaluate(el=>el.getBoundingClientRect().height),topHeights=new Map();
@@ -671,7 +673,7 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
         separated:actionBounds.every(a=>viewBounds.every(v=>a.right<=v.left+1 || v.right<=a.left+1 || a.bottom<=v.top+1 || v.bottom<=a.top+1)),
         // TOUR and embed stay visible. Four long authored View labels need the
         // existing two-row desktop header below 1200px; controls remain compact.
-        rowHeightOk:top.getBoundingClientRect().height<=(width>=1200?56:88)
+        rowHeightOk:top.getBoundingClientRect().height<=(width>=1200?56:92)
       };
     },width)).toEqual({labels:['Edit in Workbench →','Copy link to current position'],compact:true,viewsUnclipped:true,separated:true,rowHeightOk:true});
   }

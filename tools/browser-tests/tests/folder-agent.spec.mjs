@@ -1061,7 +1061,13 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.locator('#agent-update-open').click();await contained();
     await page.screenshot({path:info.outputPath('explore-review-ready.png')});
     await page.setViewportSize({width:1024,height:800});await contained();
-    await view.locator('.explore-legend-menu>summary').click();
+    const legendSummary=view.locator('.explore-legend-menu>summary');
+    if(!await legendSummary.isVisible()){
+      const utilities=view.locator('.reader-utilities');
+      if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
+      await expect(legendSummary).toBeVisible();
+    }
+    await legendSummary.click();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeInViewport();
     await page.screenshot({path:info.outputPath('explore-review-narrow-desktop.png')});
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
@@ -1967,7 +1973,9 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const before=await camera();
     await page.locator('#agent-update-current').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(node).toContainText('Backend');await expect.poll(camera).toEqual(before);
-    await expect(view.getByRole('tab',{name:'Recovery · Recovery canvas',exact:true})).toHaveAttribute('aria-selected','true');
+    const viewPicker=view.getByRole('combobox',{name:'Choose View',exact:true});
+    if(await viewPicker.isVisible())await expect(viewPicker.locator('option:checked')).toHaveText('Recovery · Recovery canvas');
+    else await expect(view.getByRole('tab',{name:'Recovery · Recovery canvas',exact:true})).toHaveAttribute('aria-selected','true');
     await page.locator('#agent-update-proposed').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');await expect.poll(camera).toEqual(before);
     await page.screenshot({path:info.outputPath('change-navigation-legacy-camera-1440x900.png')});
     await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-discard').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');expect(h.errors).toEqual([]);

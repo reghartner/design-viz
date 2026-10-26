@@ -77,6 +77,13 @@
     <div id="welcome-library-screen" class="welcome-screen" hidden>
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
       <div class="library-heading"><div><p class="welcome-kicker">THE SHARED PICTURE</p><h1 tabindex="-1">Browse diagrams.</h1><p class="welcome-description">Explore how things connect.</p></div><span class="library-reading-note">Published stories · Read only</span></div>
+      <div id="welcome-library-shell" class="library-shell">
+        <aside id="welcome-library-folders" class="library-folders" aria-label="Browse folders" hidden>
+          <div class="library-folders-heading"><strong>Folders</strong><button id="welcome-library-folders-close" type="button" aria-label="Close folders">‹</button></div>
+          <nav id="welcome-library-folder-tree" class="library-folder-tree" aria-label="Folder hierarchy"></nav>
+        </aside>
+        <div class="library-results">
+          <div id="welcome-library-folder-toolbar" class="library-folder-toolbar" hidden><button id="welcome-library-folders-toggle" type="button" aria-controls="welcome-library-folders" aria-expanded="true"><span aria-hidden="true">☰</span> Folders</button><div id="welcome-library-folder-path"></div></div>
       <div class="library-controls">
         <div class="welcome-search"><label for="welcome-library-search">Search diagrams</label><input id="welcome-library-search" type="search" placeholder="Search diagram content, team or service…" autocomplete="off" spellcheck="false" aria-controls="welcome-library-grid"></div>
         <div class="library-facets">
@@ -87,11 +94,12 @@
       </div>
       <div id="welcome-library-active" class="library-active-filters" hidden><div id="welcome-library-filter-chips" aria-label="Active filters"></div><button id="welcome-library-clear" type="button">Clear all</button></div>
       <p id="welcome-library-status" class="welcome-note" role="status"></p><button id="welcome-library-retry" type="button" class="welcome-button" hidden>Retry loading library</button>
-      <section id="welcome-library-folders" class="library-folders" aria-label="Browse folders" hidden><div id="welcome-library-folder-path"></div><div id="welcome-library-folder-children" class="library-folder-children" aria-label="Subfolders"></div></section>
       <section id="welcome-library-recent" class="library-recent" aria-labelledby="welcome-library-recent-title" hidden><div class="library-recent-heading"><h2 id="welcome-library-recent-title">Recently viewed</h2><span>On this browser</span><button id="welcome-library-clear-recent" type="button">Clear history</button></div><div id="welcome-library-recent-items"></div></section>
       <div class="library-results-heading"><h2>Explore the collection <span id="welcome-library-count" role="status"></span></h2><div class="library-presentation" role="group" aria-label="Display diagrams"><button id="welcome-library-grid-view" type="button" aria-pressed="true">Grid</button><button id="welcome-library-list-view" type="button" aria-pressed="false">List</button></div></div>
       <p id="welcome-library-empty" class="welcome-note welcome-search-empty" role="status" hidden></p>
       <div id="welcome-library-grid" class="canon-library-grid"></div>
+        </div>
+      </div>
     </div>
     <div id="welcome-reader-screen" class="welcome-screen canon-reader-screen" hidden>
       <div class="canon-reader-intro" id="canon-reader-intro">

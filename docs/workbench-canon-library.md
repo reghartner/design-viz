@@ -11,12 +11,19 @@ a reader restores its selected diagram from the published index and its selected
 Returning from a reader keeps the folder, search, filters, and Grid/List choice for the
 current page session.
 
-Browse the repository hierarchy with **All folders**, its ancestor breadcrumbs,
-and the immediate child folder buttons. Each selected folder includes diagrams
-in all its descendant folders. Counts on child folders respect the current search,
-Team, Service, and Topic filters. **Clear all** clears those filters while keeping
-the selected folder; **All folders** returns to the collection root. These choices
-last for the current page session and do not change diagram URLs.
+The **Folders** sidebar follows the reader's Contents menu: select **All folders**
+or any folder row to browse, and use the separate arrows to expand or collapse
+branches without changing the selection. Root folders start expanded one level;
+deeper branches can be opened as needed. The highlighted row includes diagrams
+in all its descendant folders, while sibling branches stay available. Counts
+respect the current search, Team, Service, and Topic filters.
+
+**Clear all** clears those filters while keeping the selected folder. **All
+folders** returns to the collection root. The **Folders** toolbar button and
+sidebar close button hide or reopen the sidebar. Selection, expansion, sidebar
+visibility, and filters last for the current page session and survive returning
+from a reader; they do not change diagram URLs. Card breadcrumbs automatically
+expand the selected folder's ancestors in the sidebar.
 
 Cards keep the authored diagram title prominent. Their smaller folder breadcrumbs
 are also clickable in Grid and List: `diagrams/features/recordings/extensions`

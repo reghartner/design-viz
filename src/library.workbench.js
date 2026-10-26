@@ -302,8 +302,9 @@ function initWorkbenchLibrary(opts){
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
   var search=document.getElementById('welcome-library-search'),empty=document.getElementById('welcome-library-empty');
-  var specRequests=new Map(),headerObserver=null,namespace=[];
-  var folders=document.getElementById('welcome-library-folders'),folderPath=document.getElementById('welcome-library-folder-path'),folderChildren=document.getElementById('welcome-library-folder-children');
+  var specRequests=new Map(),headerObserver=null,namespace=[],folderRows=new Map(),folderExpansion=new Map(),foldersOpen=true;
+  var folders=document.getElementById('welcome-library-folders'),folderPath=document.getElementById('welcome-library-folder-path'),folderTree=document.getElementById('welcome-library-folder-tree');
+  var folderShell=document.getElementById('welcome-library-shell'),folderToggle=document.getElementById('welcome-library-folders-toggle'),folderToolbar=document.getElementById('welcome-library-folder-toolbar');
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
     if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
@@ -491,7 +492,10 @@ function initWorkbenchLibrary(opts){
   function folderButton(label,parts){
     var button=document.createElement('button');button.type='button';button.textContent=label;
     button.setAttribute('aria-label','Browse folder: '+(parts.join(' / ') || 'All folders'));
-    button.addEventListener('click',function(){namespace=parts.slice();filterCards();folderPath.querySelector('[aria-current]').focus({preventScroll:true});});return button;
+    button.addEventListener('click',function(){
+      namespace=parts.slice();for(var depth=1;depth<parts.length;depth++)folderExpansion.set(JSON.stringify(parts.slice(0,depth)),true);
+      foldersOpen=true;filterCards();folderRows.get(JSON.stringify(parts)).button.focus({preventScroll:true});
+    });return button;
   }
   function folderBreadcrumb(parts,root){
     var nav=document.createElement('nav');nav.className='library-folder-path';nav.setAttribute('aria-label',root?'Current folder':'Diagram folder');
@@ -502,20 +506,49 @@ function initWorkbenchLibrary(opts){
     if(root)append('All folders',[],!parts.length);
     parts.forEach(function(part,i){append(part,parts.slice(0,i+1),root && i===parts.length-1);});return nav;
   }
-  function renderFolders(){
-    folders.hidden=!namespace.length && !entries.some(function(entry){return entry.namespace.length;});
-    folderPath.replaceChildren(folderBreadcrumb(namespace,true));folderChildren.replaceChildren();
-    var children=new Map();
-    entries.forEach(function(entry){
-      if(!libraryInNamespace(entry,namespace) || entry.namespace.length<=namespace.length)return;
-      var name=entry.namespace[namespace.length];if(!children.has(name))children.set(name,0);
-      if(matches(entry,true))children.set(name,children.get(name)+1);
-    });
-    Array.from(children.keys()).sort().forEach(function(name){
-      var button=folderButton(name,namespace.concat(name)),count=document.createElement('span');count.textContent=children.get(name)+' diagram'+(children.get(name)===1?'':'s');button.append(count);folderChildren.append(button);
-    });
-    folderChildren.hidden=!children.size;
+  // Build only when the catalog changes. Counts, selection and disclosure state
+  // update in place so filtering never replaces a focused sidebar control.
+  function buildFolderTree(){
+    folderTree.replaceChildren();folderRows.clear();var root={parts:[],children:new Map()};
+    entries.forEach(function(entry){var parent=root;entry.namespace.forEach(function(name,i){if(!parent.children.has(name))parent.children.set(name,{parts:entry.namespace.slice(0,i+1),children:new Map()});parent=parent.children.get(name);});});
+    function row(node,parent){
+      var key=JSON.stringify(node.parts),line=document.createElement('div');line.className='library-folder-row';
+      var button=folderButton(node.parts.at(-1) || 'All folders',node.parts),label=document.createElement('span'),count=document.createElement('small');
+      label.textContent=button.textContent;button.replaceChildren(label,count);button.className='library-folder-select';line.append(button);parent.append(line);
+      var children=null,disclosure=null;
+      if(node.children.size){
+        children=document.createElement('ul');children.className='library-folder-branches';parent.append(children);
+        if(node.parts.length){
+          disclosure=document.createElement('button');disclosure.type='button';disclosure.className='library-folder-disclosure';disclosure.textContent='›';
+          children.id='library-folder-branch-'+folderRows.size;disclosure.setAttribute('aria-controls',children.id);line.prepend(disclosure);
+          if(!folderExpansion.has(key))folderExpansion.set(key,node.parts.length===1);
+          disclosure.addEventListener('click',function(){folderExpansion.set(key,!folderExpansion.get(key));renderFolders();});
+        }else children.classList.add('library-folder-roots');
+      }
+      folderRows.set(key,{parts:node.parts,button:button,count:count,children:children,disclosure:disclosure});
+      Array.from(node.children.keys()).sort().forEach(function(name){var item=document.createElement('li');children.append(item);row(node.children.get(name),item);});
+    }
+    row(root,folderTree);
   }
+  function renderFolders(){
+    var available=entries.some(function(entry){return entry.namespace.length;});
+    folderShell.classList.toggle('has-folders',available);folderShell.classList.toggle('folders-closed',!foldersOpen);
+    folders.hidden=!available || !foldersOpen;folderToolbar.hidden=!available;folderToggle.setAttribute('aria-expanded',String(foldersOpen));
+    folderPath.replaceChildren(folderBreadcrumb(namespace,true));
+    var counts=new Map();
+    entries.forEach(function(entry){if(matches(entry,true))for(var depth=0;depth<=entry.namespace.length;depth++){var key=JSON.stringify(entry.namespace.slice(0,depth));counts.set(key,(counts.get(key)||0)+1);}});
+    folderRows.forEach(function(row,key){
+      var count=counts.get(key)||0;row.count.textContent=count;row.button.setAttribute('aria-description',count+' diagram'+(count===1?'':'s'));
+      if(key===JSON.stringify(namespace))row.button.setAttribute('aria-current','location');else row.button.removeAttribute('aria-current');
+      if(row.disclosure){
+        var expanded=folderExpansion.get(key);row.children.hidden=!expanded;row.disclosure.setAttribute('aria-expanded',String(expanded));
+        row.disclosure.setAttribute('aria-label',(expanded?'Collapse':'Expand')+' folder: '+row.parts.join(' / '));
+      }
+    });
+  }
+  function setFoldersOpen(open){foldersOpen=open;renderFolders();folderToggle.focus({preventScroll:true});}
+  folderToggle.addEventListener('click',function(){setFoldersOpen(!foldersOpen);});
+  document.getElementById('welcome-library-folders-close').addEventListener('click',function(){setFoldersOpen(false);});
   function cards(){
     retireServiceRows();grid.replaceChildren();
     if(!entries.some(function(entry){return libraryInNamespace(entry,namespace);}))namespace=[];
@@ -547,7 +580,7 @@ function initWorkbenchLibrary(opts){
     });
     serviceObserver=new ResizeObserver(updateServiceRows);serviceRows.forEach(function(row){serviceObserver.observe(row.element);});
     document.fonts.ready.then(function(){if(serviceObserver)updateServiceRows();});
-    if(published)readRecent();filterCards();
+    buildFolderTree();if(published)readRecent();filterCards();
   }
   function renderRecent(){
     recentItems.replaceChildren();

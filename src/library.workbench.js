@@ -29,6 +29,18 @@ function diagramSearchText(values,spec){
 /* Description and tags are optional; indexes published before them, or with
    malformed values, still load as if the metadata were absent. */
 function libraryDescription(value){return typeof value==='string'?value:'';}
+/* Folder is optional discovery metadata, never a URL or an ID. The last
+   directory owns the diagram; only its parents form the browse namespace. */
+function libraryNamespace(value){
+  if(typeof value!=='string' || value.length>2048 || /[\\\x00-\x1f\x7f]/.test(value))return [];
+  var parts=value.split('/');
+  if(parts.some(function(part){return !part || part==='.' || part==='..' || part!==part.trim();}))return [];
+  if(parts[0]==='diagrams')parts.shift();
+  parts.pop();return parts;
+}
+function libraryInNamespace(entry,namespace){
+  return namespace.every(function(part,i){return entry.namespace[i]===part;});
+}
 function libraryTags(value){return Array.isArray(value)?value.filter(function(tag){return typeof tag==='string' && tag;}):[];}
 /* Optional published bindings are never inferred from display names or fetched.
    Ignore malformed records and duplicate identities without trusting their counts. */
@@ -71,7 +83,7 @@ function parseCanonLibrary(raw){
     var title=typeof entry.title==='string' && entry.title.trim()?entry.title:entry.id;
     if(raw.version===1){
       var spec=canonLibrarySpec(entry.spec,{id:entry.id});
-      return {id:entry.id,title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),contentText:FlowCanon.contentSearchText(spec),boundServices:FlowCanon.serviceSummaries(spec),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
+      return {id:entry.id,namespace:libraryNamespace(entry.folder),title:typeof entry.title==='string' && entry.title.trim()?entry.title:spec.page.title || entry.id,description:libraryDescription(spec.page.description),tags:libraryTags(spec.page.tags),contentText:FlowCanon.contentSearchText(spec),boundServices:FlowCanon.serviceSummaries(spec),spec:spec,canon:spec.page.canon,source:entry.source,topologyContext:entry.topologyContext};
     }
     if(!entry.canon || entry.canon.id!==entry.id || FlowCanon.validate({page:{canon:entry.canon}}).length)throw new Error('Invalid diagram membership: '+entry.id);
     canonLibrarySpecURL(entry.specUrl,'https://library.invalid/workbench/diagrams.json');
@@ -79,7 +91,7 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),contentText:libraryDescription(entry.contentText),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    return {id:entry.id,namespace:libraryNamespace(entry.folder),title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),contentText:libraryDescription(entry.contentText),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 
@@ -290,7 +302,9 @@ function initWorkbenchLibrary(opts){
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
   var search=document.getElementById('welcome-library-search'),empty=document.getElementById('welcome-library-empty');
-  var specRequests=new Map(),headerObserver=null;
+  var specRequests=new Map(),headerObserver=null,namespace=[],folderRows=new Map(),folderExpansion=new Map(),foldersOpen=true;
+  var folders=document.getElementById('welcome-library-folders'),folderPath=document.getElementById('welcome-library-folder-path'),folderTree=document.getElementById('welcome-library-folder-tree');
+  var folderShell=document.getElementById('welcome-library-shell'),folderToggle=document.getElementById('welcome-library-folders-toggle'),folderToolbar=document.getElementById('welcome-library-folder-toolbar');
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireHeader(){
     if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
@@ -469,21 +483,83 @@ function initWorkbenchLibrary(opts){
     var owner={element:row,close:close,measure:measure};serviceRows.push(owner);return row;
   }
   function updateServiceRows(){serviceRows.forEach(function(row){row.measure();});}
-  function matches(entry){
-    return (!search.value.trim() || entry.searchText.includes(search.value.trim().toLowerCase())) &&
+  function matches(entry,ignoreNamespace){
+    return (ignoreNamespace || libraryInNamespace(entry,namespace)) && (!search.value.trim() || entry.searchText.includes(search.value.trim().toLowerCase())) &&
       (!facets.team.value || entry.canon.owner===facets.team.value) &&
       (!facets.service.value || (serviceRefs.has(facets.service.value)?(entry.boundServices || []).some(function(service){return service.entityRef===serviceRefs.get(facets.service.value);}):!entry.boundServices && entry.serviceNames.includes(facets.service.value))) &&
       (!facets.topic.value || (entry.tags || []).includes(facets.topic.value));
   }
+  function folderButton(label,parts){
+    var button=document.createElement('button');button.type='button';button.textContent=label;
+    button.setAttribute('aria-label','Browse folder: '+(parts.join(' / ') || 'All folders'));
+    button.addEventListener('click',function(){
+      namespace=parts.slice();for(var depth=1;depth<parts.length;depth++)folderExpansion.set(JSON.stringify(parts.slice(0,depth)),true);
+      foldersOpen=true;filterCards();folderRows.get(JSON.stringify(parts)).button.focus({preventScroll:true});
+    });return button;
+  }
+  function folderBreadcrumb(parts,root){
+    var nav=document.createElement('nav');nav.className='library-folder-path';nav.setAttribute('aria-label',root?'Current folder':'Diagram folder');
+    function append(label,path,current){
+      if(nav.children.length){var separator=document.createElement('span');separator.textContent='›';separator.setAttribute('aria-hidden','true');nav.append(separator);}
+      var button=folderButton(label,path);if(current)button.setAttribute('aria-current','location');nav.append(button);
+    }
+    if(root)append('All folders',[],!parts.length);
+    parts.forEach(function(part,i){append(part,parts.slice(0,i+1),root && i===parts.length-1);});return nav;
+  }
+  // Build only when the catalog changes. Counts, selection and disclosure state
+  // update in place so filtering never replaces a focused sidebar control.
+  function buildFolderTree(){
+    folderTree.replaceChildren();folderRows.clear();var root={parts:[],children:new Map()};
+    entries.forEach(function(entry){var parent=root;entry.namespace.forEach(function(name,i){if(!parent.children.has(name))parent.children.set(name,{parts:entry.namespace.slice(0,i+1),children:new Map()});parent=parent.children.get(name);});});
+    function row(node,parent){
+      var key=JSON.stringify(node.parts),line=document.createElement('div');line.className='library-folder-row';
+      var button=folderButton(node.parts.at(-1) || 'All folders',node.parts),label=document.createElement('span'),count=document.createElement('small');
+      label.textContent=button.textContent;button.replaceChildren(label,count);button.className='library-folder-select';line.append(button);parent.append(line);
+      var children=null,disclosure=null;
+      if(node.children.size){
+        children=document.createElement('ul');children.className='library-folder-branches';parent.append(children);
+        if(node.parts.length){
+          disclosure=document.createElement('button');disclosure.type='button';disclosure.className='library-folder-disclosure';disclosure.textContent='›';
+          children.id='library-folder-branch-'+folderRows.size;disclosure.setAttribute('aria-controls',children.id);line.prepend(disclosure);
+          if(!folderExpansion.has(key))folderExpansion.set(key,node.parts.length===1);
+          disclosure.addEventListener('click',function(){folderExpansion.set(key,!folderExpansion.get(key));renderFolders();});
+        }else children.classList.add('library-folder-roots');
+      }
+      folderRows.set(key,{parts:node.parts,button:button,count:count,children:children,disclosure:disclosure});
+      Array.from(node.children.keys()).sort().forEach(function(name){var item=document.createElement('li');children.append(item);row(node.children.get(name),item);});
+    }
+    row(root,folderTree);
+  }
+  function renderFolders(){
+    var available=entries.some(function(entry){return entry.namespace.length;});
+    folderShell.classList.toggle('has-folders',available);folderShell.classList.toggle('folders-closed',!foldersOpen);
+    folders.hidden=!available || !foldersOpen;folderToolbar.hidden=!available;folderToggle.setAttribute('aria-expanded',String(foldersOpen));
+    folderPath.replaceChildren(folderBreadcrumb(namespace,true));
+    var counts=new Map();
+    entries.forEach(function(entry){if(matches(entry,true))for(var depth=0;depth<=entry.namespace.length;depth++){var key=JSON.stringify(entry.namespace.slice(0,depth));counts.set(key,(counts.get(key)||0)+1);}});
+    folderRows.forEach(function(row,key){
+      var count=counts.get(key)||0;row.count.textContent=count;row.button.setAttribute('aria-description',count+' diagram'+(count===1?'':'s'));
+      if(key===JSON.stringify(namespace))row.button.setAttribute('aria-current','location');else row.button.removeAttribute('aria-current');
+      if(row.disclosure){
+        var expanded=folderExpansion.get(key);row.children.hidden=!expanded;row.disclosure.setAttribute('aria-expanded',String(expanded));
+        row.disclosure.setAttribute('aria-label',(expanded?'Collapse':'Expand')+' folder: '+row.parts.join(' / '));
+      }
+    });
+  }
+  function setFoldersOpen(open){foldersOpen=open;renderFolders();folderToggle.focus({preventScroll:true});}
+  folderToggle.addEventListener('click',function(){setFoldersOpen(!foldersOpen);});
+  document.getElementById('welcome-library-folders-close').addEventListener('click',function(){setFoldersOpen(false);});
   function cards(){
-    retireServiceRows();grid.replaceChildren();serviceLabels=new Map();serviceValues=new Map();serviceRefs=new Map();
+    retireServiceRows();grid.replaceChildren();
+    if(!entries.some(function(entry){return libraryInNamespace(entry,namespace);}))namespace=[];
+    serviceLabels=new Map();serviceValues=new Map();serviceRefs=new Map();
     var legacyServiceNames=new Set(entries.filter(function(entry){return !entry.boundServices;}).flatMap(services));
     entries.forEach(function(entry){(entry.boundServices || []).forEach(function(service){if(!serviceLabels.has(service.entityRef))serviceLabels.set(service.entityRef,service.label);});});
     serviceLabels.forEach(function(label,ref){var value='entity:'+ref;while(legacyServiceNames.has(value) || serviceRefs.has(value))value='entity:'+value;serviceValues.set(ref,value);serviceRefs.set(value,ref);});
     var labels=Array.from(serviceLabels.entries());
     labels.forEach(function(pair){if(labels.some(function(other){return other[0]!==pair[0] && other[1]===pair[1];}))serviceLabels.set(pair[0],pair[1]+' · '+pair[0]);});
     entries.forEach(function(entry){
-      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description,entry.contentText].concat(entry.tags || [],entry.serviceNames,(entry.boundServices || []).flatMap(function(service){return [service.label,service.entityRef];})));
+      entry.serviceNames=services(entry);entry.searchText=diagramSearchText([entry.title,entry.id,entry.canon.owner,libraryTeamName(entry.canon.owner),entry.description,entry.contentText,entry.namespace.join('/')].concat(entry.tags || [],entry.serviceNames,(entry.boundServices || []).flatMap(function(service){return [service.label,service.entityRef];})));
       var card=document.createElement('article');card.className='canon-library-card';card.dataset.id=entry.id;
       var open=link(entry,'canon-library-open'),preview=libraryPreviewElement(entry.preview);preview.setAttribute('aria-hidden','true');
       var name=document.createElement('strong');name.textContent=entry.title;open.append(preview,name);
@@ -493,7 +569,7 @@ function initWorkbenchLibrary(opts){
       var detail=document.createElement('span');detail.className='canon-library-counts';detail.textContent=entry.spec?starterCountLine(entry.spec):['nodes','steps','panels'].map(function(key){return entry.counts[key]+' '+(entry.counts[key]===1?key.slice(0,-1):key);}).join(' · ');
       var tags=document.createElement('div');tags.className='canon-library-tags';
       (entry.tags || []).forEach(function(tag){var chip=document.createElement('button');chip.type='button';chip.className='canon-library-tag';chip.textContent=tag;chip.setAttribute('aria-label','Filter by topic: '+tag);chip.setAttribute('aria-pressed',String(facets.topic.value===tag));chip.addEventListener('click',function(){facets.topic.value=facets.topic.value===tag?'':tag;filterCards();});tags.append(chip);});
-      metadata.append(owner,tags);var row=serviceRow(entry);if(row)metadata.append(row);metadata.append(detail);card.append(open,metadata);grid.append(card);
+      metadata.append(owner,tags);var row=serviceRow(entry);if(row)metadata.append(row);metadata.append(detail);var main=document.createElement('div');main.className='canon-library-main';main.append(open);if(entry.namespace.length)main.append(folderBreadcrumb(entry.namespace,false));card.append(main,metadata);grid.append(card);
     });
     Object.keys(facets).forEach(function(key){
       var select=facets[key],current=select.value,values=Array.from(new Set(entries.flatMap(function(entry){return key==='team'?[entry.canon.owner]:key==='service'?(entry.boundServices?entry.boundServices.map(function(service){return serviceValues.get(service.entityRef);}):entry.serviceNames):entry.tags || [];}))).filter(Boolean);
@@ -504,7 +580,7 @@ function initWorkbenchLibrary(opts){
     });
     serviceObserver=new ResizeObserver(updateServiceRows);serviceRows.forEach(function(row){serviceObserver.observe(row.element);});
     document.fonts.ready.then(function(){if(serviceObserver)updateServiceRows();});
-    if(published)readRecent();filterCards();
+    buildFolderTree();if(published)readRecent();filterCards();
   }
   function renderRecent(){
     recentItems.replaceChildren();
@@ -517,7 +593,7 @@ function initWorkbenchLibrary(opts){
     Array.from(grid.children).forEach(function(card,i){card.hidden=!matches(entries[i]);if(!card.hidden)shown++;});
     count.textContent=shown+' of '+entries.length+' diagrams';
     empty.hidden=!entries.length || shown>0;
-    empty.textContent=empty.hidden?'':'No diagrams match'+(query?' “'+query+'”':' these filters')+'. Try another keyword or clear your filters.';
+    empty.textContent=empty.hidden?'':'No diagrams match'+(query?' “'+query+'”':' these filters')+(namespace.length?' in '+namespace.join(' / '):'')+'. Try another keyword, clear your filters, or browse another folder.';
     filterChips.replaceChildren();
     var filters=[{label:'Search',value:query,clear:function(){search.value='';}}];
     Object.keys(facets).forEach(function(key){filters.push({label:key[0].toUpperCase()+key.slice(1),value:key==='team' && facets[key].value?libraryTeamName(facets[key].value):key==='service' && serviceRefs.has(facets[key].value)?serviceLabel(serviceRefs.get(facets[key].value)):facets[key].value,clear:function(){facets[key].value='';}});});
@@ -526,7 +602,7 @@ function initWorkbenchLibrary(opts){
     grid.querySelectorAll('.canon-library-tag').forEach(function(chip){chip.setAttribute('aria-pressed',String(chip.textContent===facets.topic.value));});
     serviceRows.forEach(function(row){row.close();});updateServiceRows();
     grid.querySelectorAll('.canon-library-service').forEach(function(chip){chip.setAttribute('aria-pressed',String(serviceValues.get(chip.dataset.service)===facets.service.value));});
-    renderRecent();
+    renderFolders();renderRecent();
   }
   window.addEventListener('resize',updateServiceRows);
   window.addEventListener('scroll',function(event){if(event.target===document)serviceRows.forEach(function(row){row.close();});},true);

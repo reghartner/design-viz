@@ -8,8 +8,30 @@ tab. Each opens a **read-only** viewer. Readers can walk the steps, select an al
 into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
 a reader restores its selected diagram from the published index and its selected spec.
-Returning from a reader keeps the search, filters, and Grid/List choice for the
+Returning from a reader keeps the folder, search, filters, and Grid/List choice for the
 current page session.
+
+The **Folders** sidebar follows the reader's Contents menu: select **All folders**
+or any folder row to browse, and use the separate arrows to expand or collapse
+branches without changing the selection. Root folders start expanded one level;
+deeper branches can be opened as needed. The highlighted row includes diagrams
+in all its descendant folders, while sibling branches stay available. Counts
+respect the current search, Team, Service, and Topic filters.
+
+**Clear all** clears those filters while keeping the selected folder. **All
+folders** returns to the collection root. The **Folders** toolbar button and
+sidebar close button hide or reopen the sidebar. Selection, expansion, sidebar
+visibility, and filters last for the current page session and survive returning
+from a reader; they do not change diagram URLs. Card breadcrumbs automatically
+expand the selected folder's ancestors in the sidebar.
+
+Cards keep the authored diagram title prominent. Their smaller folder breadcrumbs
+are also clickable in Grid and List: `diagrams/features/recordings/extensions`
+shows **features › recordings** below the title **Extensions** (or the authored
+`page.title`). The storage root `diagrams/` and the final diagram folder are
+omitted from the namespace. Folder labels retain their source spelling. Root-level
+diagrams and older indexes without folder metadata appear at **All folders**.
+Folder navigation reads only the published index, without loading diagram specs.
 
 Cards with Backstage-tagged nodes show **Services:** and one row of service
 chips in both Grid and List. Services are ranked by connected-edge count, highest
@@ -232,6 +254,13 @@ providers. Selection is bounded by named exports and may narrow their nodes and
 edges. Only the authored import is inserted; recovery retains the extended frozen
 context. Offline/legacy sessions without a v3 catalog cannot browse providers.
 See [shared topology authoring](shared-topology.md#authoring-in-workbench).
+The published v3 index optionally includes each diagram's relative source `folder`.
+Root `canon.json` supplies this path directly; legacy registries derive it from
+the spec's directory relative to the registry, and `--diagrams` discovery derives
+it relative to the selected source directory. Missing or malformed optional folder
+metadata falls back to the collection root, including in older v1/v2 indexes.
+Titles, IDs, and deployed spec URLs are never used to guess folder hierarchy.
+
 Existing version 1 embedded libraries
 and legacy version 2 snapshot URLs remain readable, including the offline demo.
 

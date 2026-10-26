@@ -1069,3 +1069,83 @@ test('reference picker combines same-section exports with crossing connections a
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
   await page.reload();await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#docview path.edge')).toHaveCount(4);
 });
+
+// Folder navigation is metadata-only, independent of diagram IDs and titles.
+test('Browse folders follows source namespaces, composes filters and survives reader navigation in grid and list',async({page,server},info)=>{
+  const fixture=await publish(server),definitions=[
+    ['features/recordings/extensions','Extensions','recording','home'],
+    ['features/recordings/deep/archive','Archived recordings','recording','home'],
+    ['features/recordings/playback','Play a recording','playback','media'],
+    ['features/recordings-extra/export','Export recordings','recording','home'],
+    ['overview','Overview','overview','home'],
+    ['legacy','Legacy story','overview','home'],
+  ],membership=[];
+  for(const [relative,title,topic,owner] of definitions){
+    const id=relative.split('/').at(-1),spec=structuredClone(fixture.specs.first),folder='diagrams/'+relative;
+    spec.page.title=title;spec.page.tags=[topic];spec.page.blocks[0].diagram.nodes.a.binding={entityRef:'component:default/recorder',label:'Recorder'};
+    await mkdir(path.join(fixture.root,folder),{recursive:true});await writeFile(path.join(fixture.root,folder,id+'.spec.json'),JSON.stringify(spec));
+    membership.push({folder,owner:'group:default/'+owner});
+  }
+  await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:membership}));
+  const index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  index.diagrams.find(entry=>entry.id==='legacy').folder='diagrams/../invalid/legacy';
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(index));
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();
+  const grid=mainLibrary(page),extension=grid.locator('[data-id="extensions"]'),folders=page.getByRole('complementary',{name:'Browse folders'}),tree=page.getByRole('navigation',{name:'Folder hierarchy'}),current=page.locator('#welcome-library-folder-path'),count=page.locator('#welcome-library-count');
+  const folder=name=>tree.getByRole('button',{name:'Browse folder: '+name,exact:true});
+  await expect(count).toHaveText('6 of 6 diagrams');await expect(extension.locator('.canon-library-open>strong')).toHaveText('Extensions');
+  await expect(extension.getByRole('navigation',{name:'Diagram folder'}).locator('button')).toHaveText(['features','recordings']);
+  await expect(grid.locator('[data-id="overview"] nav,[data-id="legacy"] nav')).toHaveCount(0);
+  await expect(folder('features')).toHaveText('features4');await expect(folder('features / recordings')).toHaveText('recordings3');
+  await expect(folder('features / recordings / deep')).toBeHidden();await expect(folder('All folders')).toHaveAttribute('aria-current','location');
+  expect(await folder('features / recordings').locator('span').evaluate(el=>el.getBoundingClientRect().left)).toBe(await folder('features / recordings-extra').locator('span').evaluate(el=>el.getBoundingClientRect().left));
+  await expect(grid.locator('a button,button a')).toHaveCount(0);
+  // Disclosure preserves the collection selection, and the same control retains focus.
+  await tree.getByRole('button',{name:'Expand folder: features / recordings',exact:true}).focus();await page.keyboard.press('Enter');
+  await expect(tree.getByRole('button',{name:'Collapse folder: features / recordings',exact:true})).toBeFocused();
+  await expect(folder('features / recordings / deep')).toBeVisible();await expect(count).toHaveText('6 of 6 diagrams');
+  await tree.getByRole('button',{name:'Collapse folder: features',exact:true}).click();
+  await expect(folder('features / recordings')).toBeHidden();
+  // A card breadcrumb expands every hidden ancestor and focuses the selected row.
+  await grid.locator('[data-id="archive"]').getByRole('button',{name:'Browse folder: features / recordings / deep',exact:true}).click();
+  await expect(folder('features / recordings / deep')).toBeFocused();await expect(folder('features / recordings / deep')).toHaveAttribute('aria-current','location');
+  await expect(tree.getByRole('button',{name:'Collapse folder: features',exact:true})).toHaveAttribute('aria-expanded','true');
+  await expect(count).toHaveText('1 of 6 diagrams');await folder('All folders').click();
+  for(const width of [1280,1440]){
+    await page.setViewportSize({width,height:1000});
+    const geometry=await page.evaluate(()=>{const sidebar=document.getElementById('welcome-library-folders').getBoundingClientRect(),results=document.querySelector('.library-results').getBoundingClientRect();return {sidebarRight:sidebar.right,sidebarWidth:sidebar.width,resultsLeft:results.left,resultsWidth:results.width,overflow:document.documentElement.scrollWidth>innerWidth};});
+    expect(geometry.sidebarWidth).toBe(264);expect(geometry.resultsLeft).toBeGreaterThan(geometry.sidebarRight);expect(geometry.resultsWidth).toBeGreaterThan(640);expect(geometry.overflow).toBe(false);
+  }
+  await page.screenshot({path:info.outputPath('folders-grid.png')});
+  await page.getByRole('button',{name:'Close folders',exact:true}).click();await expect(folders).toBeHidden();await expect(page.locator('#welcome-library-folders-toggle')).toBeFocused();
+  await page.locator('#welcome-library-folders-toggle').click();await expect(folders).toBeVisible();await expect(folder('features / recordings / deep')).toBeVisible();
+  await folder('features').click();await expect(count).toHaveText('4 of 6 diagrams');
+  await folder('features / recordings').focus();await page.keyboard.press('Enter');
+  await expect(folder('features / recordings')).toBeFocused();await expect(current.locator('button')).toHaveText(['All folders','features','recordings']);
+  await expect(count).toHaveText('3 of 6 diagrams');await expect(grid.locator('[data-id="export"]')).toBeHidden();await expect(folder('features / recordings-extra')).toBeVisible();
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('recording');
+  await page.getByLabel('Team',{exact:true}).selectOption('group:default/home');
+  await page.getByLabel('Service',{exact:true}).selectOption('entity:component:default/recorder');
+  await page.getByLabel('Topic',{exact:true}).selectOption('recording');
+  await expect(count).toHaveText('2 of 6 diagrams');
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('Extensions');await expect(count).toHaveText('1 of 6 diagrams');await expect(folder('features / recordings / deep')).toHaveText('deep0');
+  await folder('features / recordings / deep').click();await expect(count).toHaveText('0 of 6 diagrams');await expect(page.locator('#welcome-library-empty')).toContainText('in features / recordings / deep');
+  await page.locator('#welcome-library-clear').click();await expect(current.locator('[aria-current]')).toHaveText('deep');await expect(count).toHaveText('1 of 6 diagrams');
+  await folder('features / recordings').click();
+  await page.getByRole('button',{name:'List',exact:true}).click();await expect(grid).toHaveClass(/canon-library-list/);
+  await expect(extension.getByRole('navigation',{name:'Diagram folder'})).toBeVisible();await page.screenshot({path:info.outputPath('folders-list.png')});
+  expect(requests).toEqual([]);
+  // A manually collapsed branch stays collapsed across ordinary filter updates and reader returns.
+  await tree.getByRole('button',{name:'Collapse folder: features / recordings',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search diagrams'}).fill('Extensions');await expect(folder('features / recordings / deep')).toBeHidden();
+  await page.locator('#welcome-library-clear').click();
+  await extension.locator('.canon-library-open').click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await page.goBack();await expect(current.locator('[aria-current]')).toHaveText('recordings');await expect(count).toHaveText('3 of 6 diagrams');await expect(grid).toHaveClass(/canon-library-list/);
+  await expect(folder('features / recordings / deep')).toBeHidden();await expect(folder('features / recordings')).toHaveAttribute('aria-current','location');
+  await expect(page.locator('#welcome-library-recent-items')).toContainText('Extensions');
+  await page.goForward();await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.goBack();
+  await extension.getByRole('button',{name:'Browse folder: features',exact:true}).click();await expect(count).toHaveText('4 of 6 diagrams');
+  await folder('All folders').click();await expect(count).toHaveText('6 of 6 diagrams');await expect(folders).toBeVisible();
+  expect(requests.length).toBeGreaterThan(0);expect(requests.every(url=>url.endsWith('/features/recordings/extensions/extensions.spec.json'))).toBe(true);
+});

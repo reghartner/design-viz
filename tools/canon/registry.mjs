@@ -40,7 +40,7 @@ export async function registry(file){
     if(!filename.startsWith(root+path.sep) || ids.has(entry.id))throw new Error('Registry path escapes its root or repeats an ID.');
     ids.add(entry.id);const spec=await json(filename);
     if(spec.page?.canon?.id!==entry.id)throw new Error('Registry and spec IDs differ: '+entry.id);
-    entries.push({...entry,filename,spec});
+    entries.push({...entry,folder:path.relative(root,path.dirname(filename)).split(path.sep).join('/'),filename,spec});
   }
   const resolved=materializeEntries(entries);
   return {root,entries:resolved,specs:resolved.map(e=>e.spec)};

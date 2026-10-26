@@ -420,3 +420,36 @@ test('published content includes valid operational panel text, keyed items, audi
   const legacy=structuredClone(raw);legacy.page.sections[0].diagram.steps[0].patch=legacy.page.sections[0].diagram.steps[0].panels;delete legacy.page.sections[0].diagram.steps[0].panels;
   assert.equal(C.contentSearchText(legacy),text,'legacy step.patch content matches step.panels');
 });
+
+test('published folders preserve source hierarchy and authored titles independently of IDs',async t=>{
+  const {buildLibrary,buildLibraryFromDirectory}=await import('../tools/canon/library.mjs');
+  const f=discoveryFixture(t),folders=['features/recordings/extensions','features/recordings/deep/archive','features/recordings-extra/export','overview'];
+  const entries=folders.map((folder,i)=>{const id=folder.split('/').at(-1),raw=namedSpec(id);raw.page.title=i?'Authored '+id:'Extensions';f.write(folder+'/'+id+'.spec.json',raw);return {folder:'diagrams/'+folder,owner:raw.page.canon.owner};});
+  const canon=path.join(f.root,'docs/canon.json');fs.writeFileSync(canon,JSON.stringify({version:1,diagrams:entries}));
+  const library=await buildLibrary(canon);
+  assert.deepEqual(library.diagrams.map(entry=>entry.folder),entries.map(entry=>entry.folder));
+  const parsed=context.parseCanonLibrary(library),extension=parsed[0];
+  assert.equal(extension.title,'Extensions');assert.deepEqual(Array.from(extension.namespace),['features','recordings']);
+  assert.deepEqual(parsed.filter(entry=>context.libraryInNamespace(entry,['features','recordings'])).map(entry=>entry.id),['extensions','archive']);
+  assert.deepEqual(Array.from(parsed[3].namespace),[]);
+  const discovered=await buildLibraryFromDirectory(f.directory);
+  assert.equal(discovered.diagrams.find(entry=>entry.id==='extensions').folder,'features/recordings/extensions');
+  assert.deepEqual(Array.from(context.parseCanonLibrary(discovered).find(entry=>entry.id==='extensions').namespace),['features','recordings']);
+  const legacy=path.join(f.root,'docs/registry.json');fs.writeFileSync(legacy,JSON.stringify({version:1,diagrams:[{id:'extensions',path:'diagrams/features/recordings/extensions/extensions.spec.json',folder:'ignored/spoof'}]}));
+  assert.equal((await buildLibrary(legacy)).diagrams[0].folder,'diagrams/features/recordings/extensions');
+});
+
+test('all supported index versions ignore missing or malformed optional folders without inferring from titles or URLs',async()=>{
+  const {buildLibrary}=await import('../tools/canon/library.mjs');
+  const modern=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
+  for(const version of [1,2,3]){
+    const raw=version===1?manifest():{...modern,version};
+    for(const folder of [undefined,null,7,{},['features','recordings'], '', '/features/story','features//story','features/../story','features/./story','features\\story','features/ story','features/\u0000story','x'.repeat(2049)]){
+      raw.diagrams[0].folder=folder;
+      assert.deepEqual(Array.from(context.parseCanonLibrary(raw)[0].namespace),[],String(folder));
+    }
+    raw.diagrams[0].folder='diagrams/Feature Group/Recordings/leaf';
+    assert.deepEqual(Array.from(context.parseCanonLibrary(raw)[0].namespace),['Feature Group','Recordings']);
+    raw.diagrams[0].folder='diagrams/leaf';assert.deepEqual(Array.from(context.parseCanonLibrary(raw)[0].namespace),[]);
+  }
+});

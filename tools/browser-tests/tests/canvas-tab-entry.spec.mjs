@@ -176,8 +176,8 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await chooseNavigation(page.locator('.reader-navigation'),'View','Source Explore');
  await expect(page.locator('.reader-contents')).toBeHidden();await expect(page.locator('.reader-top-view[aria-selected=true]')).toHaveText('Source Explore');
  for(const id of ['s0','s1'])await expect(page.locator('#section-standard [data-dv-node="'+id+'"]').first()).toBeInViewport();
- const nav=await navigation.boundingBox(),stage=await page.locator('.explore-active-section .explore-stage').boundingBox(),toolbar=await page.locator('.reader-toolbar').boundingBox();
- expect(stage.y).toBe(nav.y+nav.height);expect(toolbar.y+toolbar.height).toBeLessThanOrEqual(stage.y);expect(toolbar.width).toBe(nav.width);
+ const nav=await navigation.boundingBox(),top=await navigation.locator('.reader-top').boundingBox(),stage=await page.locator('.explore-active-section .explore-stage').boundingBox(),toolbar=await page.locator('.reader-toolbar').boundingBox();
+ expect(stage.y).toBe(nav.y+nav.height);expect(Math.abs(top.width-nav.width)).toBeLessThanOrEqual(1);expect(toolbar.x).toBeGreaterThanOrEqual(top.x);expect(toolbar.x+toolbar.width).toBeLessThanOrEqual(top.x+top.width);expect(toolbar.y+toolbar.height).toBeLessThanOrEqual(stage.y);
  await page.locator('.reader-zoom-menu>summary').click();for(const name of ['Fit diagram','Fit width','Readable','Auto'])await expect(page.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toHaveCount(0);
  await info.attach('explore-navigation-narrow',{body:await page.screenshot(),contentType:'image/png'});
 });

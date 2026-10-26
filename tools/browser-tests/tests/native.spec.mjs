@@ -15,9 +15,26 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   expect(await page.evaluate(()=>__host.requests.length)).toBe(2);
   await page.evaluate(()=>document.fonts.ready);
   const leftPanel=alpha.locator('[data-explore-panel="state"]'),rightPanel=beta.locator('[data-explore-panel="state"]');
+  const openUtilities=async scope=>{
+    const utilities=scope.locator('.reader-navigation .reader-utilities');
+    if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
+  };
+  const clickUtility=async(scope,name)=>{
+    const button=scope.getByRole('button',{name,exact:true});
+    if(!await button.isVisible())await openUtilities(scope);
+    await expect(button).toBeVisible();await button.click();
+  };
+  const openAlphaPanels=async()=>{
+    const menu=alpha.locator('.reader-navigation .explore-panel-menu'),summary=menu.locator(':scope>summary');
+    if(!await summary.isVisible()){
+      await openUtilities(alpha);
+      await expect(summary).toBeVisible();
+    }
+    await summary.click();
+  };
   const originalRight=await rightPanel.boundingBox();
   const leftBefore=await leftPanel.boundingBox(),graphBefore=await alpha.locator('.explore-board .boardcanvas>svg').boundingBox();
-  await alpha.locator('.reader-navigation .explore-panel-menu>summary').click();await expect(alpha.locator('.explore-overlay-value')).toHaveText('100%');
+  await openAlphaPanels();await expect(alpha.locator('.explore-overlay-value')).toHaveText('100%');
   await alpha.getByRole('button',{name:'Shrink floating panels',exact:true}).click();
   await expect(alpha.locator('.explore-overlay-value')).toHaveText('90%');
   expect((await leftPanel.boundingBox()).width).toBeCloseTo(leftBefore.width*.9,0);
@@ -36,20 +53,20 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   await expect(alpha.locator('.explore-stage')).toBeHidden();await expect(beta.locator('.explore-stage')).toBeVisible();
   await page.evaluate(()=>__host.navigate({section:'delivery-2',view:'explore',path:'happy',step:'done'}));
   await expect(alpha.locator('.explore-stage')).toBeVisible();await expect(leftPanel).toBeHidden();
-  await alpha.locator('.explore-panel-menu summary').click();
+  await openAlphaPanels();
   await alpha.locator('.explore-panel-choices').getByRole('checkbox',{name:'state',exact:true}).check();
   await page.keyboard.press('Escape');await expect(leftPanel).toBeVisible();
   expect((await leftPanel.boundingBox()).width).toBeCloseTo(narrow.width,0);
-  await alpha.getByRole('button',{name:'Expand diagram view',exact:true}).click();
+  await clickUtility(alpha,'Expand diagram view');
   await expect.poll(()=>alpha.locator('.docview').evaluate(el=>el.getRootNode().fullscreenElement===el && el.contains(el.querySelector('.explore-navigation')))).toBe(true);
   await expect(beta.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
   expect(await beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement)).toBeNull();
   await page.evaluate(()=>__host.right(false));await expect(beta.locator('.docview')).toHaveCount(0);
   await expect.poll(()=>alpha.locator('.docview').evaluate(el=>el.getRootNode().fullscreenElement===el && el.contains(el.querySelector('.explore-navigation')))).toBe(true);
-  await alpha.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();
+  await clickUtility(alpha,'Exit expanded diagram view');
   await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
   await page.evaluate(()=>__host.right(true));await beta.getByRole('button',{name:'Explore',exact:true}).click();
-  await beta.getByRole('button',{name:'Expand diagram view',exact:true}).click();
+  await clickUtility(beta,'Expand diagram view');
   await expect.poll(()=>beta.locator('.docview').evaluate(el=>el.getRootNode().fullscreenElement===el && el.contains(el.querySelector('.explore-navigation')))).toBe(true);
   await expect(alpha.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
   await page.evaluate(()=>__host.left(false));await expect(alpha.locator('.docview')).toHaveCount(0);

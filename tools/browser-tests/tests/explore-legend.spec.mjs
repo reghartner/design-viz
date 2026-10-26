@@ -40,6 +40,17 @@ async function expectLegendWithin(legend,containerBounds){
   }).toPass({timeout:10000});
 }
 
+async function openReaderMenu(root,summary){
+  const navigation=root.locator('.reader-navigation');
+  if(await navigation.evaluate(el=>el.classList.contains('reader-single-toolbar')))await expect(navigation).toHaveClass(/reader-(?:wrapped|narrow|tight)/);
+  if(!await summary.isVisible()){
+    const utilities=root.locator('.reader-utilities');
+    if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
+    await expect(summary).toBeVisible();
+  }
+  await summary.click();
+}
+
 for(const surface of ['standalone','workbench','native'])test(surface+' Explore exposes the same edge samples and restores Standard legend',async({page,server},info)=>{
   const raw=fixture(),root=await open(page,server,surface,raw),source=surface==='workbench'?await page.locator('#src').inputValue():null;
   const standard=root.locator('.explore-edge-legend .li'),expected=await standard.evaluateAll(nodes=>nodes.map(node=>node.outerHTML));
@@ -61,7 +72,7 @@ for(const surface of ['standalone','workbench','native'])test(surface+' Explore 
   if(surface==='workbench'){await closeTools(page);}
   if(surface==='native')await page.evaluate(()=>viewer.setCanvas(true));
   await page.setViewportSize({width:640,height:800});
-  const summary=root.locator('.explore-legend-menu>summary');await summary.click();
+  const summary=root.locator('.explore-legend-menu>summary');await openReaderMenu(root,summary);
   const legend=root.getByRole('group',{name:'Edge legend',exact:true});await expect(legend).toBeVisible();
   for(const width of [640,480,375,320]){
     await page.setViewportSize({width,height:800});

@@ -2,8 +2,8 @@ import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {source as starter} from '../fixtures/editor-spec.mjs';
 const make=(title,diagram)=>({page:{title,sections:[{id:'main',diagram}]}});
 const specs={
-  base:make('Base',{nodes:{api:{title:'Local shared API'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}}),
-  middle:make('Middle',{topologyImports:[{spec:'base',export:'core',as:'base'}],topologyExports:{core:{nodes:['base::api'],edges:[]}}}),
+  base:make('Base',{nodes:{api:{title:'Local shared API'},store:{title:'Local shared store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api'],edges:[]},storage:{nodes:['api','store'],edges:[]}}}),
+  middle:make('Middle',{topologyImports:[{spec:'base',export:['core','storage'],as:'base',nodeOverrides:{api:{style:'moss'}},edgeOverrides:{'api->store':{label:'Local persistence'}}}],topologyExports:{core:{nodes:['base::api','base::store'],edges:['base::api->base::store']}}}),
   consumer:make('Local consumer',{nodes:{local:{title:'Editable local'}},rows:[['local']],topologyImports:[{spec:'middle',export:'core',as:'shared',position:{x:450,y:150}}]})
 };
 const consumer=JSON.stringify(specs.consumer,null,2);
@@ -28,8 +28,11 @@ async function disk(page,id='consumer'){return page.evaluate(async id=>{let dir=
 
 test('local repository imports render offline and retain editable positions, source, Undo and recovered frozen providers',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:900});await setup(page,server);
-  const provider=await disk(page,'base');const requests=[];page.on('request',request=>requests.push(request.url()));
+  const provider=await disk(page,'base'),middle=await disk(page,'middle');const requests=[];page.on('request',request=>requests.push(request.url()));
   await choose(page);await expect(node(page)).toBeVisible();await expect(page.locator('#src')).toHaveValue(consumer);
+  await expect(page.locator('#docview g.node[data-dv-node="shared::base::store"]')).toBeVisible();
+  await expect(page.locator('#docview path.edge')).toHaveCount(1);
+  expect(await disk(page,'middle')).toBe(middle);
   await expect(page.locator('#workbench-working-status')).toContainText('Saved to consumer/consumer.spec.json');expect(requests).toEqual([]);
   await closeTools(page);const card=node(page).locator('.card');await node(page).hover();const box=await card.boundingBox();
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+65,box.y+box.height/2+50,{steps:10});await page.mouse.up();

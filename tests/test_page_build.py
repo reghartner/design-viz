@@ -45,6 +45,8 @@ class PageBuildTest(unittest.TestCase):
         for name in ["platform", "checkout"]:
             raw = json.loads((ROOT / "examples/canon/topology" / (name + ".json")).read_text())
             del raw["page"]["canon"]
+            if name == "checkout":
+                raw["page"]["sections"][0]["diagram"]["topologyImports"][0]["export"] = ["entry", "persistence"]
             folder = self.tmp / "diagrams/team" / name
             folder.mkdir(parents=True)
             (folder / (name + ".spec.json")).write_text(json.dumps(raw))
@@ -65,7 +67,11 @@ class PageBuildTest(unittest.TestCase):
         embedded = json.loads(re.search(r'<script type="application/json" id="flowspec">\n(.*?)\n</script>', html, re.S)[1])
         self.assertEqual(embedded["page"]["canon"]["id"], "checkout")
         self.assertEqual(embedded["page"]["canon"]["owner"], "group:default/local")
-        self.assertIn("platform::api", embedded["page"]["sections"][0]["diagram"]["nodes"])
+        diagram = embedded["page"]["sections"][0]["diagram"]
+        self.assertIn("platform::api", diagram["nodes"])
+        self.assertIn("platform::store", diagram["nodes"])
+        self.assertEqual(sum(edge["from"] == "platform::api" and edge["to"] == "platform::store"
+                             for edge in diagram["edges"]), 1)
         self.assertEqual(source.read_bytes(), before)
         self.assertEqual((self.root / source.name).read_bytes(), before)
         broken = json.loads(before)

@@ -4,8 +4,8 @@ const {readSource}=require('../tools/source-loader.cjs');
 function specs(){
   const make=(title,diagram)=>({page:{title,sections:[{id:'main',diagram}]}});
   return {
-    base:make('Base',{nodes:{api:{title:'Shared API'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}}),
-    middle:make('Middle',{topologyImports:[{spec:'base',export:'core',as:'base'}],topologyExports:{core:{nodes:['base::api'],edges:[]}}}),
+    base:make('Base',{nodes:{api:{title:'Shared API'},store:{title:'Shared store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api'],edges:[]},storage:{nodes:['api','store'],edges:[]}}}),
+    middle:make('Middle',{topologyImports:[{spec:'base',export:['core','storage'],as:'base',nodeOverrides:{api:{style:'moss'}},edgeOverrides:{'api->store':{label:'Local persistence'}}}],topologyExports:{core:{nodes:['base::api','base::store'],edges:['base::api->base::store']}}}),
     consumer:make('Consumer',{topologyImports:[{spec:'middle',export:'core',as:'shared',position:{x:100,y:120}}]})
   };
 }
@@ -22,16 +22,22 @@ async function setup(t){
   for(const file of ['validator.js','canon.js','../tools/canon/manifest.cjs','workbench/folder-agent.js','workbench/local-repository.js','workbench/agent-project.js'])vm.runInContext(readSource(file),ctx);
   return {root,inputs,ctx,handle:handle(root),consumer:path.join(root,'diagrams/team/consumer/consumer.spec.json')};
 }
-test('CLI and browser resolve the same registered transitive closure without touching authored source or unrelated entries',async t=>{
+test('CLI and browser resolve merged exports and nested reexports without touching authored references or unrelated entries',async t=>{
   const h=await setup(t),before=await fs.readFile(h.consumer,'utf8');
+  const authored=await Promise.all(Object.keys(h.inputs).map(id=>fs.readFile(path.join(h.root,'diagrams/team',id,id+'.spec.json'),'utf8')));
   const {resolveLocalImports}=await import('../tools/canon/local-imports.mjs');
   const result=await resolveLocalImports(h.consumer,h.root);
   assert.equal(result.id,'consumer');assert.deepEqual(result.specs.map(s=>s.page.canon.id),['base','middle','consumer']);
-  assert.equal(result.resolved.page.sections[0].diagram.nodes['shared::base::api'].title,'Shared API');
+  const diagram=result.resolved.page.sections[0].diagram;
+  assert.deepEqual(Object.keys(diagram.nodes).sort(),['shared::base::api','shared::base::store']);
+  assert.equal(diagram.nodes['shared::base::api'].title,'Shared API');assert.equal(diagram.nodes['shared::base::api'].style,'moss');
+  assert.equal(diagram.edges.length,1);assert.equal(diagram.edges[0].from,'shared::base::api');assert.equal(diagram.edges[0].to,'shared::base::store');assert.equal(diagram.edges[0].label,'Local persistence');
   const choices=await h.ctx.openFolderAgentProject(h.handle);assert.equal(choices.selectionRequired,true);
   const found=await h.ctx.openFolderAgentProject(h.handle,'diagrams/team/consumer/consumer.spec.json');
   assert.equal(found.directory.name,'consumer');assert.equal(found.source,before);
   assert.deepEqual(JSON.parse(JSON.stringify(found.topologyContext.specs)),result.specs);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.ctx.FlowTopology.resolveSource(JSON.parse(before),found.topologyContext))),result.resolved);
+  assert.deepEqual(await Promise.all(Object.keys(h.inputs).map(id=>fs.readFile(path.join(h.root,'diagrams/team',id,id+'.spec.json'),'utf8'))),authored);
   assert.equal(await fs.readFile(h.consumer,'utf8'),before);
   await assert.rejects(fs.stat(path.join(h.root,'diagrams/team/consumer/.flowview-agent')),/ENOENT/);
   // Filesystem changes cannot mutate a captured, persistable context.

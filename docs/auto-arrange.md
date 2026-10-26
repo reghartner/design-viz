@@ -16,6 +16,10 @@ supported. Identical topology, identifiers and options produce the same result;
 node/edge serialization order does not change placement (parallel edges keep
 their original ordering).
 
+By default, the placement lattice adds 176px to the widest card for each
+column step and 138px to the tallest card for each row step. API callers can
+retain or choose other spacing with explicit `columnGap` and `rowGap` options.
+
 Groups are placement constraints. The arranger recursively places each group's
 members and nested groups, then places those containers with the same search.
 Native container padding and title strips separate siblings and unrelated

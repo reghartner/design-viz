@@ -69,7 +69,7 @@ test('switching arrangements restores their own placement and Auto retains the e
  const nav=page.locator('.reader-navigation');await chooseNavigation(nav,'View','Beside');await geometry(page,'beside');
  await chooseNavigation(nav,'View','Automatic');await expect(page.locator('.termbar')).toHaveAttribute('data-playback-position','auto');await expect.poll(()=>page.locator('.termbar').evaluate(el=>getComputedStyle(el).display)).toBe('flex');
  await chooseNavigation(nav,'View','Above');await geometry(page,'above');
- await page.getByRole('button',{name:'Ambient',exact:true}).click();await expect(page.locator('.termbar')).toBeHidden();
+ await page.getByRole('button',{name:'Ambient',exact:true}).click();await expect(page.locator('.termbar')).toBeVisible();await expect(page.locator('.stepline')).toBeHidden();
 });
 for(const position of ['above','beside'])test(`narrow desktop canvas preserves side caption with ${position} buttons`,async({page,server})=>{
  const spec=story('canvas',position,'right',true);spec.page.sections[0].diagram.layouts[0].exploreLayout.canvas.controls.w=460;

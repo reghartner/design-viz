@@ -100,9 +100,9 @@ test('step captions anchor to the shown step button; Tabs, Views and step contro
  for(const [key,c] of [['h-step',centers.chip],['h-bullet',centers.bullet]]){
   expect(Math.abs(placed[key].x-c.x)).toBeLessThanOrEqual(1);expect(Math.abs(placed[key].y-c.y)).toBeLessThanOrEqual(1);
  }
- // Ambient hides the step buttons, so the step thread is unplaced.
+ // Ambient keeps the neutral step controls visible, so existing comment anchors stay placed.
  await ring.locator('.mtoggle .mbtn',{hasText:'Ambient'}).click();
- await expect.poll(()=>placedKeys(page)).toEqual(['h-bullet']);
+ await expect.poll(()=>placedKeys(page)).toEqual(['h-bullet','h-step']);
  // Hidden-Tab thread: reveal switches Tab and places it.
  await page.evaluate(()=>window.__comments.callbacks.reveal('h-vault'));
  await expect(tab('Storage')).toHaveAttribute('aria-selected','true');

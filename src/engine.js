@@ -1716,6 +1716,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     paintChipContent();
     decorateDeltaChips(chipsBox, source);
     chipDeltas = wireDeltaDetails(chipsBox, prefix + '-chips');
+    if(mode==='ambient')clearPathControls();
   }
   function paintChipContent(){
     paintStepCoins();
@@ -1821,6 +1822,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var active = chipButtons.find(function(chip){return chip.path.id === selectedPath.id && chip.index === cur;});
     chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current',String(chip === active));});
     if(active)revealPathStep(active.button);
+  }
+  function clearPathControls(){
+    if(pathTimeline){pathTimeline.clearSelection();return;}
+    pathButtons.forEach(function(choice){choice.button.setAttribute('aria-pressed','false');choice.row.setAttribute('data-selected','false');});
+    chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current','false');});
   }
   paintChips();
 
@@ -1937,6 +1943,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function setStep(i, claimAddressBar, narrativePath){
     if (destroyed || !N) return;
+    if(mode!=='step')claimStepMode();
     var visible=stops();if(!visible.length)return;
     var first=visible[0],last=visible[visible.length-1];
     var target=i;
@@ -2001,15 +2008,15 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function syncPlayback(){
     var visible=stops(),count=visible.length;
     var ended = explicitPaths && count > 1 && cur === visible[count-1];
-    var state = timer ? 'playing' : ended ? 'finished' : 'paused';
-    var action = timer ? 'Pause' : ended ? 'Replay' : 'Play';
+    var state = mode === 'ambient' ? 'ambient' : timer ? 'playing' : ended ? 'finished' : 'paused';
+    var action = timer ? 'Pause' : mode === 'ambient' ? 'Play' : ended ? 'Replay' : 'Play';
     btnPlay.innerHTML = '<span aria-hidden="true">' + (timer ? '&#10074;&#10074;' : '&#9654;') + '</span> ' + action;
     btnPlay.setAttribute('aria-label', action);
     btnPlay.disabled = count < 2;
     btnPlay.title = count < 2 ? 'This view shows only one step on this path.' : timer ? 'Pause automatic step advancement' :
       ended ? 'Play this path again from step 1' : 'Advance one step every 3 seconds';
     bar.setAttribute('data-playback', state);
-    var label = timer ? 'Playing · 3s / step' : count < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
+    var label = mode === 'ambient' ? 'Ambient · choose a step or use playback' : timer ? 'Playing · 3s / step' : count < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
     if(editingPathId!==null && editingStep!==null)label+=' · Previewing a hidden path and step';
     else if(editingPathId!==null)label+=' · Previewing a hidden path';
     else if(editingStep!==null)label+=' · Previewing a hidden step';
@@ -2033,7 +2040,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (options && options.renderPath){ board = options.renderPath(d); svg = board.svg; }
     paintStepCoins();
     if (panelCtl && panelCtl.setDiagram) panelCtl.setDiagram(d);
-    mode = 'step'; boardDiv.classList.add('stepmode'); bar.hidden = false; syncToggle();
+    claimStepMode();
     setStep(at == null || at===0 ? stops(next)[0] : at, true, false);
     if (secBox.dispatchEvent) secBox.dispatchEvent(new CustomEvent('dv:pathrender',{bubbles:true}));
     return true;
@@ -2052,14 +2059,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function syncToggle(){
     btnAmb.setAttribute('aria-pressed', mode === 'ambient' ? 'true' : 'false');
     btnStep.setAttribute('aria-pressed', mode === 'step' ? 'true' : 'false');
+    bar.setAttribute('data-mode',mode);
+  }
+  function claimStepMode(){
+    mode = 'step';
+    boardDiv.classList.add('stepmode');
+    bar.hidden = false;
+    captionLine.hidden = false;
+    syncToggle();
   }
   function enterStep(auto){
     if (destroyed) return;
     clearEditingPreview();
     stopAuto();
-    mode = 'step';
-    boardDiv.classList.add('stepmode');
-    bar.hidden = false;
+    claimStepMode();
     paintedStep = null;
     setStep(stops()[0], undefined, false);
     /* reduced motion blocks only the automatic start; Play still plays */
@@ -2079,7 +2092,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     boardDiv.classList.remove('stepmode');
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, 0, false), []);
     renderRuntimeConditions(board,termbar.runtimeStatus,[]);
-    bar.hidden = true;
+    bar.hidden = false;
+    captionLine.hidden = true;
+    clearPathControls();
     setFragmentStep(secBox, 0, false);
     paintWireContracts();
     syncToggle();
@@ -2091,7 +2106,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   btnAmb.addEventListener('click', enterAmbient);
   btnStep.addEventListener('click', function(){ enterStep(true); });
   btnPlay.addEventListener('click', function(){
-    if (timer) stopAuto(); else startAuto();
+    if (timer) stopAuto(); else { if(mode!=='step')enterStep(false); startAuto(); }
     if (onChange) onChange(true);
   });
   function clearEditingPreview(){
@@ -2131,7 +2146,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   });
 
   if (document.addEventListener) document.addEventListener('visibilitychange', visibilityChanged);
-  syncToggle(); syncPlayback();
+  captionLine.hidden=true;clearPathControls();syncToggle(); syncPlayback();
   return {
     sectionEl: secBox,
     scrollTargetEl: boardDiv,
@@ -2144,7 +2159,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     setPlaybackPosition:function(value){termbar.bar.setAttribute('data-playback-position',sectionPlaybackPosition(value));},
     setPathLabelWidth:function(value){
       var next=sectionPathLabelWidth(value);if(next===pathLabelWidth)return;
-      pathLabelWidth=next;paintChips();syncPathControls();
+      pathLabelWidth=next;paintChips();if(mode==='step')syncPathControls();
     },
     setViewFilter:function(pathIds,stepIds){
       var filter=sectionViewFilter(source,pathIds,stepIds),nextPaths=filter.paths,nextSteps=filter.steps;
@@ -2538,7 +2553,6 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
       grid.appendChild(tile);
       if(key==='steps'){
         move(bar,tile);
-        var hint=document.createElement('div');hint.className='section-steps-placeholder';hint.textContent='Choose Step to show playback controls.';tile.appendChild(hint);
       }else if(it.panel != null){
         var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
         move(card,tile);
@@ -3183,7 +3197,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   /* termbar */
   bar = document.createElement('div');
-  bar.className = 'termbar'; bar.hidden = true;
+  bar.className = 'termbar'; bar.hidden = false;
   var btnPrev = document.createElement('button'); btnPrev.className = 'tbtn'; btnPrev.innerHTML = '&#8249;'; btnPrev.setAttribute('aria-label', 'Previous step');
   var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn playback-button';
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');

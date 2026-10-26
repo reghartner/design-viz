@@ -232,6 +232,16 @@ test('shared-timeline path chips light their full route endpoints and step selec
   assert.deepEqual(h.litEdges(),['a->b'],'programmatic path selection remains step-scoped');
   assert.deepEqual(h.litNodes(),['a','b'],'programmatic path selection restores step-scoped node focus');
 });
+test('Ambient clears timeline selection and same-path or alternate step circles restore only their step focus',()=>{
+  const h=harness(edgePathFixture(true));h.sp.enterAmbient();
+  assert.equal(h.sp.mode(),'ambient');assert.equal(h.term.bar.hidden,false);assert.equal(h.term.stepN.parentNode.hidden,true);
+  assert.ok(descendants(h.term.chips).filter(e=>e.classList.contains('schip')).every(e=>e.getAttribute('aria-current')==='false'));
+  assert.ok(descendants(h.term.chips).filter(e=>e.classList.contains('path-chip')).every(e=>e.getAttribute('aria-pressed')==='false'));
+  circle(h,2).fire('click');
+  assert.equal(h.sp.mode(),'step');assert.equal(h.sp.path(),'happy');assert.deepEqual(h.litEdges(),['b->c']);assert.deepEqual(h.litNodes(),['b','c']);assert.equal(h.intervals.size,0);
+  h.sp.enterAmbient();circle(h,4).fire('click');
+  assert.equal(h.sp.mode(),'step');assert.equal(h.sp.path(),'alternate');assert.deepEqual(h.litEdges(),['a->e']);assert.deepEqual(h.litNodes(),['a','e']);assert.equal(h.intervals.size,0);
+});
 test('selecting the existing path keeps the board, and a one-step path never starts an autoplay timer',()=>{
   const h=harness();h.sp.selectPath('happy',2);assert.equal(h.rendered.length,0);assert.equal(h.sp.current().id,'three');
   const d=fixture();d.paths=[{id:'one',steps:['one']}];const single=harness(d);

@@ -120,5 +120,12 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick, labelW
       track.element.setAttribute('stroke',path.color);track.element.setAttribute('opacity',active?'.85':'.45');
     });
   }
-  return {sync:sync,destroy:function(){retired=true;if(observer)observer.disconnect();}};
+  function clearSelection(){
+    if(retired)return;
+    root.setAttribute('data-selected-path','');
+    choices.forEach(function(choice){choice.button.setAttribute('aria-pressed','false');choice.row.setAttribute('data-selected','false');});
+    buttons.forEach(function(entry){entry.button.setAttribute('aria-current','false');entry.button.setAttribute('data-path-active','false');});
+    tracks.forEach(function(track){track.element.setAttribute('stroke',pathById.get(track.pathIds[0]).color);track.element.setAttribute('opacity','.45');});
+  }
+  return {sync:sync,clearSelection:clearSelection,destroy:function(){retired=true;if(observer)observer.disconnect();}};
 }

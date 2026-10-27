@@ -458,3 +458,51 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
  }
  expect(breaks,'blocked days still draw the break glyph').toBeGreaterThan(0);
 });
+
+/* Node Styles presets for live paint (#762 addition, Chuck 2026-10-27): no overlay palette of its own.
+ P1 nodes wear `node-styled ns-<preset>` (todo slate, active ember, done moss, blocked/missing rose, waiting slate);
+    edges, coins and node cards take that preset's --ns-line in a light and a dark skin. Coin numerals follow the
+    engine's step-colour rule (stepCircleInk: black or white, whichever contrasts more), which is black on every live fill.
+ P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
+ P3 an authored node `style` yields to live state and returns when Live is turned off. */
+const LIVE_PRESET={todo:'slate',active:'ember',done:'moss',blocked:'rose',missing:'rose'};
+async function presetLine(page,token){
+ return page.evaluate(t=>{
+  const svg=document.querySelector('#docview g.node').ownerSVGElement,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node ns-'+t);svg.appendChild(g);
+  const probe=document.createElement('span');probe.style.color=getComputedStyle(g).getPropertyValue('--ns-line').trim();document.body.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();g.remove();return color;
+ },token);
+}
+test('P1 live nodes wear Node Styles presets; cards, edges and coins share the preset line in daylight and aurora',async({page,server})=>{
+ const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+ await demoDay(root,2);
+ for(const skin of ['daylight','aurora']){
+  await page.evaluate(s=>window.dvSetSkin(s),skin);
+  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin).toHaveClass(/dv-live-active/);
+  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',await presetLine(page,'ember'));
+  const coins=await root.locator('g.coin[data-dv-step]').evaluateAll(els=>els.map(el=>({state:(/dv-live-(todo|active|done|blocked|missing)/.exec(el.getAttribute('class'))||[])[1],fill:getComputedStyle(el.querySelector('circle')).fill,ink:getComputedStyle(el.querySelector('text')).fill})).filter(c=>c.state));
+  expect(coins.length,skin+' painted coins').toBeGreaterThan(0);
+  for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
+ }
+ await demoDay(root,4);
+ for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','slate'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
+ for(const skin of ['daylight','aurora']){
+  await page.evaluate(s=>window.dvSetSkin(s),skin);
+  for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
+  await expect(root.locator('path.edge[data-dv-edge="2"]'),skin+' waiting edge').toHaveCSS('stroke',await presetLine(page,'slate'));
+ }
+});
+test('P2 missing carriers are dotted rose, blocked ones solid rose',async({page,server})=>{
+ const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');await demoDay(root,6);
+ await expect(node('app')).toHaveClass(/dv-live-missing/);await expect(node('app')).toHaveClass(/\bns-rose\b/);
+ await expect(node('app').locator('.card')).toHaveCSS('stroke-dasharray','2px, 3px');
+ await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveClass(/dv-live-missing/);await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveCSS('stroke-dasharray','2px, 3px');
+ await expect(node('chime')).toHaveClass(/dv-live-blocked/);await expect(node('chime').locator('.card')).toHaveCSS('stroke-dasharray','none');
+});
+test('P3 an authored node style yields to live paint and returns when Live is off',async({page,server})=>{
+ const spec=fixture();spec.page.sections[0].diagram.nodes.hardware.style='teal';
+ const root=await open(page,server,spec),hw=root.locator('#section-delivery g.node[data-dv-node="hardware"]');
+ await expect(hw).toHaveClass(/dv-live-active/);await expect(hw).toHaveClass(/\bns-ember\b/);await expect(hw).not.toHaveClass(/\bns-teal\b/);
+ const live=root.locator('.dv-live-toggle');await live.click();await expect(hw).not.toHaveClass(/dv-live-active/);
+ await expect(hw).toHaveClass(/\bnode-styled\b/);await expect(hw).toHaveClass(/\bns-teal\b/);await expect(hw).not.toHaveClass(/\bns-ember\b/);
+ await live.click();await expect(hw).toHaveClass(/\bns-ember\b/);
+});

@@ -234,6 +234,24 @@ test('R1 R2 R3 apply paints no badges; ticketed cards and edge labels are popove
  assert.ok(w.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-active'));assert.equal(wcard.getAttribute('tabindex'),null);assert.equal(wcard.getAttribute('role'),null);
  assert.equal(w.view.querySelectorAll('.dv-live-badge').length,0);
 });
+test('P1 P3 live nodes wear Node Styles presets and restore authored styles when cleared',()=>{
+ const data=fixture();data.page.sections[0].diagram.nodes.a.style='teal';const h=harness(data),api=h.ctl.liveStatus;
+ const a=h.view.querySelector('[data-dv-node="a"]');a.classList.add('node-styled','ns-teal');
+ api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),c=h.view.querySelector('[data-dv-node="c"]');
+ assert.ok(a.classList.contains('ns-ember') && !a.classList.contains('ns-teal'));assert.ok(c.classList.contains('ns-rose') && c.classList.contains('node-styled'));
+ assert.ok(b.classList.contains('dv-live-waiting') && b.classList.contains('ns-slate'));
+ api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
+ api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('ns-rose'));
+});
+test('P4 text on live fills follows the engine step-colour contrast rule in light and dark skins',()=>{
+ const C={URL};vm.runInNewContext(entrypoint('native').source,C);const css=fs.readFileSync('src/style.core.css','utf8');
+ const block=(selector)=>{const at=css.indexOf(selector+'{--dv-live-todo:');assert.ok(at>=0,selector);return css.slice(at,css.indexOf('}',at));};
+ for(const selector of [':root','.sk-aurora:not(.sk-editorial):not(.sk-pastel)']){
+  const body=block(selector),on=(/--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(body) || /--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(block(':root')))[1];
+  for(const state of ['todo','active','done','blocked','missing']){const fill=new RegExp('--dv-live-'+state+':(#[0-9A-Fa-f]{6})').exec(body)[1];assert.equal(C.stepCircleInk(fill.toLowerCase()),on.toLowerCase(),selector+' '+state);}
+ }
+ assert.match(css,/--step-ink:var\(--dv-live-on\)!important/);assert.match(fs.readFileSync('src/panels/types/live-status.js','utf8'),/\.dv-live-count\{[^}]*color:var\(--dv-live-on\)/);
+});
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
  const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}}}};

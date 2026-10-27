@@ -23,11 +23,11 @@ with the Artifact tool. An ordinary page declares only
 `capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
 A tracked page (one with `page.tracking`, see the `live-status-board` skill)
 adds the viewer's Jira connector:
-`capabilities: {mcp: {servers: [{server: "<display name>", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}`,
+`capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}`,
 where `server` is the connector's exact display name in claude.ai Settings →
-Connectors: "Atlassian" or "Atlassian MCP" when the viewer uses Atlassian's own
-directory connector (use whichever name it shows), or the custom or mock
-connector's own name. Never give a custom connector the name "Atlassian MCP":
+Connectors: "Atlassian" (or "Atlassian MCP", whichever the viewer's copy of
+Atlassian's own directory connector shows), or the custom or mock connector's
+own name. Never give a custom connector the name "Atlassian MCP":
 claude.ai resolves that name to Atlassian's directory connector and asks for an
 Atlassian login. The provider picks the connector by the tools it offers, so one
 declared name is enough. See `docs/live-status.md` ("Publishing as a claude.ai

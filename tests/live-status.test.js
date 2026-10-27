@@ -786,8 +786,11 @@ test('S2 the Jira adapter reports disconnected, connecting, connected and retryi
  assert.ok(h.watches.length>=2,'S2 the ticket watch and its Flagged watch are registered');h.watches[0].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});
  value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'connected');assert.equal(value.connection.checkedAt,new Date(1793000000000).toISOString());assert.equal(value.connection.busy,true,'S2 still busy while the second watch is outstanding');
  for(let i=1;i<h.watches.length;i++)h.watches[i].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.busy,false,'S2 idle once every watch answered');
- h.watches[0].handler({type:'error',error:{code:'rate_limited',retryable:true}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,true);
+ h.watches[0].handler({type:'error',error:{code:'tool_error',message:'boom'}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,false,'S2 a non-retryable failure leaves nothing in flight');
+ h.watches[0].handler({type:'error',error:{code:'rate_limited',retryable:true}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,true,'S2 busy while a retry timer is pending');
  h.ctl.liveStatus.destroy();
+ const nons=providerHarness();nons.win.claude={use:()=>Promise.resolve(null)};nons.start();await new Promise(setImmediate);await new Promise(setImmediate);
+ value=plain(nons.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected','S2 no mcp namespace is reported, not left connecting');assert.equal(value.connection.busy,false);nons.ctl.liveStatus.destroy();
  const none=providerHarness();none.servers.length=0;none.start();await new Promise(setImmediate);await new Promise(setImmediate);
  value=plain(none.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected');assert.equal(value.connection.busy,false);assert.match(value.note.text,/Add the Atlassian connector/);none.ctl.liveStatus.destroy();
  const nosite=providerHarness();nosite.mcp.callTool=()=>Promise.resolve({payload:[]});nosite.start();await new Promise(setImmediate);await new Promise(setImmediate);await new Promise(setImmediate);

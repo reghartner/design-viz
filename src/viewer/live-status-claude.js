@@ -136,7 +136,6 @@ function wireLiveStatusClaude(ctl,page,win){
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
     if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
-    mark(job,!!retry);status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:busy()});
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
     notices();
@@ -146,12 +145,14 @@ function wireLiveStatusClaude(ctl,page,win){
       var delay=typeof error.retryAfterMs==='number' && isFinite(error.retryAfterMs) && error.retryAfterMs>=0?error.retryAfterMs:code==='rate_limited'?5000:1000+Math.floor(Math.random()*2001);
       job.timer=win.setTimeout(function(){cancelRetry(job);if(!stopped)runCall(job);},delay);timers.push(job.timer);
     }
+    mark(job,job.timer!=null);status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:busy()});
   }
   function accept(job,result){
     if(stopped)return;
     cancelRetry(job);job.error=null;
-    mark(job,false);var stored=result && result.cache && result.cache.storedAt;status({state:'connected',busy:busy(),checkedAt:typeof stored==='number' && isFinite(stored)?stored:Date.now()});
-    if(job.accept){notices();job.accept(result);return;}
+    var stored=result && result.cache && result.cache.storedAt,checkedAt=typeof stored==='number' && isFinite(stored)?stored:Date.now();
+    if(job.accept){mark(job,false);status({state:'connected',busy:busy(),checkedAt:checkedAt});notices();job.accept(result);return;}
+    status({state:'connected',checkedAt:checkedAt});
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
       if(stopped || version!==job.version)return;
@@ -170,6 +171,7 @@ function wireLiveStatusClaude(ctl,page,win){
       // Publish only a complete page chain. A failed refresh keeps all prior evidence.
       if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
       else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      mark(job,false);status({busy:busy()});
       dirty=true;publish();notices();
     }
     pageResult(result);
@@ -232,7 +234,7 @@ function wireLiveStatusClaude(ctl,page,win){
   removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
-    if(!namespace){stop();return null;}
+    if(!namespace){status({state:'disconnected',busy:false});stop();return null;}
     mcp=namespace;
     var discovery={version:0,tool:null,input:{},inflight:true};jobs.push(discovery);
     return Promise.resolve().then(function(){if(!stopped)return mcp.listTools();}).then(function(list){
@@ -258,5 +260,5 @@ function wireLiveStatusClaude(ctl,page,win){
       var version=++job.version;
       return Promise.resolve().then(function(){if(!stopped)return mcp.callTool(server,job.tool,job.input,job.options);}).then(function(result){if(!stopped && version===job.version){job.error=null;mark(job,false);resources(result);}},function(error){fail(job,error,true);});
     },function(error){fail(discovery,error,false);});
-  },function(){stop();return null;});
+  },function(){status({state:'disconnected',busy:false});stop();return null;});
 }

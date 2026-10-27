@@ -771,7 +771,7 @@ test('panel templates exist for every engine panel type and no extras', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_TEMPLATES).sort(), [...V.PANEL_TYPES].sort());
 });
 
-test('every panel template validates with zero errors AND zero warnings', () => {
+test('every panel template validates with only the live-status empty-page advisory', () => {
   for (const type of Object.keys(B.PANEL_TEMPLATES)){
     const spec = JSON.parse(JSON.stringify(SPEC));
     const plan = B.planAddPanel(JSON.stringify(spec, null, 2), spec, 0, type);
@@ -782,7 +782,12 @@ test('every panel template validates with zero errors AND zero warnings', () => 
     assert.strictEqual(added.id, type + '1');
     const v = V.validate(V.normalize(plain(out)));
     assert.deepStrictEqual(plain(v.errors), [], type + ' errors');
-    assert.deepStrictEqual(plain(v.warnings), [], type + ' warnings: ' + JSON.stringify(v.warnings));
+    assert.deepStrictEqual(plain(v.warnings), type === 'live-status' ?
+      ['plain.diagram.panels[0]: this page has no ticket references — the panel will be empty'] : [], type + ' warnings: ' + JSON.stringify(v.warnings));
+    if (type === 'live-status') {
+      out.page.blocks[0].diagram.nodes.a.tickets = ['AA-1'];
+      assert.deepStrictEqual(plain(V.validate(V.normalize(out))), {errors:[],warnings:[]});
+    }
   }
 });
 

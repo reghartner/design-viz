@@ -162,9 +162,9 @@ Publish only when asked. Steps:
    Settings → Connectors".
 
 What the viewer sees on first open: a dialog "This artifact uses connectors"
-listing the connector with a toggle and Continue. After Continue the Live chip
+listing the connector with a toggle and Continue. After Continue the Live status panel header
 may read "Jira did not answer; retrying" for a few seconds on a cold start;
-the retry is automatic. Then the chip shows the done count and "updated just
+the retry is automatic. Then the header shows the done count and "updated just
 now".
 
 Republishing: pass the artifact's existing URL as `url` on the publish call,

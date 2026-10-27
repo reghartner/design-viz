@@ -54,3 +54,15 @@ test('L1 malformed and null patches still explain that live status has no author
  const result=C.validate(C.normalize(raw));assert.deepEqual(plain(result.errors),[]);assert.equal(result.warnings.filter(x=>x.includes('live status has no authored state')).length,4);
  assert.deepEqual(plain(definition().fold(d.panels[0],d.steps)),[{},{},{}]);
 });
+
+test('L8 rework the panel reference is extractable by widget_doc and publishing names its header',()=>{
+ const {execFileSync}=require('node:child_process');
+ const doc=execFileSync('python3',['tools/widget_doc.py','live-status'],{encoding:'utf8'});
+ assert.match(doc,/^### panels/);assert.match(doc,/- `live-status` — runtime ticket progress/);
+ assert.match(doc,/"id":"status","type":"live-status","title":"Epic status"/);
+ assert.match(doc,/no authored state/);assert.match(doc,/panelVisibility/);assert.match(doc,/sectionLayout/);
+ assert.deepEqual([...doc.matchAll(/^- `([^`]+)` /gm)].map(match=>match[1]),['live-status']);
+ assert.match(doc,/Patches are SPARSE/);
+ const skill=fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8');
+ assert.match(skill,/After Continue the Live status panel header/);assert.doesNotMatch(skill,/Live chip/);
+});

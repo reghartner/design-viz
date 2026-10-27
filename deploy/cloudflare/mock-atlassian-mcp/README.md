@@ -38,7 +38,10 @@ instance beyond the Workers Free plan daily cap:
   POST to the MCP endpoint. A denied request returns HTTP `429` with
   `Retry-After: 60` and a JSON-RPC error (`code: -32000`). The binding is free
   on every plan and needs no zone; `/`, `/healthz` and CORS preflights are not
-  counted. Change `simple.limit` or `simple.period` (10 or 60 seconds) in the
+  counted. Cloudflare enforces the limit approximately and per Cloudflare
+  location rather than globally, so a client can somewhat exceed 60 requests
+  per 60 s; treat it as a brake, not a hard cap. Change `simple.limit` or
+  `simple.period` (10 or 60 seconds) in the
   config and redeploy to tune it. Deployments whose config omits the binding
   keep working without a limit.
 - **Optional URL path token.** Set the environment variable `MCP_PATH_TOKEN`

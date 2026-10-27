@@ -111,8 +111,8 @@ remain plain links. The node links menu includes authored tickets and PRs even
 without a provider. Pulses stop for reduced motion and print; print retains colors.
 
 The reader Live control shows counts of distinct referenced tickets and the newest
-provider timestamp. With no provider or applied map, it stays hidden. Pages without
-ticket references get no Live control markup. Path, View, Tab and detail navigation
+provider timestamp. With no provider or applied map, it stays hidden. Pages with
+neither ticket references nor a configured epic get no Live control markup. Path, View, Tab and detail navigation
 reapply the current map to rebuilt elements.
 
 ## Host provider API

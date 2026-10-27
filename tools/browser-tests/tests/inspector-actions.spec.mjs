@@ -591,11 +591,11 @@ test('Demo live status passes a sorted provider map and stays preview-only acros
   const authored=await src.inputValue();expect(authored).not.toBe(original);
   await expect(toggle).not.toBeChecked();expect(await page.evaluate(()=>window.__trackingDemoEnabled)).toBe(false);
   await toggle.check();await expect(toggle).toBeChecked();
-  const expected={'AA-1':'todo','BB-2':'active','CC-3':'done','DD-4':'blocked','ZZ-5':'todo'};
+  const expected={'AA-1':{state:'todo'},'BB-2':{state:'active'},'CC-3':{state:'done'},'DD-4':{state:'blocked'},'ZZ-5':{state:'todo'}};
   await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual(expected);await expect(src).toHaveValue(authored);
   await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
   const ticket=page.locator('#guide').getByLabel('Add ticket',{exact:true});await ticket.fill('AB-9');await ticket.press('Enter');
-  await expect(toggle).toBeChecked();await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual({'AA-1':'todo','AB-9':'active','BB-2':'done','CC-3':'blocked','DD-4':'todo','ZZ-5':'active'});
+  await expect(toggle).toBeChecked();await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual({'AA-1':{state:'todo'},'AB-9':{state:'active'},'BB-2':{state:'done'},'CC-3':{state:'blocked'},'DD-4':{state:'todo'},'ZZ-5':{state:'active'}});
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(authored);await expect(toggle).toBeChecked();
   await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual(expected);
   await closeTools(page);await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-terminal').click();

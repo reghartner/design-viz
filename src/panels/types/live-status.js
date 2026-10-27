@@ -7,7 +7,7 @@
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
       '<div class="dv-live-panel-body"><div class="dv-live-epic"><div class="dv-live-completion">11/11 carriers done</div><div class="dv-live-epic-main"><span class="dv-live-epic-key">DOOR-100</span> <span class="dv-live-epic-title">Connected doorbell delivery</span> <span class="dv-live-state-pill dv-live-epic-state">done</span><div class="dv-live-epic-progress">8 of 8 stories done · 7 of 8 epic stories on diagram</div><div class="dv-live-epic-counts">Ready to demo</div></div></div>'+
       '<h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>Depends on</th><th>PRs</th></tr></thead><tbody>'+
-      sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>'+(row.key==='FW-46'?'<span class="dv-live-dep" data-tone="none"><span class="dv-live-dep-key">HW-124</span> <span class="dv-live-state-pill">done</span></span>':'')+'</td><td>1 merged</td></tr><tr class="dv-live-coverage-row"><td colspan="6"><div class="dv-live-coverage">'+(row.key==='UX-90'?'<span class="dv-live-coverage-tag">NOT ON DIAGRAM</span>':'<span class="reader-button dv-live-chip">On diagram</span>')+'</div></td></tr>';}).join('')+'</tbody></table></div><h3>Blockers and dependency chains</h3><p>None</p><h3>Activity</h3></div>';
+      sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>'+(row.key==='FW-46'?'<span class="dv-live-dep dv-live-dep-done" data-tone="done"><span class="dv-live-dep-icon" data-icon="check"></span><span class="dv-live-dep-key">HW-124</span> <span class="dv-live-state-pill">done</span></span>':'')+'</td><td>1 merged</td></tr><tr class="dv-live-coverage-row"><td colspan="6"><div class="dv-live-coverage">'+(row.key==='UX-90'?'<span class="dv-live-coverage-tag">NOT ON DIAGRAM</span>':'<span class="reader-button dv-live-chip">On diagram</span>')+'</div></td></tr>';}).join('')+'</tbody></table></div><h3>Blockers and dependency chains</h3><p>None</p><h3>Activity</h3></div>';
   }
   function mount(host){
     if(host._panelMotionCleanup)host._panelMotionCleanup();
@@ -34,13 +34,14 @@
     }
     // One keyed icon per URL: GitHub evidence (#756) and a plain authored link share the node, so a URL that gains evidence keeps its identity.
     function prLink(parent,pr){return liveStatusPRDecorate(el(parent,'a',typeof pr==='string'?pr:pr.url,'nbacklink dv-live-pr-link',null),pr);}
-    // One bounded control per upstream (#765): icon (hand while unfinished, alarm when blocked or missing),
-    // key, state pill. No source line; an authored reason rides the tooltip. Click focuses the upstream row.
+    // One bounded control per upstream (#765): icon (hand while unfinished, alarm when blocked or missing,
+    // green check when done), key, state pill. No source line; an authored reason rides the tooltip.
+    // Click focuses the upstream row.
     function depButton(parent,key,dep){
-      var node=el(parent,'button',key,'dv-live-dep'+(dep.tone==='red'?' dv-live-dep-red':''));node.type='button';node.setAttribute('data-live-dep-for',dep.key);node.setAttribute('data-tone',dep.tone);
+      var node=el(parent,'button',key,'dv-live-dep'+(dep.tone==='red'?' dv-live-dep-red':dep.tone==='done'?' dv-live-dep-done':''));node.type='button';node.setAttribute('data-live-dep-for',dep.key);node.setAttribute('data-tone',dep.tone);
       if(dep.reason)node.setAttribute('title',dep.reason);else node.removeAttribute('title');
-      node.setAttribute('aria-label',dep.key+' · '+dep.state+(dep.tone==='red'?' · blocked upstream':dep.tone==='grey'?' · upstream not done':'')+(dep.reason?' · '+dep.reason:''));
-      var icon=dep.tone==='red'?'alarm':dep.tone==='grey'?'hand':null;
+      node.setAttribute('aria-label',dep.key+' · '+dep.state+(dep.tone==='red'?' · blocked upstream':dep.tone==='grey'?' · upstream not done':dep.tone==='done'?' · upstream done':'')+(dep.reason?' · '+dep.reason:''));
+      var icon=dep.tone==='red'?'alarm':dep.tone==='grey'?'hand':dep.tone==='done'?'check':null;
       var glyph=el(node,'span','icon','dv-live-dep-icon');if(icon){if(glyph.getAttribute('data-icon')!==icon){glyph.innerHTML=FlowIcons.render(icon,{className:'dv-live-dep-glyph',monochrome:true});glyph.setAttribute('data-icon',icon);}}else{glyph.innerHTML='';glyph.removeAttribute('data-icon');}glyph.hidden=!icon;
       el(node,'span','key','dv-live-dep-key',dep.key);el(node,'span','state','dv-live-state-pill'+(states.indexOf(dep.state)>=0?' dv-live-'+dep.state:''),dep.state);
       if(!node._liveClick){node._liveClick=function(){var table=host.querySelector('table.dv-live-tickets'),row=table && table.querySelector('tr[data-live-ticket="'+node.getAttribute('data-live-dep-for')+'"]'),target=row && (row.querySelector('a') || row.querySelector('.dv-live-ticket-key'));if(target && target.focus){target.focus({preventScroll:false});if(row.scrollIntoView)row.scrollIntoView({block:'nearest'});}};node.addEventListener('click',node._liveClick);}
@@ -108,9 +109,9 @@
         value.blockers.forEach(function(item){var row=el(blockers,'li',item.key,'dv-live-blocker');link(row,'key',item.key,item.url);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','lanes','dv-live-blocker-lanes',item.lanes);el(row,'span','downstream','dv-live-downstream',item.downstream);if(item.state==='missing')el(row,'span','missing','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)');});
         // One row per chain: each hop is the same bounded button, "holds" between hops.
         var chains=el(body,'ul','chains','dv-live-chains'),depOf=function(key){var found=null;value.tickets.some(function(ticket){return (ticket.dependsOn || []).some(function(dep){if(dep.key===key)found=dep;return !!found;});});
-          var entry=value.states[key],state=found?found.state:entry && states.indexOf(entry.state)>=0?entry.state:'missing';return {key:key,state:state,tone:found?found.tone:state==='done'?'none':state==='blocked' || state==='missing'?'red':'grey',reason:found?found.reason:''};};
+          var entry=value.states[key],state=found?found.state:entry && states.indexOf(entry.state)>=0?entry.state:'missing';return {key:key,state:state,tone:found?found.tone:state==='done'?'done':state==='blocked' || state==='missing'?'red':'grey',reason:found?found.reason:''};};
         (value.chains || []).forEach(function(chain){var row=el(chains,'li',chain.join('>'),'dv-live-chain');chain.forEach(function(key,index){if(index)el(row,'span','holds-'+index,'dv-live-chain-holds','holds');
-          var dep=depOf(key);if(index===chain.length-1){var last=value.tickets.filter(function(ticket){return ticket.key===key;})[0];dep={key:key,state:last?last.state:dep.state,tone:last && last.waiting?last.waiting:'none',reason:''};}
+          var dep=depOf(key);if(index===chain.length-1){var last=value.tickets.filter(function(ticket){return ticket.key===key;})[0];dep={key:key,state:last?last.state:dep.state,tone:last && last.waiting?last.waiting:last && last.state==='done'?'done':'none',reason:''};}
           depButton(row,'hop-'+index,dep);});});
         if(!value.blockers.length && !(value.chains || []).length)el(body,'p','none','dv-live-none','None');
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
@@ -183,6 +184,8 @@
 .dv-live-dep:hover{background:color-mix(in srgb,var(--dink) 6%,transparent);}
 .dv-live-dep:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
 .dv-live-dep.dv-live-dep-red{border-color:var(--dv-live-blocked);color:var(--dv-live-blocked);}
+.dv-live-dep.dv-live-dep-done{border-color:var(--dv-live-done);}
+.dv-live-dep.dv-live-dep-done .dv-live-dep-icon{color:var(--dv-live-done);}
 .dv-live-dep-icon{display:inline-flex;width:14px;height:14px;flex:none;}
 .dv-live-dep-icon[hidden]{display:none!important;}
 .dv-live-dep-icon .dv-live-dep-glyph{width:14px;height:14px;}

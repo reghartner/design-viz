@@ -213,7 +213,9 @@ epic shows `epic KEY` under its key; there is no Epic column.
 
 **Depends on** holds one bounded button per upstream ticket: an icon, the upstream
 key and its state pill. The icon is the shared `hand` glyph while the upstream is
-unfinished and `alarm` when it is blocked or missing; a done upstream has no icon.
+unfinished, `alarm` when it is blocked or missing, and the green `check` (the done
+preset colour) when it is done. The same icons mark the hops of Blockers and
+dependency chains.
 The border is red when the upstream is blocked or missing, grey otherwise. There is
 no source line; an authored pair's reason is the button's tooltip. Clicking the
 button focuses the upstream's row. Below the table a light hint appears when an

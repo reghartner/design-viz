@@ -331,8 +331,10 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const authored=row('UX-1').querySelector('.dv-live-dep');assert.equal(authored.getAttribute('title'),'needs push payload');assert.equal(authored.getAttribute('data-tone'),'grey');assert.equal(authored.querySelector('.dv-live-state-pill').textContent,'todo');
  assert.equal(row('BE-1').querySelector('.dv-live-dep').querySelector('.dv-live-state-pill').textContent,'missing');assert.equal(row('BE-1').querySelector('.dv-live-dep').getAttribute('data-tone'),'red');
  assert.equal(row('HW-1').querySelectorAll('.dv-live-dep').length,0);
- // A done upstream is listed without a waiting icon.
- const done=depMap();done['HW-2'].state='done';api.apply(done);const doneDep=row('FW-1').querySelectorAll('.dv-live-dep')[0];assert.equal(doneDep.getAttribute('data-tone'),'none');assert.equal(doneDep.querySelector('.dv-live-dep-icon').hidden,true);api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell'}}));
+ // A done upstream shows the green check (Chuck, PR #784 review), never the hand or alarm.
+ const done=depMap();done['HW-2'].state='done';api.apply(done);const doneDep=row('FW-1').querySelectorAll('.dv-live-dep')[0];assert.equal(doneDep.getAttribute('data-tone'),'done');assert.ok(doneDep.classList.contains('dv-live-dep-done'));assert.ok(!doneDep.classList.contains('dv-live-dep-red'));
+ assert.equal(doneDep.querySelector('.dv-live-dep-icon').hidden,false);assert.equal(doneDep.querySelector('.dv-live-dep-icon').getAttribute('data-icon'),'check');assert.doesNotMatch(doneDep.querySelector('.dv-live-dep-icon').innerHTML,/data-icon="(hand|alarm)"/);assert.equal(doneDep.querySelector('.dv-live-state-pill').textContent,'done');assert.match(doneDep.getAttribute('aria-label'),/upstream done/);
+ assert.match(h.C.PanelRegistry.get('live-status').styles,/\.dv-live-dep\.dv-live-dep-done \.dv-live-dep-icon\{color:var\(--dv-live-done\)/,'check takes the done preset colour');api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell'}}));
  assert.equal(coverage('OUT-9').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.equal(row('OUT-9').querySelector('.dv-live-ticket-epic').textContent,'epic OTHER-1');
  assert.equal(coverage('GONE-1').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.ok(row('GONE-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(row('GONE-1').querySelector('.dv-live-state-pill').textContent,'No status');
  assert.ok(row('FW-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('Epic'),-1,'no Epic column');
@@ -396,9 +398,9 @@ test('D11 docs, skill, contract and native types describe dependencies and no lo
  assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking\.dependencies/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/dependencyLinks/);
  const types=fs.readFileSync('src/native/mount.d.ts','utf8');assert.match(types,/dependsOn\?: Array<\{key: string; source: 'jira' \| 'authored'; linkType\?: string; reason\?: string\}>/);
 });
-test('D12 the shared icon library offers the raised hand and alarm glyphs the panel uses',()=>{
+test('D12 the shared icon library offers the raised hand, alarm and check glyphs the panel uses',()=>{
  const C={};vm.runInNewContext(fs.readFileSync('src/icons/library.js','utf8'),C);
- assert.ok(C.FlowIcons.has('hand'));assert.ok(C.FlowIcons.has('alarm'));assert.equal(C.FlowIcons.registry.hand.legacy,false);assert.match(C.FlowIcons.render('hand',{monochrome:true}),/stroke="currentColor"/);
+ assert.ok(C.FlowIcons.has('hand'));assert.ok(C.FlowIcons.has('alarm'));assert.ok(C.FlowIcons.has('check'));assert.equal(C.FlowIcons.registry.hand.legacy,false);assert.equal(C.FlowIcons.registry.check.tone,'green');assert.match(C.FlowIcons.render('hand',{monochrome:true}),/stroke="currentColor"/);assert.match(C.FlowIcons.render('check',{monochrome:true}),/stroke="currentColor"/);
 });
 test('S4 waiting preserves own state, supplies popover keys and clears on toggle/apply',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]');

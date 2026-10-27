@@ -128,7 +128,8 @@ status** beside Preview paints sample colors without touching Jira.
 ## 2b. Dependencies
 
 Waiting is dependency evidence: ticket X waits while an upstream ticket Y is not
-done (grey, raised hand) or is blocked or missing (red, alarm). Two sources merge:
+done (grey, raised hand) or is blocked or missing (red, alarm); a done upstream
+shows a green check. Two sources merge:
 Jira issue links (default types `is blocked by` and `depends on`, configurable as
 `tracking.jira.dependencyLinks`) and authored pairs in `tracking.dependencies`.
 

@@ -668,7 +668,7 @@ A non-object `tracking` or a present `tracking.jira.site` that is not an absolut
 HTTP(S) URL string produces a warning and is ignored. The spec never stores status;
 live colors come from Jira status only. Steps, coins and chips derive their state
 from the nodes and edges they involve and never carry tickets. These fields
-declare `flow.live-status`; the overlay rendering lands separately in #735.
+declare `flow.live-status`; the overlay ships in every renderer entrypoint.
 See [live ticket status](../docs/live-status.md) for the state model and example.
 
 ### groups — containment boundaries

@@ -38,7 +38,7 @@
         "heading": "Press the button, ring the chime, alert the resident",
         "text": [
           "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: slate not started, orange in progress, green done, rose blocked or missing.",
-          "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the Story panel to pause, step, or switch the visual treatment."
+          "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the step controls under the diagram to step through the flow, and the Live status panel's Pause and Next day controls to drive the story clock."
         ],
         "diagram": {
           "view": "ambient",

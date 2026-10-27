@@ -147,13 +147,14 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
 Below Blockers, the Tickets table lists each distinct carrier ticket and every returned child of a linked
 epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
-Key, Title, State, Owner with relative update time (or “time unavailable”), PRs,
-and Coverage. The key uses the configured Jira site, and a colored stripe marks
-its team lane when known.
+Key, Title, State, Owner (assignee name), and PRs. Under each ticket a second
+row holds its coverage as a left-aligned row of chips. The key uses the configured
+Jira site, and a colored stripe marks its team lane when known.
 
-PR links come only from authored carrier `prs`; Jira's Development summary adds
-informational open, merged or declined counts without inventing URLs. Coverage
-buttons name the story's carriers, open their containing section or detail when
+PR links come only from authored carrier `prs`, rendered as icons; Jira's
+Development summary adds a muted, informational “n open/merged/declined” count
+without inventing URLs (its tooltip says Jira does not expose the link). Coverage
+chips name the story's carriers, open their containing section or detail when
 needed, and focus their live badges through the existing detail navigation. If
 no authored route is available, the button is disabled with a title naming the
 detail page. Stories without

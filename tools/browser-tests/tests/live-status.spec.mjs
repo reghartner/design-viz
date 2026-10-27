@@ -301,9 +301,9 @@ test('B5 changed node pulses its card in every skin without moving the positione
 test('E6 E10 E11 built epic Tickets table lists all children and coverage focuses the badge',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
  for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.locator('table.dv-live-tickets');
- await expect(table.locator('tbody tr')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','PRs','Coverage']);
- await expect(table.locator('tr[data-live-ticket="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');
- const hw=table.locator('tr[data-live-ticket="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo · 7 of 8 epic stories on diagram');
+ await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','PRs']);
+ await expect(table.locator('tr[data-live-coverage-for="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');await expect(table.locator('tr[data-live-ticket="HW-124"] td').nth(3)).toHaveText('Alex');
+ const hw=table.locator('tr[data-live-coverage-for="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo · 7 of 8 epic stories on diagram');
  await hw.getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('g.node[data-dv-node="chime"] .dv-live-badge')).toBeFocused();
  await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();expect(await panel.locator('.pbody').evaluate(el=>el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth)).toBe(true);
 });
@@ -327,7 +327,7 @@ test('E6 rework coverage opens a closed detail and focuses its visible badge aft
  await expect(root.locator('#section-delivery [data-dv-node="hardware"] .dv-live-badge')).toBeVisible();
  for(let visit=0;visit<2;visit++){
   await expect(panel).toBeVisible();
-  await panel.locator('tr[data-live-ticket="HW-123"]').getByRole('button',{name:'Child work',exact:true}).click();
+  await panel.locator('tr[data-live-coverage-for="HW-123"]').getByRole('button',{name:'Child work',exact:true}).click();
   const child=root.locator('[data-dv-detail-preview] [data-dv-node="child"] .dv-live-badge');
   await expect(child).toBeVisible();await expect(child).toBeFocused();await expect(panel).toBeHidden();
   // The rendered back button includes the arrow in its accessible name.
@@ -342,7 +342,7 @@ test('L4 unlinked detail coverage names its page and stays disabled',async({page
  const child=spec.page.sections[1].diagram;child.nodes.end={title:'End'};child.rows=[['child','end']];child.edges=[{from:'child',to:'end',label:'Unlinked call',tickets:['BE-68']}];
  const root=await open(page,server,spec),panel=root.locator('.pt-live-status');
  for(const [key,label] of [['HW-123','Child work'],['BE-68','Unlinked call']]){
-  const button=panel.locator('tr[data-live-ticket="'+key+'"]').getByRole('button',{name:label,exact:true});await expect(button).toBeDisabled();await expect(button).toHaveAttribute('title',/Hardware detail/);
+  const button=panel.locator('tr[data-live-coverage-for="'+key+'"]').getByRole('button',{name:label,exact:true});await expect(button).toBeDisabled();await expect(button).toHaveAttribute('title',/Hardware detail/);
  }
  await expect(root.locator('.dv-live-carrier-preview')).toHaveCount(0);await expect(root.locator('#section-detail')).toBeHidden();expect(await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent))).toEqual(spec);
 });
@@ -358,8 +358,8 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
  for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
- await expect(body.locator('tr[data-live-ticket="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-verdict')).toContainText('7 of 8 epic stories on diagram');
- await body.locator('tr[data-live-ticket="HW-124"]').getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('[data-dv-node="chime"] .dv-live-badge')).toBeFocused();
+ await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-verdict')).toContainText('7 of 8 epic stories on diagram');
+ await body.locator('tr[data-live-coverage-for="HW-124"]').getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('[data-dv-node="chime"] .dv-live-badge')).toBeFocused();
  await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
 });
 
@@ -379,7 +379,7 @@ test('L4 loaded external coverage disables unrelated sections without another lo
   const root=page.locator('#host');await root.locator('[data-dv-detail="parent"]').click();await expect(root.locator('[data-dv-detail-preview]')).toBeVisible();
   const panel=root.locator('[data-dv-detail-preview] .pt-live-status');
   for(const [key,label] of [['CH-1','Remote carrier'],['CH-2','Remote call']]){
-   const button=panel.locator('tr[data-live-ticket="'+key+'"]').getByRole('button',{name:label,exact:true});await expect(button).toBeDisabled();await expect(button).toHaveAttribute('title',/Unrelated work/);
+   const button=panel.locator('tr[data-live-coverage-for="'+key+'"]').getByRole('button',{name:label,exact:true});await expect(button).toBeDisabled();await expect(button).toHaveAttribute('title',/Unrelated work/);
   }
   expect(await page.evaluate(()=>window.__coverageLoads)).toBe(1);await expect(root.locator('.dv-live-carrier-preview')).toHaveCount(0);
   expect(await page.evaluate(()=>JSON.stringify(window.__coverageRaw))).toBe(await page.evaluate(()=>window.__coverageSource));await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();

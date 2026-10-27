@@ -81,6 +81,11 @@ function wireLiveStatusClaude(ctl,page,win){
   var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
+  function status(value){if(typeof api.status==='function')api.status(value);}
+  // busy = any job (discovery, resource lookup, watch, scheduled retry) still outstanding.
+  function mark(job,on){if(job)job.inflight=!!on;}
+  function busy(){return jobs.some(function(job){return job.inflight;});}
+  status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;
@@ -124,11 +129,12 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
+    mark(job,false);
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
@@ -139,11 +145,14 @@ function wireLiveStatusClaude(ctl,page,win){
       var delay=typeof error.retryAfterMs==='number' && isFinite(error.retryAfterMs) && error.retryAfterMs>=0?error.retryAfterMs:code==='rate_limited'?5000:1000+Math.floor(Math.random()*2001);
       job.timer=win.setTimeout(function(){cancelRetry(job);if(!stopped)runCall(job);},delay);timers.push(job.timer);
     }
+    mark(job,job.timer!=null);status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:busy()});
   }
   function accept(job,result){
     if(stopped)return;
     cancelRetry(job);job.error=null;
-    if(job.accept){notices();job.accept(result);return;}
+    var stored=result && result.cache && result.cache.storedAt,checkedAt=typeof stored==='number' && isFinite(stored)?stored:Date.now();
+    if(job.accept){mark(job,false);status({state:'connected',busy:busy(),checkedAt:checkedAt});notices();job.accept(result);return;}
+    status({state:'connected',checkedAt:checkedAt});
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
       if(stopped || version!==job.version)return;
@@ -162,12 +171,13 @@ function wireLiveStatusClaude(ctl,page,win){
       // Publish only a complete page chain. A failed refresh keeps all prior evidence.
       if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
       else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      mark(job,false);status({busy:busy()});
       dirty=true;publish();notices();
     }
     pageResult(result);
   }
   function runCall(job){
-    var version=++job.version;
+    var version=++job.version;mark(job,true);status({busy:true});
     return Promise.resolve().then(function(){
       if(stopped)return;
       return mcp.callTool(server,job.tool,job.input,job.options);
@@ -175,7 +185,7 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function watch(job){
     if(stopped)return;
-    var subscription;
+    var subscription;mark(job,true);status({busy:true});
     try{
       subscription=mcp.watchTool(server,job.tool,job.input,function(event){
         if(stopped || !event)return;
@@ -215,18 +225,18 @@ function wireLiveStatusClaude(ctl,page,win){
     var list=result && result.payload,desired=page && page.tracking && page.tracking.jira && page.tracking.jira.site;
     list=Array.isArray(list)?list:[];
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
-    if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
-    site=resource.url;cloudId=resource.id;syncWatches();
+    if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');status({state:'disconnected',busy:false});stop();return;}
+    site=resource.url;cloudId=resource.id;syncWatches();status({busy:busy()});
   }
   var pending;
-  try{pending=use.call(claude,'mcp');}catch(ex){return null;}
+  try{pending=use.call(claude,'mcp');}catch(ex){status({state:'disconnected',busy:false});return null;}
   removeDestroy=api.onDestroy(stop);
   removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
-    if(!namespace){stop();return null;}
+    if(!namespace){status({state:'disconnected',busy:false});stop();return null;}
     mcp=namespace;
-    var discovery={version:0,tool:null,input:{}};jobs.push(discovery);
+    var discovery={version:0,tool:null,input:{},inflight:true};jobs.push(discovery);
     return Promise.resolve().then(function(){if(!stopped)return mcp.listTools();}).then(function(list){
       if(stopped)return null;
       var listed=Array.isArray(list)?list:list && Array.isArray(list.servers)?list.servers:[];
@@ -243,12 +253,12 @@ function wireLiveStatusClaude(ctl,page,win){
       });
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
-      if(!server){api.note(addConnector,'info');stop();return null;}
-      var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources};jobs.push(job);
+      if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
+      var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources,inflight:true};jobs.push(job);mark(discovery,false);
       // Initial resource lookup may retry once. All subsequent call failures
       // (including explicit approval) end here rather than recursively retry.
       var version=++job.version;
-      return Promise.resolve().then(function(){if(!stopped)return mcp.callTool(server,job.tool,job.input,job.options);}).then(function(result){if(!stopped && version===job.version){job.error=null;resources(result);}},function(error){fail(job,error,true);});
+      return Promise.resolve().then(function(){if(!stopped)return mcp.callTool(server,job.tool,job.input,job.options);}).then(function(result){if(!stopped && version===job.version){job.error=null;mark(job,false);resources(result);}},function(error){fail(job,error,true);});
     },function(error){fail(discovery,error,false);});
-  },function(){stop();return null;});
+  },function(){status({state:'disconnected',busy:false});stop();return null;});
 }

@@ -30,6 +30,7 @@ function createLiveStatusDemo(doc){
   function paint(){
     if(retired)return;
     var current=timeline.days[day],label=String(current.label || '');
+    if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
     api.apply(liveStatusDemoMap(current,api.refs().tickets));
     api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
   }

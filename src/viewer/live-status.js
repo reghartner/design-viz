@@ -200,6 +200,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
+  // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
+  var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
+  var demoMode=!!(options.demo && typeof options.demo.mount==='function');
+  var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':''};
+  function setStatus(value){
+    if(retired || !value || typeof value!=='object')return;
+    if(typeof value.state==='string' && LIVE_STATUS_CONNECTIONS.indexOf(value.state)>=0)connection.state=value.state;
+    if(typeof value.busy==='boolean')connection.busy=value.busy;
+    if(typeof value.source==='string' && value.source)connection.source=value.source;
+    if(value.checkedAt!=null){var at=typeof value.checkedAt==='number'?value.checkedAt:Date.parse(value.checkedAt);if(isFinite(at))connection.checkedAt=new Date(at).toISOString();}
+    notify();
+  }
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -237,14 +249,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var pages=laneRecords(),coverage=liveStatusCoverage(page,map,refs()),readiness=liveStatusReadiness(page,map);
     var epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
     var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
-    if(coverage.epics.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
+    // Only count epic stories when the map actually carries epic membership; "0 of 0" says nothing.
+    if(coverage.epics.length && epicKeys.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
       available:!!(refs().tickets.length || refs().epics.length),hasData:!!(provider || applied),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:ticketRows(pages,coverage),
       coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):''};
+      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):''}};
   }
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -513,7 +527,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
-        owner:(entry.assignee || 'Unassigned')+' · '+(isFinite(Date.parse(entry.updatedAt))?relative(entry.updatedAt):'time unavailable'),
+        owner:entry.assignee || 'Unassigned',
         prs:entry.prs?copy(entry.prs):null,urls:urls,laneColor:laneColor,
         carriers:owners.map(function(carrier){var route=carrierRoute(carrier),mounted=carrierBinding(carrier);
           return {id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || '',
@@ -597,10 +611,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function arm(){stopTimer();if(provider && !retired && visible())timer=setTimeout(function(){timer=0;fetchMap();},delay);}
   function fetchMap(){
     if(retired || !provider || !visible())return;
-    if(pending){catchUp=true;return;}pending=true;stopTimer();
+    if(pending){catchUp=true;return;}pending=true;stopTimer();setStatus({busy:true});
     Promise.resolve().then(function(){if(!retired)return provider(refs(),abort.signal);}).then(function(value){
-      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');}
-    },function(error){if(!retired)api.note(error && error.message || String(error),'error');}).then(function(){
+      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});}
+    },function(error){if(!retired){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}}).then(function(){
       pending=false;if(retired)return;
       if(catchUp && visible()){catchUp=false;fetchMap();}else arm();
     });
@@ -653,6 +667,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';notify();},
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
+    status:function(value){setStatus(value);},
     destroy:function(){
       if(retired)return;on=false;paintLanes();retired=true;liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;

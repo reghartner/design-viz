@@ -8788,7 +8788,18 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
-.dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-note{color:var(--dtext);}
+.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden]{display:none!important;}
+.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+@keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+.dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
@@ -8802,13 +8813,17 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
-.dv-live-tickets{width:100%;min-width:720px;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets{width:100%;min-width:480px;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
-.dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
-.dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-row td{border-bottom:0;padding-bottom:4px;}
+.dv-live-coverage-cell{padding-top:0!important;}
+.dv-live-coverage{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:6px;}
+.dv-live-coverage .dv-live-chip{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border:1px solid var(--explore-border);border-radius:999px;font:500 11px/1.4 'IBM Plex Sans',sans-serif;white-space:nowrap;}
+.dv-live-coverage-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;white-space:nowrap;background:color-mix(in srgb,var(--dv-live-active) 18%,transparent);color:var(--dink);}
+.dv-live-pr-summary{color:var(--dfaint);margin-left:4px;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
@@ -8819,7 +8834,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
-.dv-live-empty,.dv-live-updated{color:var(--dfaint)}
+.dv-live-empty{color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
@@ -23874,11 +23889,12 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','done','blocked','missing'];
+  var PR_ICON='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><circle cx="3.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 5.1v5.8M12.5 10.9V7.2a2 2 0 0 0-2-2H8.2m1.9-2L8.2 5.2l1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
-      '<div class="dv-live-panel-body"><div class="dv-live-completion">11/11 carriers done</div><p class="dv-live-verdict">Ready to demo · 7 of 8 epic stories on diagram</p><h3>Blockers</h3><p>None</p><h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>PRs</th><th>Coverage</th></tr></thead><tbody>'+
-      sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>1 merged</td><td>'+ (row.key==='UX-90'?'NOT ON DIAGRAM':'On diagram')+'</td></tr>';}).join('')+'</tbody></table></div><h3>Activity</h3></div>';
+      '<div class="dv-live-panel-body"><div class="dv-live-completion">11/11 carriers done</div><p class="dv-live-verdict">Ready to demo · 7 of 8 epic stories on diagram</p><h3>Blockers</h3><p>None</p><h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>PRs</th></tr></thead><tbody>'+
+      sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>1 merged</td></tr><tr class="dv-live-coverage-row"><td colspan="5"><div class="dv-live-coverage">'+(row.key==='UX-90'?'<span class="dv-live-coverage-tag">NOT ON DIAGRAM</span>':'<span class="reader-button dv-live-chip">On diagram</span>')+'</div></td></tr>';}).join('')+'</tbody></table></div><h3>Activity</h3></div>';
   }
   function mount(host){
     if(host._panelMotionCleanup)host._panelMotionCleanup();
@@ -23903,6 +23919,12 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
+    function prLink(parent,url){
+      var number=/\/(?:pull|pulls|pull-requests|merge_requests|merge-requests)\/(\d+)/.exec(url),host='';try{host=new URL(url).host.replace(/^www\./,'');}catch(ex){}
+      var node=el(parent,'a',url,'nbacklink dv-live-pr-link',null);node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');
+      node.setAttribute('aria-label','Pull request'+(number?' #'+number[1]:'')+(host?' on '+host:''));node.setAttribute('title',url);
+      if(!node.firstChild)node.innerHTML=PR_ICON;return node;
+    }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
     function paint(value){
@@ -23912,7 +23934,11 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
-      if(hasData && value.updatedAt){var time=el(head,'time','time','dv-live-updated',value.updatedText);time.setAttribute('datetime',value.updatedAt);}
+      var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
+      var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
+      var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
+      connection.hidden=!available || conn.state==='none';
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
@@ -23927,15 +23953,17 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
         el(body,'h3','blockers-heading','','Blockers');var blockers=el(body,'ul','blockers','dv-live-blockers');
         value.blockers.forEach(function(item){var row=el(blockers,'li',item.key,'dv-live-blocker');link(row,'key',item.key,item.url);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','lanes','dv-live-blocker-lanes',item.lanes);el(row,'span','downstream','dv-live-downstream',item.downstream);if(item.state==='missing')el(row,'span','missing','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)');});
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
-        var tr=el(el(table,'thead','thead',''),'tr','tr','');['Key','Title','State','Owner','PRs','Coverage'].forEach(function(label){el(tr,'th',label,'',label).setAttribute('scope','col');});
+        var tr=el(el(table,'thead','thead',''),'tr','tr','');['Key','Title','State','Owner','PRs'].forEach(function(label){el(tr,'th',label,'',label).setAttribute('scope','col');});
         var tbody=el(table,'tbody','tbody','');value.tickets.forEach(function(item,index){
-          var row=el(tbody,'tr',item.key,'');row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
-          // Retain row and control identities through state changes and sorting.
-          if(tbody.children[index]!==row)tbody.insertBefore(row,tbody.children[index] || null);
+          var row=el(tbody,'tr',item.key,'dv-live-ticket-row');row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
+          // Retain row and control identities through state changes and sorting (two rows per ticket: data, then its coverage chips).
+          if(tbody.children[2*index]!==row)tbody.insertBefore(row,tbody.children[2*index] || null);
           link(el(row,'td','key','dv-live-ticket-key'),'link',item.key,item.url);el(row,'td','title','',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
-          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){link(prs,url,url,url);});if(item.prs)el(prs,'span','summary','',item.prs.count+' '+item.prs.state);
-          var coverage=el(row,'td','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
+          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){prLink(prs,url);});if(item.prs){var summary=el(prs,'span','summary','dv-live-pr-summary',item.prs.count+' '+item.prs.state);summary.setAttribute('title','Jira Development field: '+item.prs.count+' '+item.prs.state+' pull request'+(item.prs.count===1?'':'s')+'. Jira does not expose the link.');}
+          var coverageRow=el(tbody,'tr',item.key+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',item.key);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
+          if(tbody.children[2*index+1]!==coverageRow)tbody.insertBefore(coverageRow,tbody.children[2*index+1] || null);
+          var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','5');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button dv-live-chip',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
         });
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
       }
@@ -23955,7 +23983,18 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
-.dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-note{color:var(--dtext);}
+.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden]{display:none!important;}
+.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+@keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+.dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
@@ -23969,13 +24008,17 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
-.dv-live-tickets{width:100%;min-width:720px;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets{width:100%;min-width:480px;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
-.dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
-.dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-row td{border-bottom:0;padding-bottom:4px;}
+.dv-live-coverage-cell{padding-top:0!important;}
+.dv-live-coverage{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:6px;}
+.dv-live-coverage .dv-live-chip{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border:1px solid var(--explore-border);border-radius:999px;font:500 11px/1.4 'IBM Plex Sans',sans-serif;white-space:nowrap;}
+.dv-live-coverage-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;white-space:nowrap;background:color-mix(in srgb,var(--dv-live-active) 18%,transparent);color:var(--dink);}
+.dv-live-pr-summary{color:var(--dfaint);margin-left:4px;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
@@ -23986,7 +24029,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
-.dv-live-empty,.dv-live-updated{color:var(--dfaint)}
+.dv-live-empty{color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
@@ -34745,6 +34788,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
+  // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
+  var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
+  var demoMode=!!(options.demo && typeof options.demo.mount==='function');
+  var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':''};
+  function setStatus(value){
+    if(retired || !value || typeof value!=='object')return;
+    if(typeof value.state==='string' && LIVE_STATUS_CONNECTIONS.indexOf(value.state)>=0)connection.state=value.state;
+    if(typeof value.busy==='boolean')connection.busy=value.busy;
+    if(typeof value.source==='string' && value.source)connection.source=value.source;
+    if(value.checkedAt!=null){var at=typeof value.checkedAt==='number'?value.checkedAt:Date.parse(value.checkedAt);if(isFinite(at))connection.checkedAt=new Date(at).toISOString();}
+    notify();
+  }
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -34782,14 +34837,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var pages=laneRecords(),coverage=liveStatusCoverage(page,map,refs()),readiness=liveStatusReadiness(page,map);
     var epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
     var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
-    if(coverage.epics.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
+    // Only count epic stories when the map actually carries epic membership; "0 of 0" says nothing.
+    if(coverage.epics.length && epicKeys.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
       available:!!(refs().tickets.length || refs().epics.length),hasData:!!(provider || applied),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:ticketRows(pages,coverage),
       coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):''};
+      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):''}};
   }
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -35058,7 +35115,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
-        owner:(entry.assignee || 'Unassigned')+' · '+(isFinite(Date.parse(entry.updatedAt))?relative(entry.updatedAt):'time unavailable'),
+        owner:entry.assignee || 'Unassigned',
         prs:entry.prs?copy(entry.prs):null,urls:urls,laneColor:laneColor,
         carriers:owners.map(function(carrier){var route=carrierRoute(carrier),mounted=carrierBinding(carrier);
           return {id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || '',
@@ -35142,10 +35199,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function arm(){stopTimer();if(provider && !retired && visible())timer=setTimeout(function(){timer=0;fetchMap();},delay);}
   function fetchMap(){
     if(retired || !provider || !visible())return;
-    if(pending){catchUp=true;return;}pending=true;stopTimer();
+    if(pending){catchUp=true;return;}pending=true;stopTimer();setStatus({busy:true});
     Promise.resolve().then(function(){if(!retired)return provider(refs(),abort.signal);}).then(function(value){
-      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');}
-    },function(error){if(!retired)api.note(error && error.message || String(error),'error');}).then(function(){
+      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});}
+    },function(error){if(!retired){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}}).then(function(){
       pending=false;if(retired)return;
       if(catchUp && visible()){catchUp=false;fetchMap();}else arm();
     });
@@ -35198,6 +35255,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';notify();},
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
+    status:function(value){setStatus(value);},
     destroy:function(){
       if(retired)return;on=false;paintLanes();retired=true;liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
@@ -40076,6 +40134,7 @@ function createLiveStatusDemo(doc){
   function paint(){
     if(retired)return;
     var current=timeline.days[day],label=String(current.label || '');
+    if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
     api.apply(liveStatusDemoMap(current,api.refs().tickets));
     api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
   }
@@ -40383,6 +40442,11 @@ function wireLiveStatusClaude(ctl,page,win){
   var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
+  function status(value){if(typeof api.status==='function')api.status(value);}
+  // busy = any job (discovery, resource lookup, watch, scheduled retry) still outstanding.
+  function mark(job,on){if(job)job.inflight=!!on;}
+  function busy(){return jobs.some(function(job){return job.inflight;});}
+  status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;
@@ -40426,11 +40490,12 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
+    mark(job,false);
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
@@ -40441,11 +40506,14 @@ function wireLiveStatusClaude(ctl,page,win){
       var delay=typeof error.retryAfterMs==='number' && isFinite(error.retryAfterMs) && error.retryAfterMs>=0?error.retryAfterMs:code==='rate_limited'?5000:1000+Math.floor(Math.random()*2001);
       job.timer=win.setTimeout(function(){cancelRetry(job);if(!stopped)runCall(job);},delay);timers.push(job.timer);
     }
+    mark(job,job.timer!=null);status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:busy()});
   }
   function accept(job,result){
     if(stopped)return;
     cancelRetry(job);job.error=null;
-    if(job.accept){notices();job.accept(result);return;}
+    var stored=result && result.cache && result.cache.storedAt,checkedAt=typeof stored==='number' && isFinite(stored)?stored:Date.now();
+    if(job.accept){mark(job,false);status({state:'connected',busy:busy(),checkedAt:checkedAt});notices();job.accept(result);return;}
+    status({state:'connected',checkedAt:checkedAt});
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
       if(stopped || version!==job.version)return;
@@ -40464,12 +40532,13 @@ function wireLiveStatusClaude(ctl,page,win){
       // Publish only a complete page chain. A failed refresh keeps all prior evidence.
       if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
       else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      mark(job,false);status({busy:busy()});
       dirty=true;publish();notices();
     }
     pageResult(result);
   }
   function runCall(job){
-    var version=++job.version;
+    var version=++job.version;mark(job,true);status({busy:true});
     return Promise.resolve().then(function(){
       if(stopped)return;
       return mcp.callTool(server,job.tool,job.input,job.options);
@@ -40477,7 +40546,7 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function watch(job){
     if(stopped)return;
-    var subscription;
+    var subscription;mark(job,true);status({busy:true});
     try{
       subscription=mcp.watchTool(server,job.tool,job.input,function(event){
         if(stopped || !event)return;
@@ -40517,18 +40586,18 @@ function wireLiveStatusClaude(ctl,page,win){
     var list=result && result.payload,desired=page && page.tracking && page.tracking.jira && page.tracking.jira.site;
     list=Array.isArray(list)?list:[];
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
-    if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
-    site=resource.url;cloudId=resource.id;syncWatches();
+    if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');status({state:'disconnected',busy:false});stop();return;}
+    site=resource.url;cloudId=resource.id;syncWatches();status({busy:busy()});
   }
   var pending;
-  try{pending=use.call(claude,'mcp');}catch(ex){return null;}
+  try{pending=use.call(claude,'mcp');}catch(ex){status({state:'disconnected',busy:false});return null;}
   removeDestroy=api.onDestroy(stop);
   removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
-    if(!namespace){stop();return null;}
+    if(!namespace){status({state:'disconnected',busy:false});stop();return null;}
     mcp=namespace;
-    var discovery={version:0,tool:null,input:{}};jobs.push(discovery);
+    var discovery={version:0,tool:null,input:{},inflight:true};jobs.push(discovery);
     return Promise.resolve().then(function(){if(!stopped)return mcp.listTools();}).then(function(list){
       if(stopped)return null;
       var listed=Array.isArray(list)?list:list && Array.isArray(list.servers)?list.servers:[];
@@ -40545,14 +40614,14 @@ function wireLiveStatusClaude(ctl,page,win){
       });
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
-      if(!server){api.note(addConnector,'info');stop();return null;}
-      var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources};jobs.push(job);
+      if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
+      var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources,inflight:true};jobs.push(job);mark(discovery,false);
       // Initial resource lookup may retry once. All subsequent call failures
       // (including explicit approval) end here rather than recursively retry.
       var version=++job.version;
-      return Promise.resolve().then(function(){if(!stopped)return mcp.callTool(server,job.tool,job.input,job.options);}).then(function(result){if(!stopped && version===job.version){job.error=null;resources(result);}},function(error){fail(job,error,true);});
+      return Promise.resolve().then(function(){if(!stopped)return mcp.callTool(server,job.tool,job.input,job.options);}).then(function(result){if(!stopped && version===job.version){job.error=null;mark(job,false);resources(result);}},function(error){fail(job,error,true);});
     },function(error){fail(discovery,error,false);});
-  },function(){stop();return null;});
+  },function(){status({state:'disconnected',busy:false});stop();return null;});
 }
 /* ---- src/viewer/tour-progress.js ---- */
 /* Browser-local learning history for built-in tour topics. Custom page tours

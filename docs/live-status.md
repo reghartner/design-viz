@@ -140,9 +140,12 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
-The panel header holds **Live**, distinct-ticket counts, the updated time,
-provider note and action, **First blocker**, and demo **Play/Pause** and **Next day**
-when demo controls are supplied. The engine's panel title stays above this header.
+The panel header holds **Live**, distinct-ticket counts, a connector indicator
+(a dot plus “Jira connected, refreshed 12s ago”; the dot is grey when not connected,
+amber while connecting or awaiting approval, green when connected or in demo mode,
+red on error, and it pulses while a fetch is in flight; the time is the last successful
+fetch, not a ticket's change time), provider note and action, **First blocker**, and
+demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
 The body shows completion and verdict, Blockers, Tickets, then Activity. Lane
 progress is not listed in the panel; it stays on the step lane pills, the lane colour
 stripe of each Tickets row and the lane names in Blockers.
@@ -161,13 +164,14 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
 Below Blockers, the Tickets table lists each distinct carrier ticket and every returned child of a linked
 epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
-Key, Title, State, Owner with relative update time (or “time unavailable”), PRs,
-and Coverage. The key uses the configured Jira site, and a colored stripe marks
-its team lane when known.
+Key, Title, State, Owner (assignee name), and PRs. Under each ticket a second
+row holds its coverage as a left-aligned row of chips. The key uses the configured
+Jira site, and a colored stripe marks its team lane when known.
 
-PR links come only from authored carrier `prs`; Jira's Development summary adds
-informational open, merged or declined counts without inventing URLs. Coverage
-buttons name the story's carriers, open their containing section or detail when
+PR links come only from authored carrier `prs`, rendered as icons; Jira's
+Development summary adds a muted, informational “n open/merged/declined” count
+without inventing URLs (its tooltip says Jira does not expose the link). Coverage
+chips name the story's carriers, open their containing section or detail when
 needed, and focus the carrier itself through the existing detail navigation. If
 no authored route is available, the button is disabled with a title naming the
 detail page. Stories without
@@ -222,7 +226,16 @@ null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (return
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
-Tickets rows, coverage, activity, demo state and verdict for subscribed panels.
+Tickets rows, coverage, activity, demo state, verdict and `connection` for subscribed
+panels. `connection` is `{state, busy, checkedAt, source, checkedText}`; `state` is one of
+`none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`. A host
+provider is reported as source “Host”: connecting until its first answer, busy during
+each call, connected with `checkedAt` after a successful call, error after a rejection.
+Hosts and adapters may call `ctl.liveStatus.status({state, busy, checkedAt, source})`
+to report their own transport state; invalid fields are ignored. The Atlassian adapter
+reports “Jira” (disconnected without a qualifying connector, approval while consent is
+pending, connected on each delivered watch with the cache time, error with `busy` while
+a retry is scheduled); the demo player reports “Demo”.
 Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
 Entries for stories without a carrier are accepted too. Set their `epic` to the

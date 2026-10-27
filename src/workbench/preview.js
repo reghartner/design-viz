@@ -142,7 +142,8 @@ function workbenchDemoStatus(page){
     Object.keys(diagram.nodes || {}).forEach(function(id){collect(diagram.nodes[id]);});
     (diagram.edges || []).forEach(collect);
   });
-  keys.sort().forEach(function(key,index){map[key]={state:states[index%states.length]};});
+  var epic=typeof trackingEpics==='function'?trackingEpics(page)[0]:null;
+  keys.sort().forEach(function(key,index){map[key]={state:states[index%states.length]};if(epic)map[key].epic=epic;});
   return map;
 }
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){

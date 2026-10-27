@@ -24,17 +24,19 @@ The usual request is "give me an Epic Status board for DOOR-100". The agent
 then: reads the epic's child stories from Jira (through the author's
 connector, or asks the author to paste the list when no connector is available
 to the agent), proposes which story delivers which node or edge, settles the
-open facts below in one batch, writes the spec, builds and publishes the
-artifact, and republishes it after every later change. Stories the agent cannot
-place stay off the diagram on purpose; once the epic-linked rollup (#754) is
+open facts below in one batch, writes the spec, and asks the author to
+authorize publishing. With that authorization it builds and publishes the
+artifact and republishes it after every later accepted change; without it, it
+delivers the spec and the built HTML only. Stories the agent cannot place stay
+off the diagram on purpose; once the epic-linked rollup (#754) is
 in, the Tickets table lists them with the note NOT ON DIAGRAM so the author
 can decide later. Until then, list them for the author in chat.
 
 Where the author sees real colors: only in the published artifact. The
 Workbench never calls Jira; its **Demo live status** shows sample colors so
-the layout can be checked. So after each spec change the agent rebuilds and
-republishes to the same artifact URL (section 4), then tells the author to
-reload. A publish that creates a new artifact loses the old one's comments.
+the layout can be checked. So, once publishing is authorized, after each spec
+change the agent rebuilds and republishes to the same artifact URL (section
+4), then tells the author to reload. A publish that creates a new artifact loses the old one's comments.
 
 ## 1. Settle the tracking facts before writing JSON
 
@@ -140,7 +142,8 @@ Republishing: pass the artifact's existing URL as `url` on the publish call,
 after reading that artifact with the Artifact tool's read action in the
 current conversation; a publish without `url` creates a new artifact with a
 new link and none of the old comments. Do this after every accepted spec
-change; the author is working in the Workbench and sees no live state there.
+change the author has authorized publishing for; the author is working in
+the Workbench and sees no live state there.
 
 ## 5. Verify after publishing
 

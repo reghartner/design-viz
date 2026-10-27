@@ -69,12 +69,12 @@ test('V5 all skins keep live card, edge, coin and chip paint above tones and aut
    await expect(nav.locator('.reader-theme-menu > summary')).toHaveAttribute('data-current-skin',skin);
   }
   await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));
-  await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke','rgb(245, 158, 11)');await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke','rgb(239, 68, 68)');await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill','rgb(239, 68, 68)');await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color','rgb(239, 68, 68)');
+  await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'ember'));await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
  }
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');
  await page.emulateMedia({reducedMotion:'reduce'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');
  await expect.poll(()=>section.locator('[data-dv-node="ux"]').evaluate(el=>+getComputedStyle(el).opacity)).toBeGreaterThanOrEqual(.55);
- await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke','rgb(245, 158, 11)');
+ await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'ember'));
 });
 test('V7 V11 authored reference menus work without provider paint',async({page,server})=>{
  const root=await open(page,server,fixture(),false);await expect(root.locator('.dv-live-badge')).toHaveCount(0);await expect(root.locator('.dv-live-toggle')).toBeHidden();
@@ -113,8 +113,8 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  await expect(edge).toHaveClass(/dv-live-blocked/);const failure=root.locator('g.comm-failure[data-dv-edge="0"]');await expect(failure).toHaveCount(1);await expect(failure).toHaveAttribute('aria-label',/Not sent:.*HW-124/);await expect(failure.locator('text')).toHaveCount(0);
  await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-124');await expect(node('button')).not.toHaveClass(/dv-live-waiting/);
  await expect(node('mcu').locator('.dv-live-waiting-tag')).toHaveCount(0);await node('mcu').locator('.card').press('Enter');await expect(root.locator('.dv-live-popover')).toContainText('waiting on HW-124');await page.keyboard.press('Escape');
- for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke','rgb(168, 119, 119)');await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');}
- await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke','rgb(168, 119, 119)');await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
+ for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');}
+ await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
  await root.locator('.schip[data-step-source="0"]').first().click();await expect(failure).toHaveCount(1);await expect(failure).toBeVisible();
  for(let day=5;day<=12;day++){
   await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');

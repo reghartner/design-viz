@@ -161,7 +161,6 @@
 .dv-live-completion circle{fill:none;stroke-width:4;}
 .dv-live-ring-track{stroke:var(--dv-live-todo);opacity:.3;}
 .dv-live-ring-done{stroke:var(--dv-live-done);}
-.dv-live-verdict{font-weight:700;}
 .dv-live-blockers,.dv-live-activity{list-style:none;padding:0;margin:0;}
 .dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}

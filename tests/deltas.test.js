@@ -53,6 +53,7 @@ test('nodes, edges and steps report malformed details while retaining backward-c
 const fs = require('node:fs');
 const path = require('node:path');
 const trackingDiagram = refs => ({nodes:{a:{...refs},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',...refs}]});
+const missingStatusPanel = 'page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup';
 
 test('trackingRefs keeps valid Jira keys and HTTP(S) URLs in order, deduplicates and preserves source', () => {
   assert.equal(typeof C.trackingRefs, 'function');
@@ -78,12 +79,12 @@ test('tracking warnings identify every bad node and edge entry and retain valid 
     const before = JSON.stringify(raw), page = C.normalize(raw), result = C.validate(page);
     const dp = nested ? 'blocks[0].tabs[0].sections[0].diagram' : 'sections[0].diagram';
     assert.deepEqual(plain(result.errors), []);
-    assert.deepEqual(plain(result.warnings), ['nodes.a','edges[0]'].flatMap(target => [
+    assert.deepEqual(plain(result.warnings), [missingStatusPanel, ...['nodes.a','edges[0]'].flatMap(target => [
       `${dp}.${target}.tickets[1]: use a Jira key like HW-123 — entry ignored`,
       `${dp}.${target}.tickets[2]: use a Jira key like HW-123 — entry ignored`,
       `${dp}.${target}.prs[1]: must be an absolute http(s) URL — entry ignored`,
       `${dp}.${target}.prs[2]: must be an absolute http(s) URL — entry ignored`
-    ]));
+    ])]);
     const normalized = nested ? page.blocks[0].tabs[0].sections[0].diagram : page.sections[0].diagram;
     for (const target of [normalized.nodes.a,normalized.edges[0]])
       assert.deepEqual(plain(C.trackingRefs(target)), {tickets:['HW-123','FW-45'],prs:['https://example.test/pull/88']});
@@ -101,17 +102,17 @@ test('non-array tracking fields warn once per node and edge field, including exp
     ]));
   }
   for (const refs of [{},{tickets:[],prs:[]},{tickets:['HW-123','HW-123'],prs:['http://example.test']}])
-    assert.deepEqual(plain(C.validate(C.normalize(trackingDiagram(refs)))), {errors:[],warnings:[]});
+    assert.deepEqual(plain(C.validate(C.normalize(trackingDiagram(refs)))), {errors:[],warnings:refs.tickets?.length ? [missingStatusPanel] : []});
 });
 
 test('page tracking and Jira site validation are advisory with exact paths', () => {
   const check = tracking => C.validate(C.normalize({page:{tracking,sections:[{diagram:trackingDiagram({})}]}}));
   for (const value of [null,false,42,'https://example.test',[]])
-    assert.deepEqual(plain(check(value)), {errors:[],warnings:['tracking: must be an object — ignored']});
+    assert.deepEqual(plain(check(value)), {errors:[],warnings:['tracking: must be an object — ignored',missingStatusPanel]});
   for (const value of [null,false,42,{},[],'/jira','javascript:alert(1)','https://'])
-    assert.deepEqual(plain(check({jira:{site:value}})), {errors:[],warnings:['tracking.jira.site: must be an absolute http(s) URL — ignored']});
+    assert.deepEqual(plain(check({jira:{site:value}})), {errors:[],warnings:['tracking.jira.site: must be an absolute http(s) URL — ignored',missingStatusPanel]});
   for (const value of [{},{jira:{}},{jira:{site:'https://acme.atlassian.net'}},{jira:{site:'http://jira.example.test'}}])
-    assert.deepEqual(plain(check(value)), {errors:[],warnings:[]});
+    assert.deepEqual(plain(check(value)), {errors:[],warnings:[missingStatusPanel]});
 });
 
 test('live-status example covers node and edge references without validation or lint warnings', () => {

@@ -110,10 +110,51 @@ use the page tracking site, falling back to the provider URL. Authored PR URLs
 remain plain links. The node links menu includes authored tickets and PRs even
 without a provider. Pulses stop for reduced motion and print; print retains colors.
 
-The reader Live control shows counts of distinct referenced tickets and the newest
-provider timestamp. With no provider or applied map, it stays hidden. Pages with
-neither ticket references nor a configured epic get no Live control markup. Path, View, Tab and detail navigation
-reapply the current map to rebuilt elements.
+Path, View, Tab and detail navigation reapply the current map to rebuilt elements.
+
+## Live status panel
+
+Always add an authored `live-status` panel to a tracked page:
+`{"id":"status","type":"live-status","title":"Epic status"}` in a section's
+`diagram.panels`. Use `sectionLayout` to place it full width below the diagram
+and step controls, as in the example. It appears immediately, with no menu click.
+The generic desktop Workbench picker lists **Delivery → Live status**; insertion
+and Export project preserve the panel. There are no authored state or patch fields.
+
+The panel header holds **Live**, distinct-ticket counts, the updated time,
+provider note and action, **First blocker**, and demo **Play/Pause** and **Next day**
+when demo controls are supplied. The engine's panel title stays above this header.
+The body shows completion and verdict, Teams, Blockers, Tickets, then Activity.
+Without ticket references or epics it says “This page has no ticket references.”
+Before a provider or applied map is available, it shows the connector note and any
+required authorization action without an empty rollup. Print preserves the last
+paint, and reduced motion disables ring animation.
+
+Validation warns when tracking or carrier tickets exist without a `live-status`
+panel: `page.tracking: no live-status panel declared — add {"type": "live-status"}
+to a section's panels so viewers see the rollup`. A panel on an untracked page
+warns “this page has no ticket references — the panel will be empty”. These are
+warnings, never errors. Strongly prefer adding the panel on every tracked page.
+
+### Tickets table
+
+Below Blockers, the Tickets table lists each distinct carrier ticket and every returned child of a linked
+epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
+Key, Title, State, Owner with relative update time (or “time unavailable”), PRs,
+and Coverage. The key uses the configured Jira site, and a colored stripe marks
+its team lane when known.
+
+PR links come only from authored carrier `prs`; Jira's Development summary adds
+informational open, merged or declined counts without inventing URLs. Coverage
+buttons name the story's carriers, open their containing section or detail when
+needed, and focus their live badges through the existing detail navigation. If
+no authored route is available, the button is disabled with a title naming the
+detail page. Stories without
+carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
+a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
+stories on diagram”. A child first received after the initial map adds
+“KEY · added to epic · not on diagram” to Activity using the existing time rules.
+The table scrolls for narrow read-only viewing and print retains the panel content.
 
 ## Host provider API
 
@@ -156,9 +197,11 @@ observers and listeners. The host owns transport. Standalone claude.ai artifacts
 can also use the Atlassian adapter described below.
 
 `ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
-null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
+null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
-clear, enable changes, and loaded details that change the collected references.
+clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
+`snapshot()` also exposes enabled state, note, action label, lanes, blockers,
+Tickets rows, coverage, activity, demo state and verdict for subscribed panels.
 Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
 Entries for stories without a carrier are accepted too. Set their `epic` to the
@@ -205,7 +248,7 @@ including `file://`, without fetching or changing the spec. A host provider take
 precedence. An explicitly requested demo also takes precedence over the automatic
 claude.ai connector. Without the hash, no demo starts.
 
-The Live control shows the current day and offers **Pause/Play** and **Next day**.
+The Live status panel header shows the current day and offers **Pause/Play** and **Next day**.
 Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
 on the final day. Reduced motion uses manual advancement only. Hidden pages pause
 the timer. Requested ticket keys absent from a day become `missing`; linked PRs
@@ -291,34 +334,14 @@ The mock can be installed as a custom connector under any name except
 **Atlassian MCP** to try the artifact without an Atlassian account; declare
 that name when publishing. No GitHub connector is used.
 
-### Tickets table
-
-Open **details** in the Live control. Between Teams and Blockers, the Tickets
-table lists each distinct carrier ticket and every returned child of a linked
-epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
-Key, Title, State, Owner with relative update time (or “time unavailable”), PRs,
-and Coverage. The key uses the configured Jira site, and a colored stripe marks
-its team lane when known.
-
-PR links come only from authored carrier `prs`; Jira's Development summary adds
-informational open, merged or declined counts without inventing URLs. Coverage
-buttons name the story's carriers, open their containing section or detail when
-needed, and focus their live badges. If a section has no drill-down route, the
-button opens a read-only preview of that section using the evidence already
-loaded. Close or Escape dismisses the preview and returns focus to **details**.
-This also works for other sections in an approved, loaded detail page, without
-another fetch or any change to the authored diagram. Stories without
-carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
-a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
-stories on diagram”. A child first received after the initial map adds
-“KEY · added to epic · not on diagram” to Activity using the existing time rules.
-The table scrolls for narrow read-only viewing and the panel stays hidden in print.
+Verify after publishing: the Live status panel below the diagram shows completion,
+Teams, Blockers, Tickets and Activity, and its header shows counts and updated time.
 
 ## Story mode
 
 Live evidence follows the story's nodes and edges. Team lane pills show **n/N done**, the worst ticket state, and a hover/focus title listing each ticket and
 state. Tickets are deduplicated across every step in that lane, including edge
-endpoints and failed communications. The Live details panel repeats these lanes.
+endpoints and failed communications. The Live status panel repeats these lanes.
 
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
 **IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps
@@ -335,13 +358,12 @@ automatic playback (including its initial beat), never manual navigation.
 the current path, enters Step mode and focuses its badge; it hides when none exist.
 
 Changed ticket states produce one carrier pulse (none with reduced motion).
-**details** opens the Live panel with a completion ring, team progress, blocker
+The Live status panel below the diagram shows a completion ring, team progress, blocker
 links, affected lanes and downstream carrier/step counts, and **Activity**.
 Activity records the latest 20 transitions, newest received first; the initial
 map and identical states add nothing. Times use the ticket's `updatedAt`, then
 the map's `storedAt`. If neither exists, the entry says “time unavailable”; cached
-evidence never acquires an invented current timestamp. Escape closes details
-and returns focus to its button. The panel is hidden in print.
+evidence never acquires an invented current timestamp. The panel remains visible in print.
 
 The completion ring counts done carriers against all tracked carriers. A carrier
 is done only when all its tickets are done. **Ready to demo** requires every
@@ -356,4 +378,4 @@ Set `tracking.staleDays` to a positive number (default **7**) to mark active wor
 whose `updatedAt` is strictly older than that many days. A grey dashed badge ring
 and “no activity N d” in its popover supplement the unchanged rollup color.
 Missing/invalid timestamps are never stale; invalid thresholds warn and use 7.
-All story features work with `#live=demo`; pages without tickets gain no controls.
+All story features work with `#live=demo`; pages without tickets or epics show the empty-page message.

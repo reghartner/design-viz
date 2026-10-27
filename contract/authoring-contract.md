@@ -644,6 +644,10 @@ and are ignored; a non-array value produces one warning and is ignored. Valid
 references are retained, with duplicates removed in their original order when
 read. Authored PR references are plain links and never carry live state.
 
+Always add a `live-status` panel to a tracked page, placing it below the diagram
+with `sectionLayout`; its header owns Live and demo controls and its body shows
+Teams, Blockers, Tickets and Activity. It has no authored initial or step state.
+
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
 configures the Jira site and optional epic:
 `"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.
@@ -951,6 +955,20 @@ Compatibility metadata advertises `flow.panel-visibility`.
 a column beside the board and driven by the same steps (the "different
 perspectives" of one timeline). Types:
 
+- `live-status` — runtime ticket progress for a tracked page:
+  `{"id":"status","type":"live-status","title":"Epic status"}`.
+  Always add it when the page has tracking or carrier tickets, and use
+  `sectionLayout` to place it full width below the diagram and step controls.
+  The header owns Live, counts, updated time, provider messages and actions,
+  First blocker, and demo Play/Pause and Next day when supplied by the host.
+  The body shows completion, verdict, Teams, Blockers, Tickets and Activity.
+  It has no authored state: `initial` and all step patches warn and are ignored;
+  step `panelVisibility` still works. No setup or patch fields are needed.
+  Without ticket references or epics it reads “This page has no ticket references.”
+  Validation warns when a tracked page omits this panel or an untracked page
+  declares it. Status stays in the runtime provider, never the exported spec.
+  See [Live status panel](../docs/live-status.md#live-status-panel) for provider,
+  coverage navigation and demo behavior.
 - `appscreens` — a collection of exported app screens selected by story steps.
   Declare up to 32 `screens`, each with a unique nonempty `id`, `label`, `alt`,
   embedded PNG/JPEG/WebP `src` (512 KiB decoded maximum), optional `caption`

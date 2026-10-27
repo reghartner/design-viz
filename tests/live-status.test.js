@@ -23,13 +23,13 @@ class Element {
  }
  get className(){return this.attrs.class||'';}set className(v){this.attrs.class=v;}
  setAttribute(k,v){this.attrs[k]=String(v);}getAttribute(k){return this.attrs[k]??null;}removeAttribute(k){delete this.attrs[k];}
- appendChild(el){el.parentNode=el.parentElement=this;this.children.push(el);return el;}
- insertBefore(el,before){el.parentNode=el.parentElement=this;const i=this.children.indexOf(before);this.children.splice(i<0?this.children.length:i,0,el);return el;}
+ appendChild(el){if(el.parentNode)el.parentNode.children=el.parentNode.children.filter(c=>c!==el);el.parentNode=el.parentElement=this;el.ownerDocument=this.ownerDocument;this.children.push(el);return el;}
+ insertBefore(el,before){if(el===before)return el;if(el.parentNode)el.parentNode.children=el.parentNode.children.filter(c=>c!==el);el.parentNode=el.parentElement=this;const i=this.children.indexOf(before);this.children.splice(i<0?this.children.length:i,0,el);return el;}
  remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(c=>c!==this);this.isConnected=false;}
  replaceChildren(...els){this.children=[];els.forEach(el=>this.appendChild(el));}
  cloneNode(){return new Element(this.tagName,this.attrs);}
  matches(selector){return selector.split(',').some(s=>{s=s.trim();if(s.includes(' '))s=s.split(' ').pop();let excluded=false;s=s.replace(/:not\(([^)]+)\)/g,(_,q)=>{excluded=this.matches(q);return '';});if(excluded)return false;
-  const tag=s.match(/^[a-z]+/);if(tag&&tag[0]!==this.tagName)return false;
+  const tag=s.match(/^[a-z][a-z0-9]*/);if(tag&&tag[0]!==this.tagName)return false;
   for(const [,c] of s.matchAll(/\.([\w-]+)/g))if(!this.classList.contains(c))return false;
   for(const [,k,v] of s.matchAll(/\[([\w-]+)(?:="([^"\]]*)")?\]/g))if(this.getAttribute(k)===null || v!==undefined&&this.getAttribute(k)!==v)return false;return true;});}
  querySelectorAll(s){return this.children.flatMap(c=>[...(c.matches(s)?[c]:[]),...c.querySelectorAll(s)]);}querySelector(s){return this.querySelectorAll(s)[0]||null;}
@@ -98,12 +98,12 @@ test('V9 rebuild events and one scoped observer coalesce, then retire on destroy
 });
 test('V10 provider starts after paint, clamps cadence, pauses, catches up, retains errors and aborts',async()=>{
  let calls=0,signal,fail=false;const h=harness(fixture(),{provider:(refs,s)=>{calls++;signal=s;assert.ok(refs.tickets.includes('AA-1'));return fail?Promise.reject(Error('Unavailable')):Promise.resolve(fixed);},refreshMs:1});
- h.ctl.liveStatus.mountControls(h.view);const note=h.view.querySelector('.dv-live-note');assert.equal(note.hidden,true);
+ mountStatus(h);const note=h.view.querySelector('.dv-live-note');assert.equal(note.hidden,true);
  assert.equal(calls,0);h.flush();h.flush();await new Promise(setImmediate);assert.equal(calls,1);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal([...h.timers.values()][0].ms,30000);
  h.doc.hidden=true;h.doc.visibilityState='hidden';h.doc.dispatchEvent({type:'visibilitychange'});assert.equal(h.timers.size,0);
  h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await new Promise(setImmediate);assert.equal(calls,2);
  fail=true;const tick=[...h.timers.values()][0];h.timers.clear();tick.fn();await new Promise(setImmediate);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');
- assert.equal(note.textContent,'Unavailable');assert.equal(note.getAttribute('data-kind'),'error');assert.equal(note.hidden,false);assert.equal(h.view.querySelector('.dv-live-control').hidden,false);
+ assert.equal(note.textContent,'Unavailable');assert.equal(note.getAttribute('data-kind'),'error');assert.equal(note.hidden,false);assert.equal(h.view.querySelector('.dv-live-head').hidden,false);
  fail=false;const retry=[...h.timers.values()][0];h.timers.clear();retry.fn();await new Promise(setImmediate);assert.equal(note.textContent,'');assert.equal(note.hidden,true);assert.equal(note.getAttribute('data-kind'),'info');
  h.ctl.liveStatus.destroy();assert.equal(signal.aborted,true);assert.equal(h.timers.size,0);
 });
@@ -145,35 +145,35 @@ test('live status initializes, applies changes and disposes without a window glo
 });
 
 test('V8 notes and host actions update, replace and clear the reader controls',()=>{
- const h=harness(fixture()),api=h.ctl.liveStatus,mount=api.mountControls(h.view),root=h.view.querySelector('.dv-live-control'),note=root.querySelector('.dv-live-note'),action=root.querySelector('.dv-live-action');
+ const h=harness(fixture()),api=h.ctl.liveStatus,mount=mountStatus(h),root=h.view.querySelector('.dv-live-head'),note=root.querySelector('.dv-live-note'),action=root.querySelector('.dv-live-action');
  assert.equal(root.hidden,true);assert.equal(note.hidden,true);assert.equal(action.hidden,true);assert.equal(root.querySelector('time'),null);
  for(const kind of ['info','warn','error']){api.note('Provider '+kind,kind);assert.equal(root.hidden,false);assert.equal(note.hidden,false);assert.equal(note.textContent,'Provider '+kind);assert.equal(note.getAttribute('data-kind'),kind);}
  api.note('Fallback','unknown');assert.equal(note.getAttribute('data-kind'),'info');api.note('','info');assert.equal(note.hidden,true);assert.equal(root.hidden,true);
  let first=0,second=0;api.action('Allow',()=>first++);assert.equal(root.hidden,false);assert.equal(action.hidden,false);assert.equal(action.textContent,'Allow');action.dispatchEvent({type:'click'});assert.equal(first,1);
  api.action('Retry',()=>second++);assert.equal(root.querySelectorAll('.dv-live-action').length,1);assert.equal(action.textContent,'Retry');action.dispatchEvent({type:'click'});assert.equal(second,1);assert.equal(first,1);
  api.action('',()=>first++);assert.equal(action.hidden,true);assert.equal(root.hidden,true);action.dispatchEvent({type:'click'});assert.equal(first,1);
- mount.destroy();api.note('Detached','warn');api.action('Allow',()=>first++);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);api.destroy();
+ mount.destroy();api.note('Detached','warn');api.action('Allow',()=>first++);assert.equal(h.view.querySelectorAll('.dv-live-head').length,0);api.destroy();
 });
 
 test('V8 V9 V11 external detail refs create a deferred control and retired mounts stay absent',async()=>{
  let resolve;const loadDetail=()=>new Promise(r=>resolve=r),renderOptions={loadDetail},h=harness(undefined,{},renderOptions),api=h.ctl.liveStatus;
  const removed=h.view.appendChild(new Element('nav')),host=h.view.appendChild(new Element('nav'));
- const retiredMount=api.mountControls(removed),mount=api.mountControls(host);
- assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);assert.ok(retiredMount && mount,'empty refs still register disposable reader mounts');retiredMount.destroy();
- api.apply({'DD-1':{state:'done',updatedAt:'2026-10-26T12:00:00Z'}});api.note('Detail loaded','info');assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);
+ const retiredMount=mountStatus(h,removed),mount=mountStatus(h,host);
+ assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);assert.ok(retiredMount && mount,'empty refs still register disposable panel mounts');retiredMount.destroy();
+ api.apply({'DD-1':{state:'done',updatedAt:'2026-10-26T12:00:00Z'}});api.note('Detail loaded','info');assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);
  const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),['DD-1']);assert.equal(removed.children.length,0);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
- const root=host.querySelector('.dv-live-control'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time').getAttribute('datetime'),'2026-10-26T12:00:00Z');
+ const root=host.querySelector('.dv-live-head'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time').getAttribute('datetime'),'2026-10-26T12:00:00Z');
  toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);assert.equal(toggle.getAttribute('aria-pressed'),'false');
  h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
  mount.destroy();api.apply({});h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(host.children.length,0);
- const replacement=api.mountControls(host);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);api.destroy();replacement.destroy();assert.equal(host.children.length,0);assert.equal(renderOptions.loadDetail,loadDetail);
+ const replacement=mountStatus(h,host);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);api.destroy();replacement.destroy();assert.equal(host.children.length,0);assert.equal(renderOptions.loadDetail,loadDetail);
 });
 
 test('V9 a late detail load cannot create controls after overlay destruction',async()=>{
  let resolve;const renderOptions={loadDetail:()=>new Promise(r=>resolve=r)},h=harness(undefined,{},renderOptions),api=h.ctl.liveStatus;
- api.mountControls(h.view);const pending=renderOptions.loadDetail({spec:'late-detail'},new AbortController().signal);api.destroy();resolve({nodes:{child:{tickets:['DD-1']}}});await pending;h.flush();
- assert.deepEqual(plain(api.refs().tickets),[]);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);assert.equal(h.frames.size,0);
+ mountStatus(h);const pending=renderOptions.loadDetail({spec:'late-detail'},new AbortController().signal);api.destroy();resolve({nodes:{child:{tickets:['DD-1']}}});await pending;h.flush();
+ assert.deepEqual(plain(api.refs().tickets),[]);assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);assert.equal(h.frames.size,0);
 });
 
 /* Story contract matrix (paired with browser cases below):
@@ -252,7 +252,7 @@ const jira=(key,category='indeterminate',name='In Progress')=>({key,fields:{summ
 const settle=()=>new Promise(setImmediate);
 function providerHarness(raw=fixture(),renderOptions={}){
  const h=harness(raw,{},renderOptions);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
- h.ctl.liveStatus.mountControls(h.view);
+ mountStatus(h);
  const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]}];
  const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
   watchTool:(server,tool,input,handler,opts)=>{const watch={server,tool,input:plain(input),handler,opts:plain(opts),stopped:0};watches.push(watch);return ()=>watch.stopped++;}};
@@ -291,7 +291,7 @@ test('P1 P9 provider is standalone only and inert without runtime, refs, namespa
  assert.match(fs.readFileSync('src/boot.flowview.js','utf8'),/wireArtifactComments\(ctl, view, window\);\s*(?:if[^\n]+)?wireLiveStatusClaude\(ctl, page, window\)/);
  const h=providerHarness(),wire=h.C.wireLiveStatusClaude;delete h.win.claude;assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
  Object.defineProperty(h.win,'claude',{configurable:true,get(){throw Error('unavailable');}});assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
- Object.defineProperty(h.win,'claude',{configurable:true,value:{use:()=>Promise.resolve(null)},writable:true});assert.equal(await h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.view.querySelector('.dv-live-control').hidden,true);
+ Object.defineProperty(h.win,'claude',{configurable:true,value:{use:()=>Promise.resolve(null)},writable:true});assert.equal(await h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.view.querySelector('.dv-live-head').hidden,true);
  h.win.claude={use(){throw Error('should not be called');}};h.win.flowviewLiveStatus={};assert.equal(h.start(),null);delete h.win.flowviewLiveStatus;
  assert.equal(wire({},h.ctl.page,h.win),null);const empty=providerHarness({nodes:{a:{}}});empty.win.claude=h.win.claude;assert.equal(empty.start(),null);
 });
@@ -336,7 +336,7 @@ test('P7 destruction before namespace or resource resolution abandons late work'
  for(const stage of ['namespace','resources']){
   const h=providerHarness();let resolve;
   if(stage==='namespace')h.win.claude.use=()=>new Promise(r=>resolve=r);else h.mcp.callTool=()=>new Promise(r=>resolve=r);
-  const pending=h.start();await settle();h.ctl.liveStatus.destroy();resolve(stage==='namespace'?h.mcp:{payload:[{id:'cloud',url:'https://jira.test'}]});await pending;assert.equal(h.watches.length,0);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);
+  const pending=h.start();await settle();h.ctl.liveStatus.destroy();resolve(stage==='namespace'?h.mcp:{payload:[{id:'cloud',url:'https://jira.test'}]});await pending;assert.equal(h.watches.length,0);assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);
  }
 });
 test('P8 publishing docs and skill declare the connector by its display name and comments',()=>{
@@ -357,7 +357,7 @@ test('P6 P7 resource-call failures follow the same policy; toggles and late sear
 
 test('P5 cache timestamps take precedence, validate, and reset without changing issue evidence',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus,events=[];
- api.mountControls(h.view);api.onChange(value=>events.push(plain(value)));
+ mountStatus(h);api.onChange(value=>events.push(plain(value)));
  const issueTime='2026-10-26T12:00:00Z',entry={state:'active',updatedAt:issueTime};
  const applyCache=storedAt=>{const map={'AA-1':entry};Object.defineProperty(map,'storedAt',{value:storedAt});api.apply(map);};
  // Even an older cache timestamp, or epoch zero, describes lookup freshness.
@@ -411,8 +411,8 @@ test('B6 stale is strictly older than threshold, active only, and needs a timest
  assert.equal(C.liveStatusStale({...entry,updatedAt:'invalid'},now,7),false);
 });
 test('B5 first apply logs nothing; changed states pulse once and activity preserves evidence time and caps at 20',()=>{
- const h=harness(fixture()),api=h.ctl.liveStatus;api.mountControls(h.view);api.apply({'AA-1':{state:'todo'}});
- const details=h.view.querySelector('.dv-live-details');assert.ok(details,'B7 details action');details.dispatchEvent({type:'click'});
+ const h=harness(fixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'todo'}});
+ assert.ok(h.view.querySelector('.dv-live-panel-body'),'B7 authored panel body');
  assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);
  const storedAt=Date.parse('2020-01-01T00:00:00Z');api.apply({'AA-1':{state:'active'},storedAt});
  let rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,1);assert.match(rows[0].textContent,/AA-1 · todo → active · \d+d ago/);assert.equal(rows[0].getAttribute('data-updated-at'),new Date(storedAt).toISOString());
@@ -472,11 +472,11 @@ async function externalStoryHarness(rootLanes){
 test('B1 external detail lanes render progress state and titles when the root has no lanes',async()=>{
  for(const lanes of [undefined,{TEAM:{label:'Root team'}}]){
   const h=await externalStoryHarness(lanes),api=h.ctl.liveStatus;
-  api.mountControls(h.view);api.apply({'RR-1':{state:'done'},'DD-1':{state:'blocked'},'DD-2':{state:'done'},'DD-3':{state:'active'}});
+  mountStatus(h);api.apply({'RR-1':{state:'done'},'DD-1':{state:'blocked'},'DD-2':{state:'done'},'DD-3':{state:'active'}});
   const pill=h.childRec.sectionEl.querySelector('.lanepill');
   assert.equal(pill.textContent,'Detail team · 1/3 done');assert.ok(pill.classList.contains('dv-live-blocked'));
   assert.equal(pill.getAttribute('title'),'DD-3 · active\nDD-1 · blocked\nDD-2 · done');assert.equal(pill.getAttribute('tabindex'),'0');
-  h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+  assert.ok(h.view.querySelector('.dv-live-panel-body'));
   const rows=h.view.querySelectorAll('.dv-live-lane');assert.equal(rows.length,lanes?2:1);
   const row=rows.find(el=>el.textContent.startsWith('Detail team'));assert.equal(row.textContent,pill.textContent);assert.equal(row.getAttribute('title'),pill.getAttribute('title'));assert.ok(row.classList.contains('dv-live-blocked'));
   assert.equal(h.view.querySelector('.dv-live-blocker-lanes').textContent,'Detail team');
@@ -542,9 +542,9 @@ test('E4 demo includes extra keys and epic metadata while missing requested keys
  assert.deepEqual(map['EX-1'],{state:'active',epic:'EP-1',lane:'APP'});assert.equal(map['AA-1'].epic,'EP-1');assert.deepEqual(map['MISS-1'],{state:'missing'});
 });
 test('E6 Tickets table orders states includes columns authored PRs lane stripe and coverage focus',()=>{
- const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
  api.apply({'AA-1':{state:'done',epic:'EP-1',title:'Client work',assignee:'Alex',prs:{count:2,state:'declined'}},'BB-1':{state:'todo'},'CC-1':{state:'active',epic:'EP-1'},'DD-1':{state:'missing',epic:'EP-1'},'EE-1':{state:'blocked',epic:'EP-1'},'FF-1':{state:'blocked',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',title:'Extra',lane:'APP'},'NO-1':{state:'blocked',epic:'OTHER-1'}});
- h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
+ assert.ok(h.view.querySelector('.dv-live-panel-body'));const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
  assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','PRs','Coverage']);
  const rows=table.querySelectorAll('tbody')[0].children;assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['EE-1','FF-1','DD-1','CC-1','EX-1','BB-1','AA-1']);
  const aa=rows.at(-1),extra=rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex.*time unavailable/);assert.match(textOf(aa),/2 declined/);
@@ -555,7 +555,7 @@ test('E6 Tickets table orders states includes columns authored PRs lane stripe a
  assert.match(h.view.querySelector('.dv-live-verdict').textContent,/5 of 6 epic stories on diagram/);api.destroy();
 });
 test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
- const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);api.apply({'AA-1':{state:'done',epic:'EP-1'}});h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'done',epic:'EP-1'}});assert.ok(h.view.querySelector('.dv-live-panel-body'));
  const map={'AA-1':{state:'done',epic:'EP-1'},'EX-1':{state:'todo',epic:'EP-1'}};api.apply(map);
  let rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,1);assert.equal(rows[0].textContent,'EX-1 · added to epic · not on diagram · time unavailable');api.apply(map);assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,1);
  for(let i=2;i<24;i++){map['EX-'+i]={state:'todo',epic:'EP-1',updatedAt:'2026-10-20T00:00:00Z'};api.apply(map);}
@@ -567,8 +567,8 @@ test('E9 E11 docs and built example declare epic and Tickets table',()=>{
 });
 
 test('E7 a previously seen child returning after absence is not a new epic addition',()=>{
- const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);
- api.apply({'EX-1':{state:'todo',epic:'EP-1'}});h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
+ api.apply({'EX-1':{state:'todo',epic:'EP-1'}});assert.ok(h.view.querySelector('.dv-live-panel-body'));
  api.apply({});api.apply({'EX-1':{state:'todo',epic:'EP-1'}});assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);api.destroy();
 });
 test('E3 failed and superseded pagination cannot replace complete carrier or epic evidence',async()=>{
@@ -585,7 +585,7 @@ test('E3 failed and superseded pagination cannot replace complete carrier or epi
 test('E3 an epic without carrier tickets still starts its two watches and exposes details',async()=>{
  const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
  assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment']);
- h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-control').hidden,false);h.ctl.liveStatus.destroy();
+ h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-head').hidden,false);h.ctl.liveStatus.destroy();
 });
 
 /* Round 2 regressions: preserve the frozen E1–E11 RED rows above. */
@@ -649,9 +649,9 @@ test('E6 rework coverage opens inactive local and loaded external detail carrier
   }};
   if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
   const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
-  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+  mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
   for(let i=0;i<2;i++){
-   h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+   assert.ok(h.view.querySelector('.dv-live-panel-body'));
    const button=h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button');assert.equal(button.textContent,'Child carrier');button.dispatchEvent({type:'click'});await settle();h.flush();
    assert.equal(restores.length,i+1);assert.deepEqual(restores[i],{section:'root',frames:[{node:'parent',state:{mode:'ambient'}}]});
    assert.ok(childRec.sectionEl.contains(h.doc.activeElement),'focus is in the active detail, not its hidden original');assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
@@ -670,89 +670,91 @@ test('E3 rework an initially untracked page defers discovery until a detail intr
  h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });
 
-/* Round 3: collected carriers can live outside the authored drill-down graph. */
-test('E6 round 3 unlinked local and unrelated loaded sections preview node and edge badges with cleanup',async()=>{
+/* L3 supersedes disposable previews: keep unlinked local/remote node and edge coverage. */
+test('E6 unlinked local and loaded remote sections disable coverage without creating previews',async()=>{
  for(const external of [false,true])for(const detailOnly of [false,true]){
   if(!external && !detailOnly)continue;
   const section={id:'unlinked',detailOnly,heading:'Unlinked work',diagram:{nodes:{child:{title:'Unlinked child',tickets:['CH-1']},end:{}},rows:[['child','end']],edges:[{from:'child',to:'end',label:'Unlinked edge',tickets:['CH-2']}]}};
-  const remote={page:{tracking:{jira:{site:'https://detail.test',epic:'EP-2'}},sections:[{id:'entry',diagram:{nodes:{entry:{}},rows:[['entry']]}},section]}};
-  const ref={spec:'approved-detail',section:'entry'},raw={page:{tracking:{jira:{epic:'EP-1'}},sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],...(external?{detail:ref}:{})}},rows:[['parent']]}},...(!external?[section]:[])]}};
+  const remote={page:{sections:[{id:'entry',diagram:{nodes:{entry:{}},rows:[['entry']]}},section]}};
+  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],...(external?{detail:{spec:'approved',section:'entry'}}:{})}},rows:[['parent']]}},...(!external?[section]:[])]}};
   let loads=0;const renderOptions={loadDetail:async()=>{loads++;return remote;}},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus;
-  if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
-  else h.ctl.sections[1].sectionEl.hidden=true;
+  if(external)await renderOptions.loadDetail({spec:'approved',section:'entry'},new AbortController().signal);else h.ctl.sections[1].sectionEl.hidden=true;
   h.ctl.details={snapshot:()=>null,activeSections:()=>[],restore(){assert.fail('no authored route exists');}};
-  const before=JSON.stringify([h.ctl.page,remote]),built=[],disposals=[];
-  // Stub only the section renderer. Navigation, binding, paint, focus, map
-  // updates and teardown run through the real overlay; browser rows render SVG.
-  h.C.buildSection=(host,source,index,reference,protocols,skin,lanes,backlinks,changed,proseChanged,options)=>{
-   const child=harness({page:{sections:[plain(source)]}});child.ctl.liveStatus.destroy();
-   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);
-   rec.stepper={mode:()=> 'ambient',sourceIndex:()=>0,path:()=> 'default',enterAmbient(){},destroy:()=>disposals.push('stepper')};
-   rec.boardSize={destroy:()=>disposals.push('size')};rec.presentation={destroy:()=>disposals.push('presentation')};rec.destroy=()=>disposals.push('section');
-   built.push({rec,source,index,reference,options});return rec;
-  };
-  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
-  api.mountControls(h.view);const details=h.view.querySelector('.dv-live-details');details.focus=()=>h.doc.activeElement=details;
-  api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'},'CH-2':{state:'missing'}});
-  for(const [visit,key,id] of [[0,'CH-1','child'],[1,'CH-2','child->end'],[2,'CH-1','child']]){
-   details.dispatchEvent({type:'click'});
-   h.view.querySelector('tr[data-live-ticket="'+key+'"]').querySelector('button').dispatchEvent({type:'click'});await settle();h.flush();
-   const preview=h.view.querySelector('.dv-live-carrier-preview');assert.ok(preview,'carrier without a route opens its containing section');
-   assert.equal(built.length,visit+1);assert.equal(built[visit].source.id,'unlinked');assert.equal(built[visit].options.autoplay,false);assert.equal(built[visit].options.authoring,false);
-   assert.equal(built[visit].options.tracking.jira.epic,external?'EP-2':'EP-1');
-   assert.ok(preview.contains(h.doc.activeElement));assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.equal(h.view.querySelector('.dv-live-panel').hidden,true);
-   assert.equal(loads,external?1:0,'preview uses the approved loaded page without transport');
-   api.apply({'AA-1':{state:'done'},'CH-1':{state:'done'},'CH-2':{state:'blocked'}});
-   assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.ok(h.doc.activeElement.classList.contains(visit===1?'dv-live-blocked':'dv-live-done'));
-   if(visit===0){
-    h.doc.activeElement.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
-    assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
-    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
-    assert.ok(h.view.querySelector('.dv-live-carrier-preview'),'first Escape closes the ticket popover only');
-    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
-    assert.equal(h.doc.activeElement,details);
-   }else if(visit===1)preview.querySelector('.dv-live-carrier-close').dispatchEvent({type:'click'});
-   else api.destroy();
-   h.flush();assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);
-   assert.deepEqual(disposals,Array.from({length:visit+1},()=>['stepper','size','presentation','section']).flat());
-   for(const event of ['dv:pathrender','dv:pathchange','dv:stepchange'])assert.equal(built[visit].rec.sectionEl.events[event]?.size||0,0);
-   assert.equal(h.doc.events.keydown?.size||0,0);
-  }
-  assert.equal(JSON.stringify([h.ctl.page,remote]),before,'no authored route or page is changed');assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+  const before=JSON.stringify([h.ctl.page,remote]);mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'},'CH-2':{state:'missing'}});
+  for(const key of ['CH-1','CH-2']){const button=h.view.querySelector('tr[data-live-ticket="'+key+'"]').querySelector('button');assert.equal(button.disabled,true);assert.match(button.getAttribute('title'),/Unlinked work/);button.dispatchEvent({type:'click'});}
+  assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);assert.equal(loads,external?1:0);assert.equal(JSON.stringify([h.ctl.page,remote]),before);api.destroy();assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
  }
 });
+test('E6 pending coverage navigation cannot steal a newer panel control focus',async()=>{
+ const childSection={id:'child',detailOnly:true,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
+ const h=harness({page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['parent']]}},childSection]}}),api=h.ctl.liveStatus,child=h.ctl.sections[1];child.sectionEl.hidden=true;
+ let finish;h.ctl.details={snapshot:()=>null,activeSections:()=>[],showSection(){},restore:()=>new Promise(resolve=>finish=resolve)};
+ mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+ h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button').dispatchEvent({type:'click'});assert.equal(typeof finish,'function');
+ const toggle=h.view.querySelector('.dv-live-toggle');h.doc.activeElement=toggle;child.sectionEl.hidden=false;finish();await settle();h.flush();
+ assert.equal(h.doc.activeElement,toggle);assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);api.destroy();assert.equal(h.frames.size,0);
+});
 
-test('E6 round 4 reopening Tickets cancels late coverage focus and preview while allowing a new request',async()=>{
- for(const restored of [true,false]){
-  const childSection={id:'child',detailOnly:true,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
-  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['parent']]}},childSection]}};
-  const h=harness(raw),api=h.ctl.liveStatus,childRec=h.ctl.sections[1];childRec.sectionEl.hidden=true;
-  let finish,builds=0;
-  h.ctl.details={snapshot:()=>null,activeSections:()=>[],showSection(){},restore:()=>new Promise(resolve=>{finish=resolve;})};
-  h.C.buildSection=host=>{
-   builds++;const child=harness({page:{sections:[childSection]}});child.ctl.liveStatus.destroy();
-   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);return rec;
-  };
-  for(const name of ['createElement','createElementNS']){
-   const create=h.doc[name];h.doc[name]=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
-  }
-  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
-  const details=h.view.querySelector('.dv-live-details');details.dispatchEvent({type:'click'});
-  const selectChild=()=>h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button').dispatchEvent({type:'click'});
-  selectChild();assert.equal(typeof finish,'function','coverage restoration is pending');
-  const panel=h.view.querySelector('.dv-live-panel');assert.equal(panel.hidden,true);
-  details.dispatchEvent({type:'click'});const dismiss=panel.querySelector('.dv-live-panel-close');
-  assert.ok(h.doc.activeElement===dismiss);
-  childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
-  assert.ok(h.doc.activeElement===dismiss,'late coverage completion must not steal the newer panel focus');
-  assert.equal(panel.hidden,false);assert.equal(details.getAttribute('aria-expanded'),'true');
-  assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null,'late restoration must not open a preview over Tickets');
-  assert.equal(builds,0);
-  // Cancellation belongs to the old request, not future coverage navigation.
-  childRec.sectionEl.hidden=true;selectChild();childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
-  assert.equal(panel.hidden,true);assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
-  if(restored){assert.ok(childRec.sectionEl.contains(h.doc.activeElement));assert.equal(builds,0);}
-  else {assert.ok(h.view.querySelector('.dv-live-carrier-preview').contains(h.doc.activeElement));assert.equal(builds,1);}
-  api.destroy();assert.equal(h.frames.size,0);assert.equal(h.doc.events.keydown?.size||0,0);
- }
+/* L1–L11: authored Live status panel. These RED rows stay fixed in rework. */
+function mountStatus(h,host=h.view){
+ const d=h.C.PanelRegistry.get('live-status');assert.ok(d,'L1 registered panel');
+ const body=host.appendChild(new Element('div',{class:'pbody'}));
+ const result=d.render(body,{id:'status',type:'live-status'}, {},'pastel',[],0,false);
+ result.mounted();return {body,remount:result.mounted,destroy(){if(body._panelMotionCleanup)body._panelMotionCleanup();body.remove();}};
+}
+test('L2 controller registry resolves nearest root and retires without cross-view leakage',()=>{
+ const h=harness(fixture());assert.equal(typeof h.C.liveStatusControllerFor,'function');
+ const child=h.view.appendChild(new Element());assert.equal(h.C.liveStatusControllerFor(child),h.ctl.liveStatus);
+ const nested={view:child,sections:[]},api=h.C.createLiveStatus(nested,h.ctl.page);assert.equal(h.C.liveStatusControllerFor(child),api);api.destroy();assert.equal(h.C.liveStatusControllerFor(child),h.ctl.liveStatus);
+ h.ctl.liveStatus.destroy();assert.equal(h.C.liveStatusControllerFor(child),null);
+});
+test('L2 L3 snapshot exposes rollup and all mutations notify; navigation controls are absent',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;assert.equal(typeof api.snapshot,'function');assert.equal(api.mountControls,undefined);
+ const changes=[];api.onChange(v=>changes.push(v));api.apply({'AA-1':{state:'done',epic:'EP-1'}});api.setEnabled(false);api.note('Waiting','warn');api.action('Retry',()=>{});api.setDemoControls({playing:false,manual:true,ended:false,next(){},toggle(){}});
+ assert.equal(changes.length,5);const value=plain(api.snapshot());for(const key of ['counts','updatedAt','enabled','note','actionLabel','lanes','blockers','tickets','coverage','activity','demo','verdict'])assert.ok(key in value,key);
+ assert.equal(value.enabled,false);assert.equal(value.note.text,'Waiting');assert.equal(value.actionLabel,'Retry');assert.equal(value.tickets[0].key,'BB-1');
+ value.states['AA-1'].state='blocked';assert.equal(api.state('AA-1').state,'done');api.destroy();
+});
+test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
+ assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Blockers','Tickets','Activity']);
+ const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
+ let action=0,next=0,play=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
+ api.setDemoControls({playing:false,manual:false,ended:false,next(){next++;},toggle(){play++;}});
+ const demo=body.querySelector('.dv-live-demo');demo.children[0].dispatchEvent({type:'click'});demo.children[1].dispatchEvent({type:'click'});assert.equal(play,1);assert.equal(next,1);
+ h.doc.activeElement=toggle;api.apply(fixed);assert.equal(h.doc.activeElement,toggle);assert.ok(body.contains(toggle));
+ const before=textOf(body);body._panelMotionCleanup();api.note('After cleanup');assert.equal(textOf(body),before);mount.remount();assert.equal(body.querySelector('.dv-live-note').textContent,'After cleanup');
+ mount.remount();api.note('Once');assert.equal(body.querySelectorAll('.dv-live-head').length,1);api.destroy();assert.equal(textOf(body).includes('Once'),true);
+});
+test('L2 empty page and disconnected provider render only the appropriate message',()=>{
+ const empty=harness(),mount=mountStatus(empty);assert.match(textOf(mount.body),/This page has no ticket references\./);assert.equal(mount.body.querySelector('table'),null);
+ const h=harness(fixture());h.ctl.liveStatus.note('Add the Atlassian connector');const m=mountStatus(h);assert.equal(m.body.querySelector('.dv-live-note').textContent,'Add the Atlassian connector');assert.equal(m.body.querySelector('table'),null);assert.ok(m.body.querySelector('.dv-live-toggle').hidden);
+ empty.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('L2 early panels connect once after controller construction and cleanup removes pending subscriptions',()=>{
+ const h=harness(fixture());h.ctl.liveStatus.destroy();
+ const kept=mountStatus(h),removed=mountStatus(h);assert.equal(h.C.liveStatusPending.length,2);removed.destroy();assert.equal(h.C.liveStatusPending.length,1);
+ const api=h.C.createLiveStatus(h.ctl,h.ctl.page);h.ctl.liveStatus=api;assert.equal(h.C.liveStatusPending.length,0);api.apply(fixed);assert.ok(kept.body.querySelector('table'));
+ let subscriptions=0,unsubscriptions=0;const original=api.onChange;api.onChange=fn=>{subscriptions++;const off=original(fn);return ()=>{unsubscriptions++;off();};};
+ kept.remount();kept.remount();assert.equal(subscriptions,2);assert.equal(unsubscriptions,1);kept.body._panelMotionCleanup();assert.equal(unsubscriptions,2);
+ const before=textOf(kept.body);api.note('Hidden section');assert.equal(textOf(kept.body),before);kept.remount();assert.equal(kept.body.querySelector('.dv-live-note').textContent,'Hidden section');api.destroy();assert.equal(unsubscriptions,3);
+});
+test('L4 keyed Tickets rows retain a focused coverage button through reorder and update links',()=>{
+ const raw=epicFixture();delete raw.page.tracking.jira.site;const h=harness(raw),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'active'}});const {body}=mountStatus(h);
+ const row=body.querySelector('tr[data-live-ticket="AA-1"]'),button=row.querySelector('button');h.doc.activeElement=button;
+ api.apply({'AA-1':{state:'blocked',epic:'EP-1',url:'https://jira.test/browse/AA-1'},'BB-1':{state:'done'}});
+ assert.equal(body.querySelector('tbody').firstChild,row);assert.equal(row.querySelector('button'),button);assert.equal(h.doc.activeElement,button);
+ assert.equal(row.querySelector('a').getAttribute('href'),'https://jira.test/browse/AA-1');api.destroy();
+});
+test('L3 First blocker header action uses the current path and hides when disabled',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;let jumped;
+ h.ctl.sections[0].stepper={path:()=> 'happy',sourceIndex:()=>0,mode:()=> 'ambient',jumpSource:(index,path)=>jumped=[index,path]};
+ api.apply(fixed);const {body}=mountStatus(h),first=body.querySelector('.dv-live-first');assert.equal(first.hidden,false);first.dispatchEvent({type:'click'});assert.deepEqual(jumped,[0,'happy']);
+ api.setEnabled(false);assert.equal(first.hidden,true);api.destroy();
+});
+test('L2 detail panel mounted before attachment connects on navigation with the existing controller',()=>{
+ const h=harness(fixture()),detached=new Element(),mount=mountStatus(h,detached);assert.match(textOf(mount.body),/no ticket references/);assert.equal(h.C.liveStatusPending.length,1);
+ h.view.appendChild(detached);h.ctl.liveStatus.apply(fixed);h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(h.C.liveStatusPending.length,0);assert.ok(mount.body.querySelector('table.dv-live-tickets'));h.ctl.liveStatus.destroy();
 });

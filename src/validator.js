@@ -585,6 +585,13 @@ function validate(page){
       warnings.push('tracking.staleDays: must be a positive number — using 7 days');
   }
   trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use a Jira key or an array of Jira keys — ignored');});
+  var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
+  sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
+    Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(carrier){if(trackingRefs(carrier).tickets.length)hasTickets=true;});
+    (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
+  });
+  if((hasTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
+  if(!hasTracking && !hasTickets)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);

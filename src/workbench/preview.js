@@ -158,6 +158,15 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   if(demoOn)renderOptions.liveStatus={provider:function(){return Promise.resolve(demoMap);}};
   var ctl = renderPage(view, display, skin, null, renderOptions);
   ctl.demoLiveStatus=demoOn;
+  if(demoOn){
+    var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
+    function paintDemo(){
+      Object.keys(initialDemo).forEach(function(key){demoMap[key]={state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]};});
+      ctl.liveStatus.apply(demoMap);ctl.liveStatus.note('Demo day '+(demoDay+1),'info');
+      ctl.liveStatus.setDemoControls({playing:false,manual:true,ended:demoDay===3,toggle:function(){},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
+    }
+    paintDemo();
+  }
   var demoLabel=null,demoInput=null;
   function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
   var doc=view.ownerDocument,previewButton=doc && doc.getElementById('open-page-preview');

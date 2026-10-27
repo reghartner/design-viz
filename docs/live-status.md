@@ -147,6 +147,11 @@ null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscri
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear and enable changes. Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
+The map may carry numeric `storedAt` metadata (epoch milliseconds), including
+as a non-enumerable property. A valid cache timestamp supplies the control and
+change callback's `updatedAt` without altering any ticket's `updatedAt`. Maps
+without a valid cache timestamp fall back to the newest issue timestamp;
+`clear` removes both the entries and cache timestamp.
 `note(text, kind)` sets an `info`, `warn` or `error` message. `action(label, fn)`
 sets one host action; an empty label clears it. `onDestroy(fn)` registers adapter
 cleanup and returns an unsubscribe function. These methods allow a provider

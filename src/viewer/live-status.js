@@ -40,7 +40,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var destroyListeners=[],listeners=[],controls=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
-  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null;
+  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,cacheUpdatedAt=null;
   var remotePages=Object.create(null),originalLoad=renderOptions && renderOptions.loadDetail,wrappedLoad=null;
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function remoteKey(ref){return JSON.stringify([ref.spec,ref.revision || '']);}
@@ -68,7 +68,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     refs().tickets.forEach(function(key){var entry=map[key];if(!entry)return;counts[entry.state]++;
       var at=Date.parse(entry.updatedAt);if(isFinite(at) && at>stamp){stamp=at;latest=entry.updatedAt;}
     });
-    return {states:copy(map),counts:counts,updatedAt:latest};
+    return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest};
   }
   function notify(){refreshControls();listeners.slice().forEach(function(fn){fn(snapshot());});}
   function element(tag,cls,text,parent){var el=document.createElement(tag);el.className=cls;if(text!=null)el.textContent=String(text);if(parent)parent.appendChild(el);return el;}
@@ -232,9 +232,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
         next[key]=item;
       });
+      // Cache age describes the lookup, independently of issue modification
+      // times. Preserve it before filtering the map down to ticket entries.
+      var storedAt=value && value.storedAt;
+      cacheUpdatedAt=typeof storedAt==='number' && isFinite(new Date(storedAt).getTime())?new Date(storedAt).toISOString():null;
       map=next;applied=true;paint();notify();
     },
-    clear:function(){if(retired)return;map=Object.create(null);applied=true;paint();notify();},
+    clear:function(){if(retired)return;map=Object.create(null);cacheUpdatedAt=null;applied=true;paint();notify();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;paint();notify();},
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},

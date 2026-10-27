@@ -254,3 +254,23 @@ test('P6 P7 resource-call failures follow the same policy; toggles and late sear
  const h=providerHarness();await h.start();h.data(0,[jira('AA-1')]);h.ctl.liveStatus.setEnabled(false);h.data(0,[jira('AA-1','done')]);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.ok(h.watches.every(w=>w.stopped===0));h.ctl.liveStatus.setEnabled(true);assert.equal(h.ctl.liveStatus.state('AA-1').state,'done');
  let resolve;h.mcp.callTool=()=>new Promise(r=>resolve=r);h.watches[0].handler({type:'error',error:{code:'approval_required'}});h.view.querySelector('.dv-live-action').dispatchEvent({type:'click'});await settle();h.ctl.liveStatus.destroy();resolve({payload:{issues:[jira('AA-1')]}});await settle();assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.ctl.liveStatus.state('AA-1').state,'done');assert.equal(h.timers.size,0);
 });
+
+test('P5 cache timestamps take precedence, validate, and reset without changing issue evidence',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus,events=[];
+ api.mountControls(h.view);api.onChange(value=>events.push(plain(value)));
+ const issueTime='2026-10-26T12:00:00Z',entry={state:'active',updatedAt:issueTime};
+ const applyCache=storedAt=>{const map={'AA-1':entry};Object.defineProperty(map,'storedAt',{value:storedAt});api.apply(map);};
+ // Even an older cache timestamp, or epoch zero, describes lookup freshness.
+ for(const stamp of [1793000000000,0]){
+  applyCache(stamp);assert.equal(h.view.querySelector('time').getAttribute('datetime'),new Date(stamp).toISOString());
+  assert.equal(events.at(-1).updatedAt,new Date(stamp).toISOString());assert.deepEqual(events.at(-1).states,{'AA-1':entry});
+  assert.equal(api.state('AA-1').updatedAt,issueTime);
+ }
+ for(const invalid of [undefined,null,'1793000000000',NaN,Infinity,1e20]){
+  applyCache(1793000000000);applyCache(invalid);
+  assert.equal(h.view.querySelector('time').getAttribute('datetime'),issueTime);assert.equal(events.at(-1).updatedAt,issueTime);
+ }
+ applyCache(1793000000000);api.apply({'AA-1':entry});assert.equal(events.at(-1).updatedAt,issueTime);
+ applyCache(1793000000000);api.clear();assert.equal(h.view.querySelector('time'),null);assert.equal(events.at(-1).updatedAt,null);
+ api.apply({'AA-1':{state:'done'}});assert.equal(h.view.querySelector('time'),null);api.destroy();
+});

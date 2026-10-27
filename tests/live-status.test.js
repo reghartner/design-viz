@@ -721,3 +721,38 @@ test('E6 round 3 unlinked local and unrelated loaded sections preview node and e
   assert.equal(JSON.stringify([h.ctl.page,remote]),before,'no authored route or page is changed');assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
  }
 });
+
+test('E6 round 4 reopening Tickets cancels late coverage focus and preview while allowing a new request',async()=>{
+ for(const restored of [true,false]){
+  const childSection={id:'child',detailOnly:true,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
+  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['parent']]}},childSection]}};
+  const h=harness(raw),api=h.ctl.liveStatus,childRec=h.ctl.sections[1];childRec.sectionEl.hidden=true;
+  let finish,builds=0;
+  h.ctl.details={snapshot:()=>null,activeSections:()=>[],showSection(){},restore:()=>new Promise(resolve=>{finish=resolve;})};
+  h.C.buildSection=host=>{
+   builds++;const child=harness({page:{sections:[childSection]}});child.ctl.liveStatus.destroy();
+   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);return rec;
+  };
+  for(const name of ['createElement','createElementNS']){
+   const create=h.doc[name];h.doc[name]=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  }
+  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+  const details=h.view.querySelector('.dv-live-details');details.dispatchEvent({type:'click'});
+  const selectChild=()=>h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button').dispatchEvent({type:'click'});
+  selectChild();assert.equal(typeof finish,'function','coverage restoration is pending');
+  const panel=h.view.querySelector('.dv-live-panel');assert.equal(panel.hidden,true);
+  details.dispatchEvent({type:'click'});const dismiss=panel.querySelector('.dv-live-panel-close');
+  assert.ok(h.doc.activeElement===dismiss);
+  childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
+  assert.ok(h.doc.activeElement===dismiss,'late coverage completion must not steal the newer panel focus');
+  assert.equal(panel.hidden,false);assert.equal(details.getAttribute('aria-expanded'),'true');
+  assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null,'late restoration must not open a preview over Tickets');
+  assert.equal(builds,0);
+  // Cancellation belongs to the old request, not future coverage navigation.
+  childRec.sectionEl.hidden=true;selectChild();childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
+  assert.equal(panel.hidden,true);assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
+  if(restored){assert.ok(childRec.sectionEl.contains(h.doc.activeElement));assert.equal(builds,0);}
+  else {assert.ok(h.view.querySelector('.dv-live-carrier-preview').contains(h.doc.activeElement));assert.equal(builds,1);}
+  api.destroy();assert.equal(h.frames.size,0);assert.equal(h.doc.events.keydown?.size||0,0);
+ }
+});

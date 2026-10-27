@@ -442,6 +442,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(ev.key==='Escape' && panelTrigger){ev.preventDefault();ev.stopPropagation();closePanel(true);}
   }
   function openPanel(trigger){
+    // A reopened panel supersedes any coverage navigation still restoring.
+    coverageRequest++;
     closeCarrierPreview(false);close(false);closePanel(false);
     if(!panel){
       panel=element('section','dv-live-panel',null,view);panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Live status details');panel.setAttribute('popover','manual');

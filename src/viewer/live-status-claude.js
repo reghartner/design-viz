@@ -230,10 +230,19 @@ function wireLiveStatusClaude(ctl,page,win){
     return Promise.resolve().then(function(){if(!stopped)return mcp.listTools();}).then(function(list){
       if(stopped)return null;
       var listed=Array.isArray(list)?list:list && Array.isArray(list.servers)?list.servers:[];
-      ['Atlassian MCP','Atlassian'].some(function(name){
-        var found=listed.some(function(candidate){return candidate && (candidate.server || candidate.name)===name && Array.isArray(candidate.tools) && candidate.tools.some(function(tool){return (typeof tool==='string'?tool:tool && tool.name)==='searchJiraIssuesUsingJql';});});
-        if(found)server=name;return found;
+      // Pick the connector by what it can do, not by its display name: the
+      // page's mcp manifest already limits which connectors are listed, and
+      // "Atlassian MCP" is also the name of Atlassian's directory connector,
+      // so a custom connector (for example a mock) may carry any name.
+      var qualified=[];
+      listed.forEach(function(candidate){
+        var name=candidate && (candidate.server || candidate.name);
+        if(typeof name!=='string' || !name || !Array.isArray(candidate.tools))return;
+        var offered=candidate.tools.map(function(tool){return typeof tool==='string'?tool:tool && tool.name;});
+        if(offered.indexOf('searchJiraIssuesUsingJql')>=0 && offered.indexOf('getAccessibleAtlassianResources')>=0 && qualified.indexOf(name)<0)qualified.push(name);
       });
+      ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
+      if(!server && qualified.length)server=qualified[0];
       if(!server){api.note(addConnector,'info');stop();return null;}
       var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources};jobs.push(job);
       // Initial resource lookup may retry once. All subsequent call failures

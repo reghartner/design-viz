@@ -253,7 +253,7 @@ const settle=()=>new Promise(setImmediate);
 function providerHarness(raw=fixture(),renderOptions={}){
  const h=harness(raw,{},renderOptions);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
  h.ctl.liveStatus.mountControls(h.view);
- const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'searchJiraIssuesUsingJql'}]}];
+ const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]}];
  const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
   watchTool:(server,tool,input,handler,opts)=>{const watch={server,tool,input:plain(input),handler,opts:plain(opts),stopped:0};watches.push(watch);return ()=>watch.stopped++;}};
  h.win.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
@@ -296,10 +296,16 @@ test('P1 P9 provider is standalone only and inert without runtime, refs, namespa
  assert.equal(wire({},h.ctl.page,h.win),null);const empty=providerHarness({nodes:{a:{}}});empty.win.claude=h.win.claude;assert.equal(empty.start(),null);
 });
 test('P3 P4 connector preference, site host, resource cache and unavailable notes',async()=>{
- const h=providerHarness();h.servers.unshift({server:'Atlassian',tools:['searchJiraIssuesUsingJql']});
+ const h=providerHarness();h.servers.unshift({server:'Atlassian',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']});
  h.mcp.callTool=(...args)=>{h.calls.push(plain(args));return Promise.resolve({payload:[{id:'wrong',url:'https://other.test'},{id:'right',url:'https://jira.test/path'}]});};
  await h.start();assert.equal(h.calls.length,1);assert.deepEqual(h.calls[0],['Atlassian MCP','getAccessibleAtlassianResources',{}, {cache:{staleTime:300000}}]);assert.equal(h.watches[0].input.cloudId,'right');
  const missing=providerHarness();missing.servers.length=0;await missing.start();assert.equal(missing.calls.length,0);assert.match(missing.view.querySelector('.dv-live-note').textContent,/Add the Atlassian connector/);
+ const custom=providerHarness();custom.servers.length=0;custom.servers.push({server:'Mock-atlassian',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']});
+ await custom.start();assert.equal(custom.calls.length,1);assert.equal(custom.calls[0][0],'Mock-atlassian');assert.equal(custom.watches[0].server,'Mock-atlassian');
+ const mixed=providerHarness();mixed.servers.length=0;mixed.servers.push({server:'Mock-atlassian',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']},{name:'Atlassian',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]});
+ await mixed.start();assert.equal(mixed.calls[0][0],'Atlassian');
+ const partial=providerHarness();partial.servers.length=0;partial.servers.push({server:'Mock-atlassian',tools:['searchJiraIssuesUsingJql']},{server:'Other',tools:['getAccessibleAtlassianResources']},{server:'',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']},{server:'NoTools'});
+ await partial.start();assert.equal(partial.calls.length,0);assert.match(partial.view.querySelector('.dv-live-note').textContent,/Add the Atlassian connector/);
  const none=providerHarness();none.mcp.callTool=()=>Promise.resolve({payload:[]});await none.start();assert.equal(none.watches.length,0);assert.equal(none.view.querySelector('.dv-live-note').textContent,'No Atlassian site is available to this account.');
 });
 test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies and dispose',async()=>{
@@ -333,10 +339,12 @@ test('P7 destruction before namespace or resource resolution abandons late work'
   const pending=h.start();await settle();h.ctl.liveStatus.destroy();resolve(stage==='namespace'?h.mcp:{payload:[{id:'cloud',url:'https://jira.test'}]});await pending;assert.equal(h.watches.length,0);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);
  }
 });
-test('P8 publishing docs and skill declare both Atlassian names and comments',()=>{
+test('P8 publishing docs and skill declare the connector by its display name and comments',()=>{
  for(const file of ['docs/live-status.md','.claude/skills/hld-to-page/references/integrations.md']){
-  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian MCP"/);assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
+  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
+  assert.match(text,/exact display name/);assert.doesNotMatch(text,/name it exactly \*\*Atlassian MCP\*\*/);
  }
+ assert.match(fs.readFileSync('deploy/cloudflare/mock-atlassian-mcp/README.md','utf8'),/directory connector/);
  assert.match(fs.readFileSync('docs/tab-views.md','utf8'),/live-status.md#publishing-as-a-claudeai-artifact/);
 });
 

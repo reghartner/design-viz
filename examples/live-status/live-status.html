@@ -33963,15 +33963,17 @@ function liveStatusWaiting(diagram,states){
   edges.forEach(function(edge){var key=edge.from+'->'+edge.to;carriers[key]=edge;forward[key]=[edge.to];if(forward[edge.from])forward[edge.from].push(key);});
   Object.keys(carriers).forEach(function(start){
     var state=liveStatusCarrier(carriers[start],states);if(state!=='blocked' && state!=='missing')return;
-    var keys=liveStatusBlockingKeys(carriers[start],states),seen=Object.create(null),queue=(forward[start] || []).slice();seen[start]=true;
-    while(queue.length){
-      var key=queue.shift();if(seen[key])continue;seen[key]=true;
+    var keys=liveStatusBlockingKeys(carriers[start],states),seen=Object.create(null),queue=[],cursor=0;seen[start]=true;
+    function enqueue(key){if(!seen[key]){seen[key]=true;queue.push(key);}}
+    (forward[start] || []).forEach(enqueue);
+    while(cursor<queue.length){
+      var key=queue[cursor++];
       if(!carriers[key])continue;
       var own=liveStatusCarrier(carriers[key],states);
       if(['done','blocked','missing'].indexOf(own)<0){
         var waiting=out[key] || (out[key]=[]);keys.forEach(function(ticket){if(waiting.indexOf(ticket)<0)waiting.push(ticket);});
       }
-      queue=queue.concat(forward[key] || []);
+      (forward[key] || []).forEach(enqueue);
     }
   });
   Object.keys(out).forEach(function(key){out[key].sort();});return out;
@@ -34015,7 +34017,7 @@ function liveStatusStep(diagram,step,map){
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};
   var view=ctl.view,records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
-  var destroyListeners=[],listeners=[],controls=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false;
+  var destroyListeners=[],listeners=[],controls=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
@@ -34150,22 +34152,32 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var next=sourceBindings();
     bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});
     bindings=next;bindings.forEach(function(binding){binding.el.addEventListener('dv:pathrender',schedule);binding.el.addEventListener('dv:pathchange',schedule);});
-    if(observer)observer.disconnect();
+  }
+  function observeBindings(){
     if(applied && typeof MutationObserver!=='undefined'){
       if(!observer)observer=new MutationObserver(schedule);
       bindings.forEach(function(binding){binding.el.querySelectorAll('.schips').forEach(function(el){observer.observe(el,{childList:true,subtree:true});});});
     }
   }
   function paint(){
-    if(retired)return;
-    close(false);syncBindings();
-    if(applied){
-      view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
-      bindings.forEach(paintBinding);
+    if(retired || painting)return;
+    if(frame){cancelAnimationFrame(frame);frame=0;}
+    painting=true;
+    // Observer callbacks run after this stack. Disconnect before our writes,
+    // rather than relying on a flag that would be reset before delivery.
+    if(observer)observer.disconnect();
+    try{
+      close(false);syncBindings();
+      if(applied){
+        view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
+        bindings.forEach(paintBinding);
+      }
+      refreshControls();
+    }finally{
+      painting=false;if(!retired)observeBindings();
     }
-    refreshControls();
   }
-  function schedule(){if(retired || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();});}
+  function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();});}
   function relative(at){var seconds=Math.max(0,Math.floor((Date.now()-Date.parse(at))/1000));return seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+'m ago':seconds<86400?Math.floor(seconds/3600)+'h ago':Math.floor(seconds/86400)+'d ago';}
   function buildControl(control){
     var root=element('div','dv-live-control',null,control.host),toggle=element('button','reader-button dv-live-toggle','Live',root),counts={};toggle.type='button';

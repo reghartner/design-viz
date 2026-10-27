@@ -124,6 +124,18 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  await page.emulateMedia({reducedMotion:'no-preference'});await root.getByRole('button',{name:'Ambient',exact:true}).click();
  for(const dot of await edgeDots().all())await expect(dot).not.toHaveCSS('display','none');
 });
+test('S4 an active upstream blocker skips done descendants and marks todo descendants waiting',async({page,server})=>{
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,{state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'}]))};});
+ const root=await openStory(page,server,''),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+ // button -> mcu -> ingest: propagation must cross the done controller.
+ await expect(node('button')).toHaveClass(/dv-live-blocked/);
+ await expect(node('ingest')).toHaveClass(/dv-live-todo/);
+ await expect(node('ingest')).toHaveClass(/dv-live-waiting/);
+ await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-on','HW-123');
+ await expect(node('mcu')).toHaveClass(/dv-live-done/);
+ await expect(node('mcu')).not.toHaveClass(/dv-live-waiting/);
+ await expect(node('mcu')).not.toHaveAttribute('data-dv-live-waiting-on',/./);
+});
 test('S2 S3 without hash there are no demo controls or live classes',async({page,server})=>{
  const root=await openStory(page,server,'');await expect(root.locator('.dv-live-demo')).toHaveCount(0);await expect(root.locator('.dv-live-badge,.dv-live-waiting,.dv-live-todo')).toHaveCount(0);
 });

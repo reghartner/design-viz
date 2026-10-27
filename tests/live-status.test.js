@@ -107,6 +107,24 @@ test('V10 provider starts after paint, clamps cadence, pauses, catches up, retai
  fail=false;const retry=[...h.timers.values()][0];h.timers.clear();retry.fn();await new Promise(setImmediate);assert.equal(note.textContent,'');assert.equal(note.hidden,true);assert.equal(note.getAttribute('data-kind'),'info');
  h.ctl.liveStatus.destroy();assert.equal(signal.aborted,true);assert.equal(h.timers.size,0);
 });
+test('V9 painting disconnects observation, ignores re-entrant events and absorbs queued rebuilds',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);
+ const observer=h.observers[0],section=h.ctl.sections[0].sectionEl,paintClass=h.C.liveStatusClass;
+ let writes=0;
+ h.C.liveStatusClass=function(el,state){
+  writes++;assert.equal(observer.targets.length,0,'own DOM writes are not observed');
+  section.dispatchEvent({type:'dv:pathrender'});assert.equal(h.frames.size,0,'paint cannot schedule itself');
+  paintClass(el,state);
+ };
+ observer.callback();observer.callback();section.dispatchEvent({type:'dv:pathchange'});
+ assert.equal(h.frames.size,1,'external changes share one frame');
+ api.apply(fixed);assert.ok(writes>0);assert.equal(h.frames.size,0,'direct apply absorbs the queued paint');
+ assert.ok(observer.targets.length,'external chip rebuilds remain observed');
+ const edge=h.view.querySelector('path.edge');edge.classList.remove('dv-live-blocked');
+ observer.callback();observer.callback();assert.equal(h.frames.size,1);h.flush();
+ assert.ok(edge.classList.contains('dv-live-blocked'));assert.equal(h.frames.size,0,'paint settles without another frame');
+ h.C.liveStatusClass=paintClass;api.destroy();observer.callback();assert.equal(h.frames.size,0);assert.equal(observer.targets.length,0);
+});
 test('V10 late provider resolution after destroy cannot publish state',async()=>{
  let resolve;const h=harness(fixture(),{provider:()=>new Promise(r=>resolve=r)});h.flush();h.flush();await new Promise(setImmediate);h.ctl.liveStatus.destroy();resolve(fixed);await new Promise(setImmediate);assert.equal(h.ctl.liveStatus.state('AA-1'),null);
 });
@@ -170,6 +188,15 @@ test('S4 edge and missing blockers start at target and accumulate distinct block
  assert.deepEqual(result.join,['EE-1','CC-1'].sort());assert.deepEqual(result.end,['EE-1','CC-1'].sort());
  for(const key of ['up','a','b','c','b->join','up->a','a->b'])assert.equal(result[key],undefined,key);
  assert.deepEqual(plain(C.liveStatusWaiting(d,{})),{});
+});
+test('S4 cyclic joins and self-loops visit each carrier once per blocker',()=>{
+ const C=storyContext(),d=forkJoin();
+ d.edges.push({from:'join',to:'a'},{from:'join',to:'join'},{from:'end',to:'b'});
+ const states={'AA-1':{state:'blocked'},'CC-1':{state:'missing'},'BB-1':{state:'done'},'JJ-1':{state:'todo'}};
+ const waiting=plain(C.liveStatusWaiting(d,states));
+ assert.deepEqual(Object.keys(waiting).sort(),['a->b','a->c','b->join','c->join','end','end->b','join','join->a','join->end','join->join'].sort());
+ for(const keys of Object.values(waiting))assert.deepEqual(keys,['AA-1','CC-1']);
+ for(const key of ['up','up->a','a','b','c'])assert.equal(waiting[key],undefined,key);
 });
 test('S4 waiting preserves own state, supplies badge/popover keys and clears on toggle/apply',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]');

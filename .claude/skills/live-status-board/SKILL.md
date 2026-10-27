@@ -34,7 +34,7 @@ Where the author sees real colors: only in the published artifact. The
 Workbench never calls Jira; its **Demo live status** shows sample colors so
 the layout can be checked. So after each spec change the agent rebuilds and
 republishes to the same artifact URL (section 4), then tells the author to
-reload. Publishing to a new URL loses the artifact's comments.
+reload. A publish that creates a new artifact loses the old one's comments.
 
 ## 1. Settle the tracking facts before writing JSON
 
@@ -136,8 +136,10 @@ may read "Jira did not answer; retrying" for a few seconds on a cold start;
 the retry is automatic. Then the chip shows the done count and "updated just
 now".
 
-Republishing: pass the artifact's existing URL (or the same file path in the
-same session) so the link stays stable. Do this after every accepted spec
+Republishing: pass the artifact's existing URL as `url` on the publish call,
+after reading that artifact with the Artifact tool's read action in the
+current conversation; a publish without `url` creates a new artifact with a
+new link and none of the old comments. Do this after every accepted spec
 change; the author is working in the Workbench and sees no live state there.
 
 ## 5. Verify after publishing

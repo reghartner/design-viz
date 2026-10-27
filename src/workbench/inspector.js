@@ -502,6 +502,52 @@ function deltaControls(val){
     return fold;
   }
 
+function trackingControls(val){
+    var box=document.createElement('fieldset'),legend=document.createElement('legend');
+    box.className='tracking-editor';legend.textContent='Tracking';box.appendChild(legend);
+    function update(field,ref,remove){
+      var parsed=parseEditor();
+      if(parsed.error){formError(parsed.error);return false;}
+      var path=builderTargetPath(parsed.raw,session.target),current=path && specValueAt(parsed.raw,path);
+      if(!current)return false;
+      var refs=trackingRefs(current)[field],index=refs.indexOf(ref);
+      if(remove){if(index<0)return true;refs.splice(index,1);}
+      else {
+        if(index>=0){formError('');return true;}
+        refs.push(ref);
+      }
+      var ok=commitSimple(field,refs.length?JSON.stringify(refs):null);
+      if(ok)refreshFormSoon();
+      return ok;
+    }
+    var refs=trackingRefs(val);
+    [['tickets','Tickets','ticket'],['prs','Pull requests','PR']].forEach(function(field){
+      if(!refs[field[0]].length)return;
+      var title=document.createElement('p'),list=document.createElement('ul');
+      title.className='fnote';title.textContent=field[1];box.appendChild(title);
+      list.setAttribute('aria-label',field[1]);
+      refs[field[0]].forEach(function(ref,index){
+        var row=document.createElement('li'),text=document.createElement('span');
+        text.textContent=ref;row.appendChild(text);
+        row.appendChild(actionButton('Remove '+field[2]+' '+(index+1),function(){return update(field[0],ref,true);}));
+        list.appendChild(row);
+      });
+      box.appendChild(list);
+    });
+    [['tickets','Add ticket','HW-123','Jira key, then Enter'],
+      ['prs','Add PR','https://github.com/org/repo/pull/1','Absolute http(s) URL, then Enter']].forEach(function(field){
+      var input=textControl('',function(value){
+        if(value==null)return true;
+        var ref=field[0]==='tickets'?(trackingKeyPattern.test(value.trim())?value.trim():null):deltaLinkUrl(value);
+        if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123.':'Use an absolute http(s) URL.');return false;}
+        return update(field[0],ref,false);
+      },{placeholder:field[2]});
+      var help=document.createElement('p');help.className='fnote';help.id=prefix+'-'+field[0]+'-help';help.textContent=field[3];
+      input.setAttribute('aria-describedby',help.id);box.appendChild(frow(field[1],input));box.appendChild(help);
+    });
+    return box;
+  }
+
 function nodeForm(val, ctx){
     if(isTextBoxNode(val))return textBoxForm(val);
     var t = session.target;
@@ -573,7 +619,8 @@ function nodeForm(val, ctx){
     ] : [],[
       frow('Link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('Show change marker', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
-      deltaControls(val)
+      deltaControls(val),
+      trackingControls(val)
     ],[handoffControls(val),detailControls(val,ctx),advanced]);
   }
 
@@ -843,6 +890,7 @@ function edgeForm(val, ctx){
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val),
+      trackingControls(val),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frowBlock('Contract JSON',edgeJsonContractControl(val.contract)),
       frowBlock('Curve',curveControls),

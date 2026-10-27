@@ -38,6 +38,22 @@ This is a metadata excerpt; a complete page also needs sections or blocks.
 absolute HTTP(S) URL string. Invalid values warn and are ignored; tracking
 validation never turns them into errors.
 
+## Workbench
+
+Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
+just below the change details. In **Add ticket**, enter a Jira key such as `HW-123`
+and press Enter. Keys are case sensitive; surrounding whitespace is trimmed.
+In **Add PR**, paste an absolute HTTP(S) URL and press Enter. Duplicate references
+are ignored. Each list keeps its order; use its numbered **Remove ticket** or
+**Remove PR** button to remove an entry. Each add or removal has one Undo/Redo,
+and Export project keeps the references in its JSON.
+
+When the document has tickets, **Demo live status** beside **Preview** supplies
+sample states in sorted ticket order. It starts off and stays preview-only across
+ordinary edits and skin changes; it never saves status to the spec or contacts Jira.
+Live colors require a viewer with the live-status overlay and a status provider.
+PRs remain plain links.
+
 ## State model
 
 The planned overlay uses these runtime states. The spec never stores status.

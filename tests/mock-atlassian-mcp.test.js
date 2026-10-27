@@ -11,6 +11,8 @@
 // M9  Deployment/connector instructions and explicit parity caveats.
 // M10 This file dynamically imports the pure handler and exercises the matrix.
 // M11 Identity regexes mirror cloudflare-deploy.test.js; local output ignored.
+// M12 Per-IP rate limit binding (#749): 429 JSON-RPC error when env.RL denies.
+// M13 Optional URL path token (#749): /<token>/mcp serves, /mcp is 404, unset keeps /mcp.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -65,6 +67,11 @@ test('M1/M10: module exports, layout and placeholder config', async () => {
   assert.equal(config.name, 'mock-atlassian-mcp');
   assert.equal(config.main, 'worker.mjs');
   assert.ok(config.compatibility_date);
+  const limiter = (config.ratelimits || []).find(binding => binding.name === 'RL');
+  assert.ok(limiter, 'ratelimits binding named RL');
+  assert.match(String(limiter.namespace_id), /^\d+$/);
+  assert.equal(limiter.simple.limit, 60);
+  assert.equal(limiter.simple.period, 60);
   assert.ok(!fs.existsSync(path.join(ROOT, DIR, 'node_modules')));
   for (const file of ['mcp.mjs', 'worker.mjs']) {
     const source = read(DIR + '/' + file);
@@ -313,13 +320,76 @@ test('M8: Jira conversion, stable IDs, category names, flagged and Development s
 
 test('M9: README describes deployment, connector setup and unverified parity', () => {
   const readme = read(DIR + '/README.md');
-  for (const text of ['npx -y wrangler@4 deploy -c deploy/cloudflare/mock-atlassian-mcp/wrangler.jsonc',
+  for (const text of ['MCP_PATH_TOKEN', '/<token>/mcp', '429', 'ratelimits', 'cf-connecting-ip',
+    'npx -y wrangler@4 deploy -c deploy/cloudflare/mock-atlassian-mcp/wrangler.jsonc',
     'https://<worker>.<subdomain>.workers.dev/mcp', 'Settings → Connectors → Add custom connector', 'No sign-in', 'Atlassian MCP',
     '?scenario=story', '?scenario=all-todo', '?scenario=all-done', '&day=', 'compact-view', 'customFields', 'Development']) assert.ok(readme.includes(text), text);
   assert.match(readme, /public documentation and community reports/);
   assert.match(readme, /not a captured `tools\/list`/);
   assert.match(readme, /placeholder/);
   assert.match(read('docs/live-status.md'), /mock-atlassian-mcp\/README\.md/);
+});
+
+test('M12: rate limit binding denies with 429 JSON-RPC error and keys by client IP', async () => {
+  const keys = [];
+  const limited = { RL: { limit: async ({ key }) => { keys.push(key); return { success: false }; } } };
+  const headers = { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.7' };
+  let response = await fetchMock('/mcp', { ...post(rpc('tools/list')), headers }, limited);
+  assert.equal(response.status, 429);
+  assert.match(response.headers.get('content-type'), /^application\/json/);
+  assert.equal(response.headers.get('access-control-allow-origin'), '*');
+  assert.match(response.headers.get('retry-after'), /^\d+$/);
+  const body = await response.json();
+  assert.equal(body.jsonrpc, '2.0');
+  assert.equal(body.id, null);
+  assert.equal(body.error.code, -32000);
+  assert.match(body.error.message, /rate limit/i);
+  assert.deepEqual(keys, ['203.0.113.7']);
+  // Missing client IP still produces a key; the binding is consulted once per request.
+  response = await fetchMock('/mcp', post(rpc('tools/list')), limited);
+  assert.equal(response.status, 429);
+  assert.equal(keys.length, 2);
+  assert.equal(typeof keys[1], 'string');
+  assert.ok(keys[1].length > 0);
+  // Allowed requests pass through unchanged; non-MCP routes never consult the binding.
+  const allowed = { RL: { limit: async ({ key }) => { keys.push(key); return { success: true }; } } };
+  response = await fetchMock('/mcp', { ...post(rpc('tools/list')), headers }, allowed);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).result.tools.length, 3);
+  assert.equal(keys.length, 3);
+  assert.equal((await fetchMock('/healthz', {}, limited)).status, 200);
+  assert.equal((await fetchMock('/', {}, limited)).status, 200);
+  assert.equal((await fetchMock('/mcp', { method: 'OPTIONS' }, limited)).status, 204);
+  assert.equal(keys.length, 3);
+  // Deployments without the binding keep working.
+  assert.equal((await fetchMock('/mcp', post(rpc('tools/list')), {})).status, 200);
+});
+
+test('M13: optional MCP_PATH_TOKEN moves the endpoint under /<token>/mcp', async () => {
+  const token = 'demo-token_42';
+  const env = { MCP_PATH_TOKEN: token };
+  let response = await fetchMock('/' + token + '/mcp', post(rpc('tools/list')), env);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).result.tools.length, 3);
+  response = await fetchMock('/' + token + '/mcp?scenario=all-done', post(rpc('tools/call',
+    { name: 'getJiraIssue', arguments: { issueIdOrKey: 'HW-123' } })), env);
+  assert.equal(result(await response.json()).data.fields.status.statusCategory.key, 'done');
+  assert.equal((await fetchMock('/' + token + '/mcp', {}, env)).status, 405);
+  for (const path of ['/mcp', '/wrong-token/mcp', '/' + token, '/' + token + '/', '/' + token + '/mcp/extra']) {
+    response = await fetchMock(path, post(rpc('tools/list')), env);
+    assert.equal(response.status, 404, path);
+    assert.equal(await response.text(), 'Not found', path);
+  }
+  assert.equal(await (await fetchMock('/healthz', {}, env)).text(), 'ok');
+  assert.equal((await fetchMock('/', {}, env)).status, 200);
+  // Unset or blank token keeps the historical /mcp URL and rejects a token-shaped path.
+  for (const blank of [{}, { MCP_PATH_TOKEN: '' }, { MCP_PATH_TOKEN: '   ' }]) {
+    assert.equal((await fetchMock('/mcp', post(rpc('tools/list')), blank)).status, 200);
+    assert.equal((await fetchMock('/' + token + '/mcp', post(rpc('tools/list')), blank)).status, 404);
+  }
+  // The rate limit guards the token path too.
+  const limited = { ...env, RL: { limit: async () => ({ success: false }) } };
+  assert.equal((await fetchMock('/' + token + '/mcp', post(rpc('tools/list')), limited)).status, 429);
 });
 
 const IDENTITY = [

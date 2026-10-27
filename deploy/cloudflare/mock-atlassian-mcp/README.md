@@ -26,6 +26,33 @@ redeploy there, or supply `--var "DEPLOYED_AT:<ISO timestamp>"` during deploymen
 Without a valid value the fixed epoch is `2026-10-20T09:00:00Z`; it does not
 automatically reset on deploy.
 
+## Abuse guards
+
+The endpoint is public and unauthenticated by design (claude.ai custom
+connector with **No sign-in**). Two cheap guards limit abuse of a deployed
+instance beyond the Workers Free plan daily cap:
+
+- **Per-IP rate limit.** `wrangler.jsonc` declares a Workers Rate Limiting
+  binding (`ratelimits`, binding name `RL`, 60 requests per 60 s). The Worker
+  calls `env.RL.limit({ key })` with the client's `cf-connecting-ip` for every
+  POST to the MCP endpoint. A denied request returns HTTP `429` with
+  `Retry-After: 60` and a JSON-RPC error (`code: -32000`). The binding is free
+  on every plan and needs no zone; `/`, `/healthz` and CORS preflights are not
+  counted. Change `simple.limit` or `simple.period` (10 or 60 seconds) in the
+  config and redeploy to tune it. Deployments whose config omits the binding
+  keep working without a limit.
+- **Optional URL path token.** Set the environment variable `MCP_PATH_TOKEN`
+  to a long random URL-safe string (letters, digits, `-`, `_`). The endpoint
+  then lives at `/<token>/mcp` and plain `/mcp` returns `404 Not found`, so the
+  secret travels in the connector URL:
+  `https://<worker>.<subdomain>.workers.dev/<token>/mcp` (scenario queries
+  still apply). Supply it as a secret (`npx -y wrangler@4 secret put
+  MCP_PATH_TOKEN -c deploy/cloudflare/mock-atlassian-mcp/wrangler.jsonc --name "$FLOWVIEW_CF_WORKER"`)
+  or with `--var "MCP_PATH_TOKEN:<token>"` during deployment. Unset or blank
+  keeps the historical `/mcp` URL, so existing connectors and published
+  artifacts keep working until you choose to rotate them. Never commit the
+  token; treat it like the Worker name.
+
 Follow the [existing deployment convention](../README.md): never commit an
 actual Worker name, account ID, deployed address, login token, `local.env` or
 `.wrangler/` cache. This folder's reviewed sources are allowlisted by the parent

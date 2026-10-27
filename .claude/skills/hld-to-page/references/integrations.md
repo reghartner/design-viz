@@ -19,14 +19,19 @@ agent handles Forge registration, installation and actual Confluence validation.
 Publish only when the user asks. Build the HTML from the spec with the current
 template: `python3 <VIZ>/tools/inject.py <spec.json> <VIZ>/template/flowview.html <out.html>`
 (run `python3 <VIZ>/tools/build.py` first if `template/` may be stale). Publish it
-with the Artifact tool and declare
+with the Artifact tool. An ordinary page declares only
+`capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
+A tracked page (one with `page.tracking`, see the `live-status-board` skill)
+adds the viewer's Jira connector:
 `capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}`,
-where `server` is the exact display name of the viewer's Jira connector in
-claude.ai Settings → Connectors ("Atlassian" for Atlassian's own; a custom or
-mock connector's own name otherwise, never "Atlassian MCP", which is the
-directory connector's name). This also enables live Jira ticket status through
-that connector; see `docs/live-status.md` ("Publishing as a claude.ai artifact")
-for connector setup, approval behavior and the mock server. Tool shapes follow
+where `server` is the connector's exact display name in claude.ai Settings →
+Connectors: "Atlassian" (or "Atlassian MCP", whichever the viewer's copy of
+Atlassian's own directory connector shows), or the custom or mock connector's
+own name. Never give a custom connector the name "Atlassian MCP":
+claude.ai resolves that name to Atlassian's directory connector and asks for an
+Atlassian login. The provider picks the connector by the tools it offers, so one
+declared name is enough. See `docs/live-status.md` ("Publishing as a claude.ai
+artifact") for connector setup, approval behavior and the mock server. Tool shapes follow
 public documentation.
 That lets the page label comments by Tab and View, make "Go to" switch Tab,
 View and step, and keep step controls working in comment mode; see

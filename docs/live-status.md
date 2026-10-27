@@ -68,7 +68,7 @@ PRs remain plain links.
 
 ## State model
 
-The planned overlay uses these runtime states. The spec never stores status.
+The overlay uses these runtime states. The spec never stores status.
 
 | State | Paint |
 | --- | --- |
@@ -377,7 +377,9 @@ Blockers, Tickets and Activity, and its header shows counts and updated time.
 
 Live evidence follows the story's nodes and edges. Team lane pills show **n/N done**, the worst ticket state, and a hover/focus title listing each ticket and
 state. Tickets are deduplicated across every step in that lane, including edge
-endpoints and failed communications. The Live status panel repeats these lanes.
+endpoints and failed communications. The Live status panel does not repeat these
+lanes; lane evidence stays on the step pills, the lane colour stripe of each
+Tickets row and the lane names in Blockers.
 
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
 **IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps

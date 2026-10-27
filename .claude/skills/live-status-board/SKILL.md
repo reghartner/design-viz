@@ -29,9 +29,9 @@ authorize publishing. With that authorization it builds and publishes the
 artifact and republishes it after every later accepted change; without it, it
 delivers the spec (and built HTML only when standalone output was explicitly
 requested). Stories the agent cannot place stay
-off the diagram on purpose; once the epic-linked rollup (#754) is
-in, the Tickets table lists them with the note NOT ON DIAGRAM so the author
-can decide later. Until then, list them for the author in chat.
+off the diagram on purpose: the panel's Tickets table lists every child of the
+linked epic and tags the unplaced ones NOT ON DIAGRAM, so the author can decide
+later. Mention them in the hand-over message as well.
 
 Where the author sees real colors: only in the published artifact. The
 Workbench never calls Jira; its **Demo live status** shows sample colors so
@@ -105,8 +105,10 @@ Rules of thumb that make the board readable:
 - One to three keys per carrier. A carrier with many keys rolls up to its
   worst state and the popover becomes a long list.
 - Put the integration ticket on the edge, the component ticket on the node,
-  so a blocked integration shows as a red broken edge (the "Not sent" break
-  labelled with the key) while the nodes stay their own color.
+  so a blocked integration shows as a rose broken edge (the engine's break
+  glyph, with no text on the canvas; the blocking key is in the glyph's
+  accessible name and in the carrier's popover) while the nodes keep their own
+  color.
 - Downstream carriers of a blocked or missing one become "waiting on KEY"
   automatically along directed edges. Point the edges in delivery order or
   the propagation runs the wrong way.
@@ -166,8 +168,9 @@ Publish only when asked. Steps:
 What the viewer sees on first open: a dialog "This artifact uses connectors"
 listing the connector with a toggle and Continue. After Continue the Live status panel header
 may read "Jira did not answer; retrying" for a few seconds on a cold start;
-the retry is automatic. Then the header shows the done count and "updated just
-now".
+the retry is automatic. Then the header's connector indicator reads
+"Jira connected, refreshed just now", the state counts fill in, and the body's
+ring shows carriers done.
 
 Republishing: pass the artifact's existing URL as `url` on the publish call,
 after reading that artifact with the Artifact tool's read action in the

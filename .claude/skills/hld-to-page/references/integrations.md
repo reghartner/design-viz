@@ -20,7 +20,10 @@ Publish only when the user asks. Build the HTML from the spec with the current
 template: `python3 <VIZ>/tools/inject.py <spec.json> <VIZ>/template/flowview.html <out.html>`
 (run `python3 <VIZ>/tools/build.py` first if `template/` may be stale). Publish it
 with the Artifact tool and declare
-`capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
+`capabilities: {mcp: {servers: [{server: "Atlassian MCP", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}, {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}`.
+This also enables live Jira ticket status through the viewer’s Atlassian connector;
+see `docs/live-status.md` ("Publishing as a claude.ai artifact") for connector
+setup, approval behavior and the mock server. Tool shapes follow public documentation.
 That lets the page label comments by Tab and View, make "Go to" switch Tab,
 View and step, and keep step controls working in comment mode; see
 `docs/tab-views.md` ("Comments on claude.ai artifacts"). Without the declaration

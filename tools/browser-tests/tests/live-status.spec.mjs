@@ -138,3 +138,73 @@ test('S2 S3 fallback demo honors cadence, Pause and reduced motion',async({page,
  await demo.getByRole('button',{name:'Pause',exact:true}).click();await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 2');await demo.getByRole('button',{name:'Play',exact:true}).click();await page.clock.runFor(6000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');
  await page.emulateMedia({reducedMotion:'reduce'});await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');await demo.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('g.node.dv-live-done')).toHaveCount(2);
 });
+
+/* Claude provider contract matrix (these browser cases + tests/live-status.test.js):
+ P1 standalone boot, async mcp namespace, inert without refs/runtime/with host.
+ P2 Jira envelopes/categories/Flagged/Development/missing/chunking (VM helpers).
+ P3 connector discovery and visible add-connector note without tool calls.
+ P4 resource selection/cache (VM); resource lookup through mcp here.
+ P5 paired chunk watches, active node, Flagged edge, missing key, cached updated.
+ P6 explicit Allow Jira click calls search once; other error/retry branches in VM.
+ P7 Live toggles retain watches; destroy and late results covered by VM.
+ P8 publishing declaration checked by VM.
+ P9 no network fetch; existing no-provider browser cases remain unchanged.
+ All authoring/editing remains desktop-only. */
+function stubLiveClaude(mode){
+ const log=window.__mcpStub={calls:[],watches:[]};
+ const issue=(key,category='indeterminate')=>({key,fields:{summary:'Work '+key,status:{name:'In Progress',statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
+ const result=input=>({payload:{issues:{nodes:input.jql.includes('Flagged')?[issue('HW-124')]:['HW-123','FW-45','BE-67','HW-124','FW-46','BE-68'].map(key=>issue(key))}},cache:{storedAt:1793000000000}});
+ const mcp={
+  listTools:async()=>mode==='missing'?[]:[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'searchJiraIssuesUsingJql'}]}],
+  callTool:async(server,tool,input,opts)=>{log.calls.push({server,tool,input,opts});return tool==='getAccessibleAtlassianResources'?{payload:[{id:'cloud',url:'https://acme.atlassian.net'}]}:result(input);},
+  watchTool(server,tool,input,handler,opts){
+   const watch={server,tool,input,opts,stopped:false};log.watches.push(watch);
+   const deliver=()=>{if(!watch.stopped)handler(mode==='approval'&&!input.jql.includes('Flagged')?{type:'error',error:{code:'approval_required'}}:{type:'data',result:result(input)});};
+   setTimeout(deliver,0);watch.deliver=deliver;return ()=>{watch.stopped=true;};
+  }
+ };
+ window.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
+}
+async function openClaude(page,server,mode){
+ await page.addInitScript(stubLiveClaude,mode);
+ // A connector stub is the only allowed transport; fail any attempted fetch/XHR.
+ const requests=[];await page.route('**/*',route=>{const request=route.request();if(['fetch','xhr'].includes(request.resourceType())){requests.push(request.url());return route.abort();}return route.continue();});
+ const root=await open(page,server,fixture(),false);return {root,requests};
+}
+test('P1 P4 P5 P7 P9 claude connector paints Jira nodes and Flagged edges with cached time',async({page,server})=>{
+ const {root,requests}=await openClaude(page,server,'data'),section=root.locator('#section-delivery');
+ await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
+ await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveClass(/dv-live-blocked/);
+ await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/dv-live-missing/);
+ await expect(root.locator('time.dv-live-updated')).toHaveAttribute('datetime',new Date(1793000000000).toISOString());await expect(root.locator('time.dv-live-updated')).toContainText('updated');
+ const registrations=await page.evaluate(()=>__mcpStub.watches.map(({server,tool,input,opts})=>({server,tool,input,opts})));
+ expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Atlassian MCP');expect(registrations[0].opts).toEqual({refetchInterval:60000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
+ await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-active,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);
+ await page.evaluate(()=>__mcpStub.watches.forEach(w=>w.deliver()));expect(await page.evaluate(()=>__mcpStub.watches.some(w=>w.stopped))).toBe(false);
+ await root.locator('.dv-live-toggle').click();await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);expect(requests).toEqual([]);
+});
+test('P3 missing claude Atlassian connector shows setup note without paint or calls',async({page,server})=>{
+ const {root,requests}=await openClaude(page,server,'missing');
+ await expect(root.locator('.dv-live-note')).toHaveText('Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.');await expect(root.locator('.dv-live-note')).toBeVisible();
+ await expect(root.locator('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);
+ expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);expect(requests).toEqual([]);
+});
+test('P6 claude Jira approval is an explicit click and repeats the search exactly once',async({page,server})=>{
+ const {root,requests}=await openClaude(page,server,'approval'),action=root.getByRole('button',{name:'Allow Jira',exact:true});
+ await expect(action).toBeVisible();await expect(root.locator('.dv-live-note')).toHaveText('Jira access needs your approval');
+ expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(0);
+ await action.click();await expect(root.locator('#section-delivery g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
+ expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(1);await expect(action).toBeHidden();expect(requests).toEqual([]);
+});
+
+
+test('S2 P1 explicit demo takes precedence over the claude connector',async({page,server})=>{
+ await page.addInitScript(stubLiveClaude,'data');
+ const root=await openStory(page,server);
+ await expect(root.locator('.dv-live-demo')).toBeVisible();
+ await expect(root.locator('.dv-live-note')).toContainText('Day 1');
+ await root.getByRole('button',{name:'Next day',exact:true}).click();
+ await expect(root.locator('.dv-live-note')).toContainText('Day 2');
+ expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);
+ expect(await page.evaluate(()=>__mcpStub.watches)).toEqual([]);
+});

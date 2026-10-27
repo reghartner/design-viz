@@ -646,6 +646,10 @@ read. Authored PR references are plain links and never carry live state.
 
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
 configures the Jira site: `"tracking": {"jira": {"site": "https://acme.atlassian.net"}}`.
+Optional `tracking.staleDays` is a positive number of days (default 7). Active
+work with an `updatedAt` strictly older than this threshold gets a stale badge
+ring and age text without changing its live rollup state. Invalid values warn
+and fall back to 7; an absent or invalid timestamp is never stale.
 A non-object `tracking` or a present `tracking.jira.site` that is not an absolute
 HTTP(S) URL string produces a warning and is ignored. The spec never stores status;
 live colors come from Jira status only. Steps, coins and chips derive their state

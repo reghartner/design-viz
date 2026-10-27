@@ -220,3 +220,77 @@ test('S2 P1 explicit demo takes precedence over the claude connector',async({pag
  expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);
  expect(await page.evaluate(()=>__mcpStub.watches)).toEqual([]);
 });
+
+/* B1–B10 story panel matrix: B1 lane totals/title; B2 caption;
+ B3 shipped Play pauses and focuses badge; B4 First blocker uses current path;
+ B5 real demo changes populate Activity; B6 stale helper/paint in VM;
+ B7 dialog/ring/verdict/downstream/missing/Escape; B8 built demo final day;
+ B9 reduced motion + print here and no-ticket DOM in V11; B10 docs/validator in VM.
+ All cases use desktop reader dimensions; mobile document editing is out of scope. */
+test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach ready',async({page,server})=>{
+ const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
+ for(let day=2;day<=4;day++)await next.click();
+ const bar=root.locator('.termbar').first();
+ // Replay starts at step one, which is the first blocked beat on this path.
+ await root.locator('.schip[data-step-source="5"]').first().click();
+ await bar.getByRole('button',{name:'Replay',exact:true}).click();
+ await expect(bar).toHaveAttribute('data-playback','paused');
+ await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);
+ await expect(bar.locator('.dv-live-caption')).toContainText('BLOCKED · HW-124');
+ await expect(root.locator('.dv-live-badge.dv-live-blocked:focus')).toHaveCount(1);
+ await expect(bar.locator('.lanepill')).toContainText('Hardware · 0/4 done');await expect(bar.locator('.lanepill')).toHaveClass(/dv-live-blocked/);await expect(bar.locator('.lanepill')).toHaveAttribute('title',/HW-124 · blocked/);
+ await root.locator('.schip[data-step-source="5"]').first().click();await root.getByRole('button',{name:'First blocker',exact:true}).click();
+ await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);await expect(root.locator('.dv-live-badge.dv-live-blocked:focus')).toHaveCount(1);
+ const details=root.locator('button.dv-live-details');await details.click();const panel=root.locator('section.dv-live-panel');
+ await expect(details).toHaveAttribute('aria-expanded','true');await expect(panel).toHaveAttribute('role','dialog');await expect(panel.locator('.dv-live-verdict')).toHaveText(/1 blockers · \d+ waiting/);
+ await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane="HW"]')).toContainText('Hardware · 0/4 done');
+ const blocker=panel.locator('.dv-live-blocker').filter({hasText:'HW-124'});await expect(blocker).toContainText(/\d+ downstream carriers · \d+ steps/);await expect(blocker.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
+ await expect(panel.locator('.dv-live-activity')).toContainText('HW-124 · active → blocked');
+ await page.emulateMedia({media:'print'});await expect(panel).toBeHidden();await page.emulateMedia({media:'screen'});
+ for(let day=5;day<=12;day++){
+  await next.click();
+  if(day===6)await expect(panel.locator('.dv-live-blocker').filter({hasText:'UX-89'})).toContainText('not found in Jira (deleted, renamed, or no permission)');
+ }
+ await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ await page.keyboard.press('Escape');await expect(panel).toBeHidden();await expect(details).toBeFocused();await expect(details).toHaveAttribute('aria-expanded','false');
+});
+test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
+ await page.clock.install();
+ const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
+ for(let day=2;day<=6;day++)await next.click();
+ // Route is clear; the next beat involves the missing UX-89 ticket.
+ await root.locator('.schip[data-step-source="3"]').first().click();const bar=root.locator('.termbar').first();
+ await bar.getByRole('button',{name:'Play',exact:true}).click();await expect(bar).toHaveAttribute('data-playback','playing');await page.clock.runFor(3100);
+ await expect(bar).toHaveAttribute('data-playback','paused');await expect(root.locator('.schip[data-step-source="4"][aria-current="true"]')).toHaveCount(1);await expect(bar.locator('.dv-live-caption')).toHaveText('MISSING · UX-89');await expect(root.locator('.dv-live-badge.dv-live-missing:focus')).toHaveCount(1);
+ await bar.getByRole('button',{name:'Next step',exact:true}).click();await expect(root.locator('.schip[data-step-source="5"][aria-current="true"]')).toHaveCount(1);
+});
+test('B5 B9 reduced motion creates no change pulse after real demo changes',async({page,server})=>{
+ const root=await openStory(page,server);await root.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('.dv-live-changed')).toHaveCount(0);
+});
+
+test('B5 changed node pulses its card in every skin without moving the positioned group',async({page,server})=>{
+ const root=await openStory(page,server),node=root.locator('g.node[data-dv-node="button"]');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const before=await node.evaluate(el=>{
+  const card=el.querySelector('.card');
+  const pause=ev=>{
+   if(ev.target!==card || ev.animationName!=='dvnodepulse')return;
+   const animation=card.getAnimations().find(a=>a.animationName==='dvnodepulse');
+   animation.pause();animation.currentTime=230;el.removeEventListener('animationstart',pause);
+  };
+  el.addEventListener('animationstart',pause);
+  return {transform:getComputedStyle(el).transform,attribute:el.getAttribute('transform')};
+ });
+ await root.getByRole('button',{name:'Next day',exact:true}).click();
+ await expect(node).toHaveClass(/dv-live-changed/);
+ await expect.poll(()=>node.locator('.card').evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse' && a.playState==='paused'))).toBe(true);
+ for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
+  await page.evaluate(s=>window.dvSetSkin(s),skin);
+  await expect(node.locator('.card')).toHaveCSS('animation-name','dvnodepulse');
+  await expect(node).toHaveCSS('transform',before.transform);await expect(node).toHaveAttribute('transform',before.attribute);
+  expect(await node.evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse'))).toBe(false);
+  expect(await node.locator('.card').evaluate(el=>getComputedStyle(el).transform)).not.toBe('none');
+ }
+ await node.locator('.card').evaluate(el=>el.getAnimations().find(a=>a.animationName==='dvnodepulse').finish());
+ await expect(node).not.toHaveClass(/dv-live-changed/);
+});

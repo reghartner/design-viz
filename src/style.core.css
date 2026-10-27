@@ -4096,3 +4096,34 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
   .dv-live-comm-failure{display:inline!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
   .dv-live-comm-hidden{opacity:0!important;}
 }
+
+/* Story evidence supplements the state color with text, progress and age. */
+.dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
+.lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing),.dv-live-lane{border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
+.dv-live-stale.dv-live-badge>circle{stroke:#9ca3af!important;stroke-dasharray:3 3;stroke-width:3;}
+.dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
+/* Keep the carrier group's positioned SVG transform intact. Match the live
+   card paint specificity so its animation reset cannot suppress this pulse. */
+@media screen and (prefers-reduced-motion:no-preference){
+  :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
+  path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
+}
+.dv-live-panel{position:fixed;inset:90px 24px auto auto;margin:0;width:420px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-panel[hidden]{display:none!important;}
+.dv-live-panel h2{margin:0 60px 16px 0;font-size:18px;}
+.dv-live-panel h3{margin:18px 0 8px;font-size:14px;}
+.dv-live-panel-close{position:absolute;right:16px;top:16px;}
+.dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
+.dv-live-completion svg{width:64px;height:64px;flex:none;transform:rotate(-90deg);}
+.dv-live-completion circle{fill:none;stroke-width:4;}
+.dv-live-ring-track{stroke:var(--dv-live-todo);opacity:.3;}
+.dv-live-ring-done{stroke:var(--dv-live-done);}
+.dv-live-verdict{font-weight:700;}
+.dv-live-lane{padding:4px 8px;margin:4px 0;border-left:4px solid;font-variant-numeric:tabular-nums;}
+.dv-live-blockers,.dv-live-activity{list-style:none;padding:0;margin:0;}
+.dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--dline,#9ca3af);}
+.dv-live-state-pill{border:1px solid currentColor;border-radius:4px;padding:0 5px;font-size:11px;}
+.dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
+.dv-live-activity-entry{padding:5px 0;font-size:12px;}
+@media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
+@media print{.dv-live-panel{display:none!important;}.dv-live-changed{animation:none!important;}}

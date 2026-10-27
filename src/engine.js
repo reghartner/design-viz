@@ -1664,7 +1664,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var steps = playbackSteps(d);
   var N = steps.length;
   var cur = 0, paintedStep = null, timer = null, mode = 'ambient',activeOverview=null;
-  var pending = [], wireContracts = null;
+  var pending = [], wireContracts = null, beforeAdvance = [];
   var svg = board.svg;
   function clearWireContracts(){if(wireContracts)wireContracts.destroy();wireContracts=null;}
   function paintWireContracts(){
@@ -1995,6 +1995,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     paintedStep = cur;activeOverview=null;
     if(options && options.activeChanged)options.activeChanged();
     if (onChange) onChange(claimAddressBar !== false);
+    if(secBox.dispatchEvent)secBox.dispatchEvent(new CustomEvent('dv:stepchange',{bubbles:true}));
+  }
+  function allowAutoAdvance(){
+    return beforeAdvance.slice().every(function(fn){return fn(selectedPath.indices[cur])!==false;});
   }
   function startAuto(){
     clearEditingPreview();
@@ -2002,9 +2006,13 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var visible=stops(),last=visible[visible.length-1];
     if (destroyed || timer || visible.length < 2 || mode !== 'step' || hidden || document.hidden) return;
     if (explicitPaths && cur === last) setStep(visible[0], false, false);
+    if(!allowAutoAdvance()){stopAuto();return;}
     /* the modulo wrap back to step 0 is a jump, not a narrative move */
     var id = window.setInterval(function(){
-      if (timer === id) setStep(cur < last ? cur + 1 : explicitPaths ? last : visible[0], false, cur < last ? undefined : false);
+      if (timer === id){
+        setStep(cur < last ? cur + 1 : explicitPaths ? last : visible[0], false, cur < last ? undefined : false);
+        if(!allowAutoAdvance())stopAuto();
+      }
     }, 3000);
     timer = id;
     syncPlayback();
@@ -2110,6 +2118,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (panelCtl) panelCtl.setStep(0, false, true);
     if(options && options.activeChanged)options.activeChanged();
     if (onChange) onChange();
+    if(secBox.dispatchEvent)secBox.dispatchEvent(new CustomEvent('dv:stepchange',{bubbles:true}));
   }
 
   btnAmb.addEventListener('click', enterAmbient);
@@ -2216,8 +2225,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     autoplays: function(){ return autoplay && !RM; },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
+    onBeforeAdvance:function(fn){beforeAdvance.push(fn);return function(){var index=beforeAdvance.indexOf(fn);if(index>=0)beforeAdvance.splice(index,1);};},
     destroy: function(){
-      destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
+      destroyed = true; beforeAdvance=[];stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
       if(pathTimeline)pathTimeline.destroy();
       if(chipDeltas)chipDeltas.destroy();
       if(chipsBox.removeEventListener)chipsBox.removeEventListener('focusin',revealFocusedPathStep);

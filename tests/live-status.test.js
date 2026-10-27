@@ -218,6 +218,11 @@ test('S4 waiting preserves own state, supplies badge/popover keys and clears on 
  api.setEnabled(false);assert.equal(b.getAttribute('data-dv-live-waiting-on'),null);api.setEnabled(true);assert.ok(b.classList.contains('dv-live-waiting'));
  api.apply({'BB-1':{state:'done'},'BB-2':{state:'done'},'EE-1':{state:'blocked'}});assert.ok(!b.classList.contains('dv-live-waiting'));api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
 });
+test('L1 waiting badges carry no canvas text tag; the aria-label and popover keep the keys',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),badge=b.querySelector('.dv-live-badge');
+ assert.ok(b.classList.contains('dv-live-waiting'));assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);
+ assert.equal(h.view.querySelectorAll('.dv-live-waiting-tag').length,0);
+});
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
  const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}}}};

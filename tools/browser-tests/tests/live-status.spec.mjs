@@ -456,3 +456,33 @@ test('G2 badges and popover pills use the skin card surface, ink token and IBM P
   await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  }
 });
+
+/* Canvas label hygiene (#761, Chuck 2026-10-27).
+ L1 on every demo day: no per-badge waiting tags; a live-blocked edge shows its break glyph with no canvas text
+    (the keys stay in the group's aria-label, the badge and its popover); no dv-live text label box intersects
+    another, an edge label, a step coin, a badge or a node card. */
+async function liveLabelBoxes(page){
+ return page.evaluate(()=>{
+  const root=document.querySelector('#docview'),shown=el=>el.checkVisibility() && el.getBoundingClientRect().width>0;
+  const box=el=>{const r=el.getBoundingClientRect(),owner=el.closest('[data-dv-edge],[data-dv-node]');return {l:r.left,t:r.top,r:r.right,b:r.bottom,id:(el.getAttribute('class')||el.tagName)+' '+(owner?owner.getAttribute('data-dv-edge')??owner.getAttribute('data-dv-node'):'')+' "'+(el.textContent||'').trim().slice(0,40)+'"'};};
+  const all=sel=>[...root.querySelectorAll(sel)].filter(shown).map(box);
+  return {labels:all('text[class*="dv-live-"]:not(.lbl)'),edgeLabels:all('text.lbl'),coins:all('g.coin'),cards:all('.node .card'),badges:all('.dv-live-badge>circle'),
+   tags:root.querySelectorAll('.dv-live-waiting-tag').length,breakLabels:root.querySelectorAll('.dv-live-break-label').length,
+   breaks:[...root.querySelectorAll('g.dv-live-comm-failure')].map(el=>el.getAttribute('aria-label'))};
+ });
+}
+const overlaps=(a,b)=>a.l<b.r && b.l<a.r && a.t<b.b && b.t<a.b;
+test('L1 every demo day keeps live text off edge labels, coins, badges and node cards',async({page,server})=>{
+ const root=await openStory(page,server);let breaks=0;
+ for(let day=1;day<=12;day++){
+  await demoDay(root,day);const seen=await liveLabelBoxes(page);
+  expect(seen.tags,'day '+day+' waiting tags').toBe(0);
+  expect(seen.breakLabels,'day '+day+' live break text').toBe(0);
+  for(const label of seen.breaks){breaks++;expect(label,'day '+day+' break keeps its keys for assistive tech').toMatch(/[A-Z]+-\d+/);}
+  seen.labels.forEach((a,i)=>{
+   seen.labels.slice(i+1).forEach(b=>expect(overlaps(a,b),'day '+day+': '+a.id+' overlaps '+b.id).toBe(false));
+   for(const kind of ['edgeLabels','coins','badges','cards'])seen[kind].forEach(c=>expect(overlaps(a,c),'day '+day+': '+a.id+' overlaps '+kind+' '+c.id).toBe(false));
+  });
+ }
+ expect(breaks,'blocked days still draw the break glyph').toBeGreaterThan(0);
+});

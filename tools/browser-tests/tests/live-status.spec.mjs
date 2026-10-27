@@ -51,8 +51,19 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
 test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server})=>{
  const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';const root=await open(page,server,spec),section=root.locator('#section-delivery');
  await section.locator('.schip[data-step-source="0"]').first().click();
- for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
-  await page.evaluate(skin=>window.dvSetSkin(skin),skin);
+ for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
+  if(['daylight','editorial'].includes(skin)){
+   // Legacy skins are supported authored inputs but absent from the picker.
+   spec.page.skin=skin;await open(page,server,spec,false);
+   await section.locator('.schip[data-step-source="0"]').first().click();
+  }else{
+   const nav=root.locator('.explore-navigation').first();
+   if(!await nav.locator('.reader-contents').isVisible())await nav.getByRole('button',{name:'Open Contents',exact:true}).click();
+   await nav.locator('.reader-theme-menu > summary').click();
+   await nav.locator('[data-reader-skin="'+skin+'"]').click();
+   await expect(nav.locator('.reader-theme-menu > summary')).toHaveAttribute('data-current-skin',skin);
+  }
+  await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));
   await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke','rgb(245, 158, 11)');await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke','rgb(239, 68, 68)');await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill','rgb(239, 68, 68)');await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color','rgb(239, 68, 68)');
  }
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-badge circle')).toHaveCSS('animation-name','runtime-pulse');await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');

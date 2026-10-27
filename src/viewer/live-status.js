@@ -185,9 +185,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function schedule(){if(retired || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();});}
   function relative(at){var seconds=Math.max(0,Math.floor((Date.now()-Date.parse(at))/1000));return seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+'m ago':seconds<86400?Math.floor(seconds/3600)+'h ago':Math.floor(seconds/86400)+'d ago';}
+  function buildControl(control){
+    var root=element('div','dv-live-control',null,control.host),toggle=element('button','reader-button dv-live-toggle','Live',root),counts={};toggle.type='button';
+    LIVE_STATUS_STATES.forEach(function(state){counts[state]=element('span','dv-live-count',null,toggle);counts[state].setAttribute('data-live-count',state);});
+    var note=element('span','dv-live-note',null,root),action=element('button','reader-button dv-live-action',null,root);action.type='button';note.setAttribute('role','status');
+    toggle.addEventListener('click',function(){api.setEnabled(!on);});action.addEventListener('click',function(){if(!retired && controls.indexOf(control)>=0 && actionFn)actionFn();});
+    control.root=root;control.toggle=toggle;control.counts=counts;control.note=note;control.action=action;
+  }
   function refreshControls(){
     var value=snapshot(),available=refs().tickets.length>0;
     controls.forEach(function(control){
+      if(!control.root){if(!available)return;buildControl(control);}
       control.root.hidden=!available || !(provider || applied || noteText || actionFn);
       control.toggle.setAttribute('aria-pressed',String(on));
       LIVE_STATUS_STATES.forEach(function(state){control.counts[state].textContent=state+' '+value.counts[state];control.counts[state].hidden=!value.counts[state];});
@@ -233,13 +241,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';refreshControls();},
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;refreshControls();},
     mountControls:function(host){
-      if(retired || !refs().tickets.length)return null;
-      var root=element('div','dv-live-control',null,host),toggle=element('button','reader-button dv-live-toggle','Live',root),counts={};toggle.type='button';
-      LIVE_STATUS_STATES.forEach(function(state){counts[state]=element('span','dv-live-count',null,toggle);counts[state].setAttribute('data-live-count',state);});
-      var note=element('span','dv-live-note',null,root),action=element('button','reader-button dv-live-action',null,root);action.type='button';note.setAttribute('role','status');
-      toggle.addEventListener('click',function(){api.setEnabled(!on);});action.addEventListener('click',function(){if(actionFn)actionFn();});
-      var control={root:root,toggle:toggle,counts:counts,note:note,action:action,time:null};controls.push(control);refreshControls();
-      return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);root.remove();}};
+      if(retired)return null;
+      // Approved external details can introduce the page's first ticket later.
+      // Retain only the host until then, with no placeholder DOM on empty pages.
+      var control={host:host,root:null,time:null};controls.push(control);refreshControls();
+      return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);if(control.root)control.root.remove();}};
     },
     destroy:function(){
       if(retired)return;retired=true;close(false);stopTimer();if(abort)abort.abort();
@@ -247,7 +253,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
-      if(pop)pop.remove();controls.forEach(function(control){control.root.remove();});controls=[];listeners=[];
+      if(pop)pop.remove();controls.forEach(function(control){if(control.root)control.root.remove();});controls=[];listeners=[];
       if(applied){
         view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
         view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing').forEach(function(el){liveStatusClass(el,null);});

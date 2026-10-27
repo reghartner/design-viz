@@ -4108,7 +4108,10 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
   :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
   path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
 }
-.dv-live-panel{position:fixed;inset:90px 24px auto auto;margin:0;width:420px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-panel,.dv-live-carrier-preview{position:fixed;inset:90px 24px auto auto;margin:0;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-carrier-preview{width:1100px;}
+.dv-live-carrier-preview h2{margin:0 60px 16px 0;font-size:18px;}
+.dv-live-carrier-close{position:absolute;right:16px;top:16px;}
 .dv-live-panel[hidden]{display:none!important;}
 .dv-live-panel h2{margin:0 60px 16px 0;font-size:18px;}
 .dv-live-panel h3{margin:18px 0 8px;font-size:14px;}
@@ -4126,4 +4129,14 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
 @media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
-@media print{.dv-live-panel{display:none!important;}.dv-live-changed{animation:none!important;}}
+@media print{.dv-live-panel,.dv-live-carrier-preview{display:none!important;}.dv-live-changed{animation:none!important;}}
+
+.dv-live-tickets-scroll{overflow:auto;max-width:100%;}
+.dv-live-tickets{width:100%;min-width:720px;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--dline,#9ca3af);}
+.dv-live-tickets th{font-weight:700;}
+.dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
+.dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
+.dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}

@@ -48,6 +48,10 @@ export function parseJql(jql) {
       const keys = match[1].split(',').map(unquote);
       if (!keys.length || keys.some(key => !key || !/^[A-Z][A-Z0-9_]*-\d+$/i.test(key))) return null;
       parsed.keys = keys.map(key => key.toUpperCase());
+    } else if ((match = /^parent\s*=\s*(.+)$/i.exec(clause.trim()))) {
+      const key = unquote(match[1]);
+      if (parsed.parent || !key || !/^[A-Z][A-Z0-9_]+-\d+$/i.test(key)) return null;
+      parsed.parent = key.toUpperCase();
     } else if ((match = /^Flagged\s*=\s*(.+)$/i.exec(clause.trim()))) {
       if (parsed.flagged || unquote(match[1])?.toLowerCase() !== 'impediment') return null;
       parsed.flagged = true;
@@ -97,6 +101,7 @@ export function jiraIssueFromStatus(key, entry, now = EPOCH) {
       status: { name: entry.statusName || (entry.state === 'blocked' ? 'Blocked' : category.name), statusCategory: { ...category } },
       assignee: entry.assignee ? { displayName: entry.assignee } : null,
       priority: { name: entry.priority || 'Medium' }, issuetype: { name: entry.issueType || 'Task' },
+      ...(entry.epic ? { parent: { key: entry.epic, fields: { summary: 'Connected doorbell delivery', issuetype: { name: 'Epic' } } } } : {}),
       updated, customFields
     }
   };
@@ -130,6 +135,13 @@ function toolResult(name, args, env, id) {
   const issues = issuesFor(env);
   if (name === 'getJiraIssue') {
     const key = args.issueIdOrKey;
+    if (key === 'DOOR-100') {
+      const children = Object.values(issues).filter(entry => entry.epic === key);
+      const state = children.length && children.every(entry => entry.state === 'done') ? 'done'
+        : children.some(entry => ['active', 'blocked', 'done'].includes(entry.state)) ? 'active' : 'todo';
+      return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key,
+        { state, summary: 'Connected doorbell delivery', issueType: 'Epic' }, env.now) } };
+    }
     if (typeof key !== 'string' || !Object.hasOwn(issues, key)) {
       return error(id, -32602, 'Issue does not exist or you do not have permission to see it.');
     }
@@ -139,14 +151,18 @@ function toolResult(name, args, env, id) {
     const parsed = parseJql(args.jql);
     const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
       ? Math.max(0, Math.min(100, Math.floor(args.maxResults))) : 50;
-    const nodes = parsed ? Object.entries(issues).filter(([key, entry]) => {
+    const matches = parsed ? Object.entries(issues).filter(([key, entry]) => {
       return (!parsed.keys || parsed.keys.includes(key)) &&
         (!parsed.project || key.split('-')[0] === parsed.project) &&
+        (!parsed.parent || entry.epic === parsed.parent) &&
         (!parsed.flagged || entry.flagged || entry.state === 'blocked') &&
         (!parsed.statusCategory || CATEGORIES[entry.state]?.key === parsed.statusCategory);
-    }).slice(0, limit).map(([key, entry]) => jiraIssueFromStatus(key, entry, env.now)) : [];
+    }) : [];
+    const offset = /^\d+$/.test(args.nextPageToken || '') ? Number(args.nextPageToken) : 0;
+    const nodes = matches.slice(offset, offset + limit).map(([key, entry]) => jiraIssueFromStatus(key, entry, env.now));
+    const hasNextPage = limit > 0 && offset + nodes.length < matches.length;
     return { issues: { nodes, webUrl: SITE + '/issues/?jql=' + encodeURIComponent(typeof args.jql === 'string' ? args.jql : '') },
-      pageInfo: { hasNextPage: false, endCursor: null } };
+      pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + nodes.length) : null } };
   }
   return error(id, -32602, 'Unknown tool: ' + String(name));
 }

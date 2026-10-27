@@ -22,3 +22,14 @@ function trackingRefs(obj, invalid){
   });
   return refs;
 }
+/* Page-level epic references share the ticket key grammar. */
+function trackingEpics(page,invalid){
+  var jira=page && page.tracking && page.tracking.jira,out=[];
+  if(!jira || !Object.prototype.hasOwnProperty.call(jira,'epic'))return out;
+  var value=jira.epic;
+  if(typeof value!=='string' && !Array.isArray(value)){if(invalid)invalid(null);return out;}
+  (Array.isArray(value)?value:[value]).forEach(function(key,index){
+    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(Array.isArray(value)?index:null);}
+    else if(out.indexOf(key)<0)out.push(key);
+  });return out;
+}

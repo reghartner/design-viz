@@ -10,7 +10,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "HW-124": {
       "state": "done",
@@ -22,7 +23,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "FW-45": {
       "state": "done",
@@ -34,7 +36,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "FW-46": {
       "state": "done",
@@ -46,7 +49,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "BE-67": {
       "state": "done",
@@ -58,7 +62,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "BE-68": {
       "state": "done",
@@ -70,7 +75,8 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
     },
     "UX-89": {
       "state": "done",
@@ -82,7 +88,22 @@
       "prs": {
         "count": 1,
         "state": "MERGED"
-      }
+      },
+      "epic": "DOOR-100"
+    },
+    "UX-90": {
+      "state": "done",
+      "summary": "Alert sound setting",
+      "assignee": "Morgan",
+      "updated": "2026-10-31T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100",
+      "lane": "APP"
     }
   }
 }

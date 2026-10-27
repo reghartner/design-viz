@@ -67,14 +67,14 @@ test('V3 rollup covers every precedence branch and ignores absent and unknown st
 });
 test('V2 refs uses the shared parser across sections, tabs, paths and detail-only flows',()=>{
  const raw=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json')),h=harness(raw);
- const refs=plain(h.ctl.liveStatus.refs());refs.tickets.sort();assert.deepEqual(refs,{tickets:['BE-67','BE-68','FW-45','FW-46','HW-123','HW-124','UX-89'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
+ const {tickets,prs}=plain(h.ctl.liveStatus.refs()),refs={tickets,prs};refs.tickets.sort();assert.deepEqual(refs,{tickets:['BE-67','BE-68','FW-45','FW-46','HW-123','HW-124','UX-89'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
  const data=fixture(),d=data.page.sections[0].diagram;d.nodes.a.tickets.push('invalid','AA-1');d.steps.push({id:'other',nodes:['c']});d.paths=[{id:'main',steps:['hop']},{id:'other',steps:['other']}];data.page.blocks=[{tabs:[{label:'One',sections:data.page.sections},{label:'Two',sections:[{id:'detail',detailOnly:true,diagram:{nodes:{child:{tickets:['DD-1'],prs:['https://example.test/pr']}}}}]}]}];delete data.page.sections;
  const next=harness(data);assert.ok(next.ctl.liveStatus.refs().tickets.includes('DD-1'));assert.ok(next.ctl.liveStatus.refs().tickets.includes('CC-2'));assert.ok(!next.ctl.liveStatus.refs().tickets.includes('invalid'));assert.equal(next.ctl.liveStatus.refs().tickets.filter(k=>k==='AA-1').length,1);
 });
 test('V2 original overlay fixture preserves ticket traversal order and node/edge PR refs',()=>{
  // Keep the pre-story order assertion independently of the six-node example.
  const h=harness({nodes:{hardware:{tickets:['HW-123']},firmware:{tickets:['FW-45'],prs:['https://github.com/acme/firmware/pull/88']},backend:{tickets:['BE-67']},ux:{tickets:['UX-89']}},rows:[['hardware','firmware','backend','ux']],edges:[{from:'hardware',to:'firmware',tickets:['HW-124','FW-46']},{from:'firmware',to:'backend',tickets:['BE-68'],prs:['https://github.com/acme/backend/pull/91']},{from:'backend',to:'ux'}]});
- assert.deepEqual(plain(h.ctl.liveStatus.refs()),{tickets:['HW-123','FW-45','BE-67','UX-89','HW-124','FW-46','BE-68'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
+ const {tickets,prs}=plain(h.ctl.liveStatus.refs());assert.deepEqual({tickets,prs},{tickets:['HW-123','FW-45','BE-67','UX-89','HW-124','FW-46','BE-68'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
 });
 test('V2 V4 apply paints nodes, edge paths/halos/labels and step carriers; disable and clear restore',()=>{
  const {ctl,view}=harness(fixture()),api=ctl.liveStatus,events=[];api.onChange(v=>events.push(plain(v)));api.apply(fixed);
@@ -220,7 +220,7 @@ test('S4 waiting preserves own state, supplies badge/popover keys and clears on 
 });
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
- const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}},'EX-1':{state:'active'}}};
+ const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}}}};
  const map=plain(C.liveStatusDemoMap(day,['AA-1','BB-1','CC-1']));assert.deepEqual(map['AA-1'],{state:'blocked',title:'Signal',assignee:'Alex',updatedAt:'2026-10-26',detail:'Blocked · flagged',prs:{count:2,state:'open'}});assert.deepEqual(map['CC-1'],{state:'missing'});assert.equal(map['BB-1'].prs,undefined);assert.equal(map['EX-1'],undefined);
 });
 test('S2 synthesized fallback uses only page tickets across four days',()=>{
@@ -250,8 +250,8 @@ function providerContext(C={URL}){
 }
 const jira=(key,category='indeterminate',name='In Progress')=>({key,fields:{summary:'Work '+key,status:{name,statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
 const settle=()=>new Promise(setImmediate);
-function providerHarness(raw=fixture()){
- const h=harness(raw);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
+function providerHarness(raw=fixture(),renderOptions={}){
+ const h=harness(raw,{},renderOptions);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
  h.ctl.liveStatus.mountControls(h.view);
  const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]}];
  const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
@@ -497,4 +497,262 @@ test('B6 external detail staleDays applies to its nodes edges badges and popover
  const rootBadge=parent.querySelector('.dv-live-badge');assert.ok(!rootBadge.classList.contains('dv-live-stale'));
  rootBadge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});assert.equal(h.view.querySelector('.dv-live-stale-detail'),null);
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0);api.destroy();
+});
+
+/* E1–E11 epic contract. Existing assertions above retain carrier-only scope;
+   extra-key inclusion supersedes the old demo's EX-1 omission fixture. */
+const epicFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:['EP-1','EP-2']}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Client',tickets:['AA-1'],prs:['https://code.test/pull/1']},b:{title:'Service',tickets:['BB-1','CC-1','DD-1','EE-1','FF-1']}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Call',tickets:['AA-1'],prs:['https://code.test/pull/2']}],steps:[{id:'one',edge:'a->b',lane:'APP'}]}}]}});
+const textOf=el=>(el.textContent||'')+el.children.map(textOf).join(' ');
+test('E1 epic parser deduplicates ordered keys and validator warns per invalid entry without errors',()=>{
+ const {C}=harness();assert.equal(typeof C.trackingEpics,'function');
+ for(const [value,want,warnings] of [['EP-1',['EP-1'],0],[['EP-2','EP-1','EP-2','bad',null],['EP-2','EP-1'],2],[{},[],1],[null,[],1],[17,[],1],['bad',[],1]]){
+  const raw=epicFixture();raw.page.tracking.jira.epic=value;const before=JSON.stringify(raw);
+  assert.deepEqual(plain(C.trackingEpics(raw.page)),want);const result=C.validate(C.normalize(raw));
+  assert.deepEqual(plain(result.errors),[]);assert.equal(result.warnings.filter(w=>/tracking.jira.epic/.test(w)).length,warnings);assert.equal(JSON.stringify(raw),before);
+ }
+ assert.deepEqual(plain(C.trackingEpics({})),[]);
+});
+test('E2 refs include root and loaded detail epics and coverage leaves carrier rollups unchanged',async()=>{
+ const renderOptions={loadDetail:()=>Promise.resolve({page:{tracking:{jira:{epic:['EP-2','EP-3']}},sections:[{diagram:{nodes:{child:{tickets:['ZZ-1']}},rows:[['child']]}}]}})};
+ const h=harness(epicFixture(),{},renderOptions),api=h.ctl.liveStatus,C=h.C;
+ assert.ok(Array.isArray(api.refs().epics),'epics array');assert.deepEqual(plain(api.refs().epics),['EP-1','EP-2']);await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);
+ assert.deepEqual(plain(api.refs().epics),['EP-1','EP-2','EP-3']);assert.equal(typeof C.liveStatusCoverage,'function');
+ const map={'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'todo',epic:'OTHER-1'},'EX-1':{state:'blocked',epic:'EP-2'},'EX-2':{state:'active',epic:'EP-3'},'NO-1':{state:'done',epic:'OTHER-1'}};
+ api.apply(map);assert.equal(api.state('EX-1').epic,'EP-2');
+ assert.deepEqual(plain(C.liveStatusCoverage(h.ctl.page,map,api.refs())),{epics:['EP-1','EP-2','EP-3'],onDiagram:['AA-1','BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1'],notOnDiagram:['EX-1','EX-2'],notInEpic:['BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1']});
+ assert.deepEqual(plain(C.liveStatusCoverage({},map,{tickets:['AA-1'],epics:[]})).notInEpic,[]);
+ assert.ok(h.view.querySelector('g.node[data-dv-node="a"]').classList.contains('dv-live-done'));assert.equal(C.liveStatusCarrier({tickets:['AA-1']},map),'done');api.destroy();
+});
+test('E3 epic watches paginate both cursor envelopes tag children and keep evidence on errors',async()=>{
+ const h=providerHarness(epicFixture());await h.start();
+ const epic=h.watches.find(w=>w.input.jql==='parent = EP-1'),flag=h.watches.find(w=>w.input.jql==='parent = EP-1 AND Flagged = Impediment');
+ assert.ok(epic,'one epic watch');assert.ok(flag,'paired flagged watch');assert.equal(h.watches.filter(w=>/^parent =/.test(w.input.jql)).length,4);
+ assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuetype']);assert.equal(epic.input.maxResults,10);
+ h.data(0,[jira('AA-1')]);const calls=[];
+ h.mcp.callTool=async(server,tool,input)=>{calls.push(plain(input));return input.nextPageToken==='two'?{payload:{issues:[jira('EX-2')],nextPageToken:'three'}}:{payload:{issues:[jira('EX-3')]}};};
+ epic.handler({type:'data',result:{payload:{issues:{nodes:[jira('AA-1'),jira('EX-1')]},pageInfo:{hasNextPage:true,endCursor:'two'}}}});await settle();await settle();
+ assert.deepEqual(calls.map(c=>c.nextPageToken),['two','three']);assert.ok(calls.every(c=>c.jql==='parent = EP-1' && c.maxResults===10));
+ for(const key of ['AA-1','EX-1','EX-2','EX-3'])assert.equal(h.ctl.liveStatus.state(key).epic,'EP-1');
+ flag.handler({type:'data',result:{payload:{issues:[jira('EX-3')]}}});assert.equal(h.ctl.liveStatus.state('EX-3').state,'blocked');
+ for(const code of ['tool_error','rate_limited','needs_reauth']){epic.handler({type:'error',error:{code,retryable:true}});assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.ctl.liveStatus.state('EX-3').state,'blocked');}
+ h.ctl.liveStatus.destroy();assert.ok(h.watches.every(w=>w.stopped===1));
+});
+test('E4 demo includes extra keys and epic metadata while missing requested keys stay missing',()=>{
+ const C=storyContext(),map=plain(C.liveStatusDemoMap({issues:{'AA-1':{state:'done',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',lane:'APP'}}},['AA-1','MISS-1']));
+ assert.deepEqual(map['EX-1'],{state:'active',epic:'EP-1',lane:'APP'});assert.equal(map['AA-1'].epic,'EP-1');assert.deepEqual(map['MISS-1'],{state:'missing'});
+});
+test('E6 Tickets table orders states includes columns authored PRs lane stripe and coverage focus',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);
+ api.apply({'AA-1':{state:'done',epic:'EP-1',title:'Client work',assignee:'Alex',prs:{count:2,state:'declined'}},'BB-1':{state:'todo'},'CC-1':{state:'active',epic:'EP-1'},'DD-1':{state:'missing',epic:'EP-1'},'EE-1':{state:'blocked',epic:'EP-1'},'FF-1':{state:'blocked',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',title:'Extra',lane:'APP'},'NO-1':{state:'blocked',epic:'OTHER-1'}});
+ h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
+ assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','PRs','Coverage']);
+ const rows=table.querySelectorAll('tbody')[0].children;assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['EE-1','FF-1','DD-1','CC-1','EX-1','BB-1','AA-1']);
+ const aa=rows.at(-1),extra=rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex.*time unavailable/);assert.match(textOf(aa),/2 declined/);
+ assert.deepEqual(aa.querySelectorAll('a').map(el=>el.getAttribute('href')),['https://jira.test/browse/AA-1','https://code.test/pull/1','https://code.test/pull/2']);
+ assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(rows[5].querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
+ assert.equal(extra.props['--dv-live-lane-color'],'#34d399');assert.deepEqual(aa.querySelectorAll('button').map(el=>el.textContent),['Client','Call']);
+ let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.dv-live-badge').focus=()=>focused=true;aa.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
+ assert.match(h.view.querySelector('.dv-live-verdict').textContent,/5 of 6 epic stories on diagram/);api.destroy();
+});
+test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);api.apply({'AA-1':{state:'done',epic:'EP-1'}});h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+ const map={'AA-1':{state:'done',epic:'EP-1'},'EX-1':{state:'todo',epic:'EP-1'}};api.apply(map);
+ let rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,1);assert.equal(rows[0].textContent,'EX-1 · added to epic · not on diagram · time unavailable');api.apply(map);assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,1);
+ for(let i=2;i<24;i++){map['EX-'+i]={state:'todo',epic:'EP-1',updatedAt:'2026-10-20T00:00:00Z'};api.apply(map);}
+ rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,20);assert.equal(rows[0].getAttribute('data-updated-at'),'2026-10-20T00:00:00.000Z');api.destroy();
+});
+test('E9 E11 docs and built example declare epic and Tickets table',()=>{
+ const docs=fs.readFileSync('docs/live-status.md','utf8');assert.match(docs,/### Tickets table/);assert.match(docs,/parent =/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking.jira.epic/);
+ const built=fs.readFileSync('examples/live-status/live-status.html','utf8');assert.match(built,/function liveStatusCoverage\(/);assert.match(built,/Alert sound setting/);assert.match(built,/dv-live-tickets/);
+});
+
+test('E7 a previously seen child returning after absence is not a new epic addition',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);
+ api.apply({'EX-1':{state:'todo',epic:'EP-1'}});h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+ api.apply({});api.apply({'EX-1':{state:'todo',epic:'EP-1'}});assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);api.destroy();
+});
+test('E3 failed and superseded pagination cannot replace complete carrier or epic evidence',async()=>{
+ const h=providerHarness(epicFixture());await h.start();h.data(0,[jira('AA-1')]);const watch=h.watches.find(w=>w.input.jql==='parent = EP-1');
+ const deliver=payload=>watch.handler({type:'data',result:{payload}});
+ deliver({issues:[jira('EX-1')]});let resolve;
+ h.mcp.callTool=()=>Promise.reject({code:'upstream_error',retryable:true});
+ deliver({issues:[jira('EX-2')],pageInfo:{hasNextPage:true,endCursor:'two'}});await settle();
+ assert.equal(h.ctl.liveStatus.state('EX-1').state,'active');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,1);
+ h.mcp.callTool=()=>new Promise(r=>resolve=r);deliver({issues:[jira('EX-2')],nextPageToken:'two'});await settle();
+ deliver({issues:[jira('EX-3','done')]});resolve({payload:{issues:[jira('EX-4')]}});await settle();
+ assert.equal(h.ctl.liveStatus.state('EX-3').state,'done');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('EX-4'),null);h.ctl.liveStatus.destroy();
+});
+test('E3 an epic without carrier tickets still starts its two watches and exposes details',async()=>{
+ const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
+ assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment']);
+ h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-control').hidden,false);h.ctl.liveStatus.destroy();
+});
+
+/* Round 2 regressions: preserve the frozen E1–E11 RED rows above. */
+test('E8 rework Workbench demo entries paint carrier badges with page epics configured',()=>{
+ const raw=epicFixture(),h=harness(raw),before=JSON.stringify(h.ctl.page);
+ vm.runInNewContext(fs.readFileSync('src/workbench/preview.js','utf8'),h.C);
+ const map=h.C.workbenchDemoStatus(h.ctl.page);
+ assert.deepEqual(plain(map),{'AA-1':{state:'todo'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'blocked'},'EE-1':{state:'todo'},'FF-1':{state:'active'}});
+ h.ctl.liveStatus.apply(map);
+ assert.equal(h.view.querySelectorAll('.dv-live-badge').length,3);
+ assert.ok(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-todo'));
+ assert.ok(h.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-blocked'));
+ assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-todo'));
+ assert.deepEqual(plain(h.ctl.liveStatus.refs().epics),['EP-1','EP-2']);
+ assert.equal(JSON.stringify(h.ctl.page),before,'demo must not write status into authored data');
+ h.ctl.liveStatus.destroy();
+});
+
+test('E3 rework loaded detail epics add deduplicated paginated watches without replacing carrier evidence',async()=>{
+ const detail={page:{tracking:{jira:{epic:['EP-2','EP-3']}},sections:[{id:'child',diagram:{nodes:{child:{tickets:['CH-1']}},rows:[['child']]}}]}};
+ const renderOptions={loadDetail:async()=>detail},h=providerHarness(epicFixture(),renderOptions),api=h.ctl.liveStatus;
+ await h.start();h.data(0,[jira('AA-1')]);assert.equal(h.watches.length,6);
+ await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
+ assert.equal(h.watches.length,10,'one new key batch and one new epic, each with Flagged');
+ const watch=h.watches.find(w=>w.input.jql==='parent = EP-3'),flag=h.watches.find(w=>w.input.jql==='parent = EP-3 AND Flagged = Impediment');
+ assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuetype']);assert.equal(watch.input.maxResults,10);
+ assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-1'),null,'new unanswered chunks do not erase or invent evidence');
+ h.mcp.callTool=async(server,tool,input)=>{h.calls.push(plain(input));return {payload:{issues:[jira('CH-2')]}};};
+ watch.handler({type:'data',result:{payload:{issues:[jira('CH-1')],pageInfo:{hasNextPage:true,endCursor:'second'}}}});await settle();
+ assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
+ flag.handler({type:'data',result:{payload:{issues:[jira('CH-2')]}}});assert.equal(api.state('CH-2').state,'blocked');
+ watch.handler({type:'error',error:{code:'tool_error',message:'Temporary epic failure'}});assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-2').state,'blocked');
+ for(let i=0;i<3;i++){await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.view.dispatchEvent({type:'detail-navigation'});h.flush();api.setEnabled(i%2===0);}
+ assert.equal(h.watches.length,10,'reopening details and toggles never duplicate watches');
+ api.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
+});
+
+test('E3 rework synchronous watch delivery and late detail completion retire cleanly',async()=>{
+ let resolve;const renderOptions={loadDetail:()=>new Promise(r=>resolve=r)},h=providerHarness(epicFixture(),renderOptions);
+ const originalWatch=h.mcp.watchTool;h.mcp.watchTool=(server,tool,input,handler,options)=>{
+  const off=originalWatch(server,tool,input,handler,options);handler({type:'data',result:{payload:{issues:[]}}});return off;
+ };
+ await h.start();assert.equal(h.watches.length,6);
+ const pending=renderOptions.loadDetail({spec:'late'},new AbortController().signal);h.ctl.liveStatus.destroy();
+ resolve({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}}}}]}});await pending;await settle();
+ assert.equal(h.watches.length,6);assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.frames.size,0);
+});
+
+test('E6 rework coverage opens inactive local and loaded external detail carriers before focusing',async()=>{
+ for(const external of [false,true]){
+  const childSection={id:'child',detailOnly:!external,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
+  const detail={page:{sections:[childSection]}},ref=external?{spec:'remote',section:'child'}:{section:'child'};
+  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:ref}},rows:[['parent']]}}]}};
+  if(!external)raw.page.sections.push(childSection);
+  const renderOptions={loadDetail:async()=>detail},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus,child=harness(detail);
+  child.ctl.liveStatus.destroy();const rootRec=h.ctl.sections[0],childRec=child.ctl.sections[0],restores=[];
+  let saved=null,active=[];if(!external)h.ctl.sections[1].sectionEl.hidden=true;
+  h.ctl.details={snapshot:()=>saved,activeSections:()=>active,showSection:()=>{saved=null;active=[];rootRec.sectionEl.hidden=false;},restore:async value=>{
+   restores.push(plain(value));if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+   saved=value;active=[rootRec,childRec];rootRec.sectionEl.hidden=true;h.view.appendChild(childRec.sectionEl);
+  }};
+  if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+  for(let i=0;i<2;i++){
+   h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+   const button=h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button');assert.equal(button.textContent,'Child carrier');button.dispatchEvent({type:'click'});await settle();h.flush();
+   assert.equal(restores.length,i+1);assert.deepEqual(restores[i],{section:'root',frames:[{node:'parent',state:{mode:'ambient'}}]});
+   assert.ok(childRec.sectionEl.contains(h.doc.activeElement),'focus is in the active detail, not its hidden original');assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
+   saved=null;active=[];rootRec.sectionEl.hidden=false;childRec.sectionEl.remove();h.view.dispatchEvent({type:'detail-navigation'});h.flush();
+  }
+  api.destroy();
+ }
+});
+
+test('E3 rework an initially untracked page defers discovery until a detail introduces an epic',async()=>{
+ const renderOptions={loadDetail:async()=>({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}},rows:[['child']]}}]}})},h=providerHarness({nodes:{parent:{}},rows:[['parent']]},renderOptions);
+ assert.equal(h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.watches.length,0);
+ await renderOptions.loadDetail({spec:'first-tracked-detail'},new AbortController().signal);await settle();
+ assert.equal(h.calls.length,1);assert.deepEqual(h.watches.map(w=>w.input.jql),['key in (CH-9)','key in (CH-9) AND Flagged = Impediment','parent = EP-9','parent = EP-9 AND Flagged = Impediment']);
+ h.data(2,[jira('EX-9')]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
+ h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
+});
+
+/* Round 3: collected carriers can live outside the authored drill-down graph. */
+test('E6 round 3 unlinked local and unrelated loaded sections preview node and edge badges with cleanup',async()=>{
+ for(const external of [false,true])for(const detailOnly of [false,true]){
+  if(!external && !detailOnly)continue;
+  const section={id:'unlinked',detailOnly,heading:'Unlinked work',diagram:{nodes:{child:{title:'Unlinked child',tickets:['CH-1']},end:{}},rows:[['child','end']],edges:[{from:'child',to:'end',label:'Unlinked edge',tickets:['CH-2']}]}};
+  const remote={page:{tracking:{jira:{site:'https://detail.test',epic:'EP-2'}},sections:[{id:'entry',diagram:{nodes:{entry:{}},rows:[['entry']]}},section]}};
+  const ref={spec:'approved-detail',section:'entry'},raw={page:{tracking:{jira:{epic:'EP-1'}},sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],...(external?{detail:ref}:{})}},rows:[['parent']]}},...(!external?[section]:[])]}};
+  let loads=0;const renderOptions={loadDetail:async()=>{loads++;return remote;}},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus;
+  if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+  else h.ctl.sections[1].sectionEl.hidden=true;
+  h.ctl.details={snapshot:()=>null,activeSections:()=>[],restore(){assert.fail('no authored route exists');}};
+  const before=JSON.stringify([h.ctl.page,remote]),built=[],disposals=[];
+  // Stub only the section renderer. Navigation, binding, paint, focus, map
+  // updates and teardown run through the real overlay; browser rows render SVG.
+  h.C.buildSection=(host,source,index,reference,protocols,skin,lanes,backlinks,changed,proseChanged,options)=>{
+   const child=harness({page:{sections:[plain(source)]}});child.ctl.liveStatus.destroy();
+   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);
+   rec.stepper={mode:()=> 'ambient',sourceIndex:()=>0,path:()=> 'default',enterAmbient(){},destroy:()=>disposals.push('stepper')};
+   rec.boardSize={destroy:()=>disposals.push('size')};rec.presentation={destroy:()=>disposals.push('presentation')};rec.destroy=()=>disposals.push('section');
+   built.push({rec,source,index,reference,options});return rec;
+  };
+  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  api.mountControls(h.view);const details=h.view.querySelector('.dv-live-details');details.focus=()=>h.doc.activeElement=details;
+  api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'},'CH-2':{state:'missing'}});
+  for(const [visit,key,id] of [[0,'CH-1','child'],[1,'CH-2','child->end'],[2,'CH-1','child']]){
+   details.dispatchEvent({type:'click'});
+   h.view.querySelector('tr[data-live-ticket="'+key+'"]').querySelector('button').dispatchEvent({type:'click'});await settle();h.flush();
+   const preview=h.view.querySelector('.dv-live-carrier-preview');assert.ok(preview,'carrier without a route opens its containing section');
+   assert.equal(built.length,visit+1);assert.equal(built[visit].source.id,'unlinked');assert.equal(built[visit].options.autoplay,false);assert.equal(built[visit].options.authoring,false);
+   assert.equal(built[visit].options.tracking.jira.epic,external?'EP-2':'EP-1');
+   assert.ok(preview.contains(h.doc.activeElement));assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.equal(h.view.querySelector('.dv-live-panel').hidden,true);
+   assert.equal(loads,external?1:0,'preview uses the approved loaded page without transport');
+   api.apply({'AA-1':{state:'done'},'CH-1':{state:'done'},'CH-2':{state:'blocked'}});
+   assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.ok(h.doc.activeElement.classList.contains(visit===1?'dv-live-blocked':'dv-live-done'));
+   if(visit===0){
+    h.doc.activeElement.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+    assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
+    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.ok(h.view.querySelector('.dv-live-carrier-preview'),'first Escape closes the ticket popover only');
+    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.equal(h.doc.activeElement,details);
+   }else if(visit===1)preview.querySelector('.dv-live-carrier-close').dispatchEvent({type:'click'});
+   else api.destroy();
+   h.flush();assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);
+   assert.deepEqual(disposals,Array.from({length:visit+1},()=>['stepper','size','presentation','section']).flat());
+   for(const event of ['dv:pathrender','dv:pathchange','dv:stepchange'])assert.equal(built[visit].rec.sectionEl.events[event]?.size||0,0);
+   assert.equal(h.doc.events.keydown?.size||0,0);
+  }
+  assert.equal(JSON.stringify([h.ctl.page,remote]),before,'no authored route or page is changed');assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+ }
+});
+
+test('E6 round 4 reopening Tickets cancels late coverage focus and preview while allowing a new request',async()=>{
+ for(const restored of [true,false]){
+  const childSection={id:'child',detailOnly:true,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
+  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['parent']]}},childSection]}};
+  const h=harness(raw),api=h.ctl.liveStatus,childRec=h.ctl.sections[1];childRec.sectionEl.hidden=true;
+  let finish,builds=0;
+  h.ctl.details={snapshot:()=>null,activeSections:()=>[],showSection(){},restore:()=>new Promise(resolve=>{finish=resolve;})};
+  h.C.buildSection=host=>{
+   builds++;const child=harness({page:{sections:[childSection]}});child.ctl.liveStatus.destroy();
+   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);return rec;
+  };
+  for(const name of ['createElement','createElementNS']){
+   const create=h.doc[name];h.doc[name]=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  }
+  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+  const details=h.view.querySelector('.dv-live-details');details.dispatchEvent({type:'click'});
+  const selectChild=()=>h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button').dispatchEvent({type:'click'});
+  selectChild();assert.equal(typeof finish,'function','coverage restoration is pending');
+  const panel=h.view.querySelector('.dv-live-panel');assert.equal(panel.hidden,true);
+  details.dispatchEvent({type:'click'});const dismiss=panel.querySelector('.dv-live-panel-close');
+  assert.ok(h.doc.activeElement===dismiss);
+  childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
+  assert.ok(h.doc.activeElement===dismiss,'late coverage completion must not steal the newer panel focus');
+  assert.equal(panel.hidden,false);assert.equal(details.getAttribute('aria-expanded'),'true');
+  assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null,'late restoration must not open a preview over Tickets');
+  assert.equal(builds,0);
+  // Cancellation belongs to the old request, not future coverage navigation.
+  childRec.sectionEl.hidden=true;selectChild();childRec.sectionEl.hidden=!restored;finish();await settle();h.flush();
+  assert.equal(panel.hidden,true);assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
+  if(restored){assert.ok(childRec.sectionEl.contains(h.doc.activeElement));assert.equal(builds,0);}
+  else {assert.ok(h.view.querySelector('.dv-live-carrier-preview').contains(h.doc.activeElement));assert.equal(builds,1);}
+  api.destroy();assert.equal(h.frames.size,0);assert.equal(h.doc.events.keydown?.size||0,0);
+ }
 });

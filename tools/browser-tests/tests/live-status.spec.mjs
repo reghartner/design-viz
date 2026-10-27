@@ -16,7 +16,8 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {repo} from '../helpers/prepare.mjs';
 // Freeze the original overlay fixture: the authored story may evolve independently.
 const raw={"page":{"title":"Connected doorbell delivery","contract":"1","flowview":{"authoredWith":"0.2.0","minVersion":"0.2.0","features":["flow.live-status"]},"tracking":{"jira":{"site":"https://acme.atlassian.net"}},"sections":[{"heading":"From button press to resident notification","text":["Track implementation work on each component and the interactions between them. The spec stores references; Jira owns live status."],"diagram":{"nodes":{"hardware":{"title":"Hardware","sub":"Doorbell button","tickets":["HW-123"]},"firmware":{"title":"Firmware","sub":"Event delivery","tickets":["FW-45"],"prs":["https://github.com/acme/firmware/pull/88"]},"backend":{"title":"Backend","sub":"Notification service","tickets":["BE-67"]},"ux":{"title":"UX mobile app","sub":"Resident experience","tickets":["UX-89"]}},"rows":[["hardware","firmware","backend","ux"]],"edges":[{"from":"hardware","to":"firmware","label":"press","tickets":["HW-124","FW-46"]},{"from":"firmware","to":"backend","label":"event","kind":"https","tickets":["BE-68"],"prs":["https://github.com/acme/backend/pull/91"]},{"from":"backend","to":"ux","label":"notify","kind":"https"}]}}]}};
@@ -251,7 +252,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
   await next.click();
   if(day===6)await expect(panel.locator('.dv-live-blocker').filter({hasText:'UX-89'})).toContainText('not found in Jira (deleted, renamed, or no permission)');
  }
- await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ await expect.poll(async()=> (await panel.locator('.dv-live-verdict').textContent()).split(' · ')[0]).toBe('Ready to demo');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
  await page.keyboard.press('Escape');await expect(panel).toBeHidden();await expect(details).toBeFocused();await expect(details).toHaveAttribute('aria-expanded','false');
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -293,4 +294,88 @@ test('B5 changed node pulses its card in every skin without moving the positione
  }
  await node.locator('.card').evaluate(el=>el.getAnimations().find(a=>a.animationName==='dvnodepulse').finish());
  await expect(node).not.toHaveClass(/dv-live-changed/);
+});
+
+test('E6 E10 E11 built epic Tickets table lists all children and coverage focuses the badge',async({page,server})=>{
+ const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
+ for(let day=2;day<=12;day++)await next.click();await root.locator('.dv-live-details').click();const panel=root.locator('.dv-live-panel'),table=panel.locator('table.dv-live-tickets');
+ await expect(table.locator('tbody tr')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','PRs','Coverage']);
+ await expect(table.locator('tr[data-live-ticket="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');
+ const hw=table.locator('tr[data-live-ticket="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo · 7 of 8 epic stories on diagram');
+ await hw.getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('g.node[data-dv-node="chime"] .dv-live-badge')).toBeFocused();
+ await root.locator('.dv-live-details').click();await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();expect(await panel.evaluate(el=>el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth)).toBe(true);
+});
+test('E8 desktop page Epic controls validate preserve history export and demo',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();
+ const input=page.locator('#guide').getByLabel('Epic',{exact:true}),before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
+ for(const key of ['DOOR-100','DOOR-200']){
+  const previous=await src.inputValue();await input.fill(key);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toContain(key);const changed=await src.inputValue();
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(previous);await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await settings();
+ }
+ const both=await src.inputValue();await page.locator('#guide').getByRole('button',{name:'Remove epic 1',exact:true}).click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toEqual(['DOOR-200']);await page.locator('#undo-builder').click();await expect(src).toHaveValue(both);await page.locator('#redo-builder').click();
+ const demo=page.getByRole('checkbox',{name:'Demo live status',exact:true});await demo.check();await expect(page.locator('#docview .dv-live-badge').first()).toBeVisible();const final=await src.inputValue();
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
+ expect(saved.page.tracking.jira).toEqual({site:'https://acme.atlassian.net',epic:['DOOR-200']});expect(await src.inputValue()).toBe(final);
+});
+
+test('E6 rework coverage opens a closed detail and focuses its visible badge after each return',async({page,server})=>{
+ const root=await open(page,server),details=root.locator('.dv-live-details'),panel=root.locator('.dv-live-panel');
+ await expect(root.locator('#section-delivery [data-dv-node="hardware"] .dv-live-badge')).toBeVisible();
+ for(let visit=0;visit<2;visit++){
+  await details.click();
+  await panel.locator('tr[data-live-ticket="HW-123"]').getByRole('button',{name:'Child work',exact:true}).click();
+  const child=root.locator('[data-dv-detail-preview] [data-dv-node="child"] .dv-live-badge');
+  await expect(child).toBeVisible();await expect(child).toBeFocused();await expect(panel).toBeHidden();
+  // The rendered back button includes the arrow in its accessible name.
+  const back=root.locator('[data-dv-detail-preview] .detail-breadcrumb').getByRole('button',{name:/Overview$/});
+  await expect(back).toBeVisible();await back.click();
+  await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
+ }
+});
+
+test('E6 round 3 unlinked detail carriers open a disposable reader preview and focus node and edge badges',async({page,server})=>{
+ const spec=fixture();delete spec.page.sections[0].diagram.nodes.hardware.detail;
+ const child=spec.page.sections[1].diagram;child.nodes.end={title:'End'};child.rows=[['child','end']];
+ child.edges=[{from:'child',to:'end',label:'Unlinked call',tickets:['BE-68']}];
+ const root=await open(page,server,spec),details=root.locator('.dv-live-details'),panel=root.locator('.dv-live-panel');
+ await expect(root.locator('#section-delivery [data-dv-node="hardware"] .dv-live-badge')).toBeVisible();
+ for(const [key,label,carrier] of [['HW-123','Child work','child'],['BE-68','Unlinked call','child->end'],['HW-123','Child work','child']]){
+  await details.click();await panel.locator('tr[data-live-ticket="'+key+'"]').getByRole('button',{name:label,exact:true}).click();
+  const preview=root.getByRole('dialog',{name:'Carrier · '+label,exact:true}),badge=preview.locator('.dv-live-badge[data-live-carrier="'+carrier+'"]');
+  await expect(preview).toBeVisible();await expect(panel).toBeHidden();await expect(badge).toBeVisible();await expect(badge).toBeFocused();
+  await badge.press('Enter');await expect(root.locator('.dv-live-popover')).toContainText(key);
+  await page.keyboard.press('Escape');await expect(badge).toBeFocused();await expect(preview).toBeVisible();
+  await page.keyboard.press('Escape');await expect(preview).toHaveCount(0);await expect(details).toBeFocused();
+  await expect(root.locator('#section-detail')).toBeHidden();
+ }
+ expect(await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent))).toEqual(spec);
+});
+
+test('E6 round 3 loaded external page coverage previews unrelated sections without another load',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'coverage-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'coverage-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./coverage-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/coverage-native.html');await page.waitForFunction(()=>!!window.mount);
+ for(const detailOnly of [false,true]){
+  await page.evaluate(detailOnly=>{
+   const raw={page:{sections:[{id:'main',diagram:{nodes:{parent:{title:'Parent',tickets:['AA-1'],detail:{spec:'approved',section:'entry'}}},rows:[['parent']]}}]}};
+   const remote={page:{tracking:{jira:{site:'https://detail.test',epic:'EP-1'}},sections:[{id:'entry',heading:'Entry',diagram:{nodes:{entry:{title:'Entry'}},rows:[['entry']]}},{id:'unrelated',detailOnly,heading:'Unrelated work',diagram:{nodes:{child:{title:'Remote carrier',tickets:['CH-1']},end:{}},rows:[['child','end']],edges:[{from:'child',to:'end',label:'Remote call',tickets:['CH-2']}]}}]}};
+   window.__coverageLoads=0;window.__coverageSource=JSON.stringify([raw,remote]);window.__coverageRaw=[raw,remote];
+   window.viewer=window.mount(document.querySelector('#host'),raw,{loadDetail:async()=>{window.__coverageLoads++;return remote;},liveStatus:{provider:async()=>({'AA-1':{state:'done'},'CH-1':{state:'active',epic:'EP-1'},'CH-2':{state:'blocked',epic:'EP-1'}})}});
+  },detailOnly);
+  const root=page.locator('#host');await expect(root.locator('.dv-live-details')).toBeVisible();
+  await root.locator('[data-dv-detail="parent"]').click();await expect(root.locator('[data-dv-detail-preview]')).toBeVisible();
+  for(const [key,label,id] of [['CH-1','Remote carrier','child'],['CH-2','Remote call','child->end']]){
+   await root.locator('.dv-live-details').click();await root.locator('tr[data-live-ticket="'+key+'"]').getByRole('button',{name:label,exact:true}).click();
+   const preview=root.getByRole('dialog',{name:'Carrier · '+label,exact:true}),badge=preview.locator('.dv-live-badge[data-live-carrier="'+id+'"]');
+   await expect(preview).toBeVisible();await expect(badge).toBeVisible();await expect(badge).toBeFocused();
+   expect(await page.evaluate(()=>window.__coverageLoads)).toBe(1);
+   await preview.getByRole('button',{name:'Close carrier preview',exact:true}).click();await expect(preview).toHaveCount(0);await expect(root.locator('.dv-live-details')).toBeFocused();
+   await expect(root.locator('[data-dv-detail-preview]')).toBeVisible();
+  }
+  expect(await page.evaluate(()=>JSON.stringify(window.__coverageRaw))).toBe(await page.evaluate(()=>window.__coverageSource));
+  await root.locator('.dv-live-details').click();await root.locator('tr[data-live-ticket="CH-1"]').getByRole('button',{name:'Remote carrier',exact:true}).click();
+  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+ }
 });

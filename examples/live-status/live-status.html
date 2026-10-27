@@ -7837,7 +7837,10 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
   :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
   path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
 }
-.dv-live-panel{position:fixed;inset:90px 24px auto auto;margin:0;width:420px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-panel,.dv-live-carrier-preview{position:fixed;inset:90px 24px auto auto;margin:0;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-carrier-preview{width:1100px;}
+.dv-live-carrier-preview h2{margin:0 60px 16px 0;font-size:18px;}
+.dv-live-carrier-close{position:absolute;right:16px;top:16px;}
 .dv-live-panel[hidden]{display:none!important;}
 .dv-live-panel h2{margin:0 60px 16px 0;font-size:18px;}
 .dv-live-panel h3{margin:18px 0 8px;font-size:14px;}
@@ -7855,7 +7858,17 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
 @media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
-@media print{.dv-live-panel{display:none!important;}.dv-live-changed{animation:none!important;}}
+@media print{.dv-live-panel,.dv-live-carrier-preview{display:none!important;}.dv-live-changed{animation:none!important;}}
+
+.dv-live-tickets-scroll{overflow:auto;max-width:100%;}
+.dv-live-tickets{width:100%;min-width:720px;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--dline,#9ca3af);}
+.dv-live-tickets th{font-weight:700;}
+.dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
+.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
+.dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
+.dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 
 /* Section-local viewing chrome; floating defaults belong to each named view. */
 .section-viewport{position:relative;min-width:0;isolation:isolate;}
@@ -8969,7 +8982,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
     "title": "Doorbell Delivery Live Status",
     "contract": "1",
     "flowview": {"authoredWith": "0.2.0", "minVersion": "0.2.0", "features": ["flow.live-status"]},
-    "tracking": {"jira": {"site": "https://acme.atlassian.net"}},
+    "tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}},
     "lanes": {
       "HW": {"label": "Hardware", "color": "#f97316"},
       "FW": {"label": "Firmware", "color": "#38bdf8"},
@@ -9019,7 +9032,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 </script>
 
 <script type="application/json" id="live-timeline">
-{"version": 1, "intervalSeconds": 6, "days": [{"label": "Day 1 — kickoff", "note": "All seven tickets are ready for the connected doorbell delivery.", "issues": {"HW-123": {"state": "todo", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "todo", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "todo", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}}}, {"label": "Day 2 — hardware starts", "note": "Alex starts the button and signal work while firmware waits for the interface.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "todo", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}}}, {"label": "Day 3 — firmware starts", "note": "Sam starts event delivery against the proposed hardware interface.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}}}, {"label": "Day 4 — signal blocker", "note": "An unstable signal blocks HW-124, leaving FW-46 waiting on hardware.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}}}, {"label": "Day 5 — parallel progress", "note": "Morgan starts the notification experience while Riley builds the backend.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}}}, {"label": "Day 6 — temporary rename", "note": "UX-89 is temporarily renamed UX-90 while backend integration begins.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-25T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "UX-90": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}}}, {"label": "Day 7 — blocker clears", "note": "The signal is stable again and the UX ticket returns to its original key.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-26T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-25T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}}}, {"label": "Day 8 — reviews open", "note": "Hardware and firmware PRs open as interrupt integration gets underway.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}}}, {"label": "Day 9 — hardware merges", "note": "Hardware changes merge and both hardware tickets finish.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}}}, {"label": "Day 10 — services merge", "note": "Firmware delivery, backend, and UX changes merge with their tickets complete.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}}}, {"label": "Day 11 — final integration", "note": "The final interrupt integration PR opens for review.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-30T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}}}, {"label": "Day 12 — delivery complete", "note": "The final PR merges and all seven tickets are done.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "FW-46": {"state": "done", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-31T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}}}}]}
+{"version": 1, "intervalSeconds": 6, "days": [{"label": "Day 1 — kickoff", "note": "All seven tickets are ready for the connected doorbell delivery.", "issues": {"HW-123": {"state": "todo", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "todo", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "todo", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 2 — hardware starts", "note": "Alex starts the button and signal work while firmware waits for the interface.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "todo", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 3 — firmware starts", "note": "Sam starts event delivery against the proposed hardware interface.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 4 — signal blocker", "note": "An unstable signal blocks HW-124, leaving FW-46 waiting on hardware.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "todo", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "todo", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 5 — parallel progress", "note": "Morgan starts the notification experience while Riley builds the backend.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "todo", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 6 — ticket unavailable", "note": "UX-89 is temporarily unavailable while backend integration begins.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "blocked", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-23T09:00:00.000+0000", "flagged": true, "statusName": "Blocked", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-25T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 7 — blocker clears", "note": "The signal is stable again and the UX ticket is available.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-21T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-26T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-22T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "FW-46": {"state": "todo", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-20T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-25T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-24T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}}}, {"label": "Day 8 — reviews open", "note": "Hardware and firmware PRs open as interrupt integration gets underway. Alert sound setting joins the epic without a diagram carrier.", "issues": {"HW-123": {"state": "active", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "HW-124": {"state": "active", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "UX-90": {"state": "todo", "summary": "Alert sound setting", "assignee": "Morgan", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "To Do", "prs": {"count": 0, "state": null}, "epic": "DOOR-100", "lane": "APP"}}}, {"label": "Day 9 — hardware merges", "note": "Hardware changes merge and both hardware tickets finish.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-45": {"state": "active", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "active", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "BE-68": {"state": "active", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "UX-89": {"state": "active", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "UX-90": {"state": "active", "summary": "Alert sound setting", "assignee": "Morgan", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100", "lane": "APP"}}}, {"label": "Day 10 — services merge", "note": "Firmware delivery, backend, and UX changes merge with their tickets complete.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-27T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100"}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-90": {"state": "active", "summary": "Alert sound setting", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 0, "state": null}, "epic": "DOOR-100", "lane": "APP"}}}, {"label": "Day 11 — final integration", "note": "The final interrupt integration PR opens for review.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-46": {"state": "active", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-30T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100"}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-90": {"state": "active", "summary": "Alert sound setting", "assignee": "Morgan", "updated": "2026-10-30T09:00:00.000+0000", "flagged": false, "statusName": "In Progress", "prs": {"count": 1, "state": "OPEN"}, "epic": "DOOR-100", "lane": "APP"}}}, {"label": "Day 12 — delivery complete", "note": "The final PR merges and all eight epic stories are done.", "issues": {"HW-123": {"state": "done", "summary": "Debounce the doorbell button", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "HW-124": {"state": "done", "summary": "Stabilize the hardware event signal", "assignee": "Alex", "updated": "2026-10-28T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-45": {"state": "done", "summary": "Deliver firmware events", "assignee": "Sam", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "FW-46": {"state": "done", "summary": "Integrate hardware interrupts", "assignee": "Sam", "updated": "2026-10-31T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "BE-67": {"state": "done", "summary": "Build the notification service", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "BE-68": {"state": "done", "summary": "Accept firmware events over HTTPS", "assignee": "Riley", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-89": {"state": "done", "summary": "Show resident notifications", "assignee": "Morgan", "updated": "2026-10-29T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100"}, "UX-90": {"state": "done", "summary": "Alert sound setting", "assignee": "Morgan", "updated": "2026-10-31T09:00:00.000+0000", "flagged": false, "statusName": "Done", "prs": {"count": 1, "state": "MERGED"}, "epic": "DOOR-100", "lane": "APP"}}}]}
 </script>
 
 <!-- DERIVED CATALOG DATA: tools/page_build.py fills this from crossref.json.
@@ -10837,6 +10850,7 @@ function validate(page){
        (typeof page.tracking.staleDays!=='number' || !isFinite(page.tracking.staleDays) || page.tracking.staleDays<=0))
       warnings.push('tracking.staleDays: must be a positive number — using 7 days');
   }
+  trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use a Jira key or an array of Jira keys — ignored');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
@@ -11394,6 +11408,17 @@ function trackingRefs(obj, invalid){
     });
   });
   return refs;
+}
+/* Page-level epic references share the ticket key grammar. */
+function trackingEpics(page,invalid){
+  var jira=page && page.tracking && page.tracking.jira,out=[];
+  if(!jira || !Object.prototype.hasOwnProperty.call(jira,'epic'))return out;
+  var value=jira.epic;
+  if(typeof value!=='string' && !Array.isArray(value)){if(invalid)invalid(null);return out;}
+  (Array.isArray(value)?value:[value]).forEach(function(key,index){
+    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(Array.isArray(value)?index:null);}
+    else if(out.indexOf(key)<0)out.push(key);
+  });return out;
 }
 /* ---- src/core/paths.js ---- */
 /* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
@@ -34112,6 +34137,13 @@ function liveStatusReadiness(page,map){
     });});
   });result.ready=result.ready && primaryCount>0;result.blockers=blockers.length;return result;
 }
+/* Coverage counts keys, independently of paint, readiness and lane rollups. */
+function liveStatusCoverage(page,map,refs){
+  var epics=refs && refs.epics || trackingEpics(page),keys=refs && refs.tickets || [];
+  return {epics:epics.slice(),onDiagram:keys.slice(),
+    notOnDiagram:Object.keys(map || {}).filter(function(key){return keys.indexOf(key)<0 && map[key] && epics.indexOf(map[key].epic)>=0;}),
+    notInEpic:epics.length?keys.filter(function(key){return !map[key] || epics.indexOf(map[key].epic)<0;}):[]};
+}
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};
   var view=ctl.view,records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
@@ -34119,7 +34151,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
-  var activity=[],changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[];
+  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0,carrierPreview=null;
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -34131,14 +34163,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
      page tracking site. The host still owns transport and cancellation. */
   if(typeof originalLoad==='function'){
     wrappedLoad=function(ref,signal){return Promise.resolve(originalLoad(ref,signal)).then(function(raw){
-      if(!retired && !signal.aborted){remotePages[remoteKey(ref)]=normalize(raw);schedule();}
+      if(!retired && !signal.aborted){
+        var previous=JSON.stringify(refs());remotePages[remoteKey(ref)]=normalize(raw);schedule();
+        if(JSON.stringify(refs())!==previous)notify();
+      }
       return raw;
     });};
     renderOptions.loadDetail=wrappedLoad;
   }
   function refs(){
-    var out={tickets:[],prs:[]};
-    function collect(source){sectionRecords(source).forEach(function(record){
+    var out={tickets:[],prs:[],epics:[]};
+    function collect(source){trackingEpics(source).forEach(function(key){if(out.epics.indexOf(key)<0)out.epics.push(key);});sectionRecords(source).forEach(function(record){
       var d=record.section.diagram || {};
       Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(value){
         var found=trackingRefs(value);['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
@@ -34224,6 +34259,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var rec=activeSections[index+1];if(section && rec)found.push({el:rec.sectionEl,section:section,page:currentPage,stepper:rec.stepper});
       });
     }
+    if(carrierPreview && carrierPreview.binding)found.push(carrierPreview.binding);
     return found;
   }
   function decorateCarrier(el,value,tracking){
@@ -34284,8 +34320,97 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function focusBlocker(binding,index){
     var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index]);
     var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length;});if(!carrier)return;
-    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===carrier.id;});
+    focusCarrier(binding,carrier.id);
+  }
+  function focusCarrier(binding,id){
+    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
     if(badge)badge.focus({preventScroll:true});
+  }
+  function carrierBinding(carrier){
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
+    var record=source && detailSection(source,carrier.reference);
+    return bindings.slice().reverse().find(function(binding){
+      if(!record || binding.page!==source || binding.section!==record.section)return false;
+      for(var el=binding.el;el && el!==view;el=el.parentElement)if(el.hidden)return false;
+      return true;
+    });
+  }
+  /* Follow only authored detail links into pages already approved and loaded.
+     The existing detail controller owns restoration, cancellation and history. */
+  function carrierRoute(carrier){
+    var queue=[],seen=[];
+    records.forEach(function(record){if(record.section.diagram && !record.section.detailOnly)queue.push({page:page,record:record,section:record.reference,frames:[]});});
+    for(var cursor=0;cursor<queue.length;cursor++){
+      var route=queue[cursor],section=route.record.section;
+      if(route.page===carrier.page && section===carrier.section)return route;
+      if(seen.indexOf(section)>=0 || route.frames.length>=DETAIL_MAX_DEPTH-1)continue;
+      seen.push(section);
+      Object.keys(section.diagram && section.diagram.nodes || {}).forEach(function(id){
+        var detail=section.diagram.nodes[id].detail;if(!detail)return;
+        var source=detail.spec?remotePages[remoteKey(detail)]:route.page;
+        var target=source && (detail.section?detailSection(source,detail.section):sectionRecords(source).find(function(record){return record.section.diagram;}));
+        if(!target || !target.section.diagram)return;
+        queue.push({page:source,record:target,section:route.section,frames:route.frames.concat([{node:id,state:{mode:'ambient'}}])});
+      });
+    }return null;
+  }
+  function closeCarrierPreview(focus){
+    var preview=carrierPreview;if(!preview)return;carrierPreview=null;
+    close(false);releaseBindings();
+    document.removeEventListener('keydown',carrierPreviewKey,true);
+    var rec=preview.rec;
+    if(rec){
+      if(rec.stepper)rec.stepper.destroy();
+      if(rec.boardSize)rec.boardSize.destroy();
+      if(rec.presentation)rec.presentation.destroy();
+      if(rec.destroy)rec.destroy();
+    }
+    preview.el.remove();
+    if(!retired){paint();if(focus && preview.trigger && preview.trigger.isConnected)preview.trigger.focus();}
+  }
+  function carrierPreviewKey(ev){
+    if(ev.key==='Escape' && carrierPreview && !active){ev.preventDefault();ev.stopPropagation();closeCarrierPreview(true);}
+  }
+  /* A collected section need not have an authored drill-down route. Render its
+     existing definition in a disposable reader preview, with this overlay's
+     evidence and lifecycle, instead of inventing a node link or loading a spec. */
+  function previewCarrier(carrier,trigger){
+    closeCarrierPreview(false);
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page,record=source && detailSection(source,carrier.reference);
+    if(!record)return;
+    var box=element('section','dv-live-carrier-preview',null,view);
+    box.setAttribute('role','dialog');box.setAttribute('aria-label','Carrier · '+carrier.label);box.setAttribute('popover','manual');
+    element('h2','','Carrier · '+carrier.label,box);
+    var dismiss=element('button','reader-button dv-live-carrier-close','Close',box);dismiss.type='button';dismiss.setAttribute('aria-label','Close carrier preview');
+    dismiss.addEventListener('click',function(){closeCarrierPreview(true);});
+    carrierPreview={el:box,trigger:trigger};
+    document.addEventListener('keydown',carrierPreviewKey,true);
+    if(box.showPopover)box.showPopover();
+    var skin=SKIN_NAMES.find(function(name){return view.classList.contains('sk-'+name);}) || DEFAULT_SKIN;
+    var rec=buildSection(box,record.section,200000+coverageRequest,'live-carrier-'+coverageRequest,
+      resolveProtocols(source),skinBase(skin),resolveLanes(source),null,schedule,null,
+      {autoplay:false,tracking:source.tracking,authoring:false});
+    carrierPreview.rec=rec;
+    carrierPreview.binding={el:rec.sectionEl,section:record.section,page:source,stepper:rec.stepper};
+    if(rec.stepper)rec.stepper.enterAmbient();
+    paint();focusCarrier(carrierPreview.binding,carrier.id);
+  }
+  function showCarrier(carrier){
+    var request=++coverageRequest,binding=carrierBinding(carrier),trigger=panelTrigger;
+    if(binding){closePanel(false);focusCarrier(binding,carrier.id);return;}
+    closePanel(false);
+    var route=carrierRoute(carrier),root=route && ctl.sections.find(function(rec){return rec.reference===route.section;});
+    if(!root){previewCarrier(carrier,trigger);return;}
+    if(root.tabBlock && ctl.tabBlocks)ctl.tabBlocks[root.tabBlock-1].select(root.tab,false);
+    if(ctl.views && !ctl.views.ensure(root)){previewCarrier(carrier,trigger);return;}
+    if(ctl.details)ctl.details.showSection(root.reference);
+    var restored=ctl.details?ctl.details.restore({section:route.section,frames:route.frames}):null;
+    Promise.resolve(restored).then(function(){
+      if(retired || request!==coverageRequest)return;
+      paint();var target=carrierBinding(carrier);if(!target){previewCarrier(carrier,trigger);return;}
+      if(target.el.scrollIntoView)target.el.scrollIntoView({block:'nearest'});
+      focusCarrier(target,carrier.id);
+    });
   }
   function jumpFirstBlocker(){
     var first=firstBlocker();if(!first)return;
@@ -34302,7 +34427,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(ev.key==='Escape' && panelTrigger){ev.preventDefault();ev.stopPropagation();closePanel(true);}
   }
   function openPanel(trigger){
-    close(false);closePanel(false);
+    // A reopened panel supersedes any coverage navigation still restoring.
+    coverageRequest++;
+    closeCarrierPreview(false);close(false);closePanel(false);
     if(!panel){
       panel=element('section','dv-live-panel',null,view);panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Live status details');panel.setAttribute('popover','manual');
       element('h2','','Live status',panel);
@@ -34312,18 +34439,68 @@ function createLiveStatus(ctl,page,options,renderOptions){
     panelTrigger=trigger;trigger.setAttribute('aria-expanded','true');panel.hidden=false;refreshPanel();
     if(panel.showPopover)panel.showPopover();panel.querySelector('.dv-live-panel-close').focus();document.addEventListener('keydown',panelKey,true);
   }
+  function ticketsTable(pages,coverage){
+    element('h3','','Tickets',panelBody);
+    var scroll=element('div','dv-live-tickets-scroll',null,panelBody),table=element('table','dv-live-tickets',null,scroll);
+    table.setAttribute('aria-label','Tickets');
+    var header=element('tr','',null,element('thead','',null,table));
+    ['Key','Title','State','Owner','PRs','Coverage'].forEach(function(label){element('th','',label,header).setAttribute('scope','col');});
+    var body=element('tbody','',null,table),carriers=Object.create(null),rank=['blocked','missing','active','todo','done'];
+    pages.forEach(function(record){sectionRecords(record.page).forEach(function(section){
+      var d=section.section.diagram || {};
+      var list=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return {id:id,value:d.nodes[id],label:d.nodes[id].title || id};});
+      (d.edges || []).forEach(function(edge){list.push({id:edge.from+'->'+edge.to,value:edge,label:edge.label || edge.from+' → '+edge.to});});
+      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;carrier.reference=section.reference;
+        carrier.pageKey=Object.keys(remotePages).find(function(key){return remotePages[key]===record.page;});
+        trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
+      });
+    });});
+    coverage.onDiagram.concat(coverage.notOnDiagram).filter(function(key,index,all){return all.indexOf(key)===index;}).sort(function(a,b){
+      var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');
+      return diff || (a<b?-1:a>b?1:0);
+    }).forEach(function(key){
+      var entry=map[key] || {},owners=carriers[key] || [],row=element('tr','',null,body),laneColor=null;
+      row.setAttribute('data-live-ticket',key);
+      pages.some(function(record){return Object.keys(record.lanes).some(function(id){
+        if(record.lanes[id].keys.indexOf(key)<0 && entry.lane!==id)return false;
+        laneColor=(record.page.lanes[id] || {}).color;return !!laneColor;
+      });});
+      if(laneColor)row.style.setProperty('--dv-live-lane-color',laneColor);
+      var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
+      link(element('td','dv-live-ticket-key',null,row),key,liveStatusTicketURL(source.tracking,key,entry));
+      element('td','',entry.title || '—',row);
+      var state=element('span','dv-live-state-pill',entry.state || 'No status',element('td','',null,row));liveStatusClass(state,entry.state);
+      var updated=isFinite(Date.parse(entry.updatedAt))?relative(entry.updatedAt):'time unavailable';
+      element('td','',(entry.assignee || 'Unassigned')+' · '+updated,row);
+      var prs=element('td','dv-live-ticket-prs',null,row),urls=[];
+      owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
+      urls.forEach(function(url){link(prs,url,url);});
+      if(entry.prs)element('span','',entry.prs.count+' '+entry.prs.state,prs);
+      var cell=element('td','dv-live-coverage',null,row);
+      owners.forEach(function(carrier){
+        var button=element('button','reader-button',carrier.label,cell);button.type='button';
+        button.addEventListener('click',function(){showCarrier(carrier);});
+      });
+      if(!owners.length)element('span','dv-live-coverage-tag','NOT ON DIAGRAM',cell);
+      else if(coverage.notInEpic.indexOf(key)>=0)element('span','dv-live-coverage-tag','NOT IN EPIC',cell);
+    });
+  }
   function refreshPanel(){
     if(!panelTrigger)return;
     panelBody.replaceChildren();var readiness=liveStatusReadiness(page,map),pages=laneRecords();
     var completion=element('div','dv-live-completion',null,panelBody),svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');completion.appendChild(svg);
     ['dv-live-ring-track','dv-live-ring-done'].forEach(function(cls){var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('class',cls);circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');if(cls==='dv-live-ring-done')circle.setAttribute('stroke-dasharray',(readiness.total?100*readiness.done/readiness.total:0)+' 100');svg.appendChild(circle);});
     element('strong','',readiness.done+'/'+readiness.total+' carriers done',completion);
-    element('p','dv-live-verdict',readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting',panelBody);
+    var coverage=liveStatusCoverage(page,map,refs()),epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
+    var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
+    if(coverage.epics.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
+    element('p','dv-live-verdict',verdict,panelBody);
     if(pages.some(function(record){return Object.keys(record.lanes).length;})){
       element('h3','','Teams',panelBody);pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
         var row=element('div','dv-live-lane',null,panelBody);row.setAttribute('data-live-lane',id);decorateLane(row,id,record.lanes,record.page);
       });});
     }
+    ticketsTable(pages,coverage);
     element('h3','','Blockers',panelBody);var blockers=element('ul','dv-live-blockers',null,panelBody);
     refs().tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).forEach(function(key){
       var entry=map[key],row=element('li','dv-live-blocker',null,blockers);link(row,key,liveStatusTicketURL(page.tracking,key,entry));
@@ -34340,7 +34517,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(entry.state==='missing')element('span','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)',row);
     });
     element('h3','','Activity',panelBody);var list=element('ol','dv-live-activity',null,panelBody);
-    activity.forEach(function(item){var row=element('li','dv-live-activity-entry',item.key+' · '+item.old+' → '+item.state+' · '+(item.at?relative(item.at):'time unavailable'),list);if(item.at)row.setAttribute('data-updated-at',item.at);});
+    activity.forEach(function(item){var row=element('li','dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+(item.at?relative(item.at):'time unavailable'),list);if(item.at)row.setAttribute('data-updated-at',item.at);});
   }
   function paintBinding(binding){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
@@ -34441,7 +34618,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     control.demoNext.disabled=demoControls.ended;
   }
   function refreshControls(){
-    var value=snapshot(),available=refs().tickets.length>0;
+    var value=snapshot(),available=refs().tickets.length>0 || refs().epics.length>0;
     controls.forEach(function(control){
       if(!control.root){if(!available)return;buildControl(control);}
       control.root.hidden=!available || !(provider || applied || noteText || actionFn);
@@ -34477,9 +34654,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired)return;var next=Object.create(null);
       Object.keys(value || {}).forEach(function(key){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
-        var item={state:entry.state};['title','assignee','detail','updatedAt'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
+        var item={state:entry.state};['title','assignee','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
         var url=deltaLinkUrl(entry.url);if(url)item.url=url;
-        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
+        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
         next[key]=item;
       });
       // Cache age describes the lookup, independently of issue modification
@@ -34494,10 +34671,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var stamp=Date.parse(next[key] && next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
         activity.unshift({key:key,old:oldState,state:newState,at:at});
       });
-      activity=activity.slice(0,20);
+      if(applied)liveStatusCoverage(page,next,refs()).notOnDiagram.forEach(function(key){
+        if(seenKeys[key])return;
+        var stamp=Date.parse(next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
+        activity.unshift({key:key,added:true,at:at});
+      });
+      activity=activity.slice(0,20);Object.keys(next).forEach(function(key){seenKeys[key]=true;});
       map=next;applied=true;paint();notify();
     },
-    clear:function(){if(retired)return;map=Object.create(null);cacheUpdatedAt=null;activity=[];changedKeys=[];applied=true;paint();notify();},
+    clear:function(){if(retired)return;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;paint();notify();},
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},
@@ -34513,7 +34695,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);if(panelTrigger===control.details)closePanel(false);if(control.root)control.root.remove();}};
     },
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;closeCarrierPreview(false);if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
@@ -39359,10 +39541,10 @@ function wireReaderShortcuts(ctl,view,win,options){
 /* Standalone-only, local story transport. No network or authored-spec writes. */
 function liveStatusDemoMap(day,keys){
   var map=Object.create(null),issues=day && day.issues || {};
-  (keys || []).forEach(function(key){
+  (keys || []).concat(Object.keys(issues)).filter(function(key,index,all){return all.indexOf(key)===index;}).forEach(function(key){
     var issue=issues[key];if(!issue){map[key]={state:'missing'};return;}
     var entry={state:issue.state};
-    [['summary','title'],['assignee','assignee'],['updated','updatedAt']].forEach(function(pair){if(typeof issue[pair[0]]==='string')entry[pair[1]]=issue[pair[0]];});
+    [['summary','title'],['assignee','assignee'],['updated','updatedAt'],['epic','epic'],['lane','lane']].forEach(function(pair){if(typeof issue[pair[0]]==='string')entry[pair[1]]=issue[pair[0]];});
     if(issue.statusName || issue.flagged)entry.detail=(issue.statusName || '')+(issue.flagged?' · flagged':'');
     if(issue.prs && issue.prs.count>0)entry.prs={count:issue.prs.count,state:String(issue.prs.state).toLowerCase()};
     map[key]=entry;
@@ -39650,7 +39832,7 @@ function liveStatusDevelopmentSummary(fields){
     try{
       var parsed=JSON.parse(values[i].slice(start,end+1)),summary=parsed.cachedValue && parsed.cachedValue.summary;
       var overall=summary && summary.pullrequest && summary.pullrequest.overall,state=overall && String(overall.state).toLowerCase();
-      if(overall && typeof overall.count==='number' && isFinite(overall.count) && overall.count>=0 && ['open','merged'].indexOf(state)>=0)return {count:overall.count,state:state};
+      if(overall && typeof overall.count==='number' && isFinite(overall.count) && overall.count>=0 && ['open','merged','declined'].indexOf(state)>=0)return {count:overall.count,state:state};
     }catch(ex){}
   }
   return null;
@@ -39680,8 +39862,19 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
 function wireLiveStatusClaude(ctl,page,win){
   var claude,use,api=ctl && ctl.liveStatus;
   try{claude=win.claude;use=claude && claude.use;}catch(ex){return null;}
-  if(typeof use!=='function' || !api || win.flowviewLiveStatus || !api.refs().tickets.length)return null;
-  var stopped=false,mcp=null,server=null,site='',chunks=[],jobs=[],subscriptions=[],timers=[];
+  if(typeof use!=='function' || !api || win.flowviewLiveStatus)return null;
+  if(!api.refs().tickets.length && !(api.refs().epics || []).length){
+    var removeWaitingChange=null,removeWaitingDestroy=null;
+    var stopWaiting=function(){if(removeWaitingChange)removeWaitingChange();if(removeWaitingDestroy)removeWaitingDestroy();};
+    removeWaitingChange=api.onChange(function(){
+      if(!api.refs().tickets.length && !(api.refs().epics || []).length)return;
+      stopWaiting();wireLiveStatusClaude(ctl,page,win);
+    });
+    removeWaitingDestroy=api.onDestroy(stopWaiting);
+    return null;
+  }
+  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
+  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
@@ -39695,15 +39888,17 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function publish(){
     if(stopped || publishing || !dirty || !api.enabled())return;
-    var keys=[],issues=[],flagged=Object.create(null),stamp=null;
+    var keys=[],issues=[],flagged=Object.create(null),epics=Object.create(null),stamp=null;
     chunks.forEach(function(chunk){
       if(!chunk.answered)return;
-      keys=keys.concat(chunk.keys);issues.push(chunk.issues);
+      var found=chunk.epic?chunk.issues.filter(function(issue){return issue && typeof issue.key==='string';}).map(function(issue){return issue.key;}):chunk.keys;
+      found.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);if(chunk.epic && !epics[key])epics[key]=chunk.epic;});
+      issues.push(chunk.issues);
       (chunk.flagged || []).forEach(function(issue){if(issue && issue.key)flagged[issue.key]=true;});
       [chunk.storedAt,chunk.flaggedAt].forEach(function(at){if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);});
     });
     dirty=false;publishing=true;
-    try{api.apply(liveStatusJiraMap(keys,issues,flagged,site,stamp));}finally{publishing=false;}
+    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});api.apply(map);}finally{publishing=false;}
   }
   function notices(){
     if(stopped)return;
@@ -39725,11 +39920,11 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){api.clear();api.note('','info');api.action('',null);stop();return;}
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
@@ -39745,10 +39940,27 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     cancelRetry(job);job.error=null;
     if(job.accept){notices();job.accept(result);return;}
-    var chunk=job.chunk,issues=liveStatusJiraIssues(result && result.payload),at=result && result.cache && result.cache.storedAt;
-    if(job.flagged){chunk.flagged=issues;chunk.flaggedAt=at;}
-    else{chunk.answered=true;chunk.issues=issues;chunk.storedAt=at;}
-    dirty=true;publish();notices();
+    var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
+    function pageResult(result){
+      if(stopped || version!==job.version)return;
+      var payload=result && result.payload,at=result && result.cache && result.cache.storedAt;
+      all=all.concat(liveStatusJiraIssues(payload));
+      if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);
+      var info=payload && (payload.pageInfo || payload.issues && payload.issues.pageInfo);
+      var token=payload && payload.nextPageToken || result && result.nextPageToken || info && info.hasNextPage && info.endCursor;
+      if(chunk.epic && token){
+        if(seen[token]){fail(job,{code:'tool_error',message:'Jira repeated a page cursor'},false);return;}
+        seen[token]=true;
+        var input=Object.assign({},job.input,{nextPageToken:token});
+        Promise.resolve().then(function(){if(!stopped && version===job.version)return mcp.callTool(server,job.tool,input,job.options);}).then(pageResult,function(error){if(!stopped && version===job.version)fail(job,error,true);});
+        return;
+      }
+      // Publish only a complete page chain. A failed refresh keeps all prior evidence.
+      if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
+      else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      dirty=true;publish();notices();
+    }
+    pageResult(result);
   }
   function runCall(job){
     var version=++job.version;
@@ -39773,25 +39985,39 @@ function wireLiveStatusClaude(ctl,page,win){
     Promise.resolve(subscription).then(function(value){if(stopped)unsubscribe(value);else subscriptions.push(value);},function(error){fail(job,error,true);});
   }
   function host(url){try{return new URL(url).host;}catch(ex){return null;}}
+  function syncWatches(){
+    if(stopped || !cloudId || syncing)return;
+    syncing=true;
+    try{
+      var refs=api.refs(),added=liveStatusJiraChunks(refs.tickets.filter(function(key){return !watchedTickets[key];})).map(function(keys){
+        keys.forEach(function(key){watchedTickets[key]=true;});return {keys:keys,answered:false,issues:[],flagged:[]};
+      });
+      (refs.epics || []).forEach(function(epic){
+        if(watchedEpics[epic])return;watchedEpics[epic]=true;
+        added.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});
+      });
+      // Register identities before a watch can synchronously publish data.
+      chunks=chunks.concat(added);
+      added.forEach(function(chunk){
+        [false,true].forEach(function(flagged){
+          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
+          jobs.push(job);watch(job);
+        });
+      });
+    }finally{syncing=false;}
+  }
   function resources(result){
     if(stopped)return;
     var list=result && result.payload,desired=page && page.tracking && page.tracking.jira && page.tracking.jira.site;
     list=Array.isArray(list)?list:[];
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
-    site=resource.url;
-    chunks=liveStatusJiraChunks(api.refs().tickets).map(function(keys){return {keys:keys,answered:false,issues:[],flagged:[]};});
-    chunks.forEach(function(chunk){
-      [false,true].forEach(function(flagged){
-        var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:resource.id,jql:'key in ('+chunk.keys.join(', ')+')'+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'],maxResults:10}};
-        jobs.push(job);watch(job);
-      });
-    });
+    site=resource.url;cloudId=resource.id;syncWatches();
   }
   var pending;
   try{pending=use.call(claude,'mcp');}catch(ex){return null;}
   removeDestroy=api.onDestroy(stop);
-  removeChange=api.onChange(function(){publish();});
+  removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
     if(!namespace){stop();return null;}

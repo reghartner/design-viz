@@ -231,7 +231,7 @@ test('M7: shared timeline and fixed fixtures tell the required story', () => {
   const first = story.days[0].issues;
   const last = story.days.at(-1).issues;
   assert.deepEqual(Object.keys(first).sort(), KEYS.slice().sort());
-  assert.deepEqual(Object.keys(last).sort(), KEYS.slice().sort());
+  assert.deepEqual(Object.keys(last).filter(k => KEYS.includes(k)).sort(), KEYS.slice().sort());
   assert.ok(Object.values(first).every(e => e.state === 'todo'));
   assert.ok(Object.values(last).every(e => e.state === 'done'));
   const start = key => story.days.findIndex(d => d.issues[key]?.state === 'active');
@@ -263,7 +263,7 @@ test('M7: shared timeline and fixed fixtures tell the required story', () => {
   assert.ok(opened > blocked && merged > opened);
   for (const [name, state] of [['all-todo', 'todo'], ['all-done', 'done']]) {
     const fixture = json(DIR + '/fixtures/' + name + '.json');
-    assert.deepEqual(Object.keys(fixture.issues).sort(), KEYS.slice().sort());
+    assert.deepEqual(Object.keys(fixture.issues).filter(k => KEYS.includes(k)).sort(), KEYS.slice().sort());
     assert.ok(Object.values(fixture.issues).every(e => e.state === state));
   }
   const sources = read(DIR + '/mcp.mjs') + read(DIR + '/worker.mjs');
@@ -351,4 +351,28 @@ test('M11: identity and recursive ignore rules protect the new deploy folder', (
   for (const file of ['.wrangler/state', 'local.env', 'nested/local.env', 'nested/.wrangler/state', '.dev.vars', '.cloudflare/cache/account.json']) {
     assert.equal(spawnSync('git', ['-C', ROOT, 'check-ignore', '--no-index', '-q', DIR + '/' + file]).status, 0, file);
   }
+});
+
+test('E5 parent JQL returns current epic children and flagged subset with parent fields',async()=>{
+ const {parseJql}=await load();assert.deepEqual(parseJql('parent = DOOR-100'),{parent:'DOOR-100'});assert.deepEqual(parseJql('parent = DOOR-100 AND Flagged = Impediment'),{parent:'DOOR-100',flagged:true});
+ for(const jql of ['parent = bad','parent = DOOR-100 OR parent = NO-1','parent = DOOR-100 AND parent = NO-1'])assert.equal(parseJql(jql),null);
+ for(const day of [0,3,7,11]){
+  const issues=result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},{...CONTEXT,day})).issues.nodes;
+  assert.equal(issues.length,day>=7?8:7);for(const issue of issues)assert.deepEqual(issue.fields.parent,{key:'DOOR-100',fields:{summary:'Connected doorbell delivery',issuetype:{name:'Epic'}}});
+ }
+ const flagged=result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100 AND Flagged = Impediment'},{...CONTEXT,day:3})).issues.nodes;assert.deepEqual(flagged.map(i=>i.key),['HW-124']);
+ assert.deepEqual(result(await call('searchJiraIssuesUsingJql',{jql:'parent = OTHER-1'})).issues.nodes,[]);
+});
+test('E5 epic issue rolls up children and fixed scenarios include the extra child',async()=>{
+ for(const [context,state] of [[{...CONTEXT,day:0},'To Do'],[{...CONTEXT,day:3},'In Progress'],[{...CONTEXT,day:11},'Done'],[{...CONTEXT,scenario:'all-todo'},'To Do'],[{...CONTEXT,scenario:'all-done'},'Done']]){
+  const response=await call('getJiraIssue',{issueIdOrKey:'DOOR-100'},context);assert.equal(response.error,undefined,'epic exists');const issue=result(response).data;
+  assert.equal(issue.key,'DOOR-100');assert.equal(issue.fields.issuetype.name,'Epic');assert.equal(issue.fields.status.name,state);
+  if(context.scenario!=='story'){const children=result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},context)).issues.nodes;assert.equal(children.length,8);assert.ok(children.some(i=>i.key==='UX-90' && i.fields.parent.key==='DOOR-100'));}
+ }
+});
+test('E4 example epic has seven original stories and UX-90 appears only from Day 8',()=>{
+ assert.equal(json('examples/live-status/live-status.spec.json').page.tracking.jira.epic,'DOOR-100');
+ timeline().days.forEach((day,index)=>{for(const key of KEYS)if(day.issues[key])assert.equal(day.issues[key].epic,'DOOR-100');
+  if(index<7)assert.equal(day.issues['UX-90'],undefined);else{const extra=day.issues['UX-90'];assert.ok(extra);assert.equal(extra.summary,'Alert sound setting');assert.equal(extra.lane,'APP');assert.equal(extra.epic,'DOOR-100');}
+ });
 });

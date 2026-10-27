@@ -645,7 +645,16 @@ references are retained, with duplicates removed in their original order when
 read. Authored PR references are plain links and never carry live state.
 
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
-configures the Jira site: `"tracking": {"jira": {"site": "https://acme.atlassian.net"}}`.
+configures the Jira site and optional epic:
+`"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.
+`tracking.jira.epic` accepts one Jira key or an array using the ticket pattern.
+Valid keys are deduplicated in authored order; invalid entries warn individually
+and an invalid field type warns once, never errors. Epic children automatically
+appear in the Tickets table; mapping them to nodes and edges remains an authoring
+step. Unmapped children say NOT ON DIAGRAM; referenced tickets without evidence
+of membership in a configured epic say NOT IN EPIC. Extra children never change
+carrier colors or rollups. Desktop Workbench Tracking controls add and remove
+epics with one Undo/Redo per change and preserve them in Export project.
 Optional `tracking.staleDays` is a positive number of days (default 7). Active
 work with an `updatedAt` strictly older than this threshold gets a stale badge
 ring and age text without changing its live rollup state. Invalid values warn

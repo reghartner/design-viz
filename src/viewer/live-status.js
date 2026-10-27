@@ -152,6 +152,13 @@ function liveStatusReadiness(page,map){
     });});
   });result.ready=result.ready && primaryCount>0;result.blockers=blockers.length;return result;
 }
+/* Coverage counts keys, independently of paint, readiness and lane rollups. */
+function liveStatusCoverage(page,map,refs){
+  var epics=refs && refs.epics || trackingEpics(page),keys=refs && refs.tickets || [];
+  return {epics:epics.slice(),onDiagram:keys.slice(),
+    notOnDiagram:Object.keys(map || {}).filter(function(key){return keys.indexOf(key)<0 && map[key] && epics.indexOf(map[key].epic)>=0;}),
+    notInEpic:epics.length?keys.filter(function(key){return !map[key] || epics.indexOf(map[key].epic)<0;}):[]};
+}
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};
   var view=ctl.view,records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
@@ -159,7 +166,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
-  var activity=[],changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[];
+  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0,carrierPreview=null;
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -171,14 +178,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
      page tracking site. The host still owns transport and cancellation. */
   if(typeof originalLoad==='function'){
     wrappedLoad=function(ref,signal){return Promise.resolve(originalLoad(ref,signal)).then(function(raw){
-      if(!retired && !signal.aborted){remotePages[remoteKey(ref)]=normalize(raw);schedule();}
+      if(!retired && !signal.aborted){
+        var previous=JSON.stringify(refs());remotePages[remoteKey(ref)]=normalize(raw);schedule();
+        if(JSON.stringify(refs())!==previous)notify();
+      }
       return raw;
     });};
     renderOptions.loadDetail=wrappedLoad;
   }
   function refs(){
-    var out={tickets:[],prs:[]};
-    function collect(source){sectionRecords(source).forEach(function(record){
+    var out={tickets:[],prs:[],epics:[]};
+    function collect(source){trackingEpics(source).forEach(function(key){if(out.epics.indexOf(key)<0)out.epics.push(key);});sectionRecords(source).forEach(function(record){
       var d=record.section.diagram || {};
       Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(value){
         var found=trackingRefs(value);['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
@@ -264,6 +274,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var rec=activeSections[index+1];if(section && rec)found.push({el:rec.sectionEl,section:section,page:currentPage,stepper:rec.stepper});
       });
     }
+    if(carrierPreview && carrierPreview.binding)found.push(carrierPreview.binding);
     return found;
   }
   function decorateCarrier(el,value,tracking){
@@ -324,8 +335,97 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function focusBlocker(binding,index){
     var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index]);
     var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length;});if(!carrier)return;
-    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===carrier.id;});
+    focusCarrier(binding,carrier.id);
+  }
+  function focusCarrier(binding,id){
+    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
     if(badge)badge.focus({preventScroll:true});
+  }
+  function carrierBinding(carrier){
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
+    var record=source && detailSection(source,carrier.reference);
+    return bindings.slice().reverse().find(function(binding){
+      if(!record || binding.page!==source || binding.section!==record.section)return false;
+      for(var el=binding.el;el && el!==view;el=el.parentElement)if(el.hidden)return false;
+      return true;
+    });
+  }
+  /* Follow only authored detail links into pages already approved and loaded.
+     The existing detail controller owns restoration, cancellation and history. */
+  function carrierRoute(carrier){
+    var queue=[],seen=[];
+    records.forEach(function(record){if(record.section.diagram && !record.section.detailOnly)queue.push({page:page,record:record,section:record.reference,frames:[]});});
+    for(var cursor=0;cursor<queue.length;cursor++){
+      var route=queue[cursor],section=route.record.section;
+      if(route.page===carrier.page && section===carrier.section)return route;
+      if(seen.indexOf(section)>=0 || route.frames.length>=DETAIL_MAX_DEPTH-1)continue;
+      seen.push(section);
+      Object.keys(section.diagram && section.diagram.nodes || {}).forEach(function(id){
+        var detail=section.diagram.nodes[id].detail;if(!detail)return;
+        var source=detail.spec?remotePages[remoteKey(detail)]:route.page;
+        var target=source && (detail.section?detailSection(source,detail.section):sectionRecords(source).find(function(record){return record.section.diagram;}));
+        if(!target || !target.section.diagram)return;
+        queue.push({page:source,record:target,section:route.section,frames:route.frames.concat([{node:id,state:{mode:'ambient'}}])});
+      });
+    }return null;
+  }
+  function closeCarrierPreview(focus){
+    var preview=carrierPreview;if(!preview)return;carrierPreview=null;
+    close(false);releaseBindings();
+    document.removeEventListener('keydown',carrierPreviewKey,true);
+    var rec=preview.rec;
+    if(rec){
+      if(rec.stepper)rec.stepper.destroy();
+      if(rec.boardSize)rec.boardSize.destroy();
+      if(rec.presentation)rec.presentation.destroy();
+      if(rec.destroy)rec.destroy();
+    }
+    preview.el.remove();
+    if(!retired){paint();if(focus && preview.trigger && preview.trigger.isConnected)preview.trigger.focus();}
+  }
+  function carrierPreviewKey(ev){
+    if(ev.key==='Escape' && carrierPreview && !active){ev.preventDefault();ev.stopPropagation();closeCarrierPreview(true);}
+  }
+  /* A collected section need not have an authored drill-down route. Render its
+     existing definition in a disposable reader preview, with this overlay's
+     evidence and lifecycle, instead of inventing a node link or loading a spec. */
+  function previewCarrier(carrier,trigger){
+    closeCarrierPreview(false);
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page,record=source && detailSection(source,carrier.reference);
+    if(!record)return;
+    var box=element('section','dv-live-carrier-preview',null,view);
+    box.setAttribute('role','dialog');box.setAttribute('aria-label','Carrier · '+carrier.label);box.setAttribute('popover','manual');
+    element('h2','','Carrier · '+carrier.label,box);
+    var dismiss=element('button','reader-button dv-live-carrier-close','Close',box);dismiss.type='button';dismiss.setAttribute('aria-label','Close carrier preview');
+    dismiss.addEventListener('click',function(){closeCarrierPreview(true);});
+    carrierPreview={el:box,trigger:trigger};
+    document.addEventListener('keydown',carrierPreviewKey,true);
+    if(box.showPopover)box.showPopover();
+    var skin=SKIN_NAMES.find(function(name){return view.classList.contains('sk-'+name);}) || DEFAULT_SKIN;
+    var rec=buildSection(box,record.section,200000+coverageRequest,'live-carrier-'+coverageRequest,
+      resolveProtocols(source),skinBase(skin),resolveLanes(source),null,schedule,null,
+      {autoplay:false,tracking:source.tracking,authoring:false});
+    carrierPreview.rec=rec;
+    carrierPreview.binding={el:rec.sectionEl,section:record.section,page:source,stepper:rec.stepper};
+    if(rec.stepper)rec.stepper.enterAmbient();
+    paint();focusCarrier(carrierPreview.binding,carrier.id);
+  }
+  function showCarrier(carrier){
+    var request=++coverageRequest,binding=carrierBinding(carrier),trigger=panelTrigger;
+    if(binding){closePanel(false);focusCarrier(binding,carrier.id);return;}
+    closePanel(false);
+    var route=carrierRoute(carrier),root=route && ctl.sections.find(function(rec){return rec.reference===route.section;});
+    if(!root){previewCarrier(carrier,trigger);return;}
+    if(root.tabBlock && ctl.tabBlocks)ctl.tabBlocks[root.tabBlock-1].select(root.tab,false);
+    if(ctl.views && !ctl.views.ensure(root)){previewCarrier(carrier,trigger);return;}
+    if(ctl.details)ctl.details.showSection(root.reference);
+    var restored=ctl.details?ctl.details.restore({section:route.section,frames:route.frames}):null;
+    Promise.resolve(restored).then(function(){
+      if(retired || request!==coverageRequest)return;
+      paint();var target=carrierBinding(carrier);if(!target){previewCarrier(carrier,trigger);return;}
+      if(target.el.scrollIntoView)target.el.scrollIntoView({block:'nearest'});
+      focusCarrier(target,carrier.id);
+    });
   }
   function jumpFirstBlocker(){
     var first=firstBlocker();if(!first)return;
@@ -342,7 +442,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(ev.key==='Escape' && panelTrigger){ev.preventDefault();ev.stopPropagation();closePanel(true);}
   }
   function openPanel(trigger){
-    close(false);closePanel(false);
+    // A reopened panel supersedes any coverage navigation still restoring.
+    coverageRequest++;
+    closeCarrierPreview(false);close(false);closePanel(false);
     if(!panel){
       panel=element('section','dv-live-panel',null,view);panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Live status details');panel.setAttribute('popover','manual');
       element('h2','','Live status',panel);
@@ -352,18 +454,68 @@ function createLiveStatus(ctl,page,options,renderOptions){
     panelTrigger=trigger;trigger.setAttribute('aria-expanded','true');panel.hidden=false;refreshPanel();
     if(panel.showPopover)panel.showPopover();panel.querySelector('.dv-live-panel-close').focus();document.addEventListener('keydown',panelKey,true);
   }
+  function ticketsTable(pages,coverage){
+    element('h3','','Tickets',panelBody);
+    var scroll=element('div','dv-live-tickets-scroll',null,panelBody),table=element('table','dv-live-tickets',null,scroll);
+    table.setAttribute('aria-label','Tickets');
+    var header=element('tr','',null,element('thead','',null,table));
+    ['Key','Title','State','Owner','PRs','Coverage'].forEach(function(label){element('th','',label,header).setAttribute('scope','col');});
+    var body=element('tbody','',null,table),carriers=Object.create(null),rank=['blocked','missing','active','todo','done'];
+    pages.forEach(function(record){sectionRecords(record.page).forEach(function(section){
+      var d=section.section.diagram || {};
+      var list=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return {id:id,value:d.nodes[id],label:d.nodes[id].title || id};});
+      (d.edges || []).forEach(function(edge){list.push({id:edge.from+'->'+edge.to,value:edge,label:edge.label || edge.from+' → '+edge.to});});
+      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;carrier.reference=section.reference;
+        carrier.pageKey=Object.keys(remotePages).find(function(key){return remotePages[key]===record.page;});
+        trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
+      });
+    });});
+    coverage.onDiagram.concat(coverage.notOnDiagram).filter(function(key,index,all){return all.indexOf(key)===index;}).sort(function(a,b){
+      var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');
+      return diff || (a<b?-1:a>b?1:0);
+    }).forEach(function(key){
+      var entry=map[key] || {},owners=carriers[key] || [],row=element('tr','',null,body),laneColor=null;
+      row.setAttribute('data-live-ticket',key);
+      pages.some(function(record){return Object.keys(record.lanes).some(function(id){
+        if(record.lanes[id].keys.indexOf(key)<0 && entry.lane!==id)return false;
+        laneColor=(record.page.lanes[id] || {}).color;return !!laneColor;
+      });});
+      if(laneColor)row.style.setProperty('--dv-live-lane-color',laneColor);
+      var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
+      link(element('td','dv-live-ticket-key',null,row),key,liveStatusTicketURL(source.tracking,key,entry));
+      element('td','',entry.title || '—',row);
+      var state=element('span','dv-live-state-pill',entry.state || 'No status',element('td','',null,row));liveStatusClass(state,entry.state);
+      var updated=isFinite(Date.parse(entry.updatedAt))?relative(entry.updatedAt):'time unavailable';
+      element('td','',(entry.assignee || 'Unassigned')+' · '+updated,row);
+      var prs=element('td','dv-live-ticket-prs',null,row),urls=[];
+      owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
+      urls.forEach(function(url){link(prs,url,url);});
+      if(entry.prs)element('span','',entry.prs.count+' '+entry.prs.state,prs);
+      var cell=element('td','dv-live-coverage',null,row);
+      owners.forEach(function(carrier){
+        var button=element('button','reader-button',carrier.label,cell);button.type='button';
+        button.addEventListener('click',function(){showCarrier(carrier);});
+      });
+      if(!owners.length)element('span','dv-live-coverage-tag','NOT ON DIAGRAM',cell);
+      else if(coverage.notInEpic.indexOf(key)>=0)element('span','dv-live-coverage-tag','NOT IN EPIC',cell);
+    });
+  }
   function refreshPanel(){
     if(!panelTrigger)return;
     panelBody.replaceChildren();var readiness=liveStatusReadiness(page,map),pages=laneRecords();
     var completion=element('div','dv-live-completion',null,panelBody),svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');completion.appendChild(svg);
     ['dv-live-ring-track','dv-live-ring-done'].forEach(function(cls){var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('class',cls);circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');if(cls==='dv-live-ring-done')circle.setAttribute('stroke-dasharray',(readiness.total?100*readiness.done/readiness.total:0)+' 100');svg.appendChild(circle);});
     element('strong','',readiness.done+'/'+readiness.total+' carriers done',completion);
-    element('p','dv-live-verdict',readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting',panelBody);
+    var coverage=liveStatusCoverage(page,map,refs()),epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
+    var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
+    if(coverage.epics.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
+    element('p','dv-live-verdict',verdict,panelBody);
     if(pages.some(function(record){return Object.keys(record.lanes).length;})){
       element('h3','','Teams',panelBody);pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
         var row=element('div','dv-live-lane',null,panelBody);row.setAttribute('data-live-lane',id);decorateLane(row,id,record.lanes,record.page);
       });});
     }
+    ticketsTable(pages,coverage);
     element('h3','','Blockers',panelBody);var blockers=element('ul','dv-live-blockers',null,panelBody);
     refs().tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).forEach(function(key){
       var entry=map[key],row=element('li','dv-live-blocker',null,blockers);link(row,key,liveStatusTicketURL(page.tracking,key,entry));
@@ -380,7 +532,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(entry.state==='missing')element('span','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)',row);
     });
     element('h3','','Activity',panelBody);var list=element('ol','dv-live-activity',null,panelBody);
-    activity.forEach(function(item){var row=element('li','dv-live-activity-entry',item.key+' · '+item.old+' → '+item.state+' · '+(item.at?relative(item.at):'time unavailable'),list);if(item.at)row.setAttribute('data-updated-at',item.at);});
+    activity.forEach(function(item){var row=element('li','dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+(item.at?relative(item.at):'time unavailable'),list);if(item.at)row.setAttribute('data-updated-at',item.at);});
   }
   function paintBinding(binding){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
@@ -481,7 +633,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     control.demoNext.disabled=demoControls.ended;
   }
   function refreshControls(){
-    var value=snapshot(),available=refs().tickets.length>0;
+    var value=snapshot(),available=refs().tickets.length>0 || refs().epics.length>0;
     controls.forEach(function(control){
       if(!control.root){if(!available)return;buildControl(control);}
       control.root.hidden=!available || !(provider || applied || noteText || actionFn);
@@ -517,9 +669,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired)return;var next=Object.create(null);
       Object.keys(value || {}).forEach(function(key){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
-        var item={state:entry.state};['title','assignee','detail','updatedAt'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
+        var item={state:entry.state};['title','assignee','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
         var url=deltaLinkUrl(entry.url);if(url)item.url=url;
-        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
+        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
         next[key]=item;
       });
       // Cache age describes the lookup, independently of issue modification
@@ -534,10 +686,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var stamp=Date.parse(next[key] && next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
         activity.unshift({key:key,old:oldState,state:newState,at:at});
       });
-      activity=activity.slice(0,20);
+      if(applied)liveStatusCoverage(page,next,refs()).notOnDiagram.forEach(function(key){
+        if(seenKeys[key])return;
+        var stamp=Date.parse(next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
+        activity.unshift({key:key,added:true,at:at});
+      });
+      activity=activity.slice(0,20);Object.keys(next).forEach(function(key){seenKeys[key]=true;});
       map=next;applied=true;paint();notify();
     },
-    clear:function(){if(retired)return;map=Object.create(null);cacheUpdatedAt=null;activity=[];changedKeys=[];applied=true;paint();notify();},
+    clear:function(){if(retired)return;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;paint();notify();},
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},
@@ -553,7 +710,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);if(panelTrigger===control.details)closePanel(false);if(control.root)control.root.remove();}};
     },
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;closeCarrierPreview(false);if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

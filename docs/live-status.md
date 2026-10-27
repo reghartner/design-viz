@@ -28,7 +28,7 @@ Place the optional Jira site on the page, beside `title`, `contract` and `flowvi
 {
   "page": {
     "title": "Connected doorbell delivery",
-    "tracking": {"jira": {"site": "https://acme.atlassian.net"}}
+    "tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}
   }
 }
 ```
@@ -37,6 +37,12 @@ This is a metadata excerpt; a complete page also needs sections or blocks.
 `tracking` must be an object and a present `tracking.jira.site` must be an
 absolute HTTP(S) URL string. Invalid values warn and are ignored; tracking
 validation never turns them into errors.
+
+`tracking.jira.epic` accepts one Jira key or an array of keys using the same
+pattern as `tickets`. `trackingEpics(page)` returns valid keys once, in authored
+order. Invalid entries warn individually; an invalid field type warns once.
+Linking an epic automatically includes its child stories in the Tickets table.
+Assigning a story to a node or edge remains an authoring step.
 
 ## Workbench
 
@@ -47,6 +53,12 @@ In **Add PR**, paste an absolute HTTP(S) URL and press Enter. Duplicate referenc
 are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 **Remove PR** button to remove an entry. Each add or removal has one Undo/Redo,
 and Export project keeps the references in its JSON.
+
+With no node selected, open **Inspect → Document settings → Tracking** to edit
+**Jira site** and **Epic**. Enter a key in Epic and press Enter; use **Remove epic
+1**, **Remove epic 2**, and so on to remove keys. Each change has one Undo/Redo,
+and Export project preserves the epic references. These authoring controls are
+desktop-only.
 
 When the document has tickets, **Demo live status** beside **Preview** supplies
 sample states in sorted ticket order. It starts off and stays preview-only across
@@ -99,8 +111,8 @@ remain plain links. The node links menu includes authored tickets and PRs even
 without a provider. Pulses stop for reduced motion and print; print retains colors.
 
 The reader Live control shows counts of distinct referenced tickets and the newest
-provider timestamp. With no provider or applied map, it stays hidden. Pages without
-ticket references get no Live control markup. Path, View, Tab and detail navigation
+provider timestamp. With no provider or applied map, it stays hidden. Pages with
+neither ticket references nor a configured epic get no Live control markup. Path, View, Tab and detail navigation
 reapply the current map to rebuilt elements.
 
 ## Host provider API
@@ -111,7 +123,7 @@ A host can supply ticket transport at render time:
 var ctl = renderPage(view, page, skin, backlinks, {
   liveStatus: {
     provider: function(refs, signal) {
-      // refs = {tickets: ["HW-123", ...], prs: ["https://...", ...]}
+      // refs = {tickets: ["HW-123", ...], prs: ["https://...", ...], epics: ["DOOR-100"]}
       return hostTicketLookup(refs.tickets, signal);
     },
     refreshMs: 60000
@@ -125,6 +137,7 @@ The provider resolves a complete map, for example:
 {
   "HW-123": {
     "state": "active",
+    "epic": "DOOR-100",
     "title": "Button delivery",
     "url": "https://acme.atlassian.net/browse/HW-123",
     "assignee": "Alex",
@@ -135,7 +148,7 @@ The provider resolves a complete map, for example:
 }
 ```
 
-Only `state` is required; PR summary state is `open` or `merged`. Provider calls
+Only `state` is required; PR summary state is `open`, `merged` or `declined`. Provider calls
 start after first paint and repeat at a minimum of 30 seconds. Hidden documents
 pause refresh; returning to visible triggers one catch-up. Rejections show an error
 note and retain the previous map. Destroy aborts the signal and retires timers,
@@ -145,8 +158,16 @@ can also use the Atlassian adapter described below.
 `ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
 null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
-clear and enable changes. Counts are per distinct referenced ticket, independent
+clear, enable changes, and loaded details that change the collected references.
+Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
+Entries for stories without a carrier are accepted too. Set their `epic` to the
+configured parent key. `refs().epics` collects the root and loaded detail pages.
+`liveStatusCoverage(page, map, refs)` returns `epics`, `onDiagram` (carrier keys),
+`notOnDiagram` (configured epic children without carriers), and `notInEpic`
+(carrier keys without evidence of membership in a configured epic). With no
+epics configured, `notInEpic` is empty. Extra stories do not affect carrier
+colors, completion, or readiness.
 The map may carry numeric `storedAt` metadata (epoch milliseconds), including
 as a non-enumerable property. A valid cache timestamp supplies the control and
 change callback's `updatedAt` without altering any ticket's `updatedAt`. Maps
@@ -171,6 +192,8 @@ hardware, firmware, a mobile app and backend with node and edge references.
 The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 provides fictional Jira tools without an Atlassian account. Its shared timeline
 demonstrates progress, blocked and missing tickets, and linked PR summaries.
+Search with `parent = DOOR-100`, optionally followed by `AND Flagged = Impediment`,
+to retrieve that day's children. `getJiraIssue` can also return the epic itself.
 
 ## Demo mode
 
@@ -186,7 +209,10 @@ The Live control shows the current day and offers **Pause/Play** and **Next day*
 Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
 on the final day. Reduced motion uses manual advancement only. Hidden pages pause
 the timer. Requested ticket keys absent from a day become `missing`; linked PRs
-remain informational. Without an embedded timeline, four days are synthesized
+remain informational. Every key in a day's `issues` is included, even when no
+carrier references it; entries may include `epic` and a lane ID in `lane`. The
+example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
+It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
 
 ## Blocker propagation
@@ -236,7 +262,15 @@ manifest exposes it takes any one that offers both
 **Atlassian MCP**, then **Atlassian**, then the first other qualifying
 connector. It then selects the resource matching `page.tracking.jira.site`
 (or the first resource when no site is specified), and watches batches of ten
-keys every 60 seconds. A second Flagged Impediment query detects blockers. Jira status determines colors;
+keys every 60 seconds. A second Flagged Impediment query detects blockers. Each configured epic also gets a
+`parent = KEY` watch and a `parent = KEY AND Flagged = Impediment` watch, requesting
+summary, status, assignee, updated and issuetype in pages of ten. The adapter
+follows `pageInfo.hasNextPage`/`endCursor` or `nextPageToken` until exhausted and
+tags the returned children with their epic key. When an approved detail page
+loads, new ticket and epic references get their own watches; reopening that
+detail reuses the existing watches. Epic query errors retain prior
+carrier evidence and use the same notices and bounded retry rules.
+Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
@@ -246,7 +280,7 @@ Settings → Connectors to see live ticket status.” If approval is needed, the
 status; temporary failures keep the last evidence and permit one delayed retry
 per refresh. Switching accounts retires the adapter. The Live toggle hides
 colors while watches continue, and turning it back on applies the latest data.
-Without the claude.ai runtime or MCP capability, or without ticket references,
+Without the claude.ai runtime or MCP capability, or without ticket or epic references,
 the adapter is inert. An existing `window.flowviewLiveStatus` host provider takes
 precedence. Document editing remains desktop-only.
 
@@ -256,6 +290,29 @@ for setup, fictional scenarios, result envelopes and known fidelity limits.
 The mock can be installed as a custom connector under any name except
 **Atlassian MCP** to try the artifact without an Atlassian account; declare
 that name when publishing. No GitHub connector is used.
+
+### Tickets table
+
+Open **details** in the Live control. Between Teams and Blockers, the Tickets
+table lists each distinct carrier ticket and every returned child of a linked
+epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
+Key, Title, State, Owner with relative update time (or “time unavailable”), PRs,
+and Coverage. The key uses the configured Jira site, and a colored stripe marks
+its team lane when known.
+
+PR links come only from authored carrier `prs`; Jira's Development summary adds
+informational open, merged or declined counts without inventing URLs. Coverage
+buttons name the story's carriers, open their containing section or detail when
+needed, and focus their live badges. If a section has no drill-down route, the
+button opens a read-only preview of that section using the evidence already
+loaded. Close or Escape dismisses the preview and returns focus to **details**.
+This also works for other sections in an approved, loaded detail page, without
+another fetch or any change to the authored diagram. Stories without
+carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
+a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
+stories on diagram”. A child first received after the initial map adds
+“KEY · added to epic · not on diagram” to Activity using the existing time rules.
+The table scrolls for narrow read-only viewing and the panel stays hidden in print.
 
 ## Story mode
 

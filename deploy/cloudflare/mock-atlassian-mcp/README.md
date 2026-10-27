@@ -34,9 +34,15 @@ actual Worker name, account ID, deployed address, login token, `local.env` or
 ## Connect from claude.ai
 
 Open Settings → Connectors → Add custom connector → URL, paste the `/mcp` URL,
-choose Authentication **No sign-in**, and name it exactly **Atlassian MCP**.
-Enable the connector in the conversation using the live-status artifact. The
-artifact needs the `mcp` capability. No Atlassian account or OAuth is involved.
+choose Authentication **No sign-in**, and give it a name such as
+**Mock-atlassian**. Do not name it **Atlassian MCP**: that is the display name
+of Atlassian's directory connector on claude.ai, and a connector or artifact
+declaration under that name resolves to the directory connector, which asks
+for an Atlassian login. Publish the live-status artifact with the `mcp`
+capability declaring the exact display name you chose (see
+`docs/live-status.md`, "Publishing as a claude.ai artifact"); the adapter picks
+the connector by the tools it offers, not by name. No Atlassian account or
+OAuth is involved.
 
 The endpoint uses stateless Streamable HTTP: JSON-RPC over `POST /mcp`, single
 requests or batches, JSON responses, and 202 for notifications. `GET /mcp` is

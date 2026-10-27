@@ -167,7 +167,7 @@ function stubLiveClaude(mode){
  const issue=(key,category='indeterminate')=>({key,fields:{summary:'Work '+key,status:{name:'In Progress',statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
  const result=input=>({payload:{issues:{nodes:input.jql.includes('Flagged')?[issue('HW-124')]:['HW-123','FW-45','BE-67','HW-124','FW-46','BE-68'].map(key=>issue(key))}},cache:{storedAt:1793000000000}});
  const mcp={
-  listTools:async()=>mode==='missing'?[]:[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'searchJiraIssuesUsingJql'}]}],
+  listTools:async()=>mode==='missing'?[]:[{server:'Mock-atlassian',authStatus:'unknown',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]}],
   callTool:async(server,tool,input,opts)=>{log.calls.push({server,tool,input,opts});return tool==='getAccessibleAtlassianResources'?{payload:[{id:'cloud',url:'https://acme.atlassian.net'}]}:result(input);},
   watchTool(server,tool,input,handler,opts){
    const watch={server,tool,input,opts,stopped:false};log.watches.push(watch);
@@ -190,7 +190,7 @@ test('P1 P4 P5 P7 P9 claude connector paints Jira nodes and Flagged edges with c
  await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/dv-live-missing/);
  await expect(root.locator('time.dv-live-updated')).toHaveAttribute('datetime',new Date(1793000000000).toISOString());await expect(root.locator('time.dv-live-updated')).toContainText('updated');
  const registrations=await page.evaluate(()=>__mcpStub.watches.map(({server,tool,input,opts})=>({server,tool,input,opts})));
- expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Atlassian MCP');expect(registrations[0].opts).toEqual({refetchInterval:60000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
+ expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Mock-atlassian');expect(registrations[0].opts).toEqual({refetchInterval:60000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
  await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-active,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);
  await page.evaluate(()=>__mcpStub.watches.forEach(w=>w.deliver()));expect(await page.evaluate(()=>__mcpStub.watches.some(w=>w.stopped))).toBe(false);
  await root.locator('.dv-live-toggle').click();await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);expect(requests).toEqual([]);

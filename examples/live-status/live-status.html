@@ -8799,6 +8799,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 @keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
 @media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
 .dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
 .dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
@@ -23889,7 +23890,6 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','done','blocked','missing'];
-  var PR_ICON='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><circle cx="3.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 5.1v5.8M12.5 10.9V7.2a2 2 0 0 0-2-2H8.2m1.9-2L8.2 5.2l1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
@@ -23923,7 +23923,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       var number=/\/(?:pull|pulls|pull-requests|merge_requests|merge-requests)\/(\d+)/.exec(url),host='';try{host=new URL(url).host.replace(/^www\./,'');}catch(ex){}
       var node=el(parent,'a',url,'nbacklink dv-live-pr-link',null);node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');
       node.setAttribute('aria-label','Pull request'+(number?' #'+number[1]:'')+(host?' on '+host:''));node.setAttribute('title',url);
-      if(!node.firstChild)node.innerHTML=PR_ICON;return node;
+      if(!node.firstChild)node.innerHTML=FlowIcons.render('pull-request',{className:'dv-live-pr-icon',monochrome:true});return node;
     }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
@@ -23994,6 +23994,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 @keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
 @media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
 .dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
 .dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}

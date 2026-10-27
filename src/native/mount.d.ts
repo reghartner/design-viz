@@ -42,7 +42,21 @@ export interface NativeViewerTarget {
   path?: string;
   step?: string;
 }
+export interface LiveStatusEntry {
+  state: 'todo' | 'active' | 'done' | 'blocked' | 'missing';
+  title?: string;
+  url?: string;
+  assignee?: string;
+  prs?: {count: number; state: 'open' | 'merged'};
+  detail?: string;
+  updatedAt?: string;
+}
 export interface NativeViewerOptions {
+  /** Host-owned ticket transport; refresh pauses while the document is hidden. */
+  liveStatus?: {
+    provider: (refs: {tickets: string[]; prs: string[]}, signal: AbortSignal) => Promise<Record<string, LiveStatusEntry>>;
+    refreshMs?: number;
+  };
   /** Runtime host for diagram handoffs only. Saved destinations do not imply a host. */
   handoffHost?: 'claude' | 'site' | 'backstage' | 'unknown';
   /** Backstage continuation owned by the host. Keep the current viewer usable

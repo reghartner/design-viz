@@ -57,7 +57,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
     prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
-  return {sections:saved};
+  return {sections:saved,demoLiveStatus:!!(ctl && ctl.demoLiveStatus)};
 }
 /* Authoring a legacy View materializes its generated ID as an explicit ID.
    That ID remains authoritative through Undo/Redo. Layout identity is needed
@@ -132,13 +132,52 @@ function workbenchArrangementPreviewPage(page,index){
   ['default','backstage','confluence'].forEach(function(profile){diagram.sectionLayout[profile]=sectionLayoutItems(d,profile) || sectionLayoutPreset(d,profile);});
   return display;
 }
+/* Demo status is host state, never authored data. Sort the shared parser's
+   distinct keys so repeated references and carrier order cannot change colors. */
+function workbenchDemoStatus(page){
+  var keys=[],states=['todo','active','done','blocked'],map={};
+  sectionRecords(page).forEach(function(record){
+    var diagram=record.section.diagram || {};
+    function collect(carrier){trackingRefs(carrier).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});}
+    Object.keys(diagram.nodes || {}).forEach(function(id){collect(diagram.nodes[id]);});
+    (diagram.edges || []).forEach(collect);
+  });
+  var epic=typeof trackingEpics==='function'?trackingEpics(page)[0]:null;
+  keys.sort().forEach(function(key,index){map[key]={state:states[index%states.length]};if(epic)map[key].epic=epic;});
+  return map;
+}
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
   var tabs = previousPage ? activeTabReferences(previousCtl) : null;
   var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var display=workbenchArrangementPreviewPage(page,lifecycle && lifecycle.arrangementSection);
-  var ctl = renderPage(view, display, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
+  var demoMap=lifecycle && lifecycle.demoLiveStatus?workbenchDemoStatus(page):{};
+  var hasTickets=Object.keys(demoMap).length>0;
+  var demoOn=hasTickets && !!(saved && saved.demoLiveStatus);
+  var renderOptions={autoplay:false,authoring:true,layoutTarget:'default'};
+  if(demoOn)renderOptions.liveStatus={provider:function(){return Promise.resolve(demoMap);}};
+  var ctl = renderPage(view, display, skin, null, renderOptions);
+  ctl.demoLiveStatus=demoOn;
+  if(demoOn){
+    var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
+    function paintDemo(){
+      Object.keys(initialDemo).forEach(function(key){demoMap[key]={state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]};});
+      ctl.liveStatus.apply(demoMap);ctl.liveStatus.note('Demo day '+(demoDay+1),'info');
+      ctl.liveStatus.setDemoControls({playing:false,manual:true,ended:demoDay===3,toggle:function(){},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
+    }
+    paintDemo();
+  }
+  var demoLabel=null,demoInput=null;
+  function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
+  var doc=view.ownerDocument,previewButton=doc && doc.getElementById('open-page-preview');
+  if(hasTickets && previewButton && lifecycle && lifecycle.demoLiveStatus){
+    demoLabel=doc.createElement('label');demoLabel.className='workspace-preview';
+    demoInput=doc.createElement('input');demoInput.type='checkbox';demoInput.checked=demoOn;
+    demoLabel.appendChild(demoInput);demoLabel.appendChild(doc.createTextNode('Demo live status'));
+    demoInput.addEventListener('change',changeDemo);
+    previewButton.parentNode.insertBefore(demoLabel,previewButton);
+  }
   /* An unpublished draft has no public document ID. Its controls deliberately
      use this Workbench document as a local/recovery base; Canon supplies its
      stable published route in library.workbench.js. */
@@ -148,7 +187,11 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var linkBase=typeof window!=='undefined' && typeof fixedDeepLinkBase==='function'?
     fixedDeepLinkBase(String(window.location.href).split('#')[0],window):null;
   var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
-  ctl.destroy=function(){if(links)links.destroy();destroy();};
+  ctl.destroy=function(){
+    if(demoInput)demoInput.removeEventListener('change',changeDemo);
+    if(demoLabel && demoLabel.parentNode)demoLabel.parentNode.removeChild(demoLabel);
+    if(links)links.destroy();destroy();
+  };
   try{
     restoreActiveTabs(ctl, tabs);
     restoreWorkbenchPreview(page, ctl, saved);
@@ -254,6 +297,11 @@ function createWorkbenchPreviewController(opts){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
+        demoLiveStatus:function(on){
+          if(!ctl || !page)return;
+          ctl.demoLiveStatus=on;
+          replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+        },
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);

@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 
 test('native mount forwards host diagram routing independently of detail loading',()=>{
   let pageOptions, detailReads=0;
+  const liveStatus={provider:()=>Promise.resolve({}),refreshMs:45000};
   const reference={spec:'recording',revision:'approved-r1',section:'storage'},
     resolveDiagramLink=value=>'https://designs.test/diagrams/'+value.spec,
     loadDetail=()=>{detailReads++;return Promise.resolve({});};
@@ -16,9 +17,10 @@ test('native mount forwards host diagram routing independently of detail loading
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/native/mount.js'),'utf8')+'\nthis.mount=mountNativeSpec;',context);
   context.mount({body:{appendChild(){},classList:{toggle(){}}},listen(){},fontsReady:Promise.resolve()}, {},
-    {resolveDiagramLink,loadDetail});
+    {resolveDiagramLink,loadDetail,liveStatus});
   assert.equal(pageOptions.resolveDiagramLink,resolveDiagramLink);
   assert.equal(pageOptions.loadDetail,loadDetail);
+  assert.equal(pageOptions.liveStatus,liveStatus);
   assert.equal(pageOptions.resolveDiagramLink(reference),'https://designs.test/diagrams/recording');
   assert.equal(detailReads,0);
 });

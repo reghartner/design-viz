@@ -16,13 +16,18 @@ test('visual catalog covers each supported panel exactly once with useful descri
   }
 });
 
-test('every preview uses valid authored configuration without renderer fallback warnings',()=>{
+test('every preview validates with only the live-status empty-page advisory',()=>{
   for(const {type} of context.PANEL_CATALOG){
     const {panel}=context.panelPickerExample(type);
     const spec={page:{blocks:[{diagram:{nodes:{},rows:[[]],panels:[panel]}}]}};
     const findings=context.validate(context.normalize(spec));
     assert.deepEqual(plain(findings.errors),[],type);
-    assert.deepEqual(plain(findings.warnings),[],type);
+    assert.deepEqual(plain(findings.warnings),type==='live-status' ?
+      ['1.diagram.panels[0]: this page has no ticket references — the panel will be empty'] : [],type);
+    if(type==='live-status'){
+      spec.page.tracking={jira:{epic:'EP-1'}};
+      assert.deepEqual(plain(context.validate(context.normalize(spec))),{errors:[],warnings:[]});
+    }
   }
 });
 

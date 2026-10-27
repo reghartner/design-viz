@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'flow.live-status':['Live ticket status references','0.2.0'],
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
@@ -67,6 +68,8 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      function tracked(value){return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
+      if(Object.values(d.nodes || {}).some(tracked) || (Array.isArray(d.edges)?d.edges:[]).some(tracked))used['flow.live-status']=true;
       if(d.graphFrame!=null)used['layout.graph-frame']=true;
       if(d.brand)used['media.branding']=true;
       function icons(value,inStep){
@@ -176,6 +179,7 @@ var FlowviewCompatibility = (function(){
     }
     function views(owner){if(!object(owner) || !Array.isArray(owner.views))return;used['document.tab-views']=true;if(owner.views.some(function(view){return view && view.presentation==='explore';}))used['layout.explore']=true;}
     if(!object(page))return [];
+    if(Object.prototype.hasOwnProperty.call(page,'tracking'))used['flow.live-status']=true;
     views(page);
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;

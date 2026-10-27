@@ -634,6 +634,43 @@ including for steps without edges. Clearing `delta` hides the marker while
 retaining its optional details. See [delta markers](../docs/delta-markers.md)
 for the workbench controls and a complete example.
 
+### Live ticket references — nodes and edges
+
+Optional `tickets` on nodes and edges is an array of Jira keys matching
+`^[A-Z][A-Z0-9_]+-[0-9]+$`, such as `["HW-123", "FW-45"]`. Optional `prs` is
+an array of absolute HTTP(S) URL strings, such as
+`["https://github.com/acme/firmware/pull/88"]`. Invalid entries produce warnings
+and are ignored; a non-array value produces one warning and is ignored. Valid
+references are retained, with duplicates removed in their original order when
+read. Authored PR references are plain links and never carry live state.
+
+Always add a `live-status` panel to a tracked page and place it with
+`sectionLayout` (the example puts it beside the diagram); its header owns Live and
+demo controls and its body shows Blockers, Tickets and Activity. It has no authored
+initial or step state.
+
+At page level, beside `title`, `contract` and `flowview`, optional `tracking`
+configures the Jira site and optional epic:
+`"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.
+`tracking.jira.epic` accepts one Jira key or an array using the ticket pattern.
+Valid keys are deduplicated in authored order; invalid entries warn individually
+and an invalid field type warns once, never errors. Epic children automatically
+appear in the Tickets table; mapping them to nodes and edges remains an authoring
+step. Unmapped children say NOT ON DIAGRAM; referenced tickets without evidence
+of membership in a configured epic say NOT IN EPIC. Extra children never change
+carrier colors or rollups. Desktop Workbench Tracking controls add and remove
+epics with one Undo/Redo per change and preserve them in Export project.
+Optional `tracking.staleDays` is a positive number of days (default 7). Active
+work with an `updatedAt` strictly older than this threshold gets a stale badge
+ring and age text without changing its live rollup state. Invalid values warn
+and fall back to 7; an absent or invalid timestamp is never stale.
+A non-object `tracking` or a present `tracking.jira.site` that is not an absolute
+HTTP(S) URL string produces a warning and is ignored. The spec never stores status;
+live colors come from Jira status only. Steps, coins and chips derive their state
+from the nodes and edges they involve and never carry tickets. These fields
+declare `flow.live-status`; the overlay ships in every renderer entrypoint.
+See [live ticket status](../docs/live-status.md) for the state model and example.
+
 ### groups — containment boundaries
 
 Declare `"groups": {"doorbell": {"title": "Doorbell unit"}}` at the diagram
@@ -919,6 +956,21 @@ Compatibility metadata advertises `flow.panel-visibility`.
 a column beside the board and driven by the same steps (the "different
 perspectives" of one timeline). Types:
 
+- `live-status` — runtime ticket progress for a tracked page:
+  `{"id":"status","type":"live-status","title":"Epic status"}`.
+  Always add it when the page has tracking or carrier tickets, and place it with
+  `sectionLayout` (the example: panel in the left half, diagram with attached step
+  controls in the right half; stacked full width for Backstage and Confluence).
+  The header owns Live, counts, updated time, provider messages and actions,
+  First blocker, and demo Play/Pause and Next day when supplied by the host.
+  The body shows completion, verdict, Blockers, Tickets and Activity.
+  It has no authored state: `initial` and all step patches warn and are ignored;
+  step `panelVisibility` still works. No setup or patch fields are needed.
+  Without ticket references or epics it reads “This page has no ticket references.”
+  Validation warns when a tracked page omits this panel or an untracked page
+  declares it. Status stays in the runtime provider, never the exported spec.
+  See [Live status panel](../docs/live-status.md#live-status-panel) for provider,
+  coverage navigation and demo behavior.
 - `appscreens` — a collection of exported app screens selected by story steps.
   Declare up to 32 `screens`, each with a unique nonempty `id`, `label`, `alt`,
   embedded PNG/JPEG/WebP `src` (512 KiB decoded maximum), optional `caption`

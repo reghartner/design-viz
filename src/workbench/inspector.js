@@ -502,6 +502,86 @@ function deltaControls(val){
     return fold;
   }
 
+function pageTrackingControls(val){
+    var box=document.createElement('fieldset'),legend=document.createElement('legend');
+    box.className='tracking-editor';legend.textContent='Tracking';box.appendChild(legend);
+    function update(edit){
+      return commitCascade(function(raw){
+        var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
+        var tracking=specObject(doc.page.tracking)?builderClone(doc.page.tracking):{};
+        if(!specObject(tracking.jira))tracking.jira={};
+        edit(tracking.jira,doc.page);
+        return planSetField(session.text(),raw,doc.path,'tracking',JSON.stringify(tracking));
+      },{after:refreshFormSoon});
+    }
+    var jira=val.tracking && val.tracking.jira || {};
+    box.appendChild(frow('Jira site',textControl(jira.site,function(value){
+      var url=value==null?null:deltaLinkUrl(value);
+      if(value!=null && !url){formError('Use an absolute http(s) URL.');return false;}
+      return update(function(jira){if(url)jira.site=url;else delete jira.site;});
+    },{placeholder:'https://acme.atlassian.net'})));
+    trackingEpics(val).forEach(function(key,index){
+      var row=document.createElement('div'),label=document.createElement('span');label.textContent=key;row.appendChild(label);
+      row.appendChild(actionButton('Remove epic '+(index+1),function(){return update(function(jira,page){
+        var keys=trackingEpics(page).filter(function(value){return value!==key;});if(keys.length)jira.epic=keys;else delete jira.epic;
+      });}));box.appendChild(row);
+    });
+    box.appendChild(frow('Epic',textControl('',function(value){
+      if(value==null)return true;var key=value.trim();
+      if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
+      var current=parseEditor();if(current.error){formError(current.error);return false;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formError('');return true;}
+      return update(function(jira,page){jira.epic=trackingEpics(page).concat([key]);});
+    },{placeholder:'DOOR-100'})));
+    return box;
+  }
+
+function trackingControls(val){
+    var box=document.createElement('fieldset'),legend=document.createElement('legend');
+    box.className='tracking-editor';legend.textContent='Tracking';box.appendChild(legend);
+    function update(field,ref,remove){
+      var parsed=parseEditor();
+      if(parsed.error){formError(parsed.error);return false;}
+      var path=builderTargetPath(parsed.raw,session.target),current=path && specValueAt(parsed.raw,path);
+      if(!current)return false;
+      var refs=trackingRefs(current)[field],index=refs.indexOf(ref);
+      if(remove){if(index<0)return true;refs.splice(index,1);}
+      else {
+        if(index>=0){formError('');return true;}
+        refs.push(ref);
+      }
+      var ok=commitSimple(field,refs.length?JSON.stringify(refs):null);
+      if(ok)refreshFormSoon();
+      return ok;
+    }
+    var refs=trackingRefs(val);
+    [['tickets','Tickets','ticket'],['prs','Pull requests','PR']].forEach(function(field){
+      if(!refs[field[0]].length)return;
+      var title=document.createElement('p'),list=document.createElement('ul');
+      title.className='fnote';title.textContent=field[1];box.appendChild(title);
+      list.setAttribute('aria-label',field[1]);
+      refs[field[0]].forEach(function(ref,index){
+        var row=document.createElement('li'),text=document.createElement('span');
+        text.textContent=ref;row.appendChild(text);
+        row.appendChild(actionButton('Remove '+field[2]+' '+(index+1),function(){return update(field[0],ref,true);}));
+        list.appendChild(row);
+      });
+      box.appendChild(list);
+    });
+    [['tickets','Add ticket','HW-123','Jira key, then Enter'],
+      ['prs','Add PR','https://github.com/org/repo/pull/1','Absolute http(s) URL, then Enter']].forEach(function(field){
+      var input=textControl('',function(value){
+        if(value==null)return true;
+        var ref=field[0]==='tickets'?(trackingKeyPattern.test(value.trim())?value.trim():null):deltaLinkUrl(value);
+        if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123.':'Use an absolute http(s) URL.');return false;}
+        return update(field[0],ref,false);
+      },{placeholder:field[2]});
+      var help=document.createElement('p');help.className='fnote';help.id=prefix+'-'+field[0]+'-help';help.textContent=field[3];
+      input.setAttribute('aria-describedby',help.id);box.appendChild(frow(field[1],input));box.appendChild(help);
+    });
+    return box;
+  }
+
 function nodeForm(val, ctx){
     if(isTextBoxNode(val))return textBoxForm(val);
     var t = session.target;
@@ -573,7 +653,8 @@ function nodeForm(val, ctx){
     ] : [],[
       frow('Link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('Show change marker', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
-      deltaControls(val)
+      deltaControls(val),
+      trackingControls(val)
     ],[handoffControls(val),detailControls(val,ctx),advanced]);
   }
 
@@ -843,6 +924,7 @@ function edgeForm(val, ctx){
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val),
+      trackingControls(val),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frowBlock('Contract JSON',edgeJsonContractControl(val.contract)),
       frowBlock('Curve',curveControls),
@@ -2017,6 +2099,7 @@ function documentForm(){
     rows.push(frow('Claude artifact share URL',textControl(links.claudeUrl,function(v){return linkSetting('claudeUrl',v);},{placeholder:'https://claude.ai/artifact/…'})));
     rows.push(note('Use the existing diagram ID. This does not add the document to Canon. Paste the Claude artifact share URL once; the URL and artifact ID are saved with the document.'));
 
+    rows.push(pageTrackingControls(val));
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
     rows.push(frow('Description',textControl(val.description,function(v){return setting('description',v);},{placeholder:'One line shown on library cards'})));
     var tagText=Array.isArray(val.tags)?val.tags.join(', '):val.tags;

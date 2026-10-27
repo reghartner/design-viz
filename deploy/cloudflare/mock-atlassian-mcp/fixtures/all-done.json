@@ -1,0 +1,109 @@
+{
+  "issues": {
+    "HW-123": {
+      "state": "done",
+      "summary": "Debounce the doorbell button",
+      "assignee": "Alex",
+      "updated": "2026-10-28T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "HW-124": {
+      "state": "done",
+      "summary": "Stabilize the hardware event signal",
+      "assignee": "Alex",
+      "updated": "2026-10-28T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "FW-45": {
+      "state": "done",
+      "summary": "Deliver firmware events",
+      "assignee": "Sam",
+      "updated": "2026-10-29T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "FW-46": {
+      "state": "done",
+      "summary": "Integrate hardware interrupts",
+      "assignee": "Sam",
+      "updated": "2026-10-31T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "BE-67": {
+      "state": "done",
+      "summary": "Build the notification service",
+      "assignee": "Riley",
+      "updated": "2026-10-29T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "BE-68": {
+      "state": "done",
+      "summary": "Accept firmware events over HTTPS",
+      "assignee": "Riley",
+      "updated": "2026-10-29T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "UX-89": {
+      "state": "done",
+      "summary": "Show resident notifications",
+      "assignee": "Morgan",
+      "updated": "2026-10-29T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100"
+    },
+    "UX-90": {
+      "state": "done",
+      "summary": "Alert sound setting",
+      "assignee": "Morgan",
+      "updated": "2026-10-31T09:00:00.000+0000",
+      "flagged": false,
+      "statusName": "Done",
+      "prs": {
+        "count": 1,
+        "state": "MERGED"
+      },
+      "epic": "DOOR-100",
+      "lane": "APP"
+    }
+  }
+}

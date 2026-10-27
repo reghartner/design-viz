@@ -1,0 +1,454 @@
+{
+  "page": {
+    "title": "Doorbell Delivery Live Status",
+    "contract": "1",
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": [
+        "flow.live-status"
+      ]
+    },
+    "tracking": {
+      "jira": {
+        "site": "https://acme.atlassian.net",
+        "epic": "DOOR-100"
+      }
+    },
+    "lanes": {
+      "HW": {
+        "label": "Hardware",
+        "color": "#f97316"
+      },
+      "FW": {
+        "label": "Firmware",
+        "color": "#38bdf8"
+      },
+      "BE": {
+        "label": "Backend",
+        "color": "#a78bfa"
+      },
+      "APP": {
+        "label": "Mobile app",
+        "color": "#34d399"
+      }
+    },
+    "sections": [
+      {
+        "heading": "Press the button, ring the chime, alert the resident",
+        "text": [
+          "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: slate not started, orange in progress, green done, rose blocked or missing.",
+          "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the step controls under the diagram to step through the flow, and the Live status panel's Pause and Next day controls to drive the story clock."
+        ],
+        "diagram": {
+          "view": "ambient",
+          "panels": [
+            {
+              "id": "status",
+              "type": "live-status",
+              "title": "Epic status"
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 21
+              },
+              {
+                "x": 12,
+                "y": 30,
+                "w": 12,
+                "h": 5,
+                "controls": "steps",
+                "attachTo": "diagram"
+              },
+              {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 27,
+                "panel": "status"
+              }
+            ],
+            "backstage": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 10
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 10,
+                "w": 24,
+                "h": 6
+              },
+              {
+                "panel": "status",
+                "x": 0,
+                "y": 16,
+                "w": 24,
+                "h": 16
+              }
+            ],
+            "confluence": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 10
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 10,
+                "w": 24,
+                "h": 6
+              },
+              {
+                "panel": "status",
+                "x": 0,
+                "y": 16,
+                "w": 24,
+                "h": 16
+              }
+            ]
+          },
+          "graphFrame": {
+            "x": 16,
+            "y": 16,
+            "w": 866,
+            "h": 654
+          },
+          "floats": [
+            {
+              "id": "app",
+              "side": "below",
+              "x": 449,
+              "y": 616
+            },
+            {
+              "id": "button",
+              "side": "below",
+              "x": 775,
+              "y": 70
+            },
+            {
+              "id": "chime",
+              "side": "below",
+              "x": 123,
+              "y": 70
+            },
+            {
+              "id": "ingest",
+              "side": "below",
+              "x": 449,
+              "y": 252
+            },
+            {
+              "id": "mcu",
+              "side": "below",
+              "x": 449,
+              "y": 70
+            },
+            {
+              "id": "notify",
+              "side": "below",
+              "x": 449,
+              "y": 434
+            }
+          ],
+          "nodes": {
+            "button": {
+              "title": "Doorbell button",
+              "sub": "Debounced press sensor",
+              "tickets": [
+                "HW-123"
+              ]
+            },
+            "mcu": {
+              "title": "Doorbell controller",
+              "sub": "Firmware: event delivery",
+              "tickets": [
+                "FW-45"
+              ],
+              "prs": [
+                "https://github.com/acme/firmware/pull/88"
+              ]
+            },
+            "chime": {
+              "title": "Indoor chime",
+              "sub": "Rings on press",
+              "tickets": [
+                "HW-124"
+              ]
+            },
+            "ingest": {
+              "title": "Event ingest",
+              "sub": "Backend: device events",
+              "tickets": [
+                "BE-67"
+              ]
+            },
+            "notify": {
+              "title": "Notification service",
+              "sub": "Backend: push fan-out",
+              "tickets": [
+                "BE-68"
+              ],
+              "prs": [
+                "https://github.com/acme/backend/pull/91"
+              ]
+            },
+            "app": {
+              "title": "Resident app",
+              "sub": "Alert card and live view",
+              "tickets": [
+                "UX-89"
+              ]
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "button",
+              "to": "mcu",
+              "label": "press",
+              "tickets": [
+                "HW-124",
+                "FW-46"
+              ],
+              "fromPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -40.25,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 40.25,
+                  "dy": 0
+                }
+              ]
+            },
+            {
+              "from": "mcu",
+              "to": "chime",
+              "label": "ring",
+              "tickets": [
+                "HW-124"
+              ],
+              "fromPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -40.25,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 40.25,
+                  "dy": 0
+                }
+              ]
+            },
+            {
+              "from": "mcu",
+              "to": "ingest",
+              "label": "event",
+              "kind": "https",
+              "tickets": [
+                "FW-45"
+              ],
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 19.29
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -19.29
+                }
+              ]
+            },
+            {
+              "from": "ingest",
+              "to": "notify",
+              "label": "route",
+              "tickets": [
+                "BE-67"
+              ],
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 19.29
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -19.29
+                }
+              ]
+            },
+            {
+              "from": "notify",
+              "to": "app",
+              "label": "push",
+              "kind": "https",
+              "tickets": [
+                "BE-68",
+                "UX-89"
+              ],
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 19.29
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -19.29
+                }
+              ]
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "edges": [
+                "button->mcu"
+              ],
+              "lane": "HW",
+              "text": "The button reports a debounced press to the controller."
+            },
+            {
+              "id": "ring",
+              "edges": [
+                "mcu->chime"
+              ],
+              "lane": "HW",
+              "text": "The controller rings the indoor chime immediately."
+            },
+            {
+              "id": "publish",
+              "edges": [
+                "mcu->ingest"
+              ],
+              "lane": "FW",
+              "text": "Firmware publishes a press event to the cloud."
+            },
+            {
+              "id": "route",
+              "edges": [
+                "ingest->notify"
+              ],
+              "lane": "BE",
+              "text": "Ingest validates the device and routes the event to notifications."
+            },
+            {
+              "id": "push",
+              "edges": [
+                "notify->app"
+              ],
+              "lane": "BE",
+              "text": "The notification service pushes an alert to the resident's phone."
+            },
+            {
+              "id": "alert",
+              "nodes": [
+                "app"
+              ],
+              "lane": "APP",
+              "text": "The app shows the alert card with a live view button."
+            },
+            {
+              "id": "retry",
+              "edges": [
+                "mcu->ingest"
+              ],
+              "lane": "FW",
+              "text": "Offline: the controller stores the event and retries when the link returns."
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Connected",
+              "steps": [
+                "press",
+                "ring",
+                "publish",
+                "route",
+                "push",
+                "alert"
+              ]
+            },
+            {
+              "id": "offline",
+              "label": "Offline retry",
+              "color": "#fb923c",
+              "steps": [
+                "press",
+                "ring",
+                "retry",
+                "route",
+                "push",
+                "alert"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

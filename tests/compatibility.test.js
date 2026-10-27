@@ -383,3 +383,45 @@ test('section-owned Views declare their capability independently of legacy membe
  const detected=plain(C.detect(raw));assert.ok(detected.includes('document.section-views'));assert.ok(detected.includes('layout.explore'));assert.ok(!detected.includes('document.tab-views'));
  const older={...C.features};delete older['document.section-views'];assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures.includes('document.section-views'));
 });
+
+test('live ticket references register a 0.2.0 capability without bumping the renderer',()=>{
+  assert.deepEqual(plain(C.features['flow.live-status'] || null), {label:'Live ticket status references',since:'0.2.0'});
+  assert.equal(C.version,'0.2.0');
+});
+
+test('live-status detection, stamping and missing-feature checks cover nodes, edges and page tracking',()=>{
+  for(const location of ['node tickets','node prs','edge tickets','edge prs','page tracking']){
+    const raw=spec(),d=raw.page.blocks[0].tabs[0].sections[0].diagram;
+    if(location==='page tracking')raw.page.tracking={jira:{site:'https://acme.atlassian.net'}};
+    else {
+      const [target,field]=location.split(' '),value=field==='tickets'?['HW-123']:['https://github.com/acme/fw/pull/88'];
+      if(target==='node')d.nodes.cam[field]=value;
+      else d.edges=[{from:'cam',to:'cloud',[field]:value}];
+    }
+    assert.ok(C.detect(raw).includes('flow.live-status'),location);
+    const before=JSON.stringify(raw),stamped=C.stamp(raw);
+    assert.equal(JSON.stringify(raw),before);
+    assert.ok(stamped.page.flowview.features.includes('flow.live-status'),location);
+    assert.equal(stamped.page.flowview.minVersion,'0.2.0');
+    const older={...C.features};delete older['flow.live-status'];
+    for(const value of [raw,stamped]) {
+      const report=C.check(value,{version:C.version,contract:'1',features:older});
+      assert.deepEqual(plain(report.missingFeatures),['flow.live-status'],location);
+      assert.match(report.messages.join(' '),/Live ticket status references/);
+    }
+  }
+});
+
+test('live-status detection ignores absent, empty and non-array references and step-only tickets',()=>{
+  for(const fields of [{},{tickets:[],prs:[]},{tickets:'HW-123',prs:'https://example.test'},{tickets:null,prs:{}}]){
+    const raw={nodes:{a:fields},rows:[['a']],edges:[{from:'a',to:'a',...fields}],steps:[{tickets:['HW-123'],prs:['https://example.test']}]};
+    assert.ok(!C.detect(raw).includes('flow.live-status'));
+    assert.ok(!C.stamp(raw).page.flowview.features.includes('flow.live-status'));
+  }
+  for(const tracking of [{},null,false]) assert.ok(C.detect({page:{tracking}}).includes('flow.live-status'));
+  for(const field of ['tickets','prs']){
+    const raw={nodes:{a:{[field]:['invalid']}},rows:[['a']]};
+    assert.ok(C.detect(raw).includes('flow.live-status'),'nonempty authored arrays still declare the capability');
+    assert.ok(C.stamp(raw).page.flowview.features.includes('flow.live-status'));
+  }
+});

@@ -4020,3 +4020,83 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
   .node-review-badge rect{fill:#fff;}
   .node-review-badge,.review-badge{color:#333 !important;}
 }
+
+/* Live evidence uses one palette in every skin. It wins over authored tone,
+   protocol and step paint only for carriers present in the runtime map. */
+/* Live state colours are the Node Styles preset lines (#610): todo slate,
+   active ember, done moss, blocked and missing rose; dark values follow the
+   presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
+   (stepCircleInk: black or white, whichever contrasts more) for every fill. */
+:root{--dv-live-todo:#6E89A5;--dv-live-active:#CB6620;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#E28247;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
+.dv-live-todo{--dv-live-color:var(--dv-live-todo);}
+.dv-live-active{--dv-live-color:var(--dv-live-active);}
+.dv-live-done{--dv-live-color:var(--dv-live-done);}
+.dv-live-blocked{--dv-live-color:var(--dv-live-blocked);}
+.dv-live-missing{--dv-live-color:var(--dv-live-missing);}
+:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-on)!important;}
+.sk-aurora{--dv-live-card:#101a2c;}
+.sk-daylight{--dv-live-card:#fff;}
+body.sk-editorial .docview{--dv-live-card:var(--ed-sheet,#fff);}
+body.sk-terminal .docview{--dv-live-card:#07150b;}
+body.sk-pastel .docview{--dv-live-card:#fff;}
+body.sk-blueprint .docview{--dv-live-card:#08366d;}
+body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview{--dv-live-card:var(--fl-card,#fff);}
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing) .card{
+  stroke:var(--ns-line,var(--dv-live-color))!important;fill:var(--ns-bg,var(--dv-live-card))!important;filter:drop-shadow(0 0 3px var(--ns-line,var(--dv-live-color)))!important;animation:none!important;
+}
+.dv-live-halo{fill:none;stroke:var(--dv-live-color);stroke-width:2;filter:drop-shadow(0 0 6px var(--dv-live-color));opacity:.5;pointer-events:none;}
+:is(.dv-live-active,.dv-live-blocked,.dv-live-missing)>.dv-live-halo{animation:dv-live-halo-pulse 2.4s ease-in-out infinite;}
+@keyframes dv-live-halo-pulse{0%,100%{opacity:.3;}50%{opacity:.75;}}
+:is(path.edge,path.halo):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){stroke:var(--dv-live-color)!important;}
+text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){fill:var(--dv-live-color)!important;}
+.coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
+.coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>text{fill:var(--step-ink)!important;}
+.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
+.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
+.stepmode :is(.node,.edge,.halo,.lbl,.coin):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing):not(.lit):not(.comm-hidden):not(.dv-live-comm-hidden){opacity:max(var(--dv-dim,.45),.55)!important;}
+.dv-live-target,g.node:has(>.card.dv-live-target){cursor:pointer;}
+.dv-live-target:focus:not(:focus-visible){outline:none;}
+.dv-live-target:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
+.dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
+.dv-live-popover .node-link-title{padding-right:28px;}
+.dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}
+.dv-live-ticket-title,.dv-live-ticket-assignee,.dv-live-ticket-prs,.dv-live-ticket-detail{grid-column:1 / -1;white-space:pre-wrap;overflow-wrap:anywhere;}
+@media(prefers-reduced-motion:reduce){.dv-live-halo{animation:none!important;}}
+@media print{
+  .dv-live-halo{animation:none!important;}
+  .dv-live-popover{display:none!important;}
+  :is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+}
+
+/* Waiting is dependency evidence; the original dv-live state stays intact. */
+.dv-live-waiting{--dv-live-waiting-color:var(--dv-live-todo);}
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-waiting .card,
+:is(path.edge,path.halo).dv-live-waiting{stroke:var(--dv-live-waiting-color)!important;stroke-dasharray:5 5!important;}
+.node.dv-live-waiting>.dv-live-halo{stroke:var(--dv-live-waiting-color);filter:drop-shadow(0 0 6px var(--dv-live-waiting-color));}
+path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
+/* Missing tickets are dotted rose; blocked stays solid rose. */
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-missing:not(.dv-live-waiting) .card,
+path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
+.dv-live-packet-hidden,.dv-live-comm-suppressed{display:none!important;}
+.dv-live-comm-hidden{visibility:hidden!important;opacity:0!important;animation:none!important;pointer-events:none;}
+.dv-live-comm-failure{--comm-color:var(--dv-live-blocked)!important;}
+@media print{
+  .dv-live-waiting{print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  .dv-live-comm-failure{display:inline!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  .dv-live-comm-hidden{opacity:0!important;}
+}
+
+/* Story evidence supplements the state color with text, progress and age. */
+.dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
+.lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
+.dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
+/* Keep the carrier group's positioned SVG transform intact. Match the live
+   card paint specificity so its animation reset cannot suppress this pulse. */
+@media screen and (prefers-reduced-motion:no-preference){
+  :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
+  path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
+}
+.dv-live-state-pill{border:1px solid currentColor;border-radius:4px;padding:0 5px;font-size:11px;}
+@media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
+@media print{.dv-live-changed{animation:none!important;}}

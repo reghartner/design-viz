@@ -6,7 +6,7 @@ function mountNativeSpec(environment, spec, options){
   var skin=resolveSkin('',options.skin || page.skin), view=document.createElement('div');
   environment.body.appendChild(view);applySkinClasses(environment.body,view,skin);
   var records=sectionRecords(page), controller=renderPage(view,page,skin,options.backlinks || {},
-    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink,siteBaseUrl:options.siteBaseUrl,handoffHost:options.handoffHost,onDiagramHandoff:options.onDiagramHandoff});
+    {autoplay:false,liveStatus:options.liveStatus,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink,siteBaseUrl:options.siteBaseUrl,handoffHost:options.handoffHost,onDiagramHandoff:options.onDiagramHandoff});
   function protectLinks(){
     view.querySelectorAll('a[href]').forEach(function(link){
       var url=FlowCanon.http(link.getAttribute('href'));

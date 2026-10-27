@@ -318,6 +318,12 @@ test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known contro
   const kinds = new Set(['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',
                          'clock', 'rows', 'map', 'objf']);
   for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
+    if (type === 'live-status') {
+      assert.deepStrictEqual(plain(fields), [], 'runtime evidence has no setup fields');
+      assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS[type]), [], 'runtime evidence has no patch fields');
+      assert.deepStrictEqual(plain(B.PANEL_TEMPLATES[type]), {title:'Live status'});
+      continue;
+    }
     assert.ok(fields.length >= 1, type);
     for (const [key, kind] of fields){
       assert.ok(typeof key === 'string' && key.length, type + '.' + key);
@@ -385,7 +391,8 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
       }
     });
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
-    if (type !== 'image' && type !== 'inflight') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
+    if (type === 'live-status') assert.strictEqual(last, undefined, 'runtime evidence has no starting snapshot');
+    else if (type !== 'image' && type !== 'inflight') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
     if (type === 'inflight') assert.strictEqual(last[0], 'lanes', 'inflight has declarations but no starting snapshot');
   });
 });

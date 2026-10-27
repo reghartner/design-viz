@@ -483,3 +483,122 @@ test('the Confluence and Backstage hosts paint presets through their own stylesh
   expect(contrastRatio(cards.camera.t2,cards.camera.fill)).toBeGreaterThanOrEqual(4.5);
   expect(contrastRatio(cards.camera.stroke,cards.camera.fill)).toBeGreaterThanOrEqual(1.3);
 });
+
+/* #736 tracking contract matrix — desktop authoring only.
+   row | real gesture / observation | rejects
+   W1 | inspect node and edge, then step | missing shared controls or tracking on steps
+   W2 | Tracking fieldset, labelled lists, inputs, hints and numbered removal buttons | incomplete or always-visible empty lists
+   W3 | invalid key/URL and duplicate Enter, read #src and Undo | invalid writes, lost draft text, duplicate history
+   W4 | each add/remove, one Undo restores exact prior bytes, Redo restores result | split history, reordered arrays, empty keys
+   W5 | compare whole parsed document; Export project's JSON and capability stamp | unrelated edits or lost references
+   W6 | shipped hg-evidence paragraph and source Workbench documentation | missing user guidance
+   W7 | real checkbox; observe renderPage options/provider, edit and repaint | spec state, default-on demo, unstable key ordering
+   W8 | existing desktop viewport, step has no Tracking fieldset | mobile authoring or step controls */
+for(const carrier of ['node','edge'])test('tracking '+carrier+' controls validate, preserve order, export and undo each action once',async({page,server})=>{
+  const {projectSource,useProjectDownloads}=await import('../helpers/project-export.mjs');
+  await useProjectDownloads({page});
+  const raw=fixture();
+  // A horizontal SVG path has zero height; its visible label is a real edge selection target.
+  if(carrier==='edge')raw.page.sections[0].diagram.edges[0].label='Delivery';
+  const original=await start(page,server,raw),src=page.locator('#src'),guide=page.locator('#guide');
+  const select=()=>inspectPageElement(page,carrier==='node'?page.locator('#section-overview [data-dv-node="a"] .t1'):page.locator('#section-overview text.lbl[data-dv-edge="0"]'));
+  const element=value=>carrier==='node'?value.page.sections[0].diagram.nodes.a:value.page.sections[0].diagram.edges[0];
+  const tracking=guide.getByRole('group',{name:'Tracking',exact:true});
+  await select();await expect(tracking).toBeVisible();
+  await expect(tracking.getByRole('list')).toHaveCount(0);
+  await expect(tracking.getByLabel('Add ticket',{exact:true})).toHaveAttribute('placeholder','HW-123');
+  await expect(tracking.getByLabel('Add PR',{exact:true})).toHaveAttribute('placeholder','https://github.com/org/repo/pull/1');
+  await expect(tracking).toContainText('Jira key, then Enter');await expect(tracking).toContainText('Absolute http(s) URL, then Enter');
+  async function enter(label,value){const input=tracking.getByLabel(label,{exact:true});await input.fill(value);await input.press('Enter');}
+  async function mutation(act,field,values){
+    const before=await src.inputValue(),expected=JSON.parse(before);
+    if(values.length)element(expected)[field]=values;else delete element(expected)[field];
+    await act();await expect.poll(async()=>JSON.parse(await src.inputValue())).toEqual(expected);
+    const after=await src.inputValue();
+    await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
+    await page.locator('#redo-builder').click();await expect(src).toHaveValue(after);await select();
+  }
+  await enter('Add ticket','hw-123');await expect(guide.locator('.ierr')).toHaveText('Use a Jira key like HW-123.');
+  await expect(tracking.getByLabel('Add ticket',{exact:true})).toHaveValue('hw-123');await expect(src).toHaveValue(original);
+  await mutation(()=>enter('Add ticket','  HW-123  '),'tickets',['HW-123']);
+  await expect(tracking.getByRole('list',{name:'Tickets',exact:true}).locator('li')).toContainText(['HW-123']);
+  const one=await src.inputValue();await enter('Add ticket','HW-123');await expect(src).toHaveValue(one);
+  await expect(guide.locator('.ierr')).toBeHidden();
+  // Duplicate and invalid actions add no history: one Undo still removes the first ticket.
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(one);await select();
+  await mutation(()=>enter('Add ticket','FW-45'),'tickets',['HW-123','FW-45']);
+  await expect(tracking.getByRole('list',{name:'Tickets',exact:true}).locator('li')).toContainText(['HW-123','FW-45']);
+  const two=await src.inputValue();
+  for(const invalid of ['javascript:alert(1)','/relative']){
+    await enter('Add PR',invalid);await expect(guide.locator('.ierr')).toHaveText('Use an absolute http(s) URL.');
+    await expect(tracking.getByLabel('Add PR',{exact:true})).toHaveValue(invalid);await expect(src).toHaveValue(two);
+  }
+  const url='https://github.com/org/repo/pull/1';
+  await mutation(()=>enter('Add PR',url),'prs',[url]);
+  await expect(tracking.getByRole('list',{name:'Pull requests',exact:true}).locator('li')).toContainText([url]);
+  const withPR=await src.inputValue();await enter('Add PR',url);await expect(src).toHaveValue(withPR);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(two);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(withPR);await select();
+  await closeTools(page);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const exported=JSON.parse(await projectSource(await download));
+  expect(element(exported)).toEqual(element(JSON.parse(withPR)));expect(exported.page.flowview.features).toContain('flow.live-status');
+  await expect(src).toHaveValue(withPR);await select();
+  await mutation(()=>tracking.getByRole('button',{name:'Remove ticket 1',exact:true}).click(),'tickets',['FW-45']);
+  await mutation(()=>tracking.getByRole('button',{name:'Remove ticket 1',exact:true}).click(),'tickets',[]);
+  await expect(tracking.getByRole('list',{name:'Tickets',exact:true})).toHaveCount(0);
+  await mutation(()=>tracking.getByRole('button',{name:'Remove PR 1',exact:true}).click(),'prs',[]);
+  await expect(tracking.getByRole('list')).toHaveCount(0);expect(JSON.parse(await src.inputValue())).toEqual(raw);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
+  await expect(tracking).toHaveCount(0);
+});
+
+test('tracking guidance explains references and provider-dependent live colors',async({page,server})=>{
+  await start(page,server);
+  await page.locator('.workspace-help>summary').click();
+  await page.locator('.workspace-help').getByRole('button',{name:'User guide',exact:true}).click();
+  await expect(page.locator('#human-guide')).toBeVisible();
+  const evidence=page.locator('#hg-evidence');
+  await expect(evidence).toContainText('tickets and PR links');await expect(evidence).toContainText('nodes and edges');
+  await expect(evidence).toContainText('references only');await expect(evidence).toContainText('status provider');
+  await expect(evidence.getByRole('link',{name:'Live ticket status',exact:true})).toHaveAttribute('href',/docs\/live-status\.md$/);
+  const {readFile}=await import('node:fs/promises'),{repo}=await import('../helpers/prepare.mjs');
+  const docs=await readFile(repo+'/docs/live-status.md','utf8');
+  expect(docs).toMatch(/## Workbench/);expect(docs).toContain('Add ticket');expect(docs).toContain('Add PR');
+});
+
+test('Demo live status passes a sorted provider map and stays preview-only across edits and repaint',async({page,server})=>{
+  // #735 is absent at the RED base. Observe the actual render boundary, without
+  // replacing the renderer or invoking editor internals to simulate user actions.
+  await page.route('**/workbench.html',async route=>{
+    const response=await route.fetch(),html=await response.text();
+    const needle='function renderPage(view, page, skin, backlinks, options){';expect(html).toContain(needle);
+    await route.fulfill({response,body:html.replace(needle,`function renderPage(view, page, skin, backlinks, options){
+      if(options && options.authoring){
+        window.__trackingDemoMap=null;window.__trackingDemoEnabled=!!options.liveStatus;
+        if(options.liveStatus)options.liveStatus.provider().then(function(map){window.__trackingDemoMap=map;});
+      }
+      return trackingObservedRenderPage(view,page,skin,backlinks,options);
+    }
+    function trackingObservedRenderPage(view, page, skin, backlinks, options){`)});
+  });
+  const original=await start(page,server),src=page.locator('#src'),toggle=page.getByRole('checkbox',{name:'Demo live status',exact:true});
+  await expect(toggle).toHaveCount(0);
+  const raw=fixture();raw.page.sections[0].diagram.nodes.a.tickets=['ZZ-5','AA-1','CC-3'];
+  raw.page.sections[0].diagram.edges[0].tickets=['BB-2','AA-1'];raw.page.sections[1].diagram.nodes.inside.tickets=['DD-4'];
+  await page.locator('#editor-tab-json').click();await src.fill(JSON.stringify(raw,null,2));await page.locator('#go').click();await closeTools(page);
+  const authored=await src.inputValue();expect(authored).not.toBe(original);
+  await expect(toggle).not.toBeChecked();expect(await page.evaluate(()=>window.__trackingDemoEnabled)).toBe(false);
+  await toggle.check();await expect(toggle).toBeChecked();
+  const expected={'AA-1':{state:'todo'},'BB-2':{state:'active'},'CC-3':{state:'done'},'DD-4':{state:'blocked'},'ZZ-5':{state:'todo'}};
+  await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual(expected);await expect(src).toHaveValue(authored);
+  await inspectPageElement(page,page.locator('#section-overview [data-dv-node="a"] .t1'));
+  const ticket=page.locator('#guide').getByLabel('Add ticket',{exact:true});await ticket.fill('AB-9');await ticket.press('Enter');
+  await expect(toggle).toBeChecked();await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual({'AA-1':{state:'todo'},'AB-9':{state:'active'},'BB-2':{state:'done'},'CC-3':{state:'blocked'},'DD-4':{state:'todo'},'ZZ-5':{state:'active'}});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(authored);await expect(toggle).toBeChecked();
+  await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual(expected);
+  await closeTools(page);await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-terminal').click();
+  await expect(toggle).toBeChecked();await expect.poll(()=>page.evaluate(()=>window.__trackingDemoMap)).toEqual(expected);
+  await toggle.uncheck();expect(await page.evaluate(()=>window.__trackingDemoEnabled)).toBe(false);await expect(src).toHaveValue(authored);
+});

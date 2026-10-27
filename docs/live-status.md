@@ -85,9 +85,76 @@ fields keep their existing requirements.
 
 ## Rendering
 
-This child adds the fields, shared parser, validation and compatibility declaration.
-The overlay itself lands in the next child (#735); these references do not yet
-change rendering or fetch Jira data.
+The overlay (#735) paints nodes and edges from a runtime ticket map. Step coins
+and chips roll up the involved edges and endpoint/explicit nodes, including failed
+communications. Text boxes stay unpainted. Missing map entries add no state;
+unknown state strings are ignored. The Live toggle restores authored paint when
+disabled. Status colors override node tones and step colors while enabled.
+
+Each painted node or edge has a keyboard-accessible badge. Click it, or press
+Enter/Space, for ticket status, title, assignee and the informational PR summary.
+Escape or an outside click closes the popover and returns focus. Jira browse links
+use the page tracking site, falling back to the provider URL. Authored PR URLs
+remain plain links. The node links menu includes authored tickets and PRs even
+without a provider. Pulses stop for reduced motion and print; print retains colors.
+
+The reader Live control shows counts of distinct referenced tickets and the newest
+provider timestamp. With no provider or applied map, it stays hidden. Pages without
+ticket references get no Live control markup. Path, View, Tab and detail navigation
+reapply the current map to rebuilt elements.
+
+## Host provider API
+
+A host can supply ticket transport at render time:
+
+```js
+var ctl = renderPage(view, page, skin, backlinks, {
+  liveStatus: {
+    provider: function(refs, signal) {
+      // refs = {tickets: ["HW-123", ...], prs: ["https://...", ...]}
+      return hostTicketLookup(refs.tickets, signal);
+    },
+    refreshMs: 60000
+  }
+});
+```
+
+The provider resolves a complete map, for example:
+
+```json
+{
+  "HW-123": {
+    "state": "active",
+    "title": "Button delivery",
+    "url": "https://acme.atlassian.net/browse/HW-123",
+    "assignee": "Alex",
+    "prs": {"count": 2, "state": "open"},
+    "detail": "Waiting for the bench run",
+    "updatedAt": "2026-10-26T12:00:00Z"
+  }
+}
+```
+
+Only `state` is required; PR summary state is `open` or `merged`. Provider calls
+start after first paint and repeat at a minimum of 30 seconds. Hidden documents
+pause refresh; returning to visible triggers one catch-up. Rejections show an error
+note and retain the previous map. Destroy aborts the signal and retires timers,
+observers and listeners. No Jira adapter or network transport is built in.
+
+`ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
+null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
+function). Change callbacks receive `{states, counts, updatedAt}` after apply,
+clear and enable changes. Counts are per distinct referenced ticket, independent
+of visibility and toggle state. `apply` replaces the map; `clear` empties it.
+`note(text, kind)` sets an `info`, `warn` or `error` message. `action(label, fn)`
+sets one host action; an empty label clears it. These methods allow a provider
+adapter to offer an explicit “Allow” action before looking up tickets.
+
+Standalone hosts set `window.flowviewLiveStatus` before boot. Native hosts pass
+`liveStatus` to `mountNativeViewer`; its provider and entries are typed in
+`src/native/mount.d.ts`. All renderer entrypoints include the overlay. Approved
+external detail pages join reference collection once loaded; local detail-only
+sections are included from the start.
 
 The [live-status example](../examples/live-status/live-status.spec.json) connects
 hardware, firmware, a mobile app and backend with node and edge references.

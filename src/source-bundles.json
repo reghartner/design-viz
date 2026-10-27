@@ -43,6 +43,7 @@
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
     "viewer/deltas.js",
+    "viewer/live-status.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

@@ -125,7 +125,7 @@ function boot(raw){
   var bootSkin = activeSkin || embedSkin || resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
-  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,handoffHost:window.flowviewHandoffHost});
+  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:window.flowviewLiveStatus,handoffHost:window.flowviewHandoffHost});
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's

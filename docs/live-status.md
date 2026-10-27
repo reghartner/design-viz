@@ -164,3 +164,41 @@ hardware, firmware, a mobile app and backend with node and edge references.
 The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 provides fictional Jira tools without an Atlassian account. Its shared timeline
 demonstrates progress, blocked and missing tickets, and linked PR summaries.
+
+## Demo mode
+
+Open the [built story](../examples/live-status/live-status.html#live=demo) with
+`#live=demo` to replay the cross-team doorbell delivery. The standalone injector
+embeds `examples/live-status/live-status.timeline.json` in a separate
+`live-timeline` JSON block when the page declares `tracking`. It works offline,
+including `file://`, without fetching or changing the spec. A host provider takes
+precedence. Without the hash, no demo starts.
+
+The Live control shows the current day and offers **Pause/Play** and **Next day**.
+Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
+on the final day. Reduced motion uses manual advancement only. Hidden pages pause
+the timer. Requested ticket keys absent from a day become `missing`; linked PRs
+remain informational. Without an embedded timeline, four days are synthesized
+from the page's ticket keys: todo, active, one blocker, then all done.
+
+## Blocker propagation
+
+A node or edge rolled up to `blocked` or `missing` propagates its blocking ticket
+keys forward along directed edges. An edge starts at its target node. Reached
+nodes and edges acquire `dv-live-waiting` and `data-dv-live-waiting-on` with the
+comma-separated keys, while retaining their own `dv-live-<state>` class. Carriers
+whose own state is done, blocked or missing never become waiting; traversal still
+continues through them. Cycles terminate and multiple blockers combine their keys.
+
+Waiting uses a dashed red-grey stroke, an ellipsis badge and a **waiting on** tag;
+the badge popover lists the blocking keys. Applying a new map, clearing it or
+turning Live off removes stale waiting evidence. Print keeps the colors.
+
+## Blocked edges
+
+Blocked edges reuse the communication **Not sent** break, labelled with their
+blocking keys, in both Ambient and Step mode. The break lasts until the live state
+changes or Live is disabled. Missing edges retain their missing badge without a
+communication break. Todo edges use a dashed grey stroke and hide packet dots;
+active and done edges retain ordinary packet animation. Authored step failures
+keep their own lifecycle, and reduced-motion behavior is unchanged.

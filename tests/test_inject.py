@@ -43,6 +43,24 @@ def run_inject(template_text, spec_text):
 
 
 class InjectTests(unittest.TestCase):
+    def test_live_timeline_is_embedded_only_for_tracking_and_outside_spec(self):
+        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
+        block = re.compile(r'^<script type="application/json" id="live-timeline">\n(.*?)\n</script>', re.S | re.M)
+        for tracked in (False, True):
+            spec = json.loads(json.dumps(SPEC))
+            if tracked:
+                spec["page"]["tracking"] = {"jira": {"site": "https://jira.test"}}
+            result, out = run_inject(template, json.dumps(spec))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("<!-- LIVE_TIMELINE -->", out)
+            matches = block.findall(out)
+            self.assertEqual(len(matches), int(tracked))
+            if tracked:
+                expected = json.loads((ROOT / "examples/live-status/live-status.timeline.json").read_text())
+                self.assertEqual(json.loads(matches[0]), expected)
+            authored = re.search(r'^<script type="application/json" id="flowspec">\n(.*?)\n</script>', out, re.S | re.M)
+            self.assertEqual(json.loads(authored[1]), spec)
+
     def test_replaces_only_the_real_block(self):
         r, out = run_inject(TEMPLATE, json.dumps(SPEC))
         self.assertEqual(r.returncode, 0, r.stderr)

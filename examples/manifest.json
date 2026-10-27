@@ -278,6 +278,19 @@
       ]
     },
     {
+      "file": "live-status/live-status.html",
+      "spec": "live-status/live-status.spec.json",
+      "title": "Doorbell Delivery Live Status",
+      "family": "live-status",
+      "description": "Live Jira ticket status on a cross-team doorbell delivery; open with #live=demo to replay the story",
+      "tags": [
+        "live-status",
+        "jira",
+        "story"
+      ],
+      "widgets": []
+    },
+    {
       "file": "loomworks-trellis/trellis.html",
       "spec": "loomworks-trellis/trellis.spec.json",
       "title": "loomworks Trellis — Camera-as-Hub",

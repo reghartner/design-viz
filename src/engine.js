@@ -538,10 +538,11 @@ function settleCommunicationFailures(board){
     if (effect.packet && effect.packet.parentNode) effect.packet.parentNode.removeChild(effect.packet);
   });
 }
-function showCommunicationFailures(board,failures,animate){
+function showCommunicationFailures(board,failures,animate,options){
+  options=options || {};
   Object.keys(failures || {}).forEach(function(key){
     var info = board.edgeIds[key], path = info && info.pathEl;
-    if (!path || info.e.hidden===true || path.classList.contains('dv-fragment-hidden')) return;
+    if (!path || info.e.hidden===true || (!options.live && path.classList.contains('dv-fragment-hidden'))) return;
     var length = path.getTotalLength();
     if (!Number.isFinite(length) || length <= 0) return;
     var mode = failures[key], split = communicationBreak(length,mode), point = path.getPointAtLength(split.stop);
@@ -552,7 +553,9 @@ function showCommunicationFailures(board,failures,animate){
       return el;
     }
     var label = (mode === 'blocked' ? 'Not sent: ' : 'Dropped in transit: ') + info.e.from + ' → ' + info.e.to;
-    var group = svgEl('g',{'class':'comm-failure comm-' + mode,'data-dv-edge':info.idx,'role':'img','aria-label':label},board.svg);
+    if(options.labels && options.labels[key])label+=' · '+options.labels[key];
+    var group = svgEl('g',{'class':'comm-failure comm-' + mode+(options.live?' dv-live-comm-failure':path.classList.contains('dv-live-blocked')?' dv-live-comm-suppressed':''),'data-dv-edge':info.idx,'role':'img','aria-label':label},board.svg);
+    if(options.live){markFragmentElement(group,info.e);if(path.classList.contains('dv-fragment-hidden'))group.classList.add('dv-fragment-hidden');}
     svgEl('title',{},group).textContent = label;
     svgEl('path',{'class':'comm-segment comm-before',d:communicationSegment(path,0,split.before)},group);
     svgEl('path',{'class':'comm-segment comm-after',d:communicationSegment(path,split.after,length)},group);
@@ -561,9 +564,10 @@ function showCommunicationFailures(board,failures,animate){
       svgEl('circle',{r:8},marker);
       svgEl('path',{d:'M-5 0H5'},marker);
     } else svgEl('path',{d:'M-6 -6L6 6M-6 6L6 -6'},marker);
+    if(options.live)svgEl('text',{'class':'dv-live-break-label',x:point.x+12,y:point.y-12},group).textContent=label;
     var hidden = [path,info.haloEl].concat(info.coinEls || [info.coinEl], info.coinBaseEls || []).filter(Boolean);
-    hidden.forEach(function(el){el.classList.add('comm-hidden');});
-    if (info.labelEl) info.labelEl.classList.add('comm-label');
+    hidden.forEach(function(el){el.classList.add(options.live?'dv-live-comm-hidden':'comm-hidden');});
+    if (info.labelEl && !options.live) info.labelEl.classList.add('comm-label');
     var effect = {group:group,hidden:hidden,label:info.labelEl,packet:null};
     (board.failureEffects || (board.failureEffects = [])).push(effect);
     if (mode !== 'dropped' || !animate) return;

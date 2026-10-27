@@ -142,6 +142,7 @@
         "canon.js",
         "validator.js",
         "engine.js",
+        "viewer/live-status-demo.js",
         "viewer/artifact-comments.js",
         "viewer/tour-progress.js",
         "tour.config.js",

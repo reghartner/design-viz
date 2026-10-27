@@ -61,6 +61,7 @@ function fail(msgs){
    passes them as the preserved prefix, so the request must be read
    before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+var liveDemoRequest = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('live') === 'demo';
 /* same trap as embed: the deep-link channel canonicalizes the hash during
    wiring and drops unknown keys, so #tour=1/0 must be read before boot.
    A hash that already targets something (a diagram, step, tab, card) means
@@ -125,7 +126,9 @@ function boot(raw){
   var bootSkin = activeSkin || embedSkin || resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
-  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:window.flowviewLiveStatus,handoffHost:window.flowviewHandoffHost});
+  var liveOptions=window.flowviewLiveStatus;
+  if(liveDemoRequest && !(liveOptions && typeof liveOptions.provider==='function'))liveOptions=createLiveStatusDemo(document);
+  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost});
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's

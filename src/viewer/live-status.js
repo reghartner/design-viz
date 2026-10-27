@@ -25,6 +25,58 @@ function liveStatusClass(el,state){
 function liveStatusCarrier(value,map){
   return liveStatusRollup(trackingRefs(value).tickets.map(function(key){return map[key] && map[key].state;}));
 }
+/* A carrier's own evidence stays independent of dependency evidence. Done
+   carriers are traversed, but never marked; cycles visit each carrier once
+   per blocker. Keys are node IDs or directed from->to edge keys. */
+function liveStatusBlockingKeys(value,map){
+  return trackingRefs(value).tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;});
+}
+function liveStatusWaiting(diagram,states){
+  var nodes=diagram.nodes || {},edges=diagram.edges || [],out=Object.create(null),carriers=Object.create(null),forward=Object.create(null);
+  Object.keys(nodes).forEach(function(id){if(!isTextBoxNode(nodes[id])){carriers[id]=nodes[id];forward[id]=[];}});
+  edges.forEach(function(edge){var key=edge.from+'->'+edge.to;carriers[key]=edge;forward[key]=[edge.to];if(forward[edge.from])forward[edge.from].push(key);});
+  Object.keys(carriers).forEach(function(start){
+    var state=liveStatusCarrier(carriers[start],states);if(state!=='blocked' && state!=='missing')return;
+    var keys=liveStatusBlockingKeys(carriers[start],states),seen=Object.create(null),queue=(forward[start] || []).slice();seen[start]=true;
+    while(queue.length){
+      var key=queue.shift();if(seen[key])continue;seen[key]=true;
+      if(!carriers[key])continue;
+      var own=liveStatusCarrier(carriers[key],states);
+      if(['done','blocked','missing'].indexOf(own)<0){
+        var waiting=out[key] || (out[key]=[]);keys.forEach(function(ticket){if(waiting.indexOf(ticket)<0)waiting.push(ticket);});
+      }
+      queue=queue.concat(forward[key] || []);
+    }
+  });
+  Object.keys(out).forEach(function(key){out[key].sort();});return out;
+}
+function liveStatusWaitingClass(el,keys){
+  if(keys && keys.length){el.classList.add('dv-live-waiting');el.setAttribute('data-dv-live-waiting-on',keys.join(','));}
+  else {el.classList.remove('dv-live-waiting');el.removeAttribute('data-dv-live-waiting-on');}
+}
+/* Reconstruct the engine's small communication-break input from each visible
+   SVG. Live effects own separate classes/elements so the stepper can clear or
+   settle its authored failures without erasing persistent ticket evidence. */
+function liveStatusEdgeBreaks(scope,diagram,map,on){
+  scope.querySelectorAll('.dv-live-comm-failure').forEach(function(el){el.remove();});
+  scope.querySelectorAll('.dv-live-comm-hidden,.dv-live-packet-hidden,.dv-live-comm-suppressed').forEach(function(el){el.classList.remove('dv-live-comm-hidden','dv-live-packet-hidden','dv-live-comm-suppressed');});
+  scope.querySelectorAll('svg').forEach(function(svg){
+    var board={svg:svg,edgeIds:Object.create(null)},failures=Object.create(null),labels=Object.create(null);
+    (diagram.edges || []).forEach(function(edge,index){
+      var path=svg.querySelector('path.edge[data-dv-edge="'+index+'"]');if(!path)return;
+      var state=on?liveStatusCarrier(edge,map):null,key=edge.from+'->'+edge.to;
+      if(state==='blocked'){
+        board.edgeIds[key]={e:edge,idx:index,pathEl:path,haloEl:svg.querySelector('path.halo[data-dv-edge="'+index+'"]')};
+        failures[key]='blocked';labels[key]=liveStatusBlockingKeys(edge,map).join(', ');
+        svg.querySelectorAll('g.comm-failure[data-dv-edge="'+index+'"]').forEach(function(el){el.classList.add('dv-live-comm-suppressed');});
+      }
+      if(state==='todo' || state==='blocked')svg.querySelectorAll('circle.pkt').forEach(function(dot){
+        var mpath=dot.querySelector('mpath');if(mpath && mpath.getAttribute('href')==='#'+path.getAttribute('id'))dot.classList.add('dv-live-packet-hidden');
+      });
+    });
+    showCommunicationFailures(board,failures,false,{live:true,labels:labels});
+  });
+}
 function liveStatusStep(diagram,step,map){
   var states=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
   (diagram.edges || []).forEach(function(edge){
@@ -40,7 +92,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var listeners=[],controls=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
-  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null;
+  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null;
   var remotePages=Object.create(null),originalLoad=renderOptions && renderOptions.loadDetail,wrappedLoad=null;
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function remoteKey(ref){return JSON.stringify([ref.spec,ref.revision || '']);}
@@ -83,13 +135,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target))close(true);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
-  function show(trigger,value,tracking,label){
+  function show(trigger,value,tracking,label,waiting){
     if(retired)return;
     if(active===trigger){close(true);return;}close(false);
     if(!pop){pop=element('div','nbackpop dv-live-popover',null,view);pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;}
     pop.replaceChildren();pop.setAttribute('aria-label','Live tickets for '+label);
     element('strong','node-link-title','Live tickets · '+label,pop);
     var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label','Close live tickets');dismiss.addEventListener('click',function(){close(true);});
+    if(waiting && waiting.length)element('div','dv-live-waiting-detail','waiting on '+waiting.join(', '),pop);
     var found=trackingRefs(value);
     found.tickets.forEach(function(key){
       var entry=map[key],row=element('div','dv-live-ticket',null,pop);
@@ -109,16 +162,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
-  function badge(parent,value,state,tracking,label,x,y,edgeIndex){
+  function badge(parent,value,state,tracking,label,x,y,edgeIndex,waiting){
     var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','dv-live-badge');
-    liveStatusClass(badge,state);badge.setAttribute('transform','translate('+x+' '+y+')');
-    badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label','Live tickets for '+label);badge.setAttribute('aria-haspopup','dialog');badge.setAttribute('aria-expanded','false');
+    liveStatusClass(badge,state);liveStatusWaitingClass(badge,waiting);badge.setAttribute('transform','translate('+x+' '+y+')');
+    badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label','Live tickets for '+label+(waiting?' · waiting on '+waiting.join(', '):''));badge.setAttribute('aria-haspopup','dialog');badge.setAttribute('aria-expanded','false');
     if(edgeIndex!=null)badge.setAttribute('data-live-edge',String(edgeIndex));
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','9');badge.appendChild(circle);
-    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=LIVE_STATUS_GLYPHS[state];badge.appendChild(text);
+    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=waiting?'…':LIVE_STATUS_GLYPHS[state];badge.appendChild(text);
+    if(waiting){var tag=document.createElementNS(SVGNS,'text');tag.setAttribute('class','dv-live-waiting-tag');tag.setAttribute('text-anchor','end');tag.setAttribute('y','-16');tag.textContent='waiting on '+waiting.join(', ');badge.appendChild(tag);}
     badge.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
-    badge.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label);});
-    badge.addEventListener('keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label);}});
+    badge.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);});
+    badge.addEventListener('keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);}});
     markFragmentElement(badge,value);parent.appendChild(badge);return badge;
   }
   function sourceBindings(){
@@ -140,25 +194,27 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function paintBinding(binding){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
+    var waiting=on?liveStatusWaiting(d,map):{};
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
       var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && !el.classList.contains('node-text')?liveStatusCarrier(value,map):null;
-      liveStatusClass(el,state);
-      if(!state)return;
+      var dependencies=waiting[id];liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      if(!state && !dependencies)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
-      badge(el,value,state,binding.page.tracking,value.title || id,Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12,10);
+      badge(el,value,state,binding.page.tracking,value.title || id,Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12,10,null,dependencies);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
-      liveStatusClass(el,state);
-      if(!state || !el.classList.contains('edge'))return;
+      var dependencies=value && waiting[value.from+'->'+value.to];liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      if((!state && !dependencies) || !el.classList.contains('edge'))return;
       var svg=el.closest('svg'),label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]'),x,y;
       if(label){var box=null;try{box=label.getBBox();}catch(ex){}x=box && box.width?box.x+box.width+12:Number(label.getAttribute('x'))+12;y=Number(label.getAttribute('y'))-4;}
       else {var point=el.getPointAtLength(el.getTotalLength()/2);x=point.x;y=point.y-14;}
-      var marker=badge(svg,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,x,y,index);
+      var marker=badge(svg,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,x,y,index,dependencies);
       if(el.getAttribute('data-dv-hidden')==='true')marker.setAttribute('data-dv-hidden','true');
       if(el.classList.contains('dv-fragment-hidden'))marker.classList.add('dv-fragment-hidden');
     });
+    liveStatusEdgeBreaks(scope,d,map,on);
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && step?liveStatusStep(d,step,map):null);
@@ -192,6 +248,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     toggle.addEventListener('click',function(){api.setEnabled(!on);});action.addEventListener('click',function(){if(!retired && controls.indexOf(control)>=0 && actionFn)actionFn();});
     control.root=root;control.toggle=toggle;control.counts=counts;control.note=note;control.action=action;
   }
+  function refreshDemoControl(control){
+    if(!demoControls){if(control.demo){control.demo.remove();control.demo=null;}return;}
+    if(!control.demo){
+      control.demo=element('span','dv-live-demo',null,control.root);
+      control.demoPlay=element('button','reader-button',null,control.demo);control.demoPlay.type='button';
+      control.demoNext=element('button','reader-button','Next day',control.demo);control.demoNext.type='button';
+      control.demoPlay.addEventListener('click',function(){if(!retired && demoControls)demoControls.toggle();});
+      control.demoNext.addEventListener('click',function(){if(!retired && demoControls)demoControls.next();});
+    }
+    control.demoPlay.textContent=demoControls.playing?'Pause':'Play';control.demoPlay.disabled=demoControls.manual || demoControls.ended;
+    control.demoNext.disabled=demoControls.ended;
+  }
   function refreshControls(){
     var value=snapshot(),available=refs().tickets.length>0;
     controls.forEach(function(control){
@@ -202,7 +270,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(value.updatedAt){if(!control.time)control.time=element('time','dv-live-updated',null,control.root);control.time.setAttribute('datetime',value.updatedAt);control.time.textContent='updated '+relative(value.updatedAt);}
       else if(control.time){control.time.remove();control.time=null;}
       control.note.textContent=noteText;control.note.hidden=!noteText;control.note.setAttribute('data-kind',noteKind);
-      control.action.textContent=actionLabel;control.action.hidden=!actionFn;
+      control.action.textContent=actionLabel;control.action.hidden=!actionFn;refreshDemoControl(control);
     });
   }
   function visible(){return !document.hidden;}
@@ -240,6 +308,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';refreshControls();},
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;refreshControls();},
+    setDemoControls:function(value){if(retired)return;demoControls=value;refreshControls();},
     mountControls:function(host){
       if(retired)return null;
       // Approved external details can introduce the page's first ticket later.
@@ -248,20 +317,21 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);if(control.root)control.root.remove();}};
     },
     destroy:function(){
-      if(retired)return;retired=true;close(false);stopTimer();if(abort)abort.abort();
+      if(retired)return;retired=true;close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
-      bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings=[];
+      bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
       if(pop)pop.remove();controls.forEach(function(control){if(control.root)control.root.remove();});controls=[];listeners=[];
       if(applied){
         view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
-        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing').forEach(function(el){liveStatusClass(el,null);});
+        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);});
       }
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }
   };
   syncBindings();events.forEach(function(type){view.addEventListener(type,schedule);});
   if(provider){document.addEventListener('visibilitychange',visibility);firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;fetchMap();});});}
+  if(options.demo && typeof options.demo.mount==='function')demoDestroy=options.demo.mount(api);
   return api;
 }

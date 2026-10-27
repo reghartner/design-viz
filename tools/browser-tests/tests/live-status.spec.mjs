@@ -379,3 +379,17 @@ test('E6 round 3 loaded external page coverage previews unrelated sections witho
   await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
  }
 });
+
+test('L3 L4 L5 L10 live-status panel is below the diagram without a click and keeps its print paint',async({page,server})=>{
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status'),body=panel.locator('.pbody'),head=body.locator('.dv-live-head');
+ await expect(body).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');
+ const diagram=root.locator('.section-layout-tile[data-layout-key="diagram"]'),tile=panel.locator('xpath=ancestor::*[contains(@class,"section-layout-tile")][1]');
+ const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);expect(Math.abs(b.width-a.width)).toBeLessThan(2);
+ await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('[popover]')).toHaveCount(0);
+ await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge').first()).toBeVisible();
+ await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
+ for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
+ await expect(body.locator('tr[data-live-ticket="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-verdict')).toContainText('7 of 8 epic stories on diagram');
+ await body.locator('tr[data-live-ticket="HW-124"]').getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('[data-dv-node="chime"] .dv-live-badge')).toBeFocused();
+ await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
+});

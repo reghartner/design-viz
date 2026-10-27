@@ -756,3 +756,41 @@ test('E6 round 4 reopening Tickets cancels late coverage focus and preview while
   api.destroy();assert.equal(h.frames.size,0);assert.equal(h.doc.events.keydown?.size||0,0);
  }
 });
+
+/* L1–L11: authored Live status panel. These RED rows stay fixed in rework. */
+function mountStatus(h,host=h.view){
+ const d=h.C.PanelRegistry.get('live-status');assert.ok(d,'L1 registered panel');
+ const body=host.appendChild(new Element('div',{class:'pbody'}));
+ const result=d.render(body,{id:'status',type:'live-status'}, {},'pastel',[],0,false);
+ result.mounted();return {body,remount:result.mounted,destroy(){if(body._panelMotionCleanup)body._panelMotionCleanup();body.remove();}};
+}
+test('L2 controller registry resolves nearest root and retires without cross-view leakage',()=>{
+ const h=harness(fixture());assert.equal(typeof h.C.liveStatusControllerFor,'function');
+ const child=h.view.appendChild(new Element());assert.equal(h.C.liveStatusControllerFor(child),h.ctl.liveStatus);
+ const nested={view:child,sections:[]},api=h.C.createLiveStatus(nested,h.ctl.page);assert.equal(h.C.liveStatusControllerFor(child),api);api.destroy();assert.equal(h.C.liveStatusControllerFor(child),h.ctl.liveStatus);
+ h.ctl.liveStatus.destroy();assert.equal(h.C.liveStatusControllerFor(child),null);
+});
+test('L2 L3 snapshot exposes rollup and all mutations notify; navigation controls are absent',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;assert.equal(typeof api.snapshot,'function');assert.equal(api.mountControls,undefined);
+ const changes=[];api.onChange(v=>changes.push(v));api.apply({'AA-1':{state:'done',epic:'EP-1'}});api.setEnabled(false);api.note('Waiting','warn');api.action('Retry',()=>{});api.setDemoControls({playing:false,manual:true,ended:false,next(){},toggle(){}});
+ assert.equal(changes.length,5);const value=plain(api.snapshot());for(const key of ['counts','updatedAt','enabled','note','actionLabel','lanes','blockers','tickets','coverage','activity','demo','verdict'])assert.ok(key in value,key);
+ assert.equal(value.enabled,false);assert.equal(value.note.text,'Waiting');assert.equal(value.actionLabel,'Retry');assert.equal(value.tickets[0].key,'BB-1');
+ value.states['AA-1'].state='blocked';assert.equal(api.state('AA-1').state,'done');api.destroy();
+});
+test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
+ assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Blockers','Tickets','Activity']);
+ const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
+ let action=0,next=0,play=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
+ api.setDemoControls({playing:false,manual:false,ended:false,next(){next++;},toggle(){play++;}});
+ const demo=body.querySelector('.dv-live-demo');demo.children[0].dispatchEvent({type:'click'});demo.children[1].dispatchEvent({type:'click'});assert.equal(play,1);assert.equal(next,1);
+ h.doc.activeElement=toggle;api.apply(fixed);assert.equal(h.doc.activeElement,toggle);assert.ok(body.contains(toggle));
+ const before=textOf(body);body._panelMotionCleanup();api.note('After cleanup');assert.equal(textOf(body),before);mount.remount();assert.equal(body.querySelector('.dv-live-note').textContent,'After cleanup');
+ mount.remount();api.note('Once');assert.equal(body.querySelectorAll('.dv-live-head').length,1);api.destroy();assert.equal(textOf(body).includes('Once'),true);
+});
+test('L2 empty page and disconnected provider render only the appropriate message',()=>{
+ const empty=harness(),mount=mountStatus(empty);assert.match(textOf(mount.body),/This page has no ticket references\./);assert.equal(mount.body.querySelector('table'),null);
+ const h=harness(fixture());h.ctl.liveStatus.note('Add the Atlassian connector');const m=mountStatus(h);assert.equal(m.body.querySelector('.dv-live-note').textContent,'Add the Atlassian connector');assert.equal(m.body.querySelector('table'),null);assert.ok(m.body.querySelector('.dv-live-toggle').hidden);
+ empty.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
+});

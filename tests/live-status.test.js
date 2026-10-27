@@ -354,3 +354,72 @@ test('P5 cache timestamps take precedence, validate, and reset without changing 
  applyCache(1793000000000);api.clear();assert.equal(h.view.querySelector('time'),null);assert.equal(events.at(-1).updatedAt,null);
  api.apply({'AA-1':{state:'done'}});assert.equal(h.view.querySelector('time'),null);api.destroy();
 });
+
+/* Story panel contract matrix (desktop reader; authoring remains desktop-only):
+ B1 lane totals/state/title: VM + browser; B2 caption: VM + browser;
+ B3 shipped playback pause/focus: browser; B4 First blocker: browser;
+ B5 diff/activity/cap/timestamps/pulse: VM + browser; B6 stale boundary/paint: VM;
+ B7 primary-path readiness/ring/blockers/Escape: VM + browser;
+ B8 built demo through final day: browser; B9 reduced motion/print/no refs: both;
+ B10 Story mode and staleDays docs + validator: VM.
+*/
+const story=()=>JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json'));
+test('B1 lanes deduplicate involved node and edge tickets and roll up worst state',()=>{
+ const h=harness(story()),C=h.C,map=Object.fromEntries(h.ctl.liveStatus.refs().tickets.map(k=>[k,{state:'done'}]));
+ assert.equal(typeof C.liveStatusLanes,'function','B1 lane helper');map['HW-124'].state='blocked';
+ const lanes=plain(C.liveStatusLanes(h.ctl.page,map));
+ assert.deepEqual(lanes.HW,{total:4,done:3,state:'blocked',keys:['HW-124','FW-46','HW-123','FW-45']});
+ assert.deepEqual(lanes.APP,{total:1,done:1,state:'done',keys:['UX-89']});
+ assert.equal(lanes.BE.total,3);assert.deepEqual(plain(C.liveStatusLanes({},map)),{});
+});
+test('B2 caption distinguishes blocked missing active done todo and untracked steps',()=>{
+ const {C}=harness();assert.equal(typeof C.liveStatusCaption,'function','B2 caption helper');
+ const d={nodes:{a:{tickets:['AA-1']},b:{tickets:['BB-1']}},edges:[{from:'a',to:'b',tickets:['EE-1']} ]},step={edge:'a->b'};
+ assert.equal(C.liveStatusCaption(d,step,{'EE-1':{state:'blocked',detail:'waiting on bench'}}),'BLOCKED · EE-1 · waiting on bench');
+ assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'missing'}}),'MISSING · AA-1');
+ assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'active'},'BB-1':{state:'todo'}}),'IN PROGRESS · 2 tickets');
+ assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'done'}}),'DONE');
+ assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'todo'}}),'TODO · 1 tickets');
+ assert.equal(C.liveStatusCaption(d,{nodes:['unknown']},{}),'');
+});
+test('B6 stale is strictly older than threshold, active only, and needs a timestamp',()=>{
+ const {C}=harness();assert.equal(typeof C.liveStatusStale,'function','B6 stale helper');
+ const now=Date.parse('2026-10-26T00:00:00Z'),entry={state:'active',updatedAt:'2026-10-19T00:00:00Z'};
+ assert.equal(C.liveStatusStale(entry,now,7),false);assert.equal(C.liveStatusStale(entry,now+1,7),true);
+ assert.equal(C.liveStatusStale(entry,now+1),true);assert.equal(C.liveStatusStale({state:'active'},now,7),false);
+ assert.equal(C.liveStatusStale({...entry,state:'done'},now+1,7),false);
+ assert.equal(C.liveStatusStale({...entry,updatedAt:'invalid'},now,7),false);
+});
+test('B5 first apply logs nothing; changed states pulse once and activity preserves evidence time and caps at 20',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.mountControls(h.view);api.apply({'AA-1':{state:'todo'}});
+ const details=h.view.querySelector('.dv-live-details');assert.ok(details,'B7 details action');details.dispatchEvent({type:'click'});
+ assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);
+ const storedAt=Date.parse('2020-01-01T00:00:00Z');api.apply({'AA-1':{state:'active'},storedAt});
+ let rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,1);assert.match(rows[0].textContent,/AA-1 · todo → active · \d+d ago/);assert.equal(rows[0].getAttribute('data-updated-at'),new Date(storedAt).toISOString());
+ const carrier=h.view.querySelector('[data-dv-node="a"]');assert.ok(carrier.classList.contains('dv-live-changed'));carrier.dispatchEvent({type:'animationend'});assert.ok(!carrier.classList.contains('dv-live-changed'));
+ api.apply({'AA-1':{state:'active'},storedAt});assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,1);assert.ok(!carrier.classList.contains('dv-live-changed'));
+ for(let i=0;i<25;i++)api.apply({'AA-1':{state:i%2?'active':'done',updatedAt:'2021-01-01T00:00:00Z'},storedAt});
+ rows=h.view.querySelectorAll('.dv-live-activity-entry');assert.equal(rows.length,20);assert.equal(rows[0].getAttribute('data-updated-at'),'2021-01-01T00:00:00.000Z');
+ api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-panel').length,0);
+});
+test('B6 B9 stale decorates carriers without changing rollup and reduced motion suppresses change pulses',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;h.win.matchMedia=()=>({matches:true});
+ api.apply({'AA-1':{state:'active',updatedAt:'2000-01-01T00:00:00Z'}});
+ const node=h.view.querySelector('[data-dv-node="a"]');assert.ok(node.classList.contains('dv-live-stale'),'B6 stale carrier');assert.ok(node.classList.contains('dv-live-active'));
+ node.querySelector('.dv-live-badge').dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+ assert.ok(h.view.querySelector('.dv-live-stale-detail'));api.apply({'AA-1':{state:'done'}});assert.ok(!node.classList.contains('dv-live-stale'));assert.ok(!node.classList.contains('dv-live-changed'));
+ api.clear();assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0);
+});
+test('B7 readiness uses every tracked carrier on primary path, ignoring alternate-only work',()=>{
+ const {C}=harness();assert.equal(typeof C.liveStatusReadiness,'function','B7 readiness helper');
+ const page={sections:[{diagram:{nodes:{a:{tickets:['AA-1']},b:{tickets:['BB-1']}},edges:[],steps:[{id:'main',nodes:['a']},{id:'alt',nodes:['b']}],paths:[{id:'primary',steps:['main']},{id:'alternate',steps:['alt']}]}}]};
+ let result=C.liveStatusReadiness(page,{'AA-1':{state:'done'},'BB-1':{state:'todo'}});assert.equal(result.ready,true);assert.equal(result.total,2);assert.equal(result.done,1);
+ assert.equal(C.liveStatusReadiness(page,{'BB-1':{state:'done'}}).ready,false);
+ delete page.sections[0].diagram.paths;assert.equal(C.liveStatusReadiness(page,{'AA-1':{state:'done'},'BB-1':{state:'todo'}}).ready,false);
+});
+test('B10 validator warns for non-positive staleDays and Story mode documents the public contract',()=>{
+ const {C}=harness(),raw=story();raw.page.tracking.staleDays=0;
+ assert.ok(C.validate(C.normalize(raw)).warnings.some(w=>/tracking.staleDays/.test(w)),'B10 zero staleDays warning');
+ raw.page.tracking.staleDays=3;assert.ok(!C.validate(C.normalize(raw)).warnings.some(w=>/tracking.staleDays/.test(w)));
+ const doc=fs.readFileSync('docs/live-status.md','utf8');assert.match(doc,/## Story mode/);assert.match(doc,/onBeforeAdvance/);assert.match(doc,/staleDays/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking\.staleDays/);
+});

@@ -112,6 +112,8 @@ fail validation. Legacy files remain readable without conversion.
 
 ## Comments on claude.ai artifacts
 
+For Jira status alongside comments, use the combined declaration in [Publishing as a claude.ai artifact](live-status.md#publishing-as-a-claudeai-artifact).
+
 Inactive Tabs and Views are hidden, so the claude.ai shell's default comment
 anchoring cannot show which Tab a comment is on and cannot "Go to" a comment
 on a hidden Tab or View. When publishing a standalone Flowview page as a

@@ -384,77 +384,47 @@ test('L4 loaded external coverage disables unrelated sections without another lo
  }
 });
 
-/* Badge and label presentation (#762 glyph centring and Flowview tokens).
- G1 every badge glyph's rendered ink box is centred within 1px of its disc, in every skin, for every state and waiting.
- G2 badge rings and the badge popover (title, state pills) derive from the skin's card surface, ink token and IBM Plex faces. */
+/* Carriers without canvas badges (#762, Chuck 2026-10-27): node/edge paint, coins and the break glyph carry state.
+ R1 no .dv-live-badge after apply; a node card click and an edge-label click open the ticket popover; the node
+    links trigger keeps its own menu.
+ R2 keyboard: in the reader a ticketed node card and edge label are buttons named for their tickets; Enter/Space
+    opens the popover, Escape returns focus to the carrier; Tickets table coverage and First blocker focus the carrier.
+ R3 Workbench authoring: demo paint shows no badges, carriers stay non-focusable and a card click selects for
+    editing without opening the popover. */
 const LIVE_SKINS=['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial'];
 async function demoDay(root,day){
  const next=root.getByRole('button',{name:'Next day',exact:true});
  for(;;){const note=await root.locator('.dv-live-note').textContent();const current=Number(/Day (\d+)/.exec(note)[1]);if(current>=day)return;await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+(current+1)+' —');}
 }
-// Measures the rendered pixels: ink is anything that differs from the disc fill inside the glyph area.
-// The radius comes from the rendered disc (diagram zoom scales it), excluding the ring stroke.
-async function glyphOffsets(page){
- // The demo day control sits below the diagram; bring the badges back on screen before capturing.
- await page.locator('#docview .dv-live-badge').first().evaluate(el=>el.closest('svg').scrollIntoView({block:'center'}));
- const discs=await page.locator('#docview .dv-live-badge').evaluateAll(els=>els.filter(el=>el.checkVisibility()).map(el=>{const c=el.querySelector(':scope>circle'),r=c.getBoundingClientRect();return {cx:r.x+r.width/2,cy:r.y+r.height/2,r:r.width/2,state:el.getAttribute('class'),carrier:el.getAttribute('data-live-carrier')};}));
- expect(discs.length).toBeGreaterThan(0);
- const pad=14,x=Math.floor(Math.min(...discs.map(d=>d.cx))-pad),y=Math.floor(Math.min(...discs.map(d=>d.cy))-pad);
- const clip={x,y,width:Math.ceil(Math.max(...discs.map(d=>d.cx))+pad)-x,height:Math.ceil(Math.max(...discs.map(d=>d.cy))+pad)-y};
- const png=(await page.screenshot({clip,animations:'disabled'})).toString('base64');
- return page.evaluate(async({png,discs,clip})=>{
-  const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
-  const s=img.naturalWidth/clip.width,canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-  const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-  const px=(X,Y)=>{const i=(Math.round(Y)*canvas.width+Math.round(X))*4;return [data[i],data[i+1],data[i+2]];};
-  return discs.map(d=>{
-   const cx=(d.cx-clip.x)*s,cy=(d.cy-clip.y)*s,fill=px(cx+d.r*.8*s,cy),inner=d.r*.72*s;let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
-   for(let Y=Math.floor(cy-inner);Y<=cy+inner;Y++)for(let X=Math.floor(cx-inner);X<=cx+inner;X++){
-    if((X-cx)**2+(Y-cy)**2>inner*inner)continue;const p=px(X,Y);
-    if(Math.abs(p[0]-fill[0])+Math.abs(p[1]-fill[1])+Math.abs(p[2]-fill[2])>90){minX=Math.min(minX,X);maxX=Math.max(maxX,X+1);minY=Math.min(minY,Y);maxY=Math.max(maxY,Y+1);}
-   }
-   return {carrier:d.carrier,state:d.state,ink:maxX>minX,dx:((minX+maxX)/2-cx)/s,dy:((minY+maxY)/2-cy)/s};
-  });
- },{png,discs,clip});
-}
-test.describe('badge glyph rendering',()=>{
- test.use({deviceScaleFactor:3});
- test('G1 badge glyphs are centred in their discs for every state, waiting and skin',async({page,server})=>{
-  const root=await openStory(page,server),seen=new Set();
-  for(const day of [4,6,12]){
-   await demoDay(root,day);
-   for(const skin of LIVE_SKINS){
-    await page.evaluate(s=>window.dvSetSkin(s),skin);
-    for(const g of await glyphOffsets(page)){
-     g.state.split(' ').forEach(c=>seen.add(c));
-     expect(g.ink,skin+' day '+day+' '+g.carrier+' has visible glyph ink').toBe(true);
-     expect(Math.abs(g.dx),skin+' day '+day+' '+g.carrier+' '+g.state+' dx').toBeLessThanOrEqual(1);
-     expect(Math.abs(g.dy),skin+' day '+day+' '+g.carrier+' '+g.state+' dy').toBeLessThanOrEqual(1);
-    }
-   }
-  }
-  for(const state of ['dv-live-todo','dv-live-active','dv-live-done','dv-live-blocked','dv-live-missing','dv-live-waiting'])expect(seen.has(state),state+' was measured').toBe(true);
- });
+test('R1 carriers paint without canvas badges and open the ticket popover from the node card and edge label',async({page,server})=>{
+ const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]'),pop=root.locator('.dv-live-popover');await demoDay(root,4);
+ for(const skin of LIVE_SKINS){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(root.locator('.dv-live-badge'),skin).toHaveCount(0);await expect(node('chime'),skin).toHaveClass(/dv-live-blocked/);}
+ await node('chime').locator('.card').click();await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for Indoor chime');
+ await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+ await root.locator('text.lbl[data-dv-edge="0"]').click();await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for press');
+ for(const key of ['HW-124','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+ await node('mcu').locator('.nrefs-trigger').click();await expect(root.locator('.node-link-menu')).toBeVisible();await expect(pop).toBeHidden();
 });
-test('G2 badges and popover pills use the skin card surface, ink token and IBM Plex faces',async({page,server})=>{
- const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');await demoDay(root,4);
- for(const skin of LIVE_SKINS){
-  await page.evaluate(s=>window.dvSetSkin(s),skin);
-  const paint=await page.evaluate(()=>{
-   const node=document.querySelector('#docview g.node[data-dv-node="chime"]');
-   const ring=getComputedStyle(node.querySelector('.dv-live-badge>circle')).stroke,card=getComputedStyle(node.querySelector('.card')).fill;
-   return {ring,card,glyphText:document.querySelectorAll('#docview .dv-live-badge text').length};
-  });
-  expect(paint.ring,skin+' badge ring is the card surface').toBe(paint.card);
-  expect(paint.glyphText,skin+' glyphs are drawn, not font-dependent text').toBe(0);
-  await node('chime').locator('.dv-live-badge').press('Enter');const pop=root.locator('.dv-live-popover');await expect(pop).toBeVisible();
-  await expect(pop).toHaveCSS('font-family',/IBM Plex Sans/);
-  const ink=await pop.evaluate(el=>{const probe=document.createElement('span');probe.style.color='var(--dink)';el.appendChild(probe);const c=getComputedStyle(probe).color;probe.remove();return c;});
-  await expect(pop.locator('.node-link-title')).toHaveCSS('color',ink);
-  const pill=pop.locator('.dv-live-state-pill.dv-live-blocked');await expect(pill).toHaveText('blocked');
-  await expect(pill).toHaveCSS('border-top-color','rgb(239, 68, 68)');await expect(pill).toHaveCSS('font-family',/IBM Plex Mono/);
-  await page.keyboard.press('Escape');await expect(pop).toBeHidden();
- }
+test('R2 keyboard reaches ticketed carriers; coverage and First blocker focus the carrier itself',async({page,server})=>{
+ const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]'),pop=root.locator('.dv-live-popover');await demoDay(root,4);
+ const card=node('chime').locator('.card'),label=root.locator('text.lbl[data-dv-edge="1"]');
+ await expect(card).toHaveAttribute('role','button');await expect(card).toHaveAttribute('tabindex','0');await expect(card).toHaveAttribute('aria-label',/^Live tickets for Indoor chime/);
+ await expect(label).toHaveAttribute('role','button');await expect(label).toHaveAttribute('tabindex','0');await expect(label).toHaveAttribute('aria-haspopup','dialog');
+ await card.focus();await page.keyboard.press('Enter');await expect(pop).toBeVisible();await expect(card).toHaveAttribute('aria-expanded','true');
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();await expect(card).toBeFocused();
+ await label.focus();await page.keyboard.press(' ');await expect(pop).toHaveAttribute('aria-label','Live tickets for ring');await page.keyboard.press('Escape');await expect(label).toBeFocused();
+ await expect(node('mcu').locator('.card')).toHaveAttribute('aria-label',/waiting on HW-124/);
+ const panel=root.locator('.pt-live-status');await panel.locator('tr[data-live-ticket="HW-124"]').getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(card).toBeFocused();
+ await panel.locator('tr[data-live-ticket="HW-124"]').getByRole('button',{name:'press',exact:true}).click();await expect(root.locator('text.lbl[data-dv-edge="0"]')).toBeFocused();
+});
+test('R3 Workbench demo paint has no badges and a card click selects without the ticket popover',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();const view=page.locator('#docview');
+ await expect(view.locator('g.node.dv-live-active,g.node.dv-live-todo,g.node.dv-live-done,g.node.dv-live-blocked').first()).toBeVisible();
+ await expect(view.locator('.dv-live-badge')).toHaveCount(0);await expect(view.locator('.card[tabindex],text.lbl[role="button"]')).toHaveCount(0);
+ await view.locator('g.node[data-dv-node="firmware"] .card').click();await expect(view.locator('.dv-live-popover')).toBeHidden();
+ await expect(view.locator('g.node[data-dv-node="firmware"]')).toHaveClass(/\bdv-sel\b/);
 });
 
 /* Canvas label hygiene (#761, Chuck 2026-10-27).

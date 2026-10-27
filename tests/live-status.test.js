@@ -223,6 +223,17 @@ test('L1 waiting badges carry no canvas text tag; the aria-label and popover kee
  assert.ok(b.classList.contains('dv-live-waiting'));assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);
  assert.equal(h.view.querySelectorAll('.dv-live-waiting-tag').length,0);
 });
+test('R1 R2 R3 apply paints no badges; ticketed cards and edge labels are popover buttons only outside authoring',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);
+ assert.equal(h.view.querySelectorAll('.dv-live-badge').length,0);
+ const card=h.view.querySelector('[data-dv-node="b"]').querySelector('.card');
+ assert.equal(card.getAttribute('role'),'button');assert.equal(card.getAttribute('tabindex'),'0');assert.equal(card.getAttribute('aria-haspopup'),'dialog');assert.match(card.getAttribute('aria-label'),/^Live tickets for .*waiting on EE-1/);
+ const label=h.view.querySelector('text.lbl[data-dv-edge="0"]');assert.equal(label.getAttribute('role'),'button');assert.equal(label.getAttribute('tabindex'),'0');
+ api.setEnabled(false);assert.equal(card.getAttribute('tabindex'),null);assert.equal(card.getAttribute('role'),null);api.setEnabled(true);assert.equal(card.getAttribute('tabindex'),'0');
+ const w=harness(fixture(),{},{authoring:true});w.ctl.liveStatus.apply(fixed);const wcard=w.view.querySelector('[data-dv-node="b"]').querySelector('.card');
+ assert.ok(w.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-active'));assert.equal(wcard.getAttribute('tabindex'),null);assert.equal(wcard.getAttribute('role'),null);
+ assert.equal(w.view.querySelectorAll('.dv-live-badge').length,0);
+});
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
  const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}}}};

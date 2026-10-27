@@ -181,6 +181,22 @@ function stubLiveClaude(mode){
  };
  window.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
 }
+// GitHub is a separate connector beside Mock-atlassian; no direct network.
+function stubLiveGithub(){
+ const use=window.claude.use;
+ window.claude.use=async name=>{
+  const mcp=await use(name);if(name!=='mcp')return mcp;
+  const list=mcp.listTools,watch=mcp.watchTool;
+  mcp.listTools=async()=>[...await list(),{server:'GitHub',tools:[{name:'search_pull_requests'},{name:'pull_request_read'}]}];
+  mcp.watchTool=(server,tool,input,handler,opts)=>{
+   if(server!=='GitHub')return watch(server,tool,input,handler,opts);
+   const w={server,tool,input,opts,stopped:false};window.__mcpStub.watches.push(w);
+   const pr=n=>({number:n,title:'Change '+n,html_url:'https://github.com/acme/firmware/pull/'+n,state:[755,701].includes(n)?'closed':'open',merged:n===755,merged_at:n===755?'2026-10-27T12:00:00Z':null,draft:n===700,user:{login:'sam'},updated_at:'2026-10-27T12:00:00Z',head:{ref:'feature'}});
+   const payload=tool==='search_pull_requests'?{items:[]}:input.method==='get_check_runs'?{check_runs:[{status:'completed',conclusion:input.pullNumber===742?'failure':'success'}]}:pr(input.pullNumber);
+   setTimeout(()=>{if(!w.stopped)handler({type:'data',result:{payload}});},0);return ()=>{w.stopped=true;};
+  };return mcp;
+ };
+}
 async function openClaude(page,server,mode){
  await page.addInitScript(stubLiveClaude,mode);
  // A connector stub is the only allowed transport; fail any attempted fetch/XHR.
@@ -507,4 +523,25 @@ test('P3 an authored node style yields to live paint and returns when Live is of
  const live=root.locator('.dv-live-toggle');await live.click();await expect(hw).not.toHaveClass(/dv-live-active/);
  await expect(hw).toHaveClass(/\bnode-styled\b/);await expect(hw).toHaveClass(/\bns-teal\b/);await expect(hw).not.toHaveClass(/\bns-ember\b/);
  await live.click();await expect(hw).toHaveClass(/\bns-ember\b/);
+
+test('G2 G7 G11 GitHub chips show states checks and links in Tickets and popover while Jira-only stays plain',async({page,server})=>{
+ await page.addInitScript({content:'('+stubLiveClaude.toString()+')("data");('+stubLiveGithub.toString()+')();'});await page.emulateMedia({reducedMotion:'reduce'});
+ const spec={page:{tracking:{jira:{site:'https://acme.atlassian.net'},github:{repos:['acme/firmware']}},sections:[{diagram:{nodes:{a:{title:'Work',tickets:['HW-123'],prs:[742,755,700,701].map(n=>'https://github.com/acme/firmware/pull/'+n).concat('https://code.test/pull/1')}},rows:[['a']]}}]}};
+ const root=await open(page,server,spec,false);await expect(root.locator('g.node')).toHaveClass(/dv-live-active/);await root.locator('.dv-live-details').click();const table=root.locator('.dv-live-tickets');
+ await expect(table.locator('span.dv-live-pr')).toHaveCount(4);
+ for(const [n,state] of [[742,'open'],[755,'merged'],[700,'draft'],[701,'closed']]){const chip=table.locator('.dv-live-pr').filter({hasText:'#'+n+' '+state});await expect(chip).toBeVisible();await expect(chip.locator('a')).toHaveAttribute('href','https://github.com/acme/firmware/pull/'+n);await expect(chip).toHaveCSS('animation-name','none');}
+ await expect(table.locator('[data-checks="failing"]')).toHaveCSS('background-color','rgb(239, 68, 68)');await expect(table.locator('[data-checks="passing"]')).toHaveCSS('background-color','rgb(34, 197, 94)');await expect(table.getByRole('link',{name:'https://code.test/pull/1',exact:true})).toBeVisible();
+ await root.locator('.dv-live-panel-close').click();await root.locator('.dv-live-badge').press('Enter');await expect(root.locator('.dv-live-popover .dv-live-pr')).toHaveCount(4);await expect(root.locator('.dv-live-popover')).toContainText('#742 open');await page.keyboard.press('Escape');await expect(root.locator('.dv-live-badge')).toBeFocused();
+ });
+test('G2 G11 Jira-only connector retains plain PR links without chips',async({page,server})=>{
+ const {root}=await openClaude(page,server,'data');await expect(root.locator('g.node').first()).toHaveClass(/dv-live-active/);await root.locator('.dv-live-details').click();await expect(root.locator('.dv-live-pr')).toHaveCount(0);await expect(root.locator('.dv-live-tickets a[href="https://github.com/acme/firmware/pull/88"]').first()).toBeVisible();
+});
+test('G12 desktop GitHub scope validates repos and org with one Undo Redo and export',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();const input=page.locator('#guide').getByLabel('GitHub scope',{exact:true});
+ const before=await src.inputValue();await input.fill('bad scope!');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('owner/repo');
+ for(const [value,want] of [['acme/firmware, acme/backend',{repos:['acme/firmware','acme/backend']}],['org:acme',{org:'acme'}]]){
+  const previous=await src.inputValue();await input.fill(value);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.github).toEqual(want);const changed=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(previous);await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await settings();
+ }
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);expect(saved.page.tracking.github).toEqual({org:'acme'});expect(saved.page.tracking.jira).toEqual(raw.page.tracking.jira);
 });

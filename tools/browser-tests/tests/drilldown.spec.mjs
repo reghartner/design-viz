@@ -59,7 +59,7 @@ test('an open drilldown is named in the reader header and marked under its paren
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
  await page.goto(server.origin+'/detail-reader.html');await expect(root(page)).toBeVisible();
  const header=page.locator('.reader-top .reader-breadcrumb'),detailLabel=header.locator('.reader-detail-label');
- const parentRow=page.locator('.reader-contents-tree .reader-tree-section[data-reader-section="doorbell-domains"]');
+ const parentRow=page.locator('.reader-contents-tree .reader-tree-leaf[data-reader-section="doorbell-domains"]');
  const parentItem=parentRow.locator('xpath=..'),trail=parentItem.locator('.reader-tree-detail');
  const allTrail=page.locator('.reader-contents-tree .reader-tree-detail');
  const docLabel='Doorbell domains · from event to notification';

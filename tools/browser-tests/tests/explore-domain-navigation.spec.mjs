@@ -59,6 +59,9 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
       }),{once:true,capture:true});
     });
     await parent.locator('[data-dv-detail]').click();
+    await expect(root.locator('.reader-tree-tab')).not.toHaveAttribute('aria-expanded');
+    await expect(root.locator('.reader-tree-details .reader-tree-detail')).toHaveCount(depth+1);
+    await expect(root.locator('.reader-tree-detail[aria-current="location"]')).toHaveCount(1);
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
     const chrome=host==='workbench'?await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0})):null;

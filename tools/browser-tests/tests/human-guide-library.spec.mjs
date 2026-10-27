@@ -237,7 +237,7 @@ test('Canon edit and browser Back retain the canonical owner View and its select
 });
 
 /* #607 hosted reader row (contract matrix in reader-contents.spec.mjs):
-   H1 ?diagram= deep link | tab-views example published as "delivery", its Notes Tab given two Views (Notes pages: 2 sections, Notes brief: 1); fresh load of workbench.html?diagram=delivery#d=c&v=explore-bc at 1440x900 | #canon-reader Contents: Section C row in explore-bc aria-current=page and #section-c visible; Product and Notes Tab rows aria-expanded=true; every View disclosure in both Tabs aria-expanded=true with its own member rows | a hosted reader that expands only the linked Tab, or a deep link that loses its section */
+   H1 ?diagram= deep link | tab-views example published as "delivery", its Notes Tab given two Views (Notes pages: 2 sections, Notes brief: 1); fresh load of workbench.html?diagram=delivery#d=c&v=explore-bc at 1440x900 | #canon-reader Contents: Section C row in explore-bc aria-current=page and #section-c visible; Product and Notes Tab rows aria-expanded=true; each multi-section View disclosure aria-expanded=true with its own member rows; singleton Views are direct leaves | a hosted reader that expands only the linked Tab, or a deep link that loses its section */
 test('#607 a ?diagram= deep link lands on its section with every Contents Tab and View expanded',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   const spec=JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
@@ -253,8 +253,9 @@ test('#607 a ?diagram= deep link lands on its section with every Contents Tab an
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(group('Product').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-view')).toHaveText(['Notes pages','Notes brief']);
   for(const [label,id,count] of [['Product','standard-ac',2],['Product','explore-bc',2],['Product','explore-a',1],['Notes','notes-pages',2],['Notes','notes-brief',1]]){
-    await expect(group(label).locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure'),id).toHaveAttribute('aria-expanded','true');
-    await expect(group(label).locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);
+    const row=group(label).locator('.reader-tree-view[data-tab-view="'+id+'"]'),disclosure=row.locator('..').locator('.reader-view-disclosure');
+    if(count===1){await expect(row).toHaveClass(/reader-tree-leaf/);await expect(disclosure).toHaveCount(0);await expect(row).toHaveAttribute('data-reader-section',id==='explore-a'?'a':'notes-more');}
+    else{await expect(disclosure,id).toHaveAttribute('aria-expanded','true');await expect(group(label).locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);}
   }
 });
 

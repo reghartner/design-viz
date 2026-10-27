@@ -188,39 +188,57 @@ function createReaderContents(ctl,nav,actions,options){
     // The overlay keeps its own disclosure set: only the current part opens.
     var shown=hovering?overlayTabs:expandedTabs,numbered=topParts().length>1,number=0;
     topParts().forEach(function(item){
-      var embed=embedded();
-      var tab=element('div','reader-contents-tab',null,tree),tabButton=button(ownerLabel(item),ownerLabel(item),tab,function(){if(shown.has(item.path))shown.delete(item.path);else shown.add(item.path);drawTree();});
-      tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('aria-expanded',String(shown.has(item.path)));tabButton.setAttribute('data-reader-key','tab:'+item.path);
-      if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);if(item===owner)tabButton.setAttribute('data-current-part','true');}
+      var embed=embedded(),canonical=item.records.some(function(record){return Array.isArray(record.section.views);}),groups=[];
+      // Keep each section/View occurrence intact, then omit grouping levels
+      // that offer no choice. Canonical sections own Views; legacy Views own sections.
+      item.views.filter(function(definition){return !embed || definition.members[0].record.runtime===embed;}).forEach(function(definition){
+        var record=definition.members[0].record,id=canonical?record:definition.id,group=groups.find(function(group){return group.id===id;});
+        if(!group){group={id:id,record:record,definitions:[]};groups.push(group);}group.definitions.push(definition);
+      });
+      var only=groups.length===1 && groups[0].definitions.length===1 && groups[0].definitions[0];
+      var tab=element('div','reader-contents-tab',null,tree),tabButton=button(ownerLabel(item),ownerLabel(item),tab,function(){
+        if(only)choose(item,only,only.members[0].record.runtime);
+        else{if(shown.has(item.path))shown.delete(item.path);else shown.add(item.path);drawTree();}
+      });
+      tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('data-reader-key','tab:'+item.path);
+      if(item===owner)tabButton.setAttribute('data-current-part','true');
+      if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);}
+      function trail(parent){var levels=detailTrail();if(levels.length){var details=element('ol','reader-tree-details',null,parent);levels.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===levels.length-1)entry.setAttribute('aria-current','location');});}}
+      function leaf(choice,definition,parent,key){
+        var rec=definition.members[0].record.runtime,selected=item===owner && item.current===definition && current===rec;
+        choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
+        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+        if(selected)trail(parent);
+      }
+      function viewLeaf(definition,parent){
+        var rec=definition.members[0].record.runtime,row=element('div','reader-tree-view-row',null,parent),choice=button(definition.name,definition.name,row,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-view');leaf(choice,definition,row,item.path+':'+definition.key);
+      }
+      function sectionLeaf(definition,parent,index,key){
+        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');if(index!==null)choice.setAttribute('data-page-number',String(index+1));leaf(choice,definition,li,key);
+      }
+      function disclosure(row,key,label){
+        var expanded=!collapsedViews.has(key),control=button((expanded?'Collapse ':'Expand ')+label,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});control.classList.add('reader-view-disclosure');control.setAttribute('aria-expanded',String(expanded));control.setAttribute('data-reader-key',key+':disclosure');return expanded;
+      }
+      if(only){leaf(tabButton,only,tab,'tab:'+item.path);return;}
+      tabButton.setAttribute('aria-expanded',String(shown.has(item.path)));
       if(!shown.has(item.path))return;
-      var canonical=item.records.some(function(record){return Array.isArray(record.section.views);}),groups=[];
-      if(!canonical){
-        var legacyGroups=[];item.views.filter(function(d){return !embed || d.members[0].record.runtime===embed;}).forEach(function(d){var g=legacyGroups.find(function(g){return g.id===d.id;});if(!g){g={id:d.id,definitions:[]};legacyGroups.push(g);}g.definitions.push(d);});
-        var legacyViews=element('div','reader-tree-views',null,tab);
-        legacyGroups.forEach(function(group){
-          var definition=group.definitions.find(function(d){return d.members[0].record.runtime===item.selected;}) || group.definitions[0],key=item.path+':'+group.id,selected=item===owner && group.definitions.indexOf(item.current)>=0,row=element('div','reader-tree-view-row',null,legacyViews),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(group.definitions.indexOf(item.current)>=0));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-          var expanded=!collapsedViews.has(key),disclosure=button((expanded?'Collapse ':'Expand ')+definition.name,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});disclosure.classList.add('reader-view-disclosure');disclosure.setAttribute('aria-expanded',String(expanded));disclosure.setAttribute('data-reader-key',key+':disclosure');
-          if(expanded){var sections=element('ol','reader-tree-sections',null,legacyViews);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d,index){var rec=d.members[0].record.runtime,li=element('li','',null,sections),choice=button(title(rec),title(rec),li,function(){choose(item,d,rec);});choice.classList.add('reader-tree-section');choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('aria-current',selected && current===rec?'page':'false');choice.setAttribute('data-page-number',String(index+1));choice.setAttribute('data-reader-key',key+':'+rec.number);if(selected && current===rec){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,li);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}});}
+      if(canonical){
+        if(groups.length===1){var views=element('div','reader-tree-views',null,tab);groups[0].definitions.forEach(function(definition){viewLeaf(definition,views);});return;}
+        var sections=element('ol','reader-tree-sections',null,tab);
+        groups.forEach(function(group){
+          var rec=group.record.runtime,key=item.path+':section:'+rec.number;
+          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,null,item.path+':'+group.definitions[0].key);return;}
+          var li=element('li','',null,sections),row=element('div','reader-tree-view-row',null,li),heading=button(title(rec),title(rec),row,function(){choose(item,sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-key',key);heading.setAttribute('data-reader-section',rec.reference);
+          if(disclosure(row,key,title(rec))){var views=element('div','reader-tree-views',null,li);group.definitions.forEach(function(definition){viewLeaf(definition,views);});}
         });return;
       }
-      item.views.filter(function(definition){return !embed || definition.members[0].record.runtime===embed;}).forEach(function(definition){
-        var record=definition.members[0].record,group=groups.find(function(g){return g.record===record;});
-        if(!group){group={record:record,definitions:[]};groups.push(group);}group.definitions.push(definition);
-      });
+      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition,index){sectionLeaf(definition,sections,index,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
+      var views=element('div','reader-tree-views',null,tab);
       groups.forEach(function(group){
-        var rec=group.record.runtime,single=group.definitions.length===1,definition=single && group.definitions[0],selected=single && item===owner && item.current===definition,sections=element('div','reader-tree-sections',null,tab),heading=button(title(rec),title(rec),sections,function(){choose(item,definition || sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-section',rec.reference);heading.setAttribute('data-reader-key',single?item.path+':'+definition.key:item.path+':section:'+rec.number);heading.setAttribute('aria-current',single?selected?'page':'false':item===owner && current===rec?'page':'false');
-        if(single){
-          heading.classList.add('reader-tree-single-view');heading.setAttribute('data-tab-view',definition.id);heading.setAttribute('data-owner-selected',String(item.current===definition));heading.setAttribute('aria-pressed',String(selected));
-          if(definition.presentation==='explore'){heading.setAttribute('data-explore-view','true');heading.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-          if(selected){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,sections);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}
-          return;
-        }
-        var views=element('div','reader-tree-views',null,sections);
-        group.definitions.forEach(function(definition){
-          var key=item.path+':'+definition.key,selected=item===owner && item.current===definition,explore=definition.presentation==='explore';
-          var row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));if(explore){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-          if(selected){var trail=detailTrail();if(trail.length){var details=element('ol','reader-tree-details',null,row);trail.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===trail.length-1)entry.setAttribute('aria-current','location');});}}
-        });
+        if(group.definitions.length===1){viewLeaf(group.definitions[0],views);return;}
+        var definition=group.definitions.find(function(d){return d.members[0].record.runtime===item.selected;}) || group.definitions[0],key=item.path+':'+group.id,row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(group.definitions.indexOf(item.current)>=0));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-pressed',String(item===owner && group.definitions.indexOf(item.current)>=0));
+        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d,index){sectionLeaf(d,sections,index,key+':'+d.members[0].record.runtime.number);});}
       });
     });
     tree.scrollTop=scroll;

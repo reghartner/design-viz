@@ -72,11 +72,21 @@ The planned overlay uses these runtime states. The spec never stores status.
 
 | State | Paint |
 | --- | --- |
-| `todo` | Grey |
-| `active` | Amber, slow pulse |
-| `done` | Green |
-| `blocked` | Red pulse |
-| `missing` | Red pulse; the popover, caption and Tickets table say missing |
+| `todo` | Slate preset |
+| `active` | Ember preset (orange), slow pulse |
+| `done` | Moss preset |
+| `blocked` | Rose preset, pulse |
+| `missing` | Rose preset with a dotted outline, pulse; the popover, caption and Tickets table say missing |
+| waiting (any state) | Slate preset, dashed |
+
+Live paint has no palette of its own: it uses the Node Styles presets
+(see `docs/node-styles.md`). A painted node wears `node-styled ns-<preset>`, so its
+card takes the preset's background, line and ink in the current skin, including
+the dark variants on Aurora, Terminal and Blueprint. Edge strokes, halos, the
+break glyph, step coins and chips, lane pills and the panel's count and state
+pills use the same preset line colours through `--dv-live-<state>`. Numerals and
+pill text use `--dv-live-on`, chosen by the engine's step-colour contrast rule
+(black or white, whichever contrasts more); it is black on every live fill.
 
 For an element with several tickets, roll up their states in this order:
 
@@ -101,7 +111,8 @@ The overlay (#735) paints nodes and edges from a runtime ticket map. Step coins
 and chips roll up the involved edges and endpoint/explicit nodes, including failed
 communications. Text boxes stay unpainted. Missing map entries add no state;
 unknown state strings are ignored. The Live toggle restores authored paint when
-disabled. Status colors override node tones and step colors while enabled.
+disabled, including an authored node `style` preset. Status colors override
+node styles, node tones and step colors while enabled.
 
 The canvas has no status badges (#762): card stroke and halo, edge stroke, the
 dashed todo and waiting strokes, step coins and the break glyph carry the state.
@@ -277,7 +288,7 @@ comma-separated keys, while retaining their own `dv-live-<state>` class. Carrier
 whose own state is done, blocked or missing never become waiting; traversal still
 continues through them. Cycles terminate and multiple blockers combine their keys.
 
-Waiting uses a dashed red-grey stroke; the canvas carries no **waiting on** text.
+Waiting uses the slate preset with a dashed stroke; the canvas carries no **waiting on** text.
 The carrier's accessible name and popover list the blocking keys. Applying a new map, clearing it or
 turning Live off removes stale waiting evidence. Print keeps the colors.
 

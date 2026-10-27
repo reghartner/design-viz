@@ -1,0 +1,1086 @@
+{
+  "version": 1,
+  "intervalSeconds": 6,
+  "days": [
+    {
+      "label": "Day 1 — kickoff",
+      "note": "All seven tickets are ready for the connected doorbell delivery.",
+      "issues": {
+        "HW-123": {
+          "state": "todo",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "todo",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "todo",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "todo",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "todo",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "todo",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 2 — hardware starts",
+      "note": "Alex starts the button and signal work while firmware waits for the interface.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "active",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "todo",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "todo",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "todo",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "todo",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 3 — firmware starts",
+      "note": "Sam starts event delivery against the proposed hardware interface.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "active",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-22T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "todo",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "todo",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "todo",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 4 — signal blocker",
+      "note": "An unstable signal blocks HW-124, leaving FW-46 waiting on hardware.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "blocked",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-23T09:00:00.000+0000",
+          "flagged": true,
+          "statusName": "Blocked",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-22T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "todo",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "todo",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "todo",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 5 — parallel progress",
+      "note": "Morgan starts the notification experience while Riley builds the backend.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "blocked",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-23T09:00:00.000+0000",
+          "flagged": true,
+          "statusName": "Blocked",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-22T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "active",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "active",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "todo",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 6 — temporary rename",
+      "note": "UX-89 is temporarily renamed UX-90 while backend integration begins.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "blocked",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-23T09:00:00.000+0000",
+          "flagged": true,
+          "statusName": "Blocked",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-22T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "active",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "active",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-25T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-90": {
+          "state": "active",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 7 — blocker clears",
+      "note": "The signal is stable again and the UX ticket returns to its original key.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-21T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "HW-124": {
+          "state": "active",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-26T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-22T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "FW-46": {
+          "state": "todo",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-20T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "active",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-68": {
+          "state": "active",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-25T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "UX-89": {
+          "state": "active",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-24T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 8 — reviews open",
+      "note": "Hardware and firmware PRs open as interrupt integration gets underway.",
+      "issues": {
+        "HW-123": {
+          "state": "active",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "HW-124": {
+          "state": "active",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "FW-46": {
+          "state": "active",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "active",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "BE-68": {
+          "state": "active",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "UX-89": {
+          "state": "active",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 9 — hardware merges",
+      "note": "Hardware changes merge and both hardware tickets finish.",
+      "issues": {
+        "HW-123": {
+          "state": "done",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "HW-124": {
+          "state": "done",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-45": {
+          "state": "active",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "FW-46": {
+          "state": "active",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "active",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "BE-68": {
+          "state": "active",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "UX-89": {
+          "state": "active",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 10 — services merge",
+      "note": "Firmware delivery, backend, and UX changes merge with their tickets complete.",
+      "issues": {
+        "HW-123": {
+          "state": "done",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "HW-124": {
+          "state": "done",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-45": {
+          "state": "done",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-46": {
+          "state": "active",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          }
+        },
+        "BE-67": {
+          "state": "done",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "BE-68": {
+          "state": "done",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "UX-89": {
+          "state": "done",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 11 — final integration",
+      "note": "The final interrupt integration PR opens for review.",
+      "issues": {
+        "HW-123": {
+          "state": "done",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "HW-124": {
+          "state": "done",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-45": {
+          "state": "done",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-46": {
+          "state": "active",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-30T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          }
+        },
+        "BE-67": {
+          "state": "done",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "BE-68": {
+          "state": "done",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "UX-89": {
+          "state": "done",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        }
+      }
+    },
+    {
+      "label": "Day 12 — delivery complete",
+      "note": "The final PR merges and all seven tickets are done.",
+      "issues": {
+        "HW-123": {
+          "state": "done",
+          "summary": "Debounce the doorbell button",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "HW-124": {
+          "state": "done",
+          "summary": "Stabilize the hardware event signal",
+          "assignee": "Alex",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-45": {
+          "state": "done",
+          "summary": "Deliver firmware events",
+          "assignee": "Sam",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "FW-46": {
+          "state": "done",
+          "summary": "Integrate hardware interrupts",
+          "assignee": "Sam",
+          "updated": "2026-10-31T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "BE-67": {
+          "state": "done",
+          "summary": "Build the notification service",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "BE-68": {
+          "state": "done",
+          "summary": "Accept firmware events over HTTPS",
+          "assignee": "Riley",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        },
+        "UX-89": {
+          "state": "done",
+          "summary": "Show resident notifications",
+          "assignee": "Morgan",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          }
+        }
+      }
+    }
+  ]
+}

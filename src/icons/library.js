@@ -112,6 +112,8 @@ var FlowIcons = (function () {
   add('monitor', 'Video monitor', 'Video', 'blue', rect(2.5, 3.5, 19, 14, 2.5, 'wash') + path('M12 17.5V21M8 21h8') + path('m10 7 5 3.5-5 3.5Z', 'accent'));
   add('camera-off', 'Camera unavailable', 'Video', 'neutral', rect(3, 5.5, 18, 12.5, 3, 'wash') + circle(12, 11.75, 3.5, 'accent') + path('M12 18v3M8 21h8') + detail(path('m3 3 18 18')));
   add('person', 'Person', 'Home', 'violet', circle(12, 6, 3, 'wash') + path('M5 21v-2a7 7 0 0 1 14 0v2Z', 'wash') + detail(path('M8.5 20v-2M15.5 20v-2')));
+  // Two commits on the base branch, one on the head branch, arrow back to base.
+  add('pull-request', 'Pull request', 'Software', 'green', circle(6, 5.5, 2.5, 'wash') + circle(6, 18.5, 2.5, 'wash') + circle(18, 18.5, 2.5, 'wash') + path('M6 8v8') + detail(path('M18 16V9.5A3.5 3.5 0 0 0 14.5 6H11M13.5 3.5 11 6l2.5 2.5')));
 
   // Build-time company modules use this private hook before the public library
   // freezes. Geometry is trusted repository code, never authored document data.

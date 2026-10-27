@@ -121,3 +121,23 @@ test('sprite generation preserves all original IDs and appends each new ID exact
     assert.ok(icons.symbols().includes('<symbol id="i-' + id + '" viewBox="0 0 24 24">' + icons.glyph(id) + '</symbol>'));
   }
 });
+
+test('pull-request is a shared Software glyph that renders monochrome for link chrome', () => {
+  assert.ok(icons.has('pull-request'));
+  assert.ok(icons.ids.includes('pull-request'));
+  assert.equal(icons.resolve('pull-request', 'camera'), 'pull-request');
+  const item = icons.registry['pull-request'];
+  assert.deepEqual(JSON.parse(JSON.stringify(item)), {id:'pull-request', label:'Pull request', category:'Software',
+    tone:'green', primary:'#388463', accent:'#82C49B', legacy:false});
+  assert.equal(symbolIds(icons.symbols()).filter(id => id === 'pull-request').length, 1);
+  assert.ok(!symbolIds(legacySprite).includes('pull-request'));
+  const svg = icons.render('pull-request');
+  assert.match(svg, /^<svg class="fv-icon" data-icon="pull-request" viewBox="0 0 24 24"/);
+  assert.match(svg, /data-icon-tone="green"/);
+  assert.equal((svg.match(/<circle\b/g) || []).length, 3);
+  const mono = icons.render('pull-request', {className:'dv-live-pr-icon', monochrome:true});
+  assert.match(mono, /class="fv-icon fv-icon--mono dv-live-pr-icon"/);
+  assert.match(mono, /aria-hidden="true"/);
+  assert.doesNotMatch(mono, /#[0-9a-f]{6}|var\(--fv-icon-/i);
+  assert.ok(geometry('pull-request') !== geometry('terminal'), 'pull-request needs its own silhouette');
+});

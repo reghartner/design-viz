@@ -54,7 +54,13 @@
         "count": 0,
         "state": null
       },
-      "epic": "DOOR-100"
+      "epic": "DOOR-100",
+      "links": [
+        {
+          "type": "is blocked by",
+          "key": "HW-124"
+        }
+      ]
     },
     "UX-89": {
       "state": "todo",
@@ -82,7 +88,13 @@
         "count": 0,
         "state": null
       },
-      "epic": "DOOR-100"
+      "epic": "DOOR-100",
+      "links": [
+        {
+          "type": "depends on",
+          "key": "FW-45"
+        }
+      ]
     },
     "BE-68": {
       "state": "todo",

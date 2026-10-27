@@ -60,7 +60,7 @@ function harness(raw,options={},renderOptions={}){
  ctl.liveStatus=C.createLiveStatus(ctl,page,options,renderOptions);return {C,ctl,view,doc,win,frames,timers,observers,flush(){const work=[...frames.values()];frames.clear();work.forEach(x=>x.fn());}};
 }
 const fixture=()=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{tickets:['BB-1','BB-2']},c:{tickets:['CC-1','CC-2']},text:{type:'text',text:'Note',tickets:['AA-1']},absent:{tickets:['ZZ-1']}},rows:[['a','b','c']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b'},{id:'node',nodes:['b']},{id:'fail',failures:{'a->b':'dropped'}}]}}]}});
-const fixed={'AA-1':{state:'active',updatedAt:'2026-10-26T10:00:00Z'},'BB-1':{state:'done'},'BB-2':{state:'todo'},'CC-2':{state:'missing'},'EE-1':{state:'blocked'}};
+const fixed={'AA-1':{state:'active',updatedAt:'2026-10-26T10:00:00Z'},'BB-1':{state:'done'},'BB-2':{state:'todo',dependsOn:[{key:'EE-1',source:'jira',linkType:'is blocked by'}]},'CC-2':{state:'missing'},'EE-1':{state:'blocked'}};
 
 test('V1 shared entrypoints include the live overlay',()=>{
  for(const name of ['standalone','workbench','native','forge'])assert.match(entrypoint(name).body,/function liveStatusRollup\(/,name);
@@ -184,7 +184,7 @@ test('V9 a late detail load cannot create controls after overlay destruction',as
  S1: built 6-node/5-edge/7-step story, tickets and index (browser + test_index).
  S2: standalone-only demo source, embedded timeline, early hash and fallback.
  S3: conversion, default cadence, controls, reduced motion, completion and cleanup.
- S4: directed fork/join propagation, edge/missing blockers, own paint and clearing.
+ S4: dependency waiting (see D1–D12), own paint and clearing.
  S5: blocked breaks in ambient/step, todo packets, done/active restoration (browser).
  S6: waiting tag/badge/popover, skin and print paint (browser).
  S7: named documentation sections. S8: demo excluded from workbench; scoped diff gate.
@@ -192,29 +192,215 @@ test('V9 a late detail load cannot create controls after overlay destruction',as
 */
 function storyContext(){const C={URL};vm.runInNewContext(entrypoint('standalone').body,C);return C;}
 function forkJoin(){return {nodes:{up:{tickets:['UP-1']},a:{tickets:['AA-1']},b:{tickets:['BB-1']},c:{tickets:['CC-1']},join:{tickets:['JJ-1']},end:{}},edges:[{from:'up',to:'a'},{from:'a',to:'b'},{from:'a',to:'c'},{from:'b',to:'join',tickets:['EE-1']},{from:'c',to:'join'},{from:'join',to:'end'}]};}
-test('S4 blocked fork/join propagates forward through done, never upstream or onto blockers',()=>{
- const C=storyContext();assert.equal(typeof C.liveStatusWaiting,'function');const d=forkJoin(),before=JSON.stringify(d);
- const states={'AA-1':{state:'blocked'},'BB-1':{state:'todo'},'CC-1':{state:'done'},'JJ-1':{state:'active'}};
- assert.deepEqual(plain(C.liveStatusWaiting(d,states)),{'a->b':['AA-1'],b:['AA-1'],'b->join':['AA-1'],join:['AA-1'],'join->end':['AA-1'],end:['AA-1'],'a->c':['AA-1'],'c->join':['AA-1']});assert.equal(JSON.stringify(d),before);
- d.edges.push({from:'end',to:'a'});assert.equal(C.liveStatusWaiting(d,states).a,undefined,'cycles do not mark blocker');
+/* Dependencies contract (#765, Chuck 2026-10-27). Edge direction is data flow and infers nothing about
+   delivery: the topology propagation is gone. A dependency is ticket -> ticket from two merged sources,
+   Jira issue links (inward types, default "is blocked by" and "depends on") and authored
+   page.tracking.dependencies pairs. X waits on Y while Y is not done unless X is already active or done.
+   Tone from the DIRECT upstream: unfinished -> grey (slate, hand icon); blocked or missing -> red (rose, alarm icon).
+ D1 parsers + validator warnings; D2 apply() sanitizes dependsOn; D3 merge by provenance;
+ D4 ticket waiting; D5 carrier waiting (no edge propagation); D6 chains; D7 canvas paint and popover;
+ D8 panel (epic box, Depends on column, outside-epic rows, chains, Suggest link hint);
+ D9 Jira adapter issuelinks; D10 demo links; D11 docs/skill/contract/types; D12 shared icons. */
+const depFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'},dependencies:[{ticket:'UX-1',on:'BE-1',reason:'needs push payload'}]},sections:[{id:'main',diagram:{
+ nodes:{hw:{title:'Button',tickets:['HW-1']},fw:{title:'Controller',tickets:['FW-1']},be:{title:'Backend',tickets:['BE-1']},app:{title:'App',tickets:['UX-1']}},rows:[['hw','fw','be','app']],
+ edges:[{from:'hw',to:'fw',label:'press',tickets:['HW-2']},{from:'fw',to:'be',label:'event'},{from:'be',to:'app',label:'push',tickets:['BE-1','UX-1']}],
+ steps:[{id:'press',edge:'hw->fw'},{id:'event',edge:'fw->be'},{id:'push',edge:'be->app'}]}}]}});
+const depMap=()=>({'HW-1':{state:'active',epic:'EP-1'},'HW-2':{state:'blocked',epic:'EP-1'},
+ 'FW-1':{state:'todo',epic:'EP-1',dependsOn:[{key:'HW-2',source:'jira',linkType:'is blocked by'},{key:'OUT-9',source:'jira',linkType:'depends on'}]},
+ 'BE-1':{state:'todo',epic:'EP-1',dependsOn:[{key:'GONE-1',source:'jira',linkType:'is blocked by'}]},'UX-1':{state:'todo',epic:'EP-1'},
+ 'OUT-9':{state:'active',title:'Vendor driver',epic:'OTHER-1'}});
+test('D1 authored dependency pairs and link types parse, deduplicate and warn per malformed entry without errors',()=>{
+ const {C}=harness();assert.equal(typeof C.trackingDependencies,'function');assert.equal(typeof C.trackingDependencyLinks,'function');
+ const raw=depFixture();raw.page.tracking.dependencies.push({ticket:'UX-1',on:'BE-1'},{ticket:'bad',on:'BE-1'},{ticket:'FW-1'},null,{ticket:'FW-1',on:'FW-1'},{ticket:'FW-1',on:'HW-2',reason:7},{ticket:'FW-1',on:'HW-2'});
+ const before=JSON.stringify(raw),invalid=[];
+ assert.deepEqual(plain(C.trackingDependencies(raw.page,i=>invalid.push(i))),[{ticket:'UX-1',on:'BE-1',reason:'needs push payload'},{ticket:'FW-1',on:'HW-2'}]);
+ assert.deepEqual(invalid,[2,3,4,5,6]);assert.equal(JSON.stringify(raw),before);
+ const result=C.validate(C.normalize(raw));assert.deepEqual(plain(result.errors),[]);
+ assert.equal(result.warnings.filter(w=>/^tracking\.dependencies\[\d+\]/.test(w)).length,5);assert.ok(result.warnings.some(w=>/tracking\.dependencies\[5\].*itself/.test(w)));
+ raw.page.tracking.dependencies={};assert.deepEqual(plain(C.trackingDependencies(raw.page)),[]);assert.ok(C.validate(C.normalize(raw)).warnings.some(w=>/^tracking\.dependencies: must be an array/.test(w)));
+ assert.deepEqual(plain(C.trackingDependencies({})),[]);
+ assert.deepEqual(plain(C.trackingDependencyLinks({})),['is blocked by','depends on']);
+ const links=depFixture();links.page.tracking.jira.dependencyLinks=['Is Blocked By',' depends on ','',4];
+ assert.deepEqual(plain(C.trackingDependencyLinks(links.page)),['is blocked by','depends on']);
+ const linkResult=C.validate(C.normalize(links));assert.deepEqual(plain(linkResult.errors),[]);assert.equal(linkResult.warnings.filter(w=>/^tracking\.jira\.dependencyLinks\[\d+\]/.test(w)).length,2);
+ links.page.tracking.jira.dependencyLinks='is blocked by';assert.ok(C.validate(C.normalize(links)).warnings.some(w=>/^tracking\.jira\.dependencyLinks: must be an array/.test(w)));
+ assert.deepEqual(plain(C.validate(C.normalize(depFixture()))),{errors:[],warnings:['page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup']});
 });
-test('S4 edge and missing blockers start at target and accumulate distinct blocking keys',()=>{
- const C=storyContext();assert.equal(typeof C.liveStatusWaiting,'function');const d=forkJoin();
- const result=plain(C.liveStatusWaiting(d,{'EE-1':{state:'blocked'},'CC-1':{state:'missing'}}));
- assert.deepEqual(result.join,['EE-1','CC-1'].sort());assert.deepEqual(result.end,['EE-1','CC-1'].sort());
- for(const key of ['up','a','b','c','b->join','up->a','a->b'])assert.equal(result[key],undefined,key);
- assert.deepEqual(plain(C.liveStatusWaiting(d,{})),{});
+test('D2 apply keeps well-formed dependsOn entries and drops malformed ones',()=>{
+ const h=harness(depFixture()),api=h.ctl.liveStatus;
+ api.apply({'FW-1':{state:'todo',dependsOn:[{key:'HW-2',source:'jira',linkType:'is blocked by'},{key:'OUT-9',source:'authored',reason:'driver first'},{key:'bad',source:'jira'},{key:'HW-1',source:'guess'},null,{key:'HW-1',source:'jira',linkType:5,reason:['x']}]},'BE-1':{state:'todo',dependsOn:'HW-2'}});
+ assert.deepEqual(plain(api.state('FW-1').dependsOn),[{key:'HW-2',source:'jira',linkType:'is blocked by'},{key:'OUT-9',source:'authored',reason:'driver first'},{key:'HW-1',source:'jira'}]);
+ assert.equal(api.state('BE-1').dependsOn,undefined);assert.equal(plain(api.snapshot()).states['FW-1'].dependsOn.length,3);api.destroy();
 });
-test('S4 cyclic joins and self-loops visit each carrier once per blocker',()=>{
- const C=storyContext(),d=forkJoin();
- d.edges.push({from:'join',to:'a'},{from:'join',to:'join'},{from:'end',to:'b'});
- const states={'AA-1':{state:'blocked'},'CC-1':{state:'missing'},'BB-1':{state:'done'},'JJ-1':{state:'todo'}};
- const waiting=plain(C.liveStatusWaiting(d,states));
- assert.deepEqual(Object.keys(waiting).sort(),['a->b','a->c','b->join','c->join','end','end->b','join','join->a','join->end','join->join'].sort());
- for(const keys of Object.values(waiting))assert.deepEqual(keys,['AA-1','CC-1']);
- for(const key of ['up','up->a','a','b','c'])assert.equal(waiting[key],undefined,key);
+test('D3 dependencies merge Jira links and authored pairs by provenance',()=>{
+ const h=harness(depFixture()),C=h.C;assert.equal(typeof C.liveStatusDependencies,'function');
+ const map=depMap();map['UX-1'].dependsOn=[{key:'BE-1',source:'jira',linkType:'is blocked by'}];
+ const merged=plain(C.liveStatusDependencies([h.ctl.page],map));
+ assert.deepEqual(merged['FW-1'],[{key:'HW-2',sources:['jira'],linkType:'is blocked by'},{key:'OUT-9',sources:['jira'],linkType:'depends on'}]);
+ assert.deepEqual(merged['UX-1'],[{key:'BE-1',sources:['jira','authored'],linkType:'is blocked by',reason:'needs push payload'}]);
+ assert.deepEqual(merged['BE-1'],[{key:'GONE-1',sources:['jira'],linkType:'is blocked by'}]);assert.equal(merged['HW-1'],undefined);
+ assert.deepEqual(plain(C.liveStatusDependencies([h.ctl.page],{})['UX-1']),[{key:'BE-1',sources:['authored'],reason:'needs push payload'}]);
+ assert.deepEqual(plain(C.liveStatusDependencies([],{})),{});h.ctl.liveStatus.destroy();
 });
-test('S4 waiting preserves own state, supplies badge/popover keys and clears on toggle/apply',()=>{
+test('D4 a ticket waits while its direct upstream is unfinished; tone is red for blocked or missing upstreams',()=>{
+ const h=harness(depFixture()),C=h.C;assert.equal(typeof C.liveStatusTicketWaiting,'function');
+ const map=depMap(),waiting=plain(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],map),map));
+ assert.deepEqual(waiting,{'FW-1':{tone:'red',on:[{key:'HW-2',state:'blocked',tone:'red'},{key:'OUT-9',state:'active',tone:'grey'}]},
+  'BE-1':{tone:'red',on:[{key:'GONE-1',state:'missing',tone:'red'}]},'UX-1':{tone:'grey',on:[{key:'BE-1',state:'todo',tone:'grey'}]}});
+ // X already active or done lists the link but does not wait; a blocked or missing X still waits; a done upstream holds nothing.
+ for(const state of ['active','done']){const m=depMap();m['FW-1'].state=state;assert.equal(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],m),m)['FW-1'],undefined,state);}
+ for(const state of ['blocked','missing']){const m=depMap();m['FW-1'].state=state;const w=plain(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],m),m));assert.equal(w['FW-1'].tone,'red',state);assert.deepEqual(plain(C.liveStatusDependencyChains(w)).filter(c=>c.includes('FW-1')),[['HW-2','FW-1'],['OUT-9','FW-1']],state+' chain present');}
+ const done=depMap();done['HW-2'].state='done';done['OUT-9'].state='done';assert.equal(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],done),done)['FW-1'],undefined);
+ const absent=depMap();delete absent['FW-1'].state;absent['FW-1'].state='todo';delete absent['OUT-9'];assert.equal(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],absent),absent)['FW-1'].tone,'red');
+ // A ticket without a map entry can still wait on its authored upstream.
+ const noEntry=depMap();delete noEntry['UX-1'];assert.deepEqual(plain(C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],noEntry),noEntry))['UX-1'],{tone:'grey',on:[{key:'BE-1',state:'todo',tone:'grey'}]});
+ h.ctl.liveStatus.destroy();
+});
+test('D5 a carrier waits when any of its tickets waits; edge direction propagates nothing',()=>{
+ const h=harness(depFixture()),C=h.C,d=h.ctl.page.sections[0].diagram;assert.equal(typeof C.liveStatusCarrierWaiting,'function');assert.equal(C.liveStatusWaiting,undefined,'edge-direction propagation is gone');
+ const map=depMap(),waiting=plain(C.liveStatusCarrierWaiting(d,map,C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],map),map)));
+ assert.deepEqual(waiting,{fw:{tone:'red',keys:['HW-2','OUT-9']},be:{tone:'red',keys:['GONE-1']},app:{tone:'grey',keys:['BE-1']},'be->app':{tone:'red',keys:['BE-1','GONE-1']}});
+ // The blocked press edge feeds fw -> be -> app by data flow; without a dependency none of them waits.
+ const plain2=depMap();delete plain2['FW-1'].dependsOn;delete plain2['BE-1'].dependsOn;const page={sections:[{diagram:d}]};
+ assert.deepEqual(plain(C.liveStatusCarrierWaiting(d,plain2,C.liveStatusTicketWaiting(C.liveStatusDependencies([page],plain2),plain2))),{});
+ assert.deepEqual(plain(C.liveStatusCarrierWaiting(d,{},{})),{});h.ctl.liveStatus.destroy();
+});
+test('D6 chains run from a root upstream through each waiting hop and stay bounded on cycles',()=>{
+ const h=harness(depFixture()),C=h.C;assert.equal(typeof C.liveStatusDependencyChains,'function');
+ const map=depMap(),waiting=C.liveStatusTicketWaiting(C.liveStatusDependencies([h.ctl.page],map),map);
+ assert.deepEqual(plain(C.liveStatusDependencyChains(waiting)),[['GONE-1','BE-1','UX-1'],['HW-2','FW-1'],['OUT-9','FW-1']]);
+ const loop={'AA-1':{tone:'grey',on:[{key:'BB-1',state:'todo',tone:'grey'}]},'BB-1':{tone:'grey',on:[{key:'AA-1',state:'todo',tone:'grey'}]}};
+ const chains=plain(C.liveStatusDependencyChains(loop));assert.ok(chains.length>=1 && chains.every(chain=>chain.length<=3));assert.deepEqual(plain(C.liveStatusDependencyChains({})),[]);h.ctl.liveStatus.destroy();
+});
+test('D7 canvas paint: waiting tone on class, attribute and preset; popover names the upstream and its chain',()=>{
+ const h=harness(depFixture()),api=h.ctl.liveStatus;api.apply(depMap());const node=id=>h.view.querySelector('[data-dv-node="'+id+'"]');
+ assert.ok(node('fw').classList.contains('dv-live-waiting'));assert.equal(node('fw').getAttribute('data-dv-live-waiting-on'),'HW-2,OUT-9');assert.equal(node('fw').getAttribute('data-dv-live-waiting-tone'),'red');
+ assert.ok(node('fw').classList.contains('ns-rose') && node('fw').classList.contains('dv-live-todo'),'red waiting wears rose over its own todo state');
+ assert.ok(node('app').classList.contains('dv-live-waiting'));assert.equal(node('app').getAttribute('data-dv-live-waiting-tone'),'grey');assert.ok(node('app').classList.contains('ns-slate'));
+ assert.ok(!node('hw').classList.contains('dv-live-waiting'));assert.equal(node('hw').getAttribute('data-dv-live-waiting-tone'),null);
+ const edge=h.view.querySelector('path.edge[data-dv-edge="2"]');assert.ok(edge.classList.contains('dv-live-waiting'));assert.equal(edge.getAttribute('data-dv-live-waiting-tone'),'red');assert.equal(edge.getAttribute('data-dv-live-waiting-on'),'BE-1,GONE-1');
+ assert.ok(!h.view.querySelector('path.edge[data-dv-edge="1"]').classList.contains('dv-live-waiting'),'the untracked event edge after the blocked press edge is not waiting');
+ assert.deepEqual(h.view.querySelectorAll('.dv-live-waiting-tag,.dv-live-badge,.dv-live-waiting-icon').map(el=>el.className),[],'no canvas badges or icons');
+ const card=node('fw').querySelector('.card');assert.match(card.getAttribute('aria-label'),/waiting on HW-2, OUT-9/);
+ h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});const pop=h.view.querySelector('.dv-live-popover');
+ const details=pop.querySelectorAll('.dv-live-waiting-detail').map(el=>el.textContent);assert.deepEqual(details,['Waiting on HW-2 · blocked','Waiting on OUT-9 · active']);
+ assert.deepEqual(pop.querySelectorAll('.dv-live-waiting-detail').map(el=>el.getAttribute('data-tone')),['red','grey']);
+ assert.deepEqual(pop.querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['HW-2 holds FW-1','OUT-9 holds FW-1']);
+ api.setEnabled(false);assert.equal(node('fw').getAttribute('data-dv-live-waiting-tone'),null);assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);api.setEnabled(true);assert.ok(node('fw').classList.contains('dv-live-waiting'));
+ const cleared=depMap();cleared['HW-2'].state='done';cleared['OUT-9'].state='done';api.apply(cleared);assert.ok(!node('fw').classList.contains('dv-live-waiting'));assert.ok(node('fw').classList.contains('ns-slate'),'own todo paint returns');
+ api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);api.destroy();
+});
+test('D7 a blocked or missing dependent records waiting but the canvas keeps its own stronger paint',()=>{
+ for(const state of ['blocked','missing']){
+  const h=harness(depFixture()),api=h.ctl.liveStatus,map=depMap();map['FW-1'].state=state;map['FW-1'].dependsOn=[{key:'OUT-9',source:'jira',linkType:'depends on'}];api.apply(map);
+  const fw=h.view.querySelector('[data-dv-node="fw"]');assert.ok(fw.classList.contains('dv-live-'+state),state);assert.ok(fw.classList.contains('ns-rose'));
+  assert.ok(!fw.classList.contains('dv-live-waiting'),state+': no dashed waiting stroke over the own paint');assert.equal(fw.getAttribute('data-dv-live-waiting-tone'),null);
+  const value=plain(api.snapshot());assert.deepEqual(value.waiting['FW-1'],{tone:'grey',on:[{key:'OUT-9',state:'active',tone:'grey'}]},state+': waiting recorded');assert.ok(value.chains.some(c=>c.join('>')==='OUT-9>FW-1'));
+  const card=fw.querySelector('.card');assert.match(card.getAttribute('aria-label'),/waiting on OUT-9/);h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
+  assert.deepEqual(h.view.querySelector('.dv-live-popover').querySelectorAll('.dv-live-waiting-detail').map(el=>el.textContent),['Waiting on OUT-9 · active']);
+  mountStatus(h);api.apply(map);assert.equal(h.view.querySelector('tr[data-live-ticket="FW-1"]').querySelector('.dv-live-dep').getAttribute('data-tone'),'grey');assert.ok(h.view.querySelectorAll('.dv-live-chain').some(el=>el.querySelectorAll('.dv-live-dep-key').map(k=>k.textContent).join('>')==='OUT-9>FW-1'));
+  api.destroy();
+ }
+});
+test('D7 readiness, blockers and captions count waiting from dependencies, not edges',()=>{
+ const h=harness(depFixture()),api=h.ctl.liveStatus,C=h.C;api.apply(depMap());const value=plain(api.snapshot());
+ assert.equal(value.readiness.waiting,4,'fw, be, app and the push edge wait');assert.equal(value.readiness.blockers,1);
+ assert.equal(value.blockers.length,1);assert.equal(value.blockers[0].key,'HW-2');assert.equal(value.blockers[0].downstream,'1 downstream carriers · 2 steps');
+ const d=h.ctl.page.sections[0].diagram;assert.equal(C.liveStatusCaption(d,d.steps[2],depMap(),value.waiting),'TODO · 2 tickets · waiting on BE-1, GONE-1');
+ assert.equal(C.liveStatusCaption(d,d.steps[0],depMap()),'BLOCKED · HW-2');api.destroy();
+});
+test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the Suggest link hint',()=>{
+ const h=harness(depFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell',epic:''}}));
+ const body=h.view.querySelector('.dv-live-panel-body');assert.ok(body);
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
+ assert.ok(h.view.querySelector('.dv-live-verdict')===null,'the old verdict line is gone');
+ const epic=body.querySelector('.dv-live-epic');assert.ok(epic,'epic header box');assert.ok(body.children[0]===epic,'the epic box is first in the body');
+ assert.equal(epic.querySelector('a.dv-live-epic-key').getAttribute('href'),'https://jira.test/browse/EP-1');assert.equal(epic.querySelector('.dv-live-epic-key').textContent,'EP-1');
+ assert.equal(epic.querySelector('.dv-live-epic-title').textContent,'Connected doorbell');assert.equal(epic.querySelector('.dv-live-epic-state').textContent,'active');
+ assert.equal(epic.querySelector('.dv-live-epic-progress').textContent,'0 of 5 stories done · 5 of 5 on diagram');assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting · 2 outside epic');
+ assert.ok(epic.querySelector('.dv-live-completion'),'carrier completion ring lives in the box');assert.equal(h.view.querySelector('.dv-live-head').querySelectorAll('.dv-live-epic').length,0,'never in the header or title bar');
+ const table=body.querySelector('table.dv-live-tickets');assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
+ const rows=table.querySelectorAll('tr[data-live-ticket]'),row=key=>rows.find(el=>el.getAttribute('data-live-ticket')===key),coverage=key=>table.querySelector('tr[data-live-coverage-for="'+key+'"]');
+ assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['HW-2','GONE-1','HW-1','OUT-9','BE-1','FW-1','UX-1']);
+ assert.equal(coverage('FW-1').querySelector('td').getAttribute('colspan'),'6');
+ const deps=row('FW-1').querySelectorAll('.dv-live-dep');assert.equal(deps.length,2);
+ assert.equal(deps[0].tagName,'button');assert.equal(deps[0].getAttribute('data-live-dep-for'),'HW-2');assert.equal(deps[0].getAttribute('data-tone'),'red');assert.ok(deps[0].classList.contains('dv-live-dep-red'));
+ assert.equal(deps[0].querySelector('.dv-live-dep-key').textContent,'HW-2');assert.equal(deps[0].querySelector('.dv-live-state-pill').textContent,'blocked');assert.equal(deps[0].querySelector('.dv-live-dep-icon').getAttribute('data-icon'),'alarm');assert.match(deps[0].querySelector('.dv-live-dep-icon').innerHTML,/<svg[^>]*data-icon="alarm"/);
+ assert.equal(deps[1].getAttribute('data-tone'),'grey');assert.ok(!deps[1].classList.contains('dv-live-dep-red'));assert.equal(deps[1].querySelector('.dv-live-dep-icon').getAttribute('data-icon'),'hand');
+ assert.doesNotMatch(textOf(row('FW-1')),/Jira ·|is blocked by/,'no source line in the cell');
+ const authored=row('UX-1').querySelector('.dv-live-dep');assert.equal(authored.getAttribute('title'),'needs push payload');assert.equal(authored.getAttribute('data-tone'),'grey');assert.equal(authored.querySelector('.dv-live-state-pill').textContent,'todo');
+ assert.equal(row('BE-1').querySelector('.dv-live-dep').querySelector('.dv-live-state-pill').textContent,'missing');assert.equal(row('BE-1').querySelector('.dv-live-dep').getAttribute('data-tone'),'red');
+ assert.equal(row('HW-1').querySelectorAll('.dv-live-dep').length,0);
+ // A done upstream is listed without a waiting icon.
+ const done=depMap();done['HW-2'].state='done';api.apply(done);const doneDep=row('FW-1').querySelectorAll('.dv-live-dep')[0];assert.equal(doneDep.getAttribute('data-tone'),'none');assert.equal(doneDep.querySelector('.dv-live-dep-icon').hidden,true);api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell'}}));
+ assert.equal(coverage('OUT-9').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.equal(row('OUT-9').querySelector('.dv-live-ticket-epic').textContent,'epic OTHER-1');
+ assert.equal(coverage('GONE-1').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.ok(row('GONE-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(row('GONE-1').querySelector('.dv-live-state-pill').textContent,'No status');
+ assert.ok(row('FW-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('Epic'),-1,'no Epic column');
+ assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('On diagram'),-1,'coverage stays a chip row');
+ const suggest=body.querySelector('.dv-live-suggest');assert.equal(suggest.textContent,'1 authored dependency (UX-1 → BE-1) has no Jira link. Suggest link in Jira');assert.equal(suggest.querySelectorAll('button,a').length,0,'a hint only; the page never writes to Jira');
+ const chains=body.querySelectorAll('.dv-live-chain');assert.deepEqual(chains.map(el=>el.querySelectorAll('.dv-live-dep .dv-live-dep-key').map(k=>k.textContent)),[['GONE-1','BE-1','UX-1'],['HW-2','FW-1'],['OUT-9','FW-1']]);
+ assert.deepEqual(chains[0].querySelectorAll('.dv-live-chain-holds').map(el=>el.textContent),['holds','holds']);
+ assert.equal(body.querySelectorAll('.dv-live-blocker').length,1);assert.equal(body.querySelector('.dv-live-blocker').querySelector('a').textContent,'HW-2');
+ // Linked in Jira as well: no hint. Clicking a Depends on button focuses the upstream row.
+ const linked=depMap();linked['UX-1'].dependsOn=[{key:'BE-1',source:'jira',linkType:'is blocked by'}];api.apply(linked);assert.ok(body.querySelector('.dv-live-suggest')===null);
+ let focused=null;row('HW-2').querySelector('a').focus=()=>focused='HW-2';row('FW-1').querySelector('.dv-live-dep').dispatchEvent({type:'click'});assert.equal(focused,'HW-2');
+ api.destroy();
+});
+test('D8 without epics the summary box keeps the carrier ring and counts and the demo sample mentions the epic',()=>{
+ const raw=depFixture();delete raw.page.tracking.jira.epic;const h=harness(raw),api=h.ctl.liveStatus;mountStatus(h);api.apply(depMap());
+ const epic=h.view.querySelector('.dv-live-epic');assert.ok(epic);assert.ok(epic.querySelector('.dv-live-epic-key')===null);assert.ok(epic.querySelector('.dv-live-completion'));assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting');
+ assert.ok(h.view.querySelector('.dv-live-epic-progress')===null);api.destroy();
+ const d=h.C.PanelRegistry.get('live-status'),sample=h.C.panelPickerExample?h.C.panelPickerExample('live-status'):null;
+ if(sample){const html=d.render({},sample.panel,sample.state,'pastel',sample.states,0,false).html;assert.match(html,/dv-live-epic/);assert.match(html,/Depends on/);assert.doesNotMatch(html,/dv-live-verdict/);}
+});
+test('D9 the Jira adapter requests issue links, reads inward and outward dependency types and seeds linked issues',async()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusJiraDependencies,'function');
+ const issue=jira('FW-1');issue.fields.issuelinks=[
+  {type:{name:'Blocks',inward:'is blocked by',outward:'blocks'},inwardIssue:{key:'HW-2',fields:{summary:'Signal',status:{name:'Blocked',statusCategory:{key:'indeterminate'}}}}},
+  {type:{name:'Dependency',inward:'is depended on by',outward:'depends on'},outwardIssue:{key:'OUT-9',fields:{summary:'Vendor driver',status:{name:'In Progress',statusCategory:{key:'indeterminate'}}}}},
+  {type:{name:'Blocks',inward:'is blocked by',outward:'blocks'},outwardIssue:{key:'DOWN-1',fields:{summary:'Downstream',status:{statusCategory:{key:'new'}}}}},
+  {type:{name:'Relates',inward:'relates to',outward:'relates to'},inwardIssue:{key:'REL-1',fields:{}}},{type:{name:'Blocks',inward:'is blocked by'}},null];
+ assert.deepEqual(plain(C.liveStatusJiraDependencies(issue,['is blocked by','depends on'])).map(d=>[d.key,d.linkType]),[['HW-2','is blocked by'],['OUT-9','depends on']]);
+ assert.deepEqual(plain(C.liveStatusJiraDependencies(issue,['relates to'])).map(d=>d.key),['REL-1']);assert.deepEqual(plain(C.liveStatusJiraDependencies({},['is blocked by'])),[]);
+ const map=plain(C.liveStatusJiraMap(['FW-1'],[[issue]],new Set(),'https://jira.test',1793000000000,['is blocked by','depends on']));
+ assert.deepEqual(map['FW-1'].dependsOn,[{key:'HW-2',source:'jira',linkType:'is blocked by'},{key:'OUT-9',source:'jira',linkType:'depends on'}]);
+ assert.deepEqual(map['HW-2'],{state:'blocked',title:'Signal',url:'https://jira.test/browse/HW-2'});assert.deepEqual(map['OUT-9'],{state:'active',title:'Vendor driver',url:'https://jira.test/browse/OUT-9'});
+ assert.equal(map['DOWN-1'],undefined);assert.equal(map['REL-1'],undefined);
+ const child=jira('AA-1');child.fields.parent={key:'EP-1',fields:{summary:'Doorbell epic',status:{name:'In Progress',statusCategory:{key:'indeterminate'}},issuetype:{name:'Epic'}}};
+ const seeded=plain(C.liveStatusJiraMap(['AA-1'],[[child]],new Set(),'https://jira.test',null));assert.deepEqual(seeded['EP-1'],{state:'active',title:'Doorbell epic',url:'https://jira.test/browse/EP-1'},'the epic rides the child parent payload');
+ const bare=jira('AA-1');bare.fields.parent={key:'EP-1',fields:{summary:'No status here'}};assert.equal(plain(C.liveStatusJiraMap(['AA-1'],[[bare]],new Set(),'',null))['EP-1'],undefined,'no status, no entry');
+ const requested=plain(C.liveStatusJiraMap(['FW-1','HW-2'],[[issue,jira('HW-2','done')]],new Set(),'https://jira.test',null,['is blocked by']));assert.equal(requested['HW-2'].state,'done','a requested issue is never replaced by its link payload');
+ assert.deepEqual(plain(C.liveStatusJiraMap(['FW-1'],[[issue]],new Set(),'',null))['FW-1'].dependsOn.map(d=>d.key),['HW-2','OUT-9'],'default link types');
+ const h=providerHarness(depFixture());await h.start();for(const w of h.watches)assert.ok(w.input.fields.includes('issuelinks'),w.input.jql);
+ h.data(0,[issue]);assert.deepEqual(plain(h.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['HW-2','OUT-9']);assert.equal(h.ctl.liveStatus.state('OUT-9').title,'Vendor driver');
+ const custom=providerHarness((()=>{const raw=depFixture();raw.page.tracking.jira.dependencyLinks=['relates to'];return raw;})());await custom.start();custom.data(0,[issue]);
+ assert.deepEqual(plain(custom.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['REL-1']);h.ctl.liveStatus.destroy();custom.ctl.liveStatus.destroy();
+});
+test('D10 the demo map converts timeline links into Jira-sourced dependencies',()=>{
+ const C=storyContext();const map=plain(C.liveStatusDemoMap({issues:{'FW-46':{state:'todo',links:[{type:'is blocked by',key:'HW-124'},{type:'depends on',key:'FW-45'},{key:'bad'},null]},'HW-124':{state:'blocked'}}},['FW-46','HW-124']));
+ assert.deepEqual(map['FW-46'].dependsOn,[{key:'HW-124',source:'jira',linkType:'is blocked by'},{key:'FW-45',source:'jira',linkType:'depends on'}]);assert.equal(map['HW-124'].dependsOn,undefined);
+ const withEpic=plain(C.liveStatusDemoMap({issues:{'AA-1':{state:'active',epic:'EP-1'},'BB-1':{state:'todo',epic:'EP-1'}}},['AA-1'],{'EP-1':{summary:'Doorbell epic'}}));assert.deepEqual(withEpic['EP-1'],{state:'active',title:'Doorbell epic'});
+ assert.deepEqual(plain(C.liveStatusDemoMap({issues:{'AA-1':{state:'done',epic:'EP-1'}}},[],{'EP-1':{}}))['EP-1'],{state:'done'});
+ const timeline=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8')),spec=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json','utf8'));
+ assert.ok(timeline.days.every(day=>day.issues['FW-46'] && day.issues['FW-46'].links.some(l=>l.key==='HW-124' && l.type==='is blocked by')),'the demo keeps FW-46 blocked by HW-124');assert.equal(timeline.epics['DOOR-100'].summary,'Connected doorbell delivery');
+ assert.deepEqual(spec.page.tracking.dependencies,[{ticket:'UX-89',on:'BE-68',reason:'needs the push payload contract'}]);
+ assert.deepEqual(spec.page.sections[0].diagram.nodes.mcu.tickets,['FW-45','FW-46']);assert.deepEqual(spec.page.sections[0].diagram.edges[0].tickets,['HW-124']);
+ // Day 4: HW-124 blocked holds FW-46 (red on the controller); Day 7: unblocked but unfinished (grey); Day 8: FW-46 active, clear.
+ const h=harness(spec),api=h.ctl.liveStatus,mcu=h.view.querySelector('[data-dv-node="mcu"]');
+ for(const [day,tone] of [[3,'red'],[6,'grey'],[7,null]]){api.apply(C.liveStatusDemoMap(timeline.days[day],api.refs().tickets));assert.equal(mcu.getAttribute('data-dv-live-waiting-tone'),tone,'day '+(day+1));}
+ api.destroy();
+});
+test('D11 docs, skill, contract and native types describe dependencies and no longer describe edge-order propagation',()=>{
+ const docs=fs.readFileSync('docs/live-status.md','utf8');assert.ok(docs.includes('## Dependencies'));assert.doesNotMatch(docs,/## Blocker propagation/);assert.match(docs,/tracking\.dependencies/);assert.match(docs,/dependencyLinks/);assert.match(docs,/Suggest link in Jira/);assert.doesNotMatch(docs,/along directed edges/);
+ const skill=fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8');assert.match(skill,/## .*Dependencies/);assert.doesNotMatch(skill,/delivery order/);assert.match(skill,/Never from arrows/);assert.match(skill,/tracking\.dependencies/);
+ assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking\.dependencies/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/dependencyLinks/);
+ const types=fs.readFileSync('src/native/mount.d.ts','utf8');assert.match(types,/dependsOn\?: Array<\{key: string; source: 'jira' \| 'authored'; linkType\?: string; reason\?: string\}>/);
+});
+test('D12 the shared icon library offers the raised hand and alarm glyphs the panel uses',()=>{
+ const C={};vm.runInNewContext(fs.readFileSync('src/icons/library.js','utf8'),C);
+ assert.ok(C.FlowIcons.has('hand'));assert.ok(C.FlowIcons.has('alarm'));assert.equal(C.FlowIcons.registry.hand.legacy,false);assert.match(C.FlowIcons.render('hand',{monochrome:true}),/stroke="currentColor"/);
+});
+test('S4 waiting preserves own state, supplies popover keys and clears on toggle/apply',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]');
  assert.ok(b.classList.contains('dv-live-waiting'));assert.ok(b.classList.contains('dv-live-active'));assert.equal(b.getAttribute('data-dv-live-waiting-on'),'EE-1');
  const card=b.querySelector('.card');assert.match(card.getAttribute('aria-label'),/waiting on EE-1/);h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
@@ -222,7 +408,7 @@ test('S4 waiting preserves own state, supplies badge/popover keys and clears on 
  api.setEnabled(false);assert.equal(b.getAttribute('data-dv-live-waiting-on'),null);api.setEnabled(true);assert.ok(b.classList.contains('dv-live-waiting'));
  api.apply({'BB-1':{state:'done'},'BB-2':{state:'done'},'EE-1':{state:'blocked'}});assert.ok(!b.classList.contains('dv-live-waiting'));api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
 });
-test('L1 waiting badges carry no canvas text tag; the aria-label and popover keep the keys',()=>{
+test('L1 waiting carriers carry no canvas text tag; the aria-label and popover keep the keys',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),badge=b.querySelector('.card');
  assert.ok(b.classList.contains('dv-live-waiting'));assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);
  assert.equal(h.view.querySelectorAll('.dv-live-waiting-tag').length,0);
@@ -243,7 +429,7 @@ test('P1 P3 live nodes wear Node Styles presets and restore authored styles when
  const a=h.view.querySelector('[data-dv-node="a"]');a.classList.add('node-styled','ns-teal');
  api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),c=h.view.querySelector('[data-dv-node="c"]');
  assert.ok(a.classList.contains('ns-ember') && !a.classList.contains('ns-teal'));assert.ok(c.classList.contains('ns-rose') && c.classList.contains('node-styled'));
- assert.ok(b.classList.contains('dv-live-waiting') && b.classList.contains('ns-slate'));
+ assert.ok(b.classList.contains('dv-live-waiting') && b.classList.contains('ns-rose'),'red waiting on a blocked upstream wears rose');
  api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
  api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('ns-rose'));
 });
@@ -268,7 +454,7 @@ test('S2 synthesized fallback uses only page tickets across four days',()=>{
 });
 test('S2 demo module is standalone-only and S7 documents story behavior',()=>{
  assert.ok(/function createLiveStatusDemo\(/.test(entrypoint('standalone').source),'standalone has demo provider');assert.doesNotMatch(entrypoint('workbench').source,/function createLiveStatusDemo\(/);
- const docs=fs.readFileSync('docs/live-status.md','utf8');for(const heading of ['Demo mode','Blocker propagation','Blocked edges'])assert.ok(docs.includes('## '+heading),heading);
+ const docs=fs.readFileSync('docs/live-status.md','utf8');for(const heading of ['Demo mode','Dependencies','Blocked edges'])assert.ok(docs.includes('## '+heading),heading);
 });
 
 /* Provider contract matrix (VM + the three browser cases):
@@ -348,7 +534,7 @@ test('P3 P4 connector preference, site host, resource cache and unavailable note
 });
 test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies and dispose',async()=>{
  const keys=Array.from({length:25},(_,i)=>'AA-'+i),h=providerHarness({nodes:{a:{tickets:keys}},rows:[['a']]});await h.start();assert.equal(h.watches.length,6);
- for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
+ for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated','issuelinks']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
  h.data(0,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'active');assert.equal(h.ctl.liveStatus.state('AA-1').state,'missing');assert.equal(h.ctl.liveStatus.state('AA-10'),null);
  assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,new Date(1793000000000).toISOString());assert.equal(h.view.querySelector('time'),null);
  h.data(1,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');
@@ -426,7 +612,7 @@ test('B1 lanes deduplicate involved node and edge tickets and roll up worst stat
  const h=harness(story()),C=h.C,map=Object.fromEntries(h.ctl.liveStatus.refs().tickets.map(k=>[k,{state:'done'}]));
  assert.equal(typeof C.liveStatusLanes,'function','B1 lane helper');map['HW-124'].state='blocked';
  const lanes=plain(C.liveStatusLanes(h.ctl.page,map));
- assert.deepEqual(lanes.HW,{total:4,done:3,state:'blocked',keys:['HW-124','FW-46','HW-123','FW-45']});
+ assert.deepEqual(lanes.HW,{total:4,done:3,state:'blocked',keys:['HW-124','HW-123','FW-45','FW-46']});
  assert.deepEqual(lanes.APP,{total:1,done:1,state:'done',keys:['UX-89']});
  assert.equal(lanes.BE.total,3);assert.deepEqual(plain(C.liveStatusLanes({},map)),{});
 });
@@ -565,7 +751,7 @@ test('E3 epic watches paginate both cursor envelopes tag children and keep evide
  const h=providerHarness(epicFixture());await h.start();
  const epic=h.watches.find(w=>w.input.jql==='parent = EP-1'),flag=h.watches.find(w=>w.input.jql==='parent = EP-1 AND Flagged = Impediment');
  assert.ok(epic,'one epic watch');assert.ok(flag,'paired flagged watch');assert.equal(h.watches.filter(w=>/^parent =/.test(w.input.jql)).length,4);
- assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuetype']);assert.equal(epic.input.maxResults,10);
+ assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuelinks','issuetype']);assert.equal(epic.input.maxResults,10);
  h.data(0,[jira('AA-1')]);const calls=[];
  h.mcp.callTool=async(server,tool,input)=>{calls.push(plain(input));return input.nextPageToken==='two'?{payload:{issues:[jira('EX-2')],nextPageToken:'three'}}:{payload:{issues:[jira('EX-3')]}};};
  epic.handler({type:'data',result:{payload:{issues:{nodes:[jira('AA-1'),jira('EX-1')]},pageInfo:{hasNextPage:true,endCursor:'two'}}}});await settle();await settle();
@@ -583,7 +769,7 @@ test('E6 Tickets table orders states includes columns authored PRs lane stripe a
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
  api.apply({'AA-1':{state:'done',epic:'EP-1',title:'Client work',assignee:'Alex',prs:{count:2,state:'declined'}},'BB-1':{state:'todo'},'CC-1':{state:'active',epic:'EP-1'},'DD-1':{state:'missing',epic:'EP-1'},'EE-1':{state:'blocked',epic:'EP-1'},'FF-1':{state:'blocked',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',title:'Extra',lane:'APP'},'NO-1':{state:'blocked',epic:'OTHER-1'}});
  assert.ok(h.view.querySelector('.dv-live-panel-body'));const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
- assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','PRs']);
+ assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
  const all=table.querySelectorAll('tbody')[0].children,rows=all.filter(el=>el.getAttribute('data-live-ticket')),coverageOf=key=>all.find(el=>el.getAttribute('data-live-coverage-for')===key);assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['EE-1','FF-1','DD-1','CC-1','EX-1','BB-1','AA-1']);
  assert.equal(all.length,14);assert.equal(all[1].getAttribute('data-live-coverage-for'),'EE-1');
  const aa=rows.at(-1),extra=coverageOf('EX-1'),aaCoverage=coverageOf('AA-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex/);assert.doesNotMatch(textOf(aa),/time unavailable|ago/);assert.match(textOf(aa),/2 declined/);
@@ -591,7 +777,7 @@ test('E6 Tickets table orders states includes columns authored PRs lane stripe a
  assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
  assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.deepEqual(aaCoverage.querySelectorAll('button').map(el=>el.textContent),['Client','Call']);assert.equal(aa.querySelectorAll('button').length,0,'no coverage buttons inside the data row');
  let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;aaCoverage.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
- assert.match(h.view.querySelector('.dv-live-verdict').textContent,/5 of 6 epic stories on diagram/);api.destroy();
+ assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/5 of 6 on diagram/);assert.match(api.snapshot().verdict,/5 of 6 epic stories on diagram/);api.destroy();
 });
 test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'done',epic:'EP-1'}});assert.ok(h.view.querySelector('.dv-live-panel-body'));
@@ -651,7 +837,7 @@ test('E3 rework loaded detail epics add deduplicated paginated watches without r
  await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
  assert.equal(h.watches.length,10,'one new key batch and one new epic, each with Flagged');
  const watch=h.watches.find(w=>w.input.jql==='parent = EP-3'),flag=h.watches.find(w=>w.input.jql==='parent = EP-3 AND Flagged = Impediment');
- assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuetype']);assert.equal(watch.input.maxResults,10);
+ assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuelinks','issuetype']);assert.equal(watch.input.maxResults,10);
  assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-1'),null,'new unanswered chunks do not erase or invent evidence');
  h.mcp.callTool=async(server,tool,input)=>{h.calls.push(plain(input));return {payload:{issues:[jira('CH-2')]}};};
  watch.handler({type:'data',result:{payload:{issues:[jira('CH-1')],pageInfo:{hasNextPage:true,endCursor:'second'}}}});await settle();
@@ -758,8 +944,8 @@ test('L2 L3 snapshot exposes rollup and all mutations notify; navigation control
 });
 test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
- assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));
- assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Blockers','Tickets','Activity']);
+ assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.equal(body.querySelector('.dv-live-verdict'),null);
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
  let action=0,next=0,play=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
  api.setDemoControls({playing:false,manual:false,ended:false,next(){next++;},toggle(){play++;}});

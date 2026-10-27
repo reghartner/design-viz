@@ -1,12 +1,20 @@
 /* Standalone-only, local story transport. No network or authored-spec writes. */
-function liveStatusDemoMap(day,keys){
+function liveStatusDemoMap(day,keys,epics){
   var map=Object.create(null),issues=day && day.issues || {};
+  // Timeline-level epics {KEY: {summary}} seed the epic box; state is derived from that day's children.
+  Object.keys(epics || {}).forEach(function(epic){
+    var children=Object.keys(issues).filter(function(key){return issues[key] && issues[key].epic===epic;}).map(function(key){return issues[key].state;});
+    var state=children.length && children.every(function(s){return s==='done';})?'done':children.some(function(s){return s==='active' || s==='blocked' || s==='done';})?'active':'todo';
+    var entry={state:state};if(epics[epic] && typeof epics[epic].summary==='string')entry.title=epics[epic].summary;map[epic]=entry;
+  });
   (keys || []).concat(Object.keys(issues)).filter(function(key,index,all){return all.indexOf(key)===index;}).forEach(function(key){
     var issue=issues[key];if(!issue){map[key]={state:'missing'};return;}
     var entry={state:issue.state};
     [['summary','title'],['assignee','assignee'],['assigneeId','assigneeId'],['updated','updatedAt'],['epic','epic'],['lane','lane']].forEach(function(pair){if(typeof issue[pair[0]]==='string')entry[pair[1]]=issue[pair[0]];});
     if(issue.statusName || issue.flagged)entry.detail=(issue.statusName || '')+(issue.flagged?' · flagged':'');
     if(issue.prs && issue.prs.count>0){entry.prs={count:issue.prs.count,state:String(issue.prs.state).toLowerCase()};if(Array.isArray(issue.prs.links))entry.prs.links=JSON.parse(JSON.stringify(issue.prs.links));}
+    // Timeline `links` stand in for Jira issue links: {type: "is blocked by", key: "HW-124"}.
+    if(Array.isArray(issue.links)){var deps=[];issue.links.forEach(function(link){if(link && typeof link.key==='string' && trackingKeyPattern.test(link.key) && typeof link.type==='string' && link.type)deps.push({key:link.key,source:'jira',linkType:link.type});});if(deps.length)entry.dependsOn=deps;}
     map[key]=entry;
   });return map;
 }
@@ -31,7 +39,7 @@ function createLiveStatusDemo(doc){
     if(retired)return;
     var current=timeline.days[day],label=String(current.label || '');
     if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
-    api.apply(liveStatusDemoMap(current,api.refs().tickets));
+    api.apply(liveStatusDemoMap(current,api.refs().tickets,timeline.epics));
     api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
   }
   function arm(){
@@ -44,7 +52,7 @@ function createLiveStatusDemo(doc){
   function motionChanged(){if(manual())playing=false;controls();arm();}
   function visibility(){arm();}
   return {
-    provider:function(refs){return liveStatusDemoMap(ensure(refs.tickets).days[day],refs.tickets);},
+    provider:function(refs){var t=ensure(refs.tickets);return liveStatusDemoMap(t.days[day],refs.tickets,t.epics);},
     demo:{mount:function(live){
       api=live;ensure(api.refs().tickets);playing=!manual();paint();arm();
       doc.addEventListener('visibilitychange',visibility);if(media)media.addEventListener('change',motionChanged);

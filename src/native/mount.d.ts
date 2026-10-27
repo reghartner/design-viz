@@ -72,6 +72,10 @@ export interface LiveStatusEntry {
   epic?: string;
   /** Team lane id for an entry no carrier references (epic children). */
   lane?: string;
+  /** Upstream tickets this one waits on: Jira issue links (inward types such as
+   * "is blocked by") or authored page.tracking.dependencies pairs. The ticket
+   * waits while an upstream is not done, unless it is itself active or done. */
+  dependsOn?: Array<{key: string; source: 'jira' | 'authored'; linkType?: string; reason?: string}>;
 }
 export interface NativeViewerOptions {
   /** Host-owned ticket transport; refresh pauses while the document is hidden. */

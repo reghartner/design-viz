@@ -41,10 +41,29 @@ function liveStatusDevelopmentSummary(fields){
   }
   return null;
 }
+/* Dependencies from Jira issue links (#765): the description shown on the
+   dependent issue's side (type.inward for inwardIssue, type.outward for
+   outwardIssue) must be one of the configured link types. The linked issue's
+   key, summary and status ride the link payload, so an upstream outside the
+   epic and the diagram gets a state without another call. */
+var LIVE_STATUS_JIRA_KEY=/^[A-Z][A-Z0-9_]+-[0-9]+$/,LIVE_STATUS_JIRA_DEPENDENCY_LINKS=['is blocked by','depends on'];
+function liveStatusJiraDependencies(issue,linkTypes){
+  // Self-contained on purpose: this adapter is also loaded without the core tracking helpers.
+  var out=[],types=(linkTypes && linkTypes.length?linkTypes:LIVE_STATUS_JIRA_DEPENDENCY_LINKS).map(function(name){return String(name).trim().toLowerCase();});
+  var links=issue && issue.fields && issue.fields.issuelinks;
+  (Array.isArray(links)?links:[]).forEach(function(link){
+    if(!link || typeof link!=='object' || !link.type)return;
+    var target=link.inwardIssue || link.outwardIssue,description=link.inwardIssue?link.type.inward:link.type.outward;
+    if(!target || typeof target.key!=='string' || !LIVE_STATUS_JIRA_KEY.test(target.key) || typeof description!=='string')return;
+    if(types.indexOf(description.trim().toLowerCase())<0 || out.some(function(item){return item.key===target.key;}))return;
+    out.push({key:target.key,linkType:description.trim().toLowerCase(),issue:target});
+  });
+  return out;
+}
 function liveStatusJiraChunks(keys){
   var chunks=[];for(var i=0;i<keys.length;i+=10)chunks.push(keys.slice(i,i+10));return chunks;
 }
-function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt){
+function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt,linkTypes){
   var issues=Object.create(null),map=Object.create(null);
   (issuesByChunk || []).forEach(function(chunk){liveStatusJiraIssues(chunk).forEach(function(issue){if(issue && typeof issue.key==='string')issues[issue.key]=issue;});});
   requestedKeys.forEach(function(key){
@@ -57,8 +76,29 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
       if(fields.assignee && typeof fields.assignee.accountId==='string' && fields.assignee.accountId.trim())entry.assigneeId=fields.assignee.accountId.trim();
       if(typeof fields.updated==='string')entry.updatedAt=fields.updated;
       var prs=liveStatusDevelopmentSummary(fields);if(prs)entry.prs=prs;
+      var deps=liveStatusJiraDependencies(issue,linkTypes);if(deps.length)entry.dependsOn=deps.map(function(dep){return {key:dep.key,source:'jira',linkType:dep.linkType};});
     }
     map[key]=entry;
+  });
+  // The epic itself rides each child's parent payload (summary, status): seed its entry for the panel's epic box.
+  requestedKeys.forEach(function(key){
+    var parent=issues[key] && issues[key].fields && issues[key].fields.parent;
+    if(!parent || typeof parent.key!=='string' || !LIVE_STATUS_JIRA_KEY.test(parent.key) || requestedKeys.indexOf(parent.key)>=0 || map[parent.key])return;
+    var fields=parent.fields || {};if(!fields.status)return;
+    var entry={state:liveStatusJiraState(parent,flaggedKeys)};if(typeof fields.summary==='string')entry.title=fields.summary;
+    if(site)entry.url=site.replace(/\/+$/,'')+'/browse/'+parent.key;
+    map[parent.key]=entry;
+  });
+  // Linked upstreams the page never asked for: seed them from the link payload; a requested issue always wins.
+  requestedKeys.forEach(function(key){
+    var issue=issues[key];if(!issue)return;
+    liveStatusJiraDependencies(issue,linkTypes).forEach(function(dep){
+      if(requestedKeys.indexOf(dep.key)>=0 || map[dep.key])return;
+      var fields=dep.issue.fields || {},entry={state:liveStatusJiraState(dep.issue,flaggedKeys)};
+      if(typeof fields.summary==='string')entry.title=fields.summary;
+      if(site)entry.url=site.replace(/\/+$/,'')+'/browse/'+dep.key;
+      map[dep.key]=entry;
+    });
   });
   // Cache age is transport metadata, never an issue's modification timestamp.
   // Non-enumerable so ordinary consumers still see only requested ticket keys.
@@ -260,7 +300,7 @@ function wireLiveStatusClaude(ctl,page,win){
     return null;
   }
   var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
-  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
+  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false,linkTypes=typeof trackingDependencyLinks==='function'?trackingDependencyLinks(page):null;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null,github=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function status(value){if(typeof api.status==='function')api.status(value);}
@@ -289,7 +329,7 @@ function wireLiveStatusClaude(ctl,page,win){
       [chunk.storedAt,chunk.flaggedAt].forEach(function(at){if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);});
     });
     dirty=false;publishing=true;
-    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});if(github){github.sync(keys);github.enrich(map);}api.apply(map);}finally{publishing=false;}
+    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp,linkTypes);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});if(github){github.sync(keys);github.enrich(map);}api.apply(map);}finally{publishing=false;}
     // A GitHub watch answering synchronously inside sync() marks dirty again; one more pass folds it in.
     if(dirty)publish();
   }
@@ -398,7 +438,7 @@ function wireLiveStatusClaude(ctl,page,win){
       chunks=chunks.concat(added);
       added.forEach(function(chunk){
         [false,true].forEach(function(flagged){
-          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
+          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated','issuelinks'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
           jobs.push(job);watch(job);
         });
       });

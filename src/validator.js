@@ -586,6 +586,12 @@ function validate(page){
   }
   trackingGithubScope(page,function(field,index){warnings.push('tracking.github'+field+(index===null?'':'['+index+']')+': '+(!field?'must be an object':field==='.repos'?'use an array of owner/repo names':'use an organization name')+' — ignored');});
   trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use a Jira key or an array of Jira keys — ignored');});
+  trackingDependencies(page,function(index){
+    if(index===null){warnings.push('tracking.dependencies: must be an array of {"ticket", "on", "reason"?} pairs — ignored');return;}
+    var entry=page.tracking.dependencies[index],self=entry && typeof entry==='object' && entry.ticket===entry.on && typeof entry.ticket==='string';
+    warnings.push('tracking.dependencies['+index+']: '+(self?'a ticket cannot depend on itself':'use {"ticket": "UX-89", "on": "HW-124", "reason"?: "text"} with Jira keys')+' — entry ignored');
+  });
+  trackingDependencyLinks(page,function(index){warnings.push('tracking.jira.dependencyLinks'+(index===null?': must be an array of Jira link descriptions such as "is blocked by" — using the defaults':'['+index+']: use a non-empty link description — entry ignored'));});
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
     Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(carrier){if(trackingRefs(carrier).tickets.length)hasTickets=true;});

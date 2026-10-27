@@ -430,7 +430,7 @@ test('E5 parent JQL returns current epic children and flagged subset with parent
  for(const jql of ['parent = bad','parent = DOOR-100 OR parent = NO-1','parent = DOOR-100 AND parent = NO-1'])assert.equal(parseJql(jql),null);
  for(const day of [0,3,7,11]){
   const issues=result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},{...CONTEXT,day})).issues.nodes;
-  assert.equal(issues.length,day>=7?8:7);for(const issue of issues)assert.deepEqual(issue.fields.parent,{key:'DOOR-100',fields:{summary:'Connected doorbell delivery',issuetype:{name:'Epic'}}});
+  assert.equal(issues.length,day>=7?8:7);for(const issue of issues){assert.equal(issue.fields.parent.key,'DOOR-100');assert.equal(issue.fields.parent.fields.summary,'Connected doorbell delivery');assert.deepEqual(issue.fields.parent.fields.issuetype,{name:'Epic'});assert.ok(['new','indeterminate','done'].includes(issue.fields.parent.fields.status.statusCategory.key),'parent carries the epic status (#765)');}
  }
  const flagged=result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100 AND Flagged = Impediment'},{...CONTEXT,day:3})).issues.nodes;assert.deepEqual(flagged.map(i=>i.key),['HW-124']);
  assert.deepEqual(result(await call('searchJiraIssuesUsingJql',{jql:'parent = OTHER-1'})).issues.nodes,[]);
@@ -447,4 +447,37 @@ test('E4 example epic has seven original stories and UX-90 appears only from Day
  timeline().days.forEach((day,index)=>{for(const key of KEYS)if(day.issues[key])assert.equal(day.issues[key].epic,'DOOR-100');
   if(index<7)assert.equal(day.issues['UX-90'],undefined);else{const extra=day.issues['UX-90'];assert.ok(extra);assert.equal(extra.summary,'Alert sound setting');assert.equal(extra.lane,'APP');assert.equal(extra.epic,'DOOR-100');}
  });
+});
+
+// M12 (#765): issue links. Timeline/fixture entries carry `links: [{type, key}]`; the mock emits Jira
+// `issuelinks` (inwardIssue for "is blocked by", outwardIssue for "depends on") with the linked issue's
+// key, summary and status, and hides links whose target is absent that day, as Jira hides unviewable issues.
+test('M12: issue links follow the day\'s story and reach both search and single-issue envelopes', async () => {
+  const { jiraIssueFromStatus } = await load();
+  const issues = { 'FW-46': { state: 'todo', summary: 'Interrupts', links: [{ type: 'is blocked by', key: 'HW-124' }, { type: 'depends on', key: 'FW-45' }, { type: 'is blocked by', key: 'GONE-1' }] },
+    'HW-124': { state: 'blocked', summary: 'Signal' }, 'FW-45': { state: 'active', summary: 'Events' } };
+  const issue = jiraIssueFromStatus('FW-46', issues['FW-46'], NOW, issues);
+  assert.equal(issue.fields.issuelinks.length, 2, 'the link to an absent issue is hidden');
+  assert.deepEqual(issue.fields.issuelinks[0].type, { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' });
+  assert.equal(issue.fields.issuelinks[0].inwardIssue.key, 'HW-124');
+  assert.equal(issue.fields.issuelinks[0].inwardIssue.fields.summary, 'Signal');
+  assert.equal(issue.fields.issuelinks[0].inwardIssue.fields.status.name, 'Blocked');
+  assert.equal(issue.fields.issuelinks[0].outwardIssue, undefined);
+  assert.deepEqual(issue.fields.issuelinks[1].type, { name: 'Dependency', inward: 'is depended on by', outward: 'depends on' });
+  assert.equal(issue.fields.issuelinks[1].outwardIssue.key, 'FW-45');
+  assert.equal(issue.fields.issuelinks[1].outwardIssue.fields.status.statusCategory.key, 'indeterminate');
+  assert.deepEqual(jiraIssueFromStatus('HW-124', issues['HW-124'], NOW, issues).fields.issuelinks, []);
+  for (const day of timeline().days) {
+    assert.ok(day.issues['FW-46'].links.some(link => link.type === 'is blocked by' && link.key === 'HW-124'), day.label);
+    assert.ok(day.issues['BE-67'].links.some(link => link.type === 'depends on' && link.key === 'FW-45'), day.label);
+  }
+  for (const name of ['all-todo', 'all-done']) assert.ok(json(DIR + '/fixtures/' + name + '.json').issues['FW-46'].links.length >= 1, name);
+  const blockedDay = timeline().days.findIndex(d => d.issues['HW-124']?.state === 'blocked');
+  const found = result(await call('searchJiraIssuesUsingJql', { jql: 'key in (FW-46)', fields: ['summary', 'issuelinks'] }, { ...CONTEXT, day: blockedDay }));
+  const links = found.issues.nodes[0].fields.issuelinks;
+  assert.equal(links.find(link => link.inwardIssue?.key === 'HW-124').inwardIssue.fields.status.name, 'Blocked');
+  assert.equal(found.issues.nodes[0].fields.parent.fields.status.statusCategory.key, 'indeterminate', 'the parent payload carries the epic status');
+  const single = result(await call('getJiraIssue', { cloudId: 'mock-cloud-id-0001', issueIdOrKey: 'BE-67' })).data;
+  assert.equal(single.fields.issuelinks.find(link => link.outwardIssue?.key === 'FW-45').type.outward, 'depends on');
+  assert.match(read(DIR + '/README.md'), /issuelinks/);
 });

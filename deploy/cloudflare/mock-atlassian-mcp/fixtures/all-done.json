@@ -54,7 +54,13 @@
         "count": 1,
         "state": "MERGED"
       },
-      "epic": "DOOR-100"
+      "epic": "DOOR-100",
+      "links": [
+        {
+          "type": "is blocked by",
+          "key": "HW-124"
+        }
+      ]
     },
     "BE-67": {
       "state": "done",
@@ -68,7 +74,13 @@
         "count": 1,
         "state": "MERGED"
       },
-      "epic": "DOOR-100"
+      "epic": "DOOR-100",
+      "links": [
+        {
+          "type": "depends on",
+          "key": "FW-45"
+        }
+      ]
     },
     "BE-68": {
       "state": "done",

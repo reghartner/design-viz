@@ -114,9 +114,8 @@ Rules of thumb that make the board readable:
   glyph, with no text on the canvas; the blocking key is in the glyph's
   accessible name and in the carrier's popover) while the nodes keep their own
   color.
-- Downstream carriers of a blocked or missing one become "waiting on KEY"
-  automatically along directed edges. Point the edges in delivery order or
-  the propagation runs the wrong way.
+- Arrows are data flow, nothing more. Waiting comes from ticket dependencies
+  (section 2b), never from edge direction.
 - Every key you reference must exist in Jira, or it paints red as MISSING.
   That is the intended signal for a typo or a deleted ticket, so do not add
   placeholder keys.
@@ -126,17 +125,41 @@ warnings, never errors. In the Workbench the same fields live under
 **Inspect → Tracking** on a selected node or connection, and **Demo live
 status** beside Preview paints sample colors without touching Jira.
 
+## 2b. Dependencies
+
+Waiting is dependency evidence: ticket X waits while an upstream ticket Y is not
+done (grey, raised hand) or is blocked or missing (red, alarm). Two sources merge:
+Jira issue links (default types `is blocked by` and `depends on`, configurable as
+`tracking.jira.dependencyLinks`) and authored pairs in `tracking.dependencies`.
+
+1. Pull the Jira links for every key on the board (through the author's
+   connector, or ask for them) and present them: "FW-46 is blocked by HW-124".
+2. Infer delivery dependencies from the design source, each with a reason and a
+   citation: an API consumer waits on its provider, a contract lands before its
+   consumer, firmware lands before the app feature that needs it.
+   Never from arrows.
+3. The author confirms. Write `tracking.dependencies` for the inferred pairs
+   only, for example
+   `{"ticket": "UX-89", "on": "BE-68", "reason": "needs the push payload contract"}`;
+   Jira-linked pairs stay live and need no spec entry.
+4. Offer, lightly, to create the missing Jira links from the confirmed inferred
+   pairs. That happens in the agent session with explicit authorization each
+   time; the page itself only shows the "Suggest link in Jira" hint and never
+   writes to Jira.
+
 ## 3. Demo timeline (optional)
 
 For a board that must tell a story without a connector, write
 `<name>.timeline.json` shaped like the example: `version`, `intervalSeconds`,
 and `days[]`, each with `label`, `note` and `issues` keyed by ticket with
 `state` (todo | active | blocked | done), `summary`, `assignee`, `updated`,
-`flagged`, `statusName` and `prs: {count, state}`; from the day a PR opens, add
-`prs.links` in the host-provider shape (`url`, `number`, `title`, `state`,
-`checks`, `review`, `repo`, `author`, `source`) so the icons show offline. Include at least one
-blocked day and one day where a key is absent, so the board shows both
-failure colors. Open the built page with `#live=demo` to replay it.
+`flagged`, `statusName`, `prs: {count, state}` and optional
+`links: [{"type": "is blocked by", "key": "HW-124"}]` for Jira issue links; from the
+day a PR opens, add `prs.links` in the host-provider shape (`url`, `number`, `title`,
+`state`, `checks`, `review`, `repo`, `author`, `source`) so the icons show offline.
+Include at least one blocked day and one day where a key is absent, so the
+board shows both failure colors, and link a todo ticket to the blocked one so
+the red waiting stroke appears. Open the built page with `#live=demo` to replay it.
 
 Embed it at inject time:
 `python3 tools/inject.py <spec.json> template/flowview.html <out.html> --timeline <name>.timeline.json`.
@@ -209,8 +232,9 @@ the Workbench and sees no live state there.
 
 Open the artifact in a browser and check, in this order:
 
-- The Live status panel beside the diagram shows the carriers done ring,
-  Blockers, Tickets and Activity without a click.
+- The Live status panel beside the diagram shows the epic header box with the
+  carriers done ring, the Tickets table with its Depends on buttons, Blockers
+  and dependency chains, and Activity without a click.
 - Its header shows Live, counts and updated time; demo controls appear only in demo mode.
   With a GitHub connector the connection line ends "· GitHub connected" and the
   PRs column icons are coloured with a tooltip (state, checks, review, author,

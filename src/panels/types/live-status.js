@@ -2,6 +2,7 @@
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','done','blocked','missing'];
+  var PR_ICON='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><circle cx="3.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 5.1v5.8M12.5 10.9V7.2a2 2 0 0 0-2-2H8.2m1.9-2L8.2 5.2l1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
@@ -31,6 +32,12 @@
       if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
+    function prLink(parent,url){
+      var number=/\/(?:pull|pulls|pull-requests|merge_requests|merge-requests)\/(\d+)/.exec(url),host='';try{host=new URL(url).host.replace(/^www\./,'');}catch(ex){}
+      var node=el(parent,'a',url,'nbacklink dv-live-pr-link',null);node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');
+      node.setAttribute('aria-label','Pull request'+(number?' #'+number[1]:'')+(host?' on '+host:''));node.setAttribute('title',url);
+      if(!node.firstChild)node.innerHTML=PR_ICON;return node;
+    }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
     function paint(value){
@@ -40,6 +47,10 @@
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
+      var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[conn.source,connLabel,conn.checkedText].filter(Boolean).join(' · '));
+      connection.hidden=!available || conn.state==='none';
       if(hasData && value.updatedAt){var time=el(head,'time','time','dv-live-updated',value.updatedText);time.setAttribute('datetime',value.updatedAt);}
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
@@ -62,7 +73,7 @@
           if(tbody.children[index]!==row)tbody.insertBefore(row,tbody.children[index] || null);
           link(el(row,'td','key','dv-live-ticket-key'),'link',item.key,item.url);el(row,'td','title','',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
-          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){link(prs,url,url,url);});if(item.prs)el(prs,'span','summary','',item.prs.count+' '+item.prs.state);
+          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){prLink(prs,url);});if(item.prs)el(prs,'span','summary','',item.prs.count+' '+item.prs.state);
           var coverage=el(row,'td','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
         });
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
@@ -84,6 +95,17 @@
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
 .dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden]{display:none!important;}
+.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+@keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+.dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
@@ -101,7 +123,7 @@
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
 .dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
 .dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}

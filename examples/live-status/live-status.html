@@ -8787,6 +8787,17 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
 .dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden]{display:none!important;}
+.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+@keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+.dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
@@ -8804,7 +8815,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
 .dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
 .dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
@@ -23869,6 +23880,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','done','blocked','missing'];
+  var PR_ICON='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><circle cx="3.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 5.1v5.8M12.5 10.9V7.2a2 2 0 0 0-2-2H8.2m1.9-2L8.2 5.2l1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
@@ -23898,6 +23910,12 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
+    function prLink(parent,url){
+      var number=/\/(?:pull|pulls|pull-requests|merge_requests|merge-requests)\/(\d+)/.exec(url),host='';try{host=new URL(url).host.replace(/^www\./,'');}catch(ex){}
+      var node=el(parent,'a',url,'nbacklink dv-live-pr-link',null);node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');
+      node.setAttribute('aria-label','Pull request'+(number?' #'+number[1]:'')+(host?' on '+host:''));node.setAttribute('title',url);
+      if(!node.firstChild)node.innerHTML=PR_ICON;return node;
+    }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
     function paint(value){
@@ -23907,6 +23925,10 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
+      var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[conn.source,connLabel,conn.checkedText].filter(Boolean).join(' · '));
+      connection.hidden=!available || conn.state==='none';
       if(hasData && value.updatedAt){var time=el(head,'time','time','dv-live-updated',value.updatedText);time.setAttribute('datetime',value.updatedAt);}
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
@@ -23929,7 +23951,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
           if(tbody.children[index]!==row)tbody.insertBefore(row,tbody.children[index] || null);
           link(el(row,'td','key','dv-live-ticket-key'),'link',item.key,item.url);el(row,'td','title','',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
-          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){link(prs,url,url,url);});if(item.prs)el(prs,'span','summary','',item.prs.count+' '+item.prs.state);
+          el(row,'td','owner','',item.owner);var prs=el(row,'td','prs','dv-live-ticket-prs');item.urls.forEach(function(url){prLink(prs,url);});if(item.prs)el(prs,'span','summary','',item.prs.count+' '+item.prs.state);
           var coverage=el(row,'td','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
         });
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
@@ -23951,6 +23973,17 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
 .dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden]{display:none!important;}
+.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+@keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+.dv-live-pr-link{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
@@ -23968,7 +24001,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs a{display:block;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
 .dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
 .dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
@@ -34719,6 +34752,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
+  // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
+  var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
+  var demoMode=!!(options.demo && typeof options.demo.mount==='function');
+  var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':''};
+  function setStatus(value){
+    if(retired || !value || typeof value!=='object')return;
+    if(typeof value.state==='string' && LIVE_STATUS_CONNECTIONS.indexOf(value.state)>=0)connection.state=value.state;
+    if(typeof value.busy==='boolean')connection.busy=value.busy;
+    if(typeof value.source==='string' && value.source)connection.source=value.source;
+    if(value.checkedAt!=null){var at=typeof value.checkedAt==='number'?value.checkedAt:Date.parse(value.checkedAt);if(isFinite(at))connection.checkedAt=new Date(at).toISOString();}
+    notify();
+  }
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -34763,7 +34808,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:ticketRows(pages,coverage),
       coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):''};
+      updatedText:cacheUpdatedAt || latest?'data as of '+relative(cacheUpdatedAt || latest):'',
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'checked '+relative(connection.checkedAt):''}};
   }
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -35091,10 +35137,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function arm(){stopTimer();if(provider && !retired && visible())timer=setTimeout(function(){timer=0;fetchMap();},delay);}
   function fetchMap(){
     if(retired || !provider || !visible())return;
-    if(pending){catchUp=true;return;}pending=true;stopTimer();
+    if(pending){catchUp=true;return;}pending=true;stopTimer();setStatus({busy:true});
     Promise.resolve().then(function(){if(!retired)return provider(refs(),abort.signal);}).then(function(value){
-      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');}
-    },function(error){if(!retired)api.note(error && error.message || String(error),'error');}).then(function(){
+      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});}
+    },function(error){if(!retired){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}}).then(function(){
       pending=false;if(retired)return;
       if(catchUp && visible()){catchUp=false;fetchMap();}else arm();
     });
@@ -35147,6 +35193,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';notify();},
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
+    status:function(value){setStatus(value);},
     destroy:function(){
       if(retired)return;on=false;paintLanes();retired=true;liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
@@ -40025,6 +40072,7 @@ function createLiveStatusDemo(doc){
   function paint(){
     if(retired)return;
     var current=timeline.days[day],label=String(current.label || '');
+    if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
     api.apply(liveStatusDemoMap(current,api.refs().tickets));
     api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
   }
@@ -40332,6 +40380,8 @@ function wireLiveStatusClaude(ctl,page,win){
   var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
+  function status(value){if(typeof api.status==='function')api.status(value);}
+  status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;
@@ -40375,12 +40425,13 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
+    status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:!!retry});
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
     notices();
@@ -40394,6 +40445,7 @@ function wireLiveStatusClaude(ctl,page,win){
   function accept(job,result){
     if(stopped)return;
     cancelRetry(job);job.error=null;
+    var stored=result && result.cache && result.cache.storedAt;status({state:'connected',busy:false,checkedAt:typeof stored==='number' && isFinite(stored)?stored:Date.now()});
     if(job.accept){notices();job.accept(result);return;}
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
@@ -40426,7 +40478,7 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function watch(job){
     if(stopped)return;
-    var subscription;
+    var subscription;status({busy:true});
     try{
       subscription=mcp.watchTool(server,job.tool,job.input,function(event){
         if(stopped || !event)return;
@@ -40494,7 +40546,7 @@ function wireLiveStatusClaude(ctl,page,win){
       });
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
-      if(!server){api.note(addConnector,'info');stop();return null;}
+      if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
       var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources};jobs.push(job);
       // Initial resource lookup may retry once. All subsequent call failures
       // (including explicit approval) end here rather than recursively retry.

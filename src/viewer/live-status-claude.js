@@ -81,6 +81,8 @@ function wireLiveStatusClaude(ctl,page,win){
   var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
+  function status(value){if(typeof api.status==='function')api.status(value);}
+  status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;
@@ -124,12 +126,13 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
+    status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:!!retry});
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
     notices();
@@ -143,6 +146,7 @@ function wireLiveStatusClaude(ctl,page,win){
   function accept(job,result){
     if(stopped)return;
     cancelRetry(job);job.error=null;
+    var stored=result && result.cache && result.cache.storedAt;status({state:'connected',busy:false,checkedAt:typeof stored==='number' && isFinite(stored)?stored:Date.now()});
     if(job.accept){notices();job.accept(result);return;}
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
@@ -175,7 +179,7 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function watch(job){
     if(stopped)return;
-    var subscription;
+    var subscription;status({busy:true});
     try{
       subscription=mcp.watchTool(server,job.tool,job.input,function(event){
         if(stopped || !event)return;
@@ -243,7 +247,7 @@ function wireLiveStatusClaude(ctl,page,win){
       });
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
-      if(!server){api.note(addConnector,'info');stop();return null;}
+      if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
       var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources};jobs.push(job);
       // Initial resource lookup may retry once. All subsequent call failures
       // (including explicit approval) end here rather than recursively retry.

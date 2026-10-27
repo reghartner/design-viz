@@ -963,7 +963,7 @@ perspectives" of one timeline). Types:
   controls in the right half; stacked full width for Backstage and Confluence).
   The header owns Live, counts, updated time, provider messages and actions,
   First blocker, and demo Play/Pause and Next day when supplied by the host.
-  The body shows completion, verdict, Teams, Blockers, Tickets and Activity.
+  The body shows completion, verdict, Blockers, Tickets and Activity.
   It has no authored state: `initial` and all step patches warn and are ignored;
   step `panelVisibility` still works. No setup or patch fields are needed.
   Without ticket references or epics it reads “This page has no ticket references.”

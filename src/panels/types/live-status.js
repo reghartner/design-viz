@@ -138,7 +138,7 @@
     render:function(host,panel,state){return state && state.liveSample?{html:sampleHTML(state.liveSample)}:
       {html:'<div class="dv-live-head"></div><p class="dv-live-empty">This page has no ticket references.</p>',mounted:function(){mount(host);}};},
     authoring:{template:{title:'Live status'},setupFields:[],patchFields:[],
-      picker:{name:'Live status',category:'Delivery',tagline:'See what is ready and what is blocked',description:'Show live ticket progress, team totals, blockers and the stories in your epic below the diagram.'},
+      picker:{name:'Live status',category:'Delivery',tagline:'See what is ready and what is blocked',description:'Show live ticket progress, blockers and the stories in your epic beside or below the diagram.'},
       example:function(sample){sample.state.liveSample=LIVE_SAMPLE.map(function(row){return {key:row[0],title:row[1],owner:row[2]};});return sample;}},
     styles:LIVE_STYLES
   });

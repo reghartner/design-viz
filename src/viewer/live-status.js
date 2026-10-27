@@ -77,6 +77,10 @@ function liveStatusEdgeBreaks(scope,diagram,map,on){
       });
     });
     showCommunicationFailures(board,failures,false,{live:true,labels:labels});
+    // A live break is the glyph alone: the edge names its ends, and the badge,
+    // popover and the group's title/aria-label carry the blocking keys. Canvas
+    // text here would sit on the edge label, its coin or a node card.
+    svg.querySelectorAll('g.dv-live-comm-failure .dv-live-break-label').forEach(function(el){el.remove();});
   });
 }
 function liveStatusStep(diagram,step,map){
@@ -277,7 +281,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(edgeIndex!=null)badge.setAttribute('data-live-edge',String(edgeIndex));
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','9');badge.appendChild(circle);
     var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=waiting?'…':LIVE_STATUS_GLYPHS[state];badge.appendChild(text);
-    if(waiting){var tag=document.createElementNS(SVGNS,'text');tag.setAttribute('class','dv-live-waiting-tag');tag.setAttribute('text-anchor','end');tag.setAttribute('y','-16');tag.textContent='waiting on '+waiting.join(', ');badge.appendChild(tag);}
     badge.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
     badge.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);});
     badge.addEventListener('keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);}});

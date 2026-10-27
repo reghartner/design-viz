@@ -267,14 +267,16 @@ comma-separated keys, while retaining their own `dv-live-<state>` class. Carrier
 whose own state is done, blocked or missing never become waiting; traversal still
 continues through them. Cycles terminate and multiple blockers combine their keys.
 
-Waiting uses a dashed red-grey stroke, an ellipsis badge and a **waiting on** tag;
-the badge popover lists the blocking keys. Applying a new map, clearing it or
+Waiting uses a dashed red-grey stroke and an ellipsis badge; the canvas carries no
+**waiting on** text. The badge's accessible name and popover list the blocking keys. Applying a new map, clearing it or
 turning Live off removes stale waiting evidence. Print keeps the colors.
 
 ## Blocked edges
 
-Blocked edges reuse the communication **Not sent** break, labelled with their
-blocking keys, in both Ambient and Step mode. The break lasts until the live state
+Blocked edges reuse the communication **Not sent** break glyph, without canvas
+text, in both Ambient and Step mode: the edge already names its ends and a text
+label would sit on the edge label, its step coin or a node card. The break's
+title and accessible name keep the full sentence with the blocking keys. The break lasts until the live state
 changes or Live is disabled. Missing edges retain their missing badge without a
 communication break. Todo edges use a dashed grey stroke and hide packet dots;
 active and done edges retain ordinary packet animation. Authored step failures

@@ -326,6 +326,20 @@
         "title": "Shared icons & company branding"
       }
     ],
+    "Doorbell button": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
+      }
+    ],
+    "Doorbell controller": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
+      }
+    ],
     "Drawbridge": [
       {
         "file": "halovista-mirrorline/mirrorline.html",
@@ -345,6 +359,13 @@
         "file": "auralis-presence/presence.html",
         "family": "auralis-presence",
         "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Event ingest": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
       }
     ],
     "Expand canvas": [
@@ -497,6 +518,13 @@
         "title": "Sentinel — Cellular Off-Grid Solar Camera"
       }
     ],
+    "Indoor chime": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
+      }
+    ],
     "Inlet": [
       {
         "file": "nestrel-warden/warden.html",
@@ -584,6 +612,13 @@
         "file": "cumulus/cumulus-flow.html",
         "family": "cumulus",
         "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Notification service": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
       }
     ],
     "Notifications": [
@@ -836,6 +871,13 @@
         "file": "halovista-mirrorline/mirrorline.html",
         "family": "halovista-mirrorline",
         "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Resident app": [
+      {
+        "file": "live-status/live-status.html",
+        "family": "live-status",
+        "title": "Doorbell Delivery Live Status"
       }
     ],
     "Retry 1": [

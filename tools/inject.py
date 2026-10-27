@@ -11,6 +11,7 @@ and the matching root has crossref.json, it also fills the separate derived
 flowbacklinks block.
 """
 import json
+from pathlib import Path
 import re
 import sys
 
@@ -43,6 +44,18 @@ def main() -> int:
               f"found {len(hits)}", file=sys.stderr)
         return 1
     out = block.sub(lambda m: m.group(1) + "\n" + raw + "\n" + m.group(2), tpl, count=1)
+
+    # Standalone opt-in story data stays separate from the authored document.
+    # JSON escaping prevents timeline text from terminating its script element.
+    timeline_marker = "<!-- LIVE_TIMELINE -->"
+    timeline_block = ""
+    page = spec.get("page") or {}
+    if "tracking" in page and timeline_marker in out:
+        timeline_path = Path(__file__).resolve().parent.parent / "examples/live-status/live-status.timeline.json"
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+        payload = json.dumps(timeline, ensure_ascii=False).replace("<", "\\u003c")
+        timeline_block = '<script type="application/json" id="live-timeline">\n' + payload + '\n</script>'
+    out = re.sub(r"^<!-- LIVE_TIMELINE -->$", lambda _: timeline_block, out, flags=re.M)
 
     title = (spec.get("page") or {}).get("title")
     if title:

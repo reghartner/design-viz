@@ -18,7 +18,8 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
-const raw=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.spec.json')));
+// Freeze the original overlay fixture: the authored story may evolve independently.
+const raw={"page":{"title":"Connected doorbell delivery","contract":"1","flowview":{"authoredWith":"0.2.0","minVersion":"0.2.0","features":["flow.live-status"]},"tracking":{"jira":{"site":"https://acme.atlassian.net"}},"sections":[{"heading":"From button press to resident notification","text":["Track implementation work on each component and the interactions between them. The spec stores references; Jira owns live status."],"diagram":{"nodes":{"hardware":{"title":"Hardware","sub":"Doorbell button","tickets":["HW-123"]},"firmware":{"title":"Firmware","sub":"Event delivery","tickets":["FW-45"],"prs":["https://github.com/acme/firmware/pull/88"]},"backend":{"title":"Backend","sub":"Notification service","tickets":["BE-67"]},"ux":{"title":"UX mobile app","sub":"Resident experience","tickets":["UX-89"]}},"rows":[["hardware","firmware","backend","ux"]],"edges":[{"from":"hardware","to":"firmware","label":"press","tickets":["HW-124","FW-46"]},{"from":"firmware","to":"backend","label":"event","kind":"https","tickets":["BE-68"],"prs":["https://github.com/acme/backend/pull/91"]},{"from":"backend","to":"ux","label":"notify","kind":"https"}]}}]}};
 const FIXED_MAP={'HW-123':{state:'active',title:'Button delivery',assignee:'Alex',updatedAt:'2026-10-26T12:00:00Z',prs:{count:2,state:'open'}},'FW-45':{state:'done'},'FW-46':{state:'todo'},'BE-67':{state:'done'},'HW-124':{state:'blocked'},'BE-68':{state:'missing'}};
 function fixture(){
  const spec=structuredClone(raw),section=spec.page.sections[0],d=section.diagram;section.id='delivery';
@@ -80,6 +81,76 @@ test('V11 a page without tickets has no Live control markup',async({page,server}
  const spec=JSON.parse(await readFile(path.join(repo,'examples/step-colors/step-colors.spec.json')));const root=await open(page,server,spec,false);await expect(root.locator('.dv-live-toggle,.dv-live-badge,.dv-live-note,.dv-live-updated')).toHaveCount(0);
 });
 
+/* Story contract matrix S1–S8:
+ S1 built story and embedded data; S2 opt-in hash, provider priority and fallback;
+ S3 manual/automatic days and reduced motion; S4 downstream waiting and done immunity;
+ S5 ambient/step blocked break + packet suppression/clearing; S6 skin/print tag + popover;
+ S7 docs: unit gate; S8 workbench excluded: unit/diff gate. Desktop reader only.
+*/
+async function openStory(page,server,hash='#live=demo'){
+ await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
+ // At RED the page is not built yet: inject the existing example so failures
+ // exercise the missing runtime behavior rather than ENOENT or HTTP errors.
+ const out=path.join(server.root,'story-live.html');
+ try{await writeFile(out,await readFile(path.join(repo,'examples/live-status/live-status.html')));}
+ catch(error){if(error.code!=='ENOENT')throw error;execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out]);}
+ await page.goto(server.origin+'/story-live.html'+hash);return page.locator('#docview');
+}
+test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completion',async({page,server})=>{
+ const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});await expect(next).toBeVisible();
+ const spec=await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent));const d=spec.page.sections[0].diagram;
+ expect(spec.page.title).toBe('Doorbell Delivery Live Status');expect(Object.keys(d.nodes)).toHaveLength(6);expect(d.edges).toHaveLength(5);expect(d.steps).toHaveLength(7);
+ const timeline=await page.locator('#live-timeline').evaluate(el=>JSON.parse(el.textContent));expect(timeline.days).toHaveLength(12);
+ await expect(root.locator('.dv-live-note')).toHaveText('Day 1 — kickoff');await expect(root.locator('.dv-live-demo').getByRole('button',{name:'Play',exact:true})).toBeDisabled();
+ const edge=root.locator('path.edge[data-dv-edge="0"]'),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+ await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).toHaveCSS('stroke-dasharray','5px, 5px');
+ const edgeDots=()=>root.locator('circle.pkt').filter({has:page.locator('mpath[href$="-e0"]')});
+ expect(await edgeDots().count()).toBeGreaterThan(0);for(const dot of await edgeDots().all())await expect(dot).toHaveCSS('display','none');
+ for(let day=2;day<=4;day++){await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');}
+ await expect(edge).toHaveClass(/dv-live-blocked/);const failure=root.locator('g.comm-failure[data-dv-edge="0"]');await expect(failure).toHaveCount(1);await expect(failure).toHaveAttribute('aria-label',/Not sent:.*HW-124/);await expect(failure.locator('text')).toContainText('HW-124');
+ await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-124');await expect(node('button')).not.toHaveClass(/dv-live-waiting/);
+ await expect(node('mcu').locator('.dv-live-waiting-tag')).toContainText('waiting on HW-124');await node('mcu').locator('.dv-live-badge').press('Enter');await expect(root.locator('.dv-live-popover')).toContainText('waiting on HW-124');await page.keyboard.press('Escape');
+ for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke','rgb(168, 119, 119)');await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');}
+ await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke','rgb(168, 119, 119)');await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
+ await root.locator('.schip[data-step-source="0"]').first().click();await expect(failure).toHaveCount(1);await expect(failure).toBeVisible();
+ for(let day=5;day<=12;day++){
+  await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');
+  if(day===6){await expect(node('app')).toHaveClass(/dv-live-missing/);await expect(root.locator('g.comm-failure[data-dv-edge="4"]')).toHaveCount(0);}
+  if(day===7){await expect(root.locator('g.comm-failure')).toHaveCount(0);await expect(root.locator('.dv-live-waiting')).toHaveCount(0);}
+  if(day===9){await expect(node('chime')).toHaveClass(/dv-live-done/);await expect(node('chime')).not.toHaveClass(/dv-live-waiting/);}
+ }
+ await expect(root.locator('.dv-live-waiting')).toHaveCount(0);await expect(root.locator('g.node.dv-live-done')).toHaveCount(6);await expect(root.locator('path.edge.dv-live-done')).toHaveCount(5);await expect(next).toBeDisabled();
+ // Existing reduced-motion and step-mode rules also hide ordinary packets.
+ await page.emulateMedia({reducedMotion:'no-preference'});await root.getByRole('button',{name:'Ambient',exact:true}).click();
+ for(const dot of await edgeDots().all())await expect(dot).not.toHaveCSS('display','none');
+});
+test('S4 an active upstream blocker skips done descendants and marks todo descendants waiting',async({page,server})=>{
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,{state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'}]))};});
+ const root=await openStory(page,server,''),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+ // button -> mcu -> ingest: propagation must cross the done controller.
+ await expect(node('button')).toHaveClass(/dv-live-blocked/);
+ await expect(node('ingest')).toHaveClass(/dv-live-todo/);
+ await expect(node('ingest')).toHaveClass(/dv-live-waiting/);
+ await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-on','HW-123');
+ await expect(node('mcu')).toHaveClass(/dv-live-done/);
+ await expect(node('mcu')).not.toHaveClass(/dv-live-waiting/);
+ await expect(node('mcu')).not.toHaveAttribute('data-dv-live-waiting-on',/./);
+});
+test('S2 S3 without hash there are no demo controls or live classes',async({page,server})=>{
+ const root=await openStory(page,server,'');await expect(root.locator('.dv-live-demo')).toHaveCount(0);await expect(root.locator('.dv-live-badge,.dv-live-waiting,.dv-live-todo')).toHaveCount(0);
+});
+test('S2 host provider takes precedence over the demo hash',async({page,server})=>{
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,{state:'done'}]))};});const root=await openStory(page,server);await expect(root.locator('path.edge').first()).toHaveClass(/dv-live-done/);await expect(root.locator('.dv-live-demo')).toHaveCount(0);
+});
+test('S2 S3 fallback demo honors cadence, Pause and reduced motion',async({page,server})=>{
+ await page.clock.install();await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});
+ const spec={page:{title:'Fallback',sections:[{diagram:{nodes:{a:{title:'A',tickets:['AA-1']},b:{title:'B',tickets:['BB-1']}},rows:[['a','b']],edges:[{from:'a',to:'b'}]}}]}};
+ const file=path.join(server.root,'fallback.json'),out=path.join(server.root,'fallback.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/fallback.html#live=demo');const root=page.locator('#docview'),demo=root.locator('.dv-live-demo');
+ await expect(demo).toBeVisible();await expect(page.locator('#live-timeline')).toHaveCount(0);await expect(root.locator('.dv-live-note')).toContainText('Day 1');await page.clock.runFor(6000);await expect(root.locator('.dv-live-note')).toContainText('Day 2');
+ await demo.getByRole('button',{name:'Pause',exact:true}).click();await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 2');await demo.getByRole('button',{name:'Play',exact:true}).click();await page.clock.runFor(6000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');
+ await page.emulateMedia({reducedMotion:'reduce'});await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');await demo.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('g.node.dv-live-done')).toHaveCount(2);
+});
+
 /* Claude provider contract matrix (these browser cases + tests/live-status.test.js):
  P1 standalone boot, async mcp namespace, inert without refs/runtime/with host.
  P2 Jira envelopes/categories/Flagged/Development/missing/chunking (VM helpers).
@@ -136,4 +207,16 @@ test('P6 claude Jira approval is an explicit click and repeats the search exactl
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(0);
  await action.click();await expect(root.locator('#section-delivery g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(1);await expect(action).toBeHidden();expect(requests).toEqual([]);
+});
+
+
+test('S2 P1 explicit demo takes precedence over the claude connector',async({page,server})=>{
+ await page.addInitScript(stubLiveClaude,'data');
+ const root=await openStory(page,server);
+ await expect(root.locator('.dv-live-demo')).toBeVisible();
+ await expect(root.locator('.dv-live-note')).toContainText('Day 1');
+ await root.getByRole('button',{name:'Next day',exact:true}).click();
+ await expect(root.locator('.dv-live-note')).toContainText('Day 2');
+ expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);
+ expect(await page.evaluate(()=>__mcpStub.watches)).toEqual([]);
 });

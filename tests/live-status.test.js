@@ -67,9 +67,14 @@ test('V3 rollup covers every precedence branch and ignores absent and unknown st
 });
 test('V2 refs uses the shared parser across sections, tabs, paths and detail-only flows',()=>{
  const raw=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json')),h=harness(raw);
- assert.deepEqual(plain(h.ctl.liveStatus.refs()),{tickets:['HW-123','FW-45','BE-67','UX-89','HW-124','FW-46','BE-68'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
+ const refs=plain(h.ctl.liveStatus.refs());refs.tickets.sort();assert.deepEqual(refs,{tickets:['BE-67','BE-68','FW-45','FW-46','HW-123','HW-124','UX-89'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
  const data=fixture(),d=data.page.sections[0].diagram;d.nodes.a.tickets.push('invalid','AA-1');d.steps.push({id:'other',nodes:['c']});d.paths=[{id:'main',steps:['hop']},{id:'other',steps:['other']}];data.page.blocks=[{tabs:[{label:'One',sections:data.page.sections},{label:'Two',sections:[{id:'detail',detailOnly:true,diagram:{nodes:{child:{tickets:['DD-1'],prs:['https://example.test/pr']}}}}]}]}];delete data.page.sections;
  const next=harness(data);assert.ok(next.ctl.liveStatus.refs().tickets.includes('DD-1'));assert.ok(next.ctl.liveStatus.refs().tickets.includes('CC-2'));assert.ok(!next.ctl.liveStatus.refs().tickets.includes('invalid'));assert.equal(next.ctl.liveStatus.refs().tickets.filter(k=>k==='AA-1').length,1);
+});
+test('V2 original overlay fixture preserves ticket traversal order and node/edge PR refs',()=>{
+ // Keep the pre-story order assertion independently of the six-node example.
+ const h=harness({nodes:{hardware:{tickets:['HW-123']},firmware:{tickets:['FW-45'],prs:['https://github.com/acme/firmware/pull/88']},backend:{tickets:['BE-67']},ux:{tickets:['UX-89']}},rows:[['hardware','firmware','backend','ux']],edges:[{from:'hardware',to:'firmware',tickets:['HW-124','FW-46']},{from:'firmware',to:'backend',tickets:['BE-68'],prs:['https://github.com/acme/backend/pull/91']},{from:'backend',to:'ux'}]});
+ assert.deepEqual(plain(h.ctl.liveStatus.refs()),{tickets:['HW-123','FW-45','BE-67','UX-89','HW-124','FW-46','BE-68'],prs:['https://github.com/acme/firmware/pull/88','https://github.com/acme/backend/pull/91']});h.ctl.liveStatus.destroy();
 });
 test('V2 V4 apply paints nodes, edge paths/halos/labels and step carriers; disable and clear restore',()=>{
  const {ctl,view}=harness(fixture()),api=ctl.liveStatus,events=[];api.onChange(v=>events.push(plain(v)));api.apply(fixed);
@@ -101,6 +106,24 @@ test('V10 provider starts after paint, clamps cadence, pauses, catches up, retai
  assert.equal(note.textContent,'Unavailable');assert.equal(note.getAttribute('data-kind'),'error');assert.equal(note.hidden,false);assert.equal(h.view.querySelector('.dv-live-control').hidden,false);
  fail=false;const retry=[...h.timers.values()][0];h.timers.clear();retry.fn();await new Promise(setImmediate);assert.equal(note.textContent,'');assert.equal(note.hidden,true);assert.equal(note.getAttribute('data-kind'),'info');
  h.ctl.liveStatus.destroy();assert.equal(signal.aborted,true);assert.equal(h.timers.size,0);
+});
+test('V9 painting disconnects observation, ignores re-entrant events and absorbs queued rebuilds',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);
+ const observer=h.observers[0],section=h.ctl.sections[0].sectionEl,paintClass=h.C.liveStatusClass;
+ let writes=0;
+ h.C.liveStatusClass=function(el,state){
+  writes++;assert.equal(observer.targets.length,0,'own DOM writes are not observed');
+  section.dispatchEvent({type:'dv:pathrender'});assert.equal(h.frames.size,0,'paint cannot schedule itself');
+  paintClass(el,state);
+ };
+ observer.callback();observer.callback();section.dispatchEvent({type:'dv:pathchange'});
+ assert.equal(h.frames.size,1,'external changes share one frame');
+ api.apply(fixed);assert.ok(writes>0);assert.equal(h.frames.size,0,'direct apply absorbs the queued paint');
+ assert.ok(observer.targets.length,'external chip rebuilds remain observed');
+ const edge=h.view.querySelector('path.edge');edge.classList.remove('dv-live-blocked');
+ observer.callback();observer.callback();assert.equal(h.frames.size,1);h.flush();
+ assert.ok(edge.classList.contains('dv-live-blocked'));assert.equal(h.frames.size,0,'paint settles without another frame');
+ h.C.liveStatusClass=paintClass;api.destroy();observer.callback();assert.equal(h.frames.size,0);assert.equal(observer.targets.length,0);
 });
 test('V10 late provider resolution after destroy cannot publish state',async()=>{
  let resolve;const h=harness(fixture(),{provider:()=>new Promise(r=>resolve=r)});h.flush();h.flush();await new Promise(setImmediate);h.ctl.liveStatus.destroy();resolve(fixed);await new Promise(setImmediate);assert.equal(h.ctl.liveStatus.state('AA-1'),null);
@@ -139,6 +162,63 @@ test('V9 a late detail load cannot create controls after overlay destruction',as
  let resolve;const renderOptions={loadDetail:()=>new Promise(r=>resolve=r)},h=harness(undefined,{},renderOptions),api=h.ctl.liveStatus;
  api.mountControls(h.view);const pending=renderOptions.loadDetail({spec:'late-detail'},new AbortController().signal);api.destroy();resolve({nodes:{child:{tickets:['DD-1']}}});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),[]);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);assert.equal(h.frames.size,0);
+});
+
+/* Story contract matrix (paired with browser cases below):
+ S1: built 6-node/5-edge/7-step story, tickets and index (browser + test_index).
+ S2: standalone-only demo source, embedded timeline, early hash and fallback.
+ S3: conversion, default cadence, controls, reduced motion, completion and cleanup.
+ S4: directed fork/join propagation, edge/missing blockers, own paint and clearing.
+ S5: blocked breaks in ambient/step, todo packets, done/active restoration (browser).
+ S6: waiting tag/badge/popover, skin and print paint (browser).
+ S7: named documentation sections. S8: demo excluded from workbench; scoped diff gate.
+ Carrier keys in the pure helper are node IDs and directed from->to edge keys.
+*/
+function storyContext(){const C={URL};vm.runInNewContext(entrypoint('standalone').body,C);return C;}
+function forkJoin(){return {nodes:{up:{tickets:['UP-1']},a:{tickets:['AA-1']},b:{tickets:['BB-1']},c:{tickets:['CC-1']},join:{tickets:['JJ-1']},end:{}},edges:[{from:'up',to:'a'},{from:'a',to:'b'},{from:'a',to:'c'},{from:'b',to:'join',tickets:['EE-1']},{from:'c',to:'join'},{from:'join',to:'end'}]};}
+test('S4 blocked fork/join propagates forward through done, never upstream or onto blockers',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusWaiting,'function');const d=forkJoin(),before=JSON.stringify(d);
+ const states={'AA-1':{state:'blocked'},'BB-1':{state:'todo'},'CC-1':{state:'done'},'JJ-1':{state:'active'}};
+ assert.deepEqual(plain(C.liveStatusWaiting(d,states)),{'a->b':['AA-1'],b:['AA-1'],'b->join':['AA-1'],join:['AA-1'],'join->end':['AA-1'],end:['AA-1'],'a->c':['AA-1'],'c->join':['AA-1']});assert.equal(JSON.stringify(d),before);
+ d.edges.push({from:'end',to:'a'});assert.equal(C.liveStatusWaiting(d,states).a,undefined,'cycles do not mark blocker');
+});
+test('S4 edge and missing blockers start at target and accumulate distinct blocking keys',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusWaiting,'function');const d=forkJoin();
+ const result=plain(C.liveStatusWaiting(d,{'EE-1':{state:'blocked'},'CC-1':{state:'missing'}}));
+ assert.deepEqual(result.join,['EE-1','CC-1'].sort());assert.deepEqual(result.end,['EE-1','CC-1'].sort());
+ for(const key of ['up','a','b','c','b->join','up->a','a->b'])assert.equal(result[key],undefined,key);
+ assert.deepEqual(plain(C.liveStatusWaiting(d,{})),{});
+});
+test('S4 cyclic joins and self-loops visit each carrier once per blocker',()=>{
+ const C=storyContext(),d=forkJoin();
+ d.edges.push({from:'join',to:'a'},{from:'join',to:'join'},{from:'end',to:'b'});
+ const states={'AA-1':{state:'blocked'},'CC-1':{state:'missing'},'BB-1':{state:'done'},'JJ-1':{state:'todo'}};
+ const waiting=plain(C.liveStatusWaiting(d,states));
+ assert.deepEqual(Object.keys(waiting).sort(),['a->b','a->c','b->join','c->join','end','end->b','join','join->a','join->end','join->join'].sort());
+ for(const keys of Object.values(waiting))assert.deepEqual(keys,['AA-1','CC-1']);
+ for(const key of ['up','up->a','a','b','c'])assert.equal(waiting[key],undefined,key);
+});
+test('S4 waiting preserves own state, supplies badge/popover keys and clears on toggle/apply',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]');
+ assert.ok(b.classList.contains('dv-live-waiting'));assert.ok(b.classList.contains('dv-live-active'));assert.equal(b.getAttribute('data-dv-live-waiting-on'),'EE-1');
+ const badge=b.querySelector('.dv-live-badge');assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);badge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+ assert.ok(h.view.querySelector('.dv-live-popover').querySelectorAll('div').some(el=>(el.textContent||'').includes('EE-1')));
+ api.setEnabled(false);assert.equal(b.getAttribute('data-dv-live-waiting-on'),null);api.setEnabled(true);assert.ok(b.classList.contains('dv-live-waiting'));
+ api.apply({'BB-1':{state:'done'},'BB-2':{state:'done'},'EE-1':{state:'blocked'}});assert.ok(!b.classList.contains('dv-live-waiting'));api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
+});
+test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
+ const day={issues:{'AA-1':{state:'blocked',summary:'Signal',assignee:'Alex',updated:'2026-10-26',statusName:'Blocked',flagged:true,prs:{count:2,state:'OPEN'}},'BB-1':{state:'done',prs:{count:0,state:null}},'EX-1':{state:'active'}}};
+ const map=plain(C.liveStatusDemoMap(day,['AA-1','BB-1','CC-1']));assert.deepEqual(map['AA-1'],{state:'blocked',title:'Signal',assignee:'Alex',updatedAt:'2026-10-26',detail:'Blocked · flagged',prs:{count:2,state:'open'}});assert.deepEqual(map['CC-1'],{state:'missing'});assert.equal(map['BB-1'].prs,undefined);assert.equal(map['EX-1'],undefined);
+});
+test('S2 synthesized fallback uses only page tickets across four days',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusDemoTimeline,'function');const t=plain(C.liveStatusDemoTimeline(['AA-1','BB-1']));assert.equal(t.intervalSeconds,6);assert.equal(t.days.length,4);
+ for(const day of t.days){assert.ok(day.label);assert.deepEqual(Object.keys(day.issues).sort(),['AA-1','BB-1']);}
+ for(const [i,state] of [[0,'todo'],[1,'active'],[3,'done']])assert.ok(Object.values(t.days[i].issues).every(v=>v.state===state));assert.equal(Object.values(t.days[2].issues).filter(v=>v.state==='blocked').length,1);
+});
+test('S2 demo module is standalone-only and S7 documents story behavior',()=>{
+ assert.ok(/function createLiveStatusDemo\(/.test(entrypoint('standalone').source),'standalone has demo provider');assert.doesNotMatch(entrypoint('workbench').source,/function createLiveStatusDemo\(/);
+ const docs=fs.readFileSync('docs/live-status.md','utf8');for(const heading of ['Demo mode','Blocker propagation','Blocked edges'])assert.ok(docs.includes('## '+heading),heading);
 });
 
 /* Provider contract matrix (VM + the three browser cases):

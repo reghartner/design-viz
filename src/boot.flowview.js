@@ -61,6 +61,7 @@ function fail(msgs){
    passes them as the preserved prefix, so the request must be read
    before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+var liveDemoRequest = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('live') === 'demo';
 /* same trap as embed: the deep-link channel canonicalizes the hash during
    wiring and drops unknown keys, so #tour=1/0 must be read before boot.
    A hash that already targets something (a diagram, step, tab, card) means
@@ -125,7 +126,9 @@ function boot(raw){
   var bootSkin = activeSkin || embedSkin || resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
-  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:window.flowviewLiveStatus,handoffHost:window.flowviewHandoffHost});
+  var liveOptions=window.flowviewLiveStatus;
+  if(liveDemoRequest && !(liveOptions && typeof liveOptions.provider==='function'))liveOptions=createLiveStatusDemo(document);
+  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost});
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's
@@ -161,7 +164,7 @@ function boot(raw){
      comment records its Tab/View and "Go to" can switch to it. Inert when
      window.claude or the declared capability is absent. */
   if (typeof wireArtifactComments === 'function') wireArtifactComments(ctl, view, window);
-  if (typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
+  if (!(liveOptions && liveOptions.demo) && typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
   /* First-run guided tour: a page's own page.tour replaces the built-in
      default wholesale; an unusable override falls back to the default so a
      typo never costs the tour. wireTour itself refuses embeds and #tour=0. */

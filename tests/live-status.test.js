@@ -758,3 +758,42 @@ test('L2 detail panel mounted before attachment connects on navigation with the 
  const h=harness(fixture()),detached=new Element(),mount=mountStatus(h,detached);assert.match(textOf(mount.body),/no ticket references/);assert.equal(h.C.liveStatusPending.length,1);
  h.view.appendChild(detached);h.ctl.liveStatus.apply(fixed);h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(h.C.liveStatusPending.length,0);assert.ok(mount.body.querySelector('table.dv-live-tickets'));h.ctl.liveStatus.destroy();
 });
+
+/* S1–S4 (#769): connector state, activity and last-checked time in the panel header; PR links as icons. */
+test('S1 host provider reports connecting, busy, connected with a checked time, and error through status()',async()=>{
+ let fail=false;const h=harness(fixture(),{provider:()=>fail?Promise.reject(Error('Unavailable')):Promise.resolve(fixed),refreshMs:1}),api=h.ctl.liveStatus;
+ assert.equal(typeof api.status,'function','S1 status() exists');mountStatus(h);
+ let value=plain(api.snapshot());assert.ok(value.connection,'S1 snapshot.connection');assert.equal(value.connection.state,'connecting');assert.equal(value.connection.source,'Host');assert.equal(value.connection.busy,false);
+ h.flush();h.flush();await new Promise(setImmediate);value=plain(api.snapshot());
+ assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');assert.equal(value.connection.checkedText,'checked just now');
+ assert.match(value.updatedText,/^data as of /);
+ const badge=h.view.querySelector('.dv-live-connection');assert.ok(badge,'S1 header connection element');assert.equal(badge.getAttribute('data-state'),'connected');assert.equal(badge.getAttribute('data-busy'),'false');
+ assert.equal(badge.textContent,'Host · connected · checked just now');assert.equal(badge.getAttribute('role'),'status');
+ fail=true;const tick=[...h.timers.values()][0];h.timers.clear();tick.fn();value=plain(api.snapshot());assert.equal(value.connection.busy,true);assert.equal(badge.getAttribute('data-busy'),'true');
+ await new Promise(setImmediate);value=plain(api.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,false);assert.equal(badge.getAttribute('data-state'),'error');
+ api.status({state:'bogus',source:42});assert.equal(plain(api.snapshot()).connection.state,'error');assert.equal(plain(api.snapshot()).connection.source,'Host');
+ api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badge.textContent,'Demo · demo · checked just now');
+ api.destroy();
+});
+test('S2 the Jira adapter reports disconnected, connecting, connected and retrying error states',async()=>{
+ const h=providerHarness();h.start();await new Promise(setImmediate);await new Promise(setImmediate);await new Promise(setImmediate);
+ let value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.source,'Jira');assert.ok(['connecting','connected'].includes(value.connection.state),'S2 after discovery: '+value.connection.state);assert.equal(value.connection.busy,true);
+ assert.ok(h.watches.length>=1,'S2 watches registered');h.watches[0].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});
+ value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'connected');assert.equal(value.connection.checkedAt,new Date(1793000000000).toISOString());
+ h.watches[0].handler({type:'error',error:{code:'rate_limited',retryable:true}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,true);
+ h.ctl.liveStatus.destroy();
+ const none=providerHarness();none.servers.length=0;none.start();await new Promise(setImmediate);await new Promise(setImmediate);
+ value=plain(none.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected');assert.equal(value.connection.busy,false);assert.match(value.note.text,/Add the Atlassian connector/);none.ctl.liveStatus.destroy();
+});
+test('S3 the demo player reports a demo connection with the day as the checked time',()=>{
+ const h=harness(fixture(),{demo:{mount(api){api.status({state:'demo',source:'Demo',checkedAt:Date.now()});api.apply(fixed);return ()=>{};}}});mountStatus(h);
+ const value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'demo');assert.equal(h.view.querySelector('.dv-live-connection').getAttribute('data-state'),'demo');h.ctl.liveStatus.destroy();
+});
+test('S4 authored PR links render as icons with accessible names, not URL text',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply(fixed);
+ const row=h.view.querySelectorAll('.dv-live-tickets tbody tr').find(el=>el.getAttribute('data-live-ticket')==='AA-1'),links=row.querySelectorAll('.dv-live-ticket-prs a');
+ assert.equal(links.length,2);for(const [i,a] of links.entries()){assert.ok(a.classList.contains('dv-live-pr-link'),'S4 icon link class');assert.ok(a.querySelector('svg'),'S4 inline icon');
+  assert.equal(a.getAttribute('href'),'https://code.test/pull/'+(i+1));assert.equal(a.getAttribute('aria-label'),'Pull request #'+(i+1)+' on code.test');assert.equal(a.getAttribute('title'),'https://code.test/pull/'+(i+1));
+  assert.doesNotMatch(a.textContent,/https?:/);}
+ api.destroy();
+});

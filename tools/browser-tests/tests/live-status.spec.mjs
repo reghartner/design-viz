@@ -353,6 +353,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  const diagram=root.locator('.section-layout-tile[data-layout-key="diagram"]'),tile=panel.locator('xpath=ancestor::*[contains(@class,"section-layout-tile")][1]');
  // Default arrangement (Chuck 2026-10-27): panel in the left half, diagram with attached step controls in the right half, both visible on open.
  const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.x+b.width).toBeLessThanOrEqual(a.x+2);expect(Math.abs(b.y-a.y)).toBeLessThan(2);expect(b.width).toBeGreaterThan(300);
+ await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo');
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');

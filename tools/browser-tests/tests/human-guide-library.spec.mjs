@@ -181,7 +181,7 @@ test('Canon edit and browser Back preserve the selected chapter, path and step w
   await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
   await expect(reader.locator('.stepid')).toHaveText('press');
   await expect(reader.locator('.reader-top-view')).toHaveCount(1);
-  await reader.getByRole('button',{name:'Standard',exact:true}).click();
+  await reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]').click();await expect(reader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await reader.locator('.path-chip[data-dv-path="failed"]').click();
   await expect(reader.locator('.stepid')).toHaveText('failed');
   await info.attach('canon-reader-selected-position',{body:await page.screenshot(),contentType:'image/png'});
@@ -369,7 +369,7 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   await fresh.close();
   await card.click();await expect(page).toHaveURL(url);
   const reader=page.locator('#canon-reader');await expect(reader.locator('.reader-top-view')).toHaveCount(1);
-  await expect(reader.getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]')).toHaveAttribute('aria-current','page');await expect(reader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await reader.getByRole('button',{name:'Next step',exact:true}).click();await expect(reader.locator('.stepid')).toHaveText('done');
   await page.getByRole('button',{name:'Copy link to current position',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>window.copiedLink)).not.toBeUndefined();const copied=new URL(await page.evaluate(()=>window.copiedLink));
@@ -379,7 +379,7 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   const linkedReader=linked.locator('#canon-reader');
   await expect(linked.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
   await expect(linkedReader.locator('.reader-top-view')).toHaveCount(1);
-  await expect(linkedReader.getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(linkedReader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]')).toHaveAttribute('aria-current','page');await expect(linkedReader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(linkedReader.locator('.stepid')).toHaveText('done');
   await expect(linkedReader.locator('.path-chip[data-dv-path="happy"]')).toHaveAttribute('aria-pressed','true');
   await linked.reload();await expect(linkedReader.locator('.stepid')).toHaveText('done');

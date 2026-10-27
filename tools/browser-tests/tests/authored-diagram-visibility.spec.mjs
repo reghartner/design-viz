@@ -57,16 +57,16 @@ for(const savedLayout of [false,true])test('ordinary '+(savedLayout?'saved':'aut
   d.autoplay=false;const raw={page:{sections:[{heading:'Legacy story',diagram:d}]}};
   await open(page,server,raw);const initial=await source(page);
   await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(1);
-  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Standard',exact:true}).click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
+  await page.locator('#docview>.explore-navigation .reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]').click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
   expect(saved.layouts.map(v=>v.id)).toEqual(['flow']);expect(saved.layouts[0].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
-  const navigation=page.locator('#docview>.explore-navigation'),topView=navigation.locator('.reader-top-view[data-tab-view="standard"]'),contentsRow=navigation.getByRole('button',{name:'Legacy story',exact:true}).and(navigation.locator('.reader-tree-single-view[data-tab-view="standard"]'));
-  await expect(section(page).locator('.board')).toBeHidden();await expect(topView).toHaveAttribute('aria-selected','true');await expect(contentsRow).toHaveText('Legacy story');await expect(contentsRow).toHaveAttribute('aria-current','page');await expect(contentsRow).toHaveAttribute('aria-pressed','true');
+  const navigation=page.locator('#docview>.explore-navigation'),topView=navigation.locator('.reader-top-view[data-tab-view="standard"]'),contentsRow=navigation.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]');
+  await expect(section(page).locator('.board')).toBeHidden();await expect(topView).toHaveAttribute('aria-selected','true');await expect(contentsRow).toHaveText(await navigation.locator('.reader-tab-label').innerText());await expect(contentsRow).toHaveAttribute('aria-current','page');await expect(contentsRow).toHaveAttribute('aria-pressed','true');await expect(contentsRow).not.toHaveAttribute('aria-expanded');
   await expect(navigation.locator('.reader-top-view')).toHaveCount(1);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(section(page).locator('.board')).toBeVisible();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);await expect(section(page).locator('.board')).toBeHidden();
   const reader=await exportReader(context,server,hidden,'ordinary-hidden-'+savedLayout);
   await expect(reader.locator('.board')).toBeHidden();await expect(reader.locator('[data-layout-flow]')).toHaveCount(0);
-  await expect(reader.locator('.reader-top-view')).toHaveCount(1);await expect(reader.locator('.reader-top-view[data-tab-view="standard"]')).toHaveAttribute('aria-selected','true');await expect(reader.getByRole('button',{name:'Legacy story',exact:true}).and(reader.locator('.reader-tree-single-view[data-tab-view="standard"]'))).toHaveAttribute('aria-current','page');await reader.close();
+  await expect(reader.locator('.reader-top-view')).toHaveCount(1);await expect(reader.locator('.reader-top-view[data-tab-view="standard"]')).toHaveAttribute('aria-selected','true');await expect(reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]')).toHaveAttribute('aria-current','page');await reader.close();
   await change(page,true);await expect(section(page).locator('.board')).toBeVisible();
 });
 

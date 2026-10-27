@@ -557,3 +557,25 @@ test('E9 E11 docs and built example declare epic and Tickets table',()=>{
  const docs=fs.readFileSync('docs/live-status.md','utf8');assert.match(docs,/### Tickets table/);assert.match(docs,/parent =/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking.jira.epic/);
  const built=fs.readFileSync('examples/live-status/live-status.html','utf8');assert.match(built,/function liveStatusCoverage\(/);assert.match(built,/Alert sound setting/);assert.match(built,/dv-live-tickets/);
 });
+
+test('E7 a previously seen child returning after absence is not a new epic addition',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;api.mountControls(h.view);
+ api.apply({'EX-1':{state:'todo',epic:'EP-1'}});h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+ api.apply({});api.apply({'EX-1':{state:'todo',epic:'EP-1'}});assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);api.destroy();
+});
+test('E3 failed and superseded pagination cannot replace complete carrier or epic evidence',async()=>{
+ const h=providerHarness(epicFixture());await h.start();h.data(0,[jira('AA-1')]);const watch=h.watches.find(w=>w.input.jql==='parent = EP-1');
+ const deliver=payload=>watch.handler({type:'data',result:{payload}});
+ deliver({issues:[jira('EX-1')]});let resolve;
+ h.mcp.callTool=()=>Promise.reject({code:'upstream_error',retryable:true});
+ deliver({issues:[jira('EX-2')],pageInfo:{hasNextPage:true,endCursor:'two'}});await settle();
+ assert.equal(h.ctl.liveStatus.state('EX-1').state,'active');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,1);
+ h.mcp.callTool=()=>new Promise(r=>resolve=r);deliver({issues:[jira('EX-2')],nextPageToken:'two'});await settle();
+ deliver({issues:[jira('EX-3','done')]});resolve({payload:{issues:[jira('EX-4')]}});await settle();
+ assert.equal(h.ctl.liveStatus.state('EX-3').state,'done');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('EX-4'),null);h.ctl.liveStatus.destroy();
+});
+test('E3 an epic without carrier tickets still starts its two watches and exposes details',async()=>{
+ const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
+ assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment']);
+ h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-control').hidden,false);h.ctl.liveStatus.destroy();
+});

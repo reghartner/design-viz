@@ -50,7 +50,7 @@ Append these queries to `/mcp` when adding a connector:
 
 - `?scenario=story` (default): hardware starts, firmware follows, a hardware
   blocker stalls delivery, UX and backend progress, the blocker clears, PRs
-  open and merge, and all seven tickets finish.
+  open and merge, and all eight epic stories finish.
 - `?scenario=story&day=3`: pin a zero-based day; values clamp to the timeline.
 - `?scenario=all-todo`: every example ticket is To Do.
 - `?scenario=all-done`: every example ticket is Done.
@@ -59,18 +59,24 @@ Unknown scenario names select `all-todo`. Without `day`, the story advances one
 day per minute: `floor((now - DEPLOYED_AT) / 60000) mod days.length`. The shared
 [timeline](../../../examples/live-status/live-status.timeline.json) is imported
 directly as JSON at bundle time. Its `intervalSeconds: 6` is for the page's demo
-playback; the server intentionally uses a minute. One day temporarily renames
-`UX-89` to `UX-90`, so querying the original key demonstrates missing status.
+playback; the server intentionally uses a minute. On Day 6, `UX-89` is temporarily unavailable, demonstrating missing status.
+From Day 8, `UX-90` (Alert sound setting) joins epic `DOOR-100` without a diagram
+carrier. Both fixed scenarios include this eighth story.
 The fixed scenarios live in `fixtures/` and do not rotate.
 
 Supported JQL clauses, case-insensitive and joined by `AND` in any order:
-`key in (HW-123, "FW-45")`, `Flagged = Impediment`,
+`key in (HW-123, "FW-45")`, `parent = DOOR-100`, `Flagged = Impediment`,
 `statusCategory = "In Progress"` (also `new`, `indeterminate`, `done`, `To Do`,
 `Done`), and `project = HW`. Unsupported syntax returns an empty list. Limits
-default to 50 and cap at 100; `nextPageToken` is ignored and results always
-report no next page. `fields` is ignored; `customFields` is returned even when
+default to 50 and cap at 100. Continue with the returned `pageInfo.endCursor`
+as `nextPageToken` while `pageInfo.hasNextPage` is true. `fields` is ignored; `customFields` is returned even when
 a fields array omits `customFields` and `*all`. Cloud IDs are accepted but do
 not select a real tenant. Unknown issue keys return error -32602.
+
+`parent = DOOR-100 AND Flagged = Impediment` returns flagged children. Each child
+has `fields.parent` with the epic key, summary and Epic issue type.
+`getJiraIssue('DOOR-100')` returns the epic: Done when every child is done,
+In Progress when any child is active, blocked or done, otherwise To Do.
 
 ## Fidelity and local checks
 

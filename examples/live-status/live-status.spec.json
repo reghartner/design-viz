@@ -3,7 +3,7 @@
     "title": "Doorbell Delivery Live Status",
     "contract": "1",
     "flowview": {"authoredWith": "0.2.0", "minVersion": "0.2.0", "features": ["flow.live-status"]},
-    "tracking": {"jira": {"site": "https://acme.atlassian.net"}},
+    "tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}},
     "lanes": {
       "HW": {"label": "Hardware", "color": "#f97316"},
       "FW": {"label": "Firmware", "color": "#38bdf8"},

@@ -16,7 +16,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "todo",
@@ -28,7 +29,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "todo",
@@ -40,7 +42,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -52,7 +55,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "todo",
@@ -64,7 +68,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "todo",
@@ -76,7 +81,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "todo",
@@ -88,7 +94,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
@@ -106,7 +113,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "active",
@@ -118,7 +126,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "todo",
@@ -130,7 +139,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -142,7 +152,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "todo",
@@ -154,7 +165,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "todo",
@@ -166,7 +178,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "todo",
@@ -178,7 +191,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
@@ -196,7 +210,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "active",
@@ -208,7 +223,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -220,7 +236,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -232,7 +249,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "todo",
@@ -244,7 +262,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "todo",
@@ -256,7 +275,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "todo",
@@ -268,7 +288,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
@@ -286,7 +307,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "blocked",
@@ -298,7 +320,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -310,7 +333,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -322,7 +346,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "todo",
@@ -334,7 +359,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "todo",
@@ -346,7 +372,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "todo",
@@ -358,7 +385,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
@@ -376,7 +404,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "blocked",
@@ -388,7 +417,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -400,7 +430,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -412,7 +443,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "active",
@@ -424,7 +456,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "active",
@@ -436,7 +469,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "todo",
@@ -448,13 +482,14 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
     {
-      "label": "Day 6 — temporary rename",
-      "note": "UX-89 is temporarily renamed UX-90 while backend integration begins.",
+      "label": "Day 6 — ticket unavailable",
+      "note": "UX-89 is temporarily unavailable while backend integration begins.",
       "issues": {
         "HW-123": {
           "state": "active",
@@ -466,7 +501,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "blocked",
@@ -478,7 +514,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -490,7 +527,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -502,7 +540,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "active",
@@ -514,7 +553,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "active",
@@ -526,25 +566,14 @@
           "prs": {
             "count": 0,
             "state": null
-          }
-        },
-        "UX-90": {
-          "state": "active",
-          "summary": "Show resident notifications",
-          "assignee": "Morgan",
-          "updated": "2026-10-24T09:00:00.000+0000",
-          "flagged": false,
-          "statusName": "In Progress",
-          "prs": {
-            "count": 0,
-            "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
     {
       "label": "Day 7 — blocker clears",
-      "note": "The signal is stable again and the UX ticket returns to its original key.",
+      "note": "The signal is stable again and the UX ticket is available.",
       "issues": {
         "HW-123": {
           "state": "active",
@@ -556,7 +585,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "active",
@@ -568,7 +598,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -580,7 +611,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "todo",
@@ -592,7 +624,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "active",
@@ -604,7 +637,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "active",
@@ -616,7 +650,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "active",
@@ -628,13 +663,14 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         }
       }
     },
     {
       "label": "Day 8 — reviews open",
-      "note": "Hardware and firmware PRs open as interrupt integration gets underway.",
+      "note": "Hardware and firmware PRs open as interrupt integration gets underway. Alert sound setting joins the epic without a diagram carrier.",
       "issues": {
         "HW-123": {
           "state": "active",
@@ -646,7 +682,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "active",
@@ -658,7 +695,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -670,7 +708,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "active",
@@ -682,7 +721,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "active",
@@ -694,7 +734,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "active",
@@ -706,7 +747,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "active",
@@ -718,7 +760,22 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
+        },
+        "UX-90": {
+          "state": "todo",
+          "summary": "Alert sound setting",
+          "assignee": "Morgan",
+          "updated": "2026-10-27T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "To Do",
+          "prs": {
+            "count": 0,
+            "state": null
+          },
+          "epic": "DOOR-100",
+          "lane": "APP"
         }
       }
     },
@@ -736,7 +793,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "done",
@@ -748,7 +806,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "active",
@@ -760,7 +819,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "active",
@@ -772,7 +832,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "active",
@@ -784,7 +845,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "active",
@@ -796,7 +858,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "active",
@@ -808,7 +871,22 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
+        },
+        "UX-90": {
+          "state": "active",
+          "summary": "Alert sound setting",
+          "assignee": "Morgan",
+          "updated": "2026-10-28T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          },
+          "epic": "DOOR-100",
+          "lane": "APP"
         }
       }
     },
@@ -826,7 +904,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "done",
@@ -838,7 +917,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "done",
@@ -850,7 +930,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "active",
@@ -862,7 +943,8 @@
           "prs": {
             "count": 0,
             "state": null
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "done",
@@ -874,7 +956,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "done",
@@ -886,7 +969,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "done",
@@ -898,7 +982,22 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
+        },
+        "UX-90": {
+          "state": "active",
+          "summary": "Alert sound setting",
+          "assignee": "Morgan",
+          "updated": "2026-10-29T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 0,
+            "state": null
+          },
+          "epic": "DOOR-100",
+          "lane": "APP"
         }
       }
     },
@@ -916,7 +1015,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "done",
@@ -928,7 +1028,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "done",
@@ -940,7 +1041,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "active",
@@ -952,7 +1054,8 @@
           "prs": {
             "count": 1,
             "state": "OPEN"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "done",
@@ -964,7 +1067,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "done",
@@ -976,7 +1080,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "done",
@@ -988,13 +1093,28 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
+        },
+        "UX-90": {
+          "state": "active",
+          "summary": "Alert sound setting",
+          "assignee": "Morgan",
+          "updated": "2026-10-30T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "In Progress",
+          "prs": {
+            "count": 1,
+            "state": "OPEN"
+          },
+          "epic": "DOOR-100",
+          "lane": "APP"
         }
       }
     },
     {
       "label": "Day 12 — delivery complete",
-      "note": "The final PR merges and all seven tickets are done.",
+      "note": "The final PR merges and all eight epic stories are done.",
       "issues": {
         "HW-123": {
           "state": "done",
@@ -1006,7 +1126,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "HW-124": {
           "state": "done",
@@ -1018,7 +1139,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-45": {
           "state": "done",
@@ -1030,7 +1152,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "FW-46": {
           "state": "done",
@@ -1042,7 +1165,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-67": {
           "state": "done",
@@ -1054,7 +1178,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "BE-68": {
           "state": "done",
@@ -1066,7 +1191,8 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
         },
         "UX-89": {
           "state": "done",
@@ -1078,7 +1204,22 @@
           "prs": {
             "count": 1,
             "state": "MERGED"
-          }
+          },
+          "epic": "DOOR-100"
+        },
+        "UX-90": {
+          "state": "done",
+          "summary": "Alert sound setting",
+          "assignee": "Morgan",
+          "updated": "2026-10-31T09:00:00.000+0000",
+          "flagged": false,
+          "statusName": "Done",
+          "prs": {
+            "count": 1,
+            "state": "MERGED"
+          },
+          "epic": "DOOR-100",
+          "lane": "APP"
         }
       }
     }

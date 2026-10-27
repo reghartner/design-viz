@@ -584,6 +584,7 @@ function validate(page){
        (typeof page.tracking.staleDays!=='number' || !isFinite(page.tracking.staleDays) || page.tracking.staleDays<=0))
       warnings.push('tracking.staleDays: must be a positive number — using 7 days');
   }
+  trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use a Jira key or an array of Jira keys — ignored');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);

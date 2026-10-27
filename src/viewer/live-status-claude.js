@@ -36,7 +36,7 @@ function liveStatusDevelopmentSummary(fields){
     try{
       var parsed=JSON.parse(values[i].slice(start,end+1)),summary=parsed.cachedValue && parsed.cachedValue.summary;
       var overall=summary && summary.pullrequest && summary.pullrequest.overall,state=overall && String(overall.state).toLowerCase();
-      if(overall && typeof overall.count==='number' && isFinite(overall.count) && overall.count>=0 && ['open','merged'].indexOf(state)>=0)return {count:overall.count,state:state};
+      if(overall && typeof overall.count==='number' && isFinite(overall.count) && overall.count>=0 && ['open','merged','declined'].indexOf(state)>=0)return {count:overall.count,state:state};
     }catch(ex){}
   }
   return null;
@@ -66,7 +66,7 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
 function wireLiveStatusClaude(ctl,page,win){
   var claude,use,api=ctl && ctl.liveStatus;
   try{claude=win.claude;use=claude && claude.use;}catch(ex){return null;}
-  if(typeof use!=='function' || !api || win.flowviewLiveStatus || !api.refs().tickets.length)return null;
+  if(typeof use!=='function' || !api || win.flowviewLiveStatus || !api.refs().tickets.length && !(api.refs().epics || []).length)return null;
   var stopped=false,mcp=null,server=null,site='',chunks=[],jobs=[],subscriptions=[],timers=[];
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
@@ -81,15 +81,17 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   function publish(){
     if(stopped || publishing || !dirty || !api.enabled())return;
-    var keys=[],issues=[],flagged=Object.create(null),stamp=null;
+    var keys=[],issues=[],flagged=Object.create(null),epics=Object.create(null),stamp=null;
     chunks.forEach(function(chunk){
       if(!chunk.answered)return;
-      keys=keys.concat(chunk.keys);issues.push(chunk.issues);
+      var found=chunk.epic?chunk.issues.filter(function(issue){return issue && typeof issue.key==='string';}).map(function(issue){return issue.key;}):chunk.keys;
+      found.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);if(chunk.epic && !epics[key])epics[key]=chunk.epic;});
+      issues.push(chunk.issues);
       (chunk.flagged || []).forEach(function(issue){if(issue && issue.key)flagged[issue.key]=true;});
       [chunk.storedAt,chunk.flaggedAt].forEach(function(at){if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);});
     });
     dirty=false;publishing=true;
-    try{api.apply(liveStatusJiraMap(keys,issues,flagged,site,stamp));}finally{publishing=false;}
+    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});api.apply(map);}finally{publishing=false;}
   }
   function notices(){
     if(stopped)return;
@@ -111,11 +113,11 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
-    if(code==='user_changed'){api.clear();api.note('','info');api.action('',null);stop();return;}
+    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){api.clear();api.action('',null);api.note(message,kind);stop();return;}
+    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
@@ -131,10 +133,27 @@ function wireLiveStatusClaude(ctl,page,win){
     if(stopped)return;
     cancelRetry(job);job.error=null;
     if(job.accept){notices();job.accept(result);return;}
-    var chunk=job.chunk,issues=liveStatusJiraIssues(result && result.payload),at=result && result.cache && result.cache.storedAt;
-    if(job.flagged){chunk.flagged=issues;chunk.flaggedAt=at;}
-    else{chunk.answered=true;chunk.issues=issues;chunk.storedAt=at;}
-    dirty=true;publish();notices();
+    var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
+    function pageResult(result){
+      if(stopped || version!==job.version)return;
+      var payload=result && result.payload,at=result && result.cache && result.cache.storedAt;
+      all=all.concat(liveStatusJiraIssues(payload));
+      if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);
+      var info=payload && (payload.pageInfo || payload.issues && payload.issues.pageInfo);
+      var token=payload && payload.nextPageToken || result && result.nextPageToken || info && info.hasNextPage && info.endCursor;
+      if(chunk.epic && token){
+        if(seen[token]){fail(job,{code:'tool_error',message:'Jira repeated a page cursor'},false);return;}
+        seen[token]=true;
+        var input=Object.assign({},job.input,{nextPageToken:token});
+        Promise.resolve().then(function(){if(!stopped && version===job.version)return mcp.callTool(server,job.tool,input,job.options);}).then(pageResult,function(error){if(!stopped && version===job.version)fail(job,error,true);});
+        return;
+      }
+      // Publish only a complete page chain. A failed refresh keeps all prior evidence.
+      if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
+      else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      dirty=true;publish();notices();
+    }
+    pageResult(result);
   }
   function runCall(job){
     var version=++job.version;
@@ -167,9 +186,10 @@ function wireLiveStatusClaude(ctl,page,win){
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
     site=resource.url;
     chunks=liveStatusJiraChunks(api.refs().tickets).map(function(keys){return {keys:keys,answered:false,issues:[],flagged:[]};});
+    (api.refs().epics || []).forEach(function(epic){chunks.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});});
     chunks.forEach(function(chunk){
       [false,true].forEach(function(flagged){
-        var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:resource.id,jql:'key in ('+chunk.keys.join(', ')+')'+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'],maxResults:10}};
+        var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:resource.id,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
         jobs.push(job);watch(job);
       });
     });

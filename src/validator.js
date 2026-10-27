@@ -580,6 +580,9 @@ function validate(page){
     if (!specObject(page.tracking)) warnings.push('tracking: must be an object — ignored');
     else if (specObject(page.tracking.jira) && Object.prototype.hasOwnProperty.call(page.tracking.jira, 'site') && !deltaLinkUrl(page.tracking.jira.site))
       warnings.push('tracking.jira.site: must be an absolute http(s) URL — ignored');
+    if(specObject(page.tracking) && Object.prototype.hasOwnProperty.call(page.tracking,'staleDays') &&
+       (typeof page.tracking.staleDays!=='number' || !isFinite(page.tracking.staleDays) || page.tracking.staleDays<=0))
+      warnings.push('tracking.staleDays: must be a positive number — using 7 days');
   }
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));

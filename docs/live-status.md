@@ -244,3 +244,47 @@ real connector. See the [mock server README](../deploy/cloudflare/mock-atlassian
 for setup, fictional scenarios, result envelopes and known fidelity limits.
 The mock can be installed as **Atlassian MCP** to try the artifact without an
 Atlassian account. No GitHub connector is used.
+
+## Story mode
+
+Live evidence follows the story's nodes and edges. Team lane pills show **n/N done**, the worst ticket state, and a hover/focus title listing each ticket and
+state. Tickets are deduplicated across every step in that lane, including edge
+endpoints and failed communications. The Live details panel repeats these lanes.
+
+In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
+**IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps
+have no live caption. Captions update on step changes and new evidence.
+
+Playback pauses on the first blocked or missing beat, including the first beat
+when starting or replaying, and focuses the first blocking carrier's badge.
+Manual next/previous retain their existing navigation behavior. The small
+`stepper.onBeforeAdvance(fn)` hook returns an unsubscribe function; `fn` receives
+the selected source step index after it is painted, before automatic playback
+continues. Returning `false` invokes the ordinary pause path. It runs only for
+automatic playback (including its initial beat), never manual navigation.
+**First blocker** jumps through `stepper.jumpSource` to the earliest blocker in
+the current path, enters Step mode and focuses its badge; it hides when none exist.
+
+Changed ticket states produce one carrier pulse (none with reduced motion).
+**details** opens the Live panel with a completion ring, team progress, blocker
+links, affected lanes and downstream carrier/step counts, and **Activity**.
+Activity records the latest 20 transitions, newest received first; the initial
+map and identical states add nothing. Times use the ticket's `updatedAt`, then
+the map's `storedAt`. If neither exists, the entry says “time unavailable”; cached
+evidence never acquires an invented current timestamp. Escape closes details
+and returns focus to its button. The panel is hidden in print.
+
+The completion ring counts done carriers against all tracked carriers. A carrier
+is done only when all its tickets are done. **Ready to demo** requires every
+tracked carrier involved in the primary path (the first path, or all steps when
+there are no explicit paths) to be done. Alternate-only work does not prevent
+readiness. Otherwise the verdict gives distinct blocking/missing tickets and
+waiting carriers. Missing tickets say “not found in Jira (deleted, renamed, or no
+permission)”. Downstream counts come from the same waiting propagation as the
+canvas, counting each affected carrier and authored step once per blocking key.
+
+Set `tracking.staleDays` to a positive number (default **7**) to mark active work
+whose `updatedAt` is strictly older than that many days. A grey dashed badge ring
+and “no activity N d” in its popover supplement the unchanged rollup color.
+Missing/invalid timestamps are never stale; invalid thresholds warn and use 7.
+All story features work with `#live=demo`; pages without tickets gain no controls.

@@ -634,6 +634,25 @@ including for steps without edges. Clearing `delta` hides the marker while
 retaining its optional details. See [delta markers](../docs/delta-markers.md)
 for the workbench controls and a complete example.
 
+### Live ticket references — nodes and edges
+
+Optional `tickets` on nodes and edges is an array of Jira keys matching
+`^[A-Z][A-Z0-9_]+-[0-9]+$`, such as `["HW-123", "FW-45"]`. Optional `prs` is
+an array of absolute HTTP(S) URL strings, such as
+`["https://github.com/acme/firmware/pull/88"]`. Invalid entries produce warnings
+and are ignored; a non-array value produces one warning and is ignored. Valid
+references are retained, with duplicates removed in their original order when
+read. Authored PR references are plain links and never carry live state.
+
+At page level, beside `title`, `contract` and `flowview`, optional `tracking`
+configures the Jira site: `"tracking": {"jira": {"site": "https://acme.atlassian.net"}}`.
+A non-object `tracking` or a present `tracking.jira.site` that is not an absolute
+HTTP(S) URL string produces a warning and is ignored. The spec never stores status;
+live colors come from Jira status only. Steps, coins and chips derive their state
+from the nodes and edges they involve and never carry tickets. These fields
+declare `flow.live-status`; the overlay rendering lands separately in #735.
+See [live ticket status](../docs/live-status.md) for the state model and example.
+
 ### groups — containment boundaries
 
 Declare `"groups": {"doorbell": {"title": "Doorbell unit"}}` at the diagram

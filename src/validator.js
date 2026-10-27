@@ -81,6 +81,15 @@ function deltaWarnings(value, path, warnings){
     });
   }
 }
+function trackingWarnings(value, path, warnings){
+  trackingRefs(value, function(field, index){
+    var at = path + '.' + field;
+    if (index === null)
+      warnings.push(at + ': must be an array of ' + (field === 'tickets' ? 'Jira keys' : 'URLs') + ' — ignored');
+    else warnings.push(at + '[' + index + ']: ' + (field === 'tickets'
+      ? 'use a Jira key like HW-123' : 'must be an absolute http(s) URL') + ' — entry ignored');
+  });
+}
 function resolveProtocols(page){
   var out = Object.create(null);
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -401,6 +410,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     reviewMetadataErrors(n, DP+'.nodes.'+id, errors);
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
+    trackingWarnings(n, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
@@ -424,6 +434,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     reviewMetadataErrors(e, EP, errors);
     if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
+    trackingWarnings(e, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
       errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
     if(e && e.curveControls!=null && e.curvePoints!=null)
@@ -565,6 +576,11 @@ function validate(page){
   if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
   errors = specStructureErrors(page);
   if (errors.length) return {errors:errors, warnings:warnings};
+  if (Object.prototype.hasOwnProperty.call(page, 'tracking')){
+    if (!specObject(page.tracking)) warnings.push('tracking: must be an object — ignored');
+    else if (specObject(page.tracking.jira) && Object.prototype.hasOwnProperty.call(page.tracking.jira, 'site') && !deltaLinkUrl(page.tracking.jira.site))
+      warnings.push('tracking.jira.site: must be an absolute http(s) URL — ignored');
+  }
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);

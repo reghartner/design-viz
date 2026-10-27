@@ -288,7 +288,7 @@ comma-separated keys, while retaining their own `dv-live-<state>` class. Carrier
 whose own state is done, blocked or missing never become waiting; traversal still
 continues through them. Cycles terminate and multiple blockers combine their keys.
 
-Waiting uses the slate preset with a dashed stroke; the canvas carries no **waiting on** text.
+Waiting uses the slate preset with a dashed stroke, and the halo turns slate too; the canvas carries no **waiting on** text.
 The carrier's accessible name and popover list the blocking keys. Applying a new map, clearing it or
 turning Live off removes stale waiting evidence. Print keeps the colors.
 

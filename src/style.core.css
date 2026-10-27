@@ -4073,6 +4073,7 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .dv-live-waiting{--dv-live-waiting-color:var(--dv-live-todo);}
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-waiting .card,
 :is(path.edge,path.halo).dv-live-waiting{stroke:var(--dv-live-waiting-color)!important;stroke-dasharray:5 5!important;}
+.node.dv-live-waiting>.dv-live-halo{stroke:var(--dv-live-waiting-color);filter:drop-shadow(0 0 6px var(--dv-live-waiting-color));}
 path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 /* Missing tickets are dotted rose; blocked stays solid rose. */
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-missing:not(.dv-live-waiting) .card,

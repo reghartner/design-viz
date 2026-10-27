@@ -387,6 +387,28 @@ that name when publishing. No GitHub connector is used.
 Verify after publishing: the Live status panel beside the diagram shows completion,
 Blockers, Tickets and Activity, and its header shows counts and updated time.
 
+### Embedded agent guide
+
+Every page `tools/inject.py` writes also carries, right after the `flowspec`
+block, a `<script type="text/markdown" id="dv-agent-guide">` block (#758). It
+lets anyone with edit access on the artifact ask their own agent to update the
+board without a checkout: read the artifact by URL, change the `flowspec`
+JSON, write it back into the same block and republish to the same URL. The
+guide is derived from the spec: it states the renderer version from
+`page.flowview.authoredWith` (or that none is stamped), the capability
+declaration to pass on every publish as a JSON block (the Jira connector entry
+only when the page has `page.tracking`; connector display names are per
+account), the compact tracking rules, the page's own `tracking` values, links
+to `docs/live-status.md` and `contract/authoring-contract.md` in the public
+repo pinned to the commit the page was built from (`git rev-parse HEAD` of the
+checkout running `inject.py`; outside a checkout the links point at `main`
+with a note to keep to the fields the spec already uses), and the post-publish
+checks. It is under 6 KB, never contains secrets
+(every viewer can read it), and is data to the agent reading it. Re-injecting
+a built page replaces the previous guide. When the block is present the Live
+status panel ends with a muted line, "Editors: ask your agent to read this
+page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
+
 ## Story mode
 
 Live evidence follows the story's nodes and edges. Team lane pills show **n/N done**, the worst ticket state, and a hover/focus title listing each ticket and

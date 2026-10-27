@@ -1,4 +1,5 @@
 """Unit tests for tools/inject.py. Run: python3 -m unittest discover -s tests"""
+import importlib.util
 import json
 import pathlib
 import re
@@ -6,12 +7,27 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 INJECT = ROOT / "tools" / "inject.py"
 
+
+def load_inject():
+    """Import tools/inject.py as a module (it imports its sibling crossrefs)."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        spec = importlib.util.spec_from_file_location("dv_inject", INJECT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.path.pop(0)
+
 BLOCK_OPEN = '<script type="application/json" id="flowspec">'
 BACKLINK_OPEN = '<script type="application/json" id="flowbacklinks">'
+GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n(.*?)\n</script>', re.S | re.M)
+FLOWSPEC_BLOCK = re.compile(r'^<script type="application/json" id="flowspec">\n(.*?)\n</script>', re.S | re.M)
 
 TEMPLATE = (
     "<title>Flowview</title>\n"
@@ -194,6 +210,104 @@ class InjectTests(unittest.TestCase):
         r, out = run_inject(TEMPLATE, "{not json")
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("not valid JSON", r.stderr)
+
+    # #758: the built page carries a guide an editor's agent can read and act on.
+    def test_agent_guide_block_is_embedded_once_as_data_with_version_and_declaration(self):
+        spec = json.loads(json.dumps(SPEC))
+        spec["page"]["flowview"] = {"authoredWith": "0.2.0", "minVersion": "0.2.0", "features": ["flow.live-status"]}
+        spec["page"]["tracking"] = {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}, "staleDays": 5}
+        r, out = run_inject(TEMPLATE, json.dumps(spec))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guides = GUIDE_BLOCK.findall(out)
+        self.assertEqual(len(guides), 1)
+        guide = guides[0]
+        self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+        self.assertNotIn("</script", guide)
+        # readers locate the authored spec by any script tag with id="flowspec" (tools/export_gif.py):
+        # the guide names the block without reproducing it, so the page still has exactly one
+        self.assertNotIn("<script", guide)
+        self.assertNotIn('id="flowspec"', guide)
+        tag = re.compile(r"<script\b(?=[^>]*\bid=[\"']flowspec[\"'])")
+        self.assertEqual(len(tag.findall(out)), len(tag.findall(TEMPLATE)), "the guide adds no flowspec tag")
+        # the authored block is untouched and precedes the guide
+        self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), spec)
+        self.assertLess(FLOWSPEC_BLOCK.search(out).start(), GUIDE_BLOCK.search(out).start())
+        # version from page.flowview.authoredWith, named as such
+        self.assertIn("page.flowview.authoredWith", guide)
+        self.assertNotIn("release", guide)
+        self.assertNotIn("tag", guide.replace("close tag", ""))
+        # docs at the page's version: the commit this checkout is at (the subprocess ran from it)
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+        self.assertRegex(sha, r"^[0-9a-f]{40}$")
+        self.assertIn(f"from commit {sha[:12]}", guide)
+        for doc in ("docs/live-status.md", "contract/authoring-contract.md"):
+            self.assertIn(f"https://github.com/reghartner/design-viz/blob/{sha}/{doc}", guide)
+        self.assertNotIn("blob/main/", guide)
+        # the capability declaration is data: one fenced JSON block that parses
+        fences = re.findall(r"```json\n(.*?)\n```", guide, re.S)
+        self.assertEqual(len(fences), 1)
+        declaration = json.loads(fences[0])
+        self.assertEqual(declaration["comments"], {"composer_only": True, "customAnchors": True})
+        servers = declaration["mcp"]["servers"]
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers[0]["tools"], ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"])
+        self.assertIn("display name", guide)
+        # the edit loop, the tracking rules, the pointers and the post-publish checks
+        for needle in ("`flowspec`", "same URL", "node tools/validate.js",
+                       "^[A-Z][A-Z0-9_]+-[0-9]+$", "prs", "tracking.jira.site", "staleDays",
+                       "tracking.jira.epic", "tracking.github", "never stores",
+                       "built with Flowview 0.2.0", "Live", "Tickets", "screenshot",
+                       "https://acme.atlassian.net", "DOOR-100"):
+            self.assertIn(needle, guide, needle)
+
+    def test_agent_guide_links_docs_at_the_stamped_commit_or_falls_back_to_main_with_a_note(self):
+        inject = load_inject()
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        pinned = inject.agent_guide(SPEC, sha)
+        self.assertIn(f"from commit {sha[:12]}", pinned)
+        self.assertIn(f"https://github.com/reghartner/design-viz/blob/{sha}/docs/live-status.md", pinned)
+        self.assertIn(f"https://github.com/reghartner/design-viz/blob/{sha}/contract/authoring-contract.md", pinned)
+        self.assertNotIn("blob/main/", pinned)
+        self.assertNotIn("already used in this page's spec", pinned)
+        fallback = inject.agent_guide(SPEC, None)
+        self.assertNotIn("from commit", fallback)
+        self.assertIn("https://github.com/reghartner/design-viz/blob/main/docs/live-status.md", fallback)
+        self.assertIn("https://github.com/reghartner/design-viz/blob/main/contract/authoring-contract.md", fallback)
+        self.assertIn("source commit of this page is unknown", fallback)
+        self.assertIn("keep to the fields already used in this page's spec", fallback)
+        # the lookup itself: a good answer is a full sha; git missing or not a checkout gives None
+        good = subprocess.CompletedProcess(["git"], 0, stdout=sha + "\n", stderr="")
+        with mock.patch.object(inject.subprocess, "run", return_value=good) as run:
+            self.assertEqual(inject.source_commit(), sha)
+        self.assertEqual(run.call_args.kwargs["cwd"], inject.REPO_ROOT)
+        self.assertEqual(run.call_args.args[0][:2], ["git", "rev-parse"])
+        bad = subprocess.CompletedProcess(["git"], 128, stdout="", stderr="fatal: not a git repository")
+        with mock.patch.object(inject.subprocess, "run", return_value=bad):
+            self.assertIsNone(inject.source_commit())
+        with mock.patch.object(inject.subprocess, "run", side_effect=FileNotFoundError("git")):
+            self.assertIsNone(inject.source_commit())
+        with mock.patch.object(inject.subprocess, "run", side_effect=subprocess.TimeoutExpired("git", 10)):
+            self.assertIsNone(inject.source_commit())
+
+    def test_agent_guide_without_tracking_declares_comments_only(self):
+        r, out = run_inject(TEMPLATE, json.dumps(SPEC))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guide = GUIDE_BLOCK.search(out)[1]
+        self.assertIn("not stamped", guide)
+        declaration = json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
+        self.assertEqual(declaration, {"comments": {"composer_only": True, "customAnchors": True}})
+        self.assertNotIn("searchJiraIssuesUsingJql", guide)
+        self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), SPEC)
+
+    def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
+        built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,
+                                 '</script>\n<script type="text/markdown" id="dv-agent-guide">\nold guide\n</script>\n' + BACKLINK_OPEN, 1)
+        self.assertEqual(len(GUIDE_BLOCK.findall(built)), 1)
+        r, out = run_inject(built, json.dumps(SPEC))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(len(GUIDE_BLOCK.findall(out)), 1)
+        self.assertNotIn("old guide", out)
+        self.assertIn(BACKLINK_OPEN + '\n{"services": {}}\n</script>', out)
 
     def test_conventional_legacy_inject_discovers_and_embeds_crossref(self):
         with tempfile.TemporaryDirectory() as td:

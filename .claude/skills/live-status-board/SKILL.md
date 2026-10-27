@@ -160,7 +160,15 @@ Publish only when asked. Steps:
    **Atlassian MCP** for a custom connector or in the declaration unless the
    viewer really has Atlassian's directory connector of that name: it
    resolves to that directory connector and asks for an Atlassian login.
-4. With the connector-selection change from #750 the provider picks the
+4. The built page carries an agent guide block
+   (`<script type="text/markdown" id="dv-agent-guide">`, written by
+   `tools/inject.py`) with this edit loop, the declaration above as JSON, the
+   tracking rules and the page's `authoredWith` version. Any editor of the
+   artifact can later ask their own agent to read the page and apply a change
+   without this repo; the Live status panel's last line tells them so. Keep
+   the block in the artifact copy and do not add secrets to the spec or the
+   HTML: every viewer can read both.
+5. With the connector-selection change from #750 the provider picks the
    connector by the tools it offers, so one declared name is enough. On a
    build without that change the provider accepts only the display names
    **Atlassian MCP** and **Atlassian**; check `src/viewer/live-status-claude.js`
@@ -178,7 +186,9 @@ ring shows carriers done.
 Republishing: pass the artifact's existing URL as `url` on the publish call,
 after reading that artifact with the Artifact tool's read action in the
 current conversation; a publish without `url` creates a new artifact with a
-new link and none of the old comments. Do this after every accepted spec
+new link and none of the old comments. The same steps are in the page's
+embedded agent guide, so an editor's agent that has only the artifact URL can
+run this loop too. Do this after every accepted spec
 change the author has authorized publishing for; the author is working in
 the Workbench and sees no live state there.
 

@@ -44,7 +44,7 @@ class Element {
 }
 function harness(raw,options={},renderOptions={}){
  const frames=new Map(),timers=new Map(),observers=[];let serial=0;
- const doc=new Element('document');doc.hidden=false;doc.visibilityState='visible';doc.createElement=tag=>new Element(tag);doc.createElementNS=(_,tag)=>new Element(tag);doc.body=new Element('body');doc.documentElement=new Element('html');
+ const doc=new Element('document');doc.hidden=false;doc.visibilityState='visible';doc.createElement=tag=>new Element(tag);doc.createElementNS=(_,tag)=>new Element(tag);doc.body=new Element('body');doc.getElementById=id=>doc.querySelector('[id="'+id+'"]');doc.documentElement=new Element('html');
  const schedule=(collection,fn,ms)=>{const id=++serial;collection.set(id,{fn,ms});return id;};
  const win=new Element('window');Object.assign(win,{document:doc,innerWidth:1440,innerHeight:900,setTimeout:(f,ms)=>schedule(timers,f,ms),clearTimeout:id=>timers.delete(id),setInterval:(f,ms)=>schedule(timers,f,ms),clearInterval:id=>timers.delete(id)});
  const C={URL,console,AbortController,document:doc,window:win,requestAnimationFrame:f=>schedule(frames,f),cancelAnimationFrame:id=>frames.delete(id),setTimeout:win.setTimeout,clearTimeout:win.clearTimeout,setInterval:win.setInterval,clearInterval:win.clearInterval,
@@ -878,4 +878,17 @@ test('O2 #764 provider demo and docs carry the assignee accountId',()=>{
  const timeline=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8'));
  for(const day of timeline.days)for(const [key,entry] of Object.entries(day.issues))assert.match(entry.assigneeId || '',/\S/,'timeline '+key+' names an accountId for the demo');
  assert.match(fs.readFileSync('docs/live-status.md','utf8'),/wiki\/people/);assert.match(fs.readFileSync('src/native/mount.d.ts','utf8'),/assigneeId\?: string/);
+});
+/* G1: #758 embedded agent guide. The panel points editors at the guide block only when the document carries it. */
+test('G1 panel shows the agent-guide line only when the document carries the dv-agent-guide block',()=>{
+ const text="Editors: ask your agent to read this page's agent guide (id dv-agent-guide)";
+ const bare=harness(fixture());let status=mountStatus(bare);assert.equal(bare.view.querySelector('.dv-live-agent-guide'),null,'no guide block, no line');
+ bare.ctl.liveStatus.apply(fixed);assert.ok(bare.view.querySelector('.dv-live-panel-body'));assert.equal(bare.view.querySelector('.dv-live-agent-guide'),null,'still none with data');status.destroy();bare.ctl.liveStatus.destroy();
+ const h=harness(fixture());h.doc.appendChild(new Element('script',{type:'text/markdown',id:'dv-agent-guide'}));status=mountStatus(h);
+ let line=h.view.querySelector('.dv-live-agent-guide');assert.ok(line,'line present before any data');assert.equal(line.textContent,text);assert.equal(line.tagName,'p');
+ h.ctl.liveStatus.apply(fixed);const body=h.view.querySelector('.dv-live-panel-body');assert.ok(body);const after=h.view.querySelector('.dv-live-agent-guide');assert.ok(after===line,'identity retained across repaint');assert.equal(after.textContent,text);
+ const children=status.body.children;assert.ok(children.indexOf(after)>children.indexOf(body),'line follows the panel body');
+ assert.equal(h.view.querySelectorAll('.dv-live-agent-guide').length,1);
+ const d=h.C.PanelRegistry.get('live-status');assert.match(d.styles,/\.dv-live-agent-guide\{[^}]*--dfaint/);
+ status.destroy();h.ctl.liveStatus.destroy();
 });

@@ -818,3 +818,23 @@ test('Play buttons inspector changes either presentation with one exact Undo and
     h.inspector.render();const reset=aria(h.guide,'Play buttons');reset.value='auto';reset.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].playbackPosition,undefined);
   }
 });
+
+test('GitHub scope edits touch only tracking.github; an absent tracking.jira stays absent (#756)',()=>{
+  const e=environment(),page={title:'Board',sections:[{heading:'Flow',diagram:{nodes:{a:{tickets:['AA-1']}},rows:[['a']]}}]};
+  const h=e.mount({page});h.session.target={kind:'document'};h.inspector.render();
+  const field=name=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent===name).children[1];
+  const tracking=()=>JSON.parse(h.text).page.tracking;
+  const scope=field('GitHub scope');scope.value='acme/firmware, acme/backend';scope.fire('change');h.flush();
+  assert.deepEqual(tracking(),{github:{repos:['acme/firmware','acme/backend']}},'no jira block is invented');
+  h.inspector.render();field('GitHub scope').value='org:acme';field('GitHub scope').fire('change');h.flush();
+  assert.deepEqual(tracking(),{github:{org:'acme'}});
+  h.inspector.render();field('GitHub scope').value='';field('GitHub scope').fire('change');h.flush();
+  assert.deepEqual(tracking(),{},'clearing the scope removes tracking.github and adds nothing');
+  h.inspector.render();field('GitHub scope').value='bad scope!';field('GitHub scope').fire('change');h.flush();
+  assert.deepEqual(tracking(),{});assert.match(h.guide.querySelector('.ierr').textContent,/owner\/repo/);
+  h.inspector.render();field('Jira site').value='https://acme.atlassian.net';field('Jira site').fire('change');h.flush();
+  assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'}},'a Jira edit still creates the jira block');
+  h.inspector.render();field('GitHub scope').value='acme/firmware';field('GitHub scope').fire('change');h.flush();
+  assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'},github:{repos:['acme/firmware']}},'an existing jira block is preserved');
+  h.session.undo();assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'}});
+});

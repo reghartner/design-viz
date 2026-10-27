@@ -509,8 +509,10 @@ function pageTrackingControls(val){
       return commitCascade(function(raw){
         var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
         var tracking=specObject(doc.page.tracking)?builderClone(doc.page.tracking):{};
-        if(!specObject(tracking.jira))tracking.jira={};
-        edit(tracking.jira,doc.page,tracking);
+        // tracking.jira appears only when a Jira field is edited; a GitHub scope edit leaves an absent jira block absent.
+        var hadJira=specObject(tracking.jira),jira=hadJira?tracking.jira:{};
+        edit(jira,doc.page,tracking);
+        if(hadJira || Object.keys(jira).length)tracking.jira=jira;
         return planSetField(session.text(),raw,doc.path,'tracking',JSON.stringify(tracking));
       },{after:refreshFormSoon});
     }

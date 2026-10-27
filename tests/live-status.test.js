@@ -6,7 +6,7 @@
 | V3 | Rollup for one carrier with several tickets (docs/live-status.md): any blocked → blocked; else any missing → missing; else any active → active; else all done → done; else all todo → todo; else (mix of done and todo) → active. A carrier whose tickets are all absent from the map gets NO class. Implement as a pure function `liveStatusRollup(states[])` (exported as a global like other engine helpers) so it is unit-testable. |
 | V4 | `apply(map)` sets exactly one `dv-live-<state>` class (removing the others) on: every node `g.node[data-dv-node]` with tickets; every edge `path.edge[data-dv-edge]` with tickets, plus its halo path and its `text.lbl` label (same `data-dv-edge` index); every step coin `g.coin[data-dv-step]` and step chip `button.schip[data-step-source]` whose step involves (via `edges`/keys, `nodes`, failures) at least one carrier that has a state — rollup of those carriers' states; in path-timeline chips too. Text boxes (`g.node.node-text`) never get a class. |
 | V5 | CSS in src/style.core.css, for EVERY skin selector family that paints `.card`/edges today (aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac — check the skin list in the file): `.dv-live-todo` grey, `.dv-live-active` amber, `.dv-live-done` green, `.dv-live-blocked` and `.dv-live-missing` red. Node: card stroke + a soft halo (drop-shadow) in the state color and the status badge; edge: stroke color (main + halo) with the state color; coin: circle fill + ink via the same `--step-color`/`--step-ink` custom properties the `.step-colored` rules use (so precedence and `!important` match); chip: background via the same variables. Define the five colors once as CSS custom properties on `:root` (`--dv-live-todo`, …) and reuse. active/blocked/missing pulse: reuse the existing `runtime-pulse` keyframes (stroke-width) on the badge circle and a slow (≈2.4 s) opacity pulse on the card halo; `@media (prefers-reduced-motion: reduce)` disables both (follow the existing reduced-motion blocks). Live classes win over `tone-*` card fill/stroke while present. Step-mode dimming (`.stepmode .node:not(.lit)` etc.) still applies but with an opacity floor of .55 for live-classed elements, like `.stepmode .coin.step-colored:not(.lit)`. Print: no pulse, keep colors. |
-| V6 | Badge: on each live-classed node and edge, a small SVG `g.dv-live-badge` (circle + glyph: todo "○", active "◔", done "✓", blocked "!", missing "?") appended like `renderRuntimeConditions` does (`src/engine.js`, around line 1586) — top-right of the card (the bottom-right slot belongs to runtime badges and detail triggers); for edges at the label position. `missing` badge gets a hatched (dashed stroke) circle. Clicking/Enter/Space on a badge opens a popover (reuse the manual popover construction of `wireNodeReferences` / `.nbackpop`): one row per ticket — key (link to `tracking.jira.site + '/browse/' + key` when site exists, else `url` from the map, else plain text), state label, title, assignee, and "PRs: n open/merged" when `prs` present — then the authored `prs` URLs as plain links. Escape/outside click closes; focus returns to the badge. |
+| V6 | No canvas badge (#762, Chuck 2026-10-27): state is carried by card stroke and halo, edge stroke, dashed todo/waiting strokes, step coins and the break glyph. The ticket popover (manual popover in the `.nbackpop` style: one row per ticket with key link to `tracking.jira.site + '/browse/' + key` when site exists, else `url`, else plain text; state pill, title, assignee, "PRs: n open/merged"; then authored `prs` URLs) opens from the carrier itself: a click on a ticketed node card (not its links/detail/handoff controls) or on an edge label (the edge path when unlabelled). In the reader the card/label is a named `role="button"` with `tabindex="0"`, opened by Enter/Space; Escape/outside click closes and returns focus to it. Under `authoring` (Workbench) carriers stay inert so selection keeps its clicks. |
 | V7 | Node "⋯" menu: `nodeReferenceLinks` (`src/engine.js:257`) gains a "Tickets" group listing ticket keys (browse links when site is set) and authored PR links for that node, so the menu shows them even without a provider. |
 | V8 | Live control: in the reader controls (where the theme menu / Contents controls live, `src/viewer/contents.js`), a `button.dv-live-toggle` with text "Live" + counts chip per state (hidden when zero), `aria-pressed` reflecting `enabled()`, a `time.dv-live-updated` ("updated <relative>" from the newest `updatedAt`; omitted when none), and a `span.dv-live-note` text slot set by `ctl.liveStatus.note(text, kind)` (`kind` ∈ `info|warn|error`) plus `ctl.liveStatus.action(label, fn)` to show one button (used by #738 for "Allow"). The control is hidden until the page has at least one ticket ref (`refs().tickets.length > 0`). |
 | V9 | Re-apply after every rebuild: listen on the section element for `dv:pathrender` and `dv:pathchange`, on the view for `diagram-tab-change`, `tab-view-change`, `diagram-view-change`, `navigation-mounted`, `detail-navigation`, and use one MutationObserver (childList, subtree) scoped to step-control containers for chip rebuilds; coalesce with requestAnimationFrame. The classes survive a path switch (new SVG) and a detail flow open. `ctl.destroy()` disconnects everything. |
@@ -217,10 +217,44 @@ test('S4 cyclic joins and self-loops visit each carrier once per blocker',()=>{
 test('S4 waiting preserves own state, supplies badge/popover keys and clears on toggle/apply',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]');
  assert.ok(b.classList.contains('dv-live-waiting'));assert.ok(b.classList.contains('dv-live-active'));assert.equal(b.getAttribute('data-dv-live-waiting-on'),'EE-1');
- const badge=b.querySelector('.dv-live-badge');assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);badge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+ const card=b.querySelector('.card');assert.match(card.getAttribute('aria-label'),/waiting on EE-1/);h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
  assert.ok(h.view.querySelector('.dv-live-popover').querySelectorAll('div').some(el=>(el.textContent||'').includes('EE-1')));
  api.setEnabled(false);assert.equal(b.getAttribute('data-dv-live-waiting-on'),null);api.setEnabled(true);assert.ok(b.classList.contains('dv-live-waiting'));
  api.apply({'BB-1':{state:'done'},'BB-2':{state:'done'},'EE-1':{state:'blocked'}});assert.ok(!b.classList.contains('dv-live-waiting'));api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
+});
+test('L1 waiting badges carry no canvas text tag; the aria-label and popover keep the keys',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),badge=b.querySelector('.card');
+ assert.ok(b.classList.contains('dv-live-waiting'));assert.match(badge.getAttribute('aria-label'),/waiting on EE-1/);
+ assert.equal(h.view.querySelectorAll('.dv-live-waiting-tag').length,0);
+});
+test('R1 R2 R3 apply paints no badges; ticketed cards and edge labels are popover buttons only outside authoring',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);
+ assert.equal(h.view.querySelectorAll('.dv-live-badge').length,0);
+ const card=h.view.querySelector('[data-dv-node="b"]').querySelector('.card');
+ assert.equal(card.getAttribute('role'),'button');assert.equal(card.getAttribute('tabindex'),'0');assert.equal(card.getAttribute('aria-haspopup'),'dialog');assert.match(card.getAttribute('aria-label'),/^Live tickets for .*waiting on EE-1/);
+ const label=h.view.querySelector('text.lbl[data-dv-edge="0"]');assert.equal(label.getAttribute('role'),'button');assert.equal(label.getAttribute('tabindex'),'0');
+ api.setEnabled(false);assert.equal(card.getAttribute('tabindex'),null);assert.equal(card.getAttribute('role'),null);api.setEnabled(true);assert.equal(card.getAttribute('tabindex'),'0');
+ const w=harness(fixture(),{},{authoring:true});w.ctl.liveStatus.apply(fixed);const wcard=w.view.querySelector('[data-dv-node="b"]').querySelector('.card');
+ assert.ok(w.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-active'));assert.equal(wcard.getAttribute('tabindex'),null);assert.equal(wcard.getAttribute('role'),null);
+ assert.equal(w.view.querySelectorAll('.dv-live-badge').length,0);
+});
+test('P1 P3 live nodes wear Node Styles presets and restore authored styles when cleared',()=>{
+ const data=fixture();data.page.sections[0].diagram.nodes.a.style='teal';const h=harness(data),api=h.ctl.liveStatus;
+ const a=h.view.querySelector('[data-dv-node="a"]');a.classList.add('node-styled','ns-teal');
+ api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),c=h.view.querySelector('[data-dv-node="c"]');
+ assert.ok(a.classList.contains('ns-ember') && !a.classList.contains('ns-teal'));assert.ok(c.classList.contains('ns-rose') && c.classList.contains('node-styled'));
+ assert.ok(b.classList.contains('dv-live-waiting') && b.classList.contains('ns-slate'));
+ api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
+ api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('ns-rose'));
+});
+test('P4 text on live fills follows the engine step-colour contrast rule in light and dark skins',()=>{
+ const C={URL};vm.runInNewContext(entrypoint('native').source,C);const css=fs.readFileSync('src/style.core.css','utf8');
+ const block=(selector)=>{const at=css.indexOf(selector+'{--dv-live-todo:');assert.ok(at>=0,selector);return css.slice(at,css.indexOf('}',at));};
+ for(const selector of [':root','.sk-aurora:not(.sk-editorial):not(.sk-pastel)']){
+  const body=block(selector),on=(/--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(body) || /--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(block(':root')))[1];
+  for(const state of ['todo','active','done','blocked','missing']){const fill=new RegExp('--dv-live-'+state+':(#[0-9A-Fa-f]{6})').exec(body)[1];assert.equal(C.stepCircleInk(fill.toLowerCase()),on.toLowerCase(),selector+' '+state);}
+ }
+ assert.match(css,/--step-ink:var\(--dv-live-on\)!important/);assert.match(fs.readFileSync('src/panels/types/live-status.js','utf8'),/\.dv-live-count\{[^}]*color:var\(--dv-live-on\)/);
 });
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
@@ -430,7 +464,7 @@ test('B6 B9 stale decorates carriers without changing rollup and reduced motion 
  const h=harness(fixture()),api=h.ctl.liveStatus;h.win.matchMedia=()=>({matches:true});
  api.apply({'AA-1':{state:'active',updatedAt:'2000-01-01T00:00:00Z'}});
  const node=h.view.querySelector('[data-dv-node="a"]');assert.ok(node.classList.contains('dv-live-stale'),'B6 stale carrier');assert.ok(node.classList.contains('dv-live-active'));
- node.querySelector('.dv-live-badge').dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+ h.view.dispatchEvent({type:'click',target:node.querySelector('.card'),button:0,preventDefault(){},stopPropagation(){}});
  assert.ok(h.view.querySelector('.dv-live-stale-detail'));api.apply({'AA-1':{state:'done'}});assert.ok(!node.classList.contains('dv-live-stale'));assert.ok(!node.classList.contains('dv-live-changed'));
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0);
 });
@@ -494,12 +528,12 @@ test('B6 external detail staleDays applies to its nodes edges badges and popover
  const parent=h.rootRec.sectionEl.querySelector('g.node'),child=h.childRec.sectionEl.querySelector('g.node[data-dv-node="child"]'),edge=h.childRec.sectionEl.querySelector('path.edge');
  for(const carrier of [child,edge]){assert.ok(carrier.classList.contains('dv-live-stale'));assert.ok(carrier.classList.contains('dv-live-active'));}
  assert.ok(!parent.classList.contains('dv-live-stale'));assert.ok(parent.classList.contains('dv-live-active'));
- for(const badge of [child.querySelector('.dv-live-badge'),h.childRec.sectionEl.querySelector('.dv-live-badge[data-live-edge="0"]')]){
-  assert.ok(badge.classList.contains('dv-live-stale'));badge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+ for(const target of [child.querySelector('.card'),h.childRec.sectionEl.querySelector('text.lbl[data-dv-edge="0"]')]){
+  assert.ok(target.classList.contains('dv-live-target'));h.view.dispatchEvent({type:'click',target:target,button:0,preventDefault(){},stopPropagation(){}});
   assert.equal(h.view.querySelector('.dv-live-stale-detail').textContent,'no activity 3 d');
  }
- const rootBadge=parent.querySelector('.dv-live-badge');assert.ok(!rootBadge.classList.contains('dv-live-stale'));
- rootBadge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});assert.equal(h.view.querySelector('.dv-live-stale-detail'),null);
+ const rootCard=parent.querySelector('.card');assert.ok(rootCard.classList.contains('dv-live-target'));
+ h.view.dispatchEvent({type:'click',target:rootCard,button:0,preventDefault(){},stopPropagation(){}});assert.equal(h.view.querySelector('.dv-live-stale-detail'),null);
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0);api.destroy();
 });
 
@@ -556,7 +590,7 @@ test('E6 Tickets table orders states includes columns authored PRs lane stripe a
  assert.deepEqual(aa.querySelectorAll('a').map(el=>el.getAttribute('href')),['https://jira.test/browse/AA-1','https://code.test/pull/1','https://code.test/pull/2']);
  assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
  assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.deepEqual(aaCoverage.querySelectorAll('button').map(el=>el.textContent),['Client','Call']);assert.equal(aa.querySelectorAll('button').length,0,'no coverage buttons inside the data row');
- let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.dv-live-badge').focus=()=>focused=true;aaCoverage.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
+ let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;aaCoverage.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
  assert.match(h.view.querySelector('.dv-live-verdict').textContent,/5 of 6 epic stories on diagram/);api.destroy();
 });
 test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
@@ -601,7 +635,7 @@ test('E8 rework Workbench demo entries paint carrier badges with page epics conf
  assert.deepEqual(plain(map),{'AA-1':{state:'todo',epic:'EP-1'},'BB-1':{state:'active',epic:'EP-1'},'CC-1':{state:'done',epic:'EP-1'},'DD-1':{state:'blocked',epic:'EP-1'},'EE-1':{state:'todo',epic:'EP-1'},'FF-1':{state:'active',epic:'EP-1'}});
  h.ctl.liveStatus.apply(map);
  assert.match(h.ctl.liveStatus.snapshot().verdict,/6 of 6 epic stories on diagram/,'E8 demo entries count as epic stories');
- assert.equal(h.view.querySelectorAll('.dv-live-badge').length,3);
+ assert.equal(h.view.querySelectorAll('.dv-live-badge').length,0);assert.equal(h.view.querySelectorAll('.dv-live-target').length,3);
  assert.ok(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-todo'));
  assert.ok(h.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-blocked'));
  assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-todo'));
@@ -654,7 +688,8 @@ test('E6 rework coverage opens inactive local and loaded external detail carrier
    saved=value;active=[rootRec,childRec];rootRec.sectionEl.hidden=true;h.view.appendChild(childRec.sectionEl);
   }};
   if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
-  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  // Carriers are the harness's own cards (no canvas badges), so they take the focus stub.
+  for(const el of [...h.view.querySelectorAll('.card'),...childRec.sectionEl.querySelectorAll('.card')])el.focus=()=>h.doc.activeElement=el;
   mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
   for(let i=0;i<2;i++){
    assert.ok(h.view.querySelector('.dv-live-panel-body'));

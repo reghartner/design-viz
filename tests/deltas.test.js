@@ -153,8 +153,8 @@ test('tracking authoring guidance documents references and the future Jira-only 
   assert.ok(fs.existsSync(file), 'live-status guide exists');
   const guide = fs.readFileSync(file,'utf8');
   for (const term of ['flow.live-status','tracking','tickets','prs','Jira','informational','#735']) assert.ok(guide.includes(term),term);
-  for (const pattern of [/todo[^\n]*grey/i,/active[^\n]*amber[^\n]*slow pulse/i,/done[^\n]*green/i,
-    /blocked[^\n]*red[^\n]*pulse/i,/missing[^\n]*red[^\n]*pulse[^\n]*hatched badge/i,
+  for (const pattern of [/todo[^\n]*slate/i,/active[^\n]*ember[^\n]*slow pulse/i,/done[^\n]*moss/i,
+    /blocked[^\n]*rose[^\n]*pulse/i,/missing[^\n]*rose[^\n]*dotted[^\n]*pulse/i,/waiting[^\n]*slate[^\n]*dashed/i,
     /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
     /color comes from Jira status only/i,/prs[^.]*plain links/i,/## Rendering/]) assert.match(guide,pattern);

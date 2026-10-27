@@ -7752,13 +7752,18 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 
 /* Live evidence uses one palette in every skin. It wins over authored tone,
    protocol and step paint only for carriers present in the runtime map. */
-:root{--dv-live-todo:#9ca3af;--dv-live-active:#f59e0b;--dv-live-done:#22c55e;--dv-live-blocked:#ef4444;--dv-live-missing:#ef4444;}
+/* Live state colours are the Node Styles preset lines (#610): todo slate,
+   active ember, done moss, blocked and missing rose; dark values follow the
+   presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
+   (stepCircleInk: black or white, whichever contrasts more) for every fill. */
+:root{--dv-live-todo:#6E89A5;--dv-live-active:#CB6620;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#E28247;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
 .dv-live-todo{--dv-live-color:var(--dv-live-todo);}
 .dv-live-active{--dv-live-color:var(--dv-live-active);}
 .dv-live-done{--dv-live-color:var(--dv-live-done);}
 .dv-live-blocked{--dv-live-color:var(--dv-live-blocked);}
 .dv-live-missing{--dv-live-color:var(--dv-live-missing);}
-:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:#111827!important;}
+:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-on)!important;}
 .sk-aurora{--dv-live-card:#101a2c;}
 .sk-daylight{--dv-live-card:#fff;}
 body.sk-editorial .docview{--dv-live-card:var(--ed-sheet,#fff);}
@@ -7767,7 +7772,7 @@ body.sk-pastel .docview{--dv-live-card:#fff;}
 body.sk-blueprint .docview{--dv-live-card:#08366d;}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview{--dv-live-card:var(--fl-card,#fff);}
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing) .card{
-  stroke:var(--dv-live-color)!important;fill:var(--dv-live-card)!important;filter:drop-shadow(0 0 3px var(--dv-live-color))!important;animation:none!important;
+  stroke:var(--ns-line,var(--dv-live-color))!important;fill:var(--ns-bg,var(--dv-live-card))!important;filter:drop-shadow(0 0 3px var(--ns-line,var(--dv-live-color)))!important;animation:none!important;
 }
 .dv-live-halo{fill:none;stroke:var(--dv-live-color);stroke-width:2;filter:drop-shadow(0 0 6px var(--dv-live-color));opacity:.5;pointer-events:none;}
 :is(.dv-live-active,.dv-live-blocked,.dv-live-missing)>.dv-live-halo{animation:dv-live-halo-pulse 2.4s ease-in-out infinite;}
@@ -7779,34 +7784,32 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
 .schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
 .stepmode :is(.node,.edge,.halo,.lbl,.coin):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing):not(.lit):not(.comm-hidden):not(.dv-live-comm-hidden){opacity:max(var(--dv-dim,.45),.55)!important;}
-.dv-live-badge{cursor:pointer;outline:none;}
-.dv-live-badge circle{fill:var(--dv-live-color);stroke:#111827;stroke-width:2;}
-.dv-live-badge text{fill:#111827!important;font:bold 12px sans-serif;pointer-events:none;}
-.dv-live-badge:focus-visible circle{stroke:#fff;stroke-width:4;}
-.dv-live-badge:is(.dv-live-active,.dv-live-blocked,.dv-live-missing) circle{animation:runtime-pulse 2.4s ease-in-out infinite;}
-.dv-live-badge.dv-live-missing circle{stroke-dasharray:2 2;}
+.dv-live-target,g.node:has(>.card.dv-live-target){cursor:pointer;}
+.dv-live-target:focus:not(:focus-visible){outline:none;}
+.dv-live-target:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
 .dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}
 .dv-live-ticket-title,.dv-live-ticket-assignee,.dv-live-ticket-prs,.dv-live-ticket-detail{grid-column:1 / -1;white-space:pre-wrap;overflow-wrap:anywhere;}
-@media(prefers-reduced-motion:reduce){.dv-live-badge circle,.dv-live-halo{animation:none!important;}}
+@media(prefers-reduced-motion:reduce){.dv-live-halo{animation:none!important;}}
 @media print{
-  .dv-live-badge circle,.dv-live-halo{animation:none!important;}
+  .dv-live-halo{animation:none!important;}
   .dv-live-popover{display:none!important;}
   :is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){print-color-adjust:exact;-webkit-print-color-adjust:exact;}
 }
 
 /* Waiting is dependency evidence; the original dv-live state stays intact. */
-.dv-live-waiting{--dv-live-waiting-color:#a87777;}
+.dv-live-waiting{--dv-live-waiting-color:var(--dv-live-todo);}
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-waiting .card,
 :is(path.edge,path.halo).dv-live-waiting{stroke:var(--dv-live-waiting-color)!important;stroke-dasharray:5 5!important;}
-.dv-live-badge.dv-live-waiting circle{fill:var(--dv-live-waiting-color);animation:none!important;}
-.dv-live-badge .dv-live-waiting-tag{fill:var(--dink,#24324b)!important;font:10px sans-serif;paint-order:stroke;stroke:var(--dv-live-card,#fff);stroke-width:3px;}
+.node.dv-live-waiting>.dv-live-halo{stroke:var(--dv-live-waiting-color);filter:drop-shadow(0 0 6px var(--dv-live-waiting-color));}
 path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
+/* Missing tickets are dotted rose; blocked stays solid rose. */
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-missing:not(.dv-live-waiting) .card,
+path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
 .dv-live-packet-hidden,.dv-live-comm-suppressed{display:none!important;}
 .dv-live-comm-hidden{visibility:hidden!important;opacity:0!important;animation:none!important;pointer-events:none;}
 .dv-live-comm-failure{--comm-color:var(--dv-live-blocked)!important;}
-.dv-live-break-label{fill:var(--dink,#24324b);font:10px sans-serif;paint-order:stroke;stroke:var(--dv-live-card,#fff);stroke-width:3px;}
 @media print{
   .dv-live-waiting{print-color-adjust:exact;-webkit-print-color-adjust:exact;}
   .dv-live-comm-failure{display:inline!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
@@ -7816,7 +7819,6 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 /* Story evidence supplements the state color with text, progress and age. */
 .dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
 .lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
-.dv-live-stale.dv-live-badge>circle{stroke:#9ca3af!important;stroke-dasharray:3 3;stroke-width:3;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
 /* Keep the carrier group's positioned SVG transform intact. Match the live
    card paint specificity so its animation reset cannot suppress this pulse. */
@@ -8780,7 +8782,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dispatch-status{letter-spacing:-.6px}.dispatch-unit{background:color-mix(in srgb,var(--dtext) 3%,transparent);padding:12px}.dispatch-scene{border-radius:12px}.dispatch-hero{border-radius:12px}.dispatch-brief{line-height:1.65}.dispatch-roster{gap:7px}
 
 .dv-live-toggle{display:flex;gap:4px;align-items:center;}
-.dv-live-count{border-radius:4px;padding:2px 4px;color:#111827;}
+.dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-count[data-live-count="todo"]{background:var(--dv-live-todo);}
 .dv-live-count[data-live-count="active"]{background:var(--dv-live-active);}
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
@@ -8824,6 +8826,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-coverage-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;white-space:nowrap;background:color-mix(in srgb,var(--dv-live-active) 18%,transparent);color:var(--dink);}
 .dv-live-pr-summary{color:var(--dfaint);margin-left:4px;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
+.dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}
@@ -9032,7 +9035,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
       {
         "heading": "Press the button, ring the chime, alert the resident",
         "text": [
-          "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: grey not started, amber in progress, green done, red blocked or missing.",
+          "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: slate not started, orange in progress, green done, rose blocked or missing.",
           "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the Story panel to pause, step, or switch the visual treatment."
         ],
         "diagram": {
@@ -23974,7 +23977,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
   var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
-.dv-live-count{border-radius:4px;padding:2px 4px;color:#111827;}
+.dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-count[data-live-count="todo"]{background:var(--dv-live-todo);}
 .dv-live-count[data-live-count="active"]{background:var(--dv-live-active);}
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
@@ -24018,6 +24021,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-coverage-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;white-space:nowrap;background:color-mix(in srgb,var(--dv-live-active) 18%,transparent);color:var(--dink);}
 .dv-live-pr-summary{color:var(--dfaint);margin-left:4px;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
+.dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}
@@ -34587,7 +34591,6 @@ function wireDeltaDetails(host, prefix, scope){
    Navigation can replace SVGs and step controls independently; source indices
    and section identities keep the paint attached to the authored carriers. */
 var LIVE_STATUS_STATES = ['todo','active','done','blocked','missing'];
-var LIVE_STATUS_GLYPHS = {todo:'○',active:'◔',done:'✓',blocked:'!',missing:'?'};
 function liveStatusRollup(states){
   states=(states || []).filter(function(state){return LIVE_STATUS_STATES.indexOf(state)>=0;});
   if(!states.length)return null;
@@ -34606,6 +34609,23 @@ function liveStatusClass(el,state){
     if(value===state){if(!el.classList.contains(name))el.classList.add(name);}
     else if(el.classList.contains(name))el.classList.remove(name);
   });
+}
+/* Live node paint is a Node Styles preset (#610), not an overlay palette.
+   An authored preset is saved on first paint and restored when paint clears. */
+var LIVE_STATUS_PRESETS = {todo:'slate',active:'ember',done:'moss',blocked:'rose',missing:'rose'};
+function liveStatusPreset(el,token){
+  var saved=el._livePreset;
+  if(!saved && !token)return;
+  if(!saved){
+    var authored=null;(el.getAttribute('class') || '').split(/\s+/).forEach(function(name){if(/^ns-/.test(name))authored=name.slice(3);});
+    saved=el._livePreset={styled:el.classList.contains('node-styled'),token:authored,current:null};
+  }
+  if(saved.current)el.classList.remove('ns-'+saved.current);
+  if(saved.token)el.classList.remove('ns-'+saved.token);
+  if(token){el.classList.add('node-styled');el.classList.add('ns-'+token);saved.current=token;return;}
+  if(!saved.styled)el.classList.remove('node-styled');
+  if(saved.token)el.classList.add('ns-'+saved.token);
+  delete el._livePreset;
 }
 function liveStatusCarrier(value,map){
   return liveStatusRollup(trackingRefs(value).tickets.map(function(key){return map[key] && map[key].state;}));
@@ -34662,6 +34682,10 @@ function liveStatusEdgeBreaks(scope,diagram,map,on){
       });
     });
     showCommunicationFailures(board,failures,false,{live:true,labels:labels});
+    // A live break is the glyph alone: the edge names its ends, and the badge,
+    // popover and the group's title/aria-label carry the blocking keys. Canvas
+    // text here would sit on the edge label, its coin or a node card.
+    svg.querySelectorAll('g.dv-live-comm-failure .dv-live-break-label').forEach(function(el){el.remove();});
   });
 }
 function liveStatusStep(diagram,step,map){
@@ -34759,7 +34783,7 @@ function liveStatusWhenReady(host,connect){
 }
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};page=page || {};
-  var view=ctl.view,records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
+  var view=ctl.view,authoring=!!(renderOptions && renderOptions.authoring),records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -34837,7 +34861,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(pop){if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;}
     if(focus && trigger && trigger.isConnected)trigger.focus();
   }
-  function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target))close(true);}
+  function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
   function show(trigger,value,tracking,label,waiting){
     if(retired)return;
@@ -34867,21 +34891,50 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
-  function badge(parent,value,state,tracking,label,x,y,edgeIndex,waiting){
-    var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','dv-live-badge');
-    liveStatusClass(badge,state);liveStatusWaitingClass(badge,waiting);
-    badge.setAttribute('data-live-tickets',trackingRefs(value).tickets.join(','));
-    if(trackingRefs(value).tickets.some(function(key){return liveStatusStale(map[key],Date.now(),tracking && tracking.staleDays);}))badge.classList.add('dv-live-stale');badge.setAttribute('transform','translate('+x+' '+y+')');
-    badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label','Live tickets for '+label+(waiting?' · waiting on '+waiting.join(', '):''));badge.setAttribute('aria-haspopup','dialog');badge.setAttribute('aria-expanded','false');
-    if(edgeIndex!=null)badge.setAttribute('data-live-edge',String(edgeIndex));
-    var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','9');badge.appendChild(circle);
-    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=waiting?'…':LIVE_STATUS_GLYPHS[state];badge.appendChild(text);
-    if(waiting){var tag=document.createElementNS(SVGNS,'text');tag.setAttribute('class','dv-live-waiting-tag');tag.setAttribute('text-anchor','end');tag.setAttribute('y','-16');tag.textContent='waiting on '+waiting.join(', ');badge.appendChild(tag);}
-    badge.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
-    badge.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);});
-    badge.addEventListener('keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);}});
-    markFragmentElement(badge,value);parent.appendChild(badge);return badge;
+  /* Carriers are their own ticket triggers (#762; Chuck 2026-10-27 removed the
+     canvas badges): a ticketed node's card, and an edge's label (its path when
+     unlabelled). Paint, coins and the break glyph already carry the state. In
+     the reader the trigger is a named button reached by Tab; under authoring
+     the Workbench owns carrier clicks, selection and focus, so the trigger
+     stays inert and the Tickets table remains the route to the popover. */
+  var CARRIER_ATTRS=['role','tabindex','aria-label','aria-haspopup','aria-expanded'];
+  function carrierTarget(el,id,value,state,tracking,label,waiting){
+    if(!el._liveSaved){el._liveSaved={};CARRIER_ATTRS.forEach(function(name){el._liveSaved[name]=el.getAttribute(name);});}
+    el.classList.add('dv-live-target');el.setAttribute('data-live-carrier',id);
+    el._liveCarrier={value:value,tracking:tracking,label:label,waiting:waiting};
+    if(authoring)return el;
+    el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
+    el.setAttribute('aria-label','Live tickets for '+label+(state?' · '+state:'')+(waiting?' · waiting on '+waiting.join(', '):''));
+    return el;
   }
+  function clearTargets(){
+    view.querySelectorAll('.dv-live-target').forEach(function(el){
+      var saved=el._liveSaved || {};el.classList.remove('dv-live-target');el.removeAttribute('data-live-carrier');
+      CARRIER_ATTRS.forEach(function(name){if(saved[name]==null)el.removeAttribute(name);else el.setAttribute(name,saved[name]);});
+      el._liveSaved=null;el._liveCarrier=null;
+    });
+  }
+  // A node's own controls (links menu, detail, handoff, anchors) keep their clicks.
+  var CARRIER_SKIP='a,button,input,select,textarea,summary,[role="button"]:not(.dv-live-target),.nlink,.nbackref,[data-dv-detail],[data-dv-handoff]';
+  function carrierFrom(target){
+    if(!target || !target.closest)return null;
+    var direct=target.closest('.dv-live-target');if(direct && view.contains(direct))return direct;
+    var node=target.closest('g.node[data-dv-node]');if(!node || !view.contains(node) || target.closest(CARRIER_SKIP))return null;
+    return node.querySelector('.card.dv-live-target');
+  }
+  function openCarrier(el){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting);}
+  function carrierClick(ev){
+    if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
+    var el=carrierFrom(ev.target);if(!el || !el._liveCarrier)return;
+    ev.preventDefault();ev.stopPropagation();openCarrier(el);
+  }
+  function carrierKey(ev){
+    if(authoring || retired || ev.defaultPrevented || (ev.key!=='Enter' && ev.key!==' '))return;
+    var el=ev.target;if(!el || !el.classList || !el.classList.contains('dv-live-target') || !el._liveCarrier)return;
+    ev.preventDefault();ev.stopPropagation();openCarrier(el);
+  }
+  view.addEventListener('click',carrierClick);view.addEventListener('keydown',carrierKey);
+  destroyListeners.push(function(){view.removeEventListener('click',carrierClick);view.removeEventListener('keydown',carrierKey);});
   function sourceBindings(){
     var found=[];
     ctl.sections.forEach(function(rec){var record=records.find(function(r){return r.reference===rec.reference;});if(record)found.push({el:rec.sectionEl,section:record.section,page:page,stepper:rec.stepper});});
@@ -34960,8 +35013,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     focusCarrier(binding,carrier.id);
   }
   function focusCarrier(binding,id){
-    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
-    if(badge)badge.focus({preventScroll:true});
+    var target=Array.from(binding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
+    if(target)target.focus({preventScroll:true});
   }
   function carrierBinding(carrier){
     var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
@@ -35078,22 +35131,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
       var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && !el.classList.contains('node-text')?liveStatusCarrier(value,map):null;
       var dependencies=waiting[id];decorateCarrier(el,el.classList.contains('node-text')?null:value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      liveStatusPreset(el,dependencies && dependencies.length?'slate':state?LIVE_STATUS_PRESETS[state]:null);
       if(!state && !dependencies)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
-      badge(el,value,state,binding.page.tracking,value.title || id,Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12,10,null,dependencies).setAttribute('data-live-carrier',id);
+      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,dependencies);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
       var dependencies=value && waiting[value.from+'->'+value.to];decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
       if((!state && !dependencies) || !el.classList.contains('edge'))return;
-      var svg=el.closest('svg'),label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]'),x,y;
-      if(label){var box=null;try{box=label.getBBox();}catch(ex){}x=box && box.width?box.x+box.width+12:Number(label.getAttribute('x'))+12;y=Number(label.getAttribute('y'))-4;}
-      else {var point=el.getPointAtLength(el.getTotalLength()/2);x=point.x;y=point.y-14;}
-      var marker=badge(svg,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,x,y,index,dependencies);
-      marker.setAttribute('data-live-carrier',value.from+'->'+value.to);
-      if(el.getAttribute('data-dv-hidden')==='true')marker.setAttribute('data-dv-hidden','true');
-      if(el.classList.contains('dv-fragment-hidden'))marker.classList.add('dv-fragment-hidden');
+      var label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]');
+      carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,dependencies);
     });
     liveStatusEdgeBreaks(scope,d,map,on);
     paintStory(binding);
@@ -35131,14 +35180,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // rather than relying on a flag that would be reset before delivery.
     if(observer)observer.disconnect();
     try{
-      var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-badge') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
-      close(false);syncBindings();
+      var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
+      close(false);syncBindings();clearTargets();
       if(applied){
-        view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
+        view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
       paintLanes();
-      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
+      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
       changedKeys=[];
     }finally{
       painting=false;if(!retired)observeBindings();
@@ -35216,9 +35265,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
       if(pop)pop.remove();listeners=[];
       if(applied){
-        view.querySelectorAll('.dv-live-badge,.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
+        clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
-        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
+        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
       }
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }

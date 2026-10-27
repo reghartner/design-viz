@@ -184,7 +184,7 @@ Open the artifact in a browser and check, in this order:
   Blockers, Tickets and Activity without a click.
 - Its header shows Live, counts and updated time; demo controls appear only in demo mode.
 - Network: two or more `api/frame/mcp/call` requests with status 200.
-- One node or edge popover lists its keys with state and assignee.
+- Clicking one node card or edge label opens its popover, listing the keys with state and assignee. The canvas has no status badges.
 - Screenshot for the author.
 
 With the mock server, the story clock advances one story day per minute from

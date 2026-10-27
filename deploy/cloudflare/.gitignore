@@ -1,0 +1,17 @@
+# Override the root folder allowlist only for reviewed mock-server sources.
+!/.gitignore
+!/mock-atlassian-mcp/
+/mock-atlassian-mcp/*
+!/mock-atlassian-mcp/README.md
+!/mock-atlassian-mcp/worker.mjs
+!/mock-atlassian-mcp/mcp.mjs
+!/mock-atlassian-mcp/wrangler.jsonc
+!/mock-atlassian-mcp/fixtures/
+/mock-atlassian-mcp/fixtures/*
+!/mock-atlassian-mcp/fixtures/all-todo.json
+!/mock-atlassian-mcp/fixtures/all-done.json
+# Local settings and tool caches are never sources, at any depth.
+local.env
+.dev.vars*
+.wrangler/
+.cloudflare/

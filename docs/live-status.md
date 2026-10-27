@@ -75,3 +75,9 @@ change rendering or fetch Jira data.
 
 The [live-status example](../examples/live-status/live-status.spec.json) connects
 hardware, firmware, a mobile app and backend with node and edge references.
+
+## Mock server
+
+The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
+provides fictional Jira tools without an Atlassian account. Its shared timeline
+demonstrates progress, blocked and missing tickets, and linked PR summaries.

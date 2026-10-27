@@ -4102,7 +4102,12 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 .lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing),.dv-live-lane{border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
 .dv-live-stale.dv-live-badge>circle{stroke:#9ca3af!important;stroke-dasharray:3 3;stroke-width:3;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
-.node.dv-live-changed,path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out;}
+/* Keep the carrier group's positioned SVG transform intact. Match the live
+   card paint specificity so its animation reset cannot suppress this pulse. */
+@media screen and (prefers-reduced-motion:no-preference){
+  :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
+  path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
+}
 .dv-live-panel{position:fixed;inset:90px 24px auto auto;margin:0;width:420px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
 .dv-live-panel[hidden]{display:none!important;}
 .dv-live-panel h2{margin:0 60px 16px 0;font-size:18px;}

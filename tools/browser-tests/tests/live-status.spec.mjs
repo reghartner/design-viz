@@ -267,3 +267,30 @@ test('B2 B3 automatic advancement pauses on the newly selected missing beat; man
 test('B5 B9 reduced motion creates no change pulse after real demo changes',async({page,server})=>{
  const root=await openStory(page,server);await root.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('.dv-live-changed')).toHaveCount(0);
 });
+
+test('B5 changed node pulses its card in every skin without moving the positioned group',async({page,server})=>{
+ const root=await openStory(page,server),node=root.locator('g.node[data-dv-node="button"]');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const before=await node.evaluate(el=>{
+  const card=el.querySelector('.card');
+  const pause=ev=>{
+   if(ev.target!==card || ev.animationName!=='dvnodepulse')return;
+   const animation=card.getAnimations().find(a=>a.animationName==='dvnodepulse');
+   animation.pause();animation.currentTime=230;el.removeEventListener('animationstart',pause);
+  };
+  el.addEventListener('animationstart',pause);
+  return {transform:getComputedStyle(el).transform,attribute:el.getAttribute('transform')};
+ });
+ await root.getByRole('button',{name:'Next day',exact:true}).click();
+ await expect(node).toHaveClass(/dv-live-changed/);
+ await expect.poll(()=>node.locator('.card').evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse' && a.playState==='paused'))).toBe(true);
+ for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
+  await page.evaluate(s=>window.dvSetSkin(s),skin);
+  await expect(node.locator('.card')).toHaveCSS('animation-name','dvnodepulse');
+  await expect(node).toHaveCSS('transform',before.transform);await expect(node).toHaveAttribute('transform',before.attribute);
+  expect(await node.evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse'))).toBe(false);
+  expect(await node.locator('.card').evaluate(el=>getComputedStyle(el).transform)).not.toBe('none');
+ }
+ await node.locator('.card').evaluate(el=>el.getAnimations().find(a=>a.animationName==='dvnodepulse').finish());
+ await expect(node).not.toHaveClass(/dv-live-changed/);
+});

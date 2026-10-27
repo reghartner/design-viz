@@ -435,3 +435,58 @@ test('B10 validator warns for non-positive staleDays and Story mode documents th
  raw.page.tracking.staleDays=3;assert.ok(!C.validate(C.normalize(raw)).warnings.some(w=>/tracking.staleDays/.test(w)));
  const doc=fs.readFileSync('docs/live-status.md','utf8');assert.match(doc,/## Story mode/);assert.match(doc,/onBeforeAdvance/);assert.match(doc,/staleDays/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking\.staleDays/);
 });
+
+test('B5 change class selects the card pulse without targeting the positioned node group',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus,node=h.view.querySelector('g.node[data-dv-node="a"]');
+ node.setAttribute('transform','translate(320 180)');api.apply({'AA-1':{state:'todo'}});api.apply({'AA-1':{state:'active'}});
+ assert.ok(node.matches('.node.dv-live-changed'));
+ assert.ok(node.querySelector('.card'),'the changed carrier owns the CSS pulse target');
+ const css=fs.readFileSync('src/style.core.css','utf8');
+ assert.match(css,/\.node\.dv-live-changed \.card,\s*path\.edge\.dv-live-changed\{[^}]*animation:dvnodepulse/);
+ assert.doesNotMatch(css,/\.node\.dv-live-changed\s*[,\{]/);
+ assert.equal(node.getAttribute('transform'),'translate(320 180)');
+ node.dispatchEvent({type:'animationend',target:node.querySelector('.card'),animationName:'dvnodepulse'});
+ assert.ok(!node.classList.contains('dv-live-changed'),'card animation completion clears the carrier class');api.destroy();
+});
+
+async function externalStoryHarness(rootLanes){
+ const detail={page:{tracking:{staleDays:2},lanes:{TEAM:{label:'Detail team'}},sections:[{id:'detail',diagram:{
+  nodes:{child:{tickets:['DD-1']},end:{tickets:['DD-2']}},rows:[['child','end']],edges:[{from:'child',to:'end',tickets:['DD-3']}],steps:[{id:'detail-step',lane:'TEAM',edge:'child->end'}]
+ }}]}};
+ const root={page:{lanes:rootLanes,sections:[{id:'main',diagram:{nodes:{parent:{tickets:['RR-1'],detail:{spec:'remote-story'}}},rows:[['parent']],steps:[{id:'root-step',lane:'TEAM',nodes:['parent']}]}}]}};
+ const renderOptions={loadDetail:()=>Promise.resolve(detail)},h=harness(root,{},renderOptions),child=harness(detail);
+ child.ctl.liveStatus.destroy();const rootRec=h.ctl.sections[0],childRec=child.ctl.sections[0];h.view.appendChild(childRec.sectionEl);
+ for(const rec of [rootRec,childRec]){rec.stepper={sourceIndex:()=>0,mode:()=> 'ambient',path:()=> 'default'};rec.sectionEl.appendChild(new Element('span',{class:'lanepill'}));}
+ h.ctl.details={snapshot:()=>({section:'main',frames:[{node:'parent'}]}),activeSections:()=>[rootRec,childRec]};
+ await renderOptions.loadDetail({spec:'remote-story'},new AbortController().signal);h.flush();
+ return {...h,rootRec,childRec};
+}
+test('B1 external detail lanes render progress state and titles when the root has no lanes',async()=>{
+ for(const lanes of [undefined,{TEAM:{label:'Root team'}}]){
+  const h=await externalStoryHarness(lanes),api=h.ctl.liveStatus;
+  api.mountControls(h.view);api.apply({'RR-1':{state:'done'},'DD-1':{state:'blocked'},'DD-2':{state:'done'},'DD-3':{state:'active'}});
+  const pill=h.childRec.sectionEl.querySelector('.lanepill');
+  assert.equal(pill.textContent,'Detail team · 1/3 done');assert.ok(pill.classList.contains('dv-live-blocked'));
+  assert.equal(pill.getAttribute('title'),'DD-3 · active\nDD-1 · blocked\nDD-2 · done');assert.equal(pill.getAttribute('tabindex'),'0');
+  h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+  const rows=h.view.querySelectorAll('.dv-live-lane');assert.equal(rows.length,lanes?2:1);
+  const row=rows.find(el=>el.textContent.startsWith('Detail team'));assert.equal(row.textContent,pill.textContent);assert.equal(row.getAttribute('title'),pill.getAttribute('title'));assert.ok(row.classList.contains('dv-live-blocked'));
+  assert.equal(h.view.querySelector('.dv-live-blocker-lanes').textContent,'Detail team');
+  if(lanes){assert.equal(h.rootRec.sectionEl.querySelector('.lanepill').textContent,'Root team · 1/1 done');assert.ok(rows.find(el=>el.textContent==='Root team · 1/1 done').classList.contains('dv-live-done'));}
+  api.setEnabled(false);assert.equal(pill.textContent,'Detail team');assert.equal(pill.getAttribute('title'),null);api.destroy();
+ }
+});
+test('B6 external detail staleDays applies to its nodes edges badges and popovers independently of root default',async()=>{
+ const h=await externalStoryHarness(),api=h.ctl.liveStatus,entry={state:'active',updatedAt:new Date(Date.now()-3*86400000).toISOString()};
+ api.apply({'RR-1':entry,'DD-1':entry,'DD-3':entry});
+ const parent=h.rootRec.sectionEl.querySelector('g.node'),child=h.childRec.sectionEl.querySelector('g.node[data-dv-node="child"]'),edge=h.childRec.sectionEl.querySelector('path.edge');
+ for(const carrier of [child,edge]){assert.ok(carrier.classList.contains('dv-live-stale'));assert.ok(carrier.classList.contains('dv-live-active'));}
+ assert.ok(!parent.classList.contains('dv-live-stale'));assert.ok(parent.classList.contains('dv-live-active'));
+ for(const badge of [child.querySelector('.dv-live-badge'),h.childRec.sectionEl.querySelector('.dv-live-badge[data-live-edge="0"]')]){
+  assert.ok(badge.classList.contains('dv-live-stale'));badge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+  assert.equal(h.view.querySelector('.dv-live-stale-detail').textContent,'no activity 3 d');
+ }
+ const rootBadge=parent.querySelector('.dv-live-badge');assert.ok(!rootBadge.classList.contains('dv-live-stale'));
+ rootBadge.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});assert.equal(h.view.querySelector('.dv-live-stale-detail'),null);
+ api.clear();assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0);api.destroy();
+});

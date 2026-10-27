@@ -224,7 +224,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(entry.assignee)element('span','dv-live-ticket-assignee',entry.assignee,row);
         if(entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,row);
         if(entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
-        if(liveStatusStale(entry,Date.now(),page.tracking && page.tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
+        if(liveStatusStale(entry,Date.now(),tracking && tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
       }
     });
     found.prs.forEach(function(url){link(pop,url,url);});
@@ -238,7 +238,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','dv-live-badge');
     liveStatusClass(badge,state);liveStatusWaitingClass(badge,waiting);
     badge.setAttribute('data-live-tickets',trackingRefs(value).tickets.join(','));
-    if(trackingRefs(value).tickets.some(function(key){return liveStatusStale(map[key],Date.now(),page.tracking && page.tracking.staleDays);}))badge.classList.add('dv-live-stale');badge.setAttribute('transform','translate('+x+' '+y+')');
+    if(trackingRefs(value).tickets.some(function(key){return liveStatusStale(map[key],Date.now(),tracking && tracking.staleDays);}))badge.classList.add('dv-live-stale');badge.setAttribute('transform','translate('+x+' '+y+')');
     badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label','Live tickets for '+label+(waiting?' · waiting on '+waiting.join(', '):''));badge.setAttribute('aria-haspopup','dialog');badge.setAttribute('aria-expanded','false');
     if(edgeIndex!=null)badge.setAttribute('data-live-edge',String(edgeIndex));
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','9');badge.appendChild(circle);
@@ -266,9 +266,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     return found;
   }
-  function decorateCarrier(el,value){
+  function decorateCarrier(el,value,tracking){
     var keys=trackingRefs(value).tickets,media=reducedMotion();
-    el.classList.toggle('dv-live-stale',on && keys.some(function(key){return liveStatusStale(map[key],Date.now(),page.tracking && page.tracking.staleDays);}));
+    el.classList.toggle('dv-live-stale',on && keys.some(function(key){return liveStatusStale(map[key],Date.now(),tracking && tracking.staleDays);}));
     if(!on || !keys.some(function(key){return map[key];}) || (media && media.matches)){el.classList.remove('dv-live-changed');return;}
     if(!el.classList.contains('node') && !el.classList.contains('edge'))return;
     if(!keys.some(function(key){return changedKeys.indexOf(key)>=0;}))return;
@@ -285,23 +285,29 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var step=d.steps[stepper.sourceIndex()],text=step && liveStatusCaption(d,step,map),host=binding.el.querySelector('.termbar .step-text');
     if(text && host)element('span','dv-live-caption',text,host);
   }
-  function laneLabel(id){return (page.lanes[id] || {}).label || id;}
-  function decorateLane(el,id,lanes){
+  function laneLabel(id,source){return ((source.lanes || {})[id] || {}).label || id;}
+  function laneRecords(){
+    return [page].concat(Object.keys(remotePages).map(function(key){return remotePages[key];})).map(function(source){
+      return {page:source,lanes:liveStatusLanes(source,map)};
+    });
+  }
+  function decorateLane(el,id,lanes,source){
     var lane=lanes[id];if(!lane)return;
     var enabled=on && applied && refs().tickets.length>0;
-    el.textContent=laneLabel(id)+(enabled?' · '+lane.done+'/'+lane.total+' done':'');
+    el.textContent=laneLabel(id,source)+(enabled?' · '+lane.done+'/'+lane.total+' done':'');
     liveStatusClass(el,enabled?lane.state:null);
     if(enabled){el.setAttribute('title',lane.keys.map(function(key){return key+' · '+(map[key]?map[key].state:'No status');}).join('\n'));el.setAttribute('tabindex','0');}
     else {el.removeAttribute('title');el.removeAttribute('tabindex');}
   }
   function paintLanes(){
     if(!applied || !refs().tickets.length)return;
-    var lanes=liveStatusLanes(page,map);
+    var pages=laneRecords();
     bindings.forEach(function(binding){var stepper=binding.stepper;if(!stepper)return;
+      var lanes=pages.find(function(record){return record.page===binding.page;}).lanes;
       var step=(binding.section.diagram.steps || [])[stepper.sourceIndex()];
       binding.el.querySelectorAll('.lanepill').forEach(function(el){
         if(!step || !step.lane){liveStatusClass(el,null);el.removeAttribute('title');el.removeAttribute('tabindex');return;}
-        decorateLane(el,step.lane,lanes);
+        decorateLane(el,step.lane,lanes,binding.page);
       });
     });
   }
@@ -348,17 +354,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function refreshPanel(){
     if(!panelTrigger)return;
-    panelBody.replaceChildren();var readiness=liveStatusReadiness(page,map),lanes=liveStatusLanes(page,map);
+    panelBody.replaceChildren();var readiness=liveStatusReadiness(page,map),pages=laneRecords();
     var completion=element('div','dv-live-completion',null,panelBody),svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');completion.appendChild(svg);
     ['dv-live-ring-track','dv-live-ring-done'].forEach(function(cls){var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('class',cls);circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');if(cls==='dv-live-ring-done')circle.setAttribute('stroke-dasharray',(readiness.total?100*readiness.done/readiness.total:0)+' 100');svg.appendChild(circle);});
     element('strong','',readiness.done+'/'+readiness.total+' carriers done',completion);
     element('p','dv-live-verdict',readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting',panelBody);
-    if(Object.keys(lanes).length){element('h3','','Teams',panelBody);Object.keys(lanes).forEach(function(id){var row=element('div','dv-live-lane',null,panelBody);row.setAttribute('data-live-lane',id);decorateLane(row,id,lanes);});}
+    if(pages.some(function(record){return Object.keys(record.lanes).length;})){
+      element('h3','','Teams',panelBody);pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
+        var row=element('div','dv-live-lane',null,panelBody);row.setAttribute('data-live-lane',id);decorateLane(row,id,record.lanes,record.page);
+      });});
+    }
     element('h3','','Blockers',panelBody);var blockers=element('ul','dv-live-blockers',null,panelBody);
     refs().tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).forEach(function(key){
       var entry=map[key],row=element('li','dv-live-blocker',null,blockers);link(row,key,liveStatusTicketURL(page.tracking,key,entry));
       element('span','dv-live-state-pill',entry.state,row);
-      var labels=Object.keys(lanes).filter(function(id){return lanes[id].keys.indexOf(key)>=0;}).map(laneLabel);element('span','dv-live-blocker-lanes',labels.join(', '),row);
+      var labels=[];pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
+        var label=laneLabel(id,record.page);if(record.lanes[id].keys.indexOf(key)>=0 && labels.indexOf(label)<0)labels.push(label);
+      });});element('span','dv-live-blocker-lanes',labels.join(', '),row);
       var carriers=0,steps=0;
       sectionRecords(page).forEach(function(record){var d=record.section.diagram;if(!d)return;var waiting=liveStatusWaiting(d,map);
         carriers+=Object.keys(waiting).filter(function(id){return waiting[id].indexOf(key)>=0;}).length;
@@ -375,7 +387,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var waiting=on?liveStatusWaiting(d,map):{};
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
       var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && !el.classList.contains('node-text')?liveStatusCarrier(value,map):null;
-      var dependencies=waiting[id];decorateCarrier(el,el.classList.contains('node-text')?null:value);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      var dependencies=waiting[id];decorateCarrier(el,el.classList.contains('node-text')?null:value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
       if(!state && !dependencies)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
@@ -383,7 +395,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
-      var dependencies=value && waiting[value.from+'->'+value.to];decorateCarrier(el,value);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      var dependencies=value && waiting[value.from+'->'+value.to];decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
       if((!state && !dependencies) || !el.classList.contains('edge'))return;
       var svg=el.closest('svg'),label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]'),x,y;
       if(label){var box=null;try{box=label.getBBox();}catch(ex){}x=box && box.width?box.x+box.width+12:Number(label.getAttribute('x'))+12;y=Number(label.getAttribute('y'))-4;}

@@ -641,9 +641,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
-      if(pop)pop.remove();listeners=[];clearTargets();
+      if(pop)pop.remove();listeners=[];
       if(applied){
-        view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
+        clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
         view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
       }

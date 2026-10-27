@@ -4023,13 +4023,18 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 
 /* Live evidence uses one palette in every skin. It wins over authored tone,
    protocol and step paint only for carriers present in the runtime map. */
-:root{--dv-live-todo:#9ca3af;--dv-live-active:#f59e0b;--dv-live-done:#22c55e;--dv-live-blocked:#ef4444;--dv-live-missing:#ef4444;}
+/* Live state colours are the Node Styles preset lines (#610): todo slate,
+   active ember, done moss, blocked and missing rose; dark values follow the
+   presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
+   (stepCircleInk: black or white, whichever contrasts more) for every fill. */
+:root{--dv-live-todo:#6E89A5;--dv-live-active:#CB6620;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#E28247;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
 .dv-live-todo{--dv-live-color:var(--dv-live-todo);}
 .dv-live-active{--dv-live-color:var(--dv-live-active);}
 .dv-live-done{--dv-live-color:var(--dv-live-done);}
 .dv-live-blocked{--dv-live-color:var(--dv-live-blocked);}
 .dv-live-missing{--dv-live-color:var(--dv-live-missing);}
-:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:#111827!important;}
+:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-on)!important;}
 .sk-aurora{--dv-live-card:#101a2c;}
 .sk-daylight{--dv-live-card:#fff;}
 body.sk-editorial .docview{--dv-live-card:var(--ed-sheet,#fff);}
@@ -4038,7 +4043,7 @@ body.sk-pastel .docview{--dv-live-card:#fff;}
 body.sk-blueprint .docview{--dv-live-card:#08366d;}
 body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview{--dv-live-card:var(--fl-card,#fff);}
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing) .card{
-  stroke:var(--dv-live-color)!important;fill:var(--dv-live-card)!important;filter:drop-shadow(0 0 3px var(--dv-live-color))!important;animation:none!important;
+  stroke:var(--ns-line,var(--dv-live-color))!important;fill:var(--ns-bg,var(--dv-live-card))!important;filter:drop-shadow(0 0 3px var(--ns-line,var(--dv-live-color)))!important;animation:none!important;
 }
 .dv-live-halo{fill:none;stroke:var(--dv-live-color);stroke-width:2;filter:drop-shadow(0 0 6px var(--dv-live-color));opacity:.5;pointer-events:none;}
 :is(.dv-live-active,.dv-live-blocked,.dv-live-missing)>.dv-live-halo{animation:dv-live-halo-pulse 2.4s ease-in-out infinite;}
@@ -4065,10 +4070,13 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 }
 
 /* Waiting is dependency evidence; the original dv-live state stays intact. */
-.dv-live-waiting{--dv-live-waiting-color:#a87777;}
+.dv-live-waiting{--dv-live-waiting-color:var(--dv-live-todo);}
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-waiting .card,
 :is(path.edge,path.halo).dv-live-waiting{stroke:var(--dv-live-waiting-color)!important;stroke-dasharray:5 5!important;}
 path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
+/* Missing tickets are dotted rose; blocked stays solid rose. */
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-missing:not(.dv-live-waiting) .card,
+path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
 .dv-live-packet-hidden,.dv-live-comm-suppressed{display:none!important;}
 .dv-live-comm-hidden{visibility:hidden!important;opacity:0!important;animation:none!important;pointer-events:none;}
 .dv-live-comm-failure{--comm-color:var(--dv-live-blocked)!important;}

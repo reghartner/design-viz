@@ -77,7 +77,7 @@
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
   var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
-.dv-live-count{border-radius:4px;padding:2px 4px;color:#111827;}
+.dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-count[data-live-count="todo"]{background:var(--dv-live-todo);}
 .dv-live-count[data-live-count="active"]{background:var(--dv-live-active);}
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
@@ -106,6 +106,7 @@
 .dv-live-coverage .reader-button{display:block;margin-bottom:4px;white-space:normal;}
 .dv-live-coverage-tag{display:block;font-size:10px;font-weight:700;white-space:nowrap;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
+.dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}

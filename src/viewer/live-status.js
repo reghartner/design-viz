@@ -21,6 +21,23 @@ function liveStatusClass(el,state){
     else if(el.classList.contains(name))el.classList.remove(name);
   });
 }
+/* Live node paint is a Node Styles preset (#610), not an overlay palette.
+   An authored preset is saved on first paint and restored when paint clears. */
+var LIVE_STATUS_PRESETS = {todo:'slate',active:'ember',done:'moss',blocked:'rose',missing:'rose'};
+function liveStatusPreset(el,token){
+  var saved=el._livePreset;
+  if(!saved && !token)return;
+  if(!saved){
+    var authored=null;(el.getAttribute('class') || '').split(/\s+/).forEach(function(name){if(/^ns-/.test(name))authored=name.slice(3);});
+    saved=el._livePreset={styled:el.classList.contains('node-styled'),token:authored,current:null};
+  }
+  if(saved.current)el.classList.remove('ns-'+saved.current);
+  if(saved.token)el.classList.remove('ns-'+saved.token);
+  if(token){el.classList.add('node-styled');el.classList.add('ns-'+token);saved.current=token;return;}
+  if(!saved.styled)el.classList.remove('node-styled');
+  if(saved.token)el.classList.add('ns-'+saved.token);
+  delete el._livePreset;
+}
 function liveStatusCarrier(value,map){
   return liveStatusRollup(trackingRefs(value).tickets.map(function(key){return map[key] && map[key].state;}));
 }
@@ -511,6 +528,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
       var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && !el.classList.contains('node-text')?liveStatusCarrier(value,map):null;
       var dependencies=waiting[id];decorateCarrier(el,el.classList.contains('node-text')?null:value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
+      liveStatusPreset(el,dependencies && dependencies.length?'slate':state?LIVE_STATUS_PRESETS[state]:null);
       if(!state && !dependencies)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
@@ -645,7 +663,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(applied){
         clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
-        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
+        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
       }
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }

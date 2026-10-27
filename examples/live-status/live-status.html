@@ -34148,7 +34148,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
-  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[];
+  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0;
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -34160,7 +34160,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
      page tracking site. The host still owns transport and cancellation. */
   if(typeof originalLoad==='function'){
     wrappedLoad=function(ref,signal){return Promise.resolve(originalLoad(ref,signal)).then(function(raw){
-      if(!retired && !signal.aborted){remotePages[remoteKey(ref)]=normalize(raw);schedule();}
+      if(!retired && !signal.aborted){
+        var previous=JSON.stringify(refs());remotePages[remoteKey(ref)]=normalize(raw);schedule();
+        if(JSON.stringify(refs())!==previous)notify();
+      }
       return raw;
     });};
     renderOptions.loadDetail=wrappedLoad;
@@ -34319,6 +34322,51 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
     if(badge)badge.focus({preventScroll:true});
   }
+  function carrierBinding(carrier){
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
+    var record=source && detailSection(source,carrier.reference);
+    return bindings.slice().reverse().find(function(binding){
+      if(!record || binding.page!==source || binding.section!==record.section)return false;
+      for(var el=binding.el;el && el!==view;el=el.parentElement)if(el.hidden)return false;
+      return true;
+    });
+  }
+  /* Follow only authored detail links into pages already approved and loaded.
+     The existing detail controller owns restoration, cancellation and history. */
+  function carrierRoute(carrier){
+    var queue=[],seen=[];
+    records.forEach(function(record){if(record.section.diagram && !record.section.detailOnly)queue.push({page:page,record:record,section:record.reference,frames:[]});});
+    for(var cursor=0;cursor<queue.length;cursor++){
+      var route=queue[cursor],section=route.record.section;
+      if(route.page===carrier.page && section===carrier.section)return route;
+      if(seen.indexOf(section)>=0 || route.frames.length>=DETAIL_MAX_DEPTH-1)continue;
+      seen.push(section);
+      Object.keys(section.diagram && section.diagram.nodes || {}).forEach(function(id){
+        var detail=section.diagram.nodes[id].detail;if(!detail)return;
+        var source=detail.spec?remotePages[remoteKey(detail)]:route.page;
+        var target=source && (detail.section?detailSection(source,detail.section):sectionRecords(source).find(function(record){return record.section.diagram;}));
+        if(!target || !target.section.diagram)return;
+        queue.push({page:source,record:target,section:route.section,frames:route.frames.concat([{node:id,state:{mode:'ambient'}}])});
+      });
+    }return null;
+  }
+  function showCarrier(carrier){
+    var request=++coverageRequest,binding=carrierBinding(carrier);
+    if(binding){closePanel(false);focusCarrier(binding,carrier.id);return;}
+    var route=carrierRoute(carrier);if(!route)return;
+    var root=ctl.sections.find(function(rec){return rec.reference===route.section;});if(!root)return;
+    closePanel(false);
+    if(root.tabBlock && ctl.tabBlocks)ctl.tabBlocks[root.tabBlock-1].select(root.tab,false);
+    if(ctl.views && !ctl.views.ensure(root))return;
+    if(ctl.details)ctl.details.showSection(root.reference);
+    var restored=ctl.details?ctl.details.restore({section:route.section,frames:route.frames}):null;
+    Promise.resolve(restored).then(function(){
+      if(retired || request!==coverageRequest)return;
+      paint();var target=carrierBinding(carrier);if(!target)return;
+      if(target.el.scrollIntoView)target.el.scrollIntoView({block:'nearest'});
+      focusCarrier(target,carrier.id);
+    });
+  }
   function jumpFirstBlocker(){
     var first=firstBlocker();if(!first)return;
     first.binding.stepper.jumpSource(first.index,first.binding.stepper.path());paint();focusBlocker(first.binding,first.index);
@@ -34355,7 +34403,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var d=section.section.diagram || {};
       var list=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return {id:id,value:d.nodes[id],label:d.nodes[id].title || id};});
       (d.edges || []).forEach(function(edge){list.push({id:edge.from+'->'+edge.to,value:edge,label:edge.label || edge.from+' → '+edge.to});});
-      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;
+      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;carrier.reference=section.reference;
+        carrier.pageKey=Object.keys(remotePages).find(function(key){return remotePages[key]===record.page;});
         trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
       });
     });});
@@ -34383,11 +34432,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var cell=element('td','dv-live-coverage',null,row);
       owners.forEach(function(carrier){
         var button=element('button','reader-button',carrier.label,cell);button.type='button';
-        button.addEventListener('click',function(){
-          var binding=bindings.find(function(binding){return binding.page===carrier.page && binding.section===carrier.section;});
-          if(!binding)return;
-          closePanel(false);focusCarrier(binding,carrier.id);
-        });
+        button.addEventListener('click',function(){showCarrier(carrier);});
       });
       if(!owners.length)element('span','dv-live-coverage-tag','NOT ON DIAGRAM',cell);
       else if(coverage.notInEpic.indexOf(key)>=0)element('span','dv-live-coverage-tag','NOT IN EPIC',cell);
@@ -39770,8 +39815,19 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
 function wireLiveStatusClaude(ctl,page,win){
   var claude,use,api=ctl && ctl.liveStatus;
   try{claude=win.claude;use=claude && claude.use;}catch(ex){return null;}
-  if(typeof use!=='function' || !api || win.flowviewLiveStatus || !api.refs().tickets.length && !(api.refs().epics || []).length)return null;
-  var stopped=false,mcp=null,server=null,site='',chunks=[],jobs=[],subscriptions=[],timers=[];
+  if(typeof use!=='function' || !api || win.flowviewLiveStatus)return null;
+  if(!api.refs().tickets.length && !(api.refs().epics || []).length){
+    var removeWaitingChange=null,removeWaitingDestroy=null;
+    var stopWaiting=function(){if(removeWaitingChange)removeWaitingChange();if(removeWaitingDestroy)removeWaitingDestroy();};
+    removeWaitingChange=api.onChange(function(){
+      if(!api.refs().tickets.length && !(api.refs().epics || []).length)return;
+      stopWaiting();wireLiveStatusClaude(ctl,page,win);
+    });
+    removeWaitingDestroy=api.onDestroy(stopWaiting);
+    return null;
+  }
+  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
+  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
@@ -39882,26 +39938,39 @@ function wireLiveStatusClaude(ctl,page,win){
     Promise.resolve(subscription).then(function(value){if(stopped)unsubscribe(value);else subscriptions.push(value);},function(error){fail(job,error,true);});
   }
   function host(url){try{return new URL(url).host;}catch(ex){return null;}}
+  function syncWatches(){
+    if(stopped || !cloudId || syncing)return;
+    syncing=true;
+    try{
+      var refs=api.refs(),added=liveStatusJiraChunks(refs.tickets.filter(function(key){return !watchedTickets[key];})).map(function(keys){
+        keys.forEach(function(key){watchedTickets[key]=true;});return {keys:keys,answered:false,issues:[],flagged:[]};
+      });
+      (refs.epics || []).forEach(function(epic){
+        if(watchedEpics[epic])return;watchedEpics[epic]=true;
+        added.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});
+      });
+      // Register identities before a watch can synchronously publish data.
+      chunks=chunks.concat(added);
+      added.forEach(function(chunk){
+        [false,true].forEach(function(flagged){
+          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
+          jobs.push(job);watch(job);
+        });
+      });
+    }finally{syncing=false;}
+  }
   function resources(result){
     if(stopped)return;
     var list=result && result.payload,desired=page && page.tracking && page.tracking.jira && page.tracking.jira.site;
     list=Array.isArray(list)?list:[];
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
-    site=resource.url;
-    chunks=liveStatusJiraChunks(api.refs().tickets).map(function(keys){return {keys:keys,answered:false,issues:[],flagged:[]};});
-    (api.refs().epics || []).forEach(function(epic){chunks.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});});
-    chunks.forEach(function(chunk){
-      [false,true].forEach(function(flagged){
-        var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:resource.id,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
-        jobs.push(job);watch(job);
-      });
-    });
+    site=resource.url;cloudId=resource.id;syncWatches();
   }
   var pending;
   try{pending=use.call(claude,'mcp');}catch(ex){return null;}
   removeDestroy=api.onDestroy(stop);
-  removeChange=api.onChange(function(){publish();});
+  removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
     if(!namespace){stop();return null;}

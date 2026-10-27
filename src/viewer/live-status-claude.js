@@ -66,8 +66,19 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
 function wireLiveStatusClaude(ctl,page,win){
   var claude,use,api=ctl && ctl.liveStatus;
   try{claude=win.claude;use=claude && claude.use;}catch(ex){return null;}
-  if(typeof use!=='function' || !api || win.flowviewLiveStatus || !api.refs().tickets.length && !(api.refs().epics || []).length)return null;
-  var stopped=false,mcp=null,server=null,site='',chunks=[],jobs=[],subscriptions=[],timers=[];
+  if(typeof use!=='function' || !api || win.flowviewLiveStatus)return null;
+  if(!api.refs().tickets.length && !(api.refs().epics || []).length){
+    var removeWaitingChange=null,removeWaitingDestroy=null;
+    var stopWaiting=function(){if(removeWaitingChange)removeWaitingChange();if(removeWaitingDestroy)removeWaitingDestroy();};
+    removeWaitingChange=api.onChange(function(){
+      if(!api.refs().tickets.length && !(api.refs().epics || []).length)return;
+      stopWaiting();wireLiveStatusClaude(ctl,page,win);
+    });
+    removeWaitingDestroy=api.onDestroy(stopWaiting);
+    return null;
+  }
+  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
+  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
@@ -178,26 +189,39 @@ function wireLiveStatusClaude(ctl,page,win){
     Promise.resolve(subscription).then(function(value){if(stopped)unsubscribe(value);else subscriptions.push(value);},function(error){fail(job,error,true);});
   }
   function host(url){try{return new URL(url).host;}catch(ex){return null;}}
+  function syncWatches(){
+    if(stopped || !cloudId || syncing)return;
+    syncing=true;
+    try{
+      var refs=api.refs(),added=liveStatusJiraChunks(refs.tickets.filter(function(key){return !watchedTickets[key];})).map(function(keys){
+        keys.forEach(function(key){watchedTickets[key]=true;});return {keys:keys,answered:false,issues:[],flagged:[]};
+      });
+      (refs.epics || []).forEach(function(epic){
+        if(watchedEpics[epic])return;watchedEpics[epic]=true;
+        added.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});
+      });
+      // Register identities before a watch can synchronously publish data.
+      chunks=chunks.concat(added);
+      added.forEach(function(chunk){
+        [false,true].forEach(function(flagged){
+          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
+          jobs.push(job);watch(job);
+        });
+      });
+    }finally{syncing=false;}
+  }
   function resources(result){
     if(stopped)return;
     var list=result && result.payload,desired=page && page.tracking && page.tracking.jira && page.tracking.jira.site;
     list=Array.isArray(list)?list:[];
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');stop();return;}
-    site=resource.url;
-    chunks=liveStatusJiraChunks(api.refs().tickets).map(function(keys){return {keys:keys,answered:false,issues:[],flagged:[]};});
-    (api.refs().epics || []).forEach(function(epic){chunks.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});});
-    chunks.forEach(function(chunk){
-      [false,true].forEach(function(flagged){
-        var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:resource.id,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
-        jobs.push(job);watch(job);
-      });
-    });
+    site=resource.url;cloudId=resource.id;syncWatches();
   }
   var pending;
   try{pending=use.call(claude,'mcp');}catch(ex){return null;}
   removeDestroy=api.onDestroy(stop);
-  removeChange=api.onChange(function(){publish();});
+  removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){
     if(stopped)return null;
     if(!namespace){stop();return null;}

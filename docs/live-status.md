@@ -158,7 +158,8 @@ can also use the Atlassian adapter described below.
 `ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
 null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
-clear and enable changes. Counts are per distinct referenced ticket, independent
+clear, enable changes, and loaded details that change the collected references.
+Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
 Entries for stories without a carrier are accepted too. Set their `epic` to the
 configured parent key. `refs().epics` collects the root and loaded detail pages.
@@ -254,7 +255,9 @@ Flagged Impediment query detects blockers. Each configured epic also gets a
 `parent = KEY` watch and a `parent = KEY AND Flagged = Impediment` watch, requesting
 summary, status, assignee, updated and issuetype in pages of ten. The adapter
 follows `pageInfo.hasNextPage`/`endCursor` or `nextPageToken` until exhausted and
-tags the returned children with their epic key. Epic query errors retain prior
+tags the returned children with their epic key. When an approved detail page
+loads, new ticket and epic references get their own watches; reopening that
+detail reuses the existing watches. Epic query errors retain prior
 carrier evidence and use the same notices and bounded retry rules.
 Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
@@ -287,7 +290,8 @@ its team lane when known.
 
 PR links come only from authored carrier `prs`; Jira's Development summary adds
 informational open, merged or declined counts without inventing URLs. Coverage
-buttons name the story's carriers and focus their live badges. Stories without
+buttons name the story's carriers, open their containing section or detail when
+needed, and focus their live badges. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
 a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
 stories on diagram”. A child first received after the initial map adds

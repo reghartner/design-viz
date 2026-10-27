@@ -318,3 +318,16 @@ test('E8 desktop page Epic controls validate preserve history export and demo',a
  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
  expect(saved.page.tracking.jira).toEqual({site:'https://acme.atlassian.net',epic:['DOOR-200']});expect(await src.inputValue()).toBe(final);
 });
+
+test('E6 rework coverage opens a closed detail and focuses its visible badge after each return',async({page,server})=>{
+ const root=await open(page,server),details=root.locator('.dv-live-details'),panel=root.locator('.dv-live-panel');
+ await expect(root.locator('#section-delivery [data-dv-node="hardware"] .dv-live-badge')).toBeVisible();
+ for(let visit=0;visit<2;visit++){
+  await details.click();
+  await panel.locator('tr[data-live-ticket="HW-123"]').getByRole('button',{name:'Child work',exact:true}).click();
+  const child=root.locator('[data-dv-detail-preview] [data-dv-node="child"] .dv-live-badge');
+  await expect(child).toBeVisible();await expect(child).toBeFocused();await expect(panel).toBeHidden();
+  await root.locator('[data-dv-detail-preview] .detail-breadcrumb').getByRole('button',{name:'Overview',exact:true}).click();
+  await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
+ }
+});

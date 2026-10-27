@@ -166,7 +166,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
-  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[];
+  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0;
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -178,7 +178,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
      page tracking site. The host still owns transport and cancellation. */
   if(typeof originalLoad==='function'){
     wrappedLoad=function(ref,signal){return Promise.resolve(originalLoad(ref,signal)).then(function(raw){
-      if(!retired && !signal.aborted){remotePages[remoteKey(ref)]=normalize(raw);schedule();}
+      if(!retired && !signal.aborted){
+        var previous=JSON.stringify(refs());remotePages[remoteKey(ref)]=normalize(raw);schedule();
+        if(JSON.stringify(refs())!==previous)notify();
+      }
       return raw;
     });};
     renderOptions.loadDetail=wrappedLoad;
@@ -337,6 +340,51 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
     if(badge)badge.focus({preventScroll:true});
   }
+  function carrierBinding(carrier){
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
+    var record=source && detailSection(source,carrier.reference);
+    return bindings.slice().reverse().find(function(binding){
+      if(!record || binding.page!==source || binding.section!==record.section)return false;
+      for(var el=binding.el;el && el!==view;el=el.parentElement)if(el.hidden)return false;
+      return true;
+    });
+  }
+  /* Follow only authored detail links into pages already approved and loaded.
+     The existing detail controller owns restoration, cancellation and history. */
+  function carrierRoute(carrier){
+    var queue=[],seen=[];
+    records.forEach(function(record){if(record.section.diagram && !record.section.detailOnly)queue.push({page:page,record:record,section:record.reference,frames:[]});});
+    for(var cursor=0;cursor<queue.length;cursor++){
+      var route=queue[cursor],section=route.record.section;
+      if(route.page===carrier.page && section===carrier.section)return route;
+      if(seen.indexOf(section)>=0 || route.frames.length>=DETAIL_MAX_DEPTH-1)continue;
+      seen.push(section);
+      Object.keys(section.diagram && section.diagram.nodes || {}).forEach(function(id){
+        var detail=section.diagram.nodes[id].detail;if(!detail)return;
+        var source=detail.spec?remotePages[remoteKey(detail)]:route.page;
+        var target=source && (detail.section?detailSection(source,detail.section):sectionRecords(source).find(function(record){return record.section.diagram;}));
+        if(!target || !target.section.diagram)return;
+        queue.push({page:source,record:target,section:route.section,frames:route.frames.concat([{node:id,state:{mode:'ambient'}}])});
+      });
+    }return null;
+  }
+  function showCarrier(carrier){
+    var request=++coverageRequest,binding=carrierBinding(carrier);
+    if(binding){closePanel(false);focusCarrier(binding,carrier.id);return;}
+    var route=carrierRoute(carrier);if(!route)return;
+    var root=ctl.sections.find(function(rec){return rec.reference===route.section;});if(!root)return;
+    closePanel(false);
+    if(root.tabBlock && ctl.tabBlocks)ctl.tabBlocks[root.tabBlock-1].select(root.tab,false);
+    if(ctl.views && !ctl.views.ensure(root))return;
+    if(ctl.details)ctl.details.showSection(root.reference);
+    var restored=ctl.details?ctl.details.restore({section:route.section,frames:route.frames}):null;
+    Promise.resolve(restored).then(function(){
+      if(retired || request!==coverageRequest)return;
+      paint();var target=carrierBinding(carrier);if(!target)return;
+      if(target.el.scrollIntoView)target.el.scrollIntoView({block:'nearest'});
+      focusCarrier(target,carrier.id);
+    });
+  }
   function jumpFirstBlocker(){
     var first=firstBlocker();if(!first)return;
     first.binding.stepper.jumpSource(first.index,first.binding.stepper.path());paint();focusBlocker(first.binding,first.index);
@@ -373,7 +421,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var d=section.section.diagram || {};
       var list=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return {id:id,value:d.nodes[id],label:d.nodes[id].title || id};});
       (d.edges || []).forEach(function(edge){list.push({id:edge.from+'->'+edge.to,value:edge,label:edge.label || edge.from+' → '+edge.to});});
-      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;
+      list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;carrier.reference=section.reference;
+        carrier.pageKey=Object.keys(remotePages).find(function(key){return remotePages[key]===record.page;});
         trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
       });
     });});
@@ -401,11 +450,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var cell=element('td','dv-live-coverage',null,row);
       owners.forEach(function(carrier){
         var button=element('button','reader-button',carrier.label,cell);button.type='button';
-        button.addEventListener('click',function(){
-          var binding=bindings.find(function(binding){return binding.page===carrier.page && binding.section===carrier.section;});
-          if(!binding)return;
-          closePanel(false);focusCarrier(binding,carrier.id);
-        });
+        button.addEventListener('click',function(){showCarrier(carrier);});
       });
       if(!owners.length)element('span','dv-live-coverage-tag','NOT ON DIAGRAM',cell);
       else if(coverage.notInEpic.indexOf(key)>=0)element('span','dv-live-coverage-tag','NOT IN EPIC',cell);

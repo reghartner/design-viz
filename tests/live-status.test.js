@@ -250,8 +250,8 @@ function providerContext(C={URL}){
 }
 const jira=(key,category='indeterminate',name='In Progress')=>({key,fields:{summary:'Work '+key,status:{name,statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
 const settle=()=>new Promise(setImmediate);
-function providerHarness(raw=fixture()){
- const h=harness(raw);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
+function providerHarness(raw=fixture(),renderOptions={}){
+ const h=harness(raw,{},renderOptions);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
  h.ctl.liveStatus.mountControls(h.view);
  const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'searchJiraIssuesUsingJql'}]}];
  const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
@@ -578,4 +578,86 @@ test('E3 an epic without carrier tickets still starts its two watches and expose
  const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
  assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment']);
  h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-control').hidden,false);h.ctl.liveStatus.destroy();
+});
+
+/* Round 2 regressions: preserve the frozen E1–E11 RED rows above. */
+test('E8 rework Workbench demo entries paint carrier badges with page epics configured',()=>{
+ const raw=epicFixture(),h=harness(raw),before=JSON.stringify(h.ctl.page);
+ vm.runInNewContext(fs.readFileSync('src/workbench/preview.js','utf8'),h.C);
+ const map=h.C.workbenchDemoStatus(h.ctl.page);
+ assert.deepEqual(plain(map),{'AA-1':{state:'todo'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'blocked'},'EE-1':{state:'todo'},'FF-1':{state:'active'}});
+ h.ctl.liveStatus.apply(map);
+ assert.equal(h.view.querySelectorAll('.dv-live-badge').length,3);
+ assert.ok(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-todo'));
+ assert.ok(h.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-blocked'));
+ assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-todo'));
+ assert.deepEqual(plain(h.ctl.liveStatus.refs().epics),['EP-1','EP-2']);
+ assert.equal(JSON.stringify(h.ctl.page),before,'demo must not write status into authored data');
+ h.ctl.liveStatus.destroy();
+});
+
+test('E3 rework loaded detail epics add deduplicated paginated watches without replacing carrier evidence',async()=>{
+ const detail={page:{tracking:{jira:{epic:['EP-2','EP-3']}},sections:[{id:'child',diagram:{nodes:{child:{tickets:['CH-1']}},rows:[['child']]}}]}};
+ const renderOptions={loadDetail:async()=>detail},h=providerHarness(epicFixture(),renderOptions),api=h.ctl.liveStatus;
+ await h.start();h.data(0,[jira('AA-1')]);assert.equal(h.watches.length,6);
+ await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
+ assert.equal(h.watches.length,10,'one new key batch and one new epic, each with Flagged');
+ const watch=h.watches.find(w=>w.input.jql==='parent = EP-3'),flag=h.watches.find(w=>w.input.jql==='parent = EP-3 AND Flagged = Impediment');
+ assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuetype']);assert.equal(watch.input.maxResults,10);
+ assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-1'),null,'new unanswered chunks do not erase or invent evidence');
+ h.mcp.callTool=async(server,tool,input)=>{h.calls.push(plain(input));return {payload:{issues:[jira('CH-2')]}};};
+ watch.handler({type:'data',result:{payload:{issues:[jira('CH-1')],pageInfo:{hasNextPage:true,endCursor:'second'}}}});await settle();
+ assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
+ flag.handler({type:'data',result:{payload:{issues:[jira('CH-2')]}}});assert.equal(api.state('CH-2').state,'blocked');
+ watch.handler({type:'error',error:{code:'tool_error',message:'Temporary epic failure'}});assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-2').state,'blocked');
+ for(let i=0;i<3;i++){await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.view.dispatchEvent({type:'detail-navigation'});h.flush();api.setEnabled(i%2===0);}
+ assert.equal(h.watches.length,10,'reopening details and toggles never duplicate watches');
+ api.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
+});
+
+test('E3 rework synchronous watch delivery and late detail completion retire cleanly',async()=>{
+ let resolve;const renderOptions={loadDetail:()=>new Promise(r=>resolve=r)},h=providerHarness(epicFixture(),renderOptions);
+ const originalWatch=h.mcp.watchTool;h.mcp.watchTool=(server,tool,input,handler,options)=>{
+  const off=originalWatch(server,tool,input,handler,options);handler({type:'data',result:{payload:{issues:[]}}});return off;
+ };
+ await h.start();assert.equal(h.watches.length,6);
+ const pending=renderOptions.loadDetail({spec:'late'},new AbortController().signal);h.ctl.liveStatus.destroy();
+ resolve({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}}}}]}});await pending;await settle();
+ assert.equal(h.watches.length,6);assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.frames.size,0);
+});
+
+test('E6 rework coverage opens inactive local and loaded external detail carriers before focusing',async()=>{
+ for(const external of [false,true]){
+  const childSection={id:'child',detailOnly:!external,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
+  const detail={page:{sections:[childSection]}},ref=external?{spec:'remote',section:'child'}:{section:'child'};
+  const raw={page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:ref}},rows:[['parent']]}}]}};
+  if(!external)raw.page.sections.push(childSection);
+  const renderOptions={loadDetail:async()=>detail},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus,child=harness(detail);
+  child.ctl.liveStatus.destroy();const rootRec=h.ctl.sections[0],childRec=child.ctl.sections[0],restores=[];
+  let saved=null,active=[];if(!external)h.ctl.sections[1].sectionEl.hidden=true;
+  h.ctl.details={snapshot:()=>saved,activeSections:()=>active,showSection:()=>{saved=null;active=[];rootRec.sectionEl.hidden=false;},restore:async value=>{
+   restores.push(plain(value));if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+   saved=value;active=[rootRec,childRec];rootRec.sectionEl.hidden=true;h.view.appendChild(childRec.sectionEl);
+  }};
+  if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  api.mountControls(h.view);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
+  for(let i=0;i<2;i++){
+   h.view.querySelector('.dv-live-details').dispatchEvent({type:'click'});
+   const button=h.view.querySelector('tr[data-live-ticket="CH-1"]').querySelector('button');assert.equal(button.textContent,'Child carrier');button.dispatchEvent({type:'click'});await settle();h.flush();
+   assert.equal(restores.length,i+1);assert.deepEqual(restores[i],{section:'root',frames:[{node:'parent',state:{mode:'ambient'}}]});
+   assert.ok(childRec.sectionEl.contains(h.doc.activeElement),'focus is in the active detail, not its hidden original');assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
+   saved=null;active=[];rootRec.sectionEl.hidden=false;childRec.sectionEl.remove();h.view.dispatchEvent({type:'detail-navigation'});h.flush();
+  }
+  api.destroy();
+ }
+});
+
+test('E3 rework an initially untracked page defers discovery until a detail introduces an epic',async()=>{
+ const renderOptions={loadDetail:async()=>({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}},rows:[['child']]}}]}})},h=providerHarness({nodes:{parent:{}},rows:[['parent']]},renderOptions);
+ assert.equal(h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.watches.length,0);
+ await renderOptions.loadDetail({spec:'first-tracked-detail'},new AbortController().signal);await settle();
+ assert.equal(h.calls.length,1);assert.deepEqual(h.watches.map(w=>w.input.jql),['key in (CH-9)','key in (CH-9) AND Flagged = Impediment','parent = EP-9','parent = EP-9 AND Flagged = Impediment']);
+ h.data(2,[jira('EX-9')]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
+ h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });

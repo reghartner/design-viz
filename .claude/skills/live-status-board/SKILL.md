@@ -1,6 +1,6 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board, a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request is for a live, Jira-driven or cross-team delivery board; plain Flowview authoring stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request is for a live, Jira-driven or cross-team delivery board; plain Flowview authoring stays on hld-to-page.
 ---
 
 # Live-status board
@@ -17,6 +17,24 @@ rendering, demo mode, publishing), the `tracking` paragraphs of
 `examples/live-status/live-status.spec.json` with its
 `live-status.timeline.json`, and
 `deploy/cloudflare/mock-atlassian-mcp/README.md` for the mock server.
+
+## 0. The interaction
+
+The usual request is "give me an Epic Status board for DOOR-100". The agent
+then: reads the epic's child stories from Jira (through the author's
+connector, or asks the author to paste the list when no connector is available
+to the agent), proposes which story delivers which node or edge, settles the
+open facts below in one batch, writes the spec, builds and publishes the
+artifact, and republishes it after every later change. Stories the agent cannot
+place stay off the diagram on purpose; once the epic-linked rollup (#754) is
+in, the Tickets table lists them with the note NOT ON DIAGRAM so the author
+can decide later. Until then, list them for the author in chat.
+
+Where the author sees real colors: only in the published artifact. The
+Workbench never calls Jira; its **Demo live status** shows sample colors so
+the layout can be checked. So after each spec change the agent rebuilds and
+republishes to the same artifact URL (section 4), then tells the author to
+reload. Publishing to a new URL loses the artifact's comments.
 
 ## 1. Settle the tracking facts before writing JSON
 
@@ -112,6 +130,10 @@ listing the connector with a toggle and Continue. After Continue the Live chip
 may read "Jira did not answer; retrying" for a few seconds on a cold start;
 the retry is automatic. Then the chip shows the done count and "updated just
 now".
+
+Republishing: pass the artifact's existing URL (or the same file path in the
+same session) so the link stays stable. Do this after every accepted spec
+change; the author is working in the Workbench and sees no live state there.
 
 ## 5. Verify after publishing
 

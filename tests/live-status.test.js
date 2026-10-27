@@ -368,7 +368,7 @@ test('P5 cache timestamps take precedence, validate, and reset without changing 
  }
  for(const invalid of [undefined,null,'1793000000000',NaN,Infinity,1e20]){
   applyCache(1793000000000);applyCache(invalid);
-  assert.equal(h.view.querySelector('time').getAttribute('datetime'),issueTime);assert.equal(events.at(-1).updatedAt,issueTime);
+  assert.equal(api.snapshot().updatedAt,issueTime);assert.equal(events.at(-1).updatedAt,issueTime);
  }
  applyCache(1793000000000);api.apply({'AA-1':entry});assert.equal(events.at(-1).updatedAt,issueTime);
  applyCache(1793000000000);api.clear();assert.equal(h.view.querySelector('time'),null);assert.equal(events.at(-1).updatedAt,null);

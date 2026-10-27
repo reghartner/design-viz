@@ -27,7 +27,8 @@ to the agent), proposes which story delivers which node or edge, settles the
 open facts below in one batch, writes the spec, and asks the author to
 authorize publishing. With that authorization it builds and publishes the
 artifact and republishes it after every later accepted change; without it, it
-delivers the spec and the built HTML only. Stories the agent cannot place stay
+delivers the spec (and built HTML only when standalone output was explicitly
+requested). Stories the agent cannot place stay
 off the diagram on purpose; once the epic-linked rollup (#754) is
 in, the Tickets table lists them with the note NOT ON DIAGRAM so the author
 can decide later. Until then, list them for the author in chat.

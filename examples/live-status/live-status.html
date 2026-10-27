@@ -8786,7 +8786,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
-.dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-note{color:var(--dtext);}
 .dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
 .dv-live-connection[hidden]{display:none!important;}
 .dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
@@ -8827,7 +8827,7 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"][
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
-.dv-live-empty,.dv-live-updated{color:var(--dfaint)}
+.dv-live-empty{color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
@@ -23927,9 +23927,9 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
-      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[conn.source,connLabel,conn.checkedText].filter(Boolean).join(' · '));
+      var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
       connection.hidden=!available || conn.state==='none';
-      if(hasData && value.updatedAt){var time=el(head,'time','time','dv-live-updated',value.updatedText);time.setAttribute('datetime',value.updatedAt);}
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
@@ -23972,7 +23972,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
-.dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-note{color:var(--dtext);}
 .dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
 .dv-live-connection[hidden]{display:none!important;}
 .dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
@@ -24013,7 +24013,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
-.dv-live-empty,.dv-live-updated{color:var(--dfaint)}
+.dv-live-empty{color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
@@ -34801,15 +34801,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var pages=laneRecords(),coverage=liveStatusCoverage(page,map,refs()),readiness=liveStatusReadiness(page,map);
     var epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
     var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
-    if(coverage.epics.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
+    // Only count epic stories when the map actually carries epic membership; "0 of 0" says nothing.
+    if(coverage.epics.length && epicKeys.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
       available:!!(refs().tickets.length || refs().epics.length),hasData:!!(provider || applied),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:ticketRows(pages,coverage),
       coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      updatedText:cacheUpdatedAt || latest?'data as of '+relative(cacheUpdatedAt || latest):'',
-      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'checked '+relative(connection.checkedAt):''}};
+      updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):''}};
   }
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}

@@ -124,11 +124,11 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira · connected · checked 12s ago”; the dot is grey when not connected,
+(a dot plus “Jira connected, refreshed 12s ago”; the dot is grey when not connected,
 amber while connecting or awaiting approval, green when connected or in demo mode,
-red on error, and it pulses while a fetch is in flight), the “data as of” time of the
-newest ticket, provider note and action, **First blocker**, and demo **Play/Pause**
-and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
+red on error, and it pulses while a fetch is in flight; the time is the last successful
+fetch, not a ticket's change time), provider note and action, **First blocker**, and
+demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
 The body shows completion and verdict, Blockers, Tickets, then Activity. Lane
 progress is not listed in the panel; it stays on the step lane pills, the lane colour
 stripe of each Tickets row and the lane names in Blockers.

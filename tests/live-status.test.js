@@ -163,7 +163,7 @@ test('V8 V9 V11 external detail refs create a deferred control and retired mount
  api.apply({'DD-1':{state:'done',updatedAt:'2026-10-26T12:00:00Z'}});api.note('Detail loaded','info');assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);
  const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),['DD-1']);assert.equal(removed.children.length,0);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
- const root=host.querySelector('.dv-live-head'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time').getAttribute('datetime'),'2026-10-26T12:00:00Z');
+ const root=host.querySelector('.dv-live-head'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time'),null,'V8 no ticket-change time in the header (#769)');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,'2026-10-26T12:00:00Z');
  toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);assert.equal(toggle.getAttribute('aria-pressed'),'false');
  h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
  mount.destroy();api.apply({});h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(host.children.length,0);
@@ -312,7 +312,7 @@ test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies an
  const keys=Array.from({length:25},(_,i)=>'AA-'+i),h=providerHarness({nodes:{a:{tickets:keys}},rows:[['a']]});await h.start();assert.equal(h.watches.length,6);
  for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
  h.data(0,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'active');assert.equal(h.ctl.liveStatus.state('AA-1').state,'missing');assert.equal(h.ctl.liveStatus.state('AA-10'),null);
- assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.view.querySelector('time').getAttribute('datetime'),new Date(1793000000000).toISOString());
+ assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,new Date(1793000000000).toISOString());assert.equal(h.view.querySelector('time'),null);
  h.data(1,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');
  h.ctl.liveStatus.setEnabled(false);h.data(0,[jira('AA-0','done')]);h.data(1,[]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');assert.ok(h.watches.every(w=>!w.stopped));
  h.ctl.liveStatus.setEnabled(true);assert.equal(h.ctl.liveStatus.state('AA-0').state,'done');h.ctl.liveStatus.destroy();assert.ok(h.watches.every(w=>w.stopped===1));h.data(0,[]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'done');
@@ -362,7 +362,7 @@ test('P5 cache timestamps take precedence, validate, and reset without changing 
  const applyCache=storedAt=>{const map={'AA-1':entry};Object.defineProperty(map,'storedAt',{value:storedAt});api.apply(map);};
  // Even an older cache timestamp, or epoch zero, describes lookup freshness.
  for(const stamp of [1793000000000,0]){
-  applyCache(stamp);assert.equal(h.view.querySelector('time').getAttribute('datetime'),new Date(stamp).toISOString());
+  applyCache(stamp);assert.equal(h.ctl.liveStatus.snapshot().updatedAt,new Date(stamp).toISOString());
   assert.equal(events.at(-1).updatedAt,new Date(stamp).toISOString());assert.deepEqual(events.at(-1).states,{'AA-1':entry});
   assert.equal(api.state('AA-1').updatedAt,issueTime);
  }
@@ -593,8 +593,9 @@ test('E8 rework Workbench demo entries paint carrier badges with page epics conf
  const raw=epicFixture(),h=harness(raw),before=JSON.stringify(h.ctl.page);
  vm.runInNewContext(fs.readFileSync('src/workbench/preview.js','utf8'),h.C);
  const map=h.C.workbenchDemoStatus(h.ctl.page);
- assert.deepEqual(plain(map),{'AA-1':{state:'todo'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'blocked'},'EE-1':{state:'todo'},'FF-1':{state:'active'}});
+ assert.deepEqual(plain(map),{'AA-1':{state:'todo',epic:'EP-1'},'BB-1':{state:'active',epic:'EP-1'},'CC-1':{state:'done',epic:'EP-1'},'DD-1':{state:'blocked',epic:'EP-1'},'EE-1':{state:'todo',epic:'EP-1'},'FF-1':{state:'active',epic:'EP-1'}});
  h.ctl.liveStatus.apply(map);
+ assert.match(h.ctl.liveStatus.snapshot().verdict,/6 of 6 epic stories on diagram/,'E8 demo entries count as epic stories');
  assert.equal(h.view.querySelectorAll('.dv-live-badge').length,3);
  assert.ok(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-todo'));
  assert.ok(h.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-blocked'));
@@ -765,14 +766,13 @@ test('S1 host provider reports connecting, busy, connected with a checked time, 
  assert.equal(typeof api.status,'function','S1 status() exists');mountStatus(h);
  let value=plain(api.snapshot());assert.ok(value.connection,'S1 snapshot.connection');assert.equal(value.connection.state,'connecting');assert.equal(value.connection.source,'Host');assert.equal(value.connection.busy,false);
  h.flush();h.flush();await new Promise(setImmediate);value=plain(api.snapshot());
- assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');assert.equal(value.connection.checkedText,'checked just now');
- assert.match(value.updatedText,/^data as of /);
+ assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');assert.equal(value.connection.checkedText,'refreshed just now');assert.equal(h.view.querySelector('time.dv-live-updated'),null,'S1 no separate updated time');
  const badge=h.view.querySelector('.dv-live-connection');assert.ok(badge,'S1 header connection element');assert.equal(badge.getAttribute('data-state'),'connected');assert.equal(badge.getAttribute('data-busy'),'false');
- const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host · connected · checked just now');assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
+ const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host connected, refreshed just now');assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
  fail=true;const tick=[...h.timers.values()][0];h.timers.clear();tick.fn();value=plain(api.snapshot());assert.equal(value.connection.busy,true);assert.equal(badge.getAttribute('data-busy'),'true');
  await new Promise(setImmediate);value=plain(api.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,false);assert.equal(badge.getAttribute('data-state'),'error');
  api.status({state:'bogus',source:42});assert.equal(plain(api.snapshot()).connection.state,'error');assert.equal(plain(api.snapshot()).connection.source,'Host');
- api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo · demo · checked just now');
+ api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo, refreshed just now');
  api.destroy();
 });
 test('S2 the Jira adapter reports disconnected, connecting, connected and retrying error states',async()=>{
@@ -796,4 +796,10 @@ test('S4 authored PR links render as icons with accessible names, not URL text',
   const href=a.getAttribute('href'),number=/\/pull\/(\d+)/.exec(href)[1];assert.equal(a.getAttribute('aria-label'),'Pull request #'+number+' on code.test');assert.equal(a.getAttribute('title'),href);
   assert.ok(!a.textContent || !/https?:/.test(a.textContent),'S4 no URL text');}
  api.destroy();
+});
+
+test('E8 rework the verdict omits the epic fraction when no entry carries epic membership',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'todo'}});
+ assert.doesNotMatch(api.snapshot().verdict,/epic stories/,'no "0 of 0 epic stories"');
+ api.apply({'AA-1':{state:'todo',epic:'EP-1'}});assert.match(api.snapshot().verdict,/1 of 1 epic stories on diagram/);api.destroy();
 });

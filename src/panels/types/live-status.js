@@ -49,9 +49,9 @@
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
-      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[conn.source,connLabel,conn.checkedText].filter(Boolean).join(' · '));
+      var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
       connection.hidden=!available || conn.state==='none';
-      if(hasData && value.updatedAt){var time=el(head,'time','time','dv-live-updated',value.updatedText);time.setAttribute('datetime',value.updatedAt);}
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
@@ -94,7 +94,7 @@
 .dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
 .dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
 .dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
-.dv-live-updated,.dv-live-note{color:var(--dtext);}
+.dv-live-note{color:var(--dtext);}
 .dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
 .dv-live-connection[hidden]{display:none!important;}
 .dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
@@ -135,7 +135,7 @@
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
-.dv-live-empty,.dv-live-updated{color:var(--dfaint)}
+.dv-live-empty{color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}

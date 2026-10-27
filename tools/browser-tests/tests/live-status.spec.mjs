@@ -41,7 +41,7 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await expect(node('hardware')).toHaveClass(/dv-live-active/);await expect(node('firmware')).toHaveClass(/dv-live-active/);await expect(node('ux')).toHaveClass(/dv-live-missing/);await expect(node('todo')).toHaveClass(/dv-live-todo/);
  for(const tag of ['path.edge','path.halo','text.lbl'])await expect(section.locator(tag+'[data-dv-edge="0"]')).toHaveClass(/dv-live-blocked/);
  await expect(section.locator('g.coin[data-dv-step="0"]')).toHaveClass(/dv-live-blocked/);await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveClass(/dv-live-blocked/);
- const live=root.locator('.dv-live-toggle');await expect(live).toBeVisible();await expect(live).toHaveAttribute('aria-pressed','true');for(const state of ['todo','active','done','blocked','missing'])await expect(root.locator('.dv-live-head').locator('[data-live-count="'+state+'"]')).toContainText(state==='done'?'2':'1');await expect(root.locator('time.dv-live-updated')).toContainText('data as of');
+ const live=root.locator('.dv-live-toggle');await expect(live).toBeVisible();await expect(live).toHaveAttribute('aria-pressed','true');for(const state of ['todo','active','done','blocked','missing'])await expect(root.locator('.dv-live-head').locator('[data-live-count="'+state+'"]')).toContainText(state==='done'?'2':'1');
  await live.click();await expect(root.locator('.dv-live-active,.dv-live-done,.dv-live-todo,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);await expect(live).toHaveAttribute('aria-pressed','false');await live.click();await expect(node('hardware')).toHaveClass(/dv-live-active/);
  await section.locator('.path-chip[data-dv-path="retry"]').click();await expect(section.locator('g.coin[data-dv-step="2"]')).toHaveClass(/dv-live-blocked/);await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveClass(/dv-live-blocked/);
  // Return to Ambient so the badges are comfortably visible in the overview.
@@ -191,7 +191,7 @@ test('P1 P4 P5 P7 P9 claude connector paints Jira nodes and Flagged edges with c
  await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
  await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveClass(/dv-live-blocked/);
  await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/dv-live-missing/);
- await expect(root.locator('time.dv-live-updated')).toHaveAttribute('datetime',new Date(1793000000000).toISOString());await expect(root.locator('time.dv-live-updated')).toContainText('data as of');
+ await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');await expect(root.locator('.dv-live-connection')).toContainText('Jira connected, refreshed');
  const registrations=await page.evaluate(()=>__mcpStub.watches.map(({server,tool,input,opts})=>({server,tool,input,opts})));
  expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Mock-atlassian');expect(registrations[0].opts).toEqual({refetchInterval:60000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
  await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-active,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);
@@ -353,7 +353,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  const diagram=root.locator('.section-layout-tile[data-layout-key="diagram"]'),tile=panel.locator('xpath=ancestor::*[contains(@class,"section-layout-tile")][1]');
  // Default arrangement (Chuck 2026-10-27): panel in the left half, diagram with attached step controls in the right half, both visible on open.
  const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.x+b.width).toBeLessThanOrEqual(a.x+2);expect(Math.abs(b.y-a.y)).toBeLessThan(2);expect(b.width).toBeGreaterThan(300);
- await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo');
+ await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo, refreshed');await expect(root.locator('time.dv-live-updated')).toHaveCount(0);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');

@@ -7837,7 +7837,10 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
   :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
   path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
 }
-.dv-live-panel{position:fixed;inset:90px 24px auto auto;margin:0;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-panel,.dv-live-carrier-preview{position:fixed;inset:90px 24px auto auto;margin:0;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 120px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid var(--dline,#9ca3af);border-radius:12px;background:var(--dv-live-card,#fff);color:var(--dink,#24324b);box-shadow:0 12px 40px #0004;font:13px/1.5 sans-serif;z-index:1000;}
+.dv-live-carrier-preview{width:1100px;}
+.dv-live-carrier-preview h2{margin:0 60px 16px 0;font-size:18px;}
+.dv-live-carrier-close{position:absolute;right:16px;top:16px;}
 .dv-live-panel[hidden]{display:none!important;}
 .dv-live-panel h2{margin:0 60px 16px 0;font-size:18px;}
 .dv-live-panel h3{margin:18px 0 8px;font-size:14px;}
@@ -7855,7 +7858,7 @@ path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
 @media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
-@media print{.dv-live-panel{display:none!important;}.dv-live-changed{animation:none!important;}}
+@media print{.dv-live-panel,.dv-live-carrier-preview{display:none!important;}.dv-live-changed{animation:none!important;}}
 
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
 .dv-live-tickets{width:100%;min-width:720px;border-collapse:collapse;text-align:left;font-size:12px;}
@@ -34148,7 +34151,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
-  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0;
+  var activity=[],seenKeys=Object.create(null),changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[],coverageRequest=0,carrierPreview=null;
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
@@ -34256,6 +34259,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var rec=activeSections[index+1];if(section && rec)found.push({el:rec.sectionEl,section:section,page:currentPage,stepper:rec.stepper});
       });
     }
+    if(carrierPreview && carrierPreview.binding)found.push(carrierPreview.binding);
     return found;
   }
   function decorateCarrier(el,value,tracking){
@@ -34350,19 +34354,60 @@ function createLiveStatus(ctl,page,options,renderOptions){
       });
     }return null;
   }
+  function closeCarrierPreview(focus){
+    var preview=carrierPreview;if(!preview)return;carrierPreview=null;
+    close(false);releaseBindings();
+    document.removeEventListener('keydown',carrierPreviewKey,true);
+    var rec=preview.rec;
+    if(rec){
+      if(rec.stepper)rec.stepper.destroy();
+      if(rec.boardSize)rec.boardSize.destroy();
+      if(rec.presentation)rec.presentation.destroy();
+      if(rec.destroy)rec.destroy();
+    }
+    preview.el.remove();
+    if(!retired){paint();if(focus && preview.trigger && preview.trigger.isConnected)preview.trigger.focus();}
+  }
+  function carrierPreviewKey(ev){
+    if(ev.key==='Escape' && carrierPreview && !active){ev.preventDefault();ev.stopPropagation();closeCarrierPreview(true);}
+  }
+  /* A collected section need not have an authored drill-down route. Render its
+     existing definition in a disposable reader preview, with this overlay's
+     evidence and lifecycle, instead of inventing a node link or loading a spec. */
+  function previewCarrier(carrier,trigger){
+    closeCarrierPreview(false);
+    var source=carrier.pageKey?remotePages[carrier.pageKey]:page,record=source && detailSection(source,carrier.reference);
+    if(!record)return;
+    var box=element('section','dv-live-carrier-preview',null,view);
+    box.setAttribute('role','dialog');box.setAttribute('aria-label','Carrier · '+carrier.label);box.setAttribute('popover','manual');
+    element('h2','','Carrier · '+carrier.label,box);
+    var dismiss=element('button','reader-button dv-live-carrier-close','Close',box);dismiss.type='button';dismiss.setAttribute('aria-label','Close carrier preview');
+    dismiss.addEventListener('click',function(){closeCarrierPreview(true);});
+    carrierPreview={el:box,trigger:trigger};
+    document.addEventListener('keydown',carrierPreviewKey,true);
+    if(box.showPopover)box.showPopover();
+    var skin=SKIN_NAMES.find(function(name){return view.classList.contains('sk-'+name);}) || DEFAULT_SKIN;
+    var rec=buildSection(box,record.section,200000+coverageRequest,'live-carrier-'+coverageRequest,
+      resolveProtocols(source),skinBase(skin),resolveLanes(source),null,schedule,null,
+      {autoplay:false,tracking:source.tracking,authoring:false});
+    carrierPreview.rec=rec;
+    carrierPreview.binding={el:rec.sectionEl,section:record.section,page:source,stepper:rec.stepper};
+    if(rec.stepper)rec.stepper.enterAmbient();
+    paint();focusCarrier(carrierPreview.binding,carrier.id);
+  }
   function showCarrier(carrier){
-    var request=++coverageRequest,binding=carrierBinding(carrier);
+    var request=++coverageRequest,binding=carrierBinding(carrier),trigger=panelTrigger;
     if(binding){closePanel(false);focusCarrier(binding,carrier.id);return;}
-    var route=carrierRoute(carrier);if(!route)return;
-    var root=ctl.sections.find(function(rec){return rec.reference===route.section;});if(!root)return;
     closePanel(false);
+    var route=carrierRoute(carrier),root=route && ctl.sections.find(function(rec){return rec.reference===route.section;});
+    if(!root){previewCarrier(carrier,trigger);return;}
     if(root.tabBlock && ctl.tabBlocks)ctl.tabBlocks[root.tabBlock-1].select(root.tab,false);
-    if(ctl.views && !ctl.views.ensure(root))return;
+    if(ctl.views && !ctl.views.ensure(root)){previewCarrier(carrier,trigger);return;}
     if(ctl.details)ctl.details.showSection(root.reference);
     var restored=ctl.details?ctl.details.restore({section:route.section,frames:route.frames}):null;
     Promise.resolve(restored).then(function(){
       if(retired || request!==coverageRequest)return;
-      paint();var target=carrierBinding(carrier);if(!target)return;
+      paint();var target=carrierBinding(carrier);if(!target){previewCarrier(carrier,trigger);return;}
       if(target.el.scrollIntoView)target.el.scrollIntoView({block:'nearest'});
       focusCarrier(target,carrier.id);
     });
@@ -34382,7 +34427,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(ev.key==='Escape' && panelTrigger){ev.preventDefault();ev.stopPropagation();closePanel(true);}
   }
   function openPanel(trigger){
-    close(false);closePanel(false);
+    closeCarrierPreview(false);close(false);closePanel(false);
     if(!panel){
       panel=element('section','dv-live-panel',null,view);panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Live status details');panel.setAttribute('popover','manual');
       element('h2','','Live status',panel);
@@ -34648,7 +34693,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return {destroy:function(){var i=controls.indexOf(control);if(i>=0)controls.splice(i,1);if(panelTrigger===control.details)closePanel(false);if(control.root)control.root.remove();}};
     },
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;closeCarrierPreview(false);if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);closePanel(false);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

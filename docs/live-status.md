@@ -291,7 +291,11 @@ its team lane when known.
 PR links come only from authored carrier `prs`; Jira's Development summary adds
 informational open, merged or declined counts without inventing URLs. Coverage
 buttons name the story's carriers, open their containing section or detail when
-needed, and focus their live badges. Stories without
+needed, and focus their live badges. If a section has no drill-down route, the
+button opens a read-only preview of that section using the evidence already
+loaded. Close or Escape dismisses the preview and returns focus to **details**.
+This also works for other sections in an approved, loaded detail page, without
+another fetch or any change to the authored diagram. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
 a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
 stories on diagram”. A child first received after the initial map adds

@@ -661,3 +661,55 @@ test('E3 rework an initially untracked page defers discovery until a detail intr
  h.data(2,[jira('EX-9')]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
  h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });
+
+/* Round 3: collected carriers can live outside the authored drill-down graph. */
+test('E6 round 3 unlinked local and unrelated loaded sections preview node and edge badges with cleanup',async()=>{
+ for(const external of [false,true])for(const detailOnly of [false,true]){
+  if(!external && !detailOnly)continue;
+  const section={id:'unlinked',detailOnly,heading:'Unlinked work',diagram:{nodes:{child:{title:'Unlinked child',tickets:['CH-1']},end:{}},rows:[['child','end']],edges:[{from:'child',to:'end',label:'Unlinked edge',tickets:['CH-2']}]}};
+  const remote={page:{tracking:{jira:{site:'https://detail.test',epic:'EP-2'}},sections:[{id:'entry',diagram:{nodes:{entry:{}},rows:[['entry']]}},section]}};
+  const ref={spec:'approved-detail',section:'entry'},raw={page:{tracking:{jira:{epic:'EP-1'}},sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],...(external?{detail:ref}:{})}},rows:[['parent']]}},...(!external?[section]:[])]}};
+  let loads=0;const renderOptions={loadDetail:async()=>{loads++;return remote;}},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus;
+  if(external)await renderOptions.loadDetail(ref,new AbortController().signal);
+  else h.ctl.sections[1].sectionEl.hidden=true;
+  h.ctl.details={snapshot:()=>null,activeSections:()=>[],restore(){assert.fail('no authored route exists');}};
+  const before=JSON.stringify([h.ctl.page,remote]),built=[],disposals=[];
+  // Stub only the section renderer. Navigation, binding, paint, focus, map
+  // updates and teardown run through the real overlay; browser rows render SVG.
+  h.C.buildSection=(host,source,index,reference,protocols,skin,lanes,backlinks,changed,proseChanged,options)=>{
+   const child=harness({page:{sections:[plain(source)]}});child.ctl.liveStatus.destroy();
+   const rec=child.ctl.sections[0];host.appendChild(rec.sectionEl);
+   rec.stepper={mode:()=> 'ambient',sourceIndex:()=>0,path:()=> 'default',enterAmbient(){},destroy:()=>disposals.push('stepper')};
+   rec.boardSize={destroy:()=>disposals.push('size')};rec.presentation={destroy:()=>disposals.push('presentation')};rec.destroy=()=>disposals.push('section');
+   built.push({rec,source,index,reference,options});return rec;
+  };
+  const create=h.doc.createElementNS;h.doc.createElementNS=(...args)=>{const el=create(...args);el.focus=()=>h.doc.activeElement=el;return el;};
+  api.mountControls(h.view);const details=h.view.querySelector('.dv-live-details');details.focus=()=>h.doc.activeElement=details;
+  api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'},'CH-2':{state:'missing'}});
+  for(const [visit,key,id] of [[0,'CH-1','child'],[1,'CH-2','child->end'],[2,'CH-1','child']]){
+   details.dispatchEvent({type:'click'});
+   h.view.querySelector('tr[data-live-ticket="'+key+'"]').querySelector('button').dispatchEvent({type:'click'});await settle();h.flush();
+   const preview=h.view.querySelector('.dv-live-carrier-preview');assert.ok(preview,'carrier without a route opens its containing section');
+   assert.equal(built.length,visit+1);assert.equal(built[visit].source.id,'unlinked');assert.equal(built[visit].options.autoplay,false);assert.equal(built[visit].options.authoring,false);
+   assert.equal(built[visit].options.tracking.jira.epic,external?'EP-2':'EP-1');
+   assert.ok(preview.contains(h.doc.activeElement));assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.equal(h.view.querySelector('.dv-live-panel').hidden,true);
+   assert.equal(loads,external?1:0,'preview uses the approved loaded page without transport');
+   api.apply({'AA-1':{state:'done'},'CH-1':{state:'done'},'CH-2':{state:'blocked'}});
+   assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),id);assert.ok(h.doc.activeElement.classList.contains(visit===1?'dv-live-blocked':'dv-live-done'));
+   if(visit===0){
+    h.doc.activeElement.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+    assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
+    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.ok(h.view.querySelector('.dv-live-carrier-preview'),'first Escape closes the ticket popover only');
+    h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.equal(h.doc.activeElement,details);
+   }else if(visit===1)preview.querySelector('.dv-live-carrier-close').dispatchEvent({type:'click'});
+   else api.destroy();
+   h.flush();assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);
+   assert.deepEqual(disposals,Array.from({length:visit+1},()=>['stepper','size','presentation','section']).flat());
+   for(const event of ['dv:pathrender','dv:pathchange','dv:stepchange'])assert.equal(built[visit].rec.sectionEl.events[event]?.size||0,0);
+   assert.equal(h.doc.events.keydown?.size||0,0);
+  }
+  assert.equal(JSON.stringify([h.ctl.page,remote]),before,'no authored route or page is changed');assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+ }
+});

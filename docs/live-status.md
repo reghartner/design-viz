@@ -116,15 +116,19 @@ Path, View, Tab and detail navigation reapply the current map to rebuilt element
 
 Always add an authored `live-status` panel to a tracked page:
 `{"id":"status","type":"live-status","title":"Epic status"}` in a section's
-`diagram.panels`. Use `sectionLayout` to place it full width below the diagram
-and step controls, as in the example. It appears immediately, with no menu click.
+`diagram.panels`. Use `sectionLayout` to place it: the example's default
+arrangement puts the panel in the left half and the diagram, with its step controls
+attached, in the right half; the Backstage and Confluence profiles stack them full
+width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header holds **Live**, distinct-ticket counts, the updated time,
 provider note and action, **First blocker**, and demo **Play/Pause** and **Next day**
 when demo controls are supplied. The engine's panel title stays above this header.
-The body shows completion and verdict, Teams, Blockers, Tickets, then Activity.
+The body shows completion and verdict, Blockers, Tickets, then Activity. Lane
+progress is not listed in the panel; it stays on the step lane pills, the lane colour
+stripe of each Tickets row and the lane names in Blockers.
 Without ticket references or epics it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
@@ -334,8 +338,8 @@ The mock can be installed as a custom connector under any name except
 **Atlassian MCP** to try the artifact without an Atlassian account; declare
 that name when publishing. No GitHub connector is used.
 
-Verify after publishing: the Live status panel below the diagram shows completion,
-Teams, Blockers, Tickets and Activity, and its header shows counts and updated time.
+Verify after publishing: the Live status panel beside the diagram shows completion,
+Blockers, Tickets and Activity, and its header shows counts and updated time.
 
 ## Story mode
 
@@ -358,7 +362,7 @@ automatic playback (including its initial beat), never manual navigation.
 the current path, enters Step mode and focuses its badge; it hides when none exist.
 
 Changed ticket states produce one carrier pulse (none with reduced motion).
-The Live status panel below the diagram shows a completion ring, team progress, blocker
+The Live status panel beside the diagram shows a completion ring, blocker
 links, affected lanes and downstream carrier/step counts, and **Activity**.
 Activity records the latest 20 transitions, newest received first; the initial
 map and identical states add nothing. Times use the ticket's `updatedAt`, then

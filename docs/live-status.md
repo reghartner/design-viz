@@ -194,7 +194,8 @@ plus, when the entry carries `prs.links`, the pull requests GitHub reports for
 the ticket (see "Pull requests from GitHub"). A plain authored link is the
 monochrome icon with the URL as its tooltip. A GitHub-enriched icon takes the
 pull request's state colour (`data-pr-state` open green, draft grey, merged
-purple, closed red) and a small checks dot (`.dv-live-pr-checks[data-checks]`
+purple, closed red; the `--dv-pr-*` and `--dv-checks-*` tokens in `style.core.css`,
+the same in every skin) and a small checks dot (`.dv-live-pr-checks[data-checks]`
 failing red, pending amber, passing green); its tooltip and accessible name read
 “#742 Title · open · checks failing · changes requested · author · owner/repo”.
 No icon shows a time since the pull request was updated. Jira's Development

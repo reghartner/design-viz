@@ -7797,15 +7797,19 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .dv-live-pr-link{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
 .dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
 .dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
-.dv-live-pr-link[data-pr-state="open"]{color:#1a7f37;}
-.dv-live-pr-link[data-pr-state="draft"]{color:#6e7781;}
-.dv-live-pr-link[data-pr-state="merged"]{color:#8250df;}
-.dv-live-pr-link[data-pr-state="closed"]{color:#cf222e;}
-.dv-live-pr-link[data-pr-state]:hover{background:color-mix(in srgb,currentColor 12%,transparent);}
+/* Pull request state and check colours are GitHub's own vocabulary, one token each,
+   the same in every skin. The selectors repeat .nbacklink so they outrank the per-skin
+   `body.sk-* .nbacklink` link colours in the panel and in the popover alike. */
+:root{--dv-pr-open:#1a7f37;--dv-pr-draft:#6e7781;--dv-pr-merged:#8250df;--dv-pr-closed:#cf222e;--dv-checks-failing:#ef4444;--dv-checks-pending:#f59e0b;--dv-checks-passing:#22c55e;}
+.nbacklink.dv-live-pr-link[data-pr-state="open"],.nbacklink.dv-live-pr-link[data-pr-state="open"]:is(:hover,:focus){color:var(--dv-pr-open);}
+.nbacklink.dv-live-pr-link[data-pr-state="draft"],.nbacklink.dv-live-pr-link[data-pr-state="draft"]:is(:hover,:focus){color:var(--dv-pr-draft);}
+.nbacklink.dv-live-pr-link[data-pr-state="merged"],.nbacklink.dv-live-pr-link[data-pr-state="merged"]:is(:hover,:focus){color:var(--dv-pr-merged);}
+.nbacklink.dv-live-pr-link[data-pr-state="closed"],.nbacklink.dv-live-pr-link[data-pr-state="closed"]:is(:hover,:focus){color:var(--dv-pr-closed);}
+.nbacklink.dv-live-pr-link[data-pr-state]:is(:hover,:focus){background:color-mix(in srgb,currentColor 12%,transparent);}
 .dv-live-pr-checks{position:absolute;right:2px;bottom:2px;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1.5px var(--dbg,#fff);}
-.dv-live-pr-checks[data-checks="failing"]{background:#ef4444;}
-.dv-live-pr-checks[data-checks="pending"]{background:#f59e0b;}
-.dv-live-pr-checks[data-checks="passing"]{background:#22c55e;}
+.dv-live-pr-checks[data-checks="failing"]{background:var(--dv-checks-failing);}
+.dv-live-pr-checks[data-checks="pending"]{background:var(--dv-checks-pending);}
+.dv-live-pr-checks[data-checks="passing"]{background:var(--dv-checks-passing);}
 @media(prefers-reduced-motion:reduce){.dv-live-halo{animation:none!important;}}
 @media print{
   .dv-live-halo{animation:none!important;}

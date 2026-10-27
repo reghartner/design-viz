@@ -74,6 +74,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function element(tag,cls,text,parent){var el=document.createElement(tag);el.className=cls;if(text!=null)el.textContent=String(text);if(parent)parent.appendChild(el);return el;}
   function link(parent,label,url){var el=element(url?'a':'span','nbacklink',label,parent);if(url){el.setAttribute('href',url);el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer');}return el;}
   function close(focus){
+    if(!active)return;
     var trigger=active;active=null;
     document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);
     if(trigger)trigger.setAttribute('aria-expanded','false');
@@ -176,8 +177,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function paint(){
     if(retired)return;
     close(false);syncBindings();
-    view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
-    if(applied)bindings.forEach(paintBinding);
+    if(applied){
+      view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
+      bindings.forEach(paintBinding);
+    }
     refreshControls();
   }
   function schedule(){if(retired || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();});}
@@ -243,10 +246,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings=[];
-      events.forEach(function(type){view.removeEventListener(type,schedule);});document.removeEventListener('visibilitychange',visibility);
+      events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
       if(pop)pop.remove();controls.forEach(function(control){control.root.remove();});controls=[];listeners=[];
-      view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
-      view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing').forEach(function(el){liveStatusClass(el,null);});
+      if(applied){
+        view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
+        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing').forEach(function(el){liveStatusClass(el,null);});
+      }
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }
   };

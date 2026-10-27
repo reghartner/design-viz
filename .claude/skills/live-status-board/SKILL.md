@@ -1,6 +1,6 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request is for a live, Jira-driven or cross-team delivery board; plain Flowview authoring stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
 ---
 
 # Live-status board
@@ -55,7 +55,8 @@ Ask the author, in one batch, only what the source does not already state:
   updated for longer gets a stale ring without changing its color.
 - **PR links.** Pull-request URLs the author wants shown. They are plain
   links; live PR state comes only from what Jira already links to the ticket
-  (Development field count and open/merged/declined), never from GitHub.
+  (Development field count with state open or merged; other states are
+  dropped), never from GitHub.
 
 ## 2. Author the spec
 
@@ -121,9 +122,13 @@ Publish only when asked. Steps:
    **Atlassian MCP** for a custom connector or in the declaration unless the
    viewer really has Atlassian's directory connector of that name: it
    resolves to that directory connector and asks for an Atlassian login.
-4. The provider picks the connector by the tools it offers, so one declared
-   name is enough. A viewer without a qualifying connector sees "Add the
-   Atlassian connector in claude.ai Settings → Connectors".
+4. With the connector-selection change from #750 the provider picks the
+   connector by the tools it offers, so one declared name is enough. On a
+   build without that change the provider accepts only the display names
+   **Atlassian MCP** and **Atlassian**; check `src/viewer/live-status-claude.js`
+   for a `qualified` list before relying on a custom name. A viewer without a
+   qualifying connector sees "Add the Atlassian connector in claude.ai
+   Settings → Connectors".
 
 What the viewer sees on first open: a dialog "This artifact uses connectors"
 listing the connector with a toggle and Continue. After Continue the Live chip

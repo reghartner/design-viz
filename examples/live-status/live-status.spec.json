@@ -1,0 +1,30 @@
+{
+  "page": {
+    "title": "Connected doorbell delivery",
+    "contract": "1",
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": ["flow.live-status"]
+    },
+    "tracking": {"jira": {"site": "https://acme.atlassian.net"}},
+    "sections": [{
+      "heading": "From button press to resident notification",
+      "text": ["Track implementation work on each component and the interactions between them. The spec stores references; Jira owns live status."],
+      "diagram": {
+        "nodes": {
+          "hardware": {"title": "Hardware", "sub": "Doorbell button", "tickets": ["HW-123"]},
+          "firmware": {"title": "Firmware", "sub": "Event delivery", "tickets": ["FW-45"], "prs": ["https://github.com/acme/firmware/pull/88"]},
+          "backend": {"title": "Backend", "sub": "Notification service", "tickets": ["BE-67"]},
+          "ux": {"title": "UX mobile app", "sub": "Resident experience", "tickets": ["UX-89"]}
+        },
+        "rows": [["hardware", "firmware", "backend", "ux"]],
+        "edges": [
+          {"from": "hardware", "to": "firmware", "label": "press", "tickets": ["HW-124", "FW-46"]},
+          {"from": "firmware", "to": "backend", "label": "event", "kind": "https", "tickets": ["BE-68"], "prs": ["https://github.com/acme/backend/pull/91"]},
+          {"from": "backend", "to": "ux", "label": "notify", "kind": "https"}
+        ]
+      }
+    }]
+  }
+}

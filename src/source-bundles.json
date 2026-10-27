@@ -7,6 +7,7 @@
     "core/navigation.js",
     "core/document.js",
     "core/contracts.js",
+    "core/tracking.js",
     "core/paths.js",
     "core/design-review.js",
     "core/story-time.js",

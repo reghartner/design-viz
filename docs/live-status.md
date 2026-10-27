@@ -139,15 +139,22 @@ Only `state` is required; PR summary state is `open` or `merged`. Provider calls
 start after first paint and repeat at a minimum of 30 seconds. Hidden documents
 pause refresh; returning to visible triggers one catch-up. Rejections show an error
 note and retain the previous map. Destroy aborts the signal and retires timers,
-observers and listeners. No Jira adapter or network transport is built in.
+observers and listeners. The host owns transport. Standalone claude.ai artifacts
+can also use the Atlassian adapter described below.
 
 `ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
 null), `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear and enable changes. Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
+The map may carry numeric `storedAt` metadata (epoch milliseconds), including
+as a non-enumerable property. A valid cache timestamp supplies the control and
+change callback's `updatedAt` without altering any ticket's `updatedAt`. Maps
+without a valid cache timestamp fall back to the newest issue timestamp;
+`clear` removes both the entries and cache timestamp.
 `note(text, kind)` sets an `info`, `warn` or `error` message. `action(label, fn)`
-sets one host action; an empty label clears it. These methods allow a provider
+sets one host action; an empty label clears it. `onDestroy(fn)` registers adapter
+cleanup and returns an unsubscribe function. These methods allow a provider
 adapter to offer an explicit “Allow” action before looking up tickets.
 
 Standalone hosts set `window.flowviewLiveStatus` before boot. Native hosts pass
@@ -164,3 +171,37 @@ hardware, firmware, a mobile app and backend with node and edge references.
 The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 provides fictional Jira tools without an Atlassian account. Its shared timeline
 demonstrates progress, blocked and missing tickets, and linked PR summaries.
+
+## Publishing as a claude.ai artifact
+
+Build the standalone HTML with `python3 tools/build.py`, then inject your spec
+with `tools/inject.py`. When publishing with the Artifact tool, include this
+exact declaration:
+
+```js
+capabilities: {mcp: {servers: [{server: "Atlassian MCP", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}, {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+```
+
+With an enabled **Atlassian MCP** or **Atlassian** connector, viewers see Jira
+status on referenced nodes and edges. The adapter prefers Atlassian MCP, selects
+the resource matching `page.tracking.jira.site` (or the first resource when no
+site is specified), and watches batches of ten keys every 60 seconds. A second
+Flagged Impediment query detects blockers. Jira status determines colors;
+Development PR summaries, when returned, are informational. All tool calls go
+through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
+
+Without the connector, viewers see “Add the Atlassian connector in claude.ai
+Settings → Connectors to see live ticket status.” If approval is needed, the
+**Allow Jira** button makes one explicit retry. Account and policy errors clear
+status; temporary failures keep the last evidence and permit one delayed retry
+per refresh. Switching accounts retires the adapter. The Live toggle hides
+colors while watches continue, and turning it back on applies the latest data.
+Without the claude.ai runtime or MCP capability, or without ticket references,
+the adapter is inert. An existing `window.flowviewLiveStatus` host provider takes
+precedence. Document editing remains desktop-only.
+
+Tool shapes follow public documentation; they have not been captured from a
+real connector. See the [mock server README](../deploy/cloudflare/mock-atlassian-mcp/README.md)
+for setup, fictional scenarios, result envelopes and known fidelity limits.
+The mock can be installed as **Atlassian MCP** to try the artifact without an
+Atlassian account. No GitHub connector is used.

@@ -140,3 +140,137 @@ test('V9 a late detail load cannot create controls after overlay destruction',as
  api.mountControls(h.view);const pending=renderOptions.loadDetail({spec:'late-detail'},new AbortController().signal);api.destroy();resolve({nodes:{child:{tickets:['DD-1']}}});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),[]);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);assert.equal(h.frames.size,0);
 });
+
+/* Provider contract matrix (VM + the three browser cases):
+ P1 standalone only, defensive async use, no refs/host provider => inert.
+ P2 Jira categories, Flagged, all envelopes, Development, missing, URL, chunks.
+ P3 preferred listed Atlassian server or add-connector note without calls.
+ P4 resource host selection, five-minute cache, empty-site note.
+ P5 two watches per ten keys, partial chunks, cache time and issue time distinct.
+ P6 permission actions, clearing errors, bounded retries and user_changed.
+ P7 destroy abandons calls and unsubscribes; disabled overlay keeps watches.
+ P8 publication declaration in docs and publishing skill.
+ P9 no claude => unchanged; no transport outside mcp. */
+function providerContext(C={URL}){
+ const record=entrypoint('standalone').records.find(r=>r.file==='viewer/live-status-claude.js');
+ if(record)vm.runInNewContext(record.source,C);
+ return C;
+}
+const jira=(key,category='indeterminate',name='In Progress')=>({key,fields:{summary:'Work '+key,status:{name,statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
+const settle=()=>new Promise(setImmediate);
+function providerHarness(raw=fixture()){
+ const h=harness(raw);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
+ h.ctl.liveStatus.mountControls(h.view);
+ const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'searchJiraIssuesUsingJql'}]}];
+ const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
+  watchTool:(server,tool,input,handler,opts)=>{const watch={server,tool,input:plain(input),handler,opts:plain(opts),stopped:0};watches.push(watch);return ()=>watch.stopped++;}};
+ h.win.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
+ return Object.assign(h,{mcp,watches,calls,servers,start(){return h.C.wireLiveStatusClaude(h.ctl,h.ctl.page,h.win);},data(i,issues,at=1793000000000){watches[i].handler({type:'data',result:{payload:{issues:{nodes:issues}},cache:{storedAt:at}}});}});
+}
+test('P2 Jira status categories, unknown, blocked names and flagged sets',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusJiraState,'function');
+ for(const [category,state] of [['new','todo'],['indeterminate','active'],['done','done'],['unknown','todo']])assert.equal(C.liveStatusJiraState(jira('AA-1',category),new Set()),state);
+ assert.equal(C.liveStatusJiraState(jira('AA-1','done','BLOCKED by supplier'),new Set()),'blocked');
+ assert.equal(C.liveStatusJiraState(jira('AA-1','done'),new Set(['AA-1'])),'blocked');assert.equal(C.liveStatusJiraState({},new Set()),'todo');
+});
+test('P2 Jira issue envelopes include nodes, array, single and empty',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusJiraIssues,'function');const issue=jira('AA-1');
+ for(const payload of [{issues:{nodes:[issue]}},{issues:[issue]},{data:issue},[issue]])assert.deepEqual(plain(C.liveStatusJiraIssues(payload)),[issue]);
+ for(const payload of [null,{},'bad',{data:[]},{issues:{}}])assert.deepEqual(plain(C.liveStatusJiraIssues(payload)),[]);
+});
+test('P2 Development parses display-name and customfield strings, tolerates garbled data',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusDevelopmentSummary,'function');
+ const value='{pullrequest={state=OPEN}, json='+JSON.stringify({cachedValue:{summary:{pullrequest:{overall:{count:2,state:'OPEN'}}}}})+'}';
+ for(const fields of [{customFields:{Development:value}},{customfield_10001:value},{customFields:{customfield_10001:value}}])assert.deepEqual(plain(C.liveStatusDevelopmentSummary(fields)),{count:2,state:'open'});
+ assert.equal(C.liveStatusDevelopmentSummary({customFields:{Development:'json={bad}'}}),null);assert.equal(C.liveStatusDevelopmentSummary({}),null);assert.equal(C.liveStatusDevelopmentSummary(null),null);
+});
+test('P2 Jira map merges chunks, marks only requested missing keys and preserves issue timestamps',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusJiraMap,'function');
+ const result=plain(C.liveStatusJiraMap(['AA-1','BB-1','CC-1'],[[jira('AA-1')],[jira('BB-1','done'),jira('EX-1')]],new Set(['BB-1']),'https://jira.test/',1793000000000));
+ assert.deepEqual(Object.keys(result).sort(),['AA-1','BB-1','CC-1']);assert.equal(result['AA-1'].url,'https://jira.test/browse/AA-1');assert.equal(result['AA-1'].updatedAt,'2026-10-20T09:00:00Z');assert.equal(result['AA-1'].assignee,'Alex');assert.equal(result['BB-1'].state,'blocked');assert.equal(result['CC-1'].state,'missing');
+});
+test('P2 chunks of 25 keys preserve order in three batches of at most ten',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusJiraChunks,'function');const keys=Array.from({length:25},(_,i)=>'AA-'+i);
+ const chunks=plain(C.liveStatusJiraChunks(keys));assert.deepEqual(chunks.map(c=>c.length),[10,10,5]);assert.deepEqual(chunks.flat(),keys);assert.deepEqual(plain(C.liveStatusJiraChunks([])),[]);
+});
+test('P1 P9 provider is standalone only and inert without runtime, refs, namespace or with host provider',async()=>{
+ assert.match(entrypoint('standalone').body,/function wireLiveStatusClaude\(/);
+ for(const name of ['native','workbench','forge'])assert.doesNotMatch(entrypoint(name).body,/function wireLiveStatusClaude\(/);
+ assert.match(fs.readFileSync('src/boot.flowview.js','utf8'),/wireArtifactComments\(ctl, view, window\);\s*(?:if[^\n]+)?wireLiveStatusClaude\(ctl, page, window\)/);
+ const h=providerHarness(),wire=h.C.wireLiveStatusClaude;delete h.win.claude;assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
+ Object.defineProperty(h.win,'claude',{configurable:true,get(){throw Error('unavailable');}});assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
+ Object.defineProperty(h.win,'claude',{configurable:true,value:{use:()=>Promise.resolve(null)},writable:true});assert.equal(await h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.view.querySelector('.dv-live-control').hidden,true);
+ h.win.claude={use(){throw Error('should not be called');}};h.win.flowviewLiveStatus={};assert.equal(h.start(),null);delete h.win.flowviewLiveStatus;
+ assert.equal(wire({},h.ctl.page,h.win),null);const empty=providerHarness({nodes:{a:{}}});empty.win.claude=h.win.claude;assert.equal(empty.start(),null);
+});
+test('P3 P4 connector preference, site host, resource cache and unavailable notes',async()=>{
+ const h=providerHarness();h.servers.unshift({server:'Atlassian',tools:['searchJiraIssuesUsingJql']});
+ h.mcp.callTool=(...args)=>{h.calls.push(plain(args));return Promise.resolve({payload:[{id:'wrong',url:'https://other.test'},{id:'right',url:'https://jira.test/path'}]});};
+ await h.start();assert.equal(h.calls.length,1);assert.deepEqual(h.calls[0],['Atlassian MCP','getAccessibleAtlassianResources',{}, {cache:{staleTime:300000}}]);assert.equal(h.watches[0].input.cloudId,'right');
+ const missing=providerHarness();missing.servers.length=0;await missing.start();assert.equal(missing.calls.length,0);assert.match(missing.view.querySelector('.dv-live-note').textContent,/Add the Atlassian connector/);
+ const none=providerHarness();none.mcp.callTool=()=>Promise.resolve({payload:[]});await none.start();assert.equal(none.watches.length,0);assert.equal(none.view.querySelector('.dv-live-note').textContent,'No Atlassian site is available to this account.');
+});
+test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies and dispose',async()=>{
+ const keys=Array.from({length:25},(_,i)=>'AA-'+i),h=providerHarness({nodes:{a:{tickets:keys}},rows:[['a']]});await h.start();assert.equal(h.watches.length,6);
+ for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
+ h.data(0,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'active');assert.equal(h.ctl.liveStatus.state('AA-1').state,'missing');assert.equal(h.ctl.liveStatus.state('AA-10'),null);
+ assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.view.querySelector('time').getAttribute('datetime'),new Date(1793000000000).toISOString());
+ h.data(1,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');
+ h.ctl.liveStatus.setEnabled(false);h.data(0,[jira('AA-0','done')]);h.data(1,[]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');assert.ok(h.watches.every(w=>!w.stopped));
+ h.ctl.liveStatus.setEnabled(true);assert.equal(h.ctl.liveStatus.state('AA-0').state,'done');h.ctl.liveStatus.destroy();assert.ok(h.watches.every(w=>w.stopped===1));h.data(0,[]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'done');
+});
+test('P6 errors clear or retain evidence, approval calls once, retries are bounded',async()=>{
+ for(const [code,message,kind] of [['needs_reauth','Reconnect Atlassian','error'],['server_not_connected','Add the Atlassian','info'],['selection_required','Add the Atlassian','info'],['not_in_manifest','This page is not allowed','warn'],['blocked_by_policy','This page is not allowed','warn']]){
+  const h=providerHarness();await h.start();h.data(0,[jira('AA-1')]);h.watches[0].handler({type:'error',error:{code}});assert.equal(h.ctl.liveStatus.state('AA-1'),null);assert.ok(h.view.querySelector('.dv-live-note').textContent.startsWith(message));assert.equal(h.view.querySelector('.dv-live-note').getAttribute('data-kind'),kind);h.ctl.liveStatus.destroy();
+ }
+ for(const code of ['approval_required','consent_required']){
+  const h=providerHarness();await h.start();let searches=0;h.mcp.callTool=()=>{searches++;return Promise.resolve({payload:{issues:[jira('AA-1')]}});};
+  h.watches[0].handler({type:'error',error:{code}});const action=h.view.querySelector('.dv-live-action');assert.equal(action.textContent,'Allow Jira');action.dispatchEvent({type:'click'});action.dispatchEvent({type:'click'});await settle();assert.equal(searches,1);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');h.ctl.liveStatus.destroy();
+ }
+ for(const code of ['server_unavailable','upstream_error','rate_limited']){
+  const h=providerHarness();await h.start();h.data(0,[jira('AA-1')]);let retries=0;h.mcp.callTool=()=>{retries++;return Promise.reject({code,retryable:true,retryAfterMs:1234});};
+  h.watches[0].handler({type:'error',error:{code,retryable:true,retryAfterMs:1234}});assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,1);const timer=[...h.timers.values()][0];assert.equal(timer.ms,1234);h.timers.clear();timer.fn();await settle();assert.equal(retries,1);assert.equal(h.timers.size,0);h.ctl.liveStatus.destroy();
+ }
+ const h=providerHarness();await h.start();h.data(0,[jira('AA-1')]);h.watches[0].handler({type:'error',error:{code:'tool_error',message:'JQL unavailable'}});assert.equal(h.view.querySelector('.dv-live-note').textContent,'JQL unavailable');assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');h.watches[0].handler({type:'error',error:{code:'unknown'}});assert.equal(h.timers.size,0);
+ h.watches[0].handler({type:'error',error:{code:'user_changed'}});assert.ok(h.watches.every(w=>w.stopped===1));h.data(0,[jira('AA-1','done')]);assert.notEqual(h.ctl.liveStatus.state('AA-1')?.state,'done');
+});
+test('P7 destruction before namespace or resource resolution abandons late work',async()=>{
+ for(const stage of ['namespace','resources']){
+  const h=providerHarness();let resolve;
+  if(stage==='namespace')h.win.claude.use=()=>new Promise(r=>resolve=r);else h.mcp.callTool=()=>new Promise(r=>resolve=r);
+  const pending=h.start();await settle();h.ctl.liveStatus.destroy();resolve(stage==='namespace'?h.mcp:{payload:[{id:'cloud',url:'https://jira.test'}]});await pending;assert.equal(h.watches.length,0);assert.equal(h.view.querySelectorAll('.dv-live-control').length,0);
+ }
+});
+test('P8 publishing docs and skill declare both Atlassian names and comments',()=>{
+ for(const file of ['docs/live-status.md','.claude/skills/hld-to-page/references/integrations.md']){
+  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian MCP"/);assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
+ }
+ assert.match(fs.readFileSync('docs/tab-views.md','utf8'),/live-status.md#publishing-as-a-claudeai-artifact/);
+});
+
+test('P6 P7 resource-call failures follow the same policy; toggles and late searches stay bounded',async()=>{
+ const resources=providerHarness();resources.mcp.callTool=()=>Promise.reject({code:'needs_reauth'});await resources.start();assert.equal(resources.view.querySelector('.dv-live-note').textContent,'Reconnect Atlassian in claude.ai Settings → Connectors');assert.equal(resources.watches.length,0);
+ const empty=providerHarness();let attempts=0;empty.mcp.callTool=()=>++attempts===1?Promise.reject({code:'rate_limited',retryAfterMs:10}):Promise.resolve({payload:[]});await empty.start();const retry=[...empty.timers.values()][0];empty.timers.clear();retry.fn();await settle();assert.equal(attempts,2);assert.equal(empty.view.querySelector('.dv-live-note').textContent,'No Atlassian site is available to this account.');assert.equal(empty.timers.size,0);
+ const h=providerHarness();await h.start();h.data(0,[jira('AA-1')]);h.ctl.liveStatus.setEnabled(false);h.data(0,[jira('AA-1','done')]);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.ok(h.watches.every(w=>w.stopped===0));h.ctl.liveStatus.setEnabled(true);assert.equal(h.ctl.liveStatus.state('AA-1').state,'done');
+ let resolve;h.mcp.callTool=()=>new Promise(r=>resolve=r);h.watches[0].handler({type:'error',error:{code:'approval_required'}});h.view.querySelector('.dv-live-action').dispatchEvent({type:'click'});await settle();h.ctl.liveStatus.destroy();resolve({payload:{issues:[jira('AA-1')]}});await settle();assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.ctl.liveStatus.state('AA-1').state,'done');assert.equal(h.timers.size,0);
+});
+
+test('P5 cache timestamps take precedence, validate, and reset without changing issue evidence',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus,events=[];
+ api.mountControls(h.view);api.onChange(value=>events.push(plain(value)));
+ const issueTime='2026-10-26T12:00:00Z',entry={state:'active',updatedAt:issueTime};
+ const applyCache=storedAt=>{const map={'AA-1':entry};Object.defineProperty(map,'storedAt',{value:storedAt});api.apply(map);};
+ // Even an older cache timestamp, or epoch zero, describes lookup freshness.
+ for(const stamp of [1793000000000,0]){
+  applyCache(stamp);assert.equal(h.view.querySelector('time').getAttribute('datetime'),new Date(stamp).toISOString());
+  assert.equal(events.at(-1).updatedAt,new Date(stamp).toISOString());assert.deepEqual(events.at(-1).states,{'AA-1':entry});
+  assert.equal(api.state('AA-1').updatedAt,issueTime);
+ }
+ for(const invalid of [undefined,null,'1793000000000',NaN,Infinity,1e20]){
+  applyCache(1793000000000);applyCache(invalid);
+  assert.equal(h.view.querySelector('time').getAttribute('datetime'),issueTime);assert.equal(events.at(-1).updatedAt,issueTime);
+ }
+ applyCache(1793000000000);api.apply({'AA-1':entry});assert.equal(events.at(-1).updatedAt,issueTime);
+ applyCache(1793000000000);api.clear();assert.equal(h.view.querySelector('time'),null);assert.equal(events.at(-1).updatedAt,null);
+ api.apply({'AA-1':{state:'done'}});assert.equal(h.view.querySelector('time'),null);api.destroy();
+});

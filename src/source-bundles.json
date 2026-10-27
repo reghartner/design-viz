@@ -143,6 +143,7 @@
         "validator.js",
         "engine.js",
         "viewer/artifact-comments.js",
+        "viewer/live-status-claude.js",
         "viewer/tour-progress.js",
         "tour.config.js",
         "tour.flowview.js",

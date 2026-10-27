@@ -124,13 +124,17 @@ test('live-status example covers node and edge references without validation or 
   const diagrams = C.sectionRecords(page).filter(record => record.section.diagram).map(record => record.section.diagram);
   assert.equal(diagrams.length,1);
   const d = diagrams[0], nodes = Object.values(d.nodes);
-  assert.equal(nodes.length,4);
+  assert.equal(nodes.length,6);
+  assert.equal(d.edges.length,5);
+  // The story names its four teams in lanes, with several carriers per team.
   for (const area of [/hardware/i,/firmware/i,/mobile app/i,/backend/i])
-    assert.ok(nodes.some(node => area.test(node.title+' '+node.sub)), String(area));
-  assert.ok(nodes.filter(node => C.trackingRefs(node).tickets.length).length >= 3);
-  assert.ok(d.edges.filter(edge => C.trackingRefs(edge).tickets.length).length >= 2);
+    assert.ok(Object.values(page.lanes).some(lane => area.test(lane.label)), String(area));
+  assert.ok(nodes.every(node => C.trackingRefs(node).tickets.length));
+  assert.ok(d.edges.every(edge => C.trackingRefs(edge).tickets.length));
+  assert.deepEqual([...new Set([...nodes,...d.edges].flatMap(obj => plain(C.trackingRefs(obj)).tickets))].sort(),
+    ['BE-67','BE-68','FW-45','FW-46','HW-123','HW-124','UX-89']);
+  // This story attaches PRs to nodes; edge PR parsing is covered above.
   assert.ok(nodes.some(node => C.trackingRefs(node).prs.length));
-  assert.ok(d.edges.some(edge => C.trackingRefs(edge).prs.length));
   for (const obj of [...nodes,...d.edges]) {
     const refs = plain(C.trackingRefs(obj));
     assert.deepEqual(refs.tickets, obj.tickets || []);

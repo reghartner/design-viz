@@ -247,7 +247,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);await expect(root.locator('.dv-live-target:focus').locator('xpath=ancestor-or-self::*[contains(@class,"dv-live-blocked")][1]')).toHaveCount(1);
  const panel=root.locator('.pt-live-status');
  await expect(panel).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');await expect(panel.locator('.dv-live-verdict')).toHaveText(/1 blockers · \d+ waiting/);
- await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane="HW"]')).toContainText('Hardware · 0/4 done');
+ await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane]')).toHaveCount(0);await expect(panel.locator('h3',{hasText:'Teams'})).toHaveCount(0);
  const blocker=panel.locator('.dv-live-blocker').filter({hasText:'HW-124'});await expect(blocker).toContainText(/\d+ downstream carriers · \d+ steps/);await expect(blocker.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
  await expect(panel.locator('.dv-live-activity')).toContainText('HW-124 · active → blocked');
  await page.emulateMedia({media:'print'});await expect(panel.locator('.pbody')).not.toBeEmpty();await page.emulateMedia({media:'screen'});
@@ -348,11 +348,12 @@ test('L4 unlinked detail coverage names its page and stays disabled',async({page
  await expect(root.locator('.dv-live-carrier-preview')).toHaveCount(0);await expect(root.locator('#section-detail')).toBeHidden();expect(await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent))).toEqual(spec);
 });
 
-test('L3 L4 L5 L10 live-status panel is below the diagram without a click and keeps its print paint',async({page,server})=>{
+test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and keeps its print paint',async({page,server})=>{
  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),body=panel.locator('.pbody'),head=body.locator('.dv-live-head');
  await expect(body).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');
  const diagram=root.locator('.section-layout-tile[data-layout-key="diagram"]'),tile=panel.locator('xpath=ancestor::*[contains(@class,"section-layout-tile")][1]');
- const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);expect(Math.abs(b.width-a.width)).toBeLessThan(2);
+ // Default arrangement (Chuck 2026-10-27): panel in the left half, diagram with attached step controls in the right half, both visible on open.
+ const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.x+b.width).toBeLessThanOrEqual(a.x+2);expect(Math.abs(b.y-a.y)).toBeLessThan(2);expect(b.width).toBeGreaterThan(300);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');

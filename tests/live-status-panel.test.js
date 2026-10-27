@@ -42,7 +42,11 @@ test('L6 headless validator warns for missing and empty panels across sections',
 test('L5 L8 L9 L11 authored example, guidance and built artifact carry the panel',()=>{
  const raw=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json')),d=raw.page.sections[0].diagram;
  assert.deepEqual(d.panels,[panel]);assert.equal(d.sectionLayout.columns,24);
- for(const profile of ['default','backstage','confluence']){const tiles=d.sectionLayout[profile];assert.equal(tiles.length,3);assert.equal(tiles[0].w,24);assert.equal(tiles[1].controls,'steps');assert.equal(tiles[2].panel,'status');assert.equal(tiles[2].w,24);assert.ok(tiles[2].y>=tiles[1].y+tiles[1].h);}
+ // Default (Chuck 2026-10-27): panel in the left half, diagram in the right half with the step controls attached; narrow host profiles stack full width.
+ assert.equal(d.view,'ambient');
+ const def=d.sectionLayout.default,panelTile=def.find(t=>t.panel==='status'),diagramTile=def.find(t=>t.panel==null && t.controls==null),stepsTile=def.find(t=>t.controls==='steps');
+ assert.equal(def.length,3);assert.deepEqual([panelTile.x,panelTile.w,panelTile.y],[0,12,0]);assert.deepEqual([diagramTile.x,diagramTile.w,diagramTile.y],[12,12,0]);assert.equal(stepsTile.attachTo,'diagram');
+ for(const profile of ['backstage','confluence']){const tiles=d.sectionLayout[profile];assert.equal(tiles.length,3);assert.equal(tiles[0].w,24);assert.equal(tiles[1].controls,'steps');assert.equal(tiles[2].panel,'status');assert.equal(tiles[2].w,24);assert.ok(tiles[2].y>=tiles[1].y+tiles[1].h);}
  assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
  assert.match(fs.readFileSync('docs/live-status.md','utf8'),/## Live status panel/);assert.match(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'),/Always add the Live status panel/);
  assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/live-status.*panel|panel.*live-status/);

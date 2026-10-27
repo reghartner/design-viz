@@ -511,10 +511,10 @@ test('B1 external detail lanes render progress state and titles when the root ha
   assert.equal(pill.textContent,'Detail team · 1/3 done');assert.ok(pill.classList.contains('dv-live-blocked'));
   assert.equal(pill.getAttribute('title'),'DD-3 · active\nDD-1 · blocked\nDD-2 · done');assert.equal(pill.getAttribute('tabindex'),'0');
   assert.ok(h.view.querySelector('.dv-live-panel-body'));
-  const rows=h.view.querySelectorAll('.dv-live-lane');assert.equal(rows.length,lanes?2:1);
-  const row=rows.find(el=>el.textContent.startsWith('Detail team'));assert.equal(row.textContent,pill.textContent);assert.equal(row.getAttribute('title'),pill.getAttribute('title'));assert.ok(row.classList.contains('dv-live-blocked'));
+  // #767: the panel shows no Teams section; lane evidence stays on the step pills, the Tickets stripes and the Blockers rows.
+  assert.equal(h.view.querySelectorAll('.dv-live-lane').length,0);assert.equal(h.view.querySelectorAll('.dv-live-panel-body h3').map(el=>el.textContent).indexOf('Teams'),-1);
   assert.equal(h.view.querySelector('.dv-live-blocker-lanes').textContent,'Detail team');
-  if(lanes){assert.equal(h.rootRec.sectionEl.querySelector('.lanepill').textContent,'Root team · 1/1 done');assert.ok(rows.find(el=>el.textContent==='Root team · 1/1 done').classList.contains('dv-live-done'));}
+  if(lanes){assert.equal(h.rootRec.sectionEl.querySelector('.lanepill').textContent,'Root team · 1/1 done');}
   api.setEnabled(false);assert.equal(pill.textContent,'Detail team');assert.equal(pill.getAttribute('title'),null);api.destroy();
  }
 });

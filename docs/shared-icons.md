@@ -1,6 +1,6 @@
 # Shared icons and company branding
 
-Flowview ships one library of 63 colored SVG icons for diagram nodes, groups,
+Flowview ships one library of 64 colored SVG icons for diagram nodes, groups,
 Home elements, Device app cards, audio controls, monitoring and dispatch. Battery,
 voltage, temperature and alarm variants differ in shape as well as color. Icons describe
 the authored story; choosing an alarm icon does not trigger or verify an alarm.
@@ -176,9 +176,9 @@ support; SVG paint fallbacks work without CSS or an external sprite in offline
 exports and native ShadowRoots. CSS consumers can override
 `--fv-icon-primary`, `--fv-icon-accent`, and `--fv-icon-wash`.
 
-`symbols()` emits the 42 new `#i-*` symbols by default. The source loader appends
+`symbols()` emits the 43 new `#i-*` symbols by default. The source loader appends
 them to the existing 21-symbol sprite, preserving legacy diagram tint behavior.
-`symbols({newOnly:false})` emits all 63 for consumers that have no legacy sprite.
+`symbols({newOnly:false})` emits all 64 for consumers that have no legacy sprite.
 Both methods also include every fork icon; fork icons never replace legacy symbols.
 Do not append the full set to a document that already contains those IDs.
 
@@ -196,7 +196,7 @@ The editor owns transactions and form lifetime through
 
 | Category | IDs |
 | --- | --- |
-| Software | `terminal gear db server chip` |
+| Software | `terminal gear db server chip pull-request` |
 | Connectivity | `cloud antenna router wifi wifi-off cloud-off signal` |
 | Security | `shield key lock alarm armed disarmed triggered door motion smoke water sensor` |
 | Temperature | `thermo temperature hot cold snowflake` |

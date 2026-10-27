@@ -178,8 +178,8 @@ the Workbench and sees no live state there.
 
 Open the artifact in a browser and check, in this order:
 
-- The Live status panel below the diagram shows the carriers done ring, Teams
-  lanes with n/N, Blockers, Tickets and Activity without a click.
+- The Live status panel below the diagram shows the carriers done ring,
+  Blockers, Tickets and Activity without a click.
 - Its header shows Live, counts and updated time; demo controls appear only in demo mode.
 - Network: two or more `api/frame/mcp/call` requests with status 200.
 - One node or edge popover lists its keys with state and assignee.

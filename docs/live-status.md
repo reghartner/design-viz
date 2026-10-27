@@ -124,7 +124,9 @@ and Export project preserve the panel. There are no authored state or patch fiel
 The panel header holds **Live**, distinct-ticket counts, the updated time,
 provider note and action, **First blocker**, and demo **Play/Pause** and **Next day**
 when demo controls are supplied. The engine's panel title stays above this header.
-The body shows completion and verdict, Teams, Blockers, Tickets, then Activity.
+The body shows completion and verdict, Blockers, Tickets, then Activity. Lane
+progress is not listed in the panel; it stays on the step lane pills, the lane colour
+stripe of each Tickets row and the lane names in Blockers.
 Without ticket references or epics it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
@@ -335,7 +337,7 @@ The mock can be installed as a custom connector under any name except
 that name when publishing. No GitHub connector is used.
 
 Verify after publishing: the Live status panel below the diagram shows completion,
-Teams, Blockers, Tickets and Activity, and its header shows counts and updated time.
+Blockers, Tickets and Activity, and its header shows counts and updated time.
 
 ## Story mode
 

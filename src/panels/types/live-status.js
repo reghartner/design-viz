@@ -5,7 +5,7 @@
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
-      '<div class="dv-live-panel-body"><div class="dv-live-completion">11/11 carriers done</div><p class="dv-live-verdict">Ready to demo · 7 of 8 epic stories on diagram</p><h3>Teams</h3><p>Hardware · 4/4 done · Firmware · 3/3 done · Backend · 3/3 done · Mobile app · 1/1 done</p><h3>Blockers</h3><p>None</p><h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>PRs</th><th>Coverage</th></tr></thead><tbody>'+
+      '<div class="dv-live-panel-body"><div class="dv-live-completion">11/11 carriers done</div><p class="dv-live-verdict">Ready to demo · 7 of 8 epic stories on diagram</p><h3>Blockers</h3><p>None</p><h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>PRs</th><th>Coverage</th></tr></thead><tbody>'+
       sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>1 merged</td><td>'+ (row.key==='UX-90'?'NOT ON DIAGRAM':'On diagram')+'</td></tr>';}).join('')+'</tbody></table></div><h3>Activity</h3></div>';
   }
   function mount(host){
@@ -51,7 +51,7 @@
         var body=el(host,'div','body','dv-live-panel-body'),completion=el(body,'div','completion','dv-live-completion'),svg=el(completion,'svg','ring','');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');
         ['track','done'].forEach(function(kind){var circle=el(svg,'circle',kind,'dv-live-ring-'+kind);circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');if(kind==='done')circle.setAttribute('stroke-dasharray',(value.readiness.total?100*value.readiness.done/value.readiness.total:0)+' 100');});
         el(completion,'strong','count','',value.readiness.done+'/'+value.readiness.total+' carriers done');el(body,'p','verdict','dv-live-verdict',value.verdict);
-        if(value.lanes.length){el(body,'h3','teams-heading','','Teams');var lanes=el(body,'div','teams','');value.lanes.forEach(function(lane,i){var row=el(lanes,'div',String(i),'dv-live-lane'+(lane.state?' dv-live-'+lane.state:''),lane.text);row.setAttribute('data-live-lane',lane.id);if(lane.title){row.setAttribute('title',lane.title);row.setAttribute('tabindex','0');}else {row.removeAttribute('title');row.removeAttribute('tabindex');}});}
+        // Lane data stays in the snapshot (step pills, Tickets stripes, Blockers lanes); the Teams rows are not rendered (#767).
         el(body,'h3','blockers-heading','','Blockers');var blockers=el(body,'ul','blockers','dv-live-blockers');
         value.blockers.forEach(function(item){var row=el(blockers,'li',item.key,'dv-live-blocker');link(row,'key',item.key,item.url);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','lanes','dv-live-blocker-lanes',item.lanes);el(row,'span','downstream','dv-live-downstream',item.downstream);if(item.state==='missing')el(row,'span','missing','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)');});
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
@@ -92,7 +92,6 @@
 .dv-live-ring-track{stroke:var(--dv-live-todo);opacity:.3;}
 .dv-live-ring-done{stroke:var(--dv-live-done);}
 .dv-live-verdict{font-weight:700;}
-.dv-live-lane{padding:4px 8px;margin:4px 0;border-left:4px solid;font-variant-numeric:tabular-nums;}
 .dv-live-blockers,.dv-live-activity{list-style:none;padding:0;margin:0;}
 .dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
@@ -115,7 +114,6 @@
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
 .dv-live-empty,.dv-live-updated{color:var(--dfaint)}
-.dv-live-lane{border-color:var(--dv-live-color,var(--explore-border));color:var(--dv-live-color,var(--dtext))}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}

@@ -644,9 +644,10 @@ and are ignored; a non-array value produces one warning and is ignored. Valid
 references are retained, with duplicates removed in their original order when
 read. Authored PR references are plain links and never carry live state.
 
-Always add a `live-status` panel to a tracked page, placing it below the diagram
-with `sectionLayout`; its header owns Live and demo controls and its body shows
-Teams, Blockers, Tickets and Activity. It has no authored initial or step state.
+Always add a `live-status` panel to a tracked page and place it with
+`sectionLayout` (the example puts it beside the diagram); its header owns Live and
+demo controls and its body shows Blockers, Tickets and Activity. It has no authored
+initial or step state.
 
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
 configures the Jira site and optional epic:
@@ -957,8 +958,9 @@ perspectives" of one timeline). Types:
 
 - `live-status` — runtime ticket progress for a tracked page:
   `{"id":"status","type":"live-status","title":"Epic status"}`.
-  Always add it when the page has tracking or carrier tickets, and use
-  `sectionLayout` to place it full width below the diagram and step controls.
+  Always add it when the page has tracking or carrier tickets, and place it with
+  `sectionLayout` (the example: panel in the left half, diagram with attached step
+  controls in the right half; stacked full width for Backstage and Confluence).
   The header owns Live, counts, updated time, provider messages and actions,
   First blocker, and demo Play/Pause and Next day when supplied by the host.
   The body shows completion, verdict, Teams, Blockers, Tickets and Activity.

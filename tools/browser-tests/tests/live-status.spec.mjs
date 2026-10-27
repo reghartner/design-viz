@@ -347,11 +347,12 @@ test('L4 unlinked detail coverage names its page and stays disabled',async({page
  await expect(root.locator('.dv-live-carrier-preview')).toHaveCount(0);await expect(root.locator('#section-detail')).toBeHidden();expect(await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent))).toEqual(spec);
 });
 
-test('L3 L4 L5 L10 live-status panel is below the diagram without a click and keeps its print paint',async({page,server})=>{
+test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and keeps its print paint',async({page,server})=>{
  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),body=panel.locator('.pbody'),head=body.locator('.dv-live-head');
  await expect(body).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');
  const diagram=root.locator('.section-layout-tile[data-layout-key="diagram"]'),tile=panel.locator('xpath=ancestor::*[contains(@class,"section-layout-tile")][1]');
- const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);expect(Math.abs(b.width-a.width)).toBeLessThan(2);
+ // Default arrangement (Chuck 2026-10-27): panel in the left half, diagram with attached step controls in the right half, both visible on open.
+ const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.x+b.width).toBeLessThanOrEqual(a.x+2);expect(Math.abs(b.y-a.y)).toBeLessThan(2);expect(b.width).toBeGreaterThan(300);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-badge').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');

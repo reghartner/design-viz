@@ -72,17 +72,19 @@ on `page` beside `title`, and list `flow.live-status` under
 
 ### Always add the Live status panel
 
-Add this to the diagram so the rollup stays visible below it. The header owns
-Live and demo controls; no reader menu is needed. Use all three host profiles.
+Add this to the diagram so the rollup is visible on open. The default profile
+puts the panel in the left half and the diagram, with its step controls attached,
+in the right half; narrow hosts stack them. The header owns Live and demo
+controls; no reader menu is needed. Use all three host profiles.
 
 ```json
 {
   "panels": [{"id":"status", "type":"live-status", "title":"Epic status"}],
   "sectionLayout": {"columns":24,
     "default": [
-      {"x":0,"y":0,"w":24,"h":10},
-      {"controls":"steps","x":0,"y":10,"w":24,"h":6},
-      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+      {"panel":"status","x":0,"y":0,"w":12,"h":27},
+      {"x":12,"y":0,"w":12,"h":21},
+      {"controls":"steps","attachTo":"diagram","x":12,"y":30,"w":12,"h":5}
     ],
     "backstage": [
       {"x":0,"y":0,"w":24,"h":10},
@@ -178,7 +180,7 @@ the Workbench and sees no live state there.
 
 Open the artifact in a browser and check, in this order:
 
-- The Live status panel below the diagram shows the carriers done ring,
+- The Live status panel beside the diagram shows the carriers done ring,
   Blockers, Tickets and Activity without a click.
 - Its header shows Live, counts and updated time; demo controls appear only in demo mode.
 - Network: two or more `api/frame/mcp/call` requests with status 200.

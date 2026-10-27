@@ -434,7 +434,7 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  .reader-contents-tree{flex:1;overflow:auto;min-height:0;padding:8px 10px 24px;overscroll-behavior:contain;}
  .reader-contents-tab+.reader-contents-tab{margin-top:16px;padding-top:14px;border-top:1px solid var(--explore-border);}
  body .reader-navigation .reader-tree-tab{font-weight:600;display:block;width:100%;padding:9px 10px;}
- .reader-tree-tab:after{content:' ›';margin-left:8px;}.reader-tree-tab[aria-expanded=true]:after{content:' ⌄';}
+ .reader-tree-tab[aria-expanded]:after{content:' ›';margin-left:8px;}.reader-tree-tab[aria-expanded=true]:after{content:' ⌄';}
  .reader-tree-views{margin:6px 0 0 16px;border-left:1px solid var(--explore-border);padding-left:10px;}
  .reader-tree-view-row{display:flex;align-items:center;margin:3px 0;border-radius:6px;}
  .reader-tree-view-row:has([aria-current=page]){background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);}
@@ -446,7 +446,7 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  .reader-tree-detail{padding:4px 8px;color:var(--dfaint);overflow-wrap:anywhere;}
  .reader-tree-detail:before{content:'↳ ';}
  .reader-tree-detail[aria-current=location]{color:var(--navigation-accent);font-weight:500;}
- body .reader-navigation .reader-tree-section[aria-current=page]{background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);font-weight:500;box-shadow:-2px 0 var(--navigation-accent);}
+ body .reader-navigation :is(.reader-tree-section,.reader-tree-tab)[aria-current=page]{background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);font-weight:500;box-shadow:-2px 0 var(--navigation-accent);}
  .reader-theme-footer{display:flex;align-items:center;gap:12px;flex:none;padding:13px 14px;border-top:1px solid var(--explore-border);background:var(--reader-footer,var(--explore-bg));}
  .reader-theme-label{font-size:12px;color:var(--dfaint);}.reader-theme-menu{position:relative;flex:1;min-width:0;}
  body .reader-navigation .reader-theme-menu>summary{display:block;border:1px solid var(--explore-border);background:var(--reader-paper,var(--explore-bg));padding:7px 12px;list-style:none;}

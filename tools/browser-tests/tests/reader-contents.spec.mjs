@@ -101,7 +101,7 @@ test('Standard Contents exposes ordered section headlines and routes mouse and k
   const backstage=headlines.getByRole('button',{name:'Find the right workspace in Backstage',exact:true});await backstage.focus();await page.keyboard.press('Enter');
   await expect(backstage).toBeFocused();await expect(backstage).toHaveAttribute('aria-current','page');await expect(root.locator('.reader-page-label')).toHaveText('Page 9 of 11');await expect(root.locator('.doc-sec:visible')).toHaveCount(1);
   const target=await root.locator('#section-backstage').boundingBox(),navigation=await root.locator('.reader-navigation').boundingBox();expect(target.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(target.y).toBeLessThan(page.viewportSize().height*.6);
-  await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');const prose=root.locator('.reader-tree-sections[data-reader-view="standard"] .reader-tree-section');await expect(prose).toHaveText(['Reference material']);await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 11 of 11');
+  const prose=root.locator('.reader-tree-tab').filter({hasText:'Reference'});await expect(prose).not.toHaveAttribute('aria-expanded');await expect(prose).toHaveAccessibleName('Reference');await prose.click();await expect(prose).toHaveAttribute('aria-current','page');await expect(root.locator('#section-reference')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page 11 of 11');
 });
 
 test('desktop Contents expands every View by default and preserves independent disclosure choices',async({page,server})=>{
@@ -174,7 +174,7 @@ function fiveSectionDocument(){
 test('three single-View Tabs with 1, 1 and 3 sections keep a five-page document total in standalone, native and Workbench readers',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:900});const raw=fiveSectionDocument();
   const root=await openRaw(page,server,raw,'five-document-sections'),label=root.locator('.reader-page-label'),toggle=root.locator('.reader-top>button');
-  const ids=['one','two','three','four','five'],assertCurrent=async index=>{await expect(label).toHaveText('Page '+(index+1)+' of 5');await expect(root.locator('.reader-tree-section[aria-current="page"]')).toHaveAttribute('data-reader-section',ids[index]);};
+  const ids=['one','two','three','four','five'],assertCurrent=async index=>{await expect(label).toHaveText('Page '+(index+1)+' of 5');await expect(root.locator('.reader-tree-leaf[aria-current="page"]')).toHaveAttribute('data-reader-section',ids[index]);};
   await expect(toggle).toHaveText(/^Contents\s*·\s*5 pages$/);await expect(label).toHaveText('Page 1 of 5');
   const previous=root.getByRole('button',{name:'Previous page',exact:true}),next=root.getByRole('button',{name:'Next page',exact:true});
   await assertCurrent(0);await expect(previous).toBeDisabled();
@@ -214,7 +214,7 @@ test('#607 desktop Contents lands with every Tab and View expanded and keeps rea
   const group=label=>root.locator('.reader-contents-tab').filter({has:root.page().locator('.reader-tree-tab').filter({hasText:label})}),tabRow=label=>group(label).locator('.reader-tree-tab');
   const views=label=>group(label).locator('.reader-tree-view'),sections=id=>root.locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section'),disclosure=id=>root.locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure');
   await expect(root.locator('.reader-contents')).toBeVisible();
-  await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(group('Product journey').locator('.reader-tree-view[aria-current="page"]')).toHaveText('Full story');
+  await expect(root.locator('.reader-tab-label')).toHaveText('Product journey');await expect(group('Product journey').locator('.reader-tree-view[aria-pressed="true"]')).toHaveText('Full story');
   // The landing default is applied after the first frame; settle it before asserting.
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expectAllExpanded(root);
@@ -284,7 +284,7 @@ test('native Contents themes and destruction are isolated between sibling hosts'
 
 test('desktop Contents closes on transition to phone and releases its focus trap',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});const root=await open(page,server),toggle=root.locator('.reader-top>button');
-  await expect(root.locator('.reader-contents')).toBeVisible();await root.locator('.reader-tree-view[aria-current="page"]').focus();
+  await expect(root.locator('.reader-contents')).toBeVisible();await root.locator('.reader-tree-leaf[aria-current="page"]').focus();
   await page.setViewportSize({width:390,height:844});
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(toggle).toBeFocused();await expect(root.locator('.reader-scrim')).toBeHidden();
   await root.getByRole('button',{name:'Next page',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 9');
@@ -309,9 +309,9 @@ for(const width of [1440])test('direct top Views route with Contents closed and 
   const step=root.locator('#section-review .stepid'),before=await step.innerText();await page.evaluate(()=>document.body.classList.add('presenting'));
   await subset.focus();await page.keyboard.press('ArrowLeft');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toBeFocused();await expect(subset).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);
   await page.keyboard.press('Space');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toHaveAttribute('aria-selected','true');await expect(step).toHaveText(before);await expect(root.locator('#section-review .termbar')).toContainText('Paused');await page.evaluate(()=>document.body.classList.remove('presenting'));
-  await toggle.click();await expect(root.locator('.reader-tree-view[data-tab-view=explore]')).toHaveAttribute('aria-current','page');await choose(root,'full');await expect(full).toHaveAttribute('aria-selected','true');
+  await toggle.click();await expect(root.locator('.reader-tree-view[data-tab-view=explore]')).toHaveAttribute('aria-pressed','true');await choose(root,'full');await expect(full).toHaveAttribute('aria-selected','true');
   await page.evaluate(()=>location.hash='d=review&v=explore');await expect(strip.getByRole('tab',{name:'Explore story',exact:true})).toHaveAttribute('aria-selected','true');await expect(root.locator('#section-build')).toBeHidden();await expect(root.locator('#section-review')).toBeVisible();
-  if(!await root.locator('.reader-contents').isVisible())await toggle.click();await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).toHaveAttribute('aria-expanded','true');await root.locator('.reader-tree-tab').filter({hasText:'Reference'}).locator('..').locator('.reader-tree-view').first().click();
+  if(!await root.locator('.reader-contents').isVisible())await toggle.click();await expect(root.locator('.reader-tree-tab').filter({hasText:'Reference'})).not.toHaveAttribute('aria-expanded');await root.locator('.reader-tree-tab').filter({hasText:'Reference'}).click();
   await expect(root.locator('.reader-tab-label')).toHaveText('Reference');await expect(strip.getByRole('tab')).toHaveCount(1);await expect(strip.getByRole('tab',{selected:true})).toHaveText('Standard');await expect(root.locator('#section-reference')).toBeVisible();
 });
 
@@ -375,7 +375,7 @@ test('exported reader omits the build line, keeps the theme picker and renders a
 test('embedded top Views only offer memberships containing the embedded Section',async({page,server})=>{
   const root=await open(page,server);await page.goto(server.origin+'/contents.html#embed=build&v=explore');
   const strip=root.getByRole('tablist',{name:'Views in selected Tab'});await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story']);
-  await expect(root.locator('.reader-tree-sections[data-reader-view="full"] .reader-tree-section')).toHaveText(['Turn a doorbell story into a reviewable draft']);
+  await expect(root.locator('.reader-tree-leaf')).toHaveText(['Full story','Explore story']);
   for(const [index,name] of ['Full story','Explore story'].entries()){await strip.getByRole('tab',{name,exact:true}).click();await expect(root.locator('.doc-sec .board:visible')).toHaveCount(1);await expect(root.locator('#section-build .board')).toBeVisible();await expect(root.locator('.reader-page-label')).toHaveText('Page '+(index+1)+' of 2');}
 });
 
@@ -440,7 +440,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    H2 no edge trigger | real hover at the top bar's left edge and in the content just right of the rail, 600ms each | overlay never shown | a screen-edge hot zone
    H3 hover-intent overlay | real hover on marker 2 | .reader-contents visible with .reader-contents-overlay, opened 150–700ms after the rail's pointerenter; its left edge = rail right; #section-overview box unchanged; toggle still aria-expanded=false | a 0ms open; the pinned push sidebar; an overlay that moves the page
    H4 numbered entries match | overlay open | each .reader-tree-tab .reader-part-number = the rail marker text in order and its name = the marker's name | unnumbered Contents; numbers that drift from the rail
-   H5 only current part expanded | overlay open on part 2 | .reader-tree-tab aria-expanded = [false,true,false×4] | the pinned all-expanded tree in the overlay
+   H5 only real groups disclose | overlay open on a singleton part | the Answer and talk group aria-expanded=false; the other five parts have no aria-expanded | a redundant disclosure on a direct destination
    H6 mouse leave closes after a delay | real mouse move from the marker into the overlay, then to the page centre | crossing into the overlay keeps it open 600ms later; leaving it hides it 150–1000ms after the pointerleave; toggle aria-expanded=false | an overlay that stays until clicked; one that closes the instant the pointer leaves the rail
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
    K1 click navigates only (#681) | real click on marker 4 while the overlay is open | toggle aria-expanded=false; rail visible; marker 4 current, count "4/6"; tab label "Smart motion"; pager "Page 7 of 9"; the hovered panel is still the overlay; the overlay tree expands only part 4 | a marker click that pins Contents open
@@ -507,7 +507,7 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await expectHoverOverlay(page,root,1);
   const tabs=root.locator('.reader-tree-tab');await expect(tabs).toHaveCount(6);
   for(let i=0;i<6;i++){await expect(tabs.nth(i).locator('.reader-part-number')).toHaveText(String(i+1));await expect(tabs.nth(i)).toHaveAccessibleName(atlasParts[i]);}
-  expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(['false','true','false','false','false','false']);
+  expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'false',null,null,null]);
   const overlay=await side.boundingBox();await page.mouse.move(overlay.x+overlay.width/2,overlay.y+overlay.height/2);await page.waitForTimeout(600);await expect(side).toBeVisible();
   await takeLog(nav);await page.mouse.move(900,500);await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
   const closing=await takeLog(nav),left=closing.find(entry=>entry.type==='leave'),hidden=closing.find(entry=>entry.type==='hidden');
@@ -516,12 +516,12 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await page.mouse.move(900,500);await expectHoverOverlay(page,root,3);await marksOf(root).nth(3).click();
   await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');await expect(label).toHaveText('Page 7 of 9');
   await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(railOf(root)).toBeVisible();await expectCurrentPart(root,3);
-  await expect(side).toBeVisible();await expect(side).toHaveClass(/reader-contents-overlay/);expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(['false','false','false','true','false','false']);
+  await expect(side).toBeVisible();await expect(side).toHaveClass(/reader-contents-overlay/);expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'false',null,null,null]);
   await side.getByRole('button',{name:'Pin Contents open',exact:true}).click();
   await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).toBeVisible();await expect(side).not.toHaveClass(/reader-contents-overlay/);expect((await side.boundingBox()).x).toBe(navBox.x);await expect(railOf(root)).toBeHidden();
   await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual(Array(6).fill('true'));
+  expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'true',null,null,null]);
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,3);
   const toolbar=root.locator('.reader-toolbar'),zoomButtons=toolbar.locator('.reader-zoom-controls>.reader-button');await expect(toolbar.getByRole('button',{name:'Fit',exact:true})).toHaveCount(0);await toolbar.getByRole('button',{name:'Next page',exact:true}).focus();await page.keyboard.press('Tab');await expect(zoomButtons.first()).toBeFocused();await page.keyboard.press('Tab');await expect(toolbar.locator('.reader-zoom-menu>summary')).toBeFocused();await page.keyboard.press('Tab');await expect(zoomButtons.last()).toBeFocused();
@@ -609,4 +609,58 @@ test('#622 the rail is hidden at the read-only phone width and its current marke
     await toggle.click();await expect(railOf(root)).toBeVisible();const current=railOf(root).locator('[aria-current="page"]');
     expect(await contrast(current),'current rail marker contrast in '+skin).toBeGreaterThanOrEqual(4.5);
   }
+});
+
+function compactContents(canonical){
+  const base=story().page.sections[0].tabs[0].sections[0];
+  const section=(id,heading,names=['Standard'])=>({...structuredClone(base),id,heading,...(canonical?{views:names.map((name,index)=>({id:index?'map':'standard',name,presentation:index?'explore':'standard'}))}:{})});
+  const tabs=[
+    {label:'Solo',sections:[section('solo','Hidden singleton section')]},
+    {label:'Views',sections:[section('views','Redundant section',['Read','Map','Review'])]},
+    {label:'Sections',sections:[section('first','First section'),section('second','Second section'),section('third','Third section')]},
+    {label:'Mixed',sections:canonical?[section('single','Section 1'),section('multiple','Section 2',['View 1','View 2'])]:[section('single','Section 1'),section('multiple','Section 2'),section('last','Section 3')]}
+  ];
+  // The third canonical View needs its own identity, while all other sections
+  // deliberately reuse IDs to prove that leaf navigation retains the occurrence.
+  if(canonical)tabs[1].sections[0].views[2].id='review';
+  else{
+    tabs[1].views=['Read','Map','Review'].map((name,index)=>({id:['standard','map','review'][index],name,presentation:index?'explore':'standard',sections:['views']}));
+    tabs[3].views=[{id:'standard',name:'View 1',presentation:'standard',sections:['single']},{id:'map',name:'View 2',presentation:'explore',sections:['multiple','last']}];
+  }
+  return {page:{title:'Compact Contents',sections:[{tabs}]}};
+}
+async function assertCompactContents(page,root,canonical){
+  const tree=root.locator('.reader-contents-tree'),group=name=>tree.locator('.reader-contents-tab').filter({has:tree.page().locator('.reader-tree-tab').filter({hasText:name})});
+  const solo=group('Solo'),views=group('Views'),sections=group('Sections'),mixed=group('Mixed');
+  await expect(solo.getByRole('button')).toHaveText(['1Solo']);await expect(solo.locator('.reader-tree-tab')).not.toHaveAttribute('aria-expanded');
+  expect(await solo.locator('.reader-tree-tab').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
+  await expect(views.getByRole('button')).toHaveText(['2Views','Read','Map','Review']);
+  await expect(views.locator(':scope > .reader-tree-views > .reader-tree-view-row > .reader-tree-leaf')).toHaveText(['Read','Map','Review']);
+  await expect(sections.getByRole('button')).toHaveText(['3Sections','First section','Second section','Third section']);
+  await expect(sections.locator(':scope > .reader-tree-sections > li > .reader-tree-leaf')).toHaveText(['First section','Second section','Third section']);
+  if(canonical){
+    await expect(mixed.getByRole('button')).toHaveText(['4Mixed','Section 1','Section 2','⌄','View 1','View 2']);
+    await expect(mixed.locator(':scope > .reader-tree-sections > li > .reader-tree-leaf')).toHaveText(['Section 1']);
+    await expect(mixed.locator(':scope > .reader-tree-sections > li > .reader-tree-views .reader-tree-leaf')).toHaveText(['View 1','View 2']);
+  }else{
+    await expect(mixed.getByRole('button')).toHaveText(['4Mixed','View 1','View 2','⌄','Section 2','Section 3']);
+    await expect(mixed.locator(':scope > .reader-tree-views > .reader-tree-view-row > .reader-tree-leaf')).toHaveText(['View 1']);
+    await expect(mixed.locator(':scope > .reader-tree-views > .reader-tree-sections .reader-tree-leaf')).toHaveText(['Section 2','Section 3']);
+  }
+  await expect(tree.locator('.reader-tree-leaf[aria-expanded]')).toHaveCount(0);
+  const branch=mixed.getByRole('button',{name:canonical?'Collapse Section 2':'Collapse View 2',exact:true});
+  await branch.focus();await page.keyboard.press('Enter');await expect(mixed.getByRole('button',{name:canonical?'Expand Section 2':'Expand View 2',exact:true})).toBeFocused();
+  await expect(mixed.locator('.reader-tree-leaf')).toHaveCount(1);await page.keyboard.press('Enter');await expect(mixed.locator('.reader-tree-leaf')).toHaveCount(3);
+  await views.getByRole('button',{name:'Map',exact:true}).click();await expect(views.getByRole('button',{name:'Map',exact:true})).toBeFocused();await expect(root.locator('#section-views .explore-board')).toBeVisible();await expect(views.getByRole('button',{name:'Map',exact:true})).toHaveAttribute('aria-current','page');
+  const target=mixed.getByRole('button',{name:canonical?'View 2':'Section 3',exact:true});await target.click();await expect(target).toBeFocused();await expect(tree.locator('[aria-current="page"]')).toHaveCount(1);await expect(target).toHaveAttribute('data-reader-section',canonical?'multiple':'last');await expect(target).toHaveAttribute('aria-current','page');
+  await solo.getByRole('button').click();await expect(root.locator('.reader-tab-label')).toHaveText('Solo');await expect(solo.getByRole('button')).toHaveAttribute('aria-current','page');await expect(solo.getByRole('button')).toBeFocused();
+  const tab=sections.locator('.reader-tree-tab');await tab.click();await expect(tab).toHaveAttribute('aria-expanded','false');await expect(sections.getByRole('button')).toHaveCount(1);await tab.click();await expect(sections.locator('.reader-tree-leaf')).toHaveCount(3);
+}
+for(const canonical of [true,false])test('compact '+(canonical?'canonical':'legacy')+' Contents removes singleton levels and retains exact desktop navigation',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:900});const raw=compactContents(canonical),source=JSON.stringify(raw,null,2),name='compact-'+(canonical?'canonical':'legacy');
+  const root=await openRaw(page,server,raw,name);await assertCompactContents(page,root,canonical);await page.screenshot({path:info.outputPath(name+'.png')});
+  await writeFile(path.join(server.root,name+'-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+  await writeFile(path.join(server.root,name+'-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./'+name+'-native.js";window.mount=mountNativeViewer;</script>');
+  await page.goto(server.origin+'/'+name+'-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>window.viewer=mount(document.querySelector('#one'),raw),raw);await assertCompactContents(page,page.locator('#one'),canonical);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);await assertCompactContents(page,page.locator('#docview'),canonical);expect(await page.locator('#src').inputValue()).toBe(source);
 });

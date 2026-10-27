@@ -22,8 +22,8 @@ test('Contents uses one plain row for singleton Views and named subrows for mult
  const pseudo=(row,part='::before')=>row.evaluate((el,part)=>getComputedStyle(el,part).content,part);
  const intro=contents.locator('.reader-tree-single-view[data-reader-section="intro"]');
  await expect(intro).toHaveText('Introduction');await expect(intro).toHaveAttribute('data-tab-view','standard');await expect(intro).not.toHaveAttribute('data-explore-view','true');await expect(intro).toHaveAttribute('aria-current','page');
- await expect(contents.locator('.reader-tree-sections').filter({has:intro}).locator('.reader-tree-view')).toHaveCount(0);
- const tab=contents.locator('.reader-tree-tab'),storyHeading=contents.locator('.reader-tree-section[data-reader-section="story"]'),story=storyHeading.locator('..');
+ await expect(intro.locator('..').locator('.reader-tree-view')).toHaveCount(0);
+ const tab=contents.locator('.reader-tree-tab'),storyHeading=contents.locator('.reader-tree-section[data-reader-section="story"]'),story=storyHeading.locator('..').locator('..');
  const views=story.locator('.reader-tree-view');await expect(views).toHaveText(['Business','Data']);
  expect(await pseudo(tab)).toBe('none');expect(await pseudo(tab,'::after')).toContain('⌄');expect(await pseudo(intro)).toBe('none');expect(await pseudo(storyHeading)).toBe('none');expect(await pseudo(views.first())).toBe('none');expect(await pseudo(views.last())).toBe('none');
  await story.locator('.reader-tree-view[data-tab-view="data"]').click();await intro.focus();await page.keyboard.press('Enter');
@@ -34,7 +34,7 @@ test('Contents uses one plain row for singleton Views and named subrows for mult
  await standalone(page,server,exploreRaw);const explore=nav(root).locator('.reader-tree-single-view[data-reader-section="intro"]');
  await expect(explore).toHaveAttribute('data-explore-view','true');await expect(explore).toHaveAttribute('aria-description','Explore: pan and zoom the graph.');
  expect(await pseudo(explore)).toBe('none');
- await expect(nav(root).locator('.reader-tree-sections').filter({has:explore}).locator('.reader-tree-view')).toHaveCount(0);
+ await expect(explore.locator('..').locator('.reader-tree-view')).toHaveCount(0);
  await info.attach('singleton-explore-contents',{body:await page.screenshot(),contentType:'image/png'});
 });
 test('section pages replace the main surface, repeat local IDs safely and restore exact links/history',async({page,server},info)=>{

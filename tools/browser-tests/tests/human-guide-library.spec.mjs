@@ -181,7 +181,7 @@ test('Canon edit and browser Back preserve the selected chapter, path and step w
   await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
   await expect(reader.locator('.stepid')).toHaveText('press');
   await expect(reader.locator('.reader-top-view')).toHaveCount(1);
-  await reader.getByRole('button',{name:'Standard',exact:true}).click();
+  await reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]').click();await expect(reader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await reader.locator('.path-chip[data-dv-path="failed"]').click();
   await expect(reader.locator('.stepid')).toHaveText('failed');
   await info.attach('canon-reader-selected-position',{body:await page.screenshot(),contentType:'image/png'});
@@ -237,7 +237,7 @@ test('Canon edit and browser Back retain the canonical owner View and its select
 });
 
 /* #607 hosted reader row (contract matrix in reader-contents.spec.mjs):
-   H1 ?diagram= deep link | tab-views example published as "delivery", its Notes Tab given two Views (Notes pages: 2 sections, Notes brief: 1); fresh load of workbench.html?diagram=delivery#d=c&v=explore-bc at 1440x900 | #canon-reader Contents: Section C row in explore-bc aria-current=page and #section-c visible; Product and Notes Tab rows aria-expanded=true; every View disclosure in both Tabs aria-expanded=true with its own member rows | a hosted reader that expands only the linked Tab, or a deep link that loses its section */
+   H1 ?diagram= deep link | tab-views example published as "delivery", its Notes Tab given two Views (Notes pages: 2 sections, Notes brief: 1); fresh load of workbench.html?diagram=delivery#d=c&v=explore-bc at 1440x900 | #canon-reader Contents: Section C row in explore-bc aria-current=page and #section-c visible; Product and Notes Tab rows aria-expanded=true; each multi-section View disclosure aria-expanded=true with its own member rows; singleton Views are direct leaves | a hosted reader that expands only the linked Tab, or a deep link that loses its section */
 test('#607 a ?diagram= deep link lands on its section with every Contents Tab and View expanded',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   const spec=JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
@@ -253,8 +253,9 @@ test('#607 a ?diagram= deep link lands on its section with every Contents Tab an
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await expect(group('Product').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-tab')).toHaveAttribute('aria-expanded','true');await expect(group('Notes').locator('.reader-tree-view')).toHaveText(['Notes pages','Notes brief']);
   for(const [label,id,count] of [['Product','standard-ac',2],['Product','explore-bc',2],['Product','explore-a',1],['Notes','notes-pages',2],['Notes','notes-brief',1]]){
-    await expect(group(label).locator('.reader-tree-view[data-tab-view="'+id+'"]').locator('..').locator('.reader-view-disclosure'),id).toHaveAttribute('aria-expanded','true');
-    await expect(group(label).locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);
+    const row=group(label).locator('.reader-tree-view[data-tab-view="'+id+'"]'),disclosure=row.locator('..').locator('.reader-view-disclosure');
+    if(count===1){await expect(row).toHaveClass(/reader-tree-leaf/);await expect(disclosure).toHaveCount(0);await expect(row).toHaveAttribute('data-reader-section',id==='explore-a'?'a':'notes-more');}
+    else{await expect(disclosure,id).toHaveAttribute('aria-expanded','true');await expect(group(label).locator('.reader-tree-sections[data-reader-view="'+id+'"] .reader-tree-section')).toHaveCount(count);}
   }
 });
 
@@ -368,7 +369,7 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   await fresh.close();
   await card.click();await expect(page).toHaveURL(url);
   const reader=page.locator('#canon-reader');await expect(reader.locator('.reader-top-view')).toHaveCount(1);
-  await expect(reader.getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]')).toHaveAttribute('aria-current','page');await expect(reader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await reader.getByRole('button',{name:'Next step',exact:true}).click();await expect(reader.locator('.stepid')).toHaveText('done');
   await page.getByRole('button',{name:'Copy link to current position',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>window.copiedLink)).not.toBeUndefined();const copied=new URL(await page.evaluate(()=>window.copiedLink));
@@ -378,7 +379,7 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   const linkedReader=linked.locator('#canon-reader');
   await expect(linked.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
   await expect(linkedReader.locator('.reader-top-view')).toHaveCount(1);
-  await expect(linkedReader.getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(linkedReader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]')).toHaveAttribute('aria-current','page');await expect(linkedReader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(linkedReader.locator('.stepid')).toHaveText('done');
   await expect(linkedReader.locator('.path-chip[data-dv-path="happy"]')).toHaveAttribute('aria-pressed','true');
   await linked.reload();await expect(linkedReader.locator('.stepid')).toHaveText('done');

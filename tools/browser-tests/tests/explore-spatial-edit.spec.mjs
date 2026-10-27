@@ -162,7 +162,9 @@ test('marquee follows zoom; source handwriting retires the menu and view actions
   await expect(node(page)).toHaveClass(/dv-sel/);await expect(page.locator('.dv-sel')).toHaveCount(1);expect(await source(page)).toBe(original);await node(page).focus();await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
  }
  await fit(page);await marquee(page,true);await page.keyboard.press('Escape');await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
- await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(node(page)).toHaveClass(/dv-sel/);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Canvas',exact:true}).click();await expect(page.locator('.dv-sel')).toHaveCount(0);expect(await source(page)).toBe(original+' ');
+ await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(node(page)).toHaveClass(/dv-sel/);
+ const current=navigation(page).locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="section-1-canvas"]');await expect(current).toHaveAccessibleName('Spatial edit');await expect(current).toHaveAttribute('aria-current','page');await expect(navigation(page).getByRole('tab',{name:'Canvas',exact:true})).toHaveAttribute('aria-selected','true');await current.click();
+ await expect(page.locator('.dv-sel')).toHaveCount(0);await expect(current).toHaveAttribute('aria-current','page');expect(await source(page)).toBe(original+' ');
 });
 
 test('Explore editing chrome follows shared light and dark theme colors',async({page,server},info)=>{

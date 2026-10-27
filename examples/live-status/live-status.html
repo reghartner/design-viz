@@ -34115,7 +34115,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],changedKeys=[],panel=null,panelBody=null,panelTrigger=null,stepHooks=[];
-  var motion=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
+  var motion=reducedMotion();
   function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
   if(motion && motion.addEventListener)motion.addEventListener('change',motionChanged);
   var remotePages=Object.create(null),originalLoad=renderOptions && renderOptions.loadDetail,wrappedLoad=null;
@@ -34221,11 +34222,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return found;
   }
   function decorateCarrier(el,value){
-    var keys=trackingRefs(value).tickets;
+    var keys=trackingRefs(value).tickets,media=reducedMotion();
     el.classList.toggle('dv-live-stale',on && keys.some(function(key){return liveStatusStale(map[key],Date.now(),page.tracking && page.tracking.staleDays);}));
-    if(!on || !keys.some(function(key){return map[key];}) || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)){el.classList.remove('dv-live-changed');return;}
+    if(!on || !keys.some(function(key){return map[key];}) || (media && media.matches)){el.classList.remove('dv-live-changed');return;}
     if(!el.classList.contains('node') && !el.classList.contains('edge'))return;
-    if(!keys.some(function(key){return changedKeys.indexOf(key)>=0;}) || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches))return;
+    if(!keys.some(function(key){return changedKeys.indexOf(key)>=0;}))return;
     el.classList.remove('dv-live-changed');
     // Restart only for new evidence; navigation and identical maps never pulse.
     if(el.getBoundingClientRect)el.getBoundingClientRect();

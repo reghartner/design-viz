@@ -132,6 +132,18 @@ test('V11 absent provider and apply leave carrier DOM untouched',()=>{
  const h=harness(fixture());assert.equal(h.view.querySelectorAll('.dv-live-badge,.dv-live-active').length,0);assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);h.ctl.liveStatus.destroy();
 });
 
+test('live status initializes, applies changes and disposes without a window global',()=>{
+ const h=harness(fixture());h.ctl.liveStatus.destroy();delete h.C.window;
+ const api=h.C.createLiveStatus(h.ctl,h.ctl.page);
+ api.apply({'AA-1':{state:'todo'}});
+ api.apply({'AA-1':{state:'active'}});
+ const node=h.view.querySelector('[data-dv-node="a"]');
+ assert.ok(node.classList.contains('dv-live-active'));
+ assert.ok(node.classList.contains('dv-live-changed'));
+ api.destroy();api.destroy();
+ assert.equal(h.view.querySelectorAll('.dv-live-badge,.dv-live-changed,.dv-live-active').length,0);
+});
+
 test('V8 notes and host actions update, replace and clear the reader controls',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus,mount=api.mountControls(h.view),root=h.view.querySelector('.dv-live-control'),note=root.querySelector('.dv-live-note'),action=root.querySelector('.dv-live-action');
  assert.equal(root.hidden,true);assert.equal(note.hidden,true);assert.equal(action.hidden,true);assert.equal(root.querySelector('time'),null);

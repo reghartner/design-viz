@@ -246,7 +246,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);await expect(root.locator('.dv-live-badge.dv-live-blocked:focus')).toHaveCount(1);
  const panel=root.locator('.pt-live-status');
  await expect(panel).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');await expect(panel.locator('.dv-live-verdict')).toHaveText(/1 blockers · \d+ waiting/);
- await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane="HW"]')).toContainText('Hardware · 0/4 done');
+ await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane]')).toHaveCount(0);await expect(panel.locator('h3',{hasText:'Teams'})).toHaveCount(0);
  const blocker=panel.locator('.dv-live-blocker').filter({hasText:'HW-124'});await expect(blocker).toContainText(/\d+ downstream carriers · \d+ steps/);await expect(blocker.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
  await expect(panel.locator('.dv-live-activity')).toContainText('HW-124 · active → blocked');
  await page.emulateMedia({media:'print'});await expect(panel.locator('.pbody')).not.toBeEmpty();await page.emulateMedia({media:'screen'});

@@ -2,7 +2,6 @@
    Navigation can replace SVGs and step controls independently; source indices
    and section identities keep the paint attached to the authored carriers. */
 var LIVE_STATUS_STATES = ['todo','active','done','blocked','missing'];
-var LIVE_STATUS_GLYPHS = {todo:'○',active:'◔',done:'✓',blocked:'!',missing:'?'};
 function liveStatusRollup(states){
   states=(states || []).filter(function(state){return LIVE_STATUS_STATES.indexOf(state)>=0;});
   if(!states.length)return null;
@@ -178,7 +177,7 @@ function liveStatusWhenReady(host,connect){
 }
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};page=page || {};
-  var view=ctl.view,records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
+  var view=ctl.view,authoring=!!(renderOptions && renderOptions.authoring),records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false;
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -242,7 +241,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(pop){if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;}
     if(focus && trigger && trigger.isConnected)trigger.focus();
   }
-  function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target))close(true);}
+  function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
   function show(trigger,value,tracking,label,waiting){
     if(retired)return;
@@ -272,20 +271,50 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
-  function badge(parent,value,state,tracking,label,x,y,edgeIndex,waiting){
-    var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','dv-live-badge');
-    liveStatusClass(badge,state);liveStatusWaitingClass(badge,waiting);
-    badge.setAttribute('data-live-tickets',trackingRefs(value).tickets.join(','));
-    if(trackingRefs(value).tickets.some(function(key){return liveStatusStale(map[key],Date.now(),tracking && tracking.staleDays);}))badge.classList.add('dv-live-stale');badge.setAttribute('transform','translate('+x+' '+y+')');
-    badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label','Live tickets for '+label+(waiting?' · waiting on '+waiting.join(', '):''));badge.setAttribute('aria-haspopup','dialog');badge.setAttribute('aria-expanded','false');
-    if(edgeIndex!=null)badge.setAttribute('data-live-edge',String(edgeIndex));
-    var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','9');badge.appendChild(circle);
-    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=waiting?'…':LIVE_STATUS_GLYPHS[state];badge.appendChild(text);
-    badge.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
-    badge.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);});
-    badge.addEventListener('keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(badge,value,tracking,label,waiting);}});
-    markFragmentElement(badge,value);parent.appendChild(badge);return badge;
+  /* Carriers are their own ticket triggers (#762; Chuck 2026-10-27 removed the
+     canvas badges): a ticketed node's card, and an edge's label (its path when
+     unlabelled). Paint, coins and the break glyph already carry the state. In
+     the reader the trigger is a named button reached by Tab; under authoring
+     the Workbench owns carrier clicks, selection and focus, so the trigger
+     stays inert and the Tickets table remains the route to the popover. */
+  var CARRIER_ATTRS=['role','tabindex','aria-label','aria-haspopup','aria-expanded'];
+  function carrierTarget(el,id,value,state,tracking,label,waiting){
+    if(!el._liveSaved){el._liveSaved={};CARRIER_ATTRS.forEach(function(name){el._liveSaved[name]=el.getAttribute(name);});}
+    el.classList.add('dv-live-target');el.setAttribute('data-live-carrier',id);
+    el._liveCarrier={value:value,tracking:tracking,label:label,waiting:waiting};
+    if(authoring)return el;
+    el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
+    el.setAttribute('aria-label','Live tickets for '+label+(state?' · '+state:'')+(waiting?' · waiting on '+waiting.join(', '):''));
+    return el;
   }
+  function clearTargets(){
+    view.querySelectorAll('.dv-live-target').forEach(function(el){
+      var saved=el._liveSaved || {};el.classList.remove('dv-live-target');el.removeAttribute('data-live-carrier');
+      CARRIER_ATTRS.forEach(function(name){if(saved[name]==null)el.removeAttribute(name);else el.setAttribute(name,saved[name]);});
+      el._liveSaved=null;el._liveCarrier=null;
+    });
+  }
+  // A node's own controls (links menu, detail, handoff, anchors) keep their clicks.
+  var CARRIER_SKIP='a,button,input,select,textarea,summary,[role="button"]:not(.dv-live-target),.nlink,.nbackref,[data-dv-detail],[data-dv-handoff]';
+  function carrierFrom(target){
+    if(!target || !target.closest)return null;
+    var direct=target.closest('.dv-live-target');if(direct && view.contains(direct))return direct;
+    var node=target.closest('g.node[data-dv-node]');if(!node || !view.contains(node) || target.closest(CARRIER_SKIP))return null;
+    return node.querySelector('.card.dv-live-target');
+  }
+  function openCarrier(el){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting);}
+  function carrierClick(ev){
+    if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
+    var el=carrierFrom(ev.target);if(!el || !el._liveCarrier)return;
+    ev.preventDefault();ev.stopPropagation();openCarrier(el);
+  }
+  function carrierKey(ev){
+    if(authoring || retired || ev.defaultPrevented || (ev.key!=='Enter' && ev.key!==' '))return;
+    var el=ev.target;if(!el || !el.classList || !el.classList.contains('dv-live-target') || !el._liveCarrier)return;
+    ev.preventDefault();ev.stopPropagation();openCarrier(el);
+  }
+  view.addEventListener('click',carrierClick);view.addEventListener('keydown',carrierKey);
+  destroyListeners.push(function(){view.removeEventListener('click',carrierClick);view.removeEventListener('keydown',carrierKey);});
   function sourceBindings(){
     var found=[];
     ctl.sections.forEach(function(rec){var record=records.find(function(r){return r.reference===rec.reference;});if(record)found.push({el:rec.sectionEl,section:record.section,page:page,stepper:rec.stepper});});
@@ -364,8 +393,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     focusCarrier(binding,carrier.id);
   }
   function focusCarrier(binding,id){
-    var badge=Array.from(binding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
-    if(badge)badge.focus({preventScroll:true});
+    var target=Array.from(binding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===id;});
+    if(target)target.focus({preventScroll:true});
   }
   function carrierBinding(carrier){
     var source=carrier.pageKey?remotePages[carrier.pageKey]:page;
@@ -485,19 +514,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(!state && !dependencies)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
-      badge(el,value,state,binding.page.tracking,value.title || id,Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12,10,null,dependencies).setAttribute('data-live-carrier',id);
+      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,dependencies);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
       var dependencies=value && waiting[value.from+'->'+value.to];decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,dependencies);
       if((!state && !dependencies) || !el.classList.contains('edge'))return;
-      var svg=el.closest('svg'),label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]'),x,y;
-      if(label){var box=null;try{box=label.getBBox();}catch(ex){}x=box && box.width?box.x+box.width+12:Number(label.getAttribute('x'))+12;y=Number(label.getAttribute('y'))-4;}
-      else {var point=el.getPointAtLength(el.getTotalLength()/2);x=point.x;y=point.y-14;}
-      var marker=badge(svg,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,x,y,index,dependencies);
-      marker.setAttribute('data-live-carrier',value.from+'->'+value.to);
-      if(el.getAttribute('data-dv-hidden')==='true')marker.setAttribute('data-dv-hidden','true');
-      if(el.classList.contains('dv-fragment-hidden'))marker.classList.add('dv-fragment-hidden');
+      var label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]');
+      carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,dependencies);
     });
     liveStatusEdgeBreaks(scope,d,map,on);
     paintStory(binding);
@@ -535,14 +559,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // rather than relying on a flag that would be reset before delivery.
     if(observer)observer.disconnect();
     try{
-      var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-badge') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
-      close(false);syncBindings();
+      var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
+      close(false);syncBindings();clearTargets();
       if(applied){
-        view.querySelectorAll('.dv-live-badge,.dv-live-halo').forEach(function(el){el.remove();});
+        view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
       paintLanes();
-      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-badge')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
+      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
       changedKeys=[];
     }finally{
       painting=false;if(!retired)observeBindings();
@@ -617,9 +641,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
-      if(pop)pop.remove();listeners=[];
+      if(pop)pop.remove();listeners=[];clearTargets();
       if(applied){
-        view.querySelectorAll('.dv-live-badge,.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
+        view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
         view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
       }

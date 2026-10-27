@@ -76,7 +76,7 @@ The planned overlay uses these runtime states. The spec never stores status.
 | `active` | Amber, slow pulse |
 | `done` | Green |
 | `blocked` | Red pulse |
-| `missing` | Red pulse + hatched badge |
+| `missing` | Red pulse; the popover, caption and Tickets table say missing |
 
 For an element with several tickets, roll up their states in this order:
 
@@ -103,9 +103,15 @@ communications. Text boxes stay unpainted. Missing map entries add no state;
 unknown state strings are ignored. The Live toggle restores authored paint when
 disabled. Status colors override node tones and step colors while enabled.
 
-Each painted node or edge has a keyboard-accessible badge. Click it, or press
-Enter/Space, for ticket status, title, assignee and the informational PR summary.
-Escape or an outside click closes the popover and returns focus. Jira browse links
+The canvas has no status badges (#762): card stroke and halo, edge stroke, the
+dashed todo and waiting strokes, step coins and the break glyph carry the state.
+Click a painted node's card or an edge's label (the edge itself when it has no
+label) for ticket status, title, assignee and the informational PR summary. The
+node's own links, detail and handoff controls keep their clicks. In the reader
+that card or label is a keyboard button named for its tickets and state; press
+Enter/Space to open the popover. Escape or an outside click closes it and
+returns focus to the carrier. In the Workbench, clicks keep selecting for
+editing and the Tickets table is the route to a carrier. Jira browse links
 use the page tracking site, falling back to the provider URL. Authored PR URLs
 remain plain links. The node links menu includes authored tickets and PRs even
 without a provider. Pulses stop for reduced motion and print; print retains colors.
@@ -147,7 +153,7 @@ its team lane when known.
 PR links come only from authored carrier `prs`; Jira's Development summary adds
 informational open, merged or declined counts without inventing URLs. Coverage
 buttons name the story's carriers, open their containing section or detail when
-needed, and focus their live badges through the existing detail navigation. If
+needed, and focus the carrier itself through the existing detail navigation. If
 no authored route is available, the button is disabled with a title naming the
 detail page. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
@@ -267,8 +273,8 @@ comma-separated keys, while retaining their own `dv-live-<state>` class. Carrier
 whose own state is done, blocked or missing never become waiting; traversal still
 continues through them. Cycles terminate and multiple blockers combine their keys.
 
-Waiting uses a dashed red-grey stroke and an ellipsis badge; the canvas carries no
-**waiting on** text. The badge's accessible name and popover list the blocking keys. Applying a new map, clearing it or
+Waiting uses a dashed red-grey stroke; the canvas carries no **waiting on** text.
+The carrier's accessible name and popover list the blocking keys. Applying a new map, clearing it or
 turning Live off removes stale waiting evidence. Print keeps the colors.
 
 ## Blocked edges
@@ -277,7 +283,7 @@ Blocked edges reuse the communication **Not sent** break glyph, without canvas
 text, in both Ambient and Step mode: the edge already names its ends and a text
 label would sit on the edge label, its step coin or a node card. The break's
 title and accessible name keep the full sentence with the blocking keys. The break lasts until the live state
-changes or Live is disabled. Missing edges retain their missing badge without a
+changes or Live is disabled. Missing edges keep their red stroke without a
 communication break. Todo edges use a dashed grey stroke and hide packet dots;
 active and done edges retain ordinary packet animation. Authored step failures
 keep their own lifecycle, and reduced-motion behavior is unchanged.
@@ -350,14 +356,14 @@ In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · K
 have no live caption. Captions update on step changes and new evidence.
 
 Playback pauses on the first blocked or missing beat, including the first beat
-when starting or replaying, and focuses the first blocking carrier's badge.
+when starting or replaying, and focuses the first blocking carrier.
 Manual next/previous retain their existing navigation behavior. The small
 `stepper.onBeforeAdvance(fn)` hook returns an unsubscribe function; `fn` receives
 the selected source step index after it is painted, before automatic playback
 continues. Returning `false` invokes the ordinary pause path. It runs only for
 automatic playback (including its initial beat), never manual navigation.
 **First blocker** jumps through `stepper.jumpSource` to the earliest blocker in
-the current path, enters Step mode and focuses its badge; it hides when none exist.
+the current path, enters Step mode and focuses that carrier; it hides when none exist.
 
 Changed ticket states produce one carrier pulse (none with reduced motion).
 The Live status panel below the diagram shows a completion ring, team progress, blocker
@@ -377,7 +383,7 @@ permission)”. Downstream counts come from the same waiting propagation as the
 canvas, counting each affected carrier and authored step once per blocking key.
 
 Set `tracking.staleDays` to a positive number (default **7**) to mark active work
-whose `updatedAt` is strictly older than that many days. A grey dashed badge ring
-and “no activity N d” in its popover supplement the unchanged rollup color.
+whose `updatedAt` is strictly older than that many days. The carrier gets
+`dv-live-stale` and its popover says “no activity N d”; the rollup color is unchanged.
 Missing/invalid timestamps are never stale; invalid thresholds warn and use 7.
 All story features work with `#live=demo`; pages without tickets or epics show the empty-page message.

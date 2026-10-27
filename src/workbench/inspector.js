@@ -510,7 +510,7 @@ function pageTrackingControls(val){
         var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
         var tracking=specObject(doc.page.tracking)?builderClone(doc.page.tracking):{};
         if(!specObject(tracking.jira))tracking.jira={};
-        edit(tracking.jira,doc.page);
+        edit(tracking.jira,doc.page,tracking);
         return planSetField(session.text(),raw,doc.path,'tracking',JSON.stringify(tracking));
       },{after:refreshFormSoon});
     }
@@ -533,6 +533,17 @@ function pageTrackingControls(val){
       var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formError('');return true;}
       return update(function(jira,page){jira.epic=trackingEpics(page).concat([key]);});
     },{placeholder:'DOOR-100'})));
+    var scope=trackingGithubScope(val),scopeText=scope.repos.join(', ')+(scope.org?(scope.repos.length?', ':'')+'org:'+scope.org:'');
+    box.appendChild(frow('GitHub scope',textControl(scopeText,function(value){
+      var github={},bad=false,parts=value==null?[]:value.split(/[\s,]+/).filter(Boolean);
+      parts.forEach(function(part){
+        if(part.indexOf('org:')===0){var org=part.slice(4);if(!trackingGithubOrgPattern.test(org) || github.org)bad=true;else github.org=org;}
+        else if(trackingGithubRepoPattern.test(part)){if(!github.repos)github.repos=[];if(github.repos.indexOf(part)<0)github.repos.push(part);}
+        else bad=true;
+      });
+      if(bad){formError('Use owner/repo names separated by commas, or org:name.');return false;}
+      return update(function(jira,page,tracking){if(parts.length)tracking.github=github;else delete tracking.github;});
+    },{placeholder:'acme/firmware, acme/backend or org:acme'})));
     return box;
   }
 

@@ -30,8 +30,13 @@ Atlassian's own directory connector shows), or the custom or mock connector's
 own name. Never give a custom connector the name "Atlassian MCP":
 claude.ai resolves that name to Atlassian's directory connector and asks for an
 Atlassian login. The provider picks the connector by the tools it offers, so one
-declared name is enough. See `docs/live-status.md` ("Publishing as a claude.ai
-artifact") for connector setup, approval behavior and the mock server. Tool shapes follow
+declared name is enough. For pull-request state, checks and review on the PR
+icons add the viewer's GitHub custom connector (GitHub's remote MCP server
+`https://api.githubcopilot.com/mcp/`, OAuth) as a second entry under its exact
+display name: `{server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}`;
+without it PR links stay plain icons. See `docs/live-status.md` ("Publishing as a claude.ai
+artifact" and "Pull requests from GitHub") for connector setup, approval behavior,
+the captured GitHub tool shapes and the mock servers. Jira tool shapes follow
 public documentation.
 That lets the page label comments by Tab and View, make "Go to" switch Tab,
 View and step, and keep step controls working in comment mode; see

@@ -584,6 +584,7 @@ function validate(page){
        (typeof page.tracking.staleDays!=='number' || !isFinite(page.tracking.staleDays) || page.tracking.staleDays<=0))
       warnings.push('tracking.staleDays: must be a positive number — using 7 days');
   }
+  trackingGithubScope(page,function(field,index){warnings.push('tracking.github'+field+(index===null?'':'['+index+']')+': '+(!field?'must be an object':field==='.repos'?'use an array of owner/repo names':'use an organization name')+' — ignored');});
   trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use a Jira key or an array of Jira keys — ignored');});
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};

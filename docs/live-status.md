@@ -44,6 +44,16 @@ order. Invalid entries warn individually; an invalid field type warns once.
 Linking an epic automatically includes its child stories in the Tickets table.
 Assigning a story to a node or edge remains an authoring step.
 
+`tracking.github` bounds pull-request discovery through the viewer's GitHub
+connector (see "Pull requests from GitHub"): `{"repos": ["acme/firmware"]}` or
+`{"org": "acme"}`. `repos` is an array of `owner/repo` names; `org` is one
+organization name. `trackingGithubScope(page)` returns `{repos, org}` with valid
+entries once, in authored order; `repos` wins when both are present. Invalid
+entries warn individually (`tracking.github.repos[1]: use an array of owner/repo
+names — ignored`), a wrong type warns once, and nothing here is ever an error.
+Without a scope, discovery searches only the repositories of the authored
+GitHub `prs` URLs.
+
 ## Workbench
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
@@ -55,16 +65,18 @@ are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 and Export project keeps the references in its JSON.
 
 With no node selected, open **Inspect → Document settings → Tracking** to edit
-**Jira site** and **Epic**. Enter a key in Epic and press Enter; use **Remove epic
-1**, **Remove epic 2**, and so on to remove keys. Each change has one Undo/Redo,
-and Export project preserves the epic references. These authoring controls are
-desktop-only.
+**Jira site**, **Epic** and **GitHub scope**. Enter a key in Epic and press Enter; use
+**Remove epic 1**, **Remove epic 2**, and so on to remove keys. In **GitHub scope**,
+enter `owner/repo` names separated by commas, or `org:name`, and press Enter;
+an empty value removes `tracking.github`. Each change has one Undo/Redo, and
+Export project preserves the epic and scope references. These authoring
+controls are desktop-only.
 
 When the document has tickets, **Demo live status** beside **Preview** supplies
 sample states in sorted ticket order. It starts off and stays preview-only across
 ordinary edits and skin changes; it never saves status to the spec or contacts Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
-PRs remain plain links.
+PRs stay icons; the demo timeline supplies their GitHub detail.
 
 ## State model
 
@@ -94,9 +106,10 @@ blocked > missing > active > (all done → done) > (all todo → todo) > otherwi
 
 Steps, coins and chips derive their state from the edges and nodes they involve
 and never carry tickets. Live status color comes from Jira status only.
-Authored `prs` are plain links and never carry live state. A Jira-linked PR
-summary from Jira's Development field is informational; it does not determine
-status or color.
+Pull requests never carry live state: an authored `prs` URL is an icon, and the
+GitHub detail that may colour that icon (open, draft, merged, closed, checks,
+review) stays on the icon and in its tooltip. Jira's Development summary is
+informational; neither determines a carrier's status or color.
 
 ## Compatibility
 
@@ -123,9 +136,10 @@ that card or label is a keyboard button named for its tickets and state; press
 Enter/Space to open the popover. Escape or an outside click closes it and
 returns focus to the carrier. In the Workbench, clicks keep selecting for
 editing and the Tickets table is the route to a carrier. Jira browse links
-use the page tracking site, falling back to the provider URL. Authored PR URLs
-remain plain links. The node links menu includes authored tickets and PRs even
-without a provider. Pulses stop for reduced motion and print; print retains colors.
+use the page tracking site, falling back to the provider URL. Each ticket row of
+the popover also shows its pull-request icons when the entry carries `prs.links`;
+the carrier's authored PR URLs follow as plain links. The node links menu
+includes authored tickets and PRs even without a provider. Pulses stop for reduced motion and print; print retains colors.
 
 Path, View, Tab and detail navigation reapply the current map to rebuilt elements.
 
@@ -175,9 +189,18 @@ new tab with the same look as the other panel links; otherwise it is plain text.
 avatar is shown and no additional connector call is made: the id rides along in the
 Jira search payload.
 
-PR links come only from authored carrier `prs`, rendered as icons; Jira's
-Development summary adds a muted, informational “n open/merged/declined” count
-without inventing URLs (its tooltip says Jira does not expose the link). Coverage
+The PRs column holds one icon per pull request: the authored carrier `prs`
+plus, when the entry carries `prs.links`, the pull requests GitHub reports for
+the ticket (see "Pull requests from GitHub"). A plain authored link is the
+monochrome icon with the URL as its tooltip. A GitHub-enriched icon takes the
+pull request's state colour (`data-pr-state` open green, draft grey, merged
+purple, closed red) and a small checks dot (`.dv-live-pr-checks[data-checks]`
+failing red, pending amber, passing green); its tooltip and accessible name read
+“#742 Title · open · checks failing · changes requested · author · owner/repo”.
+No icon shows a time since the pull request was updated. Jira's Development
+summary adds a muted, informational “n open/merged/declined” count only when it
+counts more pull requests than the icons show (its tooltip says Jira does not
+expose the link). Coverage
 chips name the story's carriers, open their containing section or detail when
 needed, and focus the carrier itself through the existing detail navigation. If
 no authored route is available, the button is disabled with a title naming the
@@ -215,28 +238,42 @@ The provider resolves a complete map, for example:
     "url": "https://acme.atlassian.net/browse/HW-123",
     "assignee": "Alex",
     "assigneeId": "712020:1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c5d",
-    "prs": {"count": 2, "state": "open"},
+    "prs": {"count": 2, "state": "open", "links": [{"url": "https://github.com/acme/hardware/pull/12", "number": 12, "title": "Debounce", "state": "open", "checks": "passing", "review": "approved", "repo": "acme/hardware", "author": "alex", "source": "github-search"}]},
     "detail": "Waiting for the bench run",
     "updatedAt": "2026-10-26T12:00:00Z"
   }
 }
 ```
 
-Only `state` is required; PR summary state is `open`, `merged` or `declined`. Provider calls
+Only `state` is required; PR summary state is `open`, `merged` or `declined`.
+`prs.links` is optional: each link needs an absolute `url`; `state` is `open`,
+`draft`, `merged` or `closed` (default open), `checks` is `none`, `pending`,
+`passing` or `failing`, `review` is `none`, `approved`, `changes-requested` or
+`commented`, `source` is `authored` or `github-search`; `number`, `title`,
+`repo`, `author`, `branch` and `mergedAt` are optional strings or a positive
+number. Invalid links are dropped and duplicates by URL collapse. Links without
+a valid summary derive one (`open` if any is open or draft, `merged` if all are
+merged, else `declined`). Provider calls
 start after first paint and repeat at a minimum of 30 seconds. Hidden documents
 pause refresh; returning to visible triggers one catch-up. Rejections show an error
 note and retain the previous map. Destroy aborts the signal and retires timers,
 observers and listeners. The host owns transport. Standalone claude.ai artifacts
 can also use the Atlassian adapter described below.
 
-`ctl.liveStatus` exposes `refs()`, `apply(map)`, `clear()`, `state(key)` (entry or
+`ctl.liveStatus` exposes `refs()` (`refs(key)` narrows to the carriers holding
+that ticket and their authored `prs`), `apply(map)`, `clear()`, `state(key)` (entry or
 null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
 Tickets rows, coverage, activity, demo state, verdict and `connection` for subscribed
-panels. `connection` is `{state, busy, checkedAt, source, checkedText}`; `state` is one of
-`none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`. A host
+panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
+`none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`.
+`connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
+`connecting`, `connected`, `error`; adapters report it through
+`ctl.liveStatus.status({github: {state, busy}})` and the panel header appends
+“· GitHub connected”, “· GitHub not connected”, “· GitHub connecting” or
+“· GitHub did not answer” after the Jira text (hidden for `none`). A host
 provider is reported as source “Host”: connecting until its first answer, busy during
 each call, connected with `checkedAt` after a successful call, error after a rejection.
 Hosts and adapters may call `ctl.liveStatus.status({state, busy, checkedAt, source})`
@@ -281,6 +318,13 @@ Assignees carry fictional Atlassian `accountId`s so the Owner links render.
 Search with `parent = DOOR-100`, optionally followed by `AND Flagged = Impediment`,
 to retrieve that day's children. `getJiraIssue` can also return the epic itself.
 
+The sibling [mock GitHub MCP server](../deploy/cloudflare/mock-github-mcp/README.md)
+serves the same timeline's pull requests through `search_pull_requests` and
+`pull_request_read` (`get`, `get_check_runs`, `get_reviews`, and the empty legacy
+`get_status`), so a published artifact can show PR icons with state, checks and
+review without a GitHub account. Install it as a second custom connector and
+declare its name beside the Jira one.
+
 ## Demo mode
 
 Open the [built story](../examples/live-status/live-status.html#live=demo) with
@@ -299,8 +343,9 @@ claude.ai connector. Without the hash, no demo starts.
 The Live status panel header shows the current day and offers **Pause/Play** and **Next day**.
 Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
 on the final day. Reduced motion uses manual advancement only. Hidden pages pause
-the timer. Requested ticket keys absent from a day become `missing`; linked PRs
-remain informational. Every key in a day's `issues` is included, even when no
+the timer. Requested ticket keys absent from a day become `missing`; a day's
+`prs` may carry `links` in the host-provider shape, which the demo passes
+through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
 carrier references it; entries may include `epic` and a lane ID in `lane`. The
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
@@ -377,12 +422,98 @@ Without the claude.ai runtime or MCP capability, or without ticket or epic refer
 the adapter is inert. An existing `window.flowviewLiveStatus` host provider takes
 precedence. Document editing remains desktop-only.
 
-Tool shapes follow public documentation; they have not been captured from a
+Jira tool shapes follow public documentation; they have not been captured from a
 real connector. See the [mock server README](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 for setup, fictional scenarios, result envelopes and known fidelity limits.
 The mock can be installed as a custom connector under any name except
 **Atlassian MCP** to try the artifact without an Atlassian account; declare
-that name when publishing. No GitHub connector is used.
+that name when publishing. Pull-request detail comes from a second, optional
+GitHub connector described next; declare it as a second `servers` entry:
+
+```js
+capabilities: {mcp: {servers: [
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}
+]}, comments: {"composer_only": true, "customAnchors": true}}
+```
+
+Without the GitHub entry, or when the viewer has no such connector, the page
+behaves as before: authored PR links stay plain icons, Jira's Development count
+stays, and the header's connection line reads “GitHub not connected” on pages
+that carry GitHub PR URLs or a `tracking.github` scope.
+
+## Pull requests from GitHub
+
+Jira cannot return pull-request URLs (its Development field carries counts and
+state only), so PR links, state, checks and review come from the viewer's
+GitHub connector (#756). claude.ai has no GitHub MCP connector in its directory;
+the viewer adds a **custom connector** pointing at GitHub's remote MCP server
+`https://api.githubcopilot.com/mcp/` with OAuth sign-in (the base URL; the
+`/readonly` and `/x/pull_requests/readonly` variants may fail OAuth discovery).
+Its display name is free; declare that exact name in `capabilities.mcp.servers`
+as shown above. The adapter never matches the connector by name: from the
+listed connectors it takes any that offers both `search_pull_requests` and
+`pull_request_read`, preferring one named **GitHub**, then the first qualifying
+one. Both tools are `readOnlyHint: true`, so `watchTool` polls them at 60 s.
+
+Shapes captured on 2026-10-27 from a real claude.ai custom connector (46 tools):
+
+- `search_pull_requests {query, owner?, repo?, fields[], sort, order, page, perPage}`
+  returns `{total_count, incomplete_results, search_type, items[]}`; items carry
+  `number`, `state` (`open` | `closed`), `title`, `html_url`, `repository_url`,
+  `user{login}`, `draft`, `created_at`, `updated_at`, `closed_at` and
+  `pull_request{html_url, merged_at?}`. Merged means `pull_request.merged_at`
+  is present. The adapter sends one search per ticket key and scope:
+  `"KEY" in:title,body repo:owner/repo` (one query per repository in
+  `tracking.github.repos`), `"KEY" in:title,body org:name` when only `org` is
+  set, or the authored PRs' repositories when no scope is set; `fields` is
+  `number, title, state, html_url, user, pull_request, repository_url, draft`
+  and `perPage` is 20. Without a scope and without authored GitHub URLs there is
+  no search.
+- `pull_request_read {method, owner, repo, pullNumber}`: `get` returns the trimmed
+  pull request `{number, title, state, draft, merged, mergeable_state, html_url,
+  user, labels, head{ref, sha, repo}, base, additions, deletions, changed_files,
+  commits, created_at, updated_at, closed_at?, merged_at?, merged_by?}`; one
+  `get` watch per authored GitHub PR URL. `get_check_runs` returns
+  `{check_runs[]{name, status, conclusion, html_url}}` and is the source of CI
+  state: `get_status` is the legacy commit-status API and Actions-only
+  repositories report `{state: "pending", total_count: 0}` there, so it is not
+  called. `get_reviews` returns reviews with `state` in `APPROVED`,
+  `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED`, `PENDING`. Checks and reviews
+  are fetched only for open and draft pull requests.
+- Rate limits arrive as `tool_error` whose message contains “rate limit
+  exceeded” (search allows about 30 requests a minute). The adapter retries once
+  after 1–3 s per refresh, keeps the evidence it already has, and never writes
+  the panel note; the header's GitHub state reads “GitHub did not answer” until
+  the next successful answer. Policy and account answers (`blocked_by_policy`,
+  `not_in_manifest`, `server_not_connected`, `needs_reauth`) retire GitHub
+  enrichment and leave Jira evidence untouched.
+
+Roll-ups: a pull request is `merged` when `merged_at` or `merged` is set, else
+`draft` when open and draft, else `open` or `closed`. Checks are `failing` if
+any run concluded `failure`, `timed_out`, `action_required`, `startup_failure`
+or `cancelled`; else `pending` if any run is not completed; else `passing`;
+`none` without runs. Review is the latest decision per reviewer: any
+`CHANGES_REQUESTED` → `changes-requested`, else any `APPROVED` → `approved`,
+else `commented` when only comments exist, else `none`; a `DISMISSED` review
+withdraws that reviewer's decision.
+
+At most ten GitHub watches are subscribed at a time; a longer queue rotates in
+60-second cohorts so every ticket is eventually searched, which also keeps
+automatic polling under the search rate limit. Pull-request reads (`get`,
+`get_check_runs`, `get_reviews`) go to the front of the queue. Each ticket's
+links merge authored URLs first (source `authored`, enriched by their `get`
+answer or by a search hit for the same URL) and discovered ones after (source
+`github-search`), deduplicated by URL. Jira's Development count stays the
+summary when present; otherwise the links derive it. Nothing from GitHub alters
+a carrier's `dv-live-*` class, the counts, the ring or Activity.
+
+The Workbench edits the scope under **Document settings → Tracking → GitHub
+scope**. Demo mode and the mock server never contact GitHub: the example
+timeline carries `prs.links` from Day 8 so the icons show offline, and the
+[mock GitHub MCP](../deploy/cloudflare/mock-github-mcp/README.md) serves the
+same timeline through the two real tool names for an artifact without a GitHub
+account.
 
 Verify after publishing: the Live status panel beside the diagram shows completion,
 Blockers, Tickets and Activity, and its header shows counts and updated time.

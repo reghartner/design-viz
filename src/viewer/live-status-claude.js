@@ -65,6 +65,186 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
   if(typeof storedAt==='number' && isFinite(storedAt))Object.defineProperty(map,'storedAt',{value:storedAt});
   return map;
 }
+/* GitHub connector shapes were captured from a real claude.ai custom connector
+   (docs/live-status.md, "Pull requests from GitHub"): search items and the
+   trimmed pull request of pull_request_read. Nothing here paints a carrier. */
+var LIVE_STATUS_GITHUB_TOOLS=['search_pull_requests','pull_request_read'];
+var LIVE_STATUS_GITHUB_FIELDS=['number','title','state','html_url','user','pull_request','repository_url','draft'];
+var LIVE_STATUS_GITHUB_FAILED=['failure','timed_out','action_required','startup_failure','cancelled'];
+function liveStatusGithubURL(url){
+  var match=typeof url==='string' && /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/([1-9][0-9]*)(?:\/?(?:[?#].*)?)?$/.exec(url);
+  if(!match)return null;
+  return {owner:match[1],repo:match[2],pullNumber:Number(match[3]),url:'https://github.com/'+match[1]+'/'+match[2]+'/pull/'+Number(match[3])};
+}
+function liveStatusGithubWanted(page,api){
+  var scope=trackingGithubScope(page);
+  return !!(scope.repos.length || scope.org || api.refs().prs.some(liveStatusGithubURL));
+}
+function liveStatusGithubPR(item,source){
+  if(!item || typeof item!=='object')return null;
+  var pull=item.pull_request || {},ref=liveStatusGithubURL(pull.html_url || item.html_url);
+  if(!ref || ['open','closed'].indexOf(item.state)<0)return null;
+  var mergedAt=pull.merged_at || item.merged_at,merged=!!(mergedAt || item.merged),draft=!!item.draft;
+  var repository=typeof item.repository_url==='string' && /^https:\/\/api\.github\.com\/repos\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/?$/.exec(item.repository_url);
+  var out={url:ref.url,number:ref.pullNumber,title:typeof item.title==='string'?item.title:'',
+    state:merged?'merged':item.state==='open'?(draft?'draft':'open'):'closed',checks:'none',review:'none',
+    repo:repository?repository[1]:ref.owner+'/'+ref.repo,author:item.user && typeof item.user.login==='string'?item.user.login:'',source:source};
+  if(typeof mergedAt==='string')out.mergedAt=mergedAt;
+  if(item.head && typeof item.head.ref==='string')out.branch=item.head.ref;
+  return out;
+}
+/* CI comes from check runs: get_status is the legacy commit-status API and
+   Actions-only repositories report nothing there. */
+function liveStatusGithubChecks(payload){
+  var runs=payload && Array.isArray(payload.check_runs)?payload.check_runs:[];
+  if(!runs.length)return 'none';
+  if(runs.some(function(run){return run && LIVE_STATUS_GITHUB_FAILED.indexOf(run.conclusion)>=0;}))return 'failing';
+  if(runs.some(function(run){return !run || run.status!=='completed';}))return 'pending';
+  return runs.every(function(run){return ['success','neutral','skipped'].indexOf(run.conclusion)>=0;})?'passing':'pending';
+}
+/* One decision per reviewer, the latest wins; a dismissal withdraws it. */
+function liveStatusGithubReviews(payload){
+  var reviews=Array.isArray(payload)?payload:payload && Array.isArray(payload.reviews)?payload.reviews:[],decided=Object.create(null),commented=false;
+  reviews.forEach(function(review){
+    if(!review || typeof review!=='object')return;
+    var state=String(review.state || '').toUpperCase(),who=review.user && typeof review.user.login==='string'?review.user.login:'';
+    if(state==='APPROVED' || state==='CHANGES_REQUESTED')decided[who]=state;
+    else if(state==='DISMISSED')delete decided[who];
+    else if(state==='COMMENTED')commented=true;
+  });
+  var states=Object.keys(decided).map(function(who){return decided[who];});
+  return states.indexOf('CHANGES_REQUESTED')>=0?'changes-requested':states.indexOf('APPROVED')>=0?'approved':commented?'commented':'none';
+}
+/* GitHub evidence has its own lifecycle: no GitHub error can clear Jira state
+   or write the panel note; it reports through connection.github only. At most
+   ten watches are subscribed; a longer queue rotates in 60-second cohorts, which
+   also keeps automatic search polling under the connector's search rate limit.
+   Pull request reads go to the front of the queue, searches to the back. */
+function createLiveStatusGithub(mcp,server,page,api,win,events){
+  var jobs=Object.create(null),queue=[],active=[],authored=Object.create(null),checks=Object.create(null),reviews=Object.create(null);
+  var stopped=false,pumping=false,rotation=null,knownKeys=[],answered=false;
+  function off(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
+  function cancel(job){if(job.timer!=null){win.clearTimeout(job.timer);job.timer=null;}}
+  function all(){return Object.keys(jobs).map(function(id){return jobs[id];});}
+  function report(){
+    if(stopped)return;
+    var list=all(),failed=list.some(function(job){return job.error;}),busy=list.some(function(job){return job.timer!=null || (job.active && !job.answered);});
+    events.status({state:failed?'error':answered?'connected':'connecting',busy:busy});
+  }
+  function retire(job){
+    job.active=false;job.version++;cancel(job);
+    var registration=job.registration;job.registration=null;
+    return Promise.resolve(registration).then(off,function(){});
+  }
+  function arm(){
+    if(stopped || rotation!=null || !queue.length)return;
+    rotation=win.setTimeout(function(){
+      rotation=null;
+      var previous=active.splice(0);queue=queue.concat(previous);
+      // Await asynchronous unsubscribe registrations before opening the next cohort.
+      pumping=true;Promise.all(previous.map(retire)).then(function(){pumping=false;if(!stopped)pump();});
+    },60000);
+  }
+  function fail(job,error,retry){
+    if(stopped)return;
+    var code=error && error.code;
+    // Account and policy answers end GitHub enrichment; Jira evidence is untouched.
+    if(['blocked_by_policy','not_in_manifest','server_not_connected','selection_required','needs_reauth','user_changed'].indexOf(code)>=0){
+      stop();events.status({state:'disconnected',busy:false});return;
+    }
+    job.error=true;
+    var now=Date.now();
+    if(retry && code==='tool_error' && /rate limit exceeded/i.test(error.message || '') && job.timer==null && (job.lastRetry==null || now-job.lastRetry>=60000)){
+      job.lastRetry=now;
+      job.timer=win.setTimeout(function(){
+        job.timer=null;var version=++job.version;
+        Promise.resolve().then(function(){if(!stopped && job.active)return mcp.callTool(server,job.tool,job.input);}).then(function(result){if(!stopped && job.active && job.version===version)accept(job,result);},function(error){if(!stopped && job.active && job.version===version)fail(job,error,false);});
+      },1000+Math.floor(Math.random()*2001));
+    }
+    report();events.changed();
+  }
+  function accept(job,result){
+    cancel(job);job.error=false;job.answered=true;answered=true;job.receive(result && result.payload);report();events.changed();
+  }
+  function pump(){
+    if(stopped || pumping)return;pumping=true;
+    while(active.length<10 && queue.length){
+      var job=queue.shift();active.push(job);job.active=true;
+      (function(job){
+        var generation=++job.generation,subscription;
+        try{subscription=mcp.watchTool(server,job.tool,job.input,function(event){
+          if(stopped || !job.active || job.generation!==generation || !event)return;
+          job.version++;
+          if(event.type==='data')accept(job,event.result);
+          else if(event.type==='error')fail(job,event.error,true);
+        },{refetchInterval:60000});}
+        catch(error){fail(job,error,true);}
+        job.registration=Promise.resolve(subscription);
+        job.registration.then(function(value){if(stopped || !job.active || job.generation!==generation)off(value);},function(error){if(!stopped && job.active && job.generation===generation)fail(job,error,true);});
+      })(job);
+    }
+    pumping=false;arm();report();
+  }
+  function add(id,tool,input,receive,key,first){
+    if(jobs[id])return jobs[id];
+    var job={id:id,tool:tool,input:input,receive:receive,key:key,version:0,generation:0,error:false,active:false,answered:false,timer:null};
+    jobs[id]=job;if(first)queue.unshift(job);else queue.push(job);return job;
+  }
+  function read(ref,method,id,receive){
+    add(id+':'+ref.url,'pull_request_read',{method:method,owner:ref.owner,repo:ref.repo,pullNumber:ref.pullNumber},receive,null,true);
+  }
+  // Checks and reviews matter while a pull request can still change.
+  function follow(pr){
+    var ref=pr && ['open','draft'].indexOf(pr.state)>=0 && liveStatusGithubURL(pr.url);if(!ref)return;
+    read(ref,'get_check_runs','checks',function(payload){checks[ref.url]=liveStatusGithubChecks(payload);});
+    read(ref,'get_reviews','reviews',function(payload){reviews[ref.url]=liveStatusGithubReviews(payload);});
+  }
+  function sync(keys){
+    if(stopped)return;
+    var refs=api.refs(),scope=trackingGithubScope(page),repos=scope.repos.slice(),fromAuthored=!repos.length && !scope.org;
+    refs.prs.forEach(function(url){
+      var ref=liveStatusGithubURL(url);if(!ref)return;
+      if(fromAuthored && repos.indexOf(ref.owner+'/'+ref.repo)<0)repos.push(ref.owner+'/'+ref.repo);
+      read(ref,'get','get',function(payload){var pr=liveStatusGithubPR(payload,'authored');if(pr){authored[ref.url]=pr;follow(pr);pump();}});
+    });
+    knownKeys=knownKeys.concat(refs.tickets,keys || []).filter(function(key,index,list){return list.indexOf(key)===index;});
+    var scopes=repos.map(function(repo){return ' repo:'+repo;});if(!scopes.length && scope.org)scopes=[' org:'+scope.org];
+    knownKeys.forEach(function(key){scopes.forEach(function(where){
+      var job=add('search:'+key+where,'search_pull_requests',{query:'"'+key+'" in:title,body'+where,fields:LIVE_STATUS_GITHUB_FIELDS.slice(),perPage:20},function(payload){
+        if(!payload || !Array.isArray(payload.items))return;
+        job.links=payload.items.map(function(item){return liveStatusGithubPR(item,'github-search');}).filter(Boolean);job.links.forEach(follow);pump();
+      },key,false);
+    });});
+    pump();
+  }
+  // Authored links come first and keep the authored source; discovered ones follow. Jira's count stays authoritative when present.
+  function enrich(map){
+    Object.keys(map).forEach(function(key){
+      var entry=map[key],discovered=[],links=[],urls=[];
+      all().forEach(function(job){if(job.key===key)discovered=discovered.concat(job.links || []);});
+      var authoredURLs=api.refs(key).prs.map(liveStatusGithubURL).filter(Boolean).map(function(ref){return ref.url;});
+      function append(pr,source){
+        if(!pr || urls.indexOf(pr.url)>=0)return;urls.push(pr.url);
+        var link={};Object.keys(pr).forEach(function(field){link[field]=pr[field];});link.source=source || pr.source;
+        var live=['open','draft'].indexOf(pr.state)>=0;
+        link.checks=live && checks[pr.url] || 'none';link.review=live && reviews[pr.url] || 'none';
+        links.push(link);
+      }
+      authoredURLs.forEach(function(url){append(authored[url] || discovered.filter(function(pr){return pr.url===url;})[0],'authored');});
+      discovered.forEach(function(pr){append(pr);});
+      if(!links.length)return;
+      var summary=entry.prs || {count:links.length,state:links.some(function(pr){return pr.state==='open' || pr.state==='draft';})?'open':links.every(function(pr){return pr.state==='merged';})?'merged':'declined'};
+      entry.prs={count:summary.count,state:summary.state,links:links};
+    });
+    return map;
+  }
+  function stop(){
+    if(stopped)return;stopped=true;if(rotation!=null)win.clearTimeout(rotation);rotation=null;queue=[];
+    all().forEach(cancel);active.splice(0).forEach(retire);
+  }
+  events.status({state:'connecting',busy:true});
+  return {sync:sync,enrich:enrich,stop:stop};
+}
 function wireLiveStatusClaude(ctl,page,win){
   var claude,use,api=ctl && ctl.liveStatus;
   try{claude=win.claude;use=claude && claude.use;}catch(ex){return null;}
@@ -81,7 +261,7 @@ function wireLiveStatusClaude(ctl,page,win){
   }
   var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
   var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false;
-  var dirty=false,publishing=false,removeChange=null,removeDestroy=null;
+  var dirty=false,publishing=false,removeChange=null,removeDestroy=null,github=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function status(value){if(typeof api.status==='function')api.status(value);}
   // busy = any job (discovery, resource lookup, watch, scheduled retry) still outstanding.
@@ -90,7 +270,7 @@ function wireLiveStatusClaude(ctl,page,win){
   status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
-    if(stopped)return;stopped=true;
+    if(stopped)return;stopped=true;if(github)github.stop();
     subscriptions.splice(0).forEach(unsubscribe);timers.splice(0).forEach(function(id){win.clearTimeout(id);});
     if(removeChange)removeChange();if(removeDestroy)removeDestroy();
   }
@@ -109,7 +289,9 @@ function wireLiveStatusClaude(ctl,page,win){
       [chunk.storedAt,chunk.flaggedAt].forEach(function(at){if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);});
     });
     dirty=false;publishing=true;
-    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});api.apply(map);}finally{publishing=false;}
+    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});if(github){github.sync(keys);github.enrich(map);}api.apply(map);}finally{publishing=false;}
+    // A GitHub watch answering synchronously inside sync() marks dirty again; one more pass folds it in.
+    if(dirty)publish();
   }
   function notices(){
     if(stopped)return;
@@ -220,6 +402,7 @@ function wireLiveStatusClaude(ctl,page,win){
           jobs.push(job);watch(job);
         });
       });
+      if(github)github.sync();
     }finally{syncing=false;}
   }
   function resources(result){
@@ -256,6 +439,19 @@ function wireLiveStatusClaude(ctl,page,win){
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
       if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
+      // GitHub is optional and also chosen by offered tools. "GitHub" is only a tie-break.
+      var githubServers=[];
+      listed.forEach(function(candidate){
+        var name=candidate && (candidate.server || candidate.name),tools=candidate && candidate.tools;
+        if(typeof name!=='string' || !name || !Array.isArray(tools))return;
+        var offered=tools.map(function(tool){return typeof tool==='string'?tool:tool && tool.name;});
+        if(LIVE_STATUS_GITHUB_TOOLS.every(function(tool){return offered.indexOf(tool)>=0;}) && githubServers.indexOf(name)<0)githubServers.push(name);
+      });
+      if(githubServers.length)github=createLiveStatusGithub(mcp,githubServers.indexOf('GitHub')>=0?'GitHub':githubServers[0],page,api,win,{
+        changed:function(){if(chunks.some(function(chunk){return chunk.answered;})){dirty=true;publish();}},
+        status:function(value){status({github:value});}
+      });
+      else if(liveStatusGithubWanted(page,api))status({github:{state:'disconnected',busy:false}});
       var job={version:0,tool:'getAccessibleAtlassianResources',input:{},options:{cache:{staleTime:300000}},accept:resources,inflight:true};jobs.push(job);mark(discovery,false);
       // Initial resource lookup may retry once. All subsequent call failures
       // (including explicit approval) end here rather than recursively retry.

@@ -10,6 +10,12 @@
 /mock-atlassian-mcp/fixtures/*
 !/mock-atlassian-mcp/fixtures/all-todo.json
 !/mock-atlassian-mcp/fixtures/all-done.json
+!/mock-github-mcp/
+/mock-github-mcp/*
+!/mock-github-mcp/README.md
+!/mock-github-mcp/worker.mjs
+!/mock-github-mcp/mcp.mjs
+!/mock-github-mcp/wrangler.jsonc
 # Local settings and tool caches are never sources, at any depth.
 local.env
 .dev.vars*

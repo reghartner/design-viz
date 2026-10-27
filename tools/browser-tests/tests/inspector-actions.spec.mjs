@@ -497,8 +497,11 @@ test('the Confluence and Backstage hosts paint presets through their own stylesh
 for(const carrier of ['node','edge'])test('tracking '+carrier+' controls validate, preserve order, export and undo each action once',async({page,server})=>{
   const {projectSource,useProjectDownloads}=await import('../helpers/project-export.mjs');
   await useProjectDownloads({page});
-  const raw=fixture(),original=await start(page,server,raw),src=page.locator('#src'),guide=page.locator('#guide');
-  const select=()=>inspectPageElement(page,carrier==='node'?page.locator('#section-overview [data-dv-node="a"] .t1'):page.locator('#section-overview path.edge[data-dv-edge="0"]').first());
+  const raw=fixture();
+  // A horizontal SVG path has zero height; its visible label is a real edge selection target.
+  if(carrier==='edge')raw.page.sections[0].diagram.edges[0].label='Delivery';
+  const original=await start(page,server,raw),src=page.locator('#src'),guide=page.locator('#guide');
+  const select=()=>inspectPageElement(page,carrier==='node'?page.locator('#section-overview [data-dv-node="a"] .t1'):page.locator('#section-overview text.lbl[data-dv-edge="0"]'));
   const element=value=>carrier==='node'?value.page.sections[0].diagram.nodes.a:value.page.sections[0].diagram.edges[0];
   const tracking=guide.getByRole('group',{name:'Tracking',exact:true});
   await select();await expect(tracking).toBeVisible();
@@ -553,7 +556,9 @@ for(const carrier of ['node','edge'])test('tracking '+carrier+' controls validat
 
 test('tracking guidance explains references and provider-dependent live colors',async({page,server})=>{
   await start(page,server);
-  await page.locator('.workbench-header-links [data-open-human-guide]').click();
+  await page.locator('.workspace-help>summary').click();
+  await page.locator('.workspace-help').getByRole('button',{name:'User guide',exact:true}).click();
+  await expect(page.locator('#human-guide')).toBeVisible();
   const evidence=page.locator('#hg-evidence');
   await expect(evidence).toContainText('tickets and PR links');await expect(evidence).toContainText('nodes and edges');
   await expect(evidence).toContainText('references only');await expect(evidence).toContainText('status provider');

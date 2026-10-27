@@ -47,6 +47,8 @@ export interface LiveStatusEntry {
   title?: string;
   url?: string;
   assignee?: string;
+  /** Atlassian accountId of the assignee. With tracking.jira.site the Tickets table links the owner to <site>/wiki/people/<id>. */
+  assigneeId?: string;
   prs?: {count: number; state: 'open' | 'merged' | 'declined'};
   detail?: string;
   updatedAt?: string;

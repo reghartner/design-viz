@@ -53,6 +53,8 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
     if(issue){
       if(typeof fields.summary==='string')entry.title=fields.summary;
       if(fields.assignee && typeof fields.assignee.displayName==='string')entry.assignee=fields.assignee.displayName;
+      // Atlassian accountId (#764): the Tickets table links the owner to <site>/wiki/people/<id>. No extra tool call.
+      if(fields.assignee && typeof fields.assignee.accountId==='string' && fields.assignee.accountId.trim())entry.assigneeId=fields.assignee.accountId.trim();
       if(typeof fields.updated==='string')entry.updatedAt=fields.updated;
       var prs=liveStatusDevelopmentSummary(fields);if(prs)entry.prs=prs;
     }

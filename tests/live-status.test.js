@@ -779,12 +779,15 @@ test('S1 host provider reports connecting, busy, connected with a checked time, 
 test('S2 the Jira adapter reports disconnected, connecting, connected and retrying error states',async()=>{
  const h=providerHarness();h.start();await new Promise(setImmediate);await new Promise(setImmediate);await new Promise(setImmediate);
  let value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.source,'Jira');assert.ok(['connecting','connected'].includes(value.connection.state),'S2 after discovery: '+value.connection.state);assert.equal(value.connection.busy,true);
- assert.ok(h.watches.length>=1,'S2 watches registered');h.watches[0].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});
- value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'connected');assert.equal(value.connection.checkedAt,new Date(1793000000000).toISOString());
+ assert.ok(h.watches.length>=2,'S2 the ticket watch and its Flagged watch are registered');h.watches[0].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});
+ value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'connected');assert.equal(value.connection.checkedAt,new Date(1793000000000).toISOString());assert.equal(value.connection.busy,true,'S2 still busy while the second watch is outstanding');
+ for(let i=1;i<h.watches.length;i++)h.watches[i].handler({type:'data',result:{payload:{issues:{nodes:[]}},cache:{storedAt:1793000000000}}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.busy,false,'S2 idle once every watch answered');
  h.watches[0].handler({type:'error',error:{code:'rate_limited',retryable:true}});value=plain(h.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,true);
  h.ctl.liveStatus.destroy();
  const none=providerHarness();none.servers.length=0;none.start();await new Promise(setImmediate);await new Promise(setImmediate);
  value=plain(none.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected');assert.equal(value.connection.busy,false);assert.match(value.note.text,/Add the Atlassian connector/);none.ctl.liveStatus.destroy();
+ const nosite=providerHarness();nosite.mcp.callTool=()=>Promise.resolve({payload:[]});nosite.start();await new Promise(setImmediate);await new Promise(setImmediate);await new Promise(setImmediate);
+ value=plain(nosite.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected','S2 no available site is reported, not left connecting');assert.equal(value.connection.busy,false);assert.match(value.note.text,/No Atlassian site/);nosite.ctl.liveStatus.destroy();
 });
 test('S3 the demo player reports a demo connection with the day as the checked time',()=>{
  const h=harness(fixture(),{demo:{mount(api){api.status({state:'demo',source:'Demo',checkedAt:Date.now()});api.apply(fixed);return ()=>{};}}});mountStatus(h);

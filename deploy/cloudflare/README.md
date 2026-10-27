@@ -38,9 +38,10 @@ editor reports no catalog.
 
 ## Nothing account-specific is committed
 
-Upstream tracks only `README.md`, `deploy.sh` and `local.env.example` in this
-folder; `.gitignore` excludes everything else here, so an ordinary `git add`
-cannot pick up local settings or generated files. `tests/cloudflare-deploy.test.js`
+Upstream tracks only `README.md`, `deploy.sh`, `local.env.example` and the
+reviewed sources of the mock Atlassian MCP server (`mock-atlassian-mcp/`, see its
+README) in this folder; `.gitignore` excludes everything else here, so an
+ordinary `git add` cannot pick up local settings or generated files. `tests/cloudflare-deploy.test.js`
 fails if those ignore rules stop applying or if a Worker name, `workers.dev`
 address, Access team address, email address, `account_id` or 32-hex identifier
 appears in the three tracked files. A private company fork may still choose to force-add its own `local.env`;

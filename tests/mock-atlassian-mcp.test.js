@@ -335,8 +335,11 @@ const IDENTITY = [
 ];
 test('M11: identity and recursive ignore rules protect the new deploy folder', () => {
   assert.ok(fs.existsSync(path.join(ROOT, DIR)), DIR + ' must exist');
+  // Scan only files git would track: local state such as .cloudflare/cache or
+  // .dev.vars is ignored by the rules checked below and must not fail this test.
   const files = fs.readdirSync(path.join(ROOT, DIR), { recursive: true })
-    .filter(f => fs.statSync(path.join(ROOT, DIR, f)).isFile() && !f.startsWith('.wrangler/') && f !== 'local.env');
+    .filter(f => fs.statSync(path.join(ROOT, DIR, f)).isFile())
+    .filter(f => spawnSync('git', ['-C', ROOT, 'check-ignore', '--no-index', '-q', DIR + '/' + f]).status === 1);
   for (const file of files) {
     // The contract explicitly permits only this one placeholder name.
     const source = read(DIR + '/' + file).replace(/"name"\s*:\s*"mock-atlassian-mcp"/g, '"name": "$PLACEHOLDER"');

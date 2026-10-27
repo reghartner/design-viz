@@ -4068,10 +4068,13 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .dv-live-pr-link{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
 .dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
 .dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
-/* Pull request state and check colours are GitHub's own vocabulary, one token each,
-   the same in every skin. The selectors repeat .nbacklink so they outrank the per-skin
+/* Pull request state and check colours are Node Styles preset lines (#610), like the
+   live state tokens above: open moss, draft slate, merged violet, closed rose; checks
+   passing moss, failing rose, pending amber. Dark values follow the presets' pure-Aurora
+   variants. The selectors repeat .nbacklink so they outrank the per-skin
    `body.sk-* .nbacklink` link colours in the panel and in the popover alike. */
-:root{--dv-pr-open:#1a7f37;--dv-pr-draft:#6e7781;--dv-pr-merged:#8250df;--dv-pr-closed:#cf222e;--dv-checks-failing:#ef4444;--dv-checks-pending:#f59e0b;--dv-checks-passing:#22c55e;}
+:root{--dv-pr-open:#539A43;--dv-pr-draft:#6E89A5;--dv-pr-merged:#9B6BCE;--dv-pr-closed:#D15A63;--dv-checks-passing:#539A43;--dv-checks-failing:#D15A63;--dv-checks-pending:#AC7D00;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-pr-open:#6FB261;--dv-pr-draft:#88A1BC;--dv-pr-merged:#B386E4;--dv-pr-closed:#E8777D;--dv-checks-passing:#6FB261;--dv-checks-failing:#E8777D;--dv-checks-pending:#C99414;}
 .nbacklink.dv-live-pr-link[data-pr-state="open"],.nbacklink.dv-live-pr-link[data-pr-state="open"]:is(:hover,:focus){color:var(--dv-pr-open);}
 .nbacklink.dv-live-pr-link[data-pr-state="draft"],.nbacklink.dv-live-pr-link[data-pr-state="draft"]:is(:hover,:focus){color:var(--dv-pr-draft);}
 .nbacklink.dv-live-pr-link[data-pr-state="merged"],.nbacklink.dv-live-pr-link[data-pr-state="merged"]:is(:hover,:focus){color:var(--dv-pr-merged);}

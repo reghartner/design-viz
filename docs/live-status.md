@@ -193,10 +193,11 @@ The PRs column holds one icon per pull request: the authored carrier `prs`
 plus, when the entry carries `prs.links`, the pull requests GitHub reports for
 the ticket (see "Pull requests from GitHub"). A plain authored link is the
 monochrome icon with the URL as its tooltip. A GitHub-enriched icon takes the
-pull request's state colour (`data-pr-state` open green, draft grey, merged
-purple, closed red; the `--dv-pr-*` and `--dv-checks-*` tokens in `style.core.css`,
-the same in every skin) and a small checks dot (`.dv-live-pr-checks[data-checks]`
-failing red, pending amber, passing green); its tooltip and accessible name read
+pull request's state colour and a small checks dot (`.dv-live-pr-checks[data-checks]`).
+Both use Node Styles preset lines, like the live state tokens: `data-pr-state` open
+moss, draft slate, merged violet, closed rose; checks passing moss, failing rose,
+pending amber (`--dv-pr-*` and `--dv-checks-*` in `style.core.css`, with the
+presets' dark values on pure Aurora, Terminal and Blueprint); its tooltip and accessible name read
 “#742 Title · open · checks failing · changes requested · author · owner/repo”.
 No icon shows a time since the pull request was updated. Jira's Development
 summary adds a muted, informational “n open/merged/declined” count only when it

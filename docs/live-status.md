@@ -276,8 +276,13 @@ to retrieve that day's children. `getJiraIssue` can also return the epic itself.
 
 Open the [built story](../examples/live-status/live-status.html#live=demo) with
 `#live=demo` to replay the cross-team doorbell delivery. The standalone injector
-embeds `examples/live-status/live-status.timeline.json` in a separate
-`live-timeline` JSON block when the page declares `tracking`. It works offline,
+embeds a demo timeline in a separate `live-timeline` JSON block when the page
+declares `tracking`. `tools/inject.py` picks it with `--timeline <path|none>`:
+a path embeds that file after checking its shape (`version`, `intervalSeconds`,
+`days[].issues`), and `none` embeds nothing. The default is
+`examples/live-status/live-status.timeline.json` when the injected spec is
+`examples/live-status/live-status.spec.json`, and `none` for every other spec,
+so a board never inherits the doorbell example's keys. It works offline,
 including `file://`, without fetching or changing the spec. A host provider takes
 precedence. An explicitly requested demo also takes precedence over the automatic
 claude.ai connector. Without the hash, no demo starts.

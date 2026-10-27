@@ -131,13 +131,16 @@ and `days[]`, each with `label`, `note` and `issues` keyed by ticket with
 blocked day and one day where a key is absent, so the board shows both
 failure colors. Open the built page with `#live=demo` to replay it.
 
-Known limit: `tools/inject.py` embeds only the example timeline
-(`examples/live-status/live-status.timeline.json`) whenever the page has
-`tracking`. For a different board, after injecting, replace the contents of
-the `<script type="application/json" id="live-timeline">` block in the output
-HTML with your own timeline JSON, or delete that block so the page synthesizes
-four days (todo, active, one blocker, all done) from its own keys. Keys from
-the example timeline will otherwise show as MISSING on your board.
+Embed it at inject time:
+`python3 tools/inject.py <spec.json> template/flowview.html <out.html> --timeline <name>.timeline.json`.
+The injector checks the file's shape (`version`, `intervalSeconds`,
+`days[].issues`) and fails loud on a mismatch. Without the flag, only the
+example spec (`examples/live-status/live-status.spec.json`) gets the example
+timeline; every other spec gets none, so `#live=demo` synthesizes four days
+(todo, active, one blocker, all done) from the board's own keys. Pass
+`--timeline none` to force that synthesized replay for the example too. Keys
+from a timeline that does not match the board show as MISSING, so never embed
+another board's timeline.
 
 ## 4. Publish as a claude.ai artifact
 

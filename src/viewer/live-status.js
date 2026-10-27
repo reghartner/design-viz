@@ -14,6 +14,12 @@ function liveStatusTicketURL(tracking,key,entry){
   var site=deltaLinkUrl(tracking && tracking.jira && tracking.jira.site);
   return site?site.replace(/\/$/,'')+'/browse/'+key:deltaLinkUrl(entry && entry.url);
 }
+function liveStatusOwnerURL(tracking,entry){
+  // Confluence people page of the Jira assignee (#764): page site plus a non-blank accountId, encoded as one path
+  // segment. Atlassian ids keep their literal colon (712020:uuid) so the URL matches the one Atlassian itself emits.
+  var site=deltaLinkUrl(tracking && tracking.jira && tracking.jira.site),id=entry && typeof entry.assigneeId==='string'?entry.assigneeId.trim():'';
+  return site && id?site.replace(/\/$/,'')+'/wiki/people/'+encodeURIComponent(id).replace(/%3A/g,':'):null;
+}
 function liveStatusClass(el,state){
   LIVE_STATUS_STATES.forEach(function(value){
     var name='dv-live-'+value;
@@ -527,7 +533,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
-        owner:entry.assignee || 'Unassigned',
+        owner:entry.assignee || 'Unassigned',ownerUrl:entry.assignee?liveStatusOwnerURL(source.tracking,entry):null,
         prs:entry.prs?copy(entry.prs):null,urls:urls,laneColor:laneColor,
         carriers:owners.map(function(carrier){var route=carrierRoute(carrier),mounted=carrierBinding(carrier);
           return {id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || '',
@@ -634,7 +640,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired)return;var next=Object.create(null);
       Object.keys(value || {}).forEach(function(key){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
-        var item={state:entry.state};['title','assignee','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
+        var item={state:entry.state};['title','assignee','assigneeId','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
         var url=deltaLinkUrl(entry.url);if(url)item.url=url;
         if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
         next[key]=item;

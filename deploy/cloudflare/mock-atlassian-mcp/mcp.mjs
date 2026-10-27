@@ -99,7 +99,7 @@ export function jiraIssueFromStatus(key, entry, now = EPOCH) {
     fields: {
       summary: entry.summary || key,
       status: { name: entry.statusName || (entry.state === 'blocked' ? 'Blocked' : category.name), statusCategory: { ...category } },
-      assignee: entry.assignee ? { displayName: entry.assignee } : null,
+      assignee: entry.assignee ? { displayName: entry.assignee, ...(entry.assigneeId ? { accountId: entry.assigneeId } : {}) } : null,
       priority: { name: entry.priority || 'Medium' }, issuetype: { name: entry.issueType || 'Task' },
       ...(entry.epic ? { parent: { key: entry.epic, fields: { summary: 'Connected doorbell delivery', issuetype: { name: 'Epic' } } } } : {}),
       updated, customFields

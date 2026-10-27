@@ -250,6 +250,7 @@ test('M7: shared timeline and fixed fixtures tell the required story', () => {
       assert.ok(['todo', 'active', 'done', 'blocked'].includes(entry.state));
       assert.equal(typeof entry.summary, 'string');
       assert.equal(typeof entry.assignee, 'string');
+      assert.match(entry.assigneeId, /^712020:[0-9a-f-]{36}$/, '#764 fictional accountId');
       assert.equal(typeof entry.flagged, 'boolean');
       assert.equal(typeof entry.statusName, 'string');
       assert.match(entry.updated, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}\+0000$/);
@@ -294,6 +295,7 @@ test('M8: Jira conversion, stable IDs, category names, flagged and Development s
     else assert.ok(!fields.customFields.Flagged || fields.customFields.Flagged.length === 0);
   }
   assert.equal(jiraIssueFromStatus('HW-123', { state: 'todo', assignee: null }, NOW).fields.assignee, null);
+  assert.deepEqual(jiraIssueFromStatus('HW-123', { state: 'todo', assignee: 'Alex', assigneeId: '712020:abc' }, NOW).fields.assignee, { displayName: 'Alex', accountId: '712020:abc' }, '#764 accountId passthrough');
   const flagged = jiraIssueFromStatus('HW-123', { state: 'active', flagged: true, statusName: 'Review' }, NOW).fields;
   assert.equal(flagged.status.name, 'Review');
   assert.deepEqual(flagged.customFields.Flagged, [{ value: 'Impediment' }]);

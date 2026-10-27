@@ -2,7 +2,7 @@
 | row | rule |
 |---|---|
 | V1 | New file src/viewer/live-status.js, added to the `engine.js` list in src/source-bundles.json (so standalone, workbench, native/Backstage and forge entrypoints all get it; check tests/source-loader.test.js). ES5 browser code like its neighbours. |
-| V2 | `renderPage` attaches `ctl.liveStatus` with: `refs()` → `{tickets:[distinct keys], prs:[distinct urls]}` over every diagram of the page (all sections, all paths, detail flows) using `trackingRefs`; `apply(map)`; `clear()`; `enabled()`; `setEnabled(bool)`; `onChange(fn)` (fires after apply/clear/setEnabled with `{states, counts, updatedAt}`); `state(ref)`. `map` is `{ "<ticket key>": {state, title?, url?, assignee?, prs?: {count, state}, detail?, updatedAt?} }`, `state` ∈ `todo|active|done|blocked|missing`. Unknown state strings are ignored (treated as absent). |
+| V2 | `renderPage` attaches `ctl.liveStatus` with: `refs()` → `{tickets:[distinct keys], prs:[distinct urls]}` over every diagram of the page (all sections, all paths, detail flows) using `trackingRefs`; `apply(map)`; `clear()`; `enabled()`; `setEnabled(bool)`; `onChange(fn)` (fires after apply/clear/setEnabled with `{states, counts, updatedAt}`); `state(ref)`. `map` is `{ "<ticket key>": {state, title?, url?, assignee?, assigneeId?, prs?: {count, state}, detail?, updatedAt?} }`, `state` ∈ `todo|active|done|blocked|missing`. Unknown state strings are ignored (treated as absent). |
 | V3 | Rollup for one carrier with several tickets (docs/live-status.md): any blocked → blocked; else any missing → missing; else any active → active; else all done → done; else all todo → todo; else (mix of done and todo) → active. A carrier whose tickets are all absent from the map gets NO class. Implement as a pure function `liveStatusRollup(states[])` (exported as a global like other engine helpers) so it is unit-testable. |
 | V4 | `apply(map)` sets exactly one `dv-live-<state>` class (removing the others) on: every node `g.node[data-dv-node]` with tickets; every edge `path.edge[data-dv-edge]` with tickets, plus its halo path and its `text.lbl` label (same `data-dv-edge` index); every step coin `g.coin[data-dv-step]` and step chip `button.schip[data-step-source]` whose step involves (via `edges`/keys, `nodes`, failures) at least one carrier that has a state — rollup of those carriers' states; in path-timeline chips too. Text boxes (`g.node.node-text`) never get a class. |
 | V5 | CSS in src/style.core.css, for EVERY skin selector family that paints `.card`/edges today (aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac — check the skin list in the file): `.dv-live-todo` grey, `.dv-live-active` amber, `.dv-live-done` green, `.dv-live-blocked` and `.dv-live-missing` red. Node: card stroke + a soft halo (drop-shadow) in the state color and the status badge; edge: stroke color (main + halo) with the state color; coin: circle fill + ink via the same `--step-color`/`--step-ink` custom properties the `.step-colored` rules use (so precedence and `!important` match); chip: background via the same variables. Define the five colors once as CSS custom properties on `:root` (`--dv-live-todo`, …) and reuse. active/blocked/missing pulse: reuse the existing `runtime-pulse` keyframes (stroke-width) on the badge circle and a slow (≈2.4 s) opacity pulse on the card halo; `@media (prefers-reduced-motion: reduce)` disables both (follow the existing reduced-motion blocks). Live classes win over `tone-*` card fill/stroke while present. Step-mode dimming (`.stepmode .node:not(.lit)` etc.) still applies but with an opacity floor of .55 for live-classed elements, like `.stepmode .coin.step-colored:not(.lit)`. Print: no pulse, keep colors. |
@@ -850,4 +850,32 @@ test('E8 rework the verdict omits the epic fraction when no entry carries epic m
  const h=harness(epicFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'todo'}});
  assert.doesNotMatch(api.snapshot().verdict,/epic stories/,'no "0 of 0 epic stories"');
  api.apply({'AA-1':{state:'todo',epic:'EP-1'}});assert.match(api.snapshot().verdict,/1 of 1 epic stories on diagram/);api.destroy();
+});
+
+test('O1 #764 Owner cell links to the Confluence people page only with a site and a usable accountId',()=>{
+ const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
+ api.apply({'AA-1':{state:'done',assignee:'Alex',assigneeId:'557058:0f1a-2b3c'},'BB-1':{state:'todo',assignee:'Sam'},'CC-1':{state:'active',assignee:'Kim',assigneeId:'a b/c?d'},'DD-1':{state:'active',assignee:'Pat',assigneeId:'   '},'EE-1':{state:'active',assigneeId:'nobody'}});
+ assert.equal(api.state('AA-1').assigneeId,'557058:0f1a-2b3c','state() carries the id');assert.equal(api.state('BB-1').assigneeId,undefined);
+ const rows=h.view.querySelectorAll('.dv-live-tickets tbody tr[data-live-ticket]'),owner=key=>rows.find(el=>el.getAttribute('data-live-ticket')===key).querySelector('td.dv-live-ticket-owner');
+ const alex=owner('AA-1').querySelector('a');assert.ok(alex,'linked owner');assert.equal(alex.textContent,'Alex');assert.equal(alex.getAttribute('href'),'https://jira.test/wiki/people/557058:0f1a-2b3c');
+ assert.equal(alex.getAttribute('target'),'_blank');assert.match(alex.getAttribute('rel'),/\bnoopener\b/);assert.match(alex.className,/\bnbacklink\b/,'same look as other panel links');
+ assert.equal(owner('BB-1').querySelector('a'),null,'no id, plain text');assert.equal(textOf(owner('BB-1')).trim(),'Sam');
+ assert.equal(owner('CC-1').querySelector('a').getAttribute('href'),'https://jira.test/wiki/people/a%20b%2Fc%3Fd','id is URL-encoded');
+ assert.equal(owner('DD-1').querySelector('a'),null,'blank id, plain text');assert.equal(owner('EE-1').querySelector('a'),null,'id without a name stays Unassigned');assert.equal(textOf(owner('EE-1')).trim(),'Unassigned');
+ assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='AA-1').querySelectorAll('img').length,0,'no avatar');
+ api.apply({'AA-1':{state:'done',assignee:'Alex'}});assert.equal(owner('AA-1').querySelector('a'),null,'link leaves when the id leaves');assert.equal(textOf(owner('AA-1')).trim(),'Alex');api.destroy();
+ const raw=epicFixture();delete raw.page.tracking.jira.site;const nosite=harness(raw);mountStatus(nosite);
+ nosite.ctl.liveStatus.apply({'AA-1':{state:'done',assignee:'Alex',assigneeId:'557058:0f1a-2b3c',url:'https://elsewhere.test/browse/AA-1'}});
+ const cell=nosite.view.querySelectorAll('.dv-live-tickets tbody tr[data-live-ticket]').find(el=>el.getAttribute('data-live-ticket')==='AA-1').querySelector('td.dv-live-ticket-owner');assert.equal(cell.querySelector('a'),null,'no site, plain text');assert.equal(textOf(cell).trim(),'Alex');nosite.ctl.liveStatus.destroy();
+});
+test('O2 #764 provider demo and docs carry the assignee accountId',()=>{
+ const C=providerContext(),issue=jira('AA-1');issue.fields.assignee.accountId='557058:0f1a-2b3c';
+ const result=plain(C.liveStatusJiraMap(['AA-1','BB-1'],[[issue,jira('BB-1')]],new Set(),'https://jira.test/'));
+ assert.equal(result['AA-1'].assigneeId,'557058:0f1a-2b3c');assert.equal(result['AA-1'].assignee,'Alex');assert.equal(result['BB-1'].assigneeId,undefined,'absent accountId stays absent');
+ const blank=jira('CC-1');blank.fields.assignee.accountId='';assert.equal(plain(C.liveStatusJiraMap(['CC-1'],[[blank]],new Set(),''))['CC-1'].assigneeId,undefined,'empty accountId is dropped');
+ const S=storyContext(),demo=plain(S.liveStatusDemoMap({issues:{'AA-1':{state:'done',assignee:'Alex',assigneeId:'557058:0f1a-2b3c'},'BB-1':{state:'todo',assignee:'Sam'}}},['AA-1']));
+ assert.equal(demo['AA-1'].assigneeId,'557058:0f1a-2b3c');assert.equal(demo['BB-1'].assigneeId,undefined);
+ const timeline=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8'));
+ for(const day of timeline.days)for(const [key,entry] of Object.entries(day.issues))assert.match(entry.assigneeId || '',/\S/,'timeline '+key+' names an accountId for the demo');
+ assert.match(fs.readFileSync('docs/live-status.md','utf8'),/wiki\/people/);assert.match(fs.readFileSync('src/native/mount.d.ts','utf8'),/assigneeId\?: string/);
 });

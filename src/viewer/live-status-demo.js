@@ -4,7 +4,7 @@ function liveStatusDemoMap(day,keys){
   (keys || []).concat(Object.keys(issues)).filter(function(key,index,all){return all.indexOf(key)===index;}).forEach(function(key){
     var issue=issues[key];if(!issue){map[key]={state:'missing'};return;}
     var entry={state:issue.state};
-    [['summary','title'],['assignee','assignee'],['updated','updatedAt'],['epic','epic'],['lane','lane']].forEach(function(pair){if(typeof issue[pair[0]]==='string')entry[pair[1]]=issue[pair[0]];});
+    [['summary','title'],['assignee','assignee'],['assigneeId','assigneeId'],['updated','updatedAt'],['epic','epic'],['lane','lane']].forEach(function(pair){if(typeof issue[pair[0]]==='string')entry[pair[1]]=issue[pair[0]];});
     if(issue.statusName || issue.flagged)entry.detail=(issue.statusName || '')+(issue.flagged?' · flagged':'');
     if(issue.prs && issue.prs.count>0)entry.prs={count:issue.prs.count,state:String(issue.prs.state).toLowerCase()};
     map[key]=entry;

@@ -164,9 +164,16 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
 Below Blockers, the Tickets table lists each distinct carrier ticket and every returned child of a linked
 epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
-Key, Title, State, Owner (assignee name), and PRs. Under each ticket a second
+Key, Title, State, Owner, and PRs. Under each ticket a second
 row holds its coverage as a left-aligned row of chips. The key uses the configured
 Jira site, and a colored stripe marks its team lane when known.
+
+Owner is the Jira assignee's display name. When the page sets `tracking.jira.site`
+and the entry carries the assignee's Atlassian `accountId` (`assigneeId`), the name
+links to that person's Confluence people page, `<site>/wiki/people/<accountId>`, in a
+new tab with the same look as the other panel links; otherwise it is plain text. No
+avatar is shown and no additional connector call is made: the id rides along in the
+Jira search payload.
 
 PR links come only from authored carrier `prs`, rendered as icons; Jira's
 Development summary adds a muted, informational “n open/merged/declined” count
@@ -207,6 +214,7 @@ The provider resolves a complete map, for example:
     "title": "Button delivery",
     "url": "https://acme.atlassian.net/browse/HW-123",
     "assignee": "Alex",
+    "assigneeId": "712020:1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c5d",
     "prs": {"count": 2, "state": "open"},
     "detail": "Waiting for the bench run",
     "updatedAt": "2026-10-26T12:00:00Z"
@@ -269,6 +277,7 @@ hardware, firmware, a mobile app and backend with node and edge references.
 The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 provides fictional Jira tools without an Atlassian account. Its shared timeline
 demonstrates progress, blocked and missing tickets, and linked PR summaries.
+Assignees carry fictional Atlassian `accountId`s so the Owner links render.
 Search with `parent = DOOR-100`, optionally followed by `AND Flagged = Impediment`,
 to retrieve that day's children. `getJiraIssue` can also return the epic itself.
 

@@ -37,6 +37,10 @@ class Element {
  addEventListener(t,f){(this.events[t]??=new Set()).add(f);}removeEventListener(t,f){this.events[t]?.delete(f);}dispatchEvent(ev){ev.target??=this;for(const f of this.events[ev.type]||[])f(ev);}
  getBoundingClientRect(){return {left:0,top:0,right:100,bottom:50,width:100,height:50};}getBBox(){return {x:50,y:30,width:60,height:12};}
  getTotalLength(){return 100;}getPointAtLength(){return {x:50,y:30};}focus(){}get firstChild(){return this.children[0]||null;}
+ /* A failing assert.equal/deepEqual on two elements must print one line, not inspect two circular trees:
+    on 2026-10-27 that diff grew several node processes past 100 GB each and took the machine down. */
+ [Symbol.for('nodejs.util.inspect.custom')](){const a=this.attrs;return '<'+this.tagName+(a.class?' class="'+a.class+'"':'')+(a['data-live-ticket']?' data-live-ticket="'+a['data-live-ticket']+'"':'')+(a['data-live-coverage-for']?' data-live-coverage-for="'+a['data-live-coverage-for']+'"':'')+(a['data-dv-node']?' data-dv-node="'+a['data-dv-node']+'"':'')+' children='+this.children.length+'>';}
+ toJSON(){return this[Symbol.for('nodejs.util.inspect.custom')]();}
 }
 function harness(raw,options={},renderOptions={}){
  const frames=new Map(),timers=new Map(),observers=[];let serial=0;

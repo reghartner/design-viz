@@ -70,6 +70,34 @@ and optionally `"prs": ["https://..."]`. Keys must match
 on `page` beside `title`, and list `flow.live-status` under
 `page.flowview.features`. The spec stores keys only, never status.
 
+### Always add the Live status panel
+
+Add this to the diagram so the rollup stays visible below it. The header owns
+Live and demo controls; no reader menu is needed. Use all three host profiles.
+
+```json
+{
+  "panels": [{"id":"status", "type":"live-status", "title":"Epic status"}],
+  "sectionLayout": {"columns":24,
+    "default": [
+      {"x":0,"y":0,"w":24,"h":10},
+      {"controls":"steps","x":0,"y":10,"w":24,"h":6},
+      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+    ],
+    "backstage": [
+      {"x":0,"y":0,"w":24,"h":10},
+      {"controls":"steps","x":0,"y":10,"w":24,"h":6},
+      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+    ],
+    "confluence": [
+      {"x":0,"y":0,"w":24,"h":10},
+      {"controls":"steps","x":0,"y":10,"w":24,"h":6},
+      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+    ]
+  }
+}
+```
+
 Rules of thumb that make the board readable:
 
 - One to three keys per carrier. A carrier with many keys rolls up to its
@@ -150,9 +178,9 @@ the Workbench and sees no live state there.
 
 Open the artifact in a browser and check, in this order:
 
-- Live chip present with a count, not a note.
-- **details** opens the Live status panel: carriers done ring, Teams lanes
-  with n/N, Blockers, Activity.
+- The Live status panel below the diagram shows the carriers done ring, Teams
+  lanes with n/N, Blockers, Tickets and Activity without a click.
+- Its header shows Live, counts and updated time; demo controls appear only in demo mode.
 - Network: two or more `api/frame/mcp/call` requests with status 200.
 - One node or edge popover lists its keys with state and assignee.
 - Screenshot for the author.

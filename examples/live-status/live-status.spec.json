@@ -17,6 +17,76 @@
         "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the Story panel to pause, step, or switch the visual treatment."
       ],
       "diagram": {
+        "panels": [{"id": "status", "type": "live-status", "title": "Epic status"}],
+        "sectionLayout": {
+          "columns": 24,
+          "default": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 24,
+              "h": 10
+            },
+            {
+              "controls": "steps",
+              "x": 0,
+              "y": 10,
+              "w": 24,
+              "h": 6
+            },
+            {
+              "panel": "status",
+              "x": 0,
+              "y": 16,
+              "w": 24,
+              "h": 16
+            }
+          ],
+          "backstage": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 24,
+              "h": 10
+            },
+            {
+              "controls": "steps",
+              "x": 0,
+              "y": 10,
+              "w": 24,
+              "h": 6
+            },
+            {
+              "panel": "status",
+              "x": 0,
+              "y": 16,
+              "w": 24,
+              "h": 16
+            }
+          ],
+          "confluence": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 24,
+              "h": 10
+            },
+            {
+              "controls": "steps",
+              "x": 0,
+              "y": 10,
+              "w": 24,
+              "h": 6
+            },
+            {
+              "panel": "status",
+              "x": 0,
+              "y": 16,
+              "w": 24,
+              "h": 16
+            }
+          ]
+        },
         "nodes": {
           "button": {"title": "Doorbell button", "sub": "Debounced press sensor", "tickets": ["HW-123"]},
           "mcu": {"title": "Doorbell controller", "sub": "Firmware: event delivery", "tickets": ["FW-45"], "prs": ["https://github.com/acme/firmware/pull/88"]},

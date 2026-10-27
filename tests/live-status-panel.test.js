@@ -49,3 +49,8 @@ test('L5 L8 L9 L11 authored example, guidance and built artifact carry the panel
  assert.doesNotMatch(fs.readFileSync('src/native/mount.d.ts','utf8'),/mountControls/);
  assert.match(fs.readFileSync('examples/live-status/live-status.html','utf8'),/PanelRegistry.define\('live-status'/);
 });
+test('L1 malformed and null patches still explain that live status has no authored state',()=>{
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.panels[0].initial=null;d.steps=[null,42,[]].map(patch=>({panels:{status:patch}}));
+ const result=C.validate(C.normalize(raw));assert.deepEqual(plain(result.errors),[]);assert.equal(result.warnings.filter(x=>x.includes('live status has no authored state')).length,4);
+ assert.deepEqual(plain(definition().fold(d.panels[0],d.steps)),[{},{},{}]);
+});

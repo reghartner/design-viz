@@ -644,6 +644,10 @@ and are ignored; a non-array value produces one warning and is ignored. Valid
 references are retained, with duplicates removed in their original order when
 read. Authored PR references are plain links and never carry live state.
 
+Always add a `live-status` panel to a tracked page, placing it below the diagram
+with `sectionLayout`; its header owns Live and demo controls and its body shows
+Teams, Blockers, Tickets and Activity. It has no authored initial or step state.
+
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
 configures the Jira site and optional epic:
 `"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.

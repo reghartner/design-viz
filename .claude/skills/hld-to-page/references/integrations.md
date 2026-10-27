@@ -124,3 +124,5 @@ Use `siteBaseUrl` and `claudeUrl` for known target destinations. GO TO stays in
 Backstage through `loadSpec`; unpinned IDs outside the association list need
 `resolveHandoffDiagram` backed by the company's approved index. Never invent a
 revision. See [the handoff migration recipe](../../../../cookbook/diagram-handoffs.md#continue-in-a-separate-document).
+
+For tracked pages, always add the authored Live status panel as described in [live-status-board](../../live-status-board/SKILL.md#always-add-the-live-status-panel).

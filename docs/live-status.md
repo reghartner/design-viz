@@ -214,18 +214,29 @@ keep their own lifecycle, and reduced-motion behavior is unchanged.
 ## Publishing as a claude.ai artifact
 
 Build the standalone HTML with `python3 tools/build.py`, then inject your spec
-with `tools/inject.py`. When publishing with the Artifact tool, include this
-exact declaration:
+with `tools/inject.py`. When publishing with the Artifact tool, declare the
+viewer's connector by its **exact display name** as shown in claude.ai
+Settings → Connectors, together with the two Jira tools and the comments
+capability. For Atlassian's own connector that is:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian MCP", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}, {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
-With an enabled **Atlassian MCP** or **Atlassian** connector, viewers see Jira
-status on referenced nodes and edges. The adapter prefers Atlassian MCP, selects
-the resource matching `page.tracking.jira.site` (or the first resource when no
-site is specified), and watches batches of ten keys every 60 seconds. A second
-Flagged Impediment query detects blockers. Jira status determines colors;
+For a custom connector (for example the mock server installed as
+`Mock-atlassian`) put that name in `server` instead. The name is free, with one
+rule: do not name a custom connector **Atlassian MCP**. That is the display
+name of Atlassian's directory connector on claude.ai, so a declaration or a
+connector under that name resolves to the directory connector and asks the
+viewer for an Atlassian login.
+
+The adapter does not match connectors by name. From the connectors the
+manifest exposes it takes any one that offers both
+`getAccessibleAtlassianResources` and `searchJiraIssuesUsingJql`, preferring
+**Atlassian MCP**, then **Atlassian**, then the first other qualifying
+connector. It then selects the resource matching `page.tracking.jira.site`
+(or the first resource when no site is specified), and watches batches of ten
+keys every 60 seconds. A second Flagged Impediment query detects blockers. Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
@@ -242,8 +253,9 @@ precedence. Document editing remains desktop-only.
 Tool shapes follow public documentation; they have not been captured from a
 real connector. See the [mock server README](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 for setup, fictional scenarios, result envelopes and known fidelity limits.
-The mock can be installed as **Atlassian MCP** to try the artifact without an
-Atlassian account. No GitHub connector is used.
+The mock can be installed as a custom connector under any name except
+**Atlassian MCP** to try the artifact without an Atlassian account; declare
+that name when publishing. No GitHub connector is used.
 
 ## Story mode
 

@@ -37,6 +37,10 @@ alternate-only steps retain their own path state. Hidden steps still contribute
 their accumulated state. Omit --view to keep the page's authored default and
 the historical step-registry capture order. Rebuild older HTML before using
 --view: capture checks that the requested view and step actually became active.
+
+Chrome startup waits DV_GIF_CHROME_STARTUP_TIMEOUT seconds (default 45) for the
+page debugging target and relaunches Chrome once before failing; the failure
+message carries the tail of Chrome's own output.
 """
 
 from __future__ import annotations
@@ -56,7 +60,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Iterable
+from typing import IO, Any, Callable, Iterable
 from urllib.parse import quote, urlsplit
 from urllib.request import urlopen
 import zlib
@@ -729,10 +733,10 @@ def capture_frames(
             "about:blank",
         ]
         with log_path.open("w+", encoding="utf-8") as log:
-            process = subprocess.Popen(cmd, stdout=log, stderr=log, text=True)
+            process: subprocess.Popen | None = None
             capture_error: Exception | None = None
             try:
-                endpoint = _wait_for_page_endpoint(debug_port, process, 20)
+                process, endpoint = _launch_chrome(cmd, log, debug_port, chrome_startup_timeout())
                 with _DevToolsSocket(endpoint) as devtools:
                     devtools.command("Page.enable")
                     devtools.command("Runtime.enable")
@@ -861,24 +865,94 @@ def capture_frames(
             except Exception as exc:
                 capture_error = exc
             finally:
-                if process.poll() is None:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=3)
-            log.seek(0)
-            detail = log.read().strip()
+                if process is not None:
+                    _stop_chrome(process)
+            detail = _log_tail(log)
         if capture_error is not None:
-            if len(detail) > 800:
-                detail = detail[-800:]
+            # A startup failure already carries the log tail (see _launch_chrome).
+            if detail in str(capture_error):
+                detail = ""
             raise RuntimeError(
                 f"Chrome failed or timed out while capturing step {index + 1}"
                 f": {capture_error}"
                 + (f"\n{detail}" if detail else "")) from capture_error
         screenshots.append(screenshot)
     return screenshots
+
+
+CHROME_STARTUP_TIMEOUT_DEFAULT = 45.0
+CHROME_STARTUP_TIMEOUT_ENV = "DV_GIF_CHROME_STARTUP_TIMEOUT"
+CHROME_LAUNCH_ATTEMPTS = 2
+CHROME_LOG_TAIL_CHARS = 800
+
+
+def chrome_startup_timeout() -> float:
+    """Seconds to wait for Chrome's page target before a relaunch.
+
+    Loaded CI runners can take well over the old 20 s to expose the page
+    target on /json/list; the default is generous and the
+    DV_GIF_CHROME_STARTUP_TIMEOUT environment variable overrides it."""
+    raw = os.environ.get(CHROME_STARTUP_TIMEOUT_ENV)
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 0.0
+        if value > 0:
+            return value
+    return CHROME_STARTUP_TIMEOUT_DEFAULT
+
+
+def _log_tail(log: IO[str], limit: int = CHROME_LOG_TAIL_CHARS) -> str:
+    """Return the last ``limit`` characters of a Chrome stdout/stderr log."""
+    log.flush()
+    log.seek(0)
+    detail = log.read().strip()
+    return detail[-limit:] if len(detail) > limit else detail
+
+
+def _stop_chrome(process: subprocess.Popen) -> None:
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
+
+
+def _launch_chrome(
+    cmd: list[str],
+    log: IO[str],
+    port: int,
+    timeout: float,
+    *,
+    attempts: int = CHROME_LAUNCH_ATTEMPTS,
+    popen: Callable[..., subprocess.Popen] = subprocess.Popen,
+    wait_for_endpoint: Callable[[int, subprocess.Popen, float], str] | None = None,
+) -> tuple[subprocess.Popen, str]:
+    """Start Chrome and wait for its page debugging target.
+
+    A startup that times out (or exits early) is retried once with a fresh
+    process on the same port and profile: on a slow runner the first Chrome
+    sometimes never exposes a page target. When every attempt fails, the
+    error names the attempt count, the last wait error, and the tail of
+    Chrome's own output so the failure is diagnosable from the log alone."""
+    wait = wait_for_endpoint or _wait_for_page_endpoint
+    startup_error: Exception | None = None
+    for attempt in range(1, max(1, attempts) + 1):
+        process = popen(cmd, stdout=log, stderr=log, text=True)
+        try:
+            return process, wait(port, process, timeout)
+        except RuntimeError as exc:
+            startup_error = exc
+            _stop_chrome(process)
+        log.write(f"[export_gif] Chrome launch attempt {attempt} failed: {startup_error}\n")
+        log.flush()
+    detail = _log_tail(log)
+    raise RuntimeError(
+        f"Chrome did not start after {attempts} launches: {startup_error}"
+        + (f"\n{detail}" if detail else "")) from startup_error
 
 
 def _wait_for_page_endpoint(port: int, process: subprocess.Popen, timeout: float) -> str:

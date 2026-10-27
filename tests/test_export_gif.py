@@ -1,13 +1,16 @@
 """Pure encoder/link tests plus an optional Chrome capture smoke test."""
 
+import io
 import json
 import math
+import os
 import pathlib
 import socket
 import subprocess
 import tempfile
 import unittest
 import sys
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
@@ -344,6 +347,157 @@ class ExportGifPureTests(unittest.TestCase):
             export_gif.build_step_fragments([{"id": "wake"}], "guided").fragments,
             ("#t=guided&m=step&s=wake",),
         )
+
+
+class _FakeChromeProcess:
+    """Stand-in for a Chrome Popen: records lifecycle calls, never spawns."""
+
+    def __init__(self, log, stderr_text=""):
+        self.returncode = None
+        self.terminated = False
+        self.killed = False
+        if stderr_text:
+            log.write(stderr_text)
+            log.flush()
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self):
+        self.killed = True
+        self.returncode = -9
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+
+class ExportGifChromeStartupTests(unittest.TestCase):
+    """Startup robustness (#777) driven with fakes: no browser is launched."""
+
+    def _fake_urlopen(self, responses):
+        """Return a urlopen stand-in that yields each entry in turn: an
+        exception instance is raised, a list is served as the /json/list body."""
+        calls = []
+
+        class _Response:
+            def __init__(self, payload):
+                self.payload = json.dumps(payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self, *args):
+                data, self.payload = self.payload, b""
+                return data
+
+        def fake_urlopen(url, timeout=None):
+            calls.append(url)
+            entry = responses[min(len(calls), len(responses)) - 1]
+            if isinstance(entry, Exception):
+                raise entry
+            return _Response(entry)
+
+        return fake_urlopen, calls
+
+    def test_wait_for_page_endpoint_tolerates_refusals_and_browser_only_targets(self):
+        browser_only = [{"type": "browser", "webSocketDebuggerUrl": "ws://127.0.0.1:1/devtools/browser/x"}]
+        with_page = browser_only + [{"type": "page", "webSocketDebuggerUrl": "ws://127.0.0.1:1/devtools/page/p"}]
+        fake_urlopen, calls = self._fake_urlopen([
+            ConnectionRefusedError("refused"), ConnectionRefusedError("refused"),
+            browser_only, browser_only, with_page,
+        ])
+        with mock.patch.object(export_gif, "urlopen", fake_urlopen), \
+                mock.patch.object(export_gif.time, "sleep", lambda _s: None):
+            endpoint = export_gif._wait_for_page_endpoint(1, _FakeChromeProcess(io.StringIO()), 5)
+        self.assertEqual(endpoint, "ws://127.0.0.1:1/devtools/page/p")
+        self.assertEqual(len(calls), 5)
+
+    def test_wait_for_page_endpoint_timeout_names_the_last_error(self):
+        fake_urlopen, _calls = self._fake_urlopen([ConnectionRefusedError("still refused")])
+        with mock.patch.object(export_gif, "urlopen", fake_urlopen), \
+                mock.patch.object(export_gif.time, "sleep", lambda _s: None):
+            with self.assertRaises(RuntimeError) as caught:
+                export_gif._wait_for_page_endpoint(1, _FakeChromeProcess(io.StringIO()), 0.05)
+        self.assertIn("was not ready", str(caught.exception))
+        self.assertIn("still refused", str(caught.exception))
+
+    def test_launch_chrome_relaunches_once_after_a_startup_timeout(self):
+        log = io.StringIO()
+        launched = []
+
+        def fake_popen(cmd, **kwargs):
+            process = _FakeChromeProcess(log, f"attempt {len(launched) + 1} stderr\n")
+            launched.append((list(cmd), process))
+            return process
+
+        def fake_wait(port, process, timeout):
+            if process is launched[0][1]:
+                raise RuntimeError("Chrome debugging endpoint was not ready: refused")
+            return "ws://127.0.0.1:9/devtools/page/late"
+
+        process, endpoint = export_gif._launch_chrome(
+            ["chrome", "--flag"], log, 9, 1.0, popen=fake_popen, wait_for_endpoint=fake_wait)
+        self.assertEqual(endpoint, "ws://127.0.0.1:9/devtools/page/late")
+        self.assertEqual(len(launched), 2)
+        self.assertEqual(launched[0][0], launched[1][0])
+        self.assertTrue(launched[0][1].terminated)
+        self.assertIs(process, launched[1][1])
+        self.assertFalse(process.terminated)
+
+    def test_launch_chrome_error_carries_the_chrome_log_tail_when_every_attempt_fails(self):
+        log = io.StringIO()
+        launched = []
+
+        def fake_popen(cmd, **kwargs):
+            process = _FakeChromeProcess(log, f"[chrome] attempt {len(launched) + 1}: dbus failed\n")
+            launched.append(process)
+            return process
+
+        def fake_wait(port, process, timeout):
+            raise RuntimeError("Chrome debugging endpoint was not ready: refused")
+
+        with self.assertRaises(RuntimeError) as caught:
+            export_gif._launch_chrome(
+                ["chrome"], log, 9, 1.0, popen=fake_popen, wait_for_endpoint=fake_wait)
+        message = str(caught.exception)
+        self.assertEqual(len(launched), 2)
+        self.assertTrue(all(p.terminated for p in launched))
+        self.assertIn("after 2 launches", message)
+        self.assertIn("refused", message)
+        self.assertIn("[chrome] attempt 1: dbus failed", message)
+        self.assertIn("[chrome] attempt 2: dbus failed", message)
+
+    def test_launch_chrome_does_not_relaunch_after_success(self):
+        log = io.StringIO()
+        launched = []
+
+        def fake_popen(cmd, **kwargs):
+            process = _FakeChromeProcess(log)
+            launched.append(process)
+            return process
+
+        process, endpoint = export_gif._launch_chrome(
+            ["chrome"], log, 9, 1.0, popen=fake_popen,
+            wait_for_endpoint=lambda port, proc, timeout: "ws://127.0.0.1:9/devtools/page/first")
+        self.assertEqual(len(launched), 1)
+        self.assertIs(process, launched[0])
+        self.assertEqual(endpoint, "ws://127.0.0.1:9/devtools/page/first")
+
+    def test_chrome_startup_timeout_defaults_long_and_honors_env_override(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DV_GIF_CHROME_STARTUP_TIMEOUT", None)
+            self.assertGreaterEqual(export_gif.chrome_startup_timeout(), 40)
+        with mock.patch.dict(os.environ, {"DV_GIF_CHROME_STARTUP_TIMEOUT": "90"}):
+            self.assertEqual(export_gif.chrome_startup_timeout(), 90.0)
+        with mock.patch.dict(os.environ, {"DV_GIF_CHROME_STARTUP_TIMEOUT": "nonsense"}):
+            self.assertGreaterEqual(export_gif.chrome_startup_timeout(), 40)
 
 
 @unittest.skipUnless(CHROME, "Chrome/Chromium not available")

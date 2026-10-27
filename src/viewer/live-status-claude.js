@@ -229,7 +229,7 @@ function wireLiveStatusClaude(ctl,page,win){
     site=resource.url;cloudId=resource.id;syncWatches();status({busy:busy()});
   }
   var pending;
-  try{pending=use.call(claude,'mcp');}catch(ex){return null;}
+  try{pending=use.call(claude,'mcp');}catch(ex){status({state:'disconnected',busy:false});return null;}
   removeDestroy=api.onDestroy(stop);
   removeChange=api.onChange(function(){syncWatches();publish();});
   return Promise.resolve(pending).then(function(namespace){

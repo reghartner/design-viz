@@ -791,6 +791,8 @@ test('S2 the Jira adapter reports disconnected, connecting, connected and retryi
  h.ctl.liveStatus.destroy();
  const nons=providerHarness();nons.win.claude={use:()=>Promise.resolve(null)};nons.start();await new Promise(setImmediate);await new Promise(setImmediate);
  value=plain(nons.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected','S2 no mcp namespace is reported, not left connecting');assert.equal(value.connection.busy,false);nons.ctl.liveStatus.destroy();
+ const throws=providerHarness();throws.win.claude={use:()=>{throw new Error('no runtime');}};assert.equal(throws.start(),null);
+ value=plain(throws.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected','S2 a throwing claude.use is reported, not left connecting');assert.equal(value.connection.busy,false);throws.ctl.liveStatus.destroy();
  const none=providerHarness();none.servers.length=0;none.start();await new Promise(setImmediate);await new Promise(setImmediate);
  value=plain(none.ctl.liveStatus.snapshot());assert.equal(value.connection.state,'disconnected');assert.equal(value.connection.busy,false);assert.match(value.note.text,/Add the Atlassian connector/);none.ctl.liveStatus.destroy();
  const nosite=providerHarness();nosite.mcp.callTool=()=>Promise.resolve({payload:[]});nosite.start();await new Promise(setImmediate);await new Promise(setImmediate);await new Promise(setImmediate);

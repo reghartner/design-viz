@@ -567,8 +567,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(!row || row._liveStepTickets!==signature){
         if(row)row.remove();
         row=element('span','dv-live-step-tickets','',host);row.setAttribute('role','group');row.setAttribute('aria-label','Jira tickets for this step');
-        tickets.forEach(function(ticket){link(row,ticket.key,ticket.url);});row._liveStepTickets=signature;
+        tickets.forEach(function(ticket){var item=element('span','dv-live-step-ticket','',row);link(item,ticket.key,ticket.url);element('span','dv-live-state-pill dv-live-step-state','',item);});row._liveStepTickets=signature;
       }
+      var labels={todo:'To do',active:'In progress',done:'Done',blocked:'Blocked',missing:'Missing'};
+      tickets.forEach(function(ticket,index){
+        var state=map[ticket.key] && map[ticket.key].state,pill=row.children[index].querySelector('.dv-live-step-state');
+        pill.textContent=labels[state] || 'No status';liveStatusClass(pill,state || null);
+      });
     }
     var text=liveStatusCaption(d,step,map,ticketWaiting);
     if(text)element('span','dv-live-caption',text,host);
@@ -580,12 +585,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   function paintLanes(){
-    // The current-step pill is team context. Lane-wide progress belongs to the
-    // status model, not a caption that describes only one authored step.
+    // Status boards put each ticket's state beneath the prose. Ordinary
+    // diagrams keep their authored team context, independently of Live.
     bindings.forEach(function(binding){var stepper=binding.stepper;if(!stepper)return;
-      var step=(binding.section.diagram.steps || [])[stepper.sourceIndex()];
+      var d=binding.section.diagram,step=(d.steps || [])[stepper.sourceIndex()];
+      var statusBoard=(d.panels || []).some(function(panel){return panel && panel.type==='live-status';});
       binding.el.querySelectorAll('.lanepill').forEach(function(el){
         if(step && step.lane)el.textContent=laneLabel(step.lane,binding.page);
+        el.classList.toggle('dv-live-board-lane',statusBoard);
         liveStatusClass(el,null);el.removeAttribute('title');el.removeAttribute('tabindex');
       });
     });
@@ -891,6 +898,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
       if(pop)pop.remove();listeners=[];
+      view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
       if(applied){
         clearTargets();view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});

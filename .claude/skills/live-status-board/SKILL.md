@@ -58,8 +58,9 @@ Ask the author, in one batch, only what the source does not already state:
   often carry the cross-team ticket. Steps, coins and chips never carry
   tickets; they derive their state from the nodes and edges they involve.
 - **Teams.** Which `lanes` exist and which step belongs to which lane. Lane
-  pills identify the current step's team; Jira ticket links beneath the step's
-  text derive from its involved nodes and edges, including endpoints and failures.
+  chips are omitted from status-board step captions. Beneath the step's text,
+  each Jira ticket appears on its own line with its state, derived from involved
+  nodes and edges, including endpoints and failures. Unresolved keys say No status.
 - **Blocked.** The overlay marks a ticket blocked when Jira has it Flagged
   (JQL `Flagged = Impediment`) or its status name contains "block". Confirm
   the team uses one of those; otherwise blockers will not show.

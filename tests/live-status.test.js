@@ -666,23 +666,38 @@ function stepTicketControls(h,rec=h.ctl.sections[0]){
 test('B1 step tickets use only involved carriers, including failed-hop endpoints, deduplicated before evidence arrives',()=>{
  const raw={page:{tracking:{jira:{site:'https://jira.test/'}},lanes:{TEAM:{label:'One team'}},sections:[{diagram:{
   nodes:{a:{tickets:['AA-1','SH-1']},b:{tickets:['BB-1','SH-1']},c:{tickets:['CC-1']},text:{type:'text',text:'Note',tickets:['TT-1']}},
-  edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}],steps:[{id:'first',lane:'TEAM',nodes:['text'],failures:{'a->b':'dropped'},text:'Original first prose'},{id:'second',lane:'TEAM',nodes:['c'],text:'Original second prose'},{id:'none',text:'No tickets'}]
+  panels:[{id:'status',type:'live-status'}],edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}],steps:[{id:'first',lane:'TEAM',nodes:['text'],failures:{'a->b':'dropped'},text:'Original first prose'},{id:'second',lane:'TEAM',nodes:['c'],text:'Original second prose'},{id:'none',text:'No tickets'}]
  }}]}};
  const before=JSON.stringify(raw),h=harness(raw),normalized=JSON.stringify(h.ctl.page),api=h.ctl.liveStatus,{host,pill,change}=stepTicketControls(h);
  const keys=()=>host.querySelectorAll('.dv-live-step-tickets .nbacklink').map(el=>el.textContent);
  assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.equal(host.querySelectorAll('.dv-live-caption').length,0);
- assert.equal(pill.textContent,'One team');assert.equal(pill.getAttribute('tabindex'),null);
+ assert.ok(pill.classList.contains('dv-live-board-lane'));assert.equal(pill.getAttribute('tabindex'),null);
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['No status','No status','No status','No status']);
  change(1,'step','dv:pathchange');assert.deepEqual(keys(),['CC-1']);change(0);assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);
- const row=host.querySelector('.dv-live-step-tickets'),first=row.children[0];
+ const row=host.querySelector('.dv-live-step-tickets'),first=row.querySelector('.nbacklink');
  assert.equal(first.getAttribute('href'),'https://jira.test/browse/EE-1');assert.equal(first.getAttribute('target'),'_blank');assert.equal(first.getAttribute('rel'),'noopener noreferrer');
  api.apply({'EE-1':{state:'blocked',url:'https://runtime.test/ignored'},'CC-1':{state:'done'},'EP-99':{state:'todo',epic:'EP-1',lane:'TEAM'}});
  assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.ok(row===host.querySelector('.dv-live-step-tickets'),'unchanged references preserve the row and keyboard focus');
  assert.equal(host.querySelector('.dv-live-caption').textContent,'BLOCKED · EE-1');assert.equal(host.textContent,'Authored prose');
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Blocked','No status','No status','No status']);
+ api.apply({'EE-1':{state:'missing'},'SH-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'todo'}});
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Missing','In progress','Done','To do']);
+ assert.ok(first===row.querySelector('.nbacklink'),'state-only updates retain the ticket anchor');
  change(1,'step','dv:pathrender');assert.deepEqual(keys(),['CC-1']);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);
  change(2);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);
- change(0);api.setEnabled(false);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);
+ change(0);api.setEnabled(false);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);assert.ok(pill.classList.contains('dv-live-board-lane'));
  api.setEnabled(true);assert.equal(keys().length,4);change(0,'ambient');assert.equal(keys().length,0);
- change(0,'step');api.destroy();assert.equal(keys().length,0);assert.equal(host.textContent,'Authored prose');assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(h.ctl.page),normalized);
+ change(0,'step');api.destroy();assert.equal(keys().length,0);assert.ok(!pill.classList.contains('dv-live-board-lane'));assert.equal(host.textContent,'Authored prose');assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(h.ctl.page),normalized);
+});
+test('B1 lane suppression belongs only to diagrams with an authored live-status panel',()=>{
+ const diagram=panel=>({nodes:{a:{tickets:['AA-1']}},rows:[['a']],panels:panel?[{id:'status',type:'live-status'}]:[],steps:[{lane:'TEAM',nodes:['a']}]});
+ const h=harness({page:{lanes:{TEAM:{label:'Authored team'}},sections:[{id:'board',diagram:diagram(true)},{id:'ordinary',diagram:diagram(false)}]}});
+ const board=stepTicketControls(h,h.ctl.sections[0]),ordinary=stepTicketControls(h,h.ctl.sections[1]);
+ for(const enabled of [true,false,true]){
+  h.ctl.liveStatus.setEnabled(enabled);assert.ok(board.pill.classList.contains('dv-live-board-lane'));assert.ok(!ordinary.pill.classList.contains('dv-live-board-lane'));assert.equal(ordinary.pill.textContent,'Authored team');
+ }
+ board.change(0,'ambient');assert.ok(board.pill.classList.contains('dv-live-board-lane'));h.ctl.liveStatus.destroy();
+ assert.ok(!board.pill.classList.contains('dv-live-board-lane'));assert.equal(ordinary.pill.textContent,'Authored team');
 });
 test('B1 ticket URLs refresh safely and authored plain keys survive absent runtime URLs',()=>{
  const h=harness({nodes:{a:{tickets:['AA-1','BB-1']}},rows:[['a']],steps:[{nodes:['a']}]});
@@ -691,7 +706,7 @@ test('B1 ticket URLs refresh safely and authored plain keys survive absent runti
  api.apply({'AA-1':{state:'todo',url:'https://runtime.test/AA-1'},'BB-1':{state:'todo',url:'javascript:alert(1)'}});
  assert.equal(host.querySelector('a').getAttribute('href'),'https://runtime.test/AA-1');assert.equal(host.querySelectorAll('a').length,1);
  api.apply({'AA-1':{state:'active',url:'https://updated.test/AA-1'}});assert.equal(host.querySelector('a').getAttribute('href'),'https://updated.test/AA-1');
- api.clear();assert.equal(host.querySelectorAll('a').length,0);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);
+ api.clear();assert.equal(host.querySelectorAll('a').length,0);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['No status','No status']);
  api.destroy();assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,0);
  const pending=harness({nodes:{a:{tickets:['AA-1']}},rows:[['a']],steps:[{nodes:['a']}]});const controls=stepTicketControls(pending);
  pending.ctl.liveStatus.destroy();assert.equal(controls.host.querySelectorAll('.dv-live-step-tickets').length,0,'teardown before any provider map');

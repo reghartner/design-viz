@@ -204,8 +204,9 @@ the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
 There is no verdict line. Then come the Tickets table, **Blockers and dependency
-chains**, and Activity. Teams are identified by the current-step lane pill,
-the lane colour stripe of each Tickets row and the lane names in Blockers.
+chains**, and Activity. Teams are identified by each Tickets row's lane colour
+stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
+even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket references or epics it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
@@ -681,14 +682,17 @@ page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
 
 ## Story mode
 
-Live evidence follows the story's nodes and edges. The team lane pill identifies
-the current step's team. In Step mode, Jira ticket keys appear immediately below
-the authored step text, deduplicated across that step's nodes, edges, edge
+Live evidence follows the story's nodes and edges. Diagrams with a Live status
+panel omit the team lane chip from their step captions. In Step mode, each Jira
+ticket appears on its own line immediately below the authored step text, with
+its state beside the key: **To do**, **In progress**, **Done**, **Blocked**,
+**Missing**, or **No status** before evidence arrives or when a key has no runtime
+entry. Ticket keys are deduplicated across that step's nodes, edges, edge
 endpoints and failed communications. Other steps in the same team and unmapped
-epic stories do not add tickets to this row. Authored references appear even
+epic stories do not add tickets to this list. Authored references appear even
 before live status arrives. Keys link to the page's Jira site, or a safe runtime
 ticket URL when no site is configured; without either they remain plain text.
-The row updates with step/path navigation and new evidence, and disappears in
+The list updates with step/path navigation and new evidence, and disappears in
 Ambient mode or when Live is disabled. The Live status panel keeps its overall
 progress, Tickets team stripes and Blockers team names.
 

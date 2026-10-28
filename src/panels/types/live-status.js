@@ -187,7 +187,7 @@
 .dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
 .dv-live-ticket-title,.dv-live-ticket-owner{overflow-wrap:anywhere;}
-.dv-live-ticket-owner .nbacklink{display:inline-block;box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;vertical-align:top;}
+.dv-live-ticket-owner .nbacklink{display:inline-block;box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;vertical-align:top;}
 .dv-live-tickets .dv-live-ticket-prs{white-space:normal;}
 .dv-live-tickets .dv-live-ticket-with-tag td{border-bottom:0;padding-bottom:4px;}
 .dv-live-coverage-cell{padding-top:0!important;}

@@ -80,8 +80,8 @@ test('tracking warnings identify every bad node and edge entry and retain valid 
     const dp = nested ? 'blocks[0].tabs[0].sections[0].diagram' : 'sections[0].diagram';
     assert.deepEqual(plain(result.errors), []);
     assert.deepEqual(plain(result.warnings), [missingStatusPanel, ...['nodes.a','edges[0]'].flatMap(target => [
-      `${dp}.${target}.tickets[1]: use a Jira key like HW-123 — entry ignored`,
-      `${dp}.${target}.tickets[2]: use a Jira key like HW-123 — entry ignored`,
+      `${dp}.${target}.tickets[1]: use a Jira key like HW-123 or an absolute http(s) Jira browse URL — entry ignored`,
+      `${dp}.${target}.tickets[2]: use a Jira key like HW-123 or an absolute http(s) Jira browse URL — entry ignored`,
       `${dp}.${target}.prs[1]: must be an absolute http(s) URL — entry ignored`,
       `${dp}.${target}.prs[2]: must be an absolute http(s) URL — entry ignored`
     ])]);
@@ -97,7 +97,7 @@ test('non-array tracking fields warn once per node and edge field, including exp
     const result = C.validate(C.normalize(trackingDiagram({tickets:value,prs:value})));
     assert.deepEqual(plain(result.errors), []);
     assert.deepEqual(plain(result.warnings), ['nodes.a','edges[0]'].flatMap(target => [
-      `sections[0].diagram.${target}.tickets: must be an array of Jira keys — ignored`,
+      `sections[0].diagram.${target}.tickets: must be an array of Jira keys or browse URLs — ignored`,
       `sections[0].diagram.${target}.prs: must be an array of URLs — ignored`
     ]));
   }
@@ -158,4 +158,40 @@ test('tracking authoring guidance documents references and the future Jira-only 
     /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
     /color comes from Jira status only/i,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);
+});
+
+test('Jira browse URLs share strict ticket identity and preserve authored link fallbacks',()=>{
+  const valid=[
+    ['https://acme.atlassian.net/browse/HW-123','HW-123'],
+    ['http://jira.example.test:8080/jira/browse/API_2-001?focusedCommentId=42#comment-42','API_2-001'],
+    ['https://jira.example.test/company/jira/browse/A0_-0','A0_-0']
+  ];
+  for(const [url,key] of valid){
+    assert.equal(C.trackingTicket(url).key,key);
+    const raw={tickets:[url,key,url]},before=JSON.stringify(raw);
+    assert.deepEqual(plain(C.trackingRefs(raw)),{tickets:[key],prs:[]});
+    assert.deepEqual(plain(C.trackingStoredRefs(raw)),{tickets:[url],prs:[]});
+    assert.equal(JSON.stringify(raw),before);
+    assert.equal(C.liveStatusTicketURL(null,key,null,C.trackingTicketURL(raw,key)),url);
+    assert.equal(C.liveStatusTicketURL({jira:{site:'https://other.test'}},key,null,url),'https://other.test/browse/'+key);
+    assert.equal(C.liveStatusTicketURL(null,key,{url:'https://runtime.test/browse/'+key},url),'https://runtime.test/browse/'+key);
+    const links=plain(C.nodeReferenceLinks({nodes:{api:raw}},'api'));
+    assert.ok(links.some(link=>link.label===key && link.url===url));
+  }
+  const invalid=['https://acme.test/issue/API-1','https://acme.test/browse/API-1/extra','https://acme.test/browse/API-1/',
+    'https://acme.test/browse/api-1','https://acme.test/browse/A-1','https://acme.test/browse/API-X',
+    'https://acme.test/browse/%41PI-1','https://acme.test/browse/API-1?bad=%','https://acme.test/browse/API-1\n',
+    ' https://acme.test/browse/API-1','https://user:pass@acme.test/browse/API-1','https://user@acme.test/browse/API-1','https://@acme.test/browse/API-1','https://acme.test/browse/API-1?bad=\u0000',
+    '//acme.test/browse/API-1','/browse/API-1','javascript:https://acme.test/browse/API-1','ftp://acme.test/browse/API-1',
+    'https:///acme.test/browse/API-1','https://acme.test/a/../browse/API-1','https://acme.test/%2e/browse/API-1',
+    'https://acme.test\\browse\\API-1','https://','https://acme.test/?ticket=API-1',null,3];
+  for(const value of invalid){
+    assert.equal(C.trackingTicket(value),null,String(value));
+    const bad=[];assert.deepEqual(plain(C.trackingRefs({tickets:[value]},(field,index)=>bad.push([field,index]))),{tickets:[],prs:[]});
+    assert.deepEqual(bad,[['tickets',0]]);assert.equal(C.trackingTicketURL({tickets:[value]},'API-1'),null);
+    assert.equal(C.liveStatusTicketURL(null,'API-1',null,value),null);
+  }
+  assert.equal(C.liveStatusTicketURL(null,'OTHER-1',null,valid[0][0]),null);
+  assert.deepEqual(plain(C.trackingEpics({tracking:{jira:{epic:valid[0][0]}}})),[]);
+  assert.deepEqual(plain(C.trackingDependencies({tracking:{dependencies:[{ticket:valid[0][0],on:'API-1'}]}})),[]);
 });

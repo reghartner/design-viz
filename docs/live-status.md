@@ -15,12 +15,21 @@ Any diagram node or edge can carry these optional references:
 }
 ```
 
-`tickets` accepts strings matching `^[A-Z][A-Z0-9_]+-[0-9]+$`; keys are case
-sensitive and are not trimmed. `prs` accepts absolute HTTP(S) URL strings using
+`tickets` accepts Jira keys matching `^[A-Z][A-Z0-9_]+-[0-9]+$` or absolute
+HTTP(S) browse URLs such as `https://acme.atlassian.net/browse/HW-123`.
+Self-hosted context paths (for example `/jira/browse/HW-123`), query strings and
+fragments are supported. The final path must be `/browse/KEY`; other paths,
+credentials, whitespace, backslashes, malformed escapes and dot segments are
+rejected. Keys are case sensitive and authored strings are not trimmed. `prs` accepts absolute HTTP(S) URL strings using
 the same URL normalization as delta links. Invalid entries warn individually
 and are ignored. Non-array fields warn once and are ignored, including explicit
 null. The shared `trackingRefs(obj)` parser returns valid, deduplicated references
-in authored order without modifying the source.
+in authored order without modifying the source. Ticket URLs normalize to keys
+for lookup and deduplication, so a key and a URL for the same issue count once.
+Authored browse URLs remain available as clickable links when neither the page
+Jira site nor runtime issue metadata supplies a link. Import merges retain the
+first reference per key, inherited before local; when URLs disagree, the first
+reference wins. Host names are not restricted to Atlassian Cloud.
 
 Place the optional Jira site on the page, beside `title`, `contract` and `flowview`:
 
@@ -84,7 +93,9 @@ dependency on a key the status map never reports paints as a missing upstream
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
 just below the change details. In **Add ticket**, enter a Jira key such as `HW-123`
-and press Enter. Keys are case sensitive; surrounding whitespace is trimmed.
+or a full browse URL such as `https://acme.atlassian.net/browse/HW-123` and press
+Enter. Keys are case sensitive; surrounding input whitespace is trimmed. URLs
+are stored in normalized URL form, retaining their context path, query and fragment.
 In **Add PR**, paste an absolute HTTP(S) URL and press Enter. Duplicate references
 are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 **Remove PR** button to remove an entry. Each add or removal has one Undo/Redo,

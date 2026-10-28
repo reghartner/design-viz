@@ -183,11 +183,13 @@ references after inherited references; it never replaces inherited evidence.
 Optional `nodeTracking: {providerNodeId: {tickets: [...], prs: [...]}}` and
 `edgeTracking: {"providerFrom->providerTo": {tickets: [...], prs: [...]}}`
 add delivery annotations to imported nodes and edges. Only `tickets` and `prs`
-arrays are allowed, using the ordinary Jira key and absolute HTTP(S) PR URL
+arrays are allowed, using the ordinary Jira key/browse URL and absolute HTTP(S) PR URL
 parser. Unlike tolerant carrier metadata, malformed overlay fields are errors.
 Keys must identify selected exported members, including full nested paths.
 Resolution merges inherited references first, then local additions in authored
-order, deduplicating normalized values. Removing a local reference never removes
+order, deduplicating tickets by Jira key and retaining the first reference. For
+example, `"nodeTracking": {"api": {"tickets": ["https://acme.atlassian.net/browse/API-101"]}}`
+adds a browse link without copying the provider node. Removing a local reference never removes
 an inherited one. Presentation and routing resets preserve tracking maps.
 Desktop Inspector **Add ticket** / **Add PR** and local removal each make one Undo
 transaction; resolved-only snapshots remain read-only. Runtime providers, live
@@ -652,7 +654,14 @@ for the workbench controls and a complete example.
 ### Live ticket references — nodes and edges
 
 Optional `tickets` on nodes and edges is an array of Jira keys matching
-`^[A-Z][A-Z0-9_]+-[0-9]+$`, such as `["HW-123", "FW-45"]`. Optional `prs` is
+`^[A-Z][A-Z0-9_]+-[0-9]+$`, such as `["HW-123", "FW-45"]`, or absolute
+HTTP(S) Jira browse URLs such as `https://acme.atlassian.net/browse/HW-123`.
+Self-hosted context paths, query strings and fragments are supported; the path
+must end in `/browse/KEY`. Credentials, whitespace, backslashes, dot segments,
+malformed escapes and unrelated paths are rejected. Lookup and deduplication
+use the key, while authored URLs remain link fallbacks after page Jira site and
+runtime issue URLs. Import merges retain the first reference, inherited before
+local. Parent roots and dependency pairs remain key-only. Optional `prs` is
 an array of absolute HTTP(S) URL strings, such as
 `["https://github.com/acme/firmware/pull/88"]`. Invalid entries produce warnings
 and are ignored; a non-array value produces one warning and is ignored. Valid

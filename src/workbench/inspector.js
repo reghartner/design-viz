@@ -558,7 +558,7 @@ function trackingControls(val,overlay){
       if(parsed.error){formError(parsed.error);return false;}
       var path=builderTargetPath(parsed.raw,session.target),current=path && specValueAt(parsed.raw,path);
       if(!current)return false;
-      var refs=trackingRefs(current)[field],index=refs.indexOf(ref);
+      var refs=trackingStoredRefs(current)[field],identity=field==='tickets'?trackingTicket(ref).key:ref,index=trackingRefs(current)[field].indexOf(identity);
       if(remove){if(index<0)return true;refs.splice(index,1);}
       else {
         if(index>=0){formError('');return true;}
@@ -587,12 +587,13 @@ function trackingControls(val,overlay){
       });
       box.appendChild(list);
     });
-    [['tickets','Add ticket','HW-123','Jira key, then Enter'],
+    [['tickets','Add ticket','HW-123 or https://…/browse/HW-123','Jira key or browse URL, then Enter'],
       ['prs','Add PR','https://github.com/org/repo/pull/1','Absolute http(s) URL, then Enter']].forEach(function(field){
       var input=textControl('',function(value){
         if(value==null)return true;
-        var ref=field[0]==='tickets'?(trackingKeyPattern.test(value.trim())?value.trim():null):deltaLinkUrl(value);
-        if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123.':'Use an absolute http(s) URL.');return false;}
+        var ticket=field[0]==='tickets'?trackingTicket(value.trim()):null;
+        var ref=field[0]==='tickets'?(ticket && (ticket.url || ticket.key)):deltaLinkUrl(value);
+        if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.':'Use an absolute http(s) URL.');return false;}
         return update(field[0],ref,false);
       },{placeholder:field[2]});
       var help=document.createElement('p');help.className='fnote';help.id=prefix+'-'+field[0]+'-help';help.textContent=field[3];

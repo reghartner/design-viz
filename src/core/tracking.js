@@ -2,6 +2,36 @@
    The optional invalid callback lets validation report original entry indices
    while every consumer shares the same filtering and deduplication rules. */
 var trackingKeyPattern = /^[A-Z][A-Z0-9_]+-[0-9]+$/;
+/* Accept explicit browse links on any Jira host, including context paths.
+   Reject URL repair (whitespace, backslashes, credentials and dot segments). */
+function trackingTicket(value){
+  if(typeof value!=='string')return null;
+  if(trackingKeyPattern.test(value))return {key:value,url:null};
+  if(!/^https?:\/\/[^/?#]+(?:[/?#]|$)/i.test(value) || /[\s\u0000-\u001f\u007f\\]/.test(value) || /%(?![0-9a-f]{2})/i.test(value))return null;
+  var url;try{url=new URL(value);}catch(ex){return null;}
+  if(!url.hostname || url.username || url.password || /^https?:\/\/[^/\?#]*@/i.test(value))return null;
+  var path=value.replace(/^https?:\/\/[^/]+/i,'').split(/[?#]/)[0];
+  if(/(?:^|\/)(?:\.|%2e){1,2}(?:\/|$)/i.test(path))return null;
+  var match=/^(?:\/[A-Za-z0-9._~-]+)*\/browse\/([A-Z][A-Z0-9_]+-[0-9]+)$/.exec(url.pathname);
+  return match?{key:match[1],url:url.href}:null;
+}
+function trackingTicketURL(obj,key){
+  var values=obj && Array.isArray(obj.tickets)?obj.tickets:[];
+  for(var i=0;i<values.length;i++){
+    var ticket=trackingTicket(values[i]);if(ticket && ticket.key===key && ticket.url)return ticket.url;
+  }
+  return null;
+}
+/* Canonical authored forms retain browse links. Identity/deduplication remains
+   the issue key, with the first occurrence (inherited before local) winning. */
+function trackingStoredRefs(obj){
+  var refs=trackingRefs(obj);
+  refs.tickets=refs.tickets.map(function(key){
+    for(var i=0;i<obj.tickets.length;i++){
+      var ticket=trackingTicket(obj.tickets[i]);if(ticket && ticket.key===key)return ticket.url || key;
+    }
+  });return refs;
+}
 function trackingRefs(obj, invalid){
   var refs = {tickets:[], prs:[]};
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return refs;
@@ -13,7 +43,7 @@ function trackingRefs(obj, invalid){
     }
     obj[field].forEach(function(value, index){
       var ref = field === 'tickets'
-        ? (typeof value === 'string' && trackingKeyPattern.test(value) ? value : null)
+        ? ((trackingTicket(value) || {}).key || null)
         : deltaLinkUrl(value);
       if (ref === null){
         if (invalid) invalid(field, index);

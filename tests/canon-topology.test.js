@@ -371,3 +371,21 @@ test('subsets and nested imports support custom centers without copying structur
   const result=resolve([...specs,outer]);assert.deepEqual(diagram(result[2]).floats.find(f=>f.id==='outer::notify::sms'),{id:'outer::notify::sms',side:'below',x:140,y:20});
   assert.deepEqual(diagram(result[1]),diagram(baseline[1]));assert.deepEqual(resolve(result),result);
 });
+
+test('source and packaged validators agree on browse URL imports and ordinary carrier warnings',()=>{
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),ctx={URL,TextEncoder};vm.createContext(ctx);
+  vm.runInContext(loader.composeSources(['canon.js','validator.js']),ctx);
+  const plain=value=>JSON.parse(JSON.stringify(value)),specs=notificationSource(['push','email']);
+  const imp=diagram(specs[1]).topologyImports[0];
+  imp.nodeTracking={dispatcher:{tickets:['https://jira.test/jira/browse/API-123?view=detail#comments','API-123']}};
+  imp.edgeTracking={'dispatcher->push':{tickets:['https://jira.test/browse/API-124']}};
+  const before=structuredClone(specs),packaged=C.materializeTopology(specs),fromSource=plain(ctx.FlowTopology.materialize(specs));
+  assert.deepEqual(packaged,fromSource);assert.deepEqual(specs,before);
+  for(const spec of packaged)assert.deepEqual(C.validateSpec(spec),plain(ctx.validate(ctx.normalize(spec))));
+  imp.nodeTracking.dispatcher.tickets=['https://user:pass@jira.test/browse/API-123'];
+  assert.throws(()=>C.materializeTopology(specs),/invalid tickets entry 0/);
+  assert.throws(()=>ctx.FlowTopology.materialize(specs),/invalid tickets entry 0/);
+  const carrier={nodes:{a:{tickets:['https://jira.test/browse/API-123','https://jira.test/issues/API-124']}},rows:[['a']]};
+  const result=C.validateSpec(carrier);assert.deepEqual(result,plain(ctx.validate(ctx.normalize(carrier))));
+  assert.equal(result.errors.length,0);assert.ok(result.warnings.some(w=>w.includes('tickets[1]')));
+});

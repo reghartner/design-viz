@@ -85,9 +85,9 @@ function trackingWarnings(value, path, warnings){
   trackingRefs(value, function(field, index){
     var at = path + '.' + field;
     if (index === null)
-      warnings.push(at + ': must be an array of ' + (field === 'tickets' ? 'Jira keys' : 'URLs') + ' — ignored');
+      warnings.push(at + ': must be an array of ' + (field === 'tickets' ? 'Jira keys or browse URLs' : 'URLs') + ' — ignored');
     else warnings.push(at + '[' + index + ']: ' + (field === 'tickets'
-      ? 'use a Jira key like HW-123' : 'must be an absolute http(s) URL') + ' — entry ignored');
+      ? 'use a Jira key like HW-123 or an absolute http(s) Jira browse URL' : 'must be an absolute http(s) URL') + ' — entry ignored');
   });
 }
 function resolveProtocols(page){

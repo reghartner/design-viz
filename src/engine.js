@@ -269,7 +269,7 @@ function nodeReferenceLinks(diagram,id,options){
   sourceDiagramReferences(diagram,id).forEach(function(ref){documentDestinations(ref,options && options.resolveDiagramLink).forEach(function(item){add('Source diagrams',ref.spec+' · '+(item.kind==='site'?'Internal site':item.kind==='claude'?'Claude':'Source'),item.url,'Open source diagram · '+ref.spec+' · '+item.label);});});
   if(node.handoff || node.detail)documentDestinations(node.handoff?diagramHandoffReference(node.handoff):node.detail,options && options.resolveDiagramLink).forEach(function(item){add('Diagram destinations',item.label,item.url);});
   var tracking=trackingRefs(node);
-  tracking.tickets.forEach(function(key){var url=liveStatusTicketURL(options && options.tracking,key);if(url)add('Tickets',key,url);else out.push({group:'Tickets',label:key,url:null});});
+  tracking.tickets.forEach(function(key){var url=liveStatusTicketURL(options && options.tracking,key,null,trackingTicketURL(node,key));if(url)add('Tickets',key,url);else out.push({group:'Tickets',label:key,url:null});});
   tracking.prs.forEach(function(url){add('Tickets',url,url);});
   add('Node links','Source',node.link);
   add('Node links','Backstage · '+label(binding.label,label(binding.entityRef,id)),binding.catalogUrl);

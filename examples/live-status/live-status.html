@@ -35266,8 +35266,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(shown.indexOf(up.key)>=0)return;shown.push(up.key);
         var row=element('div','dv-live-waiting-detail','Waiting on '+up.key+' · '+up.state,pop);row.setAttribute('data-tone',up.tone);
       });});
+      // Only chains in which one of this carrier's tickets is a waiting hop; a chain
+      // this carrier merely holds up belongs to the downstream carrier's popover.
       liveStatusDependencyChains(ticketWaiting).forEach(function(chain){
-        if(!chain.some(function(key){return found.tickets.indexOf(key)>=0;}))return;
+        if(!chain.some(function(key,index){return index>0 && found.tickets.indexOf(key)>=0;}))return;
         element('div','dv-live-waiting-chain',chain.join(' holds '),pop);
       });
     }

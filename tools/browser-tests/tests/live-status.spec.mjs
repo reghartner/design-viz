@@ -331,7 +331,7 @@ test('B5 changed node pulses its card in every skin without moving the positione
 test('E6 E10 E11 built epic Tickets table lists all children and coverage focuses the badge',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
  for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.locator('table.dv-live-tickets');
- await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','PRs']);
+ await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','Depends on','PRs']);
  await expect(table.locator('tr[data-live-coverage-for="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');await expect(table.locator('tr[data-live-ticket="HW-124"] td').nth(3)).toHaveText('Alex');
  const hw=table.locator('tr[data-live-coverage-for="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-epic-counts')).toHaveText(/^Ready to demo · /);await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');
  await hw.getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('g.node[data-dv-node="chime"] .card')).toBeFocused();
@@ -434,7 +434,10 @@ test('R1 carriers paint without canvas badges and open the ticket popover from t
  await cardClick(node('chime').locator('.card'));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for Indoor chime');
  await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await root.locator('text.lbl[data-dv-edge="0"]').click();await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for press');
- for(const key of ['HW-124','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toBeVisible();
+ // The press edge carries HW-124 alone (#765 moved FW-46 to the controller); keys stay links named by the key.
+ await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'FW-46',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+ await cardClick(node('mcu').locator('.card'));await expect(pop).toBeVisible();for(const key of ['FW-45','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toBeVisible();
  await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await node('mcu').locator('.t1').click();await expect(pop).toHaveAttribute('aria-label','Live tickets for Doorbell controller');await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await node('mcu').locator('.nrefs-trigger').click();await expect(root.locator('.node-link-menu')).toBeVisible();await expect(pop).toBeHidden();

@@ -2,6 +2,9 @@ import {test,expect,paste} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 import {readFile} from 'node:fs/promises';
 
+// recoveryBytesLabel prints whole KB below 1 MB and one decimal above it.
+const size=String.raw`\d+(?:\.\d)? (?:KB|MB)`;
+
 // Two large earlier drafts: the realistic hog of the per-site Web Storage quota (#406).
 const earlier=[
   {text:'{"page":{"title":"Big earlier A","blocks":[]}}'+' '.repeat(300000),at:1},
@@ -27,7 +30,7 @@ test('a full browser offers one-click cleanup beside the recovery status and sav
   await expect(cleanup).toBeVisible();
   await cleanup.click();
   await expect(status).toContainText('Draft saved in this browser');
-  await expect(status).toContainText(/Freed about \d+ KB of Flowview recovery data/);
+  await expect(status).toContainText(new RegExp(String.raw`Draft saved in this browser · Freed about ${size} of Flowview recovery data\.`));
   await expect(cleanup).toBeHidden();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBeNull();
   expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).text).toBe(source);
@@ -46,17 +49,17 @@ test('Home lists earlier drafts with export and delete, reports Flowview storage
   await page.locator('#welcome-earlier-drafts>summary').click();
   const entries=page.locator('.welcome-earlier-entry'),usage=page.locator('#welcome-recovery-storage'),result=page.locator('#welcome-recovery-result');
   await expect(entries).toHaveCount(2);
-  await expect(usage).toContainText(/about \d+ KB · 2 earlier drafts \(\d+ KB\) · current draft \(\d+ KB\)/);
+  await expect(usage).toContainText(new RegExp(String.raw`about ${size} · 2 earlier drafts \(${size}\) · current draft \(${size}\)`));
   const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Export Big earlier A'}).click();
   const download=await downloadPromise;
   expect(download.suggestedFilename()).toBe('flowview-earlier-draft-big-earlier-a.spec.json');
   expect(await readFile(await download.path(),'utf8')).toBe(earlier[0].text);
   await page.getByRole('button',{name:'Delete Big earlier A'}).click();
   await expect(entries).toHaveCount(1);
-  await expect(result).toContainText(/Removed “Big earlier A” and freed about \d+ KB/);
+  await expect(result).toContainText(new RegExp(String.raw`Removed “Big earlier A” and freed about ${size}\.`));
   expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')))).map(entry=>entry.text)).toEqual([earlier[1].text]);
   await page.locator('#welcome-recovery-cleanup').click();
-  await expect(result).toContainText(/Freed about \d+ KB by removing 1 earlier draft\. The current draft was kept\./);
+  await expect(result).toContainText(new RegExp(String.raw`Freed about ${size} by removing 1 earlier draft\. The current draft was kept\.`));
   await expect(entries).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBeNull();
   expect(await page.evaluate(()=>localStorage.getItem('host-preference'))).toBe('kept');
@@ -72,7 +75,7 @@ test('Home lists earlier drafts with export and delete, reports Flowview storage
   const keep=page.waitForEvent('download');await page.locator('#welcome-recovery-confirm-download').click();
   expect(await readFile(await (await keep).path(),'utf8')).toBe(current);
   await page.locator('#welcome-recovery-confirm-remove').click();
-  await expect(result).toContainText(/Removed the current browser draft and freed about \d+ KB/);
+  await expect(result).toContainText(new RegExp(String.raw`Removed the current browser draft and freed about ${size}\.`));
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBeNull();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-baseline'))).toBeNull();
   await expect(page.locator('#welcome-resume')).toBeHidden();

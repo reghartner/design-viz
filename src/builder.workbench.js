@@ -1481,7 +1481,7 @@ function initWorkbenchBuilder(opts){
   var recoveryCleanupBtn=document.getElementById('workbench-recovery-cleanup');
   if(recoveryCleanupBtn)life.listen(recoveryCleanupBtn,'click',function(){
     var status=document.getElementById('workbench-recovery-status');
-    try{var freed=recovery.cleanup();if(status)status.textContent+=' Freed about '+recoveryBytesLabel(freed.freed)+' of Flowview recovery data.';}
+    try{var freed=recovery.cleanup();if(status)status.textContent+=' · Freed about '+recoveryBytesLabel(freed.freed)+' of Flowview recovery data.';}
     catch(ex){if(status)status.textContent='Browser storage could not be freed: '+(ex.message || ex);}
   });
   function restoreDraft(){

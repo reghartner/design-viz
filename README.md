@@ -821,6 +821,42 @@ python3 -m unittest discover -s tests -v
 node --test tests/*.test.js
 ```
 
+## Optional pre-commit checks
+
+With Python 3 and Node.js 20+ on your PATH, opt in from the repository root:
+
+```sh
+python3 tools/install-hooks.py --shared-repository
+```
+
+The installer sets repository-local `core.hooksPath=.githooks`. This config is
+shared by **all linked worktrees**, so the explicit flag is required. Every
+checkout using it needs the tracked `.githooks/pre-commit` and `tools/` files;
+branches predating these files do not run these checks. Installation is
+idempotent and refuses to replace an existing hooks path or bypass local hooks.
+For an existing hook setup, invoke `python3 tools/pre-commit.py` from your own
+pre-commit hook instead.
+
+The hook checks the **staged snapshot**, so partially staged files are safe. It
+checks the skill entry's existing <6000 UTF-16-character limit and the existing
+edit guide's <=6000-character limit, unresolved conflicts/markers, JSON/Python/
+JavaScript syntax (`.json`, `.py`, `.js`, `.cjs`, `.mjs`), and the generated-output
+policy shared with `node tools/check-generated.mjs --tracking-only`. JavaScript
+uses the nearest staged `package.json` module type. Deletions, symlinks and
+submodules have no source syntax check; binary files have no marker check.
+It never formats, stashes, changes files or the index, runs builds/full suites,
+or uses the network. The regular test suites above still provide full coverage.
+
+Run it manually before committing:
+
+```sh
+python3 tools/pre-commit.py
+```
+
+To uninstall this configuration for the repository and its linked worktrees,
+run `git config --local --unset core.hooksPath`. Git's standard
+`git commit --no-verify` bypasses hooks for one commit.
+
 ## Serving a spec without injection
 
 An **http(s)-served** copy of `template/flowview.html` whose JSON block still holds

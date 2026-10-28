@@ -1,0 +1,3 @@
+#!/bin/sh
+# Git runs pre-commit from the worktree root. Never modify the index here.
+exec python3 tools/pre-commit.py

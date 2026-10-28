@@ -660,6 +660,14 @@ step. Unmapped children say NOT ON DIAGRAM; referenced tickets without evidence
 of membership in a configured epic say NOT IN EPIC. Extra children never change
 carrier colors or rollups. Desktop Workbench Tracking controls add and remove
 epics with one Undo/Redo per change and preserve them in Export project.
+Optional `tracking.dependencies` is an array of authored delivery dependencies,
+`[{"ticket": "UX-89", "on": "HW-124", "reason": "needs push payload"}]`: `ticket`
+waits on `on` while `on` is not done. Both are Jira keys; `reason` is optional
+text. Malformed entries and self-dependencies warn individually and are ignored;
+a non-array warns once. Optional `tracking.jira.dependencyLinks` lists the Jira
+link descriptions that mean “waits on” (default `["is blocked by", "depends on"]`);
+Jira links and authored pairs merge at runtime with their provenance. Edge
+direction is data flow and never implies a dependency.
 Optional `tracking.staleDays` is a positive number of days (default 7). Active
 work with an `updatedAt` strictly older than this threshold gets a stale badge
 ring and age text without changing its live rollup state. Invalid values warn
@@ -963,7 +971,9 @@ perspectives" of one timeline). Types:
   controls in the right half; stacked full width for Backstage and Confluence).
   The header owns Live, counts, updated time, provider messages and actions,
   First blocker, and demo Play/Pause and Next day when supplied by the host.
-  The body shows completion, verdict, Blockers, Tickets and Activity.
+  The body shows the epic header box (key, summary, state, stories done and on
+  diagram, blocked/waiting/outside-epic counts), the Tickets table with its
+  Depends on column, Blockers and dependency chains, and Activity.
   It has no authored state: `initial` and all step patches warn and are ignored;
   step `panelVisibility` still works. No setup or patch fields are needed.
   Without ticket references or epics it reads “This page has no ticket references.”

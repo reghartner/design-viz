@@ -71,7 +71,34 @@ export function parseJql(jql) {
   return parsed;
 }
 
-export function jiraIssueFromStatus(key, entry, now = EPOCH) {
+// Issue links (#765). Fixture entries carry `links: [{type, key}]` using the description shown on this
+// issue's side; Jira hides links to issues the viewer cannot see, so an absent target day is hidden too.
+const LINK_TYPES = {
+  'is blocked by': { type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' }, side: 'inwardIssue' },
+  'blocks': { type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' }, side: 'outwardIssue' },
+  'depends on': { type: { name: 'Dependency', inward: 'is depended on by', outward: 'depends on' }, side: 'outwardIssue' },
+  'is depended on by': { type: { name: 'Dependency', inward: 'is depended on by', outward: 'depends on' }, side: 'inwardIssue' }
+};
+function issueLinks(entry, issues) {
+  return (Array.isArray(entry.links) ? entry.links : []).flatMap((link, index) => {
+    const known = LINK_TYPES[String(link?.type ?? '').toLowerCase()];
+    const target = issues && Object.hasOwn(issues, link?.key) ? issues[link.key] : null;
+    if (!known || !target) return [];
+    const category = CATEGORIES[target.state] || CATEGORIES.todo;
+    return [{ id: String(900000 + index), type: { ...known.type }, [known.side]: { key: link.key, fields: {
+      summary: target.summary || link.key,
+      status: { name: target.statusName || (target.state === 'blocked' ? 'Blocked' : category.name), statusCategory: { ...category } },
+      issuetype: { name: target.issueType || 'Task' } } } }];
+  });
+}
+
+function epicState(epic, issues) {
+  const children = Object.values(issues || {}).filter(entry => entry.epic === epic);
+  return children.length && children.every(entry => entry.state === 'done') ? 'done'
+    : children.some(entry => ['active', 'blocked', 'done'].includes(entry.state)) ? 'active' : 'todo';
+}
+
+export function jiraIssueFromStatus(key, entry, now = EPOCH, issues = null) {
   const category = CATEGORIES[entry.state] || CATEGORIES.todo;
   const updated = entry.updated || new Date(now).toISOString().replace(/Z$/, '+0000');
   // Base-128 encoding is injective for ASCII ticket keys and stays a numeric
@@ -101,7 +128,9 @@ export function jiraIssueFromStatus(key, entry, now = EPOCH) {
       status: { name: entry.statusName || (entry.state === 'blocked' ? 'Blocked' : category.name), statusCategory: { ...category } },
       assignee: entry.assignee ? { displayName: entry.assignee, ...(entry.assigneeId ? { accountId: entry.assigneeId } : {}) } : null,
       priority: { name: entry.priority || 'Medium' }, issuetype: { name: entry.issueType || 'Task' },
-      ...(entry.epic ? { parent: { key: entry.epic, fields: { summary: 'Connected doorbell delivery', issuetype: { name: 'Epic' } } } } : {}),
+      ...(entry.epic ? { parent: { key: entry.epic, fields: { summary: 'Connected doorbell delivery', issuetype: { name: 'Epic' },
+        ...(issues ? { status: { name: CATEGORIES[epicState(entry.epic, issues)].name, statusCategory: { ...CATEGORIES[epicState(entry.epic, issues)] } } } : {}) } } } : {}),
+      issuelinks: issueLinks(entry, issues),
       updated, customFields
     }
   };
@@ -136,16 +165,13 @@ function toolResult(name, args, env, id) {
   if (name === 'getJiraIssue') {
     const key = args.issueIdOrKey;
     if (key === 'DOOR-100') {
-      const children = Object.values(issues).filter(entry => entry.epic === key);
-      const state = children.length && children.every(entry => entry.state === 'done') ? 'done'
-        : children.some(entry => ['active', 'blocked', 'done'].includes(entry.state)) ? 'active' : 'todo';
       return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key,
-        { state, summary: 'Connected doorbell delivery', issueType: 'Epic' }, env.now) } };
+        { state: epicState(key, issues), summary: 'Connected doorbell delivery', issueType: 'Epic' }, env.now) } };
     }
     if (typeof key !== 'string' || !Object.hasOwn(issues, key)) {
       return error(id, -32602, 'Issue does not exist or you do not have permission to see it.');
     }
-    return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key, issues[key], env.now) } };
+    return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key, issues[key], env.now, issues) } };
   }
   if (name === 'searchJiraIssuesUsingJql') {
     const parsed = parseJql(args.jql);
@@ -159,7 +185,7 @@ function toolResult(name, args, env, id) {
         (!parsed.statusCategory || CATEGORIES[entry.state]?.key === parsed.statusCategory);
     }) : [];
     const offset = /^\d+$/.test(args.nextPageToken || '') ? Number(args.nextPageToken) : 0;
-    const nodes = matches.slice(offset, offset + limit).map(([key, entry]) => jiraIssueFromStatus(key, entry, env.now));
+    const nodes = matches.slice(offset, offset + limit).map(([key, entry]) => jiraIssueFromStatus(key, entry, env.now, issues));
     const hasNextPage = limit > 0 && offset + nodes.length < matches.length;
     return { issues: { nodes, webUrl: SITE + '/issues/?jql=' + encodeURIComponent(typeof args.jql === 'string' ? args.jql : '') },
       pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + nodes.length) : null } };

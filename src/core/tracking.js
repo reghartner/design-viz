@@ -54,3 +54,35 @@ function trackingGithubScope(page,invalid){
   }
   return out;
 }
+/* Authored delivery dependencies (#765): ticket -> ticket pairs the design source
+   implies, merged at runtime with Jira issue links. Never derived from edges. */
+function trackingDependencies(page,invalid){
+  var tracking=page && page.tracking,out=[];
+  if(!tracking || typeof tracking!=='object' || !Object.prototype.hasOwnProperty.call(tracking,'dependencies'))return out;
+  var value=tracking.dependencies;
+  if(!Array.isArray(value)){if(invalid)invalid(null);return out;}
+  value.forEach(function(entry,index){
+    var ok=entry && typeof entry==='object' && !Array.isArray(entry) &&
+      typeof entry.ticket==='string' && trackingKeyPattern.test(entry.ticket) &&
+      typeof entry.on==='string' && trackingKeyPattern.test(entry.on) && entry.ticket!==entry.on &&
+      (!Object.prototype.hasOwnProperty.call(entry,'reason') || typeof entry.reason==='string');
+    if(!ok){if(invalid)invalid(index);return;}
+    if(out.some(function(item){return item.ticket===entry.ticket && item.on===entry.on;}))return;
+    var item={ticket:entry.ticket,on:entry.on};if(typeof entry.reason==='string' && entry.reason.trim())item.reason=entry.reason.trim();out.push(item);
+  });
+  return out;
+}
+/* Jira link descriptions (as shown on the dependent issue) that mean "waits on". */
+var TRACKING_DEFAULT_DEPENDENCY_LINKS=['is blocked by','depends on'];
+function trackingDependencyLinks(page,invalid){
+  var jira=page && page.tracking && page.tracking.jira;
+  if(!jira || typeof jira!=='object' || !Object.prototype.hasOwnProperty.call(jira,'dependencyLinks'))return TRACKING_DEFAULT_DEPENDENCY_LINKS.slice();
+  var value=jira.dependencyLinks,out=[];
+  if(!Array.isArray(value)){if(invalid)invalid(null);return TRACKING_DEFAULT_DEPENDENCY_LINKS.slice();}
+  value.forEach(function(name,index){
+    var text=typeof name==='string'?name.trim().toLowerCase():'';
+    if(!text){if(invalid)invalid(index);return;}
+    if(out.indexOf(text)<0)out.push(text);
+  });
+  return out.length?out:TRACKING_DEFAULT_DEPENDENCY_LINKS.slice();
+}

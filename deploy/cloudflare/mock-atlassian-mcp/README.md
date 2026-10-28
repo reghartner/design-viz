@@ -109,6 +109,13 @@ as `nextPageToken` while `pageInfo.hasNextPage` is true. `fields` is ignored; `c
 a fields array omits `customFields` and `*all`. Cloud IDs are accepted but do
 not select a real tenant. Unknown issue keys return error -32602.
 
+Every issue carries `fields.issuelinks` built from the entry's
+`links: [{type, key}]` in the timeline or fixture: `is blocked by` becomes an
+`inwardIssue` of link type Blocks, `depends on` an `outwardIssue` of link type
+Dependency, each with the linked issue's key, summary and status. A link to a
+key absent that day is hidden, as Jira hides issues the viewer cannot see. In
+the story FW-46 is blocked by HW-124 and BE-67 depends on FW-45.
+
 `parent = DOOR-100 AND Flagged = Impediment` returns flagged children. Each child
 has `fields.parent` with the epic key, summary and Epic issue type.
 `getJiraIssue('DOOR-100')` returns the epic: Done when every child is done,

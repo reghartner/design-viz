@@ -13,7 +13,14 @@
       "jira": {
         "site": "https://acme.atlassian.net",
         "epic": "DOOR-100"
-      }
+      },
+      "dependencies": [
+        {
+          "ticket": "UX-89",
+          "on": "BE-68",
+          "reason": "needs the push payload contract"
+        }
+      ]
     },
     "lanes": {
       "HW": {
@@ -37,7 +44,7 @@
       {
         "heading": "Press the button, ring the chime, alert the resident",
         "text": [
-          "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: slate not started, orange in progress, green done, rose blocked or missing.",
+          "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the spec stores only the keys. When a viewer allows the Atlassian connector, the diagram paints itself from Jira: slate not started, orange in progress, green done, rose blocked or missing. Dashed strokes mark work waiting on another ticket: grey while the upstream is unfinished, red when it is blocked or missing.",
           "This mockup replays a scripted 12-day story instead of calling Jira, so the colors change on their own. Use the step controls under the diagram to step through the flow, and the Live status panel's Pause and Next day controls to drive the story clock."
         ],
         "diagram": {
@@ -175,7 +182,8 @@
               "title": "Doorbell controller",
               "sub": "Firmware: event delivery",
               "tickets": [
-                "FW-45"
+                "FW-45",
+                "FW-46"
               ],
               "prs": [
                 "https://github.com/acme/firmware/pull/88"
@@ -222,8 +230,7 @@
               "to": "mcu",
               "label": "press",
               "tickets": [
-                "HW-124",
-                "FW-46"
+                "HW-124"
               ],
               "fromPort": {
                 "side": "left",

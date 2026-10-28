@@ -13,7 +13,8 @@ for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprin
   await expect(page.locator('.pwidget')).toHaveCount(expectedTypes.length);
   expect(await page.locator('.pwidget').evaluateAll(cards=>cards.map(card=>card.dataset.type).sort()),
    'every registered panel has exactly one catalog preview').toEqual(expectedTypes);
-  await expect(page.locator('.pwidget[data-type="live-status"] .dv-live-verdict')).toContainText('7 of 8 epic stories on diagram');
+  // The epic header box (#765) carries the coverage line the old verdict used to hold.
+  await expect(page.locator('.pwidget[data-type="live-status"] .dv-live-epic-progress')).toContainText('7 of 8 epic stories on diagram');
   const bad=await page.locator('.pwidget').evaluateAll(cards=>cards.filter(c=>!c.textContent.trim()||c.offsetHeight<20||c.scrollWidth>c.clientWidth+2).map(c=>({type:c.dataset.type,width:c.clientWidth,overflow:c.scrollWidth-c.clientWidth})));
   expect(bad,'outer cards contain content; deliberate internal table scrollers remain allowed').toEqual([]);
  }

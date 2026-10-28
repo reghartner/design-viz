@@ -53,6 +53,26 @@ entries warn individually (`tracking.github.repos[1]: use an array of owner/repo
 names — ignored`), a wrong type warns once, and nothing here is ever an error.
 Without a scope, discovery searches only the repositories of the authored
 GitHub `prs` URLs.
+Two optional fields describe delivery dependencies (see [Dependencies](#dependencies)):
+
+```json
+{
+  "tracking": {
+    "jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100", "dependencyLinks": ["is blocked by", "depends on"]},
+    "dependencies": [{"ticket": "UX-89", "on": "BE-68", "reason": "needs the push payload contract"}]
+  }
+}
+```
+
+`tracking.jira.dependencyLinks` lists the Jira link descriptions, as shown on
+the dependent issue's side, that mean “waits on”; the default is `is blocked by`
+and `depends on`. `tracking.dependencies` holds authored ticket → ticket pairs
+(`ticket` waits on `on`, with an optional `reason`). `trackingDependencies(page)`
+returns valid pairs once, in authored order; `trackingDependencyLinks(page)`
+returns the lower-cased descriptions or the defaults. Malformed entries, a
+self-dependency and non-array fields warn individually and are ignored; a
+dependency on a key the status map never reports paints as a missing upstream
+(red waiting), in the same spirit as MISSING.
 
 ## Workbench
 
@@ -89,7 +109,7 @@ The overlay uses these runtime states. The spec never stores status.
 | `done` | Moss preset |
 | `blocked` | Rose preset, pulse |
 | `missing` | Rose preset with a dotted outline, pulse; the popover, caption and Tickets table say missing |
-| waiting (any state) | Slate preset, dashed |
+| waiting (any state) | Slate preset, dashed, while the direct upstream is unfinished; Rose preset, dashed, when it is blocked or missing |
 
 Live paint has no palette of its own: it uses the Node Styles presets
 (see `docs/node-styles.md`). A painted node wears `node-styled ns-<preset>`, so its
@@ -160,9 +180,15 @@ amber while connecting or awaiting approval, green when connected or in demo mod
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), provider note and action, **First blocker**, and
 demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
-The body shows completion and verdict, Blockers, Tickets, then Activity. Lane
-progress is not listed in the panel; it stays on the step lane pills, the lane colour
-stripe of each Tickets row and the lane names in Blockers.
+The body opens with the **epic header box**: the epic key (a Jira link), its
+summary, its state pill, “n of N stories done · m of N on diagram” and the
+blocked, waiting and outside-epic counts, with the carriers-done ring on the
+left. The epic is shown large inside the panel only, never in the title bar;
+on a page without an epic the box keeps the ring and the blocked/waiting counts.
+There is no verdict line. Then come the Tickets table, **Blockers and dependency
+chains**, and Activity. Lane progress is not listed in the panel; it stays on
+the step lane pills, the lane colour stripe of each Tickets row and the lane
+names in Blockers.
 Without ticket references or epics it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
@@ -176,11 +202,26 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
 ### Tickets table
 
-Below Blockers, the Tickets table lists each distinct carrier ticket and every returned child of a linked
-epic. Rows sort by blocked, missing, active, todo, done, then key. Columns show
-Key, Title, State, Owner, and PRs. Under each ticket a second
+The Tickets table lists each distinct carrier ticket, every returned child of a
+linked epic, and every linked upstream ticket from another epic. Rows sort by
+blocked, missing, active, todo, done, then key. Columns show Key, Title, State,
+Owner (the assignee name, linked to their Confluence people page when the
+account is known), **Depends on** and PRs. Under each ticket a second
 row holds its coverage as a left-aligned row of chips. The key uses the configured
-Jira site, and a colored stripe marks its team lane when known.
+Jira site, and a colored stripe marks its team lane when known. A row from another
+epic shows `epic KEY` under its key; there is no Epic column.
+
+**Depends on** holds one bounded button per upstream ticket: an icon, the upstream
+key and its state pill. The icon is the shared `hand` glyph while the upstream is
+unfinished, `alarm` when it is blocked or missing, and the green `check` (the done
+preset colour) when it is done. The same icons mark the hops of Blockers and
+dependency chains.
+The border is red when the upstream is blocked or missing, grey otherwise. There is
+no source line; an authored pair's reason is the button's tooltip. Clicking the
+button focuses the upstream's row. Below the table a light hint appears when an
+authored pair has no matching Jira link: “1 authored dependency (UX-89 → BE-68) has
+no Jira link. Suggest link in Jira”. It is a hint for the agent session; the page
+never writes to Jira.
 
 Owner is the Jira assignee's display name. When the page sets `tracking.jira.site`
 and the entry carries the assignee's Atlassian `accountId` (`assigneeId`), the name
@@ -208,8 +249,8 @@ needed, and focus the carrier itself through the existing detail navigation. If
 no authored route is available, the button is disabled with a title naming the
 detail page. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
-a configured epic say **NOT IN EPIC**. The verdict also gives “n of N epic
-stories on diagram”. A child first received after the initial map adds
+a configured epic say **NOT IN EPIC**. Linked upstreams that are neither carriers
+nor epic children say **OUTSIDE EPIC**. The epic box gives “m of N on diagram”. A child first received after the initial map adds
 “KEY · added to epic · not on diagram” to Activity using the existing time rules.
 The table scrolls for narrow read-only viewing and print retains the panel content.
 
@@ -242,12 +283,15 @@ The provider resolves a complete map, for example:
     "assigneeId": "712020:1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c5d",
     "prs": {"count": 2, "state": "open", "links": [{"url": "https://github.com/acme/hardware/pull/12", "number": 12, "title": "Debounce", "state": "open", "checks": "passing", "review": "approved", "repo": "acme/hardware", "author": "alex", "source": "github-search"}]},
     "detail": "Waiting for the bench run",
-    "updatedAt": "2026-10-26T12:00:00Z"
+    "updatedAt": "2026-10-26T12:00:00Z",
+    "dependsOn": [{"key": "HW-124", "source": "jira", "linkType": "is blocked by"}]
   }
 }
 ```
 
-Only `state` is required; PR summary state is `open`, `merged` or `declined`.
+Only `state` is required. `dependsOn` lists upstream tickets with a `source` of
+`jira` or `authored`, an optional `linkType` and an optional `reason`; entries
+with a malformed key or unknown source are dropped. PR summary state is `open`, `merged` or `declined`.
 `prs.links` is optional: each link needs an absolute `url`; `state` is `open`,
 `draft`, `merged` or `closed` (default open), `checks` is `none`, `pending`,
 `passing` or `failing`, `review` is `none`, `approved`, `changes-requested` or
@@ -268,7 +312,10 @@ null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (return
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
-Tickets rows, coverage, activity, demo state, verdict and `connection` for subscribed
+Tickets rows (each with `dependsOn`, `waiting` tone and `epicLabel`), `dependencies`
+(merged by provenance), `waiting` (per ticket: tone and direct upstreams), `chains`,
+`suggestions`, `epic` (keys, title, state, stories, done, onDiagram, blocked, waiting,
+outside, ready), coverage, activity, demo state, verdict and `connection` for subscribed
 panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
 `none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`.
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
@@ -315,8 +362,9 @@ hardware, firmware, a mobile app and backend with node and edge references.
 
 The [mock Atlassian MCP server](../deploy/cloudflare/mock-atlassian-mcp/README.md)
 provides fictional Jira tools without an Atlassian account. Its shared timeline
-demonstrates progress, blocked and missing tickets, and linked PR summaries.
-Assignees carry fictional Atlassian `accountId`s so the Owner links render.
+demonstrates progress, blocked and missing tickets, linked PR summaries and
+issue links (`issuelinks`, from the timeline's `links`). Assignees carry fictional
+Atlassian `accountId`s so the Owner links render.
 Search with `parent = DOOR-100`, optionally followed by `AND Flagged = Impediment`,
 to retrieve that day's children. `getJiraIssue` can also return the epic itself.
 
@@ -348,23 +396,65 @@ on the final day. Reduced motion uses manual advancement only. Hidden pages paus
 the timer. Requested ticket keys absent from a day become `missing`; a day's
 `prs` may carry `links` in the host-provider shape, which the demo passes
 through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
-carrier references it; entries may include `epic` and a lane ID in `lane`. The
+carrier references it; entries may include `epic`, a lane ID in `lane`, and
+`links: [{"type": "is blocked by", "key": "HW-124"}]`, which the demo converts to
+Jira-sourced `dependsOn` entries. A timeline-level `epics: {"DOOR-100": {"summary": "…"}}`
+seeds the epic box; its state derives from that day's children. In the example FW-46 is blocked by HW-124 and
+BE-67 depends on FW-45; the authored pair UX-89 → BE-68 has no Jira link, so the
+panel shows the Suggest link hint. Day 4 paints the controller red (waiting on the
+blocked HW-124), Day 7 grey (HW-124 unblocked but unfinished), Day 8 clears it. The
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
 
-## Blocker propagation
+## Dependencies
 
-A node or edge rolled up to `blocked` or `missing` propagates its blocking ticket
-keys forward along directed edges. An edge starts at its target node. Reached
-nodes and edges acquire `dv-live-waiting` and `data-dv-live-waiting-on` with the
-comma-separated keys, while retaining their own `dv-live-<state>` class. Carriers
-whose own state is done, blocked or missing never become waiting; traversal still
-continues through them. Cycles terminate and multiple blockers combine their keys.
+Edge direction is data flow and infers nothing about delivery. A dependency is
+ticket → ticket, never carrier → carrier, and comes from two sources merged as a
+union with provenance:
 
-Waiting uses the slate preset with a dashed stroke, and the halo turns slate too; the canvas carries no **waiting on** text.
-The carrier's accessible name and popover list the blocking keys. Applying a new map, clearing it or
-turning Live off removes stale waiting evidence. Print keeps the colors.
+1. **Jira issue links.** The adapter requests `issuelinks` with the other fields
+   (no extra calls). A link counts when the description shown on the dependent
+   issue's side (`type.inward` for `inwardIssue`, `type.outward` for
+   `outwardIssue`) is one of `tracking.jira.dependencyLinks`, default
+   `is blocked by` and `depends on`. The linked issue's key, summary and status
+   come from the link payload, so an upstream outside the epic and the diagram
+   gets a state without another fetch. The entry gains
+   `dependsOn: [{key, source: "jira", linkType}]`. The epic itself is seeded the
+   same way from a child's `parent` payload (summary and status) for the epic box.
+2. **Authored pairs** in `page.tracking.dependencies`, tagged `source: "authored"`
+   with their `reason`. Loaded detail pages contribute their own pairs.
+
+`liveStatusDependencies(pages, map)` merges both into `{ticket: [{key, sources,
+linkType?, reason?}]}`. X waits on Y while Y is not done, unless X itself is
+already active or done: then the link is listed but X is not waiting. A blocked
+or missing X still waits: the panel, the chains and the popover record it, while
+its carrier keeps its own blocked or missing paint on the canvas as the stronger
+state (solid or dotted rose, no dashed waiting stroke). The tone comes from the
+**direct** upstream: an unfinished Y paints X
+grey (slate) with the raised-hand icon in the panel; a blocked or missing Y
+(including a key the map never reports) paints X red (rose) with the alarm icon.
+Chains propagate naturally, each hop taking its tone from its own upstream.
+`liveStatusTicketWaiting(dependencies, map)` returns `{ticket: {tone, on: [{key,
+state, tone}]}}`; an empty map is no evidence and nothing waits.
+
+A carrier waits when any of its tickets waits; red wins over grey.
+`liveStatusCarrierWaiting(diagram, map, waiting)` returns `{carrierId: {tone,
+keys}}`. Waiting nodes and edges acquire `dv-live-waiting`,
+`data-dv-live-waiting-on` (comma-separated upstream keys) and
+`data-dv-live-waiting-tone` (`grey` or `red`) while retaining their own
+`dv-live-<state>` class; the node preset is slate or rose accordingly. The canvas
+shows only the dashed stroke in the waiting tone: no text, badge or icon. The
+carrier's accessible name says “waiting on KEY, KEY” and its popover lists
+“Waiting on KEY · state” per direct upstream followed by the chain(s) the
+carrier's tickets sit in (“HW-124 holds FW-46”). Applying a new map, clearing it
+or turning Live off removes stale waiting evidence. Print keeps the colors.
+
+`liveStatusDependencyChains(waiting)` returns one chain per path from a root
+upstream through each waiting hop; **Blockers and dependency chains** renders each
+chain as a row of the same bounded buttons with “holds” between hops. Downstream
+counts on blocker rows count carriers and steps whose tickets wait, directly or
+through a chain, on that key.
 
 ## Blocked edges
 
@@ -404,7 +494,7 @@ connector. It then selects the resource matching `page.tracking.jira.site`
 (or the first resource when no site is specified), and watches batches of ten
 keys every 60 seconds. A second Flagged Impediment query detects blockers. Each configured epic also gets a
 `parent = KEY` watch and a `parent = KEY AND Flagged = Impediment` watch, requesting
-summary, status, assignee, updated and issuetype in pages of ten. The adapter
+summary, status, assignee, updated, issuelinks and issuetype in pages of ten. The adapter
 follows `pageInfo.hasNextPage`/`endCursor` or `nextPageToken` until exhausted and
 tags the returned children with their epic key. When an approved detail page
 loads, new ticket and epic references get their own watches; reopening that
@@ -556,7 +646,7 @@ have no live caption. Captions update on step changes and new evidence.
 
 Playback pauses on the first blocked or missing beat, including the first beat
 when starting or replaying, and focuses the first blocking carrier.
-Manual next/previous retain their existing navigation behavior. The small
+Manual next/previous retain their existing navigation behavior. A todo step whose carriers wait adds “· waiting on KEY” to its caption. The small
 `stepper.onBeforeAdvance(fn)` hook returns an unsubscribe function; `fn` receives
 the selected source step index after it is painted, before automatic playback
 continues. Returning `false` invokes the ordinary pause path. It runs only for
@@ -576,10 +666,10 @@ The completion ring counts done carriers against all tracked carriers. A carrier
 is done only when all its tickets are done. **Ready to demo** requires every
 tracked carrier involved in the primary path (the first path, or all steps when
 there are no explicit paths) to be done. Alternate-only work does not prevent
-readiness. Otherwise the verdict gives distinct blocking/missing tickets and
-waiting carriers. Missing tickets say “not found in Jira (deleted, renamed, or no
-permission)”. Downstream counts come from the same waiting propagation as the
-canvas, counting each affected carrier and authored step once per blocking key.
+readiness; the epic box then shows “Ready to demo” in its counts line. Missing
+tickets say “not found in Jira (deleted, renamed, or no permission)”. Downstream
+counts come from the same dependency waiting as the canvas, counting each affected
+carrier and authored step once per blocking key.
 
 Set `tracking.staleDays` to a positive number (default **7**) to mark active work
 whose `updatedAt` is strictly older than that many days. The carrier gets

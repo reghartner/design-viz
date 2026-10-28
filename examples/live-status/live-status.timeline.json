@@ -1,6 +1,11 @@
 {
   "version": 1,
   "intervalSeconds": 6,
+  "epics": {
+    "DOOR-100": {
+      "summary": "Connected doorbell delivery"
+    }
+  },
   "days": [
     {
       "label": "Day 1 — kickoff",
@@ -60,7 +65,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "UX-89": {
           "state": "todo",
@@ -88,7 +99,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "todo",
@@ -164,7 +181,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "UX-89": {
           "state": "todo",
@@ -192,7 +215,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "todo",
@@ -268,7 +297,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "UX-89": {
           "state": "todo",
@@ -296,7 +331,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "todo",
@@ -316,7 +357,7 @@
     },
     {
       "label": "Day 4 — signal blocker",
-      "note": "An unstable signal blocks HW-124, leaving FW-46 waiting on hardware.",
+      "note": "An unstable signal blocks HW-124; FW-46 is blocked by it in Jira, so the controller waits in red.",
       "issues": {
         "HW-123": {
           "state": "active",
@@ -372,7 +413,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "UX-89": {
           "state": "todo",
@@ -400,7 +447,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "todo",
@@ -476,7 +529,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "UX-89": {
           "state": "active",
@@ -504,7 +563,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "todo",
@@ -580,7 +645,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "active",
@@ -594,7 +665,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "active",
@@ -614,7 +691,7 @@
     },
     {
       "label": "Day 7 — blocker clears",
-      "note": "The signal is stable again and the UX ticket is available.",
+      "note": "The signal is stable again and the UX ticket is available; FW-46 still waits (grey) on the unfinished HW-124.",
       "issues": {
         "HW-123": {
           "state": "active",
@@ -670,7 +747,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "active",
@@ -684,7 +767,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "active",
@@ -813,7 +902,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "active",
@@ -840,7 +935,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "active",
@@ -1012,7 +1113,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "active",
@@ -1039,7 +1146,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "active",
@@ -1212,7 +1325,13 @@
             "count": 0,
             "state": null
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "done",
@@ -1240,7 +1359,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "done",
@@ -1428,7 +1553,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "done",
@@ -1456,7 +1587,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "done",
@@ -1658,7 +1795,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "is blocked by",
+              "key": "HW-124"
+            }
+          ]
         },
         "BE-67": {
           "state": "done",
@@ -1686,7 +1829,13 @@
               }
             ]
           },
-          "epic": "DOOR-100"
+          "epic": "DOOR-100",
+          "links": [
+            {
+              "type": "depends on",
+              "key": "FW-45"
+            }
+          ]
         },
         "BE-68": {
           "state": "done",

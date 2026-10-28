@@ -113,6 +113,10 @@ var FlowIcons = (function () {
   add('camera-off', 'Camera unavailable', 'Video', 'neutral', rect(3, 5.5, 18, 12.5, 3, 'wash') + circle(12, 11.75, 3.5, 'accent') + path('M12 18v3M8 21h8') + detail(path('m3 3 18 18')));
   add('person', 'Person', 'Home', 'violet', circle(12, 6, 3, 'wash') + path('M5 21v-2a7 7 0 0 1 14 0v2Z', 'wash') + detail(path('M8.5 20v-2M15.5 20v-2')));
   // Two commits on the base branch, one on the head branch, arrow back to base.
+  // Raised hand: delivery is waiting on unfinished upstream work (live-status Depends on; alarm marks a blocked upstream).
+  // Check: an upstream ticket is done (live-status Depends on, green like the done preset).
+  add('check', 'Check', 'Delivery', 'green', circle(12, 12, 9, 'wash') + path('m7.5 12.5 3 3 6-7'));
+  add('hand', 'Raised hand', 'Delivery', 'neutral', path('M7.5 12.5V6.5a1.5 1.5 0 0 1 3 0V11M10.5 11V4.5a1.5 1.5 0 0 1 3 0V11M13.5 11V5.5a1.5 1.5 0 0 1 3 0V11M16.5 11V8a1.5 1.5 0 0 1 3 0v5.5A6.5 6.5 0 0 1 13 20h-1.2a5.5 5.5 0 0 1-4.6-2.5l-2.8-4.3a1.4 1.4 0 0 1 2.3-1.6l1.8 2.4', 'wash'));
   add('pull-request', 'Pull request', 'Software', 'green', circle(6, 5.5, 2.5, 'wash') + circle(6, 18.5, 2.5, 'wash') + circle(18, 18.5, 2.5, 'wash') + path('M6 8v8') + detail(path('M18 16V9.5A3.5 3.5 0 0 0 14.5 6H11M13.5 3.5 11 6l2.5 2.5')));
 
   // Build-time company modules use this private hook before the public library

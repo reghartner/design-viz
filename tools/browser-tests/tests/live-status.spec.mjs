@@ -86,7 +86,7 @@ test('V11 a page without tickets has no Live control markup',async({page,server}
 
 /* Story contract matrix S1–S8:
  S1 built story and embedded data; S2 opt-in hash, provider priority and fallback;
- S3 manual/automatic days and reduced motion; S4 downstream waiting and done immunity;
+ S3 manual/automatic days and reduced motion; S4 dependency waiting (#765: ticket -> ticket from Jira links and authored pairs, tone from the direct upstream; edges propagate nothing);
  S5 ambient/step blocked break + packet suppression/clearing; S6 skin/print tag + popover;
  S7 docs: unit gate; S8 workbench excluded: unit/diff gate. Desktop reader only.
 */
@@ -111,15 +111,19 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  expect(await edgeDots().count()).toBeGreaterThan(0);for(const dot of await edgeDots().all())await expect(dot).toHaveCSS('display','none');
  for(let day=2;day<=4;day++){await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');}
  await expect(edge).toHaveClass(/dv-live-blocked/);const failure=root.locator('g.comm-failure[data-dv-edge="0"]');await expect(failure).toHaveCount(1);await expect(failure).toHaveAttribute('aria-label',/Not sent:.*HW-124/);await expect(failure.locator('text')).toHaveCount(0);
- await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-124');await expect(node('button')).not.toHaveClass(/dv-live-waiting/);
- await expect(node('mcu').locator('.dv-live-waiting-tag')).toHaveCount(0);await node('mcu').locator('.card').press('Enter');await expect(root.locator('.dv-live-popover')).toContainText('waiting on HW-124');await page.keyboard.press('Escape');
- for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');await expect(node('mcu').locator('.dv-live-halo'),skin+' waiting halo').toHaveCSS('stroke',await presetLine(page,'slate'));}
- await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
+ // FW-46 (on the controller) is blocked by HW-124 in Jira: red waiting on an active carrier. Nothing is inferred from the press edge's direction.
+ await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-124');await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','red');await expect(node('button')).not.toHaveClass(/dv-live-waiting/);
+ await expect(node('ingest')).toHaveClass(/dv-live-waiting/);await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-on','FW-45');
+ await expect(node('mcu').locator('.dv-live-waiting-tag')).toHaveCount(0);await expect(root.locator('svg .dv-live-waiting-icon')).toHaveCount(0);await node('mcu').locator('.card').press('Enter');await expect(root.locator('.dv-live-popover .dv-live-waiting-detail')).toHaveText('Waiting on HW-124 · blocked');await expect(root.locator('.dv-live-popover .dv-live-waiting-chain')).toHaveText('HW-124 holds FW-46');await page.keyboard.press('Escape');
+ for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');await expect(node('mcu').locator('.dv-live-halo'),skin+' red waiting halo').toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('ingest').locator('.card'),skin+' grey waiting card').toHaveCSS('stroke',await presetLine(page,'slate'));}
+ await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
  await root.locator('.schip[data-step-source="0"]').first().click();await expect(failure).toHaveCount(1);await expect(failure).toBeVisible();
  for(let day=5;day<=12;day++){
   await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');
   if(day===6){await expect(node('app')).toHaveClass(/dv-live-missing/);await expect(root.locator('g.comm-failure[data-dv-edge="4"]')).toHaveCount(0);}
-  if(day===7){await expect(root.locator('g.comm-failure')).toHaveCount(0);await expect(root.locator('.dv-live-waiting')).toHaveCount(0);}
+  // Day 7: HW-124 is unblocked but unfinished, so FW-46 still waits, now grey. Day 8: FW-46 is active and nothing waits.
+  if(day===7){await expect(root.locator('g.comm-failure')).toHaveCount(0);await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));}
+  if(day===8)await expect(root.locator('.dv-live-waiting')).toHaveCount(0);
   if(day===9){await expect(node('chime')).toHaveClass(/dv-live-done/);await expect(node('chime')).not.toHaveClass(/dv-live-waiting/);}
  }
  await expect(root.locator('.dv-live-waiting')).toHaveCount(0);await expect(root.locator('g.node.dv-live-done')).toHaveCount(6);await expect(root.locator('path.edge.dv-live-done')).toHaveCount(5);await expect(next).toBeDisabled();
@@ -127,17 +131,20 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  await page.emulateMedia({reducedMotion:'no-preference'});await root.getByRole('button',{name:'Ambient',exact:true}).click();
  for(const dot of await edgeDots().all())await expect(dot).not.toHaveCSS('display','none');
 });
-test('S4 an active upstream blocker skips done descendants and marks todo descendants waiting',async({page,server})=>{
- await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,{state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'}]))};});
+test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
  const root=await openStory(page,server,''),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
- // button -> mcu -> ingest: propagation must cross the done controller.
  await expect(node('button')).toHaveClass(/dv-live-blocked/);
- await expect(node('ingest')).toHaveClass(/dv-live-todo/);
- await expect(node('ingest')).toHaveClass(/dv-live-waiting/);
- await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-on','HW-123');
- await expect(node('mcu')).toHaveClass(/dv-live-done/);
- await expect(node('mcu')).not.toHaveClass(/dv-live-waiting/);
- await expect(node('mcu')).not.toHaveAttribute('data-dv-live-waiting-on',/./);
+ // The controller carries FW-45 (done) and FW-46 (todo, blocked by HW-123): active rollup, red waiting, rose preset.
+ await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-123');await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','red');await expect(node('mcu')).toHaveClass(/\bns-rose\b/);
+ // Ingest sits downstream of the blocked button by data flow only: no dependency, no waiting.
+ await expect(node('ingest')).toHaveClass(/dv-live-todo/);await expect(node('ingest')).not.toHaveClass(/dv-live-waiting/);await expect(node('ingest')).not.toHaveAttribute('data-dv-live-waiting-on',/./);
+ // The authored pair UX-89 -> BE-68 (both todo) paints the app and the push edge grey.
+ await expect(node('app')).toHaveClass(/dv-live-waiting/);await expect(node('app')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('app')).toHaveClass(/\bns-slate\b/);await expect(node('app')).toHaveAttribute('data-dv-live-waiting-on','BE-68');
+ await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveClass(/dv-live-waiting/);await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveAttribute('data-dv-live-waiting-tone','grey');
+ const panel=root.locator('.pt-live-status');await expect(panel.locator('.dv-live-suggest')).toHaveText('1 authored dependency (UX-89 → BE-68) has no Jira link. Suggest link in Jira');
+ const dep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(dep).toHaveAttribute('data-tone','red');await expect(dep.locator('.dv-live-dep-key')).toHaveText('HW-123');await expect(dep.locator('svg[data-icon="alarm"]')).toHaveCount(1);
+ await expect(panel.locator('tr[data-live-ticket="UX-89"] .dv-live-dep svg[data-icon="hand"]')).toHaveCount(1);await expect(panel.locator('tr[data-live-ticket="UX-89"] .dv-live-dep')).toHaveAttribute('title','needs the push payload contract');
 });
 test('S2 S3 without hash there are no demo controls or live classes',async({page,server})=>{
  const root=await openStory(page,server,'');await expect(root.locator('.dv-live-demo')).toHaveCount(0);await expect(root.locator('.dv-live-badge,.dv-live-waiting,.dv-live-todo')).toHaveCount(0);
@@ -262,7 +269,11 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  await root.locator('.schip[data-step-source="5"]').first().click();await root.getByRole('button',{name:'First blocker',exact:true}).click();
  await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);await expect(root.locator('.dv-live-target:focus').locator('xpath=ancestor-or-self::*[contains(@class,"dv-live-blocked")][1]')).toHaveCount(1);
  const panel=root.locator('.pt-live-status');
- await expect(panel).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');await expect(panel.locator('.dv-live-verdict')).toHaveText(/1 blockers · \d+ waiting/);
+ await expect(panel).toBeVisible();await expect(panel.locator('.ptitle')).toHaveText('Epic status');await expect(panel.locator('.dv-live-verdict')).toHaveCount(0);
+ // Epic header box inside the panel (#765): key link, summary, state, stories done / on diagram, counts. Never in the title bar.
+ const epic=panel.locator('.dv-live-epic');await expect(epic.locator('.dv-live-epic-key')).toHaveText('DOOR-100');await expect(epic.locator('.dv-live-epic-key')).toHaveAttribute('href','https://acme.atlassian.net/browse/DOOR-100');await expect(epic.locator('.dv-live-epic-title')).toHaveText('Connected doorbell delivery');await expect(epic.locator('.dv-live-epic-state')).toHaveText('active');await expect(epic.locator('.dv-live-epic-progress')).toHaveText(/0 of 7 stories done · 7 of 7 on diagram/);await expect(epic.locator('.dv-live-epic-counts')).toHaveText(/1 blocked · \d+ waiting · 0 outside epic/);await expect(root.locator('.ptitle .dv-live-epic, .reader-nav .dv-live-epic')).toHaveCount(0);
+ await expect(panel.locator('h3')).toHaveText(['Tickets','Blockers and dependency chains','Activity']);await expect(panel.locator('.dv-live-tickets th')).toHaveText(['Key','Title','State','Owner','Depends on','PRs']);
+ const chain=panel.locator('.dv-live-chain').filter({hasText:'HW-124'});await expect(chain.locator('.dv-live-dep-key')).toHaveText(['HW-124','FW-46']);await expect(chain.locator('.dv-live-chain-holds')).toHaveText(['holds']);
  await expect(panel.locator('.dv-live-completion svg circle')).toHaveCount(2);await expect(panel.locator('[data-live-lane]')).toHaveCount(0);await expect(panel.locator('h3',{hasText:'Teams'})).toHaveCount(0);
  const blocker=panel.locator('.dv-live-blocker').filter({hasText:'HW-124'});await expect(blocker).toContainText(/\d+ downstream carriers · \d+ steps/);await expect(blocker.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
  await expect(panel.locator('.dv-live-activity')).toContainText('HW-124 · active → blocked');
@@ -271,7 +282,9 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
   await next.click();
   if(day===6)await expect(panel.locator('.dv-live-blocker').filter({hasText:'UX-89'})).toContainText('not found in Jira (deleted, renamed, or no permission)');
  }
- await expect.poll(async()=> (await panel.locator('.dv-live-verdict').textContent()).split(' · ')[0]).toBe('Ready to demo');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ await expect.poll(async()=> (await panel.locator('.dv-live-epic-counts').textContent()).split(' · ')[0]).toBe('Ready to demo');
+ // Completed upstream work wears the green check (Chuck, PR #784 review).
+ const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',await presetLine(page,'moss'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
  await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.locator('.pbody')).not.toBeEmpty();
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -318,9 +331,9 @@ test('B5 changed node pulses its card in every skin without moving the positione
 test('E6 E10 E11 built epic Tickets table lists all children and coverage focuses the badge',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
  for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.locator('table.dv-live-tickets');
- await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','PRs']);
+ await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(8);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','Depends on','PRs']);
  await expect(table.locator('tr[data-live-coverage-for="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');await expect(table.locator('tr[data-live-ticket="HW-124"] td').nth(3)).toHaveText('Alex');
- const hw=table.locator('tr[data-live-coverage-for="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-verdict')).toHaveText('Ready to demo · 7 of 8 epic stories on diagram');
+ const hw=table.locator('tr[data-live-coverage-for="HW-124"]');await expect(hw.getByRole('button')).toHaveText(['Indoor chime','press','ring']);await expect(panel.locator('.dv-live-epic-counts')).toHaveText(/^Ready to demo · /);await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');
  await hw.getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('g.node[data-dv-node="chime"] .card')).toBeFocused();
  await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();expect(await panel.locator('.pbody').evaluate(el=>el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth)).toBe(true);
 });
@@ -375,7 +388,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
  for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
- await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-verdict')).toContainText('7 of 8 epic stories on diagram');
+ await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
  await body.locator('tr[data-live-coverage-for="HW-124"]').getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('[data-dv-node="chime"] .card')).toBeFocused();
  await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
 });
@@ -421,7 +434,10 @@ test('R1 carriers paint without canvas badges and open the ticket popover from t
  await cardClick(node('chime').locator('.card'));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for Indoor chime');
  await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await root.locator('text.lbl[data-dv-edge="0"]').click();await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for press');
- for(const key of ['HW-124','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toBeVisible();
+ // The press edge carries HW-124 alone (#765 moved FW-46 to the controller); keys stay links named by the key.
+ await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'FW-46',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+ await cardClick(node('mcu').locator('.card'));await expect(pop).toBeVisible();for(const key of ['FW-45','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toBeVisible();
  await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await node('mcu').locator('.t1').click();await expect(pop).toHaveAttribute('aria-label','Live tickets for Doorbell controller');await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await node('mcu').locator('.nrefs-trigger').click();await expect(root.locator('.node-link-menu')).toBeVisible();await expect(pop).toBeHidden();
@@ -478,7 +494,7 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
 });
 
 /* Node Styles presets for live paint (#762 addition, Chuck 2026-10-27): no overlay palette of its own.
- P1 nodes wear `node-styled ns-<preset>` (todo slate, active ember, done moss, blocked/missing rose, waiting slate);
+ P1 nodes wear `node-styled ns-<preset>` (todo slate, active ember, done moss, blocked/missing rose, waiting slate or rose by upstream tone);
     edges, coins and node cards take that preset's --ns-line in a light and a dark skin. Coin numerals follow the
     engine's step-colour rule (stepCircleInk: black or white, whichever contrasts more), which is black on every live fill.
  P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
@@ -502,11 +518,12 @@ test('P1 live nodes wear Node Styles presets; cards, edges and coins share the p
   for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
  }
  await demoDay(root,4);
- for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','slate'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
+ // Day 4: mcu waits red on the blocked HW-124 (rose); ingest waits grey on the unfinished FW-45 (slate).
+ for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','rose'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
  for(const skin of ['daylight','aurora']){
   await page.evaluate(s=>window.dvSetSkin(s),skin);
-  for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
-  await expect(root.locator('path.edge[data-dv-edge="2"]'),skin+' waiting edge').toHaveCSS('stroke',await presetLine(page,'slate'));
+  for(const [id,token] of [['chime','rose'],['button','ember'],['mcu','rose'],['ingest','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
+  await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveClass(/dv-live-waiting/);await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveCSS('stroke',await presetLine(page,'slate'));
  }
 });
 test('P2 missing carriers are dotted rose, blocked ones solid rose',async({page,server})=>{

@@ -29,7 +29,7 @@ authorize publishing. With that authorization it builds and publishes the
 artifact and republishes it after every later accepted change; without it, it
 delivers the spec (and built HTML only when standalone output was explicitly
 requested). Stories the agent cannot place stay
-off the diagram on purpose: the panel's Tickets table lists every child of the
+off the diagram on purpose: the panel's Tickets table lists included children of the
 linked epic and tags the unplaced ones NOT ON DIAGRAM, so the author can decide
 later. Mention them in the hand-over message as well.
 
@@ -48,6 +48,21 @@ level when researching the hierarchy. Containers do not become story carriers
 merely because they were returned by a parent query. The offline Workbench demo
 cannot detect type without Jira; explicit runtime/demo metadata is documented in
 `docs/live-status.md`. “Diagram ready to demo” remains about primary-path carriers.
+
+Use `tracking.jira.exclude: ["DOOR-108"]` for inherited stories outside the
+board's purpose. Desktop **Document settings → Tracking → Exclude story** adds
+keys; remove controls undo exclusions. Each edit has one Undo/Redo and survives
+export. Invalid keys or a non-array value warn and are ignored.
+
+Count distinct (parent stories minus source-page exclusions) plus manual
+node/edge tickets plus displayed upstream dependency stories, including those
+outside the initiative. Manual tickets and needed dependencies add excluded
+keys back; each loaded approved source applies its own exclusions. Containers
+never count, and unknown status counts in the denominator but never as done.
+The reader's **Excluded stories** list shows keys and inclusion overrides; it
+has no editing controls. Story counts and waiting use displayed story rows;
+carrier paint/readiness remain separate. Inspect a waiting row's unmet upstream
+links before changing status or removing a real dependency.
 
 ## 1. Settle the tracking facts before writing JSON
 

@@ -838,3 +838,19 @@ test('GitHub scope edits touch only tracking.github; an absent tracking.jira sta
   assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'},github:{repos:['acme/firmware']}},'an existing jira block is preserved');
   h.session.undo();assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'}});
 });
+
+test('excluded stories add remove validate and deduplicate with one Undo Redo preserving source data',()=>{
+ const e=environment(),raw={page:{title:'Board',future:{keep:1},tracking:{jira:{site:'https://jira.test',epic:'EP-1',dependencyLinks:['depends on'],custom:'keep'},github:{org:'acme'},dependencies:[{ticket:'AA-1',on:'BB-1'}]},sections:[{diagram:{nodes:{a:{tickets:['AA-1']}},rows:[['a']]}}]}};
+ const h=e.mount(raw);h.session.target={kind:'document'};h.session.target={kind:'document'};h.inspector.render();const original=h.text;
+ const input=()=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent==='Exclude story').children[1];
+ const edit=value=>{h.session.target={kind:'document'};h.inspector.render();input().value=value;input().fire('change');h.flush();};
+ edit('bad');assert.equal(h.text,original);assert.equal(h.session.canUndo(),false);assert.match(h.guide.querySelector('.ierr').textContent,/Jira key/);
+ edit('  AA-1  ');const added=h.text;assert.deepEqual(JSON.parse(added).page.tracking.jira.exclude,['AA-1']);
+ const expected=structuredClone(raw);expected.page.tracking.jira.exclude=['AA-1'];assert.deepEqual(JSON.parse(added),expected);
+ h.session.undo();assert.equal(h.text,original);assert.equal(h.session.canUndo(),false);h.session.redo();assert.equal(h.text,added);
+ edit('AA-1');assert.equal(h.text,added);h.session.undo();assert.equal(h.text,original,'duplicate creates no history');h.session.redo();
+ edit('BB-1');assert.deepEqual(JSON.parse(h.text).page.tracking.jira.exclude,['AA-1','BB-1']);const both=h.text;
+ h.session.target={kind:'document'};h.inspector.render();h.guide.querySelectorAll('button').find(button=>button.textContent==='Remove excluded story 1').fire('click');h.flush();assert.deepEqual(JSON.parse(h.text).page.tracking.jira.exclude,['BB-1']);
+ const removed=h.text;h.session.undo();assert.equal(h.text,both);h.session.redo();assert.equal(h.text,removed);
+ h.session.target={kind:'document'};h.inspector.render();h.guide.querySelectorAll('button').find(button=>button.textContent==='Remove excluded story 1').fire('click');h.flush();assert.deepEqual(JSON.parse(h.text),raw,'last removal drops only exclude');
+});

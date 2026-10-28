@@ -770,3 +770,35 @@ test('I1 desktop initiative parent auto-detection renders story totals epic cont
  await expect(panel.locator('tr[data-live-ticket="ST-2"] .dv-live-dep')).toHaveAttribute('data-tone','red');await expect(panel.locator('.dv-live-blocker')).toContainText('ST-3');expect(await page.evaluate(()=>window.__initiativeWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
  await panel.screenshot({path:testInfo.outputPath('initiative-board.png')});
 });
+
+test('X desktop exclusions and displayed dependencies use one deduplicated story total',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1600,height:1200});
+ const spec={page:{title:'Delivery scope',tracking:{jira:{site:'https://acme.atlassian.net',epic:'IN-100',exclude:['ST-2','ST-3','ST-4','DEP-2']}},sections:[{id:'scope',heading:'Delivery stories',diagram:{
+  nodes:{delivery:{title:'Manual additions',tickets:['ST-3','MAN-1','UNKNOWN-1','DEP-1']}},rows:[['delivery']],sectionLayout:{columns:24,default:[{x:0,y:0,w:7,h:12},{controls:'steps',x:0,y:12,w:7,h:5},{panel:'status',x:7,y:0,w:17,h:35}]},panels:[{id:'status',type:'live-status',title:'Delivery status'}],steps:[{nodes:['delivery'],text:'Deliver the selected work'}]
+ }}]}};
+ const map={'IN-100':{kind:'initiative',state:'active',title:'Resident delivery'},'EP-1':{kind:'epic',state:'active',initiatives:['IN-100']},
+  'ST-1':{state:'done',epic:'EP-1',title:'Parent delivery'},'ST-2':{state:'done',epic:'EP-1',title:'Separate project'},'ST-3':{state:'done',epic:'EP-1',title:'Explicitly included work'},
+  'ST-4':{state:'blocked',epic:'EP-1',title:'Unrelated blocked work',dependsOn:[{key:'UNRELATED-1',source:'jira'}]},'ST-5':{state:'todo',epic:'EP-1',title:'Waiting delivery',dependsOn:[{key:'DEP-1',source:'jira'},{key:'DEP-2',source:'jira'},{key:'UNKNOWN-2',source:'jira'}]},
+  'MAN-1':{state:'done',title:'Manual work without an epic'},'DEP-1':{state:'done',title:'Shared upstream'},'DEP-2':{state:'blocked',title:'Required external delivery',epic:'OTHER-1'}};
+ await page.addInitScript(map=>{window.flowviewLiveStatus={provider:async()=>map};},map);await open(page,server,spec,false);
+ const panel=page.locator('#docview .pt-live-status');await expect(panel.locator('.dv-live-epic-progress')).toHaveText('4 of 8 stories done · 4 of 8 on diagram');
+ await expect(panel.locator('[data-live-count="done"]')).toHaveText('done 4');await expect(panel.locator('[data-live-count="blocked"]')).toHaveText('blocked 1');await expect(panel.locator('.dv-live-epic-counts')).toHaveText('1 blocked · 1 waiting · 5 outside scope');
+ const table=panel.getByRole('table',{name:'Tickets',exact:true});await expect(table.locator('tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tr[data-live-ticket="ST-2"],tr[data-live-ticket="ST-4"],tr[data-live-ticket="UNRELATED-1"]')).toHaveCount(0);
+ await expect(table.locator('tr[data-live-ticket="UNKNOWN-2"]')).toContainText('No status');await expect(table.locator('tr[data-live-coverage-for="DEP-2"]')).toContainText('DEPENDENCY ONLY');
+ const exclusions=panel.getByRole('list',{name:'Excluded stories',exact:true});await expect(exclusions.locator('li')).toHaveCount(4);await expect(exclusions.getByRole('link',{name:'ST-2',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/ST-2');
+ await expect(exclusions.locator('[data-live-excluded="ST-2"]')).toContainText('Separate project');await expect(exclusions.locator('[data-live-excluded="ST-3"]')).toContainText('Included by manual attachment');await expect(exclusions.locator('[data-live-excluded="DEP-2"]')).toContainText('Included as dependency');
+ await expect(exclusions.locator('button,input')).toHaveCount(0);await page.setViewportSize({width:1600,height:1800});expect((await panel.boundingBox()).width).toBeGreaterThan(700);await panel.screenshot({path:testInfo.outputPath('status-exclusions.png')});
+ await page.emulateMedia({media:'print'});await expect(panel.locator('.pbody')).toHaveCSS('overflow','visible');await expect(panel.locator('.pbody')).toHaveCSS('max-height','none');await expect(panel.locator('.dv-live-tickets-scroll')).toHaveCSS('overflow','visible');await expect(exclusions).toBeVisible();
+});
+
+test('X desktop exclusion controls validate deduplicate undo redo remove and export',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');
+ const spec=structuredClone(raw);spec.page.tracking.jira.epic='DOOR-100';spec.page.tracking.github={org:'acme'};await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();const input=page.locator('#guide').getByLabel('Exclude story',{exact:true});
+ const before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
+ await input.fill('HW-124');await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.exclude).toEqual(['HW-124']);const added=await src.inputValue();
+ await input.fill('HW-124');await input.press('Enter');await expect(src).toHaveValue(added);await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);await page.locator('#redo-builder').click();await expect(src).toHaveValue(added);await settings();
+ await page.locator('#guide').getByRole('button',{name:'Remove excluded story 1',exact:true}).click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.exclude).toBeUndefined();await page.locator('#undo-builder').click();await expect(src).toHaveValue(added);
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
+ expect(saved.page.tracking).toEqual({jira:{...spec.page.tracking.jira,exclude:['HW-124']},github:{org:'acme'}});expect(saved.page.sections).toEqual(spec.page.sections);
+});

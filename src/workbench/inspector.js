@@ -535,6 +535,20 @@ function pageTrackingControls(val){
       var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formError('');return true;}
       return update(function(jira,page){jira.epic=trackingEpics(page).concat([key]);});
     },{placeholder:'DOOR-100'})));
+    var excluded=document.createElement('p');excluded.className='fnote';excluded.textContent='Excluded stories do not count from parents. Manually attached tickets and dependencies displayed on the board still count.';box.appendChild(excluded);
+    trackingExclusions(val).forEach(function(key,index){
+      var row=document.createElement('div'),label=document.createElement('span');label.textContent=key;row.appendChild(label);
+      row.appendChild(actionButton('Remove excluded story '+(index+1),function(){return update(function(jira,page){
+        var keys=trackingExclusions(page).filter(function(value){return value!==key;});if(keys.length)jira.exclude=keys;else delete jira.exclude;
+      });}));box.appendChild(row);
+    });
+    box.appendChild(frow('Exclude story',textControl('',function(value){
+      if(value==null)return true;var key=value.trim();
+      if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
+      var current=parseEditor();if(current.error){formError(current.error);return false;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingExclusions(doc.page).indexOf(key)>=0){formError('');return true;}
+      return update(function(jira,page){jira.exclude=trackingExclusions(page).concat([key]);});
+    },{placeholder:'DOOR-101'})));
     var scope=trackingGithubScope(val),scopeText=scope.repos.join(', ')+(scope.org?(scope.repos.length?', ':'')+'org:'+scope.org:'');
     box.appendChild(frow('GitHub scope',textControl(scopeText,function(value){
       var github={},bad=false,parts=value==null?[]:value.split(/[\s,]+/).filter(Boolean);

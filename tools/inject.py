@@ -165,7 +165,7 @@ def agent_guide(spec: dict, commit: str | None) -> str:
         "would end the block: write any `<` that starts one as `<\\/script`.",
         "3. With the public repo checked out, run `node tools/validate.js "
         "<spec.json>`: no errors (tracking problems are warnings). Without the repo, keep edits to "
-        "`tickets`, `prs`, `tracking.jira.epic`, scope and text; do not restructure sections, "
+        "`tickets`, `prs`, `tracking.jira.epic`, `tracking.jira.exclude`, scope and text; do not restructure sections, "
         "steps or layouts.",
         "4. Write the JSON back into the same flowspec block of the same HTML (change nothing else) "
         "and republish to the same URL by passing `url` on the publish call. A new URL loses "
@@ -204,9 +204,16 @@ def agent_guide(spec: dict, commit: str | None) -> str:
         "- `page.tracking.jira.site` is the absolute Jira site URL; `page.tracking.jira.epic` is one "
         "key or an array; `page.tracking.staleDays` is a positive number of days (default 7); "
         "`page.tracking.github`, if declared, follows docs/live-status.md.",
+        "- `page.tracking.jira.exclude` is an optional array of Jira story keys excluded from "
+        "inherited parent membership. Count distinct parent stories minus source-page exclusions, "
+        "plus manual node/edge tickets, plus displayed upstream dependencies (including outside "
+        "the initiative). Manual tickets and needed dependencies add excluded keys back. Unknown "
+        "status counts in the denominator, never done; Epic/Initiative containers never count. "
+        "Each approved source page applies its own exclusions. Desktop Document settings edits "
+        "the list; the reader's Excluded stories list explains inclusion overrides.",
         "- The spec never stores ticket status; colors come live from Jira at view time.",
         f"- This page: tracking.jira.site {show(jira.get('site'))}, tracking.jira.epic "
-        f"{show(jira.get('epic'))}, staleDays {show(tracking.get('staleDays')) if tracking else 'not set'}, "
+        f"{show(jira.get('epic'))}, tracking.jira.exclude {show(jira.get('exclude'))}, staleDays {show(tracking.get('staleDays')) if tracking else 'not set'}, "
         f"tracking.github {'declared' if tracking and 'github' in tracking else 'not set'}.",
         "",
         "## Reference",

@@ -49,6 +49,15 @@
     }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
+    function excludedStories(body,items){
+      if(!items.length)return;
+      el(body,'h3','excluded-heading','','Excluded stories');
+      el(body,'p','excluded-help','dv-live-suggest','Parent exclusions apply before manual tickets and displayed dependencies are added.');
+      var exclusions=el(body,'ul','excluded','dv-live-excluded');exclusions.setAttribute('aria-label','Excluded stories');
+      items.forEach(function(item){var row=el(exclusions,'li',item.key,'dv-live-excluded-story');row.setAttribute('data-live-excluded',item.key);
+        link(row,'key',item.key,item.url);el(row,'span','title','',item.title);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','reason','dv-live-excluded-reason',item.reason);
+      });
+    }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
@@ -82,8 +91,9 @@
           var keyRow=el(main,'div','keys','dv-live-epic-keys');link(keyRow,'key',epic.keys[0],epic.url).className='nbacklink dv-live-epic-key';if(epic.keys.length>1)el(keyRow,'span','more','dv-live-epic-more','+'+(epic.keys.length-1)+' more');
           el(main,'div','title','dv-live-epic-title',epic.title || '');
           var pill=el(main,'span','state','dv-live-state-pill dv-live-epic-state'+(value.enabled && epic.state?' dv-live-'+epic.state:''),epic.state || 'No status');pill.hidden=!epic.state;
-          var progress=el(main,'div','progress','dv-live-epic-progress',epic.done+' of '+epic.stories+' stories done · '+epic.onDiagram+' of '+epic.stories+' on diagram');progress.hidden=!epic.stories && !initiative;
+
         }
+        var progress=el(main,'div','progress','dv-live-epic-progress',epic.done+' of '+epic.stories+' stories done · '+epic.onDiagram+' of '+epic.stories+' on diagram');
         var countParts=[epic.blocked+' blocked',epic.waiting+' waiting'];if(epic.keys.length)countParts.push(epic.outside+(epic.initiatives && epic.initiatives.length?' outside scope':' outside epic'));if(epic.ready)countParts.unshift(epic.initiatives && epic.initiatives.length?'Diagram ready to demo':'Ready to demo');
         el(main,'div','counts','dv-live-epic-counts',countParts.join(' · '));
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
@@ -104,6 +114,7 @@
           if(tbody.children[2*index+1]!==coverageRow)tbody.insertBefore(coverageRow,tbody.children[2*index+1] || null);
           var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','6');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button dv-live-chip',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
         });
+        excludedStories(body,value.excluded || []);
         // A light hint only: the agent, not the page, writes to Jira.
         var suggestions=value.suggestions || [],suggest=el(body,'p','suggest','dv-live-suggest',suggestions.length?suggestions.length+' authored '+(suggestions.length===1?'dependency':'dependencies')+' ('+suggestions.map(function(item){return item.ticket+' → '+item.on;}).join(', ')+') '+(suggestions.length===1?'has':'have')+' no Jira link. Suggest link in Jira':'');suggest.hidden=!suggestions.length;
         if(!suggestions.length)suggest.remove();
@@ -118,6 +129,7 @@
         if(!value.blockers.length && !(value.chains || []).length)el(body,'p','none','dv-live-none','None');
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
       }
+      if(!hasData && value && (value.excluded || []).length)excludedStories(el(host,'div','audit','dv-live-panel-body'),value.excluded);
       // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
       if(doc.getElementById('dv-agent-guide'))el(host,'p','agent-guide','dv-live-agent-guide',"Editors: ask your agent to read this page's agent guide (id dv-agent-guide)");
       sweep(host);
@@ -167,6 +179,9 @@
 .dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
+.dv-live-excluded{list-style:none;padding:0;margin:0;}
+.dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
+.dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
 .dv-live-tickets{width:100%;min-width:480px;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}

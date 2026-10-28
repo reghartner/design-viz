@@ -68,7 +68,8 @@ export interface LiveStatusEntry {
   detail?: string;
   updatedAt?: string;
   /** Epic key this issue belongs to; entries for keys no carrier references are
-   * listed as NOT ON DIAGRAM when their epic or initiative ancestor is configured. */
+   * listed as NOT ON DIAGRAM when their epic or initiative ancestor is configured
+   * and the source page does not exclude them via tracking.jira.exclude. */
   epic?: string;
   /** Hierarchy container classification; omitted for ordinary work items. */
   kind?: 'initiative' | 'epic' | 'story';

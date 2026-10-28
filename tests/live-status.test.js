@@ -324,7 +324,7 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const epic=body.querySelector('.dv-live-epic');assert.ok(epic,'epic header box');assert.ok(body.children[0]===epic,'the epic box is first in the body');
  assert.equal(epic.querySelector('a.dv-live-epic-key').getAttribute('href'),'https://jira.test/browse/EP-1');assert.equal(epic.querySelector('.dv-live-epic-key').textContent,'EP-1');
  assert.equal(epic.querySelector('.dv-live-epic-title').textContent,'Connected doorbell');assert.equal(epic.querySelector('.dv-live-epic-state').textContent,'active');
- assert.equal(epic.querySelector('.dv-live-epic-progress').textContent,'0 of 5 stories done · 5 of 5 on diagram');assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting · 2 outside epic');
+ assert.equal(epic.querySelector('.dv-live-epic-progress').textContent,'0 of 7 stories done · 5 of 7 on diagram');assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting · 2 outside epic');
  assert.ok(epic.querySelector('.dv-live-completion'),'carrier completion ring lives in the box');assert.equal(h.view.querySelector('.dv-live-head').querySelectorAll('.dv-live-epic').length,0,'never in the header or title bar');
  const table=body.querySelector('table.dv-live-tickets');assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
  const rows=table.querySelectorAll('tr[data-live-ticket]'),row=key=>rows.find(el=>el.getAttribute('data-live-ticket')===key),coverage=key=>table.querySelector('tr[data-live-coverage-for="'+key+'"]');
@@ -342,8 +342,8 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const done=depMap();done['HW-2'].state='done';api.apply(done);const doneDep=row('FW-1').querySelectorAll('.dv-live-dep')[0];assert.equal(doneDep.getAttribute('data-tone'),'done');assert.ok(doneDep.classList.contains('dv-live-dep-done'));assert.ok(!doneDep.classList.contains('dv-live-dep-red'));
  assert.equal(doneDep.querySelector('.dv-live-dep-icon').hidden,false);assert.equal(doneDep.querySelector('.dv-live-dep-icon').getAttribute('data-icon'),'check');assert.doesNotMatch(doneDep.querySelector('.dv-live-dep-icon').innerHTML,/data-icon="(hand|alarm)"/);assert.equal(doneDep.querySelector('.dv-live-state-pill').textContent,'done');assert.match(doneDep.getAttribute('aria-label'),/upstream done/);
  assert.match(h.C.PanelRegistry.get('live-status').styles,/\.dv-live-dep\.dv-live-dep-done \.dv-live-dep-icon\{color:var\(--dv-live-done\)/,'check takes the done preset colour');api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell'}}));
- assert.equal(coverage('OUT-9').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.equal(row('OUT-9').querySelector('.dv-live-ticket-epic').textContent,'epic OTHER-1');
- assert.equal(coverage('GONE-1').querySelector('.dv-live-coverage-tag').textContent,'OUTSIDE EPIC');assert.ok(row('GONE-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(row('GONE-1').querySelector('.dv-live-state-pill').textContent,'No status');
+ assert.equal(coverage('OUT-9').querySelector('.dv-live-coverage-tag').textContent,'DEPENDENCY ONLY');assert.equal(row('OUT-9').querySelector('.dv-live-ticket-epic').textContent,'epic OTHER-1');
+ assert.equal(coverage('GONE-1').querySelector('.dv-live-coverage-tag').textContent,'DEPENDENCY ONLY');assert.ok(row('GONE-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(row('GONE-1').querySelector('.dv-live-state-pill').textContent,'No status');
  assert.ok(row('FW-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('Epic'),-1,'no Epic column');
  assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('On diagram'),-1,'coverage stays a chip row');
  const suggest=body.querySelector('.dv-live-suggest');assert.equal(suggest.textContent,'1 authored dependency (UX-1 → BE-1) has no Jira link. Suggest link in Jira');assert.equal(suggest.querySelectorAll('button,a').length,0,'a hint only; the page never writes to Jira');
@@ -358,7 +358,7 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
 test('D8 without epics the summary box keeps the carrier ring and counts and the demo sample mentions the epic',()=>{
  const raw=depFixture();delete raw.page.tracking.jira.epic;const h=harness(raw),api=h.ctl.liveStatus;mountStatus(h);api.apply(depMap());
  const epic=h.view.querySelector('.dv-live-epic');assert.ok(epic);assert.ok(epic.querySelector('.dv-live-epic-key')===null);assert.ok(epic.querySelector('.dv-live-completion'));assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting');
- assert.ok(h.view.querySelector('.dv-live-epic-progress')===null);api.destroy();
+ assert.equal(h.view.querySelector('.dv-live-epic-progress').textContent,'0 of 7 stories done · 5 of 7 on diagram');api.destroy();
  const d=h.C.PanelRegistry.get('live-status'),sample=h.C.panelPickerExample?h.C.panelPickerExample('live-status'):null;
  if(sample){const html=d.render({},sample.panel,sample.state,'pastel',sample.states,0,false).html;assert.match(html,/dv-live-epic/);assert.match(html,/Depends on/);assert.doesNotMatch(html,/dv-live-verdict/);}
 });
@@ -860,7 +860,7 @@ test('E2 refs include root and loaded detail epics and coverage leaves carrier r
  assert.deepEqual(plain(api.refs().epics),['EP-1','EP-2','EP-3']);assert.equal(typeof C.liveStatusCoverage,'function');
  const map={'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'todo',epic:'OTHER-1'},'EX-1':{state:'blocked',epic:'EP-2'},'EX-2':{state:'active',epic:'EP-3'},'NO-1':{state:'done',epic:'OTHER-1'}};
  api.apply(map);assert.equal(api.state('EX-1').epic,'EP-2');
- assert.deepEqual(plain(C.liveStatusCoverage(h.ctl.page,map,api.refs())),{epics:['EP-1','EP-2','EP-3'],onDiagram:['AA-1','BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1'],notOnDiagram:['EX-1','EX-2'],notInEpic:['BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1']});
+ assert.deepEqual(plain(C.liveStatusCoverage(h.ctl.page,map,api.refs())),{epics:['EP-1','EP-2','EP-3'],onDiagram:['AA-1','BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1'],notOnDiagram:['EX-1','EX-2'],notInEpic:['BB-1','CC-1','DD-1','EE-1','FF-1','ZZ-1'],excluded:[]});
  assert.deepEqual(plain(C.liveStatusCoverage({},map,{tickets:['AA-1'],epics:[]})).notInEpic,[]);
  assert.ok(h.view.querySelector('g.node[data-dv-node="a"]').classList.contains('dv-live-done'));assert.equal(C.liveStatusCarrier({tickets:['AA-1']},map),'done');api.destroy();
 });
@@ -894,7 +894,7 @@ test('E6 Tickets table orders states includes columns authored PRs lane stripe a
  assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
  assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.deepEqual(aaCoverage.querySelectorAll('button').map(el=>el.textContent),['Client','Call']);assert.equal(aa.querySelectorAll('button').length,0,'no coverage buttons inside the data row');
  let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;aaCoverage.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
- assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/5 of 6 on diagram/);assert.match(api.snapshot().verdict,/5 of 6 epic stories on diagram/);api.destroy();
+ assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/6 of 7 on diagram/);assert.match(api.snapshot().verdict,/6 of 7 stories on diagram/);api.destroy();
 });
 test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'done',epic:'EP-1'}});assert.ok(h.view.querySelector('.dv-live-panel-body'));
@@ -937,7 +937,7 @@ test('E8 rework Workbench demo entries paint carrier badges with page epics conf
  const map=h.C.workbenchDemoStatus(h.ctl.page);
  assert.deepEqual(plain(map),{'AA-1':{state:'todo',epic:'EP-1'},'BB-1':{state:'active',epic:'EP-1'},'CC-1':{state:'done',epic:'EP-1'},'DD-1':{state:'blocked',epic:'EP-1'},'EE-1':{state:'todo',epic:'EP-1'},'FF-1':{state:'active',epic:'EP-1'}});
  h.ctl.liveStatus.apply(map);
- assert.match(h.ctl.liveStatus.snapshot().verdict,/6 of 6 epic stories on diagram/,'E8 demo entries count as epic stories');
+ assert.match(h.ctl.liveStatus.snapshot().verdict,/6 of 6 stories on diagram/,'E8 demo entries count as epic stories');
  assert.equal(h.view.querySelectorAll('.dv-live-badge').length,0);assert.equal(h.view.querySelectorAll('.dv-live-target').length,3);
  assert.ok(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-todo'));
  assert.ok(h.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-blocked'));
@@ -1150,10 +1150,10 @@ test('S4 authored PR links render as icons with accessible names, not URL text',
  api.destroy();
 });
 
-test('E8 rework the verdict omits the epic fraction when no entry carries epic membership',()=>{
+test('E8 verdict counts manual stories before parent membership is available',()=>{
  const h=harness(epicFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'todo'}});
- assert.doesNotMatch(api.snapshot().verdict,/epic stories/,'no "0 of 0 epic stories"');
- api.apply({'AA-1':{state:'todo',epic:'EP-1'}});assert.match(api.snapshot().verdict,/1 of 1 epic stories on diagram/);api.destroy();
+ assert.match(api.snapshot().verdict,/6 of 6 stories on diagram/,'manual references count even without status or membership');
+ api.apply({'AA-1':{state:'todo',epic:'EP-1'}});assert.match(api.snapshot().verdict,/6 of 6 stories on diagram/);api.destroy();
 });
 
 test('O1 #764 Owner cell links to the Confluence people page only with a site and a usable accountId',()=>{
@@ -1444,4 +1444,119 @@ test('I9 direct Epic parents publish only complete child and Flagged evidence ac
  hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[hierarchyIssue('ST-3',0)]);assert.equal(api.state('ST-3').state,'blocked');assert.equal(api.state('ST-2'),null);
  const latest=plain(api.snapshot().states);resolveOld({payload:{issues:[]}});await settle();assert.deepEqual(plain(api.snapshot().states),latest,'a superseded empty Flagged page cannot clear the current blocker');
  api.destroy();
+});
+
+test('X1 exclusion parser validates array entries without mutating source or round-trip data',()=>{
+ const h=harness(),C=h.C;
+ for(const [exclude,want,warnings] of [[['ST-2','ST-1','ST-2','bad',null],['ST-2','ST-1'],2],[[],[],0],['ST-1',[],1],[null,[],1],[{},[],1],[12,[],1]]){
+  const raw=epicFixture();raw.page.tracking.jira.exclude=exclude;const before=JSON.stringify(raw),normalized=C.normalize(raw);
+  assert.deepEqual(plain(C.trackingExclusions(normalized)),want);const result=C.validate(normalized);
+  assert.deepEqual(plain(result.errors),[]);assert.equal(result.warnings.filter(w=>w.startsWith('tracking.jira.exclude')).length,warnings);
+  assert.equal(JSON.stringify(raw),before);assert.deepEqual(JSON.parse(JSON.stringify(normalized)).tracking.jira.exclude,exclude);
+ }
+ assert.deepEqual(plain(C.trackingExclusions({})),[]);h.ctl.liveStatus.destroy();
+});
+function exclusionFixture(root='EP-1'){
+ return {page:{tracking:{jira:{site:'https://jira.test',epic:root,exclude:['ST-2','ST-3','ST-4','ST-4','ST-5','EP-1']}},sections:[{id:'main',diagram:{
+  nodes:{a:{title:'Manual additions',tickets:['ST-3','MAN-1','UNKNOWN-1','EP-1']}},rows:[['a']],edges:[{from:'a',to:'a',tickets:['ST-3','MAN-1']}],steps:[{nodes:['a']}]
+ }}]}};
+}
+function exclusionMap(initiative=false){
+ const map={'EP-1':{state:'done',kind:'epic'},'ST-1':{state:'done',epic:'EP-1'},'ST-2':{state:'done',title:'Unrelated delivery',epic:'EP-1'},
+  'ST-3':{state:'done',epic:'EP-1'},'ST-4':{state:'blocked',epic:'EP-1',dependsOn:[{key:'UNRELATED-1',source:'jira'}]},
+  'ST-5':{state:'todo',epic:'EP-1',dependsOn:[{key:'UNRELATED-2',source:'jira'}]},'MAN-1':{state:'done'},'OTHER-1':{state:'blocked',epic:'OTHER-2'}};
+ if(initiative){map['IN-1']={state:'done',kind:'initiative'};map['EP-1'].initiatives=['IN-1'];for(const key of ['ST-1','ST-2','ST-3','ST-4','ST-5'])map[key].initiatives=['IN-1'];}
+ return map;
+}
+test('X2 Epic and Initiative totals subtract exclusions then add all manual stories once, including unknowns',()=>{
+ for(const initiative of [false,true]){
+  const h=harness(exclusionFixture(initiative?['IN-1','EP-1','IN-1']:'EP-1')),api=h.ctl.liveStatus;mountStatus(h);api.apply(exclusionMap(initiative));const s=plain(api.snapshot());
+  assert.equal(s.epic.stories,4);assert.equal(s.epic.done,3);assert.equal(s.epic.onDiagram,3);assert.equal(s.epic.blocked,0);assert.equal(s.epic.waiting,0);assert.equal(s.epic.outside,2);
+  assert.deepEqual(s.counts,{todo:0,active:0,done:3,blocked:0,missing:0});assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','ST-1','ST-3','UNKNOWN-1']);
+  assert.deepEqual(s.coverage.notOnDiagram,['ST-1']);assert.deepEqual(s.chains,[]);assert.deepEqual(s.blockers,[]);assert.equal(s.readiness.ready,false,'unknown carrier ticket remains incomplete');
+  assert.deepEqual(s.excluded.map(row=>row.key),['ST-2','ST-3','ST-4','ST-5']);assert.equal(s.excluded[1].reason,'Included by manual attachment');
+  assert.equal(s.excluded[0].url,'https://jira.test/browse/ST-2');assert.equal(s.excluded[0].title,'Unrelated delivery');
+  assert.equal(h.view.querySelector('.dv-live-epic-progress').textContent,'3 of 4 stories done · 3 of 4 on diagram');assert.equal(h.view.querySelectorAll('.dv-live-excluded-story').length,4);
+  const before=JSON.stringify(h.ctl.page);api.setEnabled(false);assert.equal(api.snapshot().epic.done,3);assert.equal(JSON.stringify(h.ctl.page),before);api.destroy();
+ }
+});
+test('X3 displayed upstream stories count once including excluded dependencies and transitive evidence',()=>{
+ const raw=exclusionFixture(),map=exclusionMap();raw.page.tracking.dependencies=[{ticket:'ST-1',on:'ST-4'},{ticket:'ST-5',on:'UNRELATED-2'}];
+ map['ST-1'].state='todo';map['UNRELATED-1']={state:'blocked'};
+ const h=harness(raw),api=h.ctl.liveStatus;api.apply(map);const s=plain(api.snapshot());
+ assert.equal(s.epic.stories,6);assert.equal(s.epic.done,2);assert.equal(s.epic.waiting,2);assert.equal(s.epic.blocked,2);assert.equal(s.counts.blocked,2);assert.equal(s.epic.outside,3);
+ assert.deepEqual(s.tickets.filter(row=>row.tag==='DEPENDENCY ONLY').map(row=>row.key).sort(),['ST-4','UNRELATED-1']);
+ assert.ok(!s.tickets.some(row=>row.key==='ST-5' || row.key==='UNRELATED-2'));assert.deepEqual(s.chains,[['UNRELATED-1','ST-4','ST-1']]);
+ assert.deepEqual(s.suggestions,[{ticket:'ST-1',on:'ST-4'}]);assert.equal(s.excluded.find(row=>row.key==='ST-4').included,true);assert.equal(s.excluded.find(row=>row.key==='ST-4').reason,'Included as dependency');api.destroy();
+});
+test('X4 loaded detail exclusions are local to their source and manual attachments override either source',async()=>{
+ const raw=exclusionFixture();raw.page.tracking.jira.exclude=['ST-1','ST-2'];raw.page.sections[0].diagram.nodes.a.tickets=['MAN-1'];raw.page.sections[0].diagram.edges=[];
+ const detail={page:{tracking:{jira:{site:'https://detail.test',epic:'EP-1',exclude:['ST-2','ST-3']}},sections:[{diagram:{nodes:{a:{tickets:['ST-2']}},rows:[['a']]}}]}};
+ const renderOptions={loadDetail:()=>Promise.resolve(detail)},h=harness(raw,{},renderOptions),api=h.ctl.liveStatus;api.apply(exclusionMap());
+ await renderOptions.loadDetail({spec:'approved'},new AbortController().signal);h.flush();const s=plain(api.snapshot());
+ assert.equal(s.epic.stories,8);assert.equal(s.epic.done,4);assert.deepEqual(s.coverage.onDiagram,['MAN-1','ST-2']);
+ assert.equal(s.excluded.find(row=>row.key==='ST-1').reason,'Included by another source');assert.equal(s.excluded.find(row=>row.key==='ST-2').reason,'Included by manual attachment');
+ assert.equal(s.excluded.find(row=>row.key==='ST-3').reason,'Included by another source');assert.equal(s.excluded.find(row=>row.key==='ST-3').url,'https://detail.test/browse/ST-3');api.destroy();
+});
+test('X5 manual-only and empty pages show useful progress, and exclusion-only pages retain the audit list',()=>{
+ for(const root of [undefined,[]]){
+  const raw=exclusionFixture();raw.page.tracking.jira.epic=root;const h=harness(raw),api=h.ctl.liveStatus;mountStatus(h);api.apply(exclusionMap());
+  assert.equal(api.snapshot().epic.stories,3);assert.equal(api.snapshot().epic.done,2);assert.equal(api.snapshot().epic.onDiagram,3);assert.equal(h.view.querySelector('.dv-live-epic-progress').textContent,'2 of 3 stories done · 3 of 3 on diagram');api.destroy();
+ }
+ const raw=exclusionFixture();raw.page.tracking.jira.epic=[];raw.page.sections=[];const h=harness(raw),api=h.ctl.liveStatus;mountStatus(h);api.apply({});
+ assert.equal(api.snapshot().epic.stories,0);assert.equal(api.snapshot().epic.done,0);assert.equal(h.view.querySelector('.dv-live-epic-progress').textContent,'0 of 0 stories done · 0 of 0 on diagram');assert.equal(h.view.querySelectorAll('.dv-live-excluded-story').length,5);api.destroy();
+});
+
+test('X6 completed, unknown and shared outside dependencies count once with manual and inherited overlap',()=>{
+ const raw={page:{tracking:{jira:{epic:'EP-1',exclude:['OUT-1']}},sections:[{diagram:{nodes:{a:{tickets:['MAN-1','OUT-1']}},rows:[['a']]}}]}};
+ const h=harness(raw),api=h.ctl.liveStatus;api.apply({'EP-1':{state:'done',kind:'epic'},'ST-1':{state:'todo',epic:'EP-1',dependsOn:[{key:'OUT-1',source:'jira'},{key:'UNKNOWN-1',source:'jira'},{key:'EP-1',source:'jira'}]},
+  'MAN-1':{state:'active',dependsOn:[{key:'OUT-1',source:'jira'},{key:'UNKNOWN-1',source:'jira'}]},'OUT-1':{state:'done',epic:'OTHER-1'}});
+ const s=plain(api.snapshot());assert.equal(s.epic.stories,4);assert.equal(s.epic.done,1);assert.equal(s.epic.onDiagram,2);assert.equal(s.epic.outside,3);assert.equal(s.epic.waiting,1);
+ assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','OUT-1','ST-1','UNKNOWN-1']);assert.deepEqual(s.counts,{todo:1,active:1,done:1,blocked:0,missing:0});
+ assert.equal(s.tickets.find(row=>row.key==='UNKNOWN-1').state,'No status');assert.equal(s.excluded[0].reason,'Included by manual attachment');api.destroy();
+});
+test('X7 authored exclusions are visible and linked before live evidence is available',()=>{
+ const h=harness(exclusionFixture());mountStatus(h);assert.equal(h.view.querySelectorAll('.dv-live-excluded-story').length,4);
+ assert.equal(h.view.querySelector('.dv-live-excluded-story').querySelector('a').getAttribute('href'),'https://jira.test/browse/ST-2');assert.equal(h.view.querySelector('.dv-live-epic'),null);h.ctl.liveStatus.destroy();
+});
+
+test('X8 hidden container excluded and unrelated dependents cannot create a phantom waiting count',()=>{
+ for(const hidden of ['EP-1','EX-1','OTHER-1']){
+  const raw={page:{tracking:{jira:{epic:'EP-1',exclude:['EX-1']},dependencies:[{ticket:hidden,on:'UP-1'}]},sections:[{diagram:{nodes:{a:{tickets:['ST-1']}},rows:[['a']]}}]}};
+  const map={'ST-1':{state:'done',epic:'EP-1'},'EP-1':{state:'todo',kind:'epic'},'EX-1':{state:'todo',epic:'EP-1'},'OTHER-1':{state:'todo'},'UP-1':{state:'todo'}};
+  const h=harness(raw),api=h.ctl.liveStatus;api.apply(map);
+  // Reproduces the former global-count bug: one hidden dependent waits while
+  // the only included story is done. Scope filtering must remove that count.
+  const unscoped=h.C.liveStatusTicketWaiting(h.C.liveStatusDependencies([h.ctl.page],map),map);assert.equal(Object.keys(unscoped).length,1);
+  let s=plain(api.snapshot());assert.deepEqual(s.tickets.map(row=>row.key),['ST-1']);assert.equal(s.epic.waiting,0);assert.deepEqual(s.waiting,{});assert.deepEqual(s.chains,[]);
+  map['ST-1']={state:'todo',epic:'EP-1',dependsOn:[{key:'UP-1',source:'jira'}]};api.apply(map);s=plain(api.snapshot());assert.equal(s.epic.waiting,1);assert.equal(s.tickets.filter(row=>row.waiting).length,1);assert.deepEqual(Object.keys(s.waiting),['ST-1']);
+  map['ST-1'].state='done';api.apply(map);s=plain(api.snapshot());assert.equal(s.epic.waiting,0,'completed dependent cannot wait even with its unfinished upstream retained');assert.deepEqual(s.chains,[]);
+  map['ST-1'].state='todo';map['UP-1'].state='done';api.apply(map);assert.equal(api.snapshot().epic.waiting,0,'fresh done upstream removes previous waiting');
+  map['UP-1'].state='todo';delete map['ST-1'].dependsOn;api.apply(map);assert.equal(api.snapshot().epic.waiting,0,'removed live link cannot leave stale waiting evidence');api.destroy();
+ }
+});
+test('X9 board waiting and chains match displayed story dependents across a container bridge',()=>{
+ const raw={page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{tickets:['ST-1']}},rows:[['a']]}}]}};
+ const h=harness(raw),api=h.ctl.liveStatus;api.apply({'ST-1':{state:'todo',epic:'EP-1',dependsOn:[{key:'EP-1',source:'jira'}]},'EP-1':{state:'todo',kind:'epic',dependsOn:[{key:'OUT-1',source:'jira'}]},'OUT-1':{state:'todo'}});
+ const s=plain(api.snapshot());assert.deepEqual(s.tickets.map(row=>row.key).sort(),['OUT-1','ST-1']);assert.equal(s.epic.stories,2);assert.equal(s.epic.state,'todo','parent status stays Jira state');assert.equal(s.epic.waiting,1);
+ assert.deepEqual(Object.keys(s.waiting),['ST-1']);assert.equal(s.epic.waiting,s.tickets.filter(row=>row.waiting).length);assert.deepEqual(s.chains,[['EP-1','ST-1']]);assert.equal(s.tickets.find(row=>row.key==='ST-1').dependsOn[0].key,'EP-1');api.destroy();
+});
+
+test('X10 Jira linked issue metadata keeps outside containers out of board totals without guessing unknown keys',()=>{
+ const C=providerContext(),link=issue=>({type:{inward:'is blocked by'},inwardIssue:issue});
+ const upstream=(key,type)=>{const issue=jira(key,'done');if(type)issue.fields.issuetype=type;return issue;};
+ for(const legacy of [false,true]){
+  const issue=jira('ST-1','new'),other=jira('ST-2','done');
+  const epic=upstream('EP-9',legacy?{name:'Epic'}:{name:'Delivery group',hierarchyLevel:1}),initiative=upstream('IN-9',legacy?{name:'Initiative'}:{name:'Program',hierarchyLevel:2});
+  issue.fields.issuelinks=[link(upstream('EP-9')),link(initiative),link(upstream('WORK-1',{name:'Story',hierarchyLevel:0})),link(upstream('WORK-2',{name:'Task',hierarchyLevel:0})),link(upstream('WORK-3',{name:'Bug',hierarchyLevel:0})),link(upstream('EP-404'))];
+  // The first link is sparse; metadata on a second dependent's link must fill it.
+  other.fields.issuelinks=[link(epic)];
+  const map=C.liveStatusJiraMap(['ST-1','ST-2'],[[issue,other]],new Set(),'https://jira.test');
+  assert.equal(map['EP-9'].kind,'epic');assert.equal(map['IN-9'].kind,'initiative');for(const key of ['WORK-1','WORK-2','WORK-3'])assert.equal(map[key].kind,'story');assert.equal(map['EP-404'].kind,undefined,'no type is unknown, never inferred from prefix');
+  const h=harness({page:{sections:[{diagram:{nodes:{a:{tickets:['ST-1','ST-2']}},rows:[['a']]}}]}});h.ctl.liveStatus.apply(map);const s=plain(h.ctl.liveStatus.snapshot());
+  assert.equal(s.epic.stories,6);assert.equal(s.epic.done,5);assert.equal(s.epic.waiting,0);assert.deepEqual(s.tickets.map(row=>row.key).sort(),['EP-404','ST-1','ST-2','WORK-1','WORK-2','WORK-3']);assert.deepEqual(s.counts,{todo:1,active:0,done:5,blocked:0,missing:0});
+  assert.ok(s.tickets.find(row=>row.key==='ST-1').dependsOn.some(dep=>dep.key==='IN-9'),'container remains direct dependency evidence');h.ctl.liveStatus.destroy();
+ }
+ const direct=upstream('KEEP-1',{name:'Story',hierarchyLevel:0}),dependent=jira('ST-1');dependent.fields.issuelinks=[link(upstream('KEEP-1',{name:'Epic',hierarchyLevel:1}))];
+ assert.equal(C.liveStatusJiraMap(['ST-1','KEEP-1'],[[dependent,direct]],new Set(),'')['KEEP-1'].kind,'story','requested issue metadata wins over a linked stub');
 });

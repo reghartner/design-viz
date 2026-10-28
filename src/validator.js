@@ -586,6 +586,7 @@ function validate(page){
   }
   trackingGithubScope(page,function(field,index){warnings.push('tracking.github'+field+(index===null?'':'['+index+']')+': '+(!field?'must be an object':field==='.repos'?'use an array of owner/repo names':'use an organization name')+' — ignored');});
   trackingEpics(page,function(index){warnings.push('tracking.jira.epic'+(index===null?'':'['+index+']')+': use an Epic or Initiative Jira key or an array of Jira keys — ignored');});
+  trackingExclusions(page,function(index){warnings.push('tracking.jira.exclude'+(index===null?'':'['+index+']')+': use an array of Jira story keys — ignored');});
   trackingDependencies(page,function(index){
     if(index===null){warnings.push('tracking.dependencies: must be an array of {"ticket", "on", "reason"?} pairs — ignored');return;}
     var entry=page.tracking.dependencies[index],self=entry && typeof entry==='object' && entry.ticket===entry.on && typeof entry.ticket==='string';

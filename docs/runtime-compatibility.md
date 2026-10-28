@@ -126,3 +126,11 @@ New behavior within an existing panel also needs its own feature ID and detector
 when old renderers would omit or misinterpret it. No versioning system can infer
 an unregistered future semantic change. The company release process is
 responsible for maintaining these declarations.
+
+Workbench project and Confluence exports stamp the authored source using the
+frozen resolved provider closure as additional capability evidence. Thus a
+consumer inherits `flow.live-status` requirements from provider ticket/PR refs
+even when it has no local tracking metadata. Only feature IDs and their required
+versions are added; saved source keeps its imports and never copies provider
+nodes or edges. The shared `stamp(spec, effective?)` and
+`stampText(text, effective?)` helpers accept this optional resolved evidence.

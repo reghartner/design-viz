@@ -15,6 +15,6 @@ export declare const FlowviewCompatibility: FlowviewRuntime & {
   detect(spec: unknown): string[];
   metadataWarnings(spec: unknown): string[];
   compare(a: string, b: string): number | null;
-  stamp(spec: unknown): unknown;
-  stampText(text: string): string;
+  stamp(spec: unknown, effective?: unknown): unknown;
+  stampText(text: string, effective?: unknown): string;
 };

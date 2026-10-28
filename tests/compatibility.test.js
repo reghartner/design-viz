@@ -441,3 +441,13 @@ test('import-only tracking declares live-status in authored exports without mate
     assert.ok(!C.detect({nodes:{},rows:[[]],topologyImports:[{nodeTracking:value}]}).includes('flow.live-status'));
   }
 });
+
+test('frozen effective provider evidence stamps authored imports without copying provider structure or metadata',()=>{
+  const raw={page:{title:'Board',flowview:{features:['future.capability'],minVersion:'0.2.0'},sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon'}]}}]}};
+  const effective={page:{title:'Resolved board',sections:[{diagram:{nodes:{'canon::api':{tickets:['AA-1'],prs:['https://github.com/acme/api/pull/1']}},rows:[['canon::api']]}}]}};
+  const before=JSON.stringify(raw),stamped=JSON.parse(C.stampText(before,effective));
+  assert.ok(stamped.page.flowview.features.includes('flow.live-status'));assert.ok(stamped.page.flowview.features.includes('future.capability'));
+  assert.deepEqual(stamped.page.sections,raw.page.sections);assert.equal(stamped.page.title,'Board');assert.equal(JSON.stringify(raw),before);
+  const invalid={page:{flowview:{features:'invalid'},sections:raw.page.sections}};
+  assert.deepEqual(plain(C.stamp(invalid,effective)),invalid);
+});

@@ -228,11 +228,14 @@ var FlowviewCompatibility = (function(){
     return {runtimeVersion:runtime.version,minVersion:minimum,missingFeatures:missing,messages:messages,
       status:schemaMismatch?'unsupported':messages.length?'partial':p && p.flowview?'compatible':'unversioned'};
   }
-  function stamp(raw){
+  function stamp(raw,effective){
     var copy=JSON.parse(JSON.stringify(raw)),p=pageOf(copy);
     if(!object(p) || metadataWarnings(copy).length)return copy;
     if(p.nodes && p.rows){copy={page:{sections:[{diagram:p}]}};p=copy.page;}
     var m=object(p.flowview)?p.flowview:{},required=detect(copy);
+    // A frozen provider closure contributes capability evidence, never topology
+    // or metadata values. The returned document stays authored source.
+    if(effective)detect(effective).forEach(function(id){if(required.indexOf(id)<0)required.push(id);});
     (m.features || []).forEach(function(id){if(required.indexOf(id)<0)required.push(id);});
     var minimum=m.minVersion || baseline;
     required.forEach(function(id){var f=features[id];if(f && compare(f.since,minimum)>0)minimum=f.since;});
@@ -240,13 +243,13 @@ var FlowviewCompatibility = (function(){
     if(p.contract==null)p.contract=contract;
     return copy;
   }
-  function stampText(text){
+  function stampText(text,effective){
     try{
       var raw=JSON.parse(text,function(key,value){
         if(typeof value==='number' && !Number.isFinite(value))throw new Error('Preserve overflowing numeric input.');
         return value;
       });
-      return JSON.stringify(stamp(raw),null,2).replace(/</g,'\\u003c');
+      return JSON.stringify(stamp(raw,effective),null,2).replace(/</g,'\\u003c');
     }
     catch(ex){return text;} // Saving unfinished JSON must remain possible.
   }

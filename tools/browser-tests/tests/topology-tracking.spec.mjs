@@ -1,4 +1,4 @@
-import {writeFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,closeTools} from '../helpers/test.mjs';
@@ -129,7 +129,7 @@ test('an Initiative board discovers stories over imported-only tracking and focu
   const root=page.locator('#docview'),panel=root.locator('.pt-live-status');
   await expect(panel.locator('.dv-live-scope')).toHaveText('Initiative · 2 epics');await expect(panel.locator('.dv-live-epic-progress')).toHaveText('1 of 3 stories done · 2 of 3 on diagram');
   await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(3);await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-ticket-epic')).toHaveText('epic EP-101');
-  await expect(panel.locator('tr[data-live-coverage-for="ST-3"]')).toContainText('NOT ON DIAGRAM');await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-dep')).toHaveAttribute('data-tone','red');
+  await expect(panel.locator('tr[data-live-coverage-for="ST-3"]')).toContainText('NOT ON DIAGRAM');await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-dep[data-live-dep-for="ST-3"]')).toHaveAttribute('data-tone','red');
   await expect(node(page)).toHaveClass(/dv-live-active/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-todo/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-waiting/);
   const coverage=panel.locator('tr[data-live-coverage-for="API-2"]');await expect(coverage.getByRole('button')).toHaveText(['API','Persist']);
   await coverage.getByRole('button',{name:'API',exact:true}).click();await expect(node(page).locator('.card')).toBeFocused();
@@ -151,4 +151,22 @@ test('import-overlay-only source exports live-status capability without page tra
   await page.locator('#file-input').setInputFiles({name:'overlay-only.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});
   await page.reload();await expect(page.locator('#src')).toHaveValue(json);await page.getByLabel('Demo live status',{exact:true}).check();
   await expect(page.locator('#docview path.edge')).toHaveClass(/dv-live-todo/);await expect(page.locator('#docview .pt-live-status tr[data-live-ticket="API-2"]')).toHaveCount(1);
+});
+
+test('provider-only tracking stamps editable project and Confluence exports without copying topology',async({page,server})=>{
+  await fixture(page,server,(provider,consumer)=>{
+    delete consumer.page.tracking;diagram(provider).nodes.api.prs=[pr];
+  });
+  const before=await source(page),pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))],saved=JSON.parse(json);
+  expect(saved.page.flowview.features).toContain('flow.live-status');expect(saved.page.tracking).toBeUndefined();
+  expect(diagram(saved)).toEqual(diagram(JSON.parse(before)));expect(diagram(saved).topologyImports[0].nodeTracking).toBeUndefined();
+  await expect(page.locator('#src')).toHaveValue(before);
+  const handoff=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#confluence-export').click();
+  const confluence=JSON.parse(await readFile(await (await handoff).path(),'utf8'));
+  expect((confluence.page || confluence).flowview.features).toContain('flow.live-status');
+  expect(JSON.stringify(confluence)).not.toContain('"canon::api":');expect(JSON.stringify(confluence)).toContain('topologyImports');
+  await page.locator('#file-input').setInputFiles({name:'inherited-only.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});
+  await page.reload();await expect(page.locator('#src')).toHaveValue(json);await select(page,'node');
+  await expect(page.locator('#guide')).toContainText('Inherited tracking (read only): CAN-1, '+pr);await expect(page.getByRole('button',{name:'Remove ticket 1',exact:true})).toHaveCount(0);
 });

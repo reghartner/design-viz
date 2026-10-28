@@ -91,7 +91,11 @@ New, imported and pasted documents start browser-only. Home/Continue retains a
 standalone working association; an agent connection that disconnects must be
 reopened. Reload recovers the browser draft without claiming a writable file;
 reopen the file/folder explicitly. Reopening loads disk contents and preserves the
-outgoing browser draft in Earlier drafts.
+outgoing browser draft in Earlier drafts. When the File pane reports **Browser
+recovery unavailable**, **Free browser storage** removes Flowview's earlier drafts
+(never other site data or the current draft), reports the space freed, and saves
+the draft again; Home → Earlier drafts offers the same cleanup with per-entry
+Export and Delete.
 
 Writable access requires a supporting desktop browser and secure context. Other
 browsers explicitly show **Browser only**; Export project still downloads a copy.

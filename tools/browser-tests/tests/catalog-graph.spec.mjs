@@ -46,8 +46,9 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   expect((await spec(page)).page.blocks[0].diagram.edges).toEqual([]);
   expect((await spec(page)).page.title).toBe('Doorbell without connections');
   await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts'))))
-    .toContainEqual(expect.objectContaining({text:createdText,baseline:createdText}));
+  // An earlier draft stores null for a baseline equal to its text (#406); restore reads both forms as the text.
+  expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')))).map(entry=>[entry.text,entry.baseline ?? entry.text]))
+    .toContainEqual([createdText,createdText]);
   await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
   await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Doorbell platform ·/}).click();
   await expect(page.locator('#src')).toHaveValue(createdText);await expect(page.locator('#undo-builder')).toBeDisabled();

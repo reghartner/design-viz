@@ -232,6 +232,53 @@ identity; a failed replacement after teardown invalidates it. Rejected source
 does not make a stale board fresh. Existing geometry and dialog checks still guard their own render/selection
 identities; a project counter does not replace independent operation generations.
 
+### Browser recovery storage (#406)
+
+Recovery copies live in three `localStorage` keys that `createBuilderPersistence()`
+owns: `dv-workbench-draft` (the current text plus its ledger and frozen topology
+context), `dv-workbench-baseline` (the Diff baseline, naming its draft by a
+length-plus-two-hash fingerprint rather than a second copy of the text) and
+`dv-workbench-earlier-drafts` (the two most recent distinct outgoing drafts, each
+with text, baseline, ledger and topology context; a baseline equal to the text is
+stored as `null`, which restore already reads as "same as the text"). They share
+the per-site Web Storage quota, which browsers commonly cap near 5 MB of UTF-16
+text, with every other key on the origin: Flowview's own small preferences
+(`dv-workbench-floating-v1` layout, `dv-workbench-secs`, `dv-workbench-authoring-repository-v1`,
+`dv_tour_v1`, `dv_tour_features_v1`, `flowview-library-recent-v1:<index url>`),
+the capped folder-agent conversation record `dv-folder-agent-recovery-v1`, and
+whatever the hosting site (Backstage, Confluence) stores on the same origin.
+Folder handles sit in the IndexedDB database `flowview-folder-recovery`, outside
+this quota. Session storage holds only per-visit retirement markers.
+
+Measured on the checked-in examples (characters, 2026-10-28, scratch script over
+`JSON.stringify` of the stored records): a spec costs about seven times its own
+size while open with two earlier drafts under the pre-#406 layout (text, two copies
+in the baseline record, and two archive entries of text plus baseline), so the
+~5M-character quota caps a diagram near 710K characters. `app-screens` (153K
+characters with four embedded screenshots) already used about 1.1M characters;
+`kestrel-overnight` (57K spec plus a 60K ledger) used about 620K; the 5.07M-character
+`flowview-product-tour` spec (40 embedded screenshots) can never fit as a browser
+recovery copy. The fingerprint and the omitted equal baseline cut the steady-state
+cost to about four times the spec size (`app-screens` 616K, `kestrel-overnight`
+431K), raising the cap to about 1.25M characters. Image-bearing diagrams remain
+the realistic threshold case; moving recovery copies to IndexedDB is the follow-up.
+
+The persistence leaf also reports and frees that footprint without touching other
+keys: `footprint()` returns the UTF-16 bytes per key and the number of archived
+entries (`{total, draft, baseline, archive, count}`, plus `unavailable` when the
+storage API is blocked); `removeArchived(entry)` drops one earlier draft and may
+rewrite the archive, leaving unreadable neighbours in place; `cleanup()` removes
+the earlier drafts and `cleanup({draft:true})` additionally the current draft and
+baseline, each returning the bytes freed. The builder exposes them as
+`builder.recovery`, writing the open project again after a cleanup so a failed
+save retries at once. The Workbench offers the cleanup wherever a full browser is
+reported: the File pane recovery status, the draft-recovery banner after a failed
+archive, and Home's Earlier drafts, which also lists per-entry Export and Delete
+and asks for an in-page confirmation (never a browser dialog) before removing the
+current draft. Visible failure path: when the storage API itself is unavailable,
+the footprint reads `unavailable` and the controls report the error instead of
+claiming success.
+
 The optional local agent transport lives in `workbench/agent-session.js`, loaded
 after the lifetime helper. It is inactive unless the localhost helper injects its
 configuration into the built page. The builder supplies source snapshots,

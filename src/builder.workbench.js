@@ -475,17 +475,20 @@ function initWorkbenchBuilder(opts){
   var interactions=null;
 
   var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
+  var persistence=createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
+    schedule:function(fn,ms){return life.delay(fn,ms);},
+    cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
+    archiveFailure:function(error){document.dispatchEvent(new CustomEvent('dv:draftarchiveerror',{detail:{message:error.message}}));},
+    status:function(state){
+      var status=document.getElementById('workbench-recovery-status');if(!status)return;
+      status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Use Export → Export project to keep your changes. For unfinished JSON, copy the text from the JSON workspace to a repair file.'}[state];
+      status.dataset.state=state;
+      /* A full browser offers the one-click cleanup right beside the failure (#406). */
+      var cleanup=document.getElementById('workbench-recovery-cleanup');if(cleanup)cleanup.hidden=state!=='unavailable';
+    }});
   var session=createBuilderSession({
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
-    persistence:createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
-      schedule:function(fn,ms){return life.delay(fn,ms);},
-      cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
-      archiveFailure:function(error){document.dispatchEvent(new CustomEvent('dv:draftarchiveerror',{detail:{message:error.message}}));},
-      status:function(state){
-        var status=document.getElementById('workbench-recovery-status');if(!status)return;
-        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Use Export → Export project to keep your changes. For unfinished JSON, copy the text from the JSON workspace to a repair file.'}[state];
-        status.dataset.state=state;
-      }}),
+    persistence:persistence,
     saveWorking:function(){if(workingFile)workingFile.save();},pendingWorking:function(){if(workingFile)workingFile.pending();},
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
     editError:function(message){inspectorMessage(message);},
@@ -1461,6 +1464,26 @@ function initWorkbenchBuilder(opts){
       }
     },current);
   }
+  /* Browser recovery housekeeping: frees only Flowview's own recovery keys and
+     reports the bytes freed. The current draft goes only with the explicit
+     choice, which the UI confirms in the page first (#406). */
+  var recovery={
+    footprint:function(){return persistence.footprint();},
+    cleanup:function(choice){
+      var result=persistence.cleanup(choice);
+      if(choice && choice.draft)session.forgetDraft();
+      if(session.isProjectOpen())session.save(); // writes the open project again, which also retries a failed save
+      return result;
+    },
+    removeEarlierDraft:function(entry){return persistence.removeArchived(entry);},
+    exportEarlierDraft:function(entry){var name=recoveryExportName(entry);io.download(name,entry.text,'application/json');return name;}
+  };
+  var recoveryCleanupBtn=document.getElementById('workbench-recovery-cleanup');
+  if(recoveryCleanupBtn)life.listen(recoveryCleanupBtn,'click',function(){
+    var status=document.getElementById('workbench-recovery-status');
+    try{var freed=recovery.cleanup();if(status)status.textContent+=' · Freed about '+recoveryBytesLabel(freed.freed)+' of Flowview recovery data.';}
+    catch(ex){if(status)status.textContent='Browser storage could not be freed: '+(ex.message || ex);}
+  });
   function restoreDraft(){
     var restored=session.restoreDraft(projectHooks());
     if(!restored)return false;
@@ -1661,6 +1684,7 @@ function initWorkbenchBuilder(opts){
       return io.download('flowview-draft-recovery.spec.json',typeof draft==='string'?draft:draft?draft.text:session.text(),'application/json');
     }),
     earlierDrafts:session.earlierDrafts,
+    recovery:{footprint:recovery.footprint,cleanup:life.guard(recovery.cleanup),removeEarlierDraft:life.guard(recovery.removeEarlierDraft),exportEarlierDraft:life.guard(recovery.exportEarlierDraft)},
     restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),
     navigate:navigateWorkspace,
     destroy:destroy,

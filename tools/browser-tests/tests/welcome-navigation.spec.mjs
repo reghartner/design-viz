@@ -40,6 +40,7 @@ test('failed Build archive keeps source and Undo, shows recovery, and downloads 
   await expect(page.locator('#src')).toHaveValue(edited);
   await expect(page.locator('#undo-builder')).toBeEnabled();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBe(earlier);
+  await expect(page.locator('#workbench-draft-recovery-cleanup')).toBeVisible();
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();
   await expect(page.locator('#welcome-template-error')).toBeHidden();
   await expect(page.locator('#workbench-draft-recovery [role="alert"]')).toContainText('earlier draft could not be saved');
@@ -48,6 +49,11 @@ test('failed Build archive keeps source and Undo, shows recovery, and downloads 
   const download=await downloadPromise;
   expect(download.suggestedFilename()).toBe('flowview-draft-recovery.spec.json');
   expect(await readFile(await download.path(),'utf8')).toBe(edited);
+  // The failure offers the cleanup in place: it frees the earlier drafts, reports the size, and keeps the current draft.
+  await page.locator('#workbench-draft-recovery-cleanup').click();
+  await expect(page.locator('#workbench-draft-recovery-result')).toContainText(/Freed about \d+ KB by removing 1 earlier draft\. Try the action again\./);
+  expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBeNull();
+  await expect(page.locator('#src')).toHaveValue(edited);
   await page.locator('#welcome-header-resume').click();await expect(editor(page)).toBeVisible();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
 });

@@ -41,7 +41,7 @@ function archiveHarness(initial){
   const persistence=context.createBuilderPersistence({
     storage:()=>({getItem:key=>storage.get(key)||null,setItem(key,value){
       if(blocked)throw Error('quota');writes++;storage.set(key,value);
-    }}),now:()=>++at,archiveFailure:()=>failures++
+    },removeItem:key=>storage.delete(key)}),now:()=>++at,archiveFailure:()=>failures++
   });
   return {persistence,storage,get writes(){return writes;},get failures(){return failures;},block(){blocked=true;}};
 }
@@ -316,4 +316,77 @@ test('working-file saving remains independent of browser-storage failure for inp
   const session=context.createBuilderSession({source:{read:()=>source,write:value=>source=value},persistence,render(){},saveWorking(){working++;}});
   source='{ handwritten';session.noteInput();timer();assert.equal(working,1);assert.equal(browserStates.at(-1),'unavailable');
   session.accept({text:'{"valid":true}'});session.undo();session.redo();assert.equal(working,4);assert.equal(browserStates.at(-1),'unavailable');
+});
+
+test('recovery footprint, per-entry removal and cleanup touch only Flowview recovery keys and report freed bytes',()=>{
+  const storage=new Map([['host-preference','kept'],['dv-workbench-floating-v1','{"windows":{}}']]);
+  let at=0;
+  const persistence=context.createBuilderPersistence({storage:()=>({getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}),now:()=>++at});
+  assert.deepEqual(plain(persistence.footprint()),{total:0,draft:0,baseline:0,archive:0,count:0});
+  persistence.save('{"title":"current"}','{"title":"base"}',{ledger:'ledger'});
+  persistence.preserve('A','base A',{ledger:'ledger A'});persistence.preserve('B','base B',{ledger:'ledger B'});
+  const size=key=>2*(key.length+storage.get(key).length),before=persistence.footprint();
+  assert.deepEqual(plain(before),{total:size('dv-workbench-draft')+size('dv-workbench-baseline')+size('dv-workbench-earlier-drafts'),
+    draft:size('dv-workbench-draft'),baseline:size('dv-workbench-baseline'),archive:size('dv-workbench-earlier-drafts'),count:2});
+  const removed=persistence.removeArchived(persistence.archived()[1]);
+  assert.ok(removed.freed>0 && removed.removed);assert.deepEqual(plain(persistence.archived()).map(e=>e.text),['B']);
+  assert.deepEqual(plain(persistence.removeArchived({text:'missing'})),{freed:0,removed:false});
+  const archiveBytes=size('dv-workbench-earlier-drafts'),kept=persistence.cleanup();
+  assert.deepEqual(plain(kept),{freed:archiveBytes,archive:1,draft:false});
+  assert.equal(storage.has('dv-workbench-earlier-drafts'),false);assert.ok(storage.has('dv-workbench-draft') && storage.has('dv-workbench-baseline'));
+  const draftBytes=size('dv-workbench-draft')+size('dv-workbench-baseline'),all=persistence.cleanup({draft:true});
+  assert.deepEqual(plain(all),{freed:draftBytes,archive:0,draft:true});
+  assert.deepEqual([...storage.keys()],['host-preference','dv-workbench-floating-v1'],'unrelated site data and Workbench preferences stay');
+  assert.deepEqual(plain(persistence.footprint()),{total:0,draft:0,baseline:0,archive:0,count:0});
+  const blocked=context.createBuilderPersistence({storage(){throw Error('blocked');},now:()=>1});
+  assert.deepEqual(plain(blocked.footprint()),{total:0,draft:0,baseline:0,archive:0,count:0,unavailable:true});
+  assert.throws(()=>blocked.cleanup(),/blocked/);
+});
+test('cleanup removes a malformed archive whole while per-entry removal keeps unreadable bytes',()=>{
+  const malformed='[{"text":"first"},null,{"broken":true},{"text":"second"}]',h=archiveHarness(malformed);
+  assert.equal(h.persistence.footprint().count,4);
+  const removed=h.persistence.removeArchived({text:'first'});
+  assert.ok(removed.removed);assert.equal(h.storage.get('dv-workbench-earlier-drafts'),'[null,{"broken":true},{"text":"second"}]');
+  assert.ok(h.persistence.cleanup().freed>0);assert.equal(h.storage.has('dv-workbench-earlier-drafts'),false);
+});
+test('the baseline record carries a fingerprint instead of a second copy of the draft and still rejects mismatched baselines',()=>{
+  const storage=new Map();
+  const p=context.createBuilderPersistence({storage:()=>({getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}),now:()=>1});
+  const draft='{"title":"a draft that is long enough to matter for storage"}';
+  p.save(draft,'baseline text');
+  const record=JSON.parse(storage.get('dv-workbench-baseline'));
+  assert.equal(record.text,'baseline text');assert.equal('draftText' in record,false);
+  assert.ok(storage.get('dv-workbench-baseline').length<draft.length+'baseline text'.length,'no second copy of the draft');
+  assert.deepEqual(plain(p.read()),{draft:{text:draft,at:1},baseline:'baseline text'});
+  storage.set('dv-workbench-draft',JSON.stringify({text:'other draft',at:2}));
+  assert.equal(p.read().baseline,null,'a fingerprint for another draft is rejected');
+  storage.set('dv-workbench-baseline',JSON.stringify({text:'legacy baseline',draftText:'other draft'}));
+  assert.equal(p.read().baseline,'legacy baseline','legacy records with the full draft copy still match');
+});
+test('earlier drafts omit a baseline equal to their text and treat both forms as the same draft',()=>{
+  const h=archiveHarness(),p=h.persistence;
+  p.preserve('same','same',{ledger:'L'});
+  const [entry]=JSON.parse(h.storage.get('dv-workbench-earlier-drafts'));
+  assert.equal(entry.baseline,null);assert.equal(entry.text,'same');assert.equal(entry.ledger,'L');
+  const writes=h.writes;p.preserve('same','same',{ledger:'L'});assert.equal(h.writes,writes,'the same draft is not archived twice');
+  p.preserve('edited','same');
+  assert.deepEqual(plain(p.archived()).map(e=>[e.text,e.baseline]),[['edited','same'],['same',null]]);
+  h.storage.set('dv-workbench-earlier-drafts',JSON.stringify([{text:'legacy',baseline:'legacy',at:1}]));
+  p.preserve('legacy','legacy');
+  assert.equal(JSON.parse(h.storage.get('dv-workbench-earlier-drafts')).length,1,'a legacy entry with an equal baseline is the same draft');
+});
+test('recovery byte labels and export names are stable',()=>{
+  assert.equal(context.recoveryBytesLabel(0),'0 KB');assert.equal(context.recoveryBytesLabel(300),'1 KB');
+  assert.equal(context.recoveryBytesLabel(614400),'600 KB');assert.equal(context.recoveryBytesLabel(1258291),'1.2 MB');
+  assert.equal(context.recoveryBytesLabel(2*1048576),'2 MB');
+  assert.equal(context.recoveryExportName({text:'{"page":{"title":"Big earlier A"}}   '}),'flowview-earlier-draft-big-earlier-a.spec.json');
+  assert.equal(context.recoveryExportName({text:' { unfinished'}),'flowview-earlier-draft.spec.json');
+  assert.equal(context.recoveryExportName({text:'{"title":"'+'x'.repeat(80)+'"}'}),'flowview-earlier-draft-'+'x'.repeat(40)+'.spec.json');
+});
+test('forgetting the browser draft hides it from the session without saving the boot source',()=>{
+  const storage=new Map([['dv-workbench-draft',JSON.stringify({text:'saved',at:1})]]);
+  const h=harness({storage,deferInitialSave:true}),s=h.session;
+  assert.equal(s.draft().text,'saved');
+  s.forgetDraft();assert.equal(s.draft(),null);assert.equal(s.isProjectOpen(),false);assert.equal(s.restoreDraft(),false);
+  assert.equal(storage.get('dv-workbench-draft'),JSON.stringify({text:'saved',at:1}),'storage removal belongs to the persistence cleanup');
 });

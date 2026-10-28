@@ -230,6 +230,30 @@ drag changes no source or Undo history and does not replace Inspector content.
 The solid lock border and badge appear only on the editing canvas,
 not in readers, read-only preview, embeds, or exported SVG.
 
+Data panels take the same position lock, scoped to the placement that owns
+their rectangle. In Explore, **Panels → Lock position** beside a panel's
+Placement control, or **Lock position** in a canvas panel's right-click menu,
+writes `locked: true` on that View's saved floating or canvas rectangle as one
+undoable edit; a stacked or automatic panel first becomes a fixed rectangle at
+its current place and size. In a Standard arrangement, **Arrange selected
+section… → Lock position** writes it on the selected tile of the active host
+profile only. A locked panel keeps its position and size: header drags, corner
+resizes, arrow keys, the Column/Row/Width/Height fields, Swap places and
+**Stack at edge** leave it where it is and announce that it stayed fixed, while
+selection, content editing, saved visibility, Hide/Restore and deletion continue
+to work. Mixed node and canvas-panel selections keep locked members selected
+while nudges, alignment, distribution and spacing move only the unlocked
+members; an all-locked action changes no source and adds no Undo entry.
+**Optimize layout** keeps every locked tile or panel fixed and arranges the
+unlocked ones around it; when nothing unlocked remains it reports that and
+changes nothing, and if the unlocked panels cannot be stacked clear of the
+locked ones it explains why and leaves the arrangement unchanged. **Reset
+layout** is the explicit escape hatch: it discards the whole arrangement,
+locks included. Changing a panel's Placement is still an explicit edit; each
+placement keeps its own lock. Reader movement of panels remains temporary and
+is not restricted. The lock outline and badge appear only in the Workbench
+editor, never in readers, read-only preview, or exports.
+
 A fresh editor leaves these windows closed so the view controls and authored
 panels are available immediately. The first object selection opens **Inspect**
 with its fields. A saved browser workspace restores its previous open windows and

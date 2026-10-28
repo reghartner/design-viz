@@ -178,7 +178,10 @@ Use **View → Use current camera as opening view** to save current pan and zoom
 Temporary Hide/Restore actions never change saved visibility; use **Visible
 elements** for that. **Section notes** has its own saved visibility checkbox in
 Explore. Reset and Optimize preserve that visibility while clearing its position
-and size. Defaults are shared across host profiles and scale to the
+and size. Optimize also keeps every position-locked panel at its saved rectangle
+and placement and stacks the unlocked panels around it; Reset clears locks with
+the rest of the arrangement (see
+[panel position locks](workbench-workspace.md)). Defaults are shared across host profiles and scale to the
 available viewport. Duplicating a view preserves its defaults. Returning a view to **Standard** restores its authored arrangement.
 
 Keep Standard as the default for a business presentation and add an Explore
@@ -318,7 +321,13 @@ host's total height; it reserves no separate grid space. Allow enough host heigh
 for both the visualization and controls. An undersized host scrolls. Legacy
 combined tiles with no controls entry reserve 4 rows, or 6 with alternate paths.
 Omit `attachTo` for a detached tile. Do not
-combine `panel` and `controls` on one tile. Omitting the controls tile preserves
+combine `panel` and `controls` on one tile. An optional boolean `locked` on a
+diagram or panel tile is a position lock for that host profile: Optimize
+layout, drags, arrow keys, the size and position fields and Swap places keep
+the tile's rectangle, and other tiles pack around it. Step-control tiles take
+no `locked`; attached controls follow their host. A hidden locked tile reserves
+no space until it is shown again. Reset layout removes the profile, locks
+included. Omitting the controls tile preserves
 the previous combined diagram-and-controls presentation. A saved controls
 position is ignored while no steps are available and reused if steps return.
 `x` and `y` are zero-based grid positions;
@@ -404,12 +413,20 @@ on rendered content, and the wrapped right-edge columns described above. The
 renderer clamps windows to the available viewport and practical minimum sizes.
 Invalid optional entries warn and fall back independently.
 
+Optional boolean `locked` on a `panels[]` or `canvas.panels[]` entry is a
+position lock for that rectangle: the panel keeps its position and size through
+Optimize layout, authored drags, resizes, arrow keys, Stack at edge and mixed
+selection moves, and the automatic stack flows around it. A locked floating
+rectangle is never `stacked`. Each placement keeps its own lock; Reset layout
+clears them.
+
 ```json
 "exploreLayout": {
   "overlayScale": 0.75,
   "prosePlacement": "floating",
   "panels": [
-    {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true}
+    {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true},
+    {"panel":"phone", "x":0.04, "y":0.6, "w":0.2, "h":0.3, "locked":true}
   ],
   "prose": {"x":0.04, "y":0.12, "w":0.3, "h":0.38, "stacked":false},
   "controls": {"x":0.02, "y":0.83, "w":0.68, "h":0.14},

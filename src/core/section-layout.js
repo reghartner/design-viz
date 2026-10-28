@@ -18,14 +18,23 @@ function sectionLayoutTiles(d){
   if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
   return tiles;
 }
+/* A position-locked diagram or panel tile keeps its saved rectangle through
+   packing, Optimize and gestures; other tiles flow around it. Hidden tiles
+   reserve no space, so their lock is dormant until they are shown again. */
+function sectionLayoutFixed(item){
+  return !!item && item.locked===true && item.controls==null && item.hidden!==true;
+}
 function sectionLayoutPack(items, priority){
   var dock=sectionLayoutDock(items);
   var placed = [], order = items.map(function(it){return Object.assign({},it);});
-  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
+  /* Locked tiles are placed first and never move; the gesture's own tile
+     follows, so a drag onto a locked tile sends the dragged tile below it. */
+  function rank(it){return sectionLayoutFixed(it)?0:priority && sectionLayoutKey(it)===priority?1:2;}
+  order.sort(function(a,b){return rank(a)-rank(b);});
   order.forEach(function(it){
     function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
     var hits;
-    while (!it.hidden && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    while (!it.hidden && !sectionLayoutFixed(it) && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
     placed.push(it);
   });
   return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
@@ -40,13 +49,17 @@ function sectionLayoutControlsRows(d,items){
   var steps=(items || []).find(function(it){return it.controls==='steps';});
   return steps?steps.h:(d.paths || []).length>1?6:4;
 }
-function sectionLayoutPreset(d, target, excludedKeys){
-  var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
-  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
+/* `fixed` tiles are occupied bounds (locked tiles) that the preset flows
+   around; only the newly placed tiles are returned. */
+function sectionLayoutPreset(d, target, excludedKeys, fixed){
+  var excluded=Array.isArray(excludedKeys)?excludedKeys:[], occupied=Array.isArray(fixed)?fixed.length:0;
+  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=occupied?fixed.map(function(it){return Object.assign({},it);}):[];
   var ordered=tiles;
   var controls=tiles.find(function(t){return t.key==='steps';});
   if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
+  /* Fixed tiles still shape the widths chosen for the tiles placed around them. */
+  var fixedKeys=occupied?fixed.map(sectionLayoutKey):[];
+  var supporting=sectionLayoutTiles(d).some(function(t){return (excluded.indexOf(t.key)<0 || fixedKeys.indexOf(t.key)>=0) && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
   ordered.forEach(function(t){
     var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge;
     var w=large?(narrow||!supporting?24:16):(narrow?12:8);
@@ -60,7 +73,7 @@ function sectionLayoutPreset(d, target, excludedKeys){
     candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
     var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
   });
-  return items;
+  return items.slice(occupied);
 }
 /* Explore defaults are viewport fractions; camera center is in SVG coordinates.
    Recover malformed optional entries independently without modifying source. */
@@ -132,7 +145,9 @@ function sectionExploreLayout(d,value,warnings,path){
         else canvasOut.panels=canvas.panels.reduce(function(list,v,i){
           var at=path+'.canvas.panels['+i+']',r=graphRect(v,at);
           if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || canvasUsed[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
-          canvasUsed[v.panel]=true;if(r)list.push(Object.assign({panel:v.panel},r));return list;
+          canvasUsed[v.panel]=true;
+          if(v.locked!==undefined && typeof v.locked!=='boolean'){warn(at+'.locked','expected a boolean');return list;}
+          if(r)list.push(Object.assign({panel:v.panel},r,v.locked===true?{locked:true}:{}));return list;
         },[]);
       }
       if(canvas.controls!==undefined){var controlsRect=graphRect(canvas.controls,path+'.canvas.controls');if(controlsRect)canvasOut.controls=controlsRect;}
@@ -155,7 +170,9 @@ function sectionExploreLayout(d,value,warnings,path){
       if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || used[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
       used[v.panel]=true;
       if(v.stacked!==undefined && typeof v.stacked!=='boolean'){warn(at+'.stacked','expected a boolean');return list;}
-      if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
+      if(v.locked!==undefined && typeof v.locked!=='boolean'){warn(at+'.locked','expected a boolean');return list;}
+      // A locked rectangle is fixed, so it never rejoins the edge stack.
+      if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true && v.locked!==true},v.locked===true?{locked:true}:{}));return list;
     },[]);
   }
   if(value.prose!==undefined){
@@ -246,6 +263,7 @@ function sectionLayoutItems(d, target, id){
       if(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))copy.attachTo=it.attachTo;
     }
     if(it.hidden===true && it.controls==null)copy.hidden=true;
+    if(it.locked===true && it.controls==null)copy.locked=true;
     used[key]=true;items.push(copy);
   });
   var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);

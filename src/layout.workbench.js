@@ -185,17 +185,28 @@ function initSectionLayoutEditor(opts){
     sectionLayoutTiles(d).filter(function(t){return !(dock && t.key==='steps') && items.some(function(it){return sectionLayoutKey(it)===t.key;});}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
     if(!items.some(function(it){return sectionLayoutKey(it)===selected;}))selected='diagram';choose.value=selected;
     fieldLife.listen(choose,'change',function(){selected=choose.value;fields(section,d);});row.appendChild(choose);
-    var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={};
+    var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={},itemLocked=item.locked===true,tile=sectionLayoutTiles(d).find(function(t){return t.key===selected;});
     [['x','Column',1,SECTION_LAYOUT_COLUMNS],['y','Row',1,501],['w','Width',1,SECTION_LAYOUT_COLUMNS],['h','Height',3,40]].forEach(function(f){
-      var l=el('label',null,f[1]+' '),input=el('input');input.type='number';input.min=f[2];input.max=f[3];input.step='1';input.value=item[f[0]]+(f[0]==='x'||f[0]==='y'?1:0);input.setAttribute('aria-label',f[1]);inputs[f[0]]=input;l.appendChild(input);row.appendChild(l);
+      var l=el('label',null,f[1]+' '),input=el('input');input.type='number';input.min=f[2];input.max=f[3];input.step='1';input.value=item[f[0]]+(f[0]==='x'||f[0]==='y'?1:0);input.setAttribute('aria-label',f[1]);input.disabled=itemLocked;inputs[f[0]]=input;l.appendChild(input);row.appendChild(l);
     });
-    row.appendChild(button('Apply size / position',function(){
+    var apply=button('Apply size / position',function(){
       var next=items.map(function(it){return Object.assign({},it);}),it=next.find(function(v){return sectionLayoutKey(v)===selected;});
+      if(it.locked===true){feedback('Position locked. Unlock '+(tile?tile.title:'the element')+' to change its size or position.');return;}
       Object.keys(inputs).forEach(function(k){it[k]=Number(inputs[k].value)-(k==='x'||k==='y'?1:0);});
       var warnings=[];sectionLayoutWarnings(Object.assign({},d,{sectionLayout:{columns:24,default:next}}),'diagram',warnings);
       if(warnings.length){feedback(warnings[0]);return;}
       persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
-    }));
+    });apply.disabled=itemLocked;if(itemLocked)apply.title='Position locked. Unlock to change size or position.';row.appendChild(apply);
+    // A position lock (#474) fixes this tile's rectangle for drags, arrow keys,
+    // these fields and Optimize layout; visibility and content stay editable.
+    if(selected!=='steps'){
+      var lockLabel=el('label','layout-position-lock'),lock=el('input');lock.type='checkbox';lock.checked=itemLocked;lock.setAttribute('aria-label','Lock position of '+(tile?tile.title:selected));lock.setAttribute('data-layout-lock',selected);
+      fieldLife.listen(lock,'change',function(){
+        var next=items.map(function(it){var copy=Object.assign({},it);if(sectionLayoutKey(it)===selected){if(lock.checked)copy.locked=true;else delete copy.locked;}return copy;});
+        if(!persist(index,next,id))lock.checked=itemLocked;
+      });
+      lockLabel.appendChild(lock);lockLabel.appendChild(el('span',null,'Lock position'));row.appendChild(lockLabel);
+    }
     }
     var contentTiles=explore && section.querySelector('.sec-prose')?[{key:'prose',title:'Section notes',hidden:!!(definition.exploreLayout.prose && definition.exploreLayout.prose.hidden)}]:[];
     var visibility=sectionLayoutVisibilityControl(document,d,items,definition?definition.name:'Layout',function(key,visible){
@@ -269,11 +280,29 @@ function initSectionLayoutEditor(opts){
     }
     if(!explore && selected!=='steps'){
       var swap=el('select');swap.setAttribute('aria-label','Swap places with');
-      sectionLayoutTiles(d).filter(function(t){return t.key!==selected && t.key!=='steps';}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;swap.appendChild(o);});
+      sectionLayoutTiles(d).filter(function(t){return t.key!==selected && t.key!=='steps' && !items.some(function(it){return sectionLayoutKey(it)===t.key && it.locked===true;});}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;swap.appendChild(o);});
+      var selectedLocked=items.some(function(it){return sectionLayoutKey(it)===selected && it.locked===true;});
       row.appendChild(swap);var swapButton=button('Swap places',function(){persist(index,sectionLayoutSwap(items,selected,swap.value));});
-      swapButton.disabled=!swap.options.length;swapButton.title='Exchange position, size and visibility with the selected element.';row.appendChild(swapButton);
+      swapButton.disabled=!swap.options.length || selectedLocked;swapButton.title=selectedLocked?'Position locked. Unlock to swap places.':'Exchange position, size and visibility with the selected element. Locked elements are not offered.';row.appendChild(swapButton);
     }
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
+  }
+  /* Lock cue only while this section is being arranged; readers, preview and
+     exports never receive the class or badge. */
+  function paintLocks(section,items){
+    section.querySelectorAll('.section-layout-tile').forEach(function(tile){
+      var item=items && items.find(function(it){return sectionLayoutKey(it)===tile.getAttribute('data-layout-key');}),locked=!!(item && item.locked===true),badge=tile.querySelector(':scope>.dv-position-lock-badge');
+      tile.classList.toggle('dv-position-locked',locked);if(!locked)tile.classList.remove('dv-position-lock-feedback');
+      if(locked && !badge){badge=el('span','dv-position-lock-badge');badge.setAttribute('role','img');badge.setAttribute('aria-label','Position locked');tile.appendChild(badge);}
+      else if(!locked && badge)badge.remove();
+    });
+  }
+  function lockedHandle(handle,items){
+    var tile=handle.closest('.section-layout-tile'),item=tile && items && items.find(function(it){return sectionLayoutKey(it)===tile.getAttribute('data-layout-key');});
+    if(!item || item.locked!==true)return false;
+    feedback('Position locked; '+(tile.getAttribute('data-layout-label') || 'this element')+' stayed fixed. Uncheck Lock position to move or resize it.');
+    tile.classList.add('dv-position-lock-feedback');life.delay(function(){tile.classList.remove('dv-position-lock-feedback');},900);
+    return true;
   }
   function refreshViewSettings(){
     view.querySelectorAll('.doc-sec[data-dv-section]').forEach(function(section){
@@ -307,8 +336,15 @@ function initSectionLayoutEditor(opts){
           if(!ready())return;editing=index;
           var current=rawDiagram(index),items=sectionLayoutItems(current,profile,activeLayout(index)),p=presentation(index);
           var definition=sectionLayoutDefinition(current,activeLayout(index));
-          if(effectivePresentation(index,definition)==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
-          if(persist(index,sectionLayoutOptimize(current,profile,items))){forceLayout(index);refresh();}
+          // Explore Optimize keeps position-locked panels; Reset layout clears them.
+          if(effectivePresentation(index,definition)==='explore'){var optimize=p && (p.optimizeExplore || p.resetExplore);if(optimize)optimize();return;}
+          var next=sectionLayoutOptimize(current,profile,items),locked=(items || []).filter(sectionLayoutFixed);
+          if(locked.length){
+            if(JSON.stringify(next)===JSON.stringify(items)){feedback('Every visible element is position-locked; Optimize layout changed nothing.');return;}
+            var moved=locked.find(function(it){var after=next.find(function(n){return sectionLayoutKey(n)===sectionLayoutKey(it);});return !after || ['x','y','w','h'].some(function(k){return after[k]!==it[k];});});
+            if(moved){feedback('Optimize layout could not keep every locked position; the arrangement is unchanged.');return;}
+          }
+          if(persist(index,next)){forceLayout(index);refresh();}
         }));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;var p=presentation(index),v=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));if(effectivePresentation(index,v)==='explore'){if(p && p.resetExplore)p.resetExplore();return;}endEditing();persist(index,null);}));
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
@@ -361,6 +397,7 @@ function initSectionLayoutEditor(opts){
         }
       });
       section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
+      paintLocks(section,editing===index && effectivePresentation(index,definition)!=='explore'?currentItems(index,d):null);
       if(editing===index){
         fields(section,d);
         if(effectivePresentation(index,definition)!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
@@ -394,6 +431,7 @@ function initSectionLayoutEditor(opts){
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
     var items=currentItems(index),rect=grid.getBoundingClientRect(),scale=grid.offsetWidth?rect.width/grid.offsetWidth:1;
+    if(lockedHandle(handle,items)){fields(section,rawDiagram(index));return;}
     drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)*scale/SECTION_LAYOUT_COLUMNS,row:40*scale,minHeight:grid.style.minHeight};
     // Keep the scroll range while moving the bottom tile upward. Otherwise
     // scroll clamping moves the grid origin and feeds back into the next delta.
@@ -424,7 +462,9 @@ function initSectionLayoutEditor(opts){
     if(controls && (ev.key==='ArrowLeft' || ev.key==='ArrowRight'))return;
     selected=key;var delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
     var resize=ev.shiftKey||handle.classList.contains('section-tile-resize');
-    var items=currentItems(index),d=rawDiagram(index),next=controls?sectionLayoutResizeControls(d,items,sectionLayoutControlsRows(d,items)+delta[1]):sectionLayoutGesture(items,key,delta[0],delta[1],resize);
+    var items=currentItems(index),d=rawDiagram(index);
+    if(lockedHandle(handle,items))return;
+    var next=controls?sectionLayoutResizeControls(d,items,sectionLayoutControlsRows(d,items)+delta[1]):sectionLayoutGesture(items,key,delta[0],delta[1],resize);
     if(persist(index,next))life.delay(function(){
       if(editing!==index)return;refresh();
       var sec=view.querySelector('[data-dv-section="'+index+'"]');if(!sec)return;
@@ -444,8 +484,8 @@ function initSectionLayoutEditor(opts){
     beforeReplace:life.guard(function(request){cancel();if(!request || ['edit','history','arrangement-preview'].indexOf(request.origin)<0)endEditing();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();endEditing();
       var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){var p=rec.presentation || rec.viewport;if(p && p.setArranging)p.setArranging(false);var clear=p && (p.setExploreAuthor || p.setAuthor);if(clear)clear.call(p,null);});
-      view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-controls-resize').forEach(function(node){node.remove();});
-      view.querySelectorAll('.section-arranging,.layout-selected').forEach(function(node){node.classList.remove('section-arranging','layout-selected');});
+      view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-controls-resize,.section-layout-tile>.dv-position-lock-badge').forEach(function(node){node.remove();});
+      view.querySelectorAll('.section-arranging,.layout-selected,.dv-position-locked,.dv-position-lock-feedback').forEach(function(node){node.classList.remove('section-arranging','layout-selected','dv-position-locked','dv-position-lock-feedback');});
       view.style.removeProperty('--home-max-height');
       if(stage.parentNode)stage.parentNode.insertBefore(view,stage);toolbar.remove();stage.remove();
     }};

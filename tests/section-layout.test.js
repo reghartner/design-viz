@@ -817,3 +817,88 @@ test('whole step-controls scale validates independently and survives arrangement
  }
  assert.deepEqual(d,before);
 });
+
+/* #474 panel position locks live on the tile (Standard) or the saved Explore
+   rectangle. Optimize arranges unlocked tiles around them; gestures leave them. */
+function lockedPreset(d,target){
+  const items=plain(ctx.sectionLayoutPreset(d,target)),phone=items.find(t=>t.panel==='phone');
+  Object.assign(phone,{x:0,y:0,w:8,h:6,locked:true});
+  return ctx.sectionLayoutPack(items,'panel:phone').map(t=>({...t}));
+}
+test('locked tiles project, validate as booleans on diagram or panel tiles and stay out of step controls',()=>{
+  const d=diagram(),items=[{...board,locked:true},{...phone,locked:true},{controls:'steps',x:0,y:12,w:24,h:4,locked:true},{panel:'home',x:0,y:16,w:12,h:6,locked:false}];
+  const projected=plain(ctx.sectionLayoutItems({...d,sectionLayout:{columns:24,default:items}},'default'));
+  assert.equal(projected.find(t=>ctx.sectionLayoutKey(t)==='diagram').locked,true);assert.equal(projected.find(t=>t.panel==='phone').locked,true);
+  assert.equal('locked' in projected.find(t=>t.controls),false);assert.equal('locked' in projected.find(t=>t.panel==='home'),false);
+  const warnings=[];ctx.sectionLayoutWarnings({...d,sectionLayout:{columns:24,default:items}},'diagram',warnings);
+  assert.equal(warnings.length,1);assert.match(warnings[0],/default\[2\].*locked/);
+  const bad=[];ctx.sectionLayoutWarnings({...d,sectionLayout:{columns:24,default:[{...board,locked:'yes'}]}},'diagram',bad);assert.match(bad[0],/locked/);
+  assert.ok(ctx.planSectionLayout(JSON.stringify(d),d,0,'default',[{...board,locked:'yes'}]).error);
+  const legacy=[];ctx.sectionLayoutWarnings({...d,sectionLayout:{columns:24,default:[board,phone]}},'diagram',legacy);assert.deepEqual(legacy,[]);
+});
+test('optimization keeps every locked tile fixed, arranges unlocked tiles around it and keeps legacy parity without locks',()=>{
+  for(const target of ['default','backstage','confluence']){
+    const d=diagram(),items=lockedPreset(d,target),before=JSON.stringify(items);
+    const optimized=plain(ctx.sectionLayoutOptimize(d,target,items));
+    assert.equal(JSON.stringify(items),before,'input is not mutated');
+    assert.deepEqual(optimized.find(t=>t.panel==='phone'),{panel:'phone',x:0,y:0,w:8,h:6,locked:true});
+    assert.equal(optimized.length,items.length);noOverlap(optimized.filter(t=>!t.hidden));
+    const warnings=[];ctx.sectionLayoutWarnings({...d,sectionLayout:{columns:24,[target]:optimized}},'diagram',warnings);assert.deepEqual(warnings,[]);
+    const plain24=plain(ctx.sectionLayoutOptimize(d,target,plain(ctx.sectionLayoutPreset(d,target))));
+    assert.deepEqual(plain24,plain(ctx.sectionLayoutPack(ctx.sectionLayoutPreset(d,target))),'unlocked documents optimize exactly as before');
+    assert.ok(plain24.every(t=>!('locked' in t)));
+  }
+});
+test('all-locked optimization is a geometric no-op and a locked docked host keeps its controls',()=>{
+  const d=diagram(),items=plain(ctx.sectionLayoutPreset(d,'default'));
+  items.forEach(t=>{if(!t.controls)t.locked=true;});
+  const shuffled=items.map(t=>({...t}));shuffled.find(t=>t.panel==='q').y+=7;
+  const byKey=list=>[...list].sort((a,b)=>ctx.sectionLayoutKey(a).localeCompare(ctx.sectionLayoutKey(b)));
+  assert.deepEqual(byKey(plain(ctx.sectionLayoutOptimize(d,'default',shuffled))),byKey(shuffled));
+  const attached=plain(ctx.sectionLayoutAttach(d,plain(ctx.sectionLayoutPreset(d,'default')),'panel:home'));
+  attached.find(t=>t.panel==='home').locked=true;const host=attached.find(t=>t.panel==='home'),controls=attached.find(t=>t.controls);
+  const optimized=plain(ctx.sectionLayoutOptimize(d,'default',attached));
+  assert.deepEqual(optimized.find(t=>t.panel==='home'),host);assert.deepEqual(optimized.find(t=>t.controls),controls);
+  assert.equal(ctx.sectionLayoutDock(optimized),'panel:home');noOverlap(optimized.filter(t=>!t.hidden && !t.controls));
+});
+test('gestures and swaps leave locked tiles where they are and push moving tiles below them',()=>{
+  const d=diagram(),items=lockedPreset(d,'default'),before=JSON.stringify(items);
+  assert.deepEqual(plain(ctx.sectionLayoutGesture(items,'panel:phone',4,4,false)),items);
+  assert.deepEqual(plain(ctx.sectionLayoutGesture(items,'panel:phone',4,4,true)),items);
+  const moved=plain(ctx.sectionLayoutGesture(items,'panel:q',-100,-100,false)),q=moved.find(t=>t.panel==='q');
+  assert.deepEqual(moved.find(t=>t.panel==='phone'),{panel:'phone',x:0,y:0,w:8,h:6,locked:true});
+  assert.equal(q.x,0);assert.ok(q.y>=6,'the dragged tile lands below the locked tile');noOverlap(moved.filter(t=>!t.hidden));
+  assert.deepEqual(plain(ctx.sectionLayoutSwap(items,'panel:phone','panel:q')),items);
+  assert.deepEqual(plain(ctx.sectionLayoutSwap(items,'panel:q','panel:phone')),items);
+  assert.equal(JSON.stringify(items),before);
+  const unlocked=items.map(t=>({...t}));delete unlocked.find(t=>t.panel==='phone').locked;
+  assert.notDeepEqual(plain(ctx.sectionLayoutGesture(unlocked,'panel:phone',4,4,false)),unlocked);
+});
+test('locking a tile edits only its own host profile and View',()=>{
+  const d=diagram();d.layouts=[{id:'a',name:'A',sectionLayout:{columns:24,default:[board,phone]}},{id:'b',name:'B',sectionLayout:{columns:24,default:[board,phone],confluence:[{...board,w:24},{...phone,x:0,y:12,w:24}]}}];
+  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw,null,2);
+  const plan=ctx.planSectionLayout(text,raw,0,'confluence',[{...board,w:24},{...phone,x:0,y:12,w:24,locked:true}],'b');assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text).page.sections[0].diagram;
+  assert.deepEqual(next.layouts[0],d.layouts[0]);assert.deepEqual(next.layouts[1].sectionLayout.default,d.layouts[1].sectionLayout.default);
+  assert.equal(next.layouts[1].sectionLayout.confluence[1].locked,true);
+  assert.equal(JSON.parse(ctx.planSectionLayout(plan.text,JSON.parse(plan.text),0,'confluence',[{...board,w:24},{...phone,x:0,y:12,w:24}],'b').text).page.sections[0].diagram.layouts[1].sectionLayout.confluence[1].locked,undefined);
+});
+test('Explore rectangles carry a boolean lock that leaves the stack and survives plans, duplication and renames',()=>{
+  const d=diagram(),value={overlayScale:.8,panels:[{panel:'home',x:.6,y:.1,w:.3,h:.4,stacked:true,locked:true},{panel:'phone',x:.1,y:.1,w:.2,h:.3,stacked:true}],canvas:{panels:[{panel:'q',x:40,y:20,w:340,h:300,locked:true}]}};
+  const warnings=[],normalized=plain(ctx.sectionExploreLayout(d,value,warnings));assert.deepEqual(warnings,[]);
+  assert.deepEqual(normalized.panels,[{panel:'home',x:.6,y:.1,w:.3,h:.4,stacked:false,locked:true},{panel:'phone',x:.1,y:.1,w:.2,h:.3,stacked:true}]);
+  assert.deepEqual(normalized.canvas,{panels:[{panel:'q',x:40,y:20,w:340,h:300,locked:true}]});
+  for(const bad of ['yes',1,null]){const issues=[],out=plain(ctx.sectionExploreLayout(d,{panels:[{panel:'home',x:.1,y:.1,w:.2,h:.2,locked:bad}],canvas:{panels:[{panel:'q',x:0,y:0,w:10,h:10,locked:bad}]}},issues));assert.equal(issues.length,2);assert.equal(out.panels.length,0);assert.equal(out.canvas.panels.length,0);}
+  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+  const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',normalized);assert.ok(!plan.error,plan.error);assert.deepEqual(JSON.parse(plan.text).page.sections[0].diagram.layouts[0].exploreLayout,normalized);
+  assert.deepEqual(JSON.parse(ctx.planDuplicateSectionLayout(text,raw,0,'eng').text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+  const renamed=JSON.parse(ctx.planRenamePanel(text,raw,0,2,'queue').text).page.sections[0].diagram.layouts[0].exploreLayout;assert.deepEqual(renamed.canvas.panels[0],{panel:'queue',x:40,y:20,w:340,h:300,locked:true});
+});
+test('panel lock chrome is Workbench-owned: the viewer stays free of lock classes and the arranger owns the badge',()=>{
+  const repo=path.join(__dirname,'..'),read=file=>fs.readFileSync(path.join(repo,file),'utf8');
+  for(const file of ['src/viewer/explore.js','src/engine.js','src/core/section-layout.js'])assert.doesNotMatch(read(file),/dv-position-lock/,file);
+  const arranger=read('src/layout.workbench.js');assert.match(arranger,/dv-position-lock-badge/);assert.match(arranger,/setAttribute\('aria-label','Position locked'\)/);assert.match(arranger,/dv-position-lock-feedback/);
+  assert.match(read('src/viewer/explore.js'),/data-explore-locked/);assert.match(read('src/style.workbench.css'),/\[data-explore-locked\]/);
+  assert.match(read('src/workbench/svg-export.js'),/dv-position-lock-badge/);
+});

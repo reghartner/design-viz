@@ -1641,6 +1641,30 @@ body:not(.workbench-reader-preview-active) .docview g.node.dv-position-locked.dv
 body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .card{stroke:#7657c8;stroke-width:5;stroke-dasharray:none;}
 body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .dv-position-lock-badge{filter:drop-shadow(0 0 3px currentColor);}
 body:not(.workbench-reader-preview-active) .docview g.node.dv-position-lock-feedback .dv-position-lock-badge rect{stroke-width:2.5;}
+/* Panel position locks (#474): Standard tiles while arranging and Explore
+   windows in the editor. The badge is drawn in CSS so exports and readers,
+   which never load this sheet, show nothing. */
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile.dv-position-locked{outline:2px solid #7657c8;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile.layout-selected.dv-position-locked{outline:3px solid var(--acc);outline-offset:-2px;box-shadow:0 0 0 2px #7657c8;}
+.section-layout-tile>.dv-position-lock-badge{display:none;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile>.dv-position-lock-badge,
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]::after{display:block;position:absolute;z-index:5;box-sizing:border-box;width:16px;height:12px;border:1.4px solid #7657c8;border-radius:3px;background:var(--card,#fff);pointer-events:none;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile>.dv-position-lock-badge::before,
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]::before{content:'';display:block;position:absolute;z-index:5;box-sizing:border-box;width:9px;height:7px;border:1.4px solid #7657c8;border-bottom:0;border-radius:5px 5px 0 0;pointer-events:none;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile>.dv-position-lock-badge{left:6px;bottom:6px;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile>.dv-position-lock-badge::before{left:2.3px;top:-6px;}
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]{outline:2px solid #7657c8;outline-offset:1px;}
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]>.explore-window-header{padding-left:28px;}
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]::after{content:'';left:7px;top:14px;}
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-locked]::before{left:10.3px;top:8px;}
+body:not(.workbench-reader-preview-active) .docview .explore-canvas-objects>.explore-window[data-explore-locked]::after{top:8px;}
+body:not(.workbench-reader-preview-active) .docview .explore-canvas-objects>.explore-window[data-explore-locked]::before{top:2px;}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile.dv-position-lock-feedback,
+body:not(.workbench-reader-preview-active) .docview .explore-window[data-explore-lock-feedback]{outline:4px solid #7657c8;box-shadow:0 0 0 4px color-mix(in srgb,#7657c8 30%,transparent);}
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile.dv-position-locked>.section-tile-move,
+body:not(.workbench-reader-preview-active) .section-arranging .section-layout-tile.dv-position-locked>.section-tile-resize{cursor:not-allowed;color:#7657c8;}
+.layout-position-lock{display:inline-flex;align-items:center;gap:6px;}
+.explore-panel-choices .explore-panel-choice>.explore-position-lock{justify-content:flex-start;gap:8px;}
 
 body .docview .section-viewport .boardcanvas g.node[data-dv-object-menu]:focus-visible .card{stroke:var(--accent);stroke-width:4;stroke-dasharray:3 3;}
 

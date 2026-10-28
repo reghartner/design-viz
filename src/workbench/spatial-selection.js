@@ -66,6 +66,7 @@ function createBuilderSpatialSelection(opts){
       if(!controls && !panel && nodeRecord.imported)help='This imported node can be aligned here; only this consumer’s arrangement is saved. '+help;
       else if(!controls && !panel && !(got.d.floats || []).some(function(f){return f.id===id;}))help='Row nodes follow the row layout. Use Free placement to move this node. '+help;
       if(!controls && !panel && nodeRecord && !nodeRecord.imported && nodeRecord.value.locked===true)help='Position locked; selection and content editing remain available. '+help;
+      if(panel && builderPanelPositionLocked(got.d,layoutId(surface(el)),id))help='Position locked; selection and content editing remain available. '+help;
       var attrs={},values={tabindex:'0',role:'group','aria-label':(value.title || id)+(controls?' on canvas':panel?' canvas panel':' node'),'aria-haspopup':'menu','aria-keyshortcuts':controls?'Enter Shift+Enter Shift+F10':'Enter Shift+Enter ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10','aria-description':help,title:help,'data-dv-object-menu':''};
       Object.keys(values).forEach(function(name){attrs[name]=el.getAttribute(name);el.setAttribute(name,values[name]);});
       focusNodes.push({el:el,attrs:attrs});
@@ -133,7 +134,7 @@ function createBuilderSpatialSelection(opts){
     view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{section:c.targets[0].section,x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
   function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null,reason=fitReason(c);fitButton.disabled=!!reason;fitButton.title=reason || 'Frame selected canvas objects';}}
-  function distribute(direction){var c=context();if(!active() || !c)return;var plan=planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry);if(plan.noop){announce('Every selected graph node is position-locked; nothing moved.',c.shell);return;}opts.apply(plan,null,c.s);}
+  function distribute(direction){var c=context();if(!active() || !c)return;var plan=planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry);if(plan.noop){announce('Every selected object is position-locked; nothing moved.',c.shell);return;}opts.apply(plan,null,c.s);}
   function expand(direction){var c=context();if(!active() || !c)return;var plan=planExpandSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry);if(plan.error){announce(plan.error,c.shell);return;}opts.apply(plan,null,c.s);}
   function actions(host,lifetime){
     var c=context();sync();if(!c)return;
@@ -153,7 +154,7 @@ function createBuilderSpatialSelection(opts){
   function finishNudge(){
     if(!nudge)return;var g=nudge,plan=planNudgeSpatial(g.c.s.text,g.c.s.raw,g.c.targets,g.c.id,g.c.geometry,g.dx,g.dy);cancelNudge();
     if(!active() || opts.session.text()!==g.c.s.text)return;
-    if(plan.error){announce(plan.error,g.c.shell);return;}if(plan.noop){announce('Every selected graph node is position-locked; nothing moved.',g.c.shell);return;}
+    if(plan.error){announce(plan.error,g.c.shell);return;}if(plan.noop){announce('Every selected object is position-locked; nothing moved.',g.c.shell);return;}
     if(opts.apply(plan,null,g.c.s)){var el=opts.find(g.focus);if(el)el.focus({preventScroll:true});sync();}
   }
   function keyboard(ev){
@@ -170,9 +171,9 @@ function createBuilderSpatialSelection(opts){
       if(!currentTargets().some(function(x){return x.kind===t.kind && x.section===t.section && x.id===t.id;}))opts.select([t]);
       var c=context();if(!c)return;var check=builderMovableSpatial(c.s.text,c.s.raw,c.targets,c.id,c.geometry);
       if(check.error){announce(check.error,c.shell);return;}
-      if(check.noop){announce('Every selected graph node is position-locked; nothing moved.',c.shell);return;}
+      if(check.noop){announce('Every selected object is position-locked; nothing moved.',c.shell);return;}
       if(status)status.remove();status=null;
-      nudge={c:c,focus:t,dx:0,dy:0,keys:new Set(),preview:c.targets.filter(function(x){return x.kind!=='node' || !builderNodePositionLocked(check.d,x.id);}).map(function(x){return {el:x.el,node:x.kind==='node',transform:x.kind==='node'?x.el.getAttribute('transform'):x.el.style.transform};})};
+      nudge={c:c,focus:t,dx:0,dy:0,keys:new Set(),preview:c.targets.filter(function(x){return !builderSpatialTargetLocked(check.d,c.id,x);}).map(function(x){return {el:x.el,node:x.kind==='node',transform:x.kind==='node'?x.el.getAttribute('transform'):x.el.style.transform};})};
     }
     var step=ev.shiftKey?50:10;nudge.dx+=dir[0]*step;nudge.dy+=dir[1]*step;nudge.keys.add(ev.key);
     nudge.preview.forEach(function(p){var move='translate('+nudge.dx+(p.node?' ': 'px,')+nudge.dy+(p.node?')':'px)');if(p.node)p.el.setAttribute('transform',(p.transform || '')+' '+move);else p.el.style.transform=(p.transform || '')+' '+move;});
@@ -215,16 +216,16 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)!==topologyKey)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
-    if(selectedNodes.length && selectedNodes.length===targets.length){
-      var lockIds=selectedNodes.map(function(target){return target.id;}),lockSection=selectedNodes[0].section;
-      var lockReason=containsImported?'Imported structure belongs to its provider.':null;
-      if(selectedNodes.length===1){
-        var positionLocked=!lockReason && authored && !authored.error && builderNodePositionLocked(authored.d,lockIds[0]);
-        var lockPlan=lockReason?null:planSetNodesLocked(s.text,s.raw,lockSection,lockIds,!positionLocked);
+    // Position locks cover nodes and canvas panels (#474) in one undoable plan.
+    if(spatial){
+      var lockReason=containsImported?'Imported structure belongs to its provider.':null,lockDiagram=builderDiagram(s.text,s.raw,targets[0].section);
+      if(targets.length===1){
+        var positionLocked=!lockReason && !lockDiagram.error && builderSpatialTargetLocked(lockDiagram.d,id,targets[0]);
+        var lockPlan=lockReason?null:planSetSpatialLocked(s.text,s.raw,targets,id,geometry,!positionLocked);
         item(positionLocked?'Unlock position':'Lock position',function(){opts.apply(lockPlan,null,s);},lockReason || lockPlan && lockPlan.error);
       }else{
         [true,false].forEach(function(value){
-          var plan=lockReason?null:planSetNodesLocked(s.text,s.raw,lockSection,lockIds,value);
+          var plan=lockReason?null:planSetSpatialLocked(s.text,s.raw,targets,id,geometry,value);
           var reason=lockReason || plan && plan.error || plan && plan.noop && (value?'All selected positions are already locked.':'All selected positions are already unlocked.');
           item(value?'Lock selected positions':'Unlock selected positions',function(){opts.apply(plan,null,s);},reason);
         });
@@ -234,7 +235,7 @@ function createBuilderSpatialSelection(opts){
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
     var clearPlan=planClearCustomEdges(s.text,s.raw,{targets:routingTargets}),clearReason=clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null);
     item('Clear Custom Edges',function(){opts.apply(clearPlan,null,s);},clearReason);
-    ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(plan.noop)announce('Every selected graph node is position-locked or already aligned; nothing moved.',shell);else opts.apply(plan,null,s);},alignment.error);});
+    ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(plan.noop)announce('Every selected object is position-locked or already aligned; nothing moved.',shell);else opts.apply(plan,null,s);},alignment.error);});
     ['column','row'].forEach(function(direction){var plan=planExpandSpatial(s.text,s.raw,targets,id,direction,geometry);item('Increase '+direction+' spacing',function(){expand(direction);},plan.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,fitReason(context()));

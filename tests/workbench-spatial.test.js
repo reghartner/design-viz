@@ -178,3 +178,45 @@ test('selection refresh and batch candidates scan once per section and discard t
  }finally{spatial.destroy();B.jsonLocate=originalLocate;}
  assert.equal(all[0].getAttribute('role'),'img');assert.equal(all[0].getAttribute('title'),'Original title');assert.equal(all[0].getAttribute('tabindex'),null);
 });
+
+/* #474 canvas panel position locks live on the view's canvas rectangle and
+   share the node-lock interaction semantics for mixed selections. */
+function lockedPanel(){const raw=fixture(),d=raw.page.sections[0].diagram;d.rows=[[]];d.floats.push({id:'b',x:240,y:280});d.layouts[0].exploreLayout.canvas.panels[0].locked=true;return {raw,targets:[...targets,{kind:'node',section:0,id:'b'}],rects:[{x:40,y:50,w:120,h:60},{x:300,y:200,w:240,h:80},{x:170,y:170,w:140,h:220}]};}
+test('a locked canvas panel stays fixed while mixed nudge, align, distribute and spacing move the unlocked members',()=>{
+ const {raw,targets,rects}=lockedPanel(),text=JSON.stringify(raw),panel=()=>raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0];
+ const nudged=B.planNudgeSpatial(text,raw,targets,'explore',rects,10,0);assert.ok(!nudged.error,nudged.error);let d=JSON.parse(nudged.text).page.sections[0].diagram;
+ assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],panel());assert.equal(d.floats[0].x,110);assert.equal(d.floats[1].x,250);
+ const aligned=B.planAlignSpatial(text,raw,targets,'explore','horizontal',rects,1);assert.ok(!aligned.error,aligned.error);d=JSON.parse(aligned.text).page.sections[0].diagram;
+ assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],panel());assert.equal(d.floats[0].y,240);assert.equal(d.floats[1].y,240);
+ const distributed=B.planDistributeSpatial(text,raw,targets,'explore','vertical',[{x:40,y:0,w:120,h:60},{x:300,y:400,w:240,h:80},{x:170,y:100,w:140,h:100}]);assert.ok(!distributed.error,distributed.error);d=JSON.parse(distributed.text).page.sections[0].diagram;
+ assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],panel());assert.equal(d.floats[1].y,230,'b is re-centered on its rendered bounds with a 120 gap after a');
+ const expanded=B.planExpandSpatial(text,raw,targets,'explore','column',rects);assert.ok(!expanded.error,expanded.error);d=JSON.parse(expanded.text).page.sections[0].diagram;
+ assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],panel());assert.equal(d.floats[0].x,100);assert.equal(d.floats[1].x,290,'the locked far-right panel is not a movable lane');
+ const panelOnly=[targets[1]],panelRect=[rects[1]];
+ const noop=plan=>{assert.equal(plan.error,undefined);assert.equal(plan.noop,true);assert.equal(plan.text,undefined);};
+ noop(B.planNudgeSpatial(text,raw,panelOnly,'explore',panelRect,10,0));
+ raw.page.sections[0].diagram.nodes.a.locked=true;raw.page.sections[0].diagram.nodes.b.locked=true;const all=JSON.stringify(raw);
+ noop(B.planNudgeSpatial(all,raw,targets,'explore',rects,10,0));noop(B.planAlignSpatial(all,raw,targets,'explore','vertical',rects));noop(B.planDistributeSpatial(all,raw,targets,'explore','horizontal',rects));
+ assert.match(B.planExpandSpatial(all,raw,targets,'explore','column',rects).error,/at least two unlocked/);
+});
+test('locking a mixed selection is one plan that pins nodes and materializes the canvas rectangle it protects',()=>{
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.layouts[0].exploreLayout.canvas.panels=[];const text=JSON.stringify(raw,null,2).replace('"title": "Keep exact outside"','"title" :  "Keep exact outside"');
+ const plan=B.planSetSpatialLocked(text,raw,targets,'explore',rects,true);assert.ok(!plan.error,plan.error);assert.ok(plan.text.includes('"title" :  "Keep exact outside"'));
+ const next=JSON.parse(plan.text).page.sections[0].diagram;assert.equal(next.nodes.a.locked,true);assert.deepEqual(next.floats,[{id:'a',x:100,y:80}]);
+ assert.deepEqual(next.layouts[0].exploreLayout.canvas.panels,[{panel:'p',x:300,y:200,w:240,h:80,locked:true}]);
+ const repeat=B.planSetSpatialLocked(plan.text,JSON.parse(plan.text),targets,'explore',rects,true);assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
+ const unlock=B.planSetSpatialLocked(plan.text,JSON.parse(plan.text),targets,'explore',rects,false);assert.ok(!unlock.error,unlock.error);const after=JSON.parse(unlock.text).page.sections[0].diagram;
+ assert.equal(after.nodes.a.locked,undefined);assert.deepEqual(after.layouts[0].exploreLayout.canvas.panels,[{panel:'p',x:300,y:200,w:240,h:80}]);
+ const panelOnly=B.planSetSpatialLocked(text,raw,[targets[1]],'explore',[rects[1]],true);assert.ok(!panelOnly.error,panelOnly.error);assert.equal(JSON.parse(panelOnly.text).page.sections[0].diagram.nodes.a.locked,undefined);
+ assert.match(B.planSetSpatialLocked(text,raw,[targets[1]],'explore',[null],true).error,/Render/);
+ assert.match(B.planSetSpatialLocked(text,raw,[targets[1]],'missing',[rects[1]],true).error,/Explore view/);
+ assert.match(B.planSetSpatialLocked(text,raw,[{kind:'step-controls',section:0}],'explore',[rects[1]],true).error,/nodes and canvas panels/);
+ assert.match(B.planSetSpatialLocked(text,raw,targets,'explore',rects,'yes').error,/locked or unlocked/);
+ assert.equal(JSON.stringify(raw),JSON.stringify(fixture()).replace('"canvas":{"panels":[{"panel":"p","x":300,"y":200,"w":240,"h":900}]}','"canvas":{"panels":[]}'));
+});
+test('duplicating a locked canvas panel copies it unlocked and renaming keeps the lock',()=>{
+ const {raw}=lockedPanel(),text=JSON.stringify(raw);
+ const dup=B.planDuplicateSpatial(text,raw,[targets[1]],'explore',[{x:300,y:200,w:240,h:80}]);assert.ok(!dup.error,dup.error);const d=JSON.parse(dup.text).page.sections[0].diagram;
+ assert.equal(d.layouts[0].exploreLayout.canvas.panels[0].locked,true);assert.equal(d.layouts[0].exploreLayout.canvas.panels[1].locked,undefined);
+ const renamed=B.planRenamePanel(text,raw,0,0,'status');assert.ok(!renamed.error,renamed.error);assert.deepEqual(JSON.parse(renamed.text).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0],{panel:'status',x:300,y:200,w:240,h:900,locked:true});
+});

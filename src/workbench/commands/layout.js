@@ -6,6 +6,14 @@ function builderLockedNodeIds(d,ids){
   return Object.keys(nodes).filter(function(id){return (!wanted || wanted.has(id)) && nodes[id] && nodes[id].locked===true;});
 }
 function builderNodePositionLocked(d,id){return !!(d && d.nodes && d.nodes[id] && d.nodes[id].locked===true);}
+/* Canvas panel locks belong to the view's saved canvas rectangle (#474). */
+function builderPanelPositionLocked(d,layoutId,id){
+  var view=d && (d.layouts || []).find(function(v){return v && v.id===layoutId;}),canvas=view && view.exploreLayout && view.exploreLayout.canvas;
+  return !!(canvas && Array.isArray(canvas.panels) && canvas.panels.some(function(p){return p && p.panel===id && p.locked===true;}));
+}
+function builderSpatialTargetLocked(d,layoutId,t){
+  return t.kind==='node'?builderNodePositionLocked(d,t.id):t.kind==='panel'?builderPanelPositionLocked(d,layoutId,t.id):false;
+}
 /* A lock keeps a row node in its slot, so locking moves no neighbour. A plan
    that would move a locked node lifts it here into an absolute noSpread float
    at its current position (placement plans directly, every other accepted plan
@@ -861,33 +869,43 @@ function planDefaultSectionLayout(text,raw,section,layoutId){
 function sectionLayoutSwap(items,from,to){
   var next=items.map(function(it){return Object.assign({},it);});
   var a=next.find(function(it){return sectionLayoutKey(it)===from;}),b=next.find(function(it){return sectionLayoutKey(it)===to;});
-  if(!a || !b || a.controls || b.controls)return next;
+  if(!a || !b || a.controls || b.controls || a.locked===true || b.locked===true)return next;
   ['x','y','w','h','hidden'].forEach(function(k){var value=a[k];if(b[k]===undefined)delete a[k];else a[k]=b[k];if(value===undefined)delete b[k];else b[k]=value;});
   return sectionLayoutPack(next);
 }
+/* Locked visible tiles are occupied bounds: they keep their rectangle and the
+   preset flows the unlocked tiles around them. Documents without locks take
+   the unchanged preset path. */
 function sectionLayoutOptimize(d,target,items){
   var hidden=(items || []).filter(function(it){return it.hidden===true && it.controls==null;});
+  var fixed=(items || []).filter(sectionLayoutFixed).map(function(it){return Object.assign({},it);});
+  /* Every visible element locked: nothing to arrange, so the controls stay too. */
+  if(fixed.length && !(items || []).some(function(it){return it.hidden!==true && it.controls==null && !sectionLayoutFixed(it);}))return items.map(function(it){return Object.assign({},it);});
   var previous=(items || []).find(function(it){return it.controls==='steps';});
   var attachment=previous?previous.attachTo:'diagram';
   var excluded=hidden.map(sectionLayoutKey),dock=attachment && excluded.indexOf(attachment)<0 && sectionLayoutTiles(d).some(function(t){return t.key==='steps';});
   if(dock)excluded.push('steps');
-  var next=sectionLayoutPreset(d,target,excluded);
+  var next=sectionLayoutPreset(d,target,excluded.concat(fixed.map(sectionLayoutKey)),fixed);
   if(dock){
-    var host=next.find(function(it){return sectionLayoutKey(it)===attachment;});
+    var lockedHost=fixed.find(function(it){return sectionLayoutKey(it)===attachment;}),host=lockedHost || next.find(function(it){return sectionLayoutKey(it)===attachment;});
     if(host){
       var height=sectionLayoutControlsRows(d,items);
-      next.push({controls:'steps',attachTo:attachment,x:host.x,y:host.y+host.h,w:host.w,h:height});
-      host.h=Math.min(40,host.h+height);
+      /* A locked host already includes its attached controls height. */
+      if(lockedHost)next.push(previous?Object.assign({},previous):{controls:'steps',attachTo:attachment,x:host.x,y:host.y+host.h,w:host.w,h:height});
+      else{
+        next.push({controls:'steps',attachTo:attachment,x:host.x,y:host.y+host.h,w:host.w,h:height});
+        host.h=Math.min(40,host.h+height);
+      }
     }
   }else{
     var stepTile=next.find(function(it){return it.controls==='steps';});
     if(stepTile){if(attachment)stepTile.attachTo=attachment;if(previous)stepTile.h=previous.h;}
   }
-  return sectionLayoutPack(next.concat(hidden.map(function(it){return Object.assign({},it);})));
+  return sectionLayoutPack(fixed.concat(next,hidden.map(function(it){return Object.assign({},it);})));
 }
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
-  if(!item)return next;
+  if(!item || item.locked===true)return next;
   if(resize){item.w=Math.max(1,Math.min(SECTION_LAYOUT_COLUMNS-item.x,item.w+Math.round(dx)));item.h=Math.max(3,Math.min(40,item.h+Math.round(dy)));}
   else{item.x=Math.max(0,Math.min(SECTION_LAYOUT_COLUMNS-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
   return sectionLayoutPack(next,key);
@@ -1003,7 +1021,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
   if(anchorIndex==null)anchorIndex=0;
   if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
-  if(!targets.some(function(t){return t.kind!=='node' || !builderNodePositionLocked(got.d,t.id);}))return {noop:true};
+  if(!targets.some(function(t){return !builderSpatialTargetLocked(got.d,layoutId,t);}))return {noop:true};
   var axis=direction==='vertical'?'x':'y',size=direction==='vertical'?'w':'h',anchorCenter=rects[anchorIndex][axis]+rects[anchorIndex][size]/2;
   if(rects.every(function(r){return Math.abs(r[axis]+r[size]/2-anchorCenter)<.0001;}))return {noop:true};
   var effectiveBefore=layout(got.d).pos,selectedNodes=Object.create(null);targets.forEach(function(t){if(t.kind==='node' && Object.prototype.hasOwnProperty.call(got.d.nodes || {},t.id))selectedNodes[t.id]=true;});
@@ -1022,7 +1040,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
     for(var i=0;i<targets.length;i++){
       if(i===anchorIndex)continue;
       var t=targets[i],r=rects[i],x=direction==='vertical'?cx:coordinate(r.x+r.w/2),y=direction==='horizontal'?cy:coordinate(r.y+r.h/2);
-      if(t.kind==='node' && builderNodePositionLocked(got.d,t.id))continue;
+      if(builderSpatialTargetLocked(got.d,layoutId,t))continue;
       if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
       if(t.kind==='node'){
         var record=got.records[i];
@@ -1084,14 +1102,14 @@ function builderMovableSpatial(text,raw,targets,layoutId,rects){
   var definition=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!definition || definition.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before moving them.'};
-  got.noop=!targets.some(function(t){return t.kind!=='node' || !builderNodePositionLocked(got.d,t.id);});
+  got.noop=!targets.some(function(t){return !builderSpatialTargetLocked(got.d,layoutId,t);});
   return got;
 }
 function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas,options){
   var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
   if(got.noop)return {noop:true};
   if(deltas.every(function(delta){return Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001;}))return {error:'The selected objects are already in position.'};
-  if(targets.every(function(t,i){return t.kind==='node' && builderNodePositionLocked(got.d,t.id) || Math.abs(deltas[i].x)<.00001 && Math.abs(deltas[i].y)<.00001;}))return {noop:true};
+  if(targets.every(function(t,i){return builderSpatialTargetLocked(got.d,layoutId,t) || Math.abs(deltas[i].x)<.00001 && Math.abs(deltas[i].y)<.00001;}))return {noop:true};
   var positions=layout(got.d).pos,preserve=options && options.preserveEffectivePositions,selectedNodes=Object.create(null);
   targets.forEach(function(t){if(t.kind==='node' && Object.prototype.hasOwnProperty.call(got.d.nodes || {},t.id))selectedNodes[t.id]=true;});
   return builderRewrite(text,raw,got.path,function(d){
@@ -1103,7 +1121,7 @@ function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas,options){
     var automaticChanged=false;
     for(var i=0;i<targets.length;i++){
       var t=targets[i],r=rects[i],delta=deltas[i],x=r.x+delta.x,y=r.y+delta.y;
-      if(t.kind==='node' && builderNodePositionLocked(got.d,t.id))continue;
+      if(builderSpatialTargetLocked(got.d,layoutId,t))continue;
       if(!floatCoordinate(x) || !floatCoordinate(y) || !floatCoordinate(x+r.w/2) || !floatCoordinate(y+r.h/2))return {error:'Movement is outside the supported canvas coordinates.'};
       if(t.kind==='node'){
         var f=d.floats.find(function(f){return f.id===t.id;});
@@ -1161,7 +1179,7 @@ function planDistributeSpatial(text,raw,targets,layoutId,direction,rects){
 function planExpandSpatial(text,raw,targets,layoutId,direction,rects){
   var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
   if(['column','row'].indexOf(direction)<0)return {error:'Choose column or row spacing.'};
-  var movable=[];targets.forEach(function(t,i){if(t.kind!=='node' || !builderNodePositionLocked(got.d,t.id))movable.push(i);});
+  var movable=[];targets.forEach(function(t,i){if(!builderSpatialTargetLocked(got.d,layoutId,t))movable.push(i);});
   if(movable.length<2)return {error:'Select at least two unlocked objects to increase spacing.'};
   var axis=direction==='column'?'x':'y',size=direction==='column'?'w':'h',tolerance=.1;
   var ordered=movable.map(function(i){return {i:i,center:rects[i][axis]+rects[i][size]/2};}).sort(function(a,b){return a.center-b.center;});
@@ -1195,12 +1213,41 @@ function planDuplicateSpatial(text,raw,targets,layoutId,rects){
     Object.keys(panelMap).forEach(function(id){var p=d.panels.find(function(p){return p.id===panelMap[id];});panelRemapReferences(p,'nodes',nodeMap);});
     [d].concat(d.layouts || []).forEach(function(v){
       var layouts=v.sectionLayout;if(layouts)Object.keys(layouts).forEach(function(key){if(!Array.isArray(layouts[key]))return;layouts[key].slice().forEach(function(tile){if(panelMap[tile.panel]){var c=builderClone(tile);c.panel=panelMap[tile.panel];layouts[key].push(c);}});});
-      var explore=v.exploreLayout;if(explore){[explore,explore.canvas].forEach(function(place){if(place && place.panels)place.panels.slice().forEach(function(p){if(panelMap[p.panel]){var c=builderClone(p);c.panel=panelMap[p.panel];if(place===explore.canvas){c.x+=24;c.y+=24;}place.panels.push(c);}});});
+      /* A copy is a new object placed beside the original, so it starts unlocked. */
+      var explore=v.exploreLayout;if(explore){[explore,explore.canvas].forEach(function(place){if(place && place.panels)place.panels.slice().forEach(function(p){if(panelMap[p.panel]){var c=builderClone(p);c.panel=panelMap[p.panel];delete c.locked;if(place===explore.canvas){c.x+=24;c.y+=24;}place.panels.push(c);}});});
         if(explore.panelPlacements)explore.panelPlacements.slice().forEach(function(p){if(panelMap[p.panel])explore.panelPlacements.push(Object.assign({},p,{panel:panelMap[p.panel]}));});
       }
     });
     var active=(d.layouts || []).find(function(v){return v.id===layoutId;});
     if(active)targets.forEach(function(t,i){if(t.kind!=='panel' || !rects || !rects[i])return;var ex=active.exploreLayout || (active.exploreLayout={}),canvas=ex.canvas || (ex.canvas={}),panels=canvas.panels || (canvas.panels=[]),id=panelMap[t.id],p=panels.find(function(p){return p.panel===id;});if(!p){p={panel:id};panels.push(p);}Object.assign(p,rects[i],{x:rects[i].x+24,y:rects[i].y+24});var placements=ex.panelPlacements || (ex.panelPlacements=[]);var placement=placements.find(function(p){return p.panel===id;});if(!placement){placement={panel:id};placements.push(placement);}placement.placement='canvas';});
+  });
+}
+
+/* One undoable lock edit for a mixed node/canvas panel selection (#474).
+   Nodes pin where they are; a canvas panel's lock lives on the view's saved
+   canvas rectangle, materialized from its rendered bounds when absent. */
+function planSetSpatialLocked(text,raw,targets,layoutId,rects,locked){
+  var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+  if(typeof locked!=='boolean')return {error:'Choose locked or unlocked.'};
+  var panels=targets.filter(function(t){return t.kind==='panel';}),nodes=targets.filter(function(t){return t.kind==='node';});
+  var view=(got.d.layouts || []).find(function(v){return v && v.id===layoutId;});
+  if(panels.length && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before locking canvas panels.'};
+  if(panels.some(function(t){var r=rects && rects[targets.indexOf(t)];return !builderPanelPositionLocked(got.d,layoutId,t.id) && locked && !(r && [r.x,r.y,r.w,r.h].every(Number.isFinite) && r.w>0 && r.h>0);}))return {error:'Render the selected panels before locking their positions.'};
+  var changedNodes=Array.from(new Set(nodes.map(function(t){return t.id;}))).filter(function(id){return Object.prototype.hasOwnProperty.call(got.d.nodes || {},id) && (got.d.nodes[id].locked===true)!==locked;});
+  var changedPanels=Array.from(new Set(panels.map(function(t){return t.id;}))).filter(function(id){return builderPanelPositionLocked(got.d,layoutId,id)!==locked;});
+  if(!changedNodes.length && !changedPanels.length)return {noop:true};
+  var positions=layout(got.d).pos;
+  return builderRewrite(text,raw,got.path,function(d){
+    var failed=builderApplyNodeLocks(d,changedNodes,locked,positions);if(failed)return failed;
+    var definition=(d.layouts || []).find(function(v){return v && v.id===layoutId;});
+    changedPanels.forEach(function(id){
+      var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),list=canvas.panels || (canvas.panels=[]);
+      var p=list.find(function(p){return p && p.panel===id;});
+      if(locked){
+        if(!p){var r=rects[targets.findIndex(function(t){return t.kind==='panel' && t.id===id;})];p={panel:id,x:r.x,y:r.y,w:r.w,h:r.h};list.push(p);}
+        p.locked=true;
+      }else if(p)delete p.locked;
+    });
   });
 }
 

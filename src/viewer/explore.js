@@ -28,7 +28,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
   var workbenchFocus=false;
-  var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
+  var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null, stackBlocked=false;
   var fitFrame=0,cameraRevision=0,followMotion=createCameraMotion();
   function manualCamera(){followMotion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
   var shell=document.createElement('div');shell.className='section-viewport';
@@ -54,7 +54,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   placementLabel.appendChild(placement);panelBody.appendChild(placementLabel);
   var placementHint=document.createElement('small');placementHint.className='explore-placement-hint';placementHint.textContent='Default applies to panels without overrides.';placementLabel.appendChild(placementHint);placementLabel.hidden=true;placement.addEventListener('change',function(){changePlacement(placement.value);});
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
-  var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(function(w){return available(w) && !canvasWindow(w);}).forEach(function(w){w.state.stacked=true;setWindowHidden(w,false);w.state.automatic=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
+  var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(function(w){return available(w) && !canvasWindow(w) && !windowLocked(w);}).forEach(function(w){w.state.stacked=true;setWindowHidden(w,false);w.state.automatic=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.classList.add('viewport-expand');expand.title='Expand diagram view';expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
   var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
   function zoomGroup(label,cls){
@@ -190,7 +190,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var layout=memory.layout.canvas || {},saved=w===playerWindow?layout.controls:w.prose?layout.prose:(layout.panels || []).find(function(p){return p.panel===w.panel.id;});
       // Floating panels do not consume a canvas slot before new notes.
       var slot=w.prose?windows.filter(function(item){return !item.prose && canvasWindow(item);}).length:index;
-      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(slot/3)*380),y:(slot%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:w.prose && !saved});
+      // Automatic slots step past position-locked canvas rectangles (#474).
+      var lockedCanvas=(layout.panels || []).filter(function(p){return p.locked===true && !(w.panel && p.panel===w.panel.id);});
+      function candidate(n){return {x:Math.min(10000,graphWidth()+40+Math.floor(n/3)*380),y:(n%3)*330,w:340,h:300};}
+      function blocked(r){return lockedCanvas.some(function(o){return r.x<o.x+o.w && r.x+r.w>o.x && r.y<o.y+o.h && r.y+r.h>o.y;});}
+      var automatic=candidate(slot);for(var tries=0;tries<36 && blocked(automatic);tries++)automatic=candidate(++slot);
+      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:automatic,{hidden:w.state && w.state.hidden,stacked:false,automatic:w.prose && !saved});
     }
     return states[key];
   }
@@ -252,7 +257,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var layout=memory.layout.canvas || (memory.layout.canvas={}),r=graphRect(w.state);
       if(w===playerWindow)layout.controls=r;
       else if(w.prose)layout.prose=r;
-      else{var panels=layout.panels || (layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;}),value=Object.assign({panel:w.panel.id},r);if(i<0)panels.push(value);else panels[i]=value;}
+      else{var panels=layout.panels || (layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;}),value=Object.assign({panel:w.panel.id},r);if(i>=0 && panels[i].locked===true)value.locked=true;if(i<0)panels.push(value);else panels[i]=value;}
       return;
     }
     latchOverlayScale();
@@ -262,10 +267,45 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else{
       var panels=memory.layout.panels || (memory.layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;});
       var value=Object.assign({panel:w.panel.id},r,{stacked:w.state.stacked===true});
+      if(i>=0 && panels[i].locked===true){value.locked=true;value.stacked=false;}
       if(i<0)panels.push(value);else panels[i]=value;
     }
   }
   function savedWindowRect(w){return w.prose?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===w.panel.id;});}
+  function savedCanvasRect(w){return w===playerWindow || w.prose?null:(memory.layout.canvas && memory.layout.canvas.panels || []).find(function(p){return p.panel===w.panel.id;}) || null;}
+  /* A position lock belongs to the saved rectangle of the panel's current
+     placement (#474). It fixes that rectangle against authored gestures and
+     Optimize; readers still move panels temporarily. */
+  function windowLocked(w){if(!memory || w===playerWindow || w.prose)return false;var saved=canvasWindow(w)?savedCanvasRect(w):savedWindowRect(w);return !!(saved && saved.locked===true);}
+  function authoredPanels(){return !!author && (!workbenchCanvas || !!definition && definition.presentation==='explore');}
+  function lockedRects(){return windows.filter(function(w){return !canvasWindow(w) && visible(w) && windowLocked(w);}).map(function(w){return constrain(w,scaledRect(w,w.state));});}
+  var lockFeedbackTimer=null;
+  function lockFeedback(w){
+    w.el.setAttribute('data-explore-lock-feedback','true');
+    status.textContent='Position locked; '+w.label+' stayed fixed. Unlock it in Panels to move or resize it.';
+    if(lockFeedbackTimer!==null)window.clearTimeout(lockFeedbackTimer);
+    lockFeedbackTimer=window.setTimeout(function(){lockFeedbackTimer=null;windows.forEach(function(item){item.el.removeAttribute('data-explore-lock-feedback');});},900);
+  }
+  function setWindowLocked(w,value){
+    if(!active || retired || !authoredPanels() || windowLocked(w)===!!value)return false;
+    finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false || !token.authored)return false;
+    // The stack and fitting write w.rect, not w.state: materialize the
+    // rendered rectangle the same way a gesture does before saving it.
+    function materialize(){if(w.rect)Object.assign(w.state,scaledRect(w,w.rect,true));w.state.stacked=false;w.state.automatic=false;rememberRect(w);}
+    if(canvasWindow(w)){
+      if(!savedCanvasRect(w))materialize();
+      var canvasRect=savedCanvasRect(w);if(value)canvasRect.locked=true;else delete canvasRect.locked;
+    }else{
+      // Locking fixes the rectangle, so a stacked or automatic panel first
+      // becomes an authored free rectangle at its current place and size.
+      if(value)materialize();
+      var saved=savedWindowRect(w);if(!saved)return false;
+      if(value)saved.locked=true;else delete saved.locked;
+    }
+    paint();
+    if(!publish(token)){paint();return false;}
+    return true;
+  }
   function camera(width,height){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     return {zoom:clamp(graphPixels/graphWidth(),.001,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
@@ -535,7 +575,25 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
     windows.forEach(function(w){if(w.prose)w.el.style.setProperty('--explore-text-scale',String(sectionExploreTextScale(memory.layout.textScale && memory.layout.textScale.prose)));w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
-    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
+    windows.forEach(function(w){
+      var locked=windowLocked(w),authored=locked && authoredPanels();
+      if(locked)w.el.setAttribute('data-explore-locked','true');else w.el.removeAttribute('data-explore-locked');
+      w.grip.setAttribute('aria-label',authored?w.label+' position locked; unlock it in Panels to move':'Move '+w.label+'; use arrow keys');
+      if(w.lock){w.lock.checked=locked;w.lockLabel.hidden=!authoredPanels();}
+    });
+    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked && !windowLocked(w);}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
+    // Locked floating panels are occupied bounds the automatic stack flows
+    // around (#474). stackBlocked reports a stack that could not avoid them.
+    var obstacles=lockedRects();stackBlocked=false;
+    function lockedFree(left,right,y,h,bottom){
+      for(var guard=0;guard<=obstacles.length;guard++){
+        var hits=obstacles.filter(function(o){return left<o.x+o.w && right>o.x && y<o.y+o.h && y+h>o.y;});
+        if(!hits.length)return y;
+        y=Math.max.apply(null,hits.map(function(o){return o.y+o.h;}))+gap;
+        if(y+h>bottom)return null;
+      }
+      return null;
+    }
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom,stageRect=stage.getBoundingClientRect();
     var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),readerTools=readerCanvas && shell.closest('.docview') && shell.closest('.docview').querySelector(':scope > .reader-page-actions');
     // The reader action wrapper spans the viewport so its children can align
@@ -556,8 +614,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         // Readable notes can be taller than other cards; leaving their lower
         // space unused can consume the playback lane on desktop. Only reuse a
         // column that already has enough width, preserving its neighbors.
-        var priorColumn=columns.find(function(column){return r.w<=column.width && column.y+r.h<=columnBottom(column.right-column.width,column.right);});
-        if(priorColumn){r.x=Math.max(12,priorColumn.right-r.w);r.y=priorColumn.y;stackRects.set(w,r);priorColumn.y+=r.h+gap;stackLeft=Math.min(stackLeft,r.x);return;}
+        var priorFree=null,priorColumn=columns.find(function(column){priorFree=lockedFree(Math.max(12,column.right-r.w),column.right,column.y,r.h,columnBottom(column.right-column.width,column.right));return r.w<=column.width && priorFree!==null;});
+        if(priorColumn){r.x=Math.max(12,priorColumn.right-r.w);r.y=priorFree;stackRects.set(w,r);priorColumn.y=priorFree+r.h+gap;stackLeft=Math.min(stackLeft,r.x);return;}
         // Authored panels retain their full size. An oversized panel owns a
         // top-aligned column (and may overflow below); the next panel wraps left.
         // Clear the entire toolbar, which can be wider than a single panel.
@@ -570,9 +628,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
           stackRects.forEach(function(placed){if(Math.abs(placed.x+placed.w-columnRight)<1){placed.x+=shift;stackLeft=Math.min(stackLeft,placed.x);}});
           columnRight=shiftedRight;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);
         }
-        if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columns.push({right:columnRight,width:columnWidth,y:y});columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
-        r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
-        y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
+        var free=lockedFree(Math.max(12,columnRight-r.w),columnRight,y,r.h,stackBottom);
+        if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom || free===null)){columns.push({right:columnRight,width:columnWidth,y:y});columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);free=lockedFree(Math.max(12,columnRight-r.w),columnRight,y,r.h,stackBottom);}
+        // Only a locked rectangle leaves free null: open further columns to
+        // its left before overlapping it and reporting the blocked stack.
+        for(var extra=0;free===null && extra<8 && columnRight-width-gap-r.w>=12;extra++){columns.push({right:columnRight,width:width,y:y});columnRight-=width+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);free=lockedFree(Math.max(12,columnRight-r.w),columnRight,y,r.h,stackBottom);}
+        if(free===null){free=y;stackBlocked=true;}
+        r.x=Math.max(12,columnRight-r.w);r.y=free;stackRects.set(w,r);
+        y=free+r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
       });
     }
     packStack(Infinity);
@@ -591,7 +654,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
       w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
       if(!shown)return;
-      var previous=w.rect,scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
+      var previous=w.rect,scaled=scaledRect(w,w.state),r=stackRects.has(w)?stackRects.get(w):constrain(w,scaled);
       if(canvasWindow(w))r=fittedCanvasRect(w,r);
       if(canvasWindow(w) && previous && ['x','y','w','h'].some(function(key){return Math.abs(previous[key]-r[key])>.01;}))canvasGeometryChanged=true;
       apply(w,r);
@@ -677,6 +740,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     /* Leaving an Inspector field can synchronously rebuild this viewport. */
     if(retired || !active || !handle.isConnected)return;
     clearScrollEdit();var token=beginEdit(true);if(token===false)return;
+    if(token.authored && windowLocked(w)){lockFeedback(w);return;}
     raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
     if(w===playerWindow && !canvasWindow(w))memory.controls=w.state=scaledRect(w,r,true);
@@ -706,7 +770,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
     manualCamera();cancelDeferredFit();
     var token=beginEdit(true);if(token===false)return;
-    ev.preventDefault();ev.stopPropagation();raise(w);
+    ev.preventDefault();ev.stopPropagation();
+    if(token.authored && windowLocked(w)){lockFeedback(w);return;}
+    raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
     if(w===playerWindow && !canvasWindow(w))memory.controls=w.state=scaledRect(w,w.rect,true);
     else w.state.automatic=false;
@@ -732,7 +798,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var saved=notes?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
     var state=notes?memory.prose:memory.panels[panel.id];
     if(!state){
-      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false,automatic:false}):{x:12,y:12,w:300,h:72,stacked:!(saved && saved.stacked===false),hidden:false,automatic:true};
+      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true && saved.locked!==true,hidden:false,automatic:false}):{x:12,y:12,w:300,h:72,stacked:!(saved && saved.stacked===false),hidden:false,automatic:true};
       if(notes)memory.prose=state;else memory.panels[panel.id]=state;
     }
     var el=document.createElement('article');el.className='explore-window'+(notes?' explore-prose-window':'');
@@ -754,6 +820,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       [['floating','Floating'],['canvas','On canvas']].forEach(function(pair){var option=document.createElement('option');option.value=pair[0];option.textContent=pair[1];select.appendChild(option);});
       placementLabel.appendChild(select);row.appendChild(placementLabel);w.placement=select;
       select.addEventListener('change',function(){changePlacement(select.value,w);});
+      if(!notes){
+        // Workbench-only authoring control; readers never see or save locks.
+        var lockLabel=document.createElement('label'),lock=document.createElement('input'),lockText=document.createElement('span');
+        lockLabel.className='explore-placement explore-position-lock';lock.type='checkbox';lock.setAttribute('aria-label','Lock position of '+label);lockText.textContent='Lock position';
+        lockLabel.appendChild(lockText);lockLabel.appendChild(lock);lockLabel.hidden=true;row.appendChild(lockLabel);w.lock=lock;w.lockLabel=lockLabel;
+        lock.addEventListener('change',function(){if(!setWindowLocked(w,lock.checked))lock.checked=windowLocked(w);});
+      }
       if(notes){var hint=document.createElement('div');hint.className='explore-placement-hint explore-notes-size-hint';hint.textContent='Section notes ignore floating-panel and step-control sizing. Resize the notes window.';row.appendChild(hint);}
     }
     check.addEventListener('change',function(){setWindowHidden(w,!check.checked);if(check.checked)memory.focus=false;paint();});
@@ -1019,6 +1092,30 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(!active)return;var token=beginEdit(true);if(token===false)return;
       var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};if(memory.layout.textScale)defaults.textScale=copy(memory.layout.textScale);if(memory.layout.controlsScale!==undefined)defaults.controlsScale=memory.layout.controlsScale;leave();delete memories[id];
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
+    },
+    /* Optimize layout (#474): automatic stacking and sizing for everything
+       except position-locked panels, which keep their rectangle and placement.
+       Reset layout above still clears locks with the rest of the arrangement. */
+    optimize:function(){
+      if(!active || retired)return;
+      var id=definition.id,current=JSON.stringify(sectionExploreLayout(d,memory.layout));
+      var defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};if(memory.layout.textScale)defaults.textScale=copy(memory.layout.textScale);if(memory.layout.controlsScale!==undefined)defaults.controlsScale=memory.layout.controlsScale;
+      var floating=(memory.layout.panels || []).filter(function(p){return p && p.locked===true;}).map(copy),canvasLocked=(memory.layout.canvas && memory.layout.canvas.panels || []).filter(function(p){return p && p.locked===true;}).map(copy);
+      if(floating.length){defaults.panels=floating;defaults.overlayScale=floatingOverlayScale();}
+      if(canvasLocked.length){
+        defaults.canvas={panels:canvasLocked};
+        var placements=canvasLocked.filter(function(p){return windows.some(function(w){return !w.prose && w.panel.id===p.panel && canvasWindow(w);});}).map(function(p){return {panel:p.panel,placement:'canvas'};});
+        if(placements.length)defaults.panelPlacements=placements;
+      }
+      if(JSON.stringify(sectionExploreLayout(d,defaults))===current){status.textContent='Every panel is position-locked; Optimize layout changed nothing.';return;}
+      var token=beginEdit(true);if(token===false)return;
+      var previousMemory=memories[id];leave();delete memories[id];
+      var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;
+      if(stackBlocked){
+        leave();memories[id]=previousMemory;enter();
+        status.textContent='Optimize layout could not arrange the panels around the locked panels; the arrangement is unchanged.';return;
+      }
+      status.textContent='';publish(token);
     },
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,refreshChrome:paint,

@@ -2627,7 +2627,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
       return false;
     },
     diagramVisible:function(){return active?showDiagram:true;},viewport:viewport,
-    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,optimizeExplore:viewport.optimize,
     destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();}};
 }
 

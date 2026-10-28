@@ -199,6 +199,7 @@ function sectionLayoutProfileWarnings(d, v, path, warnings){
       if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>columns||it.y>500||it.h>40)
         warnings.push(p+': use integer x/y/w/h; '+columns+' columns, y 0–500, h 3–40');
       if(it && it.hidden!=null && (typeof it.hidden!=='boolean' || it.controls!=null))warnings.push(p+': hidden must be a boolean on a diagram or panel tile; step controls stay available');
+      if(it && it.locked!=null && (typeof it.locked!=='boolean' || it.controls!=null))warnings.push(p+': locked must be a boolean on a diagram or panel tile; step controls follow their host');
       if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
       if(it && it.attachTo!=null && (it.controls!=='steps' || !(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))))warnings.push(p+'.attachTo: attach step controls to "diagram" or "panel:<homemap ID>"');
       if(used[key]||(key!=='steps'&&!tiles.some(function(t){return t.key===key;})))warnings.push(p+': duplicate or unknown diagram/panel tile');

@@ -40,6 +40,8 @@ test('a full browser offers one-click cleanup beside the recovery status and sav
 test('Home lists earlier drafts with export and delete, reports Flowview storage use, and frees it without touching other site data or the current draft',async({page,server})=>{
   const current='{"page":{"title":"Current unsaved","blocks":[]}}';
   await page.addInitScript(({entries,current})=>{
+    // Init scripts run again on reload; seed once so the final reload shows the emptied store.
+    if(sessionStorage.getItem('dv-test-seeded'))return;sessionStorage.setItem('dv-test-seeded','1');
     localStorage.setItem('dv-workbench-earlier-drafts',JSON.stringify(entries));
     localStorage.setItem('dv-workbench-draft',JSON.stringify({text:current,at:3}));
     localStorage.setItem('host-preference','kept');
@@ -81,5 +83,8 @@ test('Home lists earlier drafts with export and delete, reports Flowview storage
   await expect(page.locator('#welcome-resume')).toBeHidden();
   await expect(page.locator('#welcome-recovery-draft')).toBeHidden();
   await page.reload();await expect(page.locator('#welcome-home')).toBeVisible();
+  expect(await page.evaluate(()=>['dv-workbench-draft','dv-workbench-baseline','dv-workbench-earlier-drafts'].map(key=>localStorage.getItem(key)))).toEqual([null,null,null]);
+  await expect(page.locator('#welcome-resume')).toBeHidden();
   await expect(page.locator('#welcome-earlier-drafts')).toBeHidden();
+  expect(await page.evaluate(()=>localStorage.getItem('host-preference'))).toBe('kept');
 });

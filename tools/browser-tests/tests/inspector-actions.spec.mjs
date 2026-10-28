@@ -506,9 +506,9 @@ for(const carrier of ['node','edge'])test('tracking '+carrier+' controls validat
   const tracking=guide.getByRole('group',{name:'Tracking',exact:true});
   await select();await expect(tracking).toBeVisible();
   await expect(tracking.getByRole('list')).toHaveCount(0);
-  await expect(tracking.getByLabel('Add ticket',{exact:true})).toHaveAttribute('placeholder','HW-123');
+  await expect(tracking.getByLabel('Add ticket',{exact:true})).toHaveAttribute('placeholder','HW-123 or https://…/browse/HW-123');
   await expect(tracking.getByLabel('Add PR',{exact:true})).toHaveAttribute('placeholder','https://github.com/org/repo/pull/1');
-  await expect(tracking).toContainText('Jira key, then Enter');await expect(tracking).toContainText('Absolute http(s) URL, then Enter');
+  await expect(tracking).toContainText('Jira key or browse URL, then Enter');await expect(tracking).toContainText('Absolute http(s) URL, then Enter');
   async function enter(label,value){const input=tracking.getByLabel(label,{exact:true});await input.fill(value);await input.press('Enter');}
   async function mutation(act,field,values){
     const before=await src.inputValue(),expected=JSON.parse(before);
@@ -518,7 +518,7 @@ for(const carrier of ['node','edge'])test('tracking '+carrier+' controls validat
     await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
     await page.locator('#redo-builder').click();await expect(src).toHaveValue(after);await select();
   }
-  await enter('Add ticket','hw-123');await expect(guide.locator('.ierr')).toHaveText('Use a Jira key like HW-123.');
+  await enter('Add ticket','hw-123');await expect(guide.locator('.ierr')).toHaveText('Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.');
   await expect(tracking.getByLabel('Add ticket',{exact:true})).toHaveValue('hw-123');await expect(src).toHaveValue(original);
   await mutation(()=>enter('Add ticket','  HW-123  '),'tickets',['HW-123']);
   await expect(tracking.getByRole('list',{name:'Tickets',exact:true}).locator('li')).toContainText(['HW-123']);

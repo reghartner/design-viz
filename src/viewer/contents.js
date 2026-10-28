@@ -80,7 +80,7 @@ function createReaderContents(ctl,nav,actions,options){
       if(narrow && opened){var focused=root.activeElement || doc.activeElement;setOpen(false,sidebar.contains(focused),false);}
       if(narrow && hovering)hideOverlay();
     }
-    if(opened===null){opened=!narrow;sidebar.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));toggle.setAttribute('aria-label',opened?'Close Contents':'Open Contents');toggle.title=opened?'Close Contents':'Open Contents';view.classList.toggle('reader-contents-open',opened);if(options.onOpenChange)options.onOpenChange(opened);}
+    if(opened===null){opened=!narrow && documentPages().length!==1;sidebar.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));toggle.setAttribute('aria-label',opened?'Close Contents':'Open Contents');toggle.title=opened?'Close Contents':'Open Contents';view.classList.toggle('reader-contents-open',opened);if(options.onOpenChange)options.onOpenChange(opened);}
     var containerRect=options.container && (options.container!==document.body || host) && options.container.getBoundingClientRect();if(containerRect)bottom=Math.min(bottom,containerRect.bottom);
     var width=Math.max(0,Math.min(284,rect.width-42));
     var railShown=!opened && !narrow && partCount>1;rail.hidden=!railShown;

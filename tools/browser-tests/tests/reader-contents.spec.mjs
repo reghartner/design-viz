@@ -17,6 +17,53 @@ async function openRaw(page,server,raw,name='contents'){
 }
 async function choose(root,id){await root.locator('.reader-tree-view[data-tab-view="'+id+'"]').click();}
 
+function onePage(){return {page:{title:'One page',sections:[{id:'only',heading:'Only page',text:'One readable page.'}]}};}
+
+test('one document page starts with Contents closed in standalone and native readers, while two Views of that section start open',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const root=await openRaw(page,server,onePage(),'single-page-reader'),toggle=root.locator('.reader-top>button');
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');
+  await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(root.locator('.reader-contents')).toBeHidden();
+  await toggle.click();await expect(root.locator('.reader-contents')).toBeVisible();
+  await toggle.click();await expect(root.locator('.reader-contents')).toBeHidden();
+
+  await writeFile(path.join(server.root,'single-page-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+  await writeFile(path.join(server.root,'single-page-native.html'),'<div id="one" style="width:1200px;height:800px"></div><script type="module">import {mountNativeViewer} from "./single-page-native.js";window.mount=mountNativeViewer;</script>');
+  await page.goto(server.origin+'/single-page-native.html');await page.waitForFunction(()=>!!window.mount);
+  await page.evaluate(raw=>window.viewer=mount(document.querySelector('#one'),raw),onePage());
+  const native=page.locator('#one');await expect(native.locator('.reader-page-label')).toHaveText('Page 1 of 1');
+  await expect(native.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
+  await native.locator('.reader-top>button').click();await expect(native.locator('.reader-contents')).toBeVisible();
+  await page.evaluate(()=>window.viewer.destroy());
+
+  const section=onePage().page.sections[0];
+  const twoViews={page:{title:'One section, two pages',sections:[{tabs:[{label:'Only tab',views:[{id:'full',name:'Full',presentation:'standard',sections:['only']},{id:'alternate',name:'Alternate',presentation:'standard',sections:['only']}],sections:[section]}]}]}};
+  const multiple=await openRaw(page,server,twoViews,'single-section-two-views');
+  await expect(multiple.locator('.reader-page-label')).toHaveText('Page 1 of 2');
+  await expect(multiple.locator('.reader-top>button')).toHaveAttribute('aria-expanded','true');
+  await multiple.getByRole('button',{name:'Next page',exact:true}).click();await expect(multiple.locator('.reader-page-label')).toHaveText('Page 2 of 2');
+});
+
+test('desktop editor and read-only preview start a one-page Contents closed and retain deliberate toggles through rerenders',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  const source=JSON.stringify(onePage(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
+  const root=page.locator('#docview'),toggle=root.locator('.reader-top>button');
+  await expect(root.locator('.reader-page-label')).toHaveText('Page 1 of 1');await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await toggle.click();await expect(root.locator('.reader-contents')).toBeVisible();
+  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();
+  const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Retitled one page');await title.press('Enter');
+  await expect(root.locator('.reader-contents')).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await toggle.click();await expect(root.locator('.reader-contents')).toBeHidden();
+  await title.fill('Retitled again');await title.press('Enter');await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await closeTools(page);await page.locator('#open-page-preview').click();
+  const preview=page.locator('#page-preview-view'),previewToggle=preview.locator('.reader-top>button');
+  await expect(preview.locator('.reader-page-label')).toHaveText('Page 1 of 1');await expect(previewToggle).toHaveAttribute('aria-expanded','false');
+  await previewToggle.click();await expect(preview.locator('.reader-contents')).toBeVisible();
+  await page.locator('#close-page-preview').click();await expect(root.locator('.reader-contents')).toBeHidden();
+  await expect(page.locator('#workbench-editor-title')).toHaveText('Retitled again');
+  await page.locator('#editor-tab-json').click();await expect(page.locator('#src')).toHaveValue(/Retitled again/);
+});
+
 test('desktop reader keeps common navigation and utilities fixed when diagram actions appear',async({page,server})=>{
   await page.setViewportSize({width:1440,height:900});
   const diagram=story().page.sections[0].tabs[0].sections[0].diagram;

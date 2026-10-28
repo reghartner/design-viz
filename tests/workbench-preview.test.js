@@ -275,3 +275,25 @@ test('Arrange follows a surviving section across insertion and ends when it is r
   const anonymous=h.c.normalize(JSON.parse(SOURCE)),duplicate=plain(anonymous);duplicate.sections.push(plain(anonymous.sections[0]));
   assert.equal(h.c.workbenchArrangementSection(anonymous,duplicate,0),null);
 });
+
+
+test('preview restores session follow only when the effective authored default is unchanged',()=>{
+  const c={};vm.createContext(c);for(const file of ['validator.js','workbench/preview.js'])vm.runInContext(readSource(file),c);
+  for(const before of [undefined,true,false,'invalid'])for(const after of [undefined,true,false,'invalid'])for(const session of [true,false]){
+    const source={sections:[{id:'story',diagram:{nodes:{a:{}},rows:[['a']],followActive:before}}]};
+    const saved=c.workbenchPreviewSnapshot(source,{sections:[{number:1,follow:{snapshot:()=>session}}]});
+    assert.equal(saved.sections[0].followActiveDefault,before!==false);
+    const next=structuredClone(source);next.sections[0].diagram.followActive=after;
+    const values=[],cameras=[],ctl={sections:[{number:1,follow:{restore:v=>values.push(v)},boardSize:{setMode(){},restore:v=>cameras.push(v)}}]};
+    c.restoreWorkbenchPreview(next,ctl,saved);
+    const expected=(before!==false)===(after!==false)?session:after!==false;
+    assert.deepEqual(values,[expected,expected],'both restoration paths honor authored changes');assert.equal(cameras.length,1);
+  }
+  const page={sections:[{id:'legacy',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+  const saved=c.workbenchPreviewSnapshot(page,{sections:[{number:1,follow:{snapshot:()=>false}}]});delete saved.sections[0].followActiveDefault;
+  for(const authored of [undefined,false]){
+    page.sections[0].diagram.followActive=authored;const values=[];
+    c.restoreWorkbenchPreview(page,{sections:[{number:1,follow:{restore:v=>values.push(v)}}]},saved);
+    assert.deepEqual(values,[false,false],'old snapshots assume the legacy enabled default');
+  }
+});

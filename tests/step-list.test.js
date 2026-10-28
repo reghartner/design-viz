@@ -96,7 +96,7 @@ function harness(raw=fixture()){
     'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect',
     'steps-path','steps-path-tools','steps-path-settings','steps-path-label','steps-path-color','steps-fork','steps-path-save','steps-path-remove',
     'steps-reuse','steps-independent','steps-remove-occurrence','steps-sharing','steps-shared-with',
-    'steps-autoplay','steps-opening-view','src','view']) root.appendChild(el('div',id));
+    'steps-autoplay','steps-follow-active','steps-opening-view','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
   let rendered=src.value, target=null, locked=false, activePath=null, ui;
   const c=load({document:doc,setTimeout:fn=>timers.push(fn),clearTimeout(){},MutationObserver:class {constructor(){throw new Error('Controlled refresh must not observe DOM');}}});
@@ -133,6 +133,19 @@ test('playback settings save per diagram, preserve selection and content, and us
   opening.value='step';opening.fire('change');assert.equal(dOf(JSON.parse(h.src.value)).view,'step');
   h.undo();assert.equal(opening.value,'ambient');assert.equal(auto.checked,true);
   h.undo();assert.equal(auto.checked,false);assert.deepEqual(JSON.parse(h.src.value),fixture());
+});
+
+test('Follow active default saves in the selected tab section with one undo and rejects stale or locked edits',()=>{
+  const raw=fixture();raw.page.blocks[0].diagram={nodes:{n:{}},rows:[['n']]};
+  const h=harness(raw),input=h.e['steps-follow-active'];h.select(1);
+  assert.equal(input.checked,true);input.checked=false;input.fire('change');
+  assert.equal(dOf(JSON.parse(h.src.value)).followActive,false);assert.equal(h.history.length,1);assert.equal(h.target.index,1);
+  assert.equal(JSON.parse(h.src.value).page.blocks[0].diagram.followActive,undefined);
+  h.undo();assert.equal(input.checked,true);assert.deepEqual(JSON.parse(h.src.value),raw);
+  h.lock(true);assert.equal(input.disabled,true);input.checked=false;input.fire('change');assert.equal(h.history.length,0);assert.equal(input.checked,true);
+  h.lock(false);h.src.value+=' ';input.checked=false;input.fire('change');assert.equal(h.history.length,0);assert.equal(input.checked,true);
+  h.render();h.e['steps-section'].value='0';h.e['steps-section'].fire('change');
+  input.checked=false;input.fire('change');assert.equal(JSON.parse(h.src.value).page.blocks[0].diagram.followActive,false);assert.equal(dOf(JSON.parse(h.src.value)).followActive,undefined);
 });
 
 test('playback settings refuse stale source and locked edits, and ambient-only disables autoplay',()=>{

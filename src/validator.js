@@ -360,6 +360,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (Object.prototype.hasOwnProperty.call(d, 'autoplay') && typeof d.autoplay !== 'boolean')
     warnings.push(DP + '.autoplay: must be true or false — opening paused');
+  if (Object.prototype.hasOwnProperty.call(d, 'followActive') && typeof d.followActive !== 'boolean')
+    warnings.push(DP + '.followActive: must be true or false — following active steps by default');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')

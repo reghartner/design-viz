@@ -740,11 +740,15 @@ panel omit the team lane chip from their step captions. In Step mode, each Jira
 ticket appears on its own line immediately below the authored step text, with
 its state beside the key: **To do**, **In progress**, **Done**, **Blocked**,
 **Missing**, or **No status** before evidence arrives or when a key has no runtime
-entry. Ticket keys are deduplicated across that step's nodes, edges, edge
-endpoints and failed communications. Other steps in the same team and unmapped
-epic stories do not add tickets to this list. Authored references appear even
-before live status arrives. Keys link to the page's Jira site, or a safe runtime
-ticket URL when no site is configured; without either they remain plain text.
+entry. Ticket keys are deduplicated across nodes explicitly added to the step
+and the step's selected edges, including failed communications. Selecting a
+delivered edge still highlights both endpoints; a failed communication keeps
+its source highlighted. Neither adds endpoint-node tickets to the list. Add
+an endpoint to the step's `nodes` to include its tickets. Other steps in the
+same team and unmapped epic stories do not add tickets to this list. Authored
+references appear even before live status arrives. Keys link to the page's Jira
+site, or a safe runtime ticket URL when no site is configured; without either
+they remain plain text.
 The list updates with step/path navigation and new evidence, and disappears in
 Ambient mode or when Live is disabled. The Live status panel keeps its overall
 progress, Tickets team stripes and Blockers team names.
@@ -752,6 +756,9 @@ progress, Tickets team stripes and Blockers team names.
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
 **IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps
 have no live caption. Captions update on step changes and new evidence.
+Aggregate captions, step/coin states, lane rollups, playback blockers and
+readiness continue to include the endpoints of selected edges and failed
+communications; the explicit-node rule applies only to the visible ticket list.
 
 Playback pauses on the first blocked or missing beat, including the first beat
 when starting or replaying, and focuses the first blocking carrier.

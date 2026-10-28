@@ -31,7 +31,8 @@ function workbenchPreviewSnapshot(page, ctl, options){
     var section = sections[rec.number - 1], stepper = rec.stepper;
     if (!section) return;
     var prior = {number:rec.number,sectionId:section.sectionId,context:section.context,content:section.content,
-      playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
+      playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient',
+      followActiveDefault:section.diagram.followActive!==false};
     if(options && options.reader && rec.viewport)prior.reader=rec.viewport.snapshotReaderState();
     if(rec.follow)prior.followActive=rec.follow.snapshot();
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
@@ -82,8 +83,11 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
         if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
       }
     }
+    // Old snapshots predate the authored option, whose default was enabled.
+    var followDefault=section.diagram.followActive!==false,priorDefault=prior.followActiveDefault!==false;
+    var followActive=followDefault===priorDefault?prior.followActive:followDefault;
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
-    if(rec.follow)rec.follow.restore(prior.followActive);
+    if(rec.follow)rec.follow.restore(followActive);
     try{
     if (!stepper || !prior.mode || !(options && options.comparison) && prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
@@ -109,7 +113,7 @@ function restoreWorkbenchPreview(page, ctl, saved, options){
       // Path restoration may replace or reframe the SVG. Restore the camera
       // only after that geometry has settled, including early-return cases.
       if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
-      if(rec.follow)rec.follow.restore(prior.followActive);
+      if(rec.follow)rec.follow.restore(followActive);
     }
   });
 }

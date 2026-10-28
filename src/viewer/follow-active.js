@@ -41,8 +41,8 @@ function createCameraMotion(){
   }};
 }
 
-function createActiveFollow(section,board,host,stepper,camera){
-  var enabled=true,retired=false,visible=true,pending=0,last=null;
+function createActiveFollow(section,board,host,stepper,camera,initialEnabled){
+  var enabled=initialEnabled!==false,retired=false,visible=true,pending=0,last=null;
   var button=document.createElement('button');button.type='button';button.className='mbtn follow-active';host.appendChild(button);
   function paint(){button.textContent=enabled?'Follow active':'Resume follow';button.setAttribute('aria-pressed',String(enabled));button.title=enabled?'Follow the current step. Pan or zoom to pause.':'Resume following the current step';}
   function cancelMotion(){var ctl=camera();if(ctl && ctl.cancelFollow)ctl.cancelFollow();last=null;}

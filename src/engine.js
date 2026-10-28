@@ -3301,7 +3301,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   bar.parentNode.insertBefore(modeRail,bar);
   result.modeRail=modeRail;
   addComposition();
-  result.follow=createActiveFollow(box,boardDiv,tog,stepper,function(){return result.viewport && result.viewport.isExplore()?result.viewport:result.boardSize;});
+  result.follow=createActiveFollow(box,boardDiv,tog,stepper,function(){return result.viewport && result.viewport.isExplore()?result.viewport:result.boardSize;},d.followActive);
   return result;
 }
 

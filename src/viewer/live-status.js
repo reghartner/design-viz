@@ -232,19 +232,20 @@ function liveStatusStep(diagram,step,map){
   return liveStatusRollup(states);
 }
 /* Carrier identities are section-local; ticket keys are deduplicated only when
-   counting work. Failed hops involve both endpoints, just like step rollups. */
-function liveStatusStepCarriers(diagram,step){
+   counting work. Failed hops involve both endpoints, just like step rollups.
+   The visible step ticket list opts into direct carriers; rollups keep endpoints. */
+function liveStatusStepCarriers(diagram,step,directOnly){
   var out=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
   (diagram.edges || []).forEach(function(edge){
     var key=edge.from+'->'+edge.to;if(keys.indexOf(key)<0)return;
-    out.push({id:key,value:edge});nodes.push(edge.from,edge.to);
+    out.push({id:key,value:edge});if(!directOnly)nodes.push(edge.from,edge.to);
   });
   nodes.filter(function(id,i){return nodes.indexOf(id)===i;}).forEach(function(id){
     var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))out.push({id:id,value:node});
   });return out;
 }
-function liveStatusStepTickets(diagram,step){
-  var keys=[];liveStatusStepCarriers(diagram,step).forEach(function(carrier){
+function liveStatusStepTickets(diagram,step,directOnly){
+  var keys=[];liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
     trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
   });return keys;
 }
@@ -600,7 +601,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var stepper=binding.stepper,d=binding.section.diagram,scope=binding.el;
     scope.querySelectorAll('.dv-live-caption').forEach(function(el){el.remove();});
     var step=on && stepper && stepper.mode()==='step' && (d.steps || [])[stepper.sourceIndex()];
-    var host=step && scope.querySelector('.termbar .step-text'),keys=step?liveStatusStepTickets(d,step):[];
+    var host=step && scope.querySelector('.termbar .step-text'),keys=step?liveStatusStepTickets(d,step,true):[];
     var row=host && host.querySelector('.dv-live-step-tickets');
     scope.querySelectorAll('.dv-live-step-tickets').forEach(function(el){if(el!==row || !keys.length)el.remove();});
     if(!host)return;

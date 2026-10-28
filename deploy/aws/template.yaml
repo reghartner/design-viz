@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Flowview invited-team cloud library. Public shell, private authenticated project data.
+Parameters:
+  CognitoDomainPrefix:
+    Type: String
+    AllowedPattern: '[a-z0-9-]+'
+  SesIdentityArn:
+    Type: String
+    Description: Verified SES identity ARN in a Cognito-supported email region; required for EMAIL_OTP.
+  FromEmail:
+    Type: String
+    Description: Verified SES sender email.
+Resources:
+  ShellBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
+  ShellOriginAccess:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-shell'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  ShellDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        Origins:
+          - Id: shell
+            DomainName: !GetAtt ShellBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt ShellOriginAccess.Id
+            S3OriginConfig: {OriginAccessIdentity: ''}
+        DefaultCacheBehavior:
+          TargetOriginId: shell
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          ForwardedValues: {QueryString: false}
+          MinTTL: 0
+          DefaultTTL: 60
+          MaxTTL: 3600
+        ViewerCertificate: {CloudFrontDefaultCertificate: true}
+  ShellPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ShellBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub '${ShellBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ShellDistribution}'
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt ShellBucket.Arn, !Sub '${ShellBucket.Arn}/*']
+            Condition: {Bool: {aws:SecureTransport: false}}
+  Snapshots:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Sub 'https://${ShellDistribution.DomainName}']
+            AllowedMethods: [GET, PUT]
+            AllowedHeaders: [content-type, x-amz-*]
+            MaxAge: 300
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-staging
+            Status: Enabled
+            Prefix: staging/
+            ExpirationInDays: 2
+            NoncurrentVersionExpiration: {NoncurrentDays: 2}
+  SnapshotsPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Snapshots
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt Snapshots.Arn, !Sub '${Snapshots.Arn}/*']
+            Condition: {Bool: {aws:SecureTransport: false}}
+  Projects:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: pk, AttributeType: S}, {AttributeName: sk, AttributeType: S}]
+      KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolTier: ESSENTIALS
+      AdminCreateUserConfig: {AllowAdminCreateUserOnly: true}
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      Policies:
+        SignInPolicy: {AllowedFirstAuthFactors: [EMAIL_OTP]}
+      EmailConfiguration:
+        EmailSendingAccount: DEVELOPER
+        SourceArn: !Ref SesIdentityArn
+        From: !Ref FromEmail
+      AccountRecoverySetting:
+        RecoveryMechanisms: [{Name: admin_only, Priority: 1}]
+  ResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: flowview
+      Name: Flowview library
+      Scopes: [{ScopeName: projects, ScopeDescription: Read and edit invited team projects}]
+  Client:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: ResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, flowview/projects]
+      SupportedIdentityProviders: [COGNITO]
+      ExplicitAuthFlows: [ALLOW_USER_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      CallbackURLs: [!Sub 'https://${ShellDistribution.DomainName}/']
+      LogoutURLs: [!Sub 'https://${ShellDistribution.DomainName}/']
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      TokenValidityUnits: {AccessToken: minutes}
+  CognitoDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref UserPool
+      ManagedLoginVersion: 2
+  ManagedLogin:
+    Type: AWS::Cognito::ManagedLoginBranding
+    Properties:
+      ClientId: !Ref Client
+      UserPoolId: !Ref UserPool
+      UseCognitoProvidedValues: true
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: [!Sub 'https://${ShellDistribution.DomainName}']
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST]
+      Auth:
+        DefaultAuthorizer: Cognito
+        Authorizers:
+          Cognito:
+            IdentitySource: '$request.header.Authorization'
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+              audience: [!Ref Client]
+            AuthorizationScopes: [flowview/projects]
+  Service:
+    Type: AWS::Serverless::Function
+    Metadata: {BuildMethod: makefile}
+    Properties:
+      CodeUri: ./
+      Handler: handler.main
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE: !Ref Projects
+          BUCKET: !Ref Snapshots
+          ISSUER: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+          CLIENT_ID: !Ref Client
+          ACCESS_SCOPE: flowview/projects
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:PutItem, dynamodb:TransactWriteItems]
+              Resource: !GetAtt Projects.Arn
+            # HeadObject can distinguish missing keys (404) from denied access
+            # only with ListBucket. This is Lambda-only on this private bucket;
+            # no list capability is signed or exposed to the browser.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt Snapshots.Arn
+            - Effect: Allow
+              Action: [s3:GetObject, s3:GetObjectVersion, s3:PutObject]
+              Resource: [!Sub '${Snapshots.Arn}/staging/*', !Sub '${Snapshots.Arn}/revisions/*']
+      Events:
+        Library:
+          Type: HttpApi
+          Properties: {ApiId: !Ref Api, Path: '/{proxy+}', Method: ANY}
+Outputs:
+  Website: {Value: !Sub 'https://${ShellDistribution.DomainName}/'}
+  ShellBucketName: {Value: !Ref ShellBucket}
+  SnapshotsBucketName: {Value: !Ref Snapshots}
+  MembershipTable: {Value: !Ref Projects}
+  UserPoolId: {Value: !Ref UserPool}
+  ClientId: {Value: !Ref Client}
+  ApiUrl: {Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'}
+  LoginDomain: {Value: !Sub 'https://${CognitoDomain}.auth.${AWS::Region}.amazoncognito.com'}

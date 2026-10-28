@@ -70,6 +70,9 @@
     "workbench/commands/topology.js",
     "workbench/persistence.js",
     "workbench/working-file.js",
+    "workbench/cloud-session.js",
+    "workbench/cloud-auth.js",
+    "workbench/cloud-ui.js",
     "workbench/session.js",
     "workbench/field-values.js",
     "workbench/panel-collections.js",
@@ -295,7 +298,8 @@
         "workbench/brand.css",
         "workbench/agent-conversation.css",
         "workbench/story-brief.css",
-        "workbench/onboarding.css"
+        "workbench/onboarding.css",
+        "workbench/cloud.css"
       ]
     },
     "iconLibrary": "icons/library.js",

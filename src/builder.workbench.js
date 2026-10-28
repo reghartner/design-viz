@@ -474,6 +474,7 @@ function initWorkbenchBuilder(opts){
   function retireInspector(){inspector.retire();}
   var interactions=null;
 
+  var cloudPersistence=null;
   var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
   var persistence=createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
     schedule:function(fn,ms){return life.delay(fn,ms);},
@@ -489,7 +490,7 @@ function initWorkbenchBuilder(opts){
   var session=createBuilderSession({
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
     persistence:persistence,
-    saveWorking:function(){if(workingFile)workingFile.save();},pendingWorking:function(){if(workingFile)workingFile.pending();},
+    saveWorking:function(){if(workingFile)workingFile.save();if(cloudPersistence)cloudPersistence.save();},pendingWorking:function(){if(workingFile)workingFile.pending();if(cloudPersistence)cloudPersistence.changed();},
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
     editError:function(message){inspectorMessage(message);},
     historyChanged:function(undo,redo){
@@ -507,12 +508,12 @@ function initWorkbenchBuilder(opts){
     },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
-    invalidateProject:function(policy){workingOperation++;if(workingFile && (!policy || !policy.preserveHistory || workingFile.attached() && workingFile.attached().external))workingFile.clear();retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
+    invalidateProject:function(policy){if(cloudPersistence && (!policy || !policy.preserveHistory))cloudPersistence.detach();workingOperation++;if(workingFile && (!policy || !policy.preserveHistory || workingFile.attached() && workingFile.attached().external))workingFile.clear();retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
   });
   /* File choices authorize a working destination; import/paste remain copies. */
   function refreshWorkingHeader(){
     var el=document.getElementById('workspace-provenance');if(!el || !workingView)return;
-    var value=workingView,label={browser:'Browser only',pending:'File pending',saving:'Saving file',saved:'File saved',paused:'File save paused',failed:'File save failed'}[value.state];
+    var value=workingView,label={browser:cloudPersistence && cloudPersistence.attachment()?'No local file':'Browser only',pending:'File pending',saving:'Saving file',saved:'File saved',paused:'File save paused',failed:'File save failed'}[value.state];
     el.textContent=label+(value.name?' · '+value.name:'');el.dataset.state=value.state;
     var status=document.getElementById('workbench-working-status');if(status)el.title=status.textContent+' Browser recovery is reported separately in File.';
   }
@@ -522,7 +523,7 @@ function initWorkbenchBuilder(opts){
     var el=document.getElementById('workbench-working-status'),retry=document.getElementById('working-file-retry');
     if(!el)return;
     var label=value.name || '',suffix=value.paired?' + coverage ledger':'';
-    el.textContent={browser:'Browser-only editing. '+(value.detail || (workingBrowser.pickFile?'Choose a working file or folder to save changes on your computer.':'Writable file access is unavailable here. Use desktop Chrome or Edge over HTTPS, or Export project to download a copy.')),
+    el.textContent={browser:(cloudPersistence && cloudPersistence.attachment()?'No local file connected. Online saving is reported in Online projects. ':'Browser-only editing. ')+(value.detail || (workingBrowser.pickFile?'Choose a working file or folder to save changes on your computer.':'Writable file access is unavailable here. Use desktop Chrome or Edge over HTTPS, or Export project to download a copy.')),
       pending:'Changes waiting to save to '+label+suffix+'.',saving:'Saving '+label+suffix+'…',
       saved:'Saved to '+label+suffix+'.'+(value.detail?' '+value.detail:''),
       paused:'File save paused: '+label+'. '+value.detail+' Unfinished text stays in browser recovery.',
@@ -589,7 +590,7 @@ function initWorkbenchBuilder(opts){
       var findings=session.validate(JSON.parse(source),context);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       var project=await found.initialize(check);check();
       if((project.source===null?expected.text:project.source)!==source)throw Error('The saved source changed. Choose the folder again.');
-      if(!replaceProject(source,undefined,context))return;
+      if(!(cloudPersistence && cloudPersistence.attachment() && source===expected.text?session.openFolder(context,expected):replaceProject(source,undefined,context)))return;
       agentOptions.setLedger(project.hasLedger?project.ledger:found.source===null?previousLedger || '':'',true);
       var documentId=session.snapshot().project;
       binding={name:directory.name+'/'+found.spec,paired:true,handle:directory,artifacts:project.files.artifacts,
@@ -823,6 +824,7 @@ function initWorkbenchBuilder(opts){
 
   function closeInsertMenu(){if(addMenu)addMenu.close(false);}
   function beforeImported(kind){
+    if(cloudPersistence)cloudPersistence.detach();
     workingOperation++;workingFile.clear();if(agentChat && agentChat.releaseWorking)agentChat.releaseWorking();
     setSelected(null);session.target=null;session.insertSection=0;
     if(interactions.connecting())cancelConnect(null);
@@ -1609,7 +1611,7 @@ function initWorkbenchBuilder(opts){
     restoreSavedStory:function(source,expected,context){
       var current=agentOptions.snapshot();
       if(expected && (current.project!==expected.project || current.source!==expected.source || current.topologyRevision!==expected.topologyRevision))return {ok:false,error:'Your draft changed while opening the folder. Choose the diagram folder again.'};
-      var ok=loadText(source,context);return {ok:ok,project:session.snapshot().project};
+      var ok=cloudPersistence && cloudPersistence.attachment() && source===current.source?session.openFolder(context,session.snapshot()):loadText(source,context);return {ok:ok,project:session.snapshot().project};
     },
     showChanges:showAgentChanges,
     undoChange:function(receipt){
@@ -1668,6 +1670,21 @@ function initWorkbenchBuilder(opts){
   life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference},{editDetail:true});});
   function destroy(){life.destroy();}
   return {
+    cloud:{
+      own:function(dispose){life.own(dispose);},
+      refreshDestination:function(){if(workingView)workingStatus(workingView);},
+      connect:function(controller){cloudPersistence=controller;life.own(function(){controller.destroy();});},
+      snapshot:function(){return {source:session.text(),ledger:agentLedgerProject===session.snapshot().project?agentLedger:null,topologyContext:session.topologyContext()};},
+      archive:session.preserveDraft,
+      replace:function(value){
+        // Cloud saves preserve repairable raw text; rendering may report invalid
+        // JSON without refusing to open the authored draft.
+        var hooks=Object.assign(projectHooks(),{topologyContext:value.topologyContext,beforeRender:function(){
+          agentLedger=value.ledger;agentLedgerProject=session.snapshot().project;if(opts.beforeProjectLoad)opts.beforeProjectLoad();
+        }});
+        var ok=session.replaceProject(value.source,value.source,hooks);if(ok){sourceOrigin=null;refreshProvenance();}return ok;
+      }
+    },
     resolve:session.resolve,
     loadSpec:function(raw,origin,topologyContext){var ok=life.alive() && loadText(JSON.stringify(raw,null,2),topologyContext);if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
     setSkin:function(name){if(agentChat && agentChat.setSkin)agentChat.setSkin(name);},

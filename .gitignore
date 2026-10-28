@@ -52,3 +52,10 @@ node_modules/
 # .cloudflare/cache/ holds the account ID and account name.
 .cloudflare/
 .wrangler/
+
+# AWS build/deployment output and account-specific configuration.
+/.aws-sam/
+/deploy/aws/.aws-sam/
+/deploy/aws/cloud-config.json
+/deploy/aws/samconfig.toml
+/deploy/aws/dist/

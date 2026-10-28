@@ -432,3 +432,9 @@ canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location
 initWorkbenchHumanGuide();
 initWorkbenchOnboarding({source:workbenchPristine,welcome:welcome});
 }
+
+// Opt-in hosting configuration is injected only by the AWS/mock packager.
+// Ordinary portable builds make no cloud requests and show no cloud controls.
+if(!workbenchPractice && document.getElementById('flowview-cloud-config')){
+  initFlowviewCloud({builder:workbenchBuilder,welcome:welcome,workspace:workspace});
+}

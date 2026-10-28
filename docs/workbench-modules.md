@@ -757,3 +757,30 @@ repeated current-source and disk checks. This path preserves handwritten JSON
 formatting instead of stamping it, and preserves an unknown sibling ledger when
 only the spec had been associated. Other export destinations keep normal snapshot
 stamping. A changed snapshot or external edit refuses the remaining export.
+
+## Optional hosted projects
+
+`workbench/cloud-session.js` owns the cloud attachment, serialized save operation,
+revision and async generation. The builder's existing save/pending boundaries feed
+it exact source, coverage ledger and frozen topology context. Paired agent
+acceptance and history therefore use the same transaction boundary as local
+saving. The cloud controller neither reads agent protocol files nor grants Canon
+publication/refresh. Local replacement/import detaches the cloud project; an
+explicit matching-source or empty agent-folder connection retains it.
+
+`workbench/cloud-auth.js` implements managed Cognito code/PKCE sign-in.
+`workbench/cloud-ui.js` mounts the desktop library only when the AWS packager has
+injected `flowview-cloud-config`; ordinary portable builds initialize no cloud UI
+or network activity. The builder lifetime owns the mounted cloud controller/UI.
+The authenticated reader renders a frozen snapshot in a sandboxed viewer frame
+and leaves authoring hidden. Local unsynced recovery is distinct from an
+acknowledged online revision; browser storage failure blocks destructive opens
+but does not block saving the current draft online.
+
+`deploy/aws/service.mjs` is shared by production Lambda and the loopback mock.
+Adapters provide membership, conditional DynamoDB transactions and immutable S3
+snapshots. Full envelopes travel through signed object URLs, avoiding Lambda's
+payload boundary. See [AWS pilot setup and local rehearsal](../deploy/aws/README.md)
+for the upload protocol, account linking, recovery/privacy limits and commands.
+`tests/cloud-*.test.js` and the required `cloud-projects.spec.mjs` desktop contracts
+cover these boundaries without live AWS calls.

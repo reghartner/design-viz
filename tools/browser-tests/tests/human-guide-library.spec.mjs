@@ -181,6 +181,7 @@ test('Canon edit and browser Back preserve the selected chapter, path and step w
   await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
   await expect(reader.locator('.stepid')).toHaveText('press');
   await expect(reader.locator('.reader-top-view')).toHaveCount(1);
+  await reader.locator('.reader-top>button').click();
   await reader.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]').click();await expect(reader.getByRole('tab',{name:'Standard',exact:true})).toHaveAttribute('aria-selected','true');
   await reader.locator('.path-chip[data-dv-path="failed"]').click();
   await expect(reader.locator('.stepid')).toHaveText('failed');

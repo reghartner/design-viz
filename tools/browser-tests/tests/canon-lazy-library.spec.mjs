@@ -578,7 +578,7 @@ test('the selected site skin owns Canon, navigation and editor rerenders without
   await expect(body).toHaveClass(/\bsk-blueprint\b/);await expect(reader).toHaveClass(/\bsk-blueprint\b/);
   const firstSection=await reader.locator('.doc-sec').first().elementHandle();
 
-  await reader.locator('.reader-theme-menu>summary').click();await reader.locator('[data-reader-skin="terminal"]').click();
+  await reader.locator('.reader-top>button').click();await reader.locator('.reader-theme-menu>summary').click();await reader.locator('[data-reader-skin="terminal"]').click();
   await expect(body).toHaveClass(/\bsk-terminal\b/);await expect(reader).toHaveClass(/\bsk-terminal\b/);
   expect(await firstSection.evaluate(el=>el.isConnected)).toBe(true);
   const terminalSection=await reader.locator('.doc-sec').first().evaluate(el=>getComputedStyle(el).backgroundColor);

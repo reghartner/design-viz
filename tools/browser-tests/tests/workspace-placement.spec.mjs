@@ -69,7 +69,7 @@ test('Contents changes, tool restoration and the single dock keep desktop contro
     for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize','.workspace-window-dock'])await hit(win.locator(control));
     await win.locator('.workspace-window-close').click();
   }
-  await page.getByRole('button',{name:'Close Contents',exact:true}).first().click();await page.locator('#editor-tab-agent').click();
+  await expect(page.getByRole('button',{name:'Open Contents',exact:true}).first()).toBeVisible();await page.locator('#editor-tab-agent').click();
   const agent=page.locator('#workspace-window-agent');await agent.locator('.workspace-window-grip').focus();
   for(let n=0;n<12;n++)await page.keyboard.press('Shift+ArrowLeft');
   const collapsed=await agent.boundingBox();expect(collapsed.x).toBeLessThan(200);

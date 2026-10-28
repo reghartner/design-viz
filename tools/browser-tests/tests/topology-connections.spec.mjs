@@ -275,7 +275,8 @@ for(const [view,selection] of [['ambient','Shift'],['explore','Alt marquee']])te
 test('imported node drags retire when rendering, replacing provider context or destroying the editor',async({page,server})=>{
   const {provider,consumer}=await fixture(page,server,'lifetime','ambient',(_provider,value)=>{const d=diagram(value);d.rows=[[]];d.floats=[{id:'local',x:800,y:500},{id:'other',x:1050,y:500}];});const before=await source(page);
   async function hold(){
-    await closeTools(page);const box=await node(page,'shared::store').locator('.card').boundingBox();
+    await closeTools(page);const card=node(page,'shared::store').locator('.card');await card.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}));
+    const box=await card.boundingBox();
     await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
     await page.mouse.move(box.x+box.width/2+70,box.y+box.height/2+50,{steps:8});
     await expect(page.locator('#docview .dv-ghost')).toHaveCount(1);
@@ -283,7 +284,8 @@ test('imported node drags retire when rendering, replacing provider context or d
   await hold();await page.evaluate(()=>document.querySelector('#go').click());await page.mouse.up();
   await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
   await closeTools(page);await node(page,'local').click();await node(page,'shared::api').click({modifiers:['Shift']});
-  const localBox=await node(page,'local').locator('.card').boundingBox();await page.mouse.move(localBox.x+localBox.width/2,localBox.y+localBox.height/2);await page.mouse.down();await page.mouse.move(localBox.x+localBox.width/2+70,localBox.y+localBox.height/2+50,{steps:8});
+  const localCard=node(page,'local').locator('.card');await localCard.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}));
+  const localBox=await localCard.boundingBox();await page.mouse.move(localBox.x+localBox.width/2,localBox.y+localBox.height/2);await page.mouse.down();await page.mouse.move(localBox.x+localBox.width/2+70,localBox.y+localBox.height/2+50,{steps:8});
   await expect(page.locator('#docview .dv-ghost')).toHaveCount(2);diagram(provider).nodes.api.title='Updated provider';
   await page.evaluate(({text,context})=>__editorTest.builder.loadText(text,context),{text:before,context:{version:1,id:'consumer',specs:[provider,consumer]}});
   await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect(node(page,'shared::api')).toContainText('Updated provider');

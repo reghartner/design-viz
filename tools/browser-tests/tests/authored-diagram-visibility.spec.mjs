@@ -57,6 +57,7 @@ for(const savedLayout of [false,true])test('ordinary '+(savedLayout?'saved':'aut
   d.autoplay=false;const raw={page:{sections:[{heading:'Legacy story',diagram:d}]}};
   await open(page,server,raw);const initial=await source(page);
   await expect(page.locator('#docview>.explore-navigation .reader-top-view')).toHaveCount(1);
+  await page.locator('#docview>.explore-navigation .reader-top>button').click();
   await page.locator('#docview>.explore-navigation .reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]').click();await change(page,false);const hidden=await source(page),saved=JSON.parse(hidden).page.sections[0].diagram;
   expect(saved.layouts.map(v=>v.id)).toEqual(['flow']);expect(saved.layouts[0].sectionLayout.default.find(it=>!it.panel&&!it.controls).hidden).toBe(true);
   const navigation=page.locator('#docview>.explore-navigation'),topView=navigation.locator('.reader-top-view[data-tab-view="standard"]'),contentsRow=navigation.locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="standard"]');

@@ -124,8 +124,10 @@ for(const named of [true,false])test(`Tab-owned Explore text sizing preserves ${
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
  await closeTools(page);await player(page).locator('.stepline').click();await page.locator('#editor-tab-inspect').click();
  await expect(page.getByRole('textbox',{name:'Step controls text size',exact:true})).toHaveCount(0);
- await closeTools(page);await panelsOptions(page);await page.getByRole('button',{name:'Enlarge step controls',exact:true}).click();
- await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts.find(l=>l.id===(named?'explore':'flow')).exploreLayout.controlsScale).toBe(.9);
+ await closeTools(page);await panelsOptions(page);
+ const startingScale=await player(page).evaluate(el=>Number(el.style.getPropertyValue('--explore-overlay-scale')));expect(startingScale).toBeGreaterThan(0);
+ await page.getByRole('button',{name:'Enlarge step controls',exact:true}).click();
+ await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts.find(l=>l.id===(named?'explore':'flow')).exploreLayout.controlsScale).toBe(Math.round((startingScale+.1)*100)/100);
  expect(JSON.parse(await source.inputValue()).page.views).toEqual(raw.page.views);
 });
 

@@ -6,9 +6,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const runtime = 'tools/canon/generated-runtime.cjs';
-const native = 'apps/backstage/src/generated';
-const pages = ['template/flowview.html', 'workbench/flowspec.html', 'workbench/diagrams.json'];
+const {pages, runtime, native} = JSON.parse(await readFile(new URL('./generated-paths.json', import.meta.url), 'utf8'));
 const generated = [...pages, runtime, native];
 const run = (command, args) => execFileSync(command, args, {cwd: root, stdio: 'inherit'});
 const tracked = execFileSync('git', ['ls-files', '--', ...generated], {cwd: root, encoding: 'utf8'}).trim();

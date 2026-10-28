@@ -1,0 +1,5 @@
+{
+  "pages": ["template/flowview.html", "workbench/flowspec.html", "workbench/diagrams.json"],
+  "runtime": "tools/canon/generated-runtime.cjs",
+  "native": "apps/backstage/src/generated"
+}

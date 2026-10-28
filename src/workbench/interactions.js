@@ -1133,7 +1133,8 @@ function createBuilderInteractions(opts){
     Array.prototype.forEach.call(view.querySelectorAll('g.node.dv-position-locked'),function(node){
       node.classList.remove('dv-position-locked');node.removeAttribute('data-dv-position-locked');
     });
-    Array.prototype.forEach.call(view.querySelectorAll('.dv-position-lock-badge'),function(badge){badge.remove();});
+    /* Only node badges: the section arranger owns the badges on its layout tiles (#474). */
+    Array.prototype.forEach.call(view.querySelectorAll('g.node>.dv-position-lock-badge'),function(badge){badge.remove();});
     var parsed=parseEditor();if(parsed.error)return;
     specSectionPaths(parsed.raw).forEach(function(record,section){
       var d=specValueAt(parsed.raw,record.diagram),sec=view.querySelector('.doc-sec[data-dv-section="'+section+'"]');if(!d || !sec || inDetailPreview(sec))return;

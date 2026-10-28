@@ -109,7 +109,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(active)return;
     if(bar){
       var layout=definition && definition.exploreLayout || {};
-      bar.classList.toggle('standard-controls-layout',!!layout.steps && layout.steps.textPosition!=='below');
+      bar.classList.toggle('standard-controls-layout',!!layout.steps && layout.steps.textPosition!=='below' || !bar.classList.contains('has-paths'));
       if(layout.steps)bar.setAttribute('data-step-text-position',layout.steps.textPosition);else bar.removeAttribute('data-step-text-position');
       // Grid readers retain their grid; only explicit authored sizing opts in.
       bar.style.zoom=layout.controlsScale!==undefined?String(layout.controlsScale):'';

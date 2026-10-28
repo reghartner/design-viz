@@ -157,5 +157,5 @@ test('tracking authoring guidance documents references and the future Jira-only 
     /blocked[^\n]*rose[^\n]*pulse/i,/missing[^\n]*rose[^\n]*dotted[^\n]*pulse/i,/waiting[^\n]*slate[^\n]*dashed/i,
     /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
-    /color comes from Jira status only/i,/prs[^.]*plain links/i,/## Rendering/]) assert.match(guide,pattern);
+    /color comes from Jira status only/i,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);
 });

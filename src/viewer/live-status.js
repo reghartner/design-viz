@@ -20,6 +20,56 @@ function liveStatusOwnerURL(tracking,entry){
   var site=deltaLinkUrl(tracking && tracking.jira && tracking.jira.site),id=entry && typeof entry.assigneeId==='string'?entry.assigneeId.trim():'';
   return site && id?site.replace(/\/$/,'')+'/wiki/people/'+encodeURIComponent(id).replace(/%3A/g,':'):null;
 }
+/* Pull request evidence travels with a ticket entry and never paints a carrier.
+   Links are sanitized once here, so the panel and the popover render the same shape. */
+var LIVE_STATUS_PR_STATES=['open','draft','merged','closed'],LIVE_STATUS_PR_CHECKS=['none','pending','passing','failing'],LIVE_STATUS_PR_REVIEWS=['none','approved','changes-requested','commented'];
+function liveStatusPRLinks(list){
+  var out=[],urls=[];
+  (Array.isArray(list)?list:[]).forEach(function(pr){
+    var url=pr && typeof pr==='object' && deltaLinkUrl(pr.url);
+    if(!url || urls.indexOf(url)>=0)return;urls.push(url);
+    var link={url:url,state:LIVE_STATUS_PR_STATES.indexOf(pr.state)>=0?pr.state:'open',checks:LIVE_STATUS_PR_CHECKS.indexOf(pr.checks)>=0?pr.checks:'none',
+      review:LIVE_STATUS_PR_REVIEWS.indexOf(pr.review)>=0?pr.review:'none',source:pr.source==='github-search'?'github-search':'authored'};
+    if(typeof pr.number==='number' && isFinite(pr.number) && pr.number>0)link.number=Math.floor(pr.number);
+    ['title','repo','author','branch','mergedAt'].forEach(function(field){if(typeof pr[field]==='string' && pr[field])link[field]=pr[field];});
+    out.push(link);
+  });
+  return out;
+}
+function liveStatusPRSummary(links){
+  return {count:links.length,state:links.some(function(pr){return pr.state==='open' || pr.state==='draft';})?'open':links.every(function(pr){return pr.state==='merged';})?'merged':'declined'};
+}
+function liveStatusPRNumber(url){var match=/\/(?:pull|pulls|pull-requests|merge_requests|merge-requests)\/(\d+)/.exec(url);return match?match[1]:null;}
+function liveStatusPRHost(url){try{return new URL(url).host.replace(/^www\./,'');}catch(ex){return '';}}
+/* Tooltip and accessible name of one pull request icon: state, checks, review,
+   author and repository. No relative times (Chuck, 2026-10-27). */
+function liveStatusPRLabel(pr){
+  var number=pr.number!=null?'#'+pr.number:liveStatusPRNumber(pr.url)?'#'+liveStatusPRNumber(pr.url):'';
+  var checks={pending:'checks pending',passing:'checks passing',failing:'checks failing'}[pr.checks],review={approved:'approved','changes-requested':'changes requested',commented:'review comments'}[pr.review];
+  var head=[number,pr.title].filter(Boolean).join(' '),facts=[pr.state,checks,review].filter(Boolean).join(' · '),who=[pr.author,pr.repo].filter(Boolean).join(' · ');
+  return {label:['Pull request '+head,facts,who].filter(Boolean).join(' · '),title:[head,facts,who].filter(Boolean).join('\n')};
+}
+/* One icon for the Tickets table and the carrier popover. A plain authored URL
+   keeps the monochrome icon; GitHub evidence colours it by state and adds a
+   checks dot. The icon markup is written once and kept across repaints. */
+function liveStatusPRDecorate(node,pr){
+  var doc=node.ownerDocument || document,enriched=!!(pr && typeof pr==='object'),url=enriched?pr.url:pr;
+  node.className='nbacklink dv-live-pr-link';node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');
+  if(!node._livePRIcon){node.innerHTML=FlowIcons.render('pull-request',{className:'dv-live-pr-icon',monochrome:true});node._livePRIcon=true;}
+  var dot=node._livePRChecks;
+  if(!enriched){
+    var number=liveStatusPRNumber(url),host=liveStatusPRHost(url);
+    node.removeAttribute('data-pr-state');node.setAttribute('aria-label','Pull request'+(number?' #'+number:'')+(host?' on '+host:''));node.setAttribute('title',url);
+    if(dot){dot.remove();node._livePRChecks=null;}
+    return node;
+  }
+  var text=liveStatusPRLabel(pr);node.setAttribute('data-pr-state',pr.state);node.setAttribute('aria-label',text.label);node.setAttribute('title',text.title);
+  if(pr.checks && pr.checks!=='none'){
+    if(!dot){dot=node._livePRChecks=doc.createElement('i');dot.className='dv-live-pr-checks';dot.setAttribute('aria-hidden','true');node.appendChild(dot);}
+    dot.setAttribute('data-checks',pr.checks);
+  }else if(dot){dot.remove();node._livePRChecks=null;}
+  return node;
+}
 function liveStatusClass(el,state){
   LIVE_STATUS_STATES.forEach(function(value){
     var name='dv-live-'+value;
@@ -209,13 +259,20 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
   var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
   var demoMode=!!(options.demo && typeof options.demo.mount==='function');
-  var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':''};
+  var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':'',github:{state:'none',busy:false}};
+  // GitHub is a second, optional connector (#756): its state rides beside the Jira state and never replaces it.
+  var LIVE_STATUS_GITHUB_CONNECTIONS=['none','disconnected','connecting','connected','error'];
   function setStatus(value){
     if(retired || !value || typeof value!=='object')return;
     if(typeof value.state==='string' && LIVE_STATUS_CONNECTIONS.indexOf(value.state)>=0)connection.state=value.state;
     if(typeof value.busy==='boolean')connection.busy=value.busy;
     if(typeof value.source==='string' && value.source)connection.source=value.source;
     if(value.checkedAt!=null){var at=typeof value.checkedAt==='number'?value.checkedAt:Date.parse(value.checkedAt);if(isFinite(at))connection.checkedAt=new Date(at).toISOString();}
+    var github=value.github;
+    if(github && typeof github==='object'){
+      if(typeof github.state==='string' && LIVE_STATUS_GITHUB_CONNECTIONS.indexOf(github.state)>=0)connection.github.state=github.state;
+      if(typeof github.busy==='boolean')connection.github.busy=github.busy;
+    }
     notify();
   }
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
@@ -237,12 +294,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });};
     renderOptions.loadDetail=wrappedLoad;
   }
-  function refs(){
-    var out={tickets:[],prs:[],epics:[]};
-    function collect(source){trackingEpics(source).forEach(function(key){if(out.epics.indexOf(key)<0)out.epics.push(key);});sectionRecords(source).forEach(function(record){
+  // refs() collects the whole page; refs(key) narrows to the carriers that hold that ticket (their tickets are just the key).
+  function refs(key){
+    var byKey=typeof key==='string',out={tickets:[],prs:[],epics:[]};
+    function collect(source){if(!byKey)trackingEpics(source).forEach(function(key){if(out.epics.indexOf(key)<0)out.epics.push(key);});sectionRecords(source).forEach(function(record){
       var d=record.section.diagram || {};
       Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(value){
-        var found=trackingRefs(value);['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
+        var found=trackingRefs(value);if(byKey){if(found.tickets.indexOf(key)<0)return;found.tickets=[key];}
+        ['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
       });
     });}
     collect(page);Object.keys(remotePages).forEach(function(key){collect(remotePages[key]);});return out;
@@ -264,7 +323,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
-      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):''}};
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -297,6 +356,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
         if(entry.assignee)element('span','dv-live-ticket-assignee',entry.assignee,row);
         if(entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,row);
+        if(entry.prs && entry.prs.links){var icons=element('span','dv-live-ticket-links',null,row);entry.prs.links.forEach(function(pr){liveStatusPRDecorate(element('a',null,null,icons),pr);});}
         if(entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
         if(liveStatusStale(entry,Date.now(),tracking && tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
       }
@@ -642,7 +702,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
         var item={state:entry.state};['title','assignee','assigneeId','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
         var url=deltaLinkUrl(entry.url);if(url)item.url=url;
+        var links=liveStatusPRLinks(entry.prs && entry.prs.links);
         if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
+        else if(links.length)item.prs=liveStatusPRSummary(links);
+        if(links.length)item.prs.links=links;
         next[key]=item;
       });
       // Cache age describes the lookup, independently of issue modification

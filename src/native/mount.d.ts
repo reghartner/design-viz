@@ -42,6 +42,21 @@ export interface NativeViewerTarget {
   path?: string;
   step?: string;
 }
+/** One pull request shown as an icon in the Tickets table and the carrier popover (#756).
+ * State, checks and review colour the icon and fill its tooltip; nothing here paints a carrier. */
+export interface LiveStatusPullRequest {
+  url: string;
+  number?: number;
+  title?: string;
+  state?: 'open' | 'draft' | 'merged' | 'closed';
+  checks?: 'none' | 'pending' | 'passing' | 'failing';
+  review?: 'none' | 'approved' | 'changes-requested' | 'commented';
+  repo?: string;
+  author?: string;
+  branch?: string;
+  mergedAt?: string;
+  source?: 'authored' | 'github-search';
+}
 export interface LiveStatusEntry {
   state: 'todo' | 'active' | 'done' | 'blocked' | 'missing';
   title?: string;
@@ -49,7 +64,7 @@ export interface LiveStatusEntry {
   assignee?: string;
   /** Atlassian accountId of the assignee. With tracking.jira.site the Tickets table links the owner to <site>/wiki/people/<id>. */
   assigneeId?: string;
-  prs?: {count: number; state: 'open' | 'merged' | 'declined'};
+  prs?: {count: number; state: 'open' | 'merged' | 'declined'; links?: LiveStatusPullRequest[]};
   detail?: string;
   updatedAt?: string;
   /** Epic key this issue belongs to; entries for keys no carrier references are

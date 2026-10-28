@@ -4061,7 +4061,29 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
 .dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}
-.dv-live-ticket-title,.dv-live-ticket-assignee,.dv-live-ticket-prs,.dv-live-ticket-detail{grid-column:1 / -1;white-space:pre-wrap;overflow-wrap:anywhere;}
+.dv-live-ticket-title,.dv-live-ticket-assignee,.dv-live-ticket-prs,.dv-live-ticket-detail,.dv-live-ticket-links{grid-column:1 / -1;white-space:pre-wrap;overflow-wrap:anywhere;}
+.dv-live-ticket-links{display:flex;flex-wrap:wrap;gap:2px;}
+/* Pull request icons (#733, #756): one monochrome icon per link. GitHub evidence
+   colours the icon by state and adds a checks dot; details live in the tooltip. */
+.dv-live-pr-link{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
+.dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
+.dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
+/* Pull request state and check colours are Node Styles preset lines (#610), like the
+   live state tokens above: open moss, draft slate, merged violet, closed rose; checks
+   passing moss, failing rose, pending amber. Dark values follow the presets' pure-Aurora
+   variants. The selectors repeat .nbacklink so they outrank the per-skin
+   `body.sk-* .nbacklink` link colours in the panel and in the popover alike. */
+:root{--dv-pr-open:#539A43;--dv-pr-draft:#6E89A5;--dv-pr-merged:#9B6BCE;--dv-pr-closed:#D15A63;--dv-checks-passing:#539A43;--dv-checks-failing:#D15A63;--dv-checks-pending:#AC7D00;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-pr-open:#6FB261;--dv-pr-draft:#88A1BC;--dv-pr-merged:#B386E4;--dv-pr-closed:#E8777D;--dv-checks-passing:#6FB261;--dv-checks-failing:#E8777D;--dv-checks-pending:#C99414;}
+.nbacklink.dv-live-pr-link[data-pr-state="open"],.nbacklink.dv-live-pr-link[data-pr-state="open"]:is(:hover,:focus){color:var(--dv-pr-open);}
+.nbacklink.dv-live-pr-link[data-pr-state="draft"],.nbacklink.dv-live-pr-link[data-pr-state="draft"]:is(:hover,:focus){color:var(--dv-pr-draft);}
+.nbacklink.dv-live-pr-link[data-pr-state="merged"],.nbacklink.dv-live-pr-link[data-pr-state="merged"]:is(:hover,:focus){color:var(--dv-pr-merged);}
+.nbacklink.dv-live-pr-link[data-pr-state="closed"],.nbacklink.dv-live-pr-link[data-pr-state="closed"]:is(:hover,:focus){color:var(--dv-pr-closed);}
+.nbacklink.dv-live-pr-link[data-pr-state]:is(:hover,:focus){background:color-mix(in srgb,currentColor 12%,transparent);}
+.dv-live-pr-checks{position:absolute;right:2px;bottom:2px;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1.5px var(--dbg,#fff);}
+.dv-live-pr-checks[data-checks="failing"]{background:var(--dv-checks-failing);}
+.dv-live-pr-checks[data-checks="pending"]{background:var(--dv-checks-pending);}
+.dv-live-pr-checks[data-checks="passing"]{background:var(--dv-checks-passing);}
 @media(prefers-reduced-motion:reduce){.dv-live-halo{animation:none!important;}}
 @media print{
   .dv-live-halo{animation:none!important;}

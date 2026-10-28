@@ -33,3 +33,24 @@ function trackingEpics(page,invalid){
     else if(out.indexOf(key)<0)out.push(key);
   });return out;
 }
+/* GitHub discovery is always bounded to authored repositories or an org. */
+var trackingGithubRepoPattern=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+var trackingGithubOrgPattern=/^[A-Za-z0-9_.-]+$/;
+function trackingGithubScope(page,invalid){
+  var out={repos:[],org:null},tracking=page && page.tracking;
+  if(!tracking || !Object.prototype.hasOwnProperty.call(tracking,'github'))return out;
+  var github=tracking.github;
+  if(!github || typeof github!=='object' || Array.isArray(github)){if(invalid)invalid('',null);return out;}
+  if(Object.prototype.hasOwnProperty.call(github,'repos')){
+    if(!Array.isArray(github.repos)){if(invalid)invalid('.repos',null);}
+    else github.repos.forEach(function(repo,index){
+      if(typeof repo!=='string' || !trackingGithubRepoPattern.test(repo)){if(invalid)invalid('.repos',index);}
+      else if(out.repos.indexOf(repo)<0)out.repos.push(repo);
+    });
+  }
+  if(Object.prototype.hasOwnProperty.call(github,'org')){
+    if(typeof github.org==='string' && trackingGithubOrgPattern.test(github.org))out.org=github.org;
+    else if(invalid)invalid('.org',null);
+  }
+  return out;
+}

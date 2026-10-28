@@ -730,7 +730,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/12",
+                "number": 12,
+                "title": "HW-123 Debounce the doorbell button",
+                "state": "open",
+                "checks": "passing",
+                "review": "approved",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -744,7 +757,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/13",
+                "number": 13,
+                "title": "HW-124 Stabilize the hardware event signal",
+                "state": "open",
+                "checks": "failing",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -758,7 +784,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/88",
+                "number": 88,
+                "title": "Deliver firmware events over HTTPS",
+                "state": "open",
+                "checks": "passing",
+                "review": "none",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "authored"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -786,7 +825,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/90",
+                "number": 90,
+                "title": "BE-67 Notification service fan-out",
+                "state": "open",
+                "checks": "pending",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -800,7 +852,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/91",
+                "number": 91,
+                "title": "Accept firmware events over HTTPS",
+                "state": "open",
+                "checks": "pending",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "authored"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -814,7 +879,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/41",
+                "number": 41,
+                "title": "UX-89 Resident notification card",
+                "state": "draft",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -849,7 +927,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/12",
+                "number": 12,
+                "title": "HW-123 Debounce the doorbell button",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -863,7 +955,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/13",
+                "number": 13,
+                "title": "HW-124 Stabilize the hardware event signal",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -877,7 +983,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/88",
+                "number": 88,
+                "title": "Deliver firmware events over HTTPS",
+                "state": "open",
+                "checks": "passing",
+                "review": "approved",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "authored"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -905,7 +1024,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/90",
+                "number": 90,
+                "title": "BE-67 Notification service fan-out",
+                "state": "open",
+                "checks": "passing",
+                "review": "approved",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -919,7 +1051,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/91",
+                "number": 91,
+                "title": "Accept firmware events over HTTPS",
+                "state": "open",
+                "checks": "passing",
+                "review": "commented",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "authored"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -933,7 +1078,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/41",
+                "number": 41,
+                "title": "UX-89 Resident notification card",
+                "state": "open",
+                "checks": "passing",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -968,7 +1126,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/12",
+                "number": 12,
+                "title": "HW-123 Debounce the doorbell button",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -982,7 +1154,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/13",
+                "number": 13,
+                "title": "HW-124 Stabilize the hardware event signal",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -996,7 +1182,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/88",
+                "number": 88,
+                "title": "Deliver firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1024,7 +1224,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/90",
+                "number": 90,
+                "title": "BE-67 Notification service fan-out",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1038,7 +1252,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/91",
+                "number": 91,
+                "title": "Accept firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1052,7 +1280,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/41",
+                "number": 41,
+                "title": "UX-89 Resident notification card",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1087,7 +1329,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/12",
+                "number": 12,
+                "title": "HW-123 Debounce the doorbell button",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1101,7 +1357,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/13",
+                "number": 13,
+                "title": "HW-124 Stabilize the hardware event signal",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1115,7 +1385,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/88",
+                "number": 88,
+                "title": "Deliver firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1129,7 +1413,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/95",
+                "number": 95,
+                "title": "FW-46 Hardware interrupt integration",
+                "state": "open",
+                "checks": "passing",
+                "review": "approved",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1143,7 +1440,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/90",
+                "number": 90,
+                "title": "BE-67 Notification service fan-out",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1157,7 +1468,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/91",
+                "number": 91,
+                "title": "Accept firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1171,7 +1496,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/41",
+                "number": 41,
+                "title": "UX-89 Resident notification card",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1185,7 +1524,20 @@
           "statusName": "In Progress",
           "prs": {
             "count": 1,
-            "state": "OPEN"
+            "state": "OPEN",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/44",
+                "number": 44,
+                "title": "UX-90 Alert sound setting",
+                "state": "open",
+                "checks": "pending",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search"
+              }
+            ]
           },
           "epic": "DOOR-100",
           "lane": "APP"
@@ -1206,7 +1558,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/12",
+                "number": 12,
+                "title": "HW-123 Debounce the doorbell button",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1220,7 +1586,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/hardware/pull/13",
+                "number": 13,
+                "title": "HW-124 Stabilize the hardware event signal",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/hardware",
+                "author": "Alex",
+                "source": "github-search",
+                "mergedAt": "2026-10-28T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1234,7 +1614,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/88",
+                "number": 88,
+                "title": "Deliver firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1248,7 +1642,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/firmware/pull/95",
+                "number": 95,
+                "title": "FW-46 Hardware interrupt integration",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/firmware",
+                "author": "Sam",
+                "source": "github-search",
+                "mergedAt": "2026-10-31T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1262,7 +1670,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/90",
+                "number": 90,
+                "title": "BE-67 Notification service fan-out",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1276,7 +1698,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/backend/pull/91",
+                "number": 91,
+                "title": "Accept firmware events over HTTPS",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/backend",
+                "author": "Riley",
+                "source": "authored",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1290,7 +1726,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/41",
+                "number": 41,
+                "title": "UX-89 Resident notification card",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search",
+                "mergedAt": "2026-10-29T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100"
         },
@@ -1304,7 +1754,21 @@
           "statusName": "Done",
           "prs": {
             "count": 1,
-            "state": "MERGED"
+            "state": "MERGED",
+            "links": [
+              {
+                "url": "https://github.com/acme/app/pull/44",
+                "number": 44,
+                "title": "UX-90 Alert sound setting",
+                "state": "merged",
+                "checks": "none",
+                "review": "none",
+                "repo": "acme/app",
+                "author": "Morgan",
+                "source": "github-search",
+                "mergedAt": "2026-10-31T09:00:00Z"
+              }
+            ]
           },
           "epic": "DOOR-100",
           "lane": "APP"

@@ -56,18 +56,23 @@ Ask the author, in one batch, only what the source does not already state:
   pick the right Atlassian resource and to link keys.
 - **Stale threshold.** `tracking.staleDays` (default 7): active work not
   updated for longer gets a stale ring without changing its color.
-- **PR links.** Pull-request URLs the author wants shown. They are plain
-  links; live PR state comes only from what Jira already links to the ticket
-  (Development field count with state open or merged; other states are
-  dropped), never from GitHub.
+- **PR links.** Pull-request URLs the author wants shown as icons in the PRs
+  column and the carrier popover. With the viewer's GitHub connector the icons
+  take the pull request's state, checks and review (tooltip and colour, inside
+  the panel only); without it they stay plain icons and Jira's Development
+  count (open or merged; other states are dropped) is the only PR evidence.
+- **GitHub scope.** `tracking.github`: `{"repos": ["owner/repo", ...]}` or
+  `{"org": "name"}`. Pull requests are discovered by searching each ticket key
+  in titles and bodies within that scope; without it only the authored PRs'
+  repositories are searched. Ask which repositories carry the epic's work.
 
 ## 2. Author the spec
 
 Write the diagram as usual, then add, per node or edge, `"tickets": ["HW-123"]`
 and optionally `"prs": ["https://..."]`. Keys must match
 `^[A-Z][A-Z0-9_]+-[0-9]+$` exactly (case sensitive). Put
-`"tracking": {"jira": {"site": "https://<site>.atlassian.net"}, "staleDays": 7}`
-on `page` beside `title`, and list `flow.live-status` under
+`"tracking": {"jira": {"site": "https://<site>.atlassian.net"}, "github": {"repos": ["acme/firmware"]}, "staleDays": 7}`
+on `page` beside `title` (omit `github` when no repositories are known), and list `flow.live-status` under
 `page.flowview.features`. The spec stores keys only, never status.
 
 ### Always add the Live status panel
@@ -127,7 +132,9 @@ For a board that must tell a story without a connector, write
 `<name>.timeline.json` shaped like the example: `version`, `intervalSeconds`,
 and `days[]`, each with `label`, `note` and `issues` keyed by ticket with
 `state` (todo | active | blocked | done), `summary`, `assignee`, `updated`,
-`flagged`, `statusName` and `prs: {count, state}`. Include at least one
+`flagged`, `statusName` and `prs: {count, state}`; from the day a PR opens, add
+`prs.links` in the host-provider shape (`url`, `number`, `title`, `state`,
+`checks`, `review`, `repo`, `author`, `source`) so the icons show offline. Include at least one
 blocked day and one day where a key is absent, so the board shows both
 failure colors. Open the built page with `#live=demo` to replay it.
 
@@ -160,6 +167,12 @@ Publish only when asked. Steps:
    **Atlassian MCP** for a custom connector or in the declaration unless the
    viewer really has Atlassian's directory connector of that name: it
    resolves to that directory connector and asks for an Atlassian login.
+   For pull-request detail add the viewer's GitHub custom connector (GitHub's
+   remote MCP server `https://api.githubcopilot.com/mcp/`, OAuth) as a second
+   entry under its exact display name, for example
+   `{server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}`.
+   Without it the board still works; PR icons stay plain and the header says
+   "GitHub not connected" when the page has GitHub links or a scope.
 4. The built page carries an agent guide block
    (`<script type="text/markdown" id="dv-agent-guide">`, written by
    `tools/inject.py`) with this edit loop, the declaration above as JSON, the
@@ -199,6 +212,9 @@ Open the artifact in a browser and check, in this order:
 - The Live status panel beside the diagram shows the carriers done ring,
   Blockers, Tickets and Activity without a click.
 - Its header shows Live, counts and updated time; demo controls appear only in demo mode.
+  With a GitHub connector the connection line ends "· GitHub connected" and the
+  PRs column icons are coloured with a tooltip (state, checks, review, author,
+  repository).
 - Network: two or more `api/frame/mcp/call` requests with status 200.
 - Clicking one node card or edge label opens its popover, listing the keys with state and assignee. The canvas has no status badges.
 - Screenshot for the author.

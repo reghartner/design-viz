@@ -892,3 +892,125 @@ test('G1 panel shows the agent-guide line only when the document carries the dv-
  const d=h.C.PanelRegistry.get('live-status');assert.match(d.styles,/\.dv-live-agent-guide\{[^}]*--dfaint/);
  status.destroy();h.ctl.liveStatus.destroy();
 });
+/* G1–G12 GitHub enrichment contract (#756): connector payloads match the captured schema.
+   Rulings (Chuck, 2026-10-27): PR links stay an icon in the PRs column; GitHub state, checks and
+   review colour the icon and fill its tooltip; no "time since updated" text; a missing GitHub
+   connector leaves plain links and is reported on the header connection line. Browser rows
+   cover real icon colours and desktop scope Undo/Redo/export. */
+const ghURL=n=>'https://github.com/acme/firmware/pull/'+n;
+const ghFixture=()=>({page:{tracking:{jira:{site:'https://jira.test'},github:{repos:['acme/firmware']}},sections:[{diagram:{nodes:{a:{tickets:['AA-1'],prs:[ghURL(742),'https://code.test/pull/1']},b:{tickets:['BB-1'],prs:[ghURL(742)]}},rows:[['a','b']]}}]}});
+const GH_FIELDS=['number','title','state','html_url','user','pull_request','repository_url','draft'];
+function githubHarness(raw=ghFixture()){
+ const h=providerHarness(raw);h.servers.push({server:'GitHub',tools:[{name:'search_pull_requests'},{name:'pull_request_read'}]});
+ h.github=()=>h.watches.filter(w=>w.tool==='search_pull_requests'||w.tool==='pull_request_read');
+ h.search=key=>h.github().find(w=>w.input.query?.startsWith('"'+key+'"'));
+ h.reads=method=>h.github().filter(w=>w.input.method===method);
+ h.deliver=(w,payload)=>{assert.ok(w,'GitHub watch exists');w.handler({type:'data',result:{payload}});};
+ h.icons=root=>root.querySelectorAll('a.dv-live-pr-link').filter(a=>a.getAttribute('data-pr-state'));
+ h.ghConnection=()=>h.view.querySelector('.dv-live-connection-github');
+ h.openPopover=id=>{const card=h.view.querySelector('g.node[data-dv-node="'+id+'"] .card');h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});return h.view.querySelector('.dv-live-popover');};
+ return h;
+}
+const searchPR=(number,state='open',extra={})=>({number,title:'PR '+number,state,html_url:ghURL(number),repository_url:'https://api.github.com/repos/acme/firmware',user:{login:'sam'},updated_at:'2026-10-27T12:00:00Z',pull_request:{html_url:ghURL(number)},draft:false,...extra});
+test('G1 GitHub scope normalizes and warns per malformed entry without mutating authored data',()=>{
+ const {C}=harness();assert.equal(typeof C.trackingGithubScope,'function');
+ for(const [value,want,count] of [[{repos:['acme/a','bad','acme/a',null,'acme/b'],org:'team'},{repos:['acme/a','acme/b'],org:'team'},2],[{repos:'acme/a',org:'bad org'},{repos:[],org:null},2],[null,{repos:[],org:null},1],[[],{repos:[],org:null},1],[{},{repos:[],org:null},0]]){
+  const raw=ghFixture();raw.page.tracking.github=value;const before=JSON.stringify(raw);assert.deepEqual(plain(C.trackingGithubScope(raw.page)),want);
+  const result=C.validate(C.normalize(raw));assert.deepEqual(plain(result.errors),[]);assert.equal(result.warnings.filter(w=>w.includes('tracking.github')).length,count);assert.equal(JSON.stringify(raw),before);
+ }
+ assert.deepEqual(plain(C.trackingGithubScope({})),{repos:[],org:null});
+});
+test('G2 GitHub selection requires both tools prefers GitHub then first qualifying; absence is silent except on the connection line',async()=>{
+ for(const preferred of [true,false]){
+  const h=githubHarness();h.servers.splice(1,0,{server:'Other code',tools:['search_pull_requests','pull_request_read']});if(!preferred)h.servers[2].tools=['search_pull_requests'];
+  await h.start();assert.ok(h.github().length);assert.ok(h.github().every(w=>w.server===(preferred?'GitHub':'Other code')));
+  assert.equal(h.ghConnection().getAttribute('data-state'),'connecting');assert.equal(h.ghConnection().textContent,'GitHub connecting');h.data(0,[jira('AA-1')]);h.deliver(h.search('AA-1'),{items:[]});
+  assert.equal(h.ghConnection().getAttribute('data-state'),'connected');assert.equal(plain(h.ctl.liveStatus.snapshot()).connection.github.state,'connected');assert.equal(h.view.querySelector('.dv-live-connection').getAttribute('data-state'),'connected');h.ctl.liveStatus.destroy();
+ }
+ const h=providerHarness(ghFixture());await h.start();h.data(0,[jira('AA-1')]);assert.ok(h.watches.every(w=>w.server==='Atlassian MCP'));assert.equal(h.view.querySelector('.dv-live-note').textContent,'');assert.equal(h.ctl.liveStatus.state('AA-1').prs,undefined);
+ assert.equal(h.ghConnection?.()??h.view.querySelector('.dv-live-connection-github').textContent,'GitHub not connected');assert.equal(h.view.querySelector('.dv-live-connection-github').getAttribute('data-state'),'disconnected');assert.equal(h.view.querySelector('.dv-live-connection-github').hidden,false);
+ assert.equal(h.view.querySelector('tr[data-live-ticket="AA-1"]').querySelectorAll('a.dv-live-pr-link').length,2,'plain authored icons stay');assert.equal(h.view.querySelector('tr[data-live-ticket="AA-1"]').querySelectorAll('a.dv-live-pr-link').filter(a=>a.getAttribute('data-pr-state')).length,0);h.ctl.liveStatus.destroy();
+ // A page without GitHub links or scope never mentions GitHub.
+ const plainPage=providerHarness();await plainPage.start();plainPage.data(0,[jira('AA-1')]);assert.equal(plainPage.view.querySelector('.dv-live-connection-github').hidden,true);assert.equal(plain(plainPage.ctl.liveStatus.snapshot()).connection.github.state,'none');plainPage.ctl.liveStatus.destroy();
+});
+test('G3 search scopes use separate repo queries org or authored repos only and map all PR states',async()=>{
+ for(const [scope,expected,authored] of [[{repos:['acme/a','acme/b'],org:'ignored'},[' repo:acme/a',' repo:acme/b'],true],[{org:'acme'},[' org:acme'],true],[undefined,[' repo:acme/firmware'],true],[undefined,[],false]]){
+  const raw=ghFixture();raw.page.tracking.github=scope;if(!authored)for(const node of Object.values(raw.page.sections[0].diagram.nodes))delete node.prs;
+  const h=githubHarness(raw);await h.start();const watches=h.github().filter(w=>w.tool==='search_pull_requests');assert.deepEqual(watches.filter(w=>w.input.query.startsWith('"AA-1"')).map(w=>w.input.query),expected.map(s=>'"AA-1" in:title,body'+s));
+  if(expected.length){assert.ok(watches.length);for(const w of watches){assert.equal(w.input.perPage,20);assert.deepEqual(w.input.fields,GH_FIELDS);assert.deepEqual(w.opts,{refetchInterval:60000});}}
+  h.ctl.liveStatus.destroy();
+ }
+ const h=githubHarness();await h.start();h.data(0,[jira('AA-1')]);h.deliver(h.search('AA-1'),{items:[searchPR(755,'closed',{pull_request:{html_url:ghURL(755),merged_at:'2026-10-27T10:00:00Z'}}),searchPR(700,'open',{draft:true}),searchPR(701,'closed'),searchPR(743)]});
+ const links=h.ctl.liveStatus.state('AA-1').prs?.links;assert.ok(links);assert.deepEqual(plain(links.map(p=>p.state)),['merged','draft','closed','open']);assert.equal(links[0].mergedAt,'2026-10-27T10:00:00Z');assert.equal(links[0].repo,'acme/firmware');assert.equal(links[0].author,'sam');assert.equal(links[0].source,'github-search');assert.equal(links[0].url,ghURL(755));
+ assert.equal(links[0].updatedAt,undefined,'no update times travel with a link');assert.deepEqual([links[0].checks,links[0].review],['none','none']);h.ctl.liveStatus.destroy();
+});
+test('G4 authored GitHub URLs get one trimmed PR watch per URL and non-GitHub links stay plain',async()=>{
+ const h=githubHarness();await h.start();h.data(0,[jira('AA-1'),jira('BB-1')]);const gets=h.reads('get');assert.equal(gets.length,1);assert.deepEqual(gets[0].input,{method:'get',owner:'acme',repo:'firmware',pullNumber:742});
+ h.deliver(gets[0],{number:742,title:'Authored title',state:'closed',merged:true,draft:false,html_url:ghURL(742),user:{login:'alex'},updated_at:'2026-10-27T13:00:00Z',merged_at:'2026-10-27T12:00:00Z',head:{ref:'feature'}});
+ for(const key of ['AA-1','BB-1']){const p=h.ctl.liveStatus.state(key).prs?.links?.[0];assert.ok(p);assert.equal(p.state,'merged');assert.equal(p.title,'Authored title');assert.equal(p.source,'authored');assert.equal(p.author,'alex');assert.equal(p.mergedAt,'2026-10-27T12:00:00Z');assert.equal(p.branch,'feature');}
+ assert.equal(h.reads('get_check_runs').length,0);assert.equal(h.reads('get_reviews').length,0,'merged PRs are not followed');
+ const row=h.view.querySelector('tr[data-live-ticket="AA-1"]'),icons=row.querySelectorAll('a.dv-live-pr-link');assert.deepEqual(icons.map(a=>a.getAttribute('href')),[ghURL(742),'https://code.test/pull/1']);
+ assert.equal(icons[0].getAttribute('data-pr-state'),'merged');assert.match(icons[0].getAttribute('title'),/^#742 Authored title\nmerged\nalex · acme\/firmware$/);assert.equal(icons[0].getAttribute('aria-label'),'Pull request #742 Authored title · merged · alex · acme/firmware');assert.equal(icons[0].querySelector('.dv-live-pr-checks'),null);
+ assert.equal(icons[1].getAttribute('data-pr-state'),null);assert.equal(icons[1].getAttribute('aria-label'),'Pull request #1 on code.test');assert.equal(icons[1].getAttribute('title'),'https://code.test/pull/1');assert.equal(row.querySelector('.dv-live-pr-summary'),null,'a count equal to the icons adds nothing');h.ctl.liveStatus.destroy();
+});
+test('G5 check runs roll up failure pending passing and none; reviews take the latest decision; open and draft PRs use checks and reviews not legacy status',async()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusGithubChecks,'function');assert.equal(typeof C.liveStatusGithubReviews,'function');
+ const complete=conclusion=>({status:'completed',conclusion});
+ for(const failure of ['failure','timed_out','action_required','startup_failure','cancelled'])assert.equal(C.liveStatusGithubChecks({check_runs:[{status:'queued'},complete(failure)]}),'failing');
+ for(const status of ['queued','in_progress','waiting','requested','pending'])assert.equal(C.liveStatusGithubChecks({check_runs:[complete('success'),{status}]}),'pending');
+ assert.equal(C.liveStatusGithubChecks({check_runs:['success','neutral','skipped'].map(complete)}),'passing');assert.equal(C.liveStatusGithubChecks({check_runs:[]}),'none');assert.equal(C.liveStatusGithubChecks(null),'none');
+ const review=(state,login)=>({state,user:{login}});
+ assert.equal(C.liveStatusGithubReviews([review('COMMENTED','a')]),'commented');assert.equal(C.liveStatusGithubReviews({reviews:[review('APPROVED','a'),review('COMMENTED','b')]}),'approved');
+ assert.equal(C.liveStatusGithubReviews([review('APPROVED','a'),review('CHANGES_REQUESTED','b')]),'changes-requested');assert.equal(C.liveStatusGithubReviews([review('CHANGES_REQUESTED','a'),review('APPROVED','a')]),'approved','latest decision per reviewer');
+ assert.equal(C.liveStatusGithubReviews([review('APPROVED','a'),review('DISMISSED','a')]),'none');assert.equal(C.liveStatusGithubReviews([review('PENDING','a')]),'none');assert.equal(C.liveStatusGithubReviews(null),'none');
+ const h=githubHarness();await h.start();h.data(0,[jira('AA-1')]);h.deliver(h.search('AA-1'),{items:[searchPR(742),searchPR(700,'open',{draft:true}),searchPR(701,'closed')]});h.deliver(h.reads('get')[0],searchPR(742));
+ const checks=h.reads('get_check_runs'),reviews=h.reads('get_reviews');assert.deepEqual(checks.map(w=>w.input.pullNumber).sort(),[700,742]);assert.deepEqual(reviews.map(w=>w.input.pullNumber).sort(),[700,742]);assert.equal(h.reads('get_status').length,0);
+ h.deliver(checks.find(w=>w.input.pullNumber===742),{check_runs:[complete('failure')]});h.deliver(reviews.find(w=>w.input.pullNumber===742),[review('CHANGES_REQUESTED','kim')]);
+ const pr=h.ctl.liveStatus.state('AA-1').prs.links.find(p=>p.number===742);assert.equal(pr.checks,'failing');assert.equal(pr.review,'changes-requested');
+ const icon=h.icons(h.view.querySelector('tr[data-live-ticket="AA-1"]')).find(a=>a.getAttribute('href')===ghURL(742));assert.equal(icon.querySelector('.dv-live-pr-checks').getAttribute('data-checks'),'failing');assert.match(icon.getAttribute('title'),/open · checks failing · changes requested/);
+ h.deliver(checks.find(w=>w.input.pullNumber===742),{check_runs:[complete('success')]});assert.equal(icon.querySelector('.dv-live-pr-checks').getAttribute('data-checks'),'passing');h.ctl.liveStatus.destroy();
+});
+test('G6 G7 merge URLs authored first retain Jira summary render icons and never change carrier class or activity',async()=>{
+ const h=githubHarness();await h.start();const issue=jira('AA-1');issue.fields.customFields={Development:'json='+JSON.stringify({cachedValue:{summary:{pullrequest:{overall:{count:9,state:'OPEN'}}}}})};h.data(0,[issue]);
+ const node=h.view.querySelector('g.node[data-dv-node="a"]'),before=node.className;
+ h.deliver(h.search('AA-1'),{items:[searchPR(755,'closed',{pull_request:{html_url:ghURL(755),merged_at:'2026-10-27'}}),searchPR(742)]});h.deliver(h.reads('get')[0],searchPR(742,'open',{title:'Authored'}));
+ const prs=h.ctl.liveStatus.state('AA-1').prs;assert.equal(prs.count,9);assert.equal(prs.state,'open');assert.deepEqual(plain(prs.links.map(p=>p.number)),[742,755]);assert.equal(prs.links[0].source,'authored');assert.equal(node.className,before);
+ assert.equal(h.view.querySelectorAll('.dv-live-activity-entry').length,0);const row=h.view.querySelector('tr[data-live-ticket="AA-1"]'),icons=h.icons(row);assert.equal(icons.length,2);
+ assert.deepEqual(icons.map(a=>[a.getAttribute('href'),a.getAttribute('data-pr-state')]),[[ghURL(742),'open'],[ghURL(755),'merged']]);assert.match(icons[0].getAttribute('title'),/^#742 Authored\nopen\nsam · acme\/firmware$/);assert.match(icons[1].getAttribute('aria-label'),/^Pull request #755 PR 755 · merged/);
+ for(const a of row.querySelectorAll('a'))assert.doesNotMatch(textOf(a)+a.getAttribute('title')+a.getAttribute('aria-label'),/ago|updated/i,'no time since updated');
+ assert.equal(row.querySelector('.dv-live-pr-summary').textContent,'9 open','Jira knows more PRs than the icons show');
+ const pop=h.openPopover('a');assert.ok(pop);assert.equal(h.icons(pop).length,2);assert.ok(pop.querySelectorAll('span').some(el=>el.textContent==='PRs: 9 open'));h.ctl.liveStatus.destroy();
+});
+test('G8 GitHub rate-limit tool error retries once preserves PR evidence keeps notes out of the Live chip and reports on the connection line',async()=>{
+ const h=githubHarness();await h.start();h.data(0,[jira('AA-1')]);const w=h.search('AA-1');h.deliver(w,{items:[searchPR(755,'closed')]});h.deliver(h.search('BB-1'),{items:[]});h.deliver(h.reads('get')[0],searchPR(742,'closed',{merged:true}));const before=plain(h.ctl.liveStatus.state('AA-1').prs);let retries=0;
+ assert.equal(h.ghConnection().getAttribute('data-state'),'connected');assert.equal(h.ghConnection().getAttribute('data-busy'),'false');
+ h.mcp.callTool=async(server,tool,input)=>{assert.equal(server,'GitHub');assert.equal(tool,'search_pull_requests');retries++;throw {code:'tool_error',message:'API rate limit exceeded'};};
+ w.handler({type:'error',error:{code:'tool_error',message:'API rate limit exceeded'}});const retry=[...h.timers.entries()].find(([,t])=>t.ms>=1000&&t.ms<=3000);assert.ok(retry,'randomized retry delay');
+ assert.equal(h.ghConnection().getAttribute('data-state'),'error');assert.equal(h.ghConnection().getAttribute('data-busy'),'true');assert.equal(h.ghConnection().textContent,'GitHub did not answer');
+ h.timers.delete(retry[0]);retry[1].fn();await settle();assert.equal(retries,1);assert.equal(h.timers.size,0);assert.deepEqual(plain(h.ctl.liveStatus.state('AA-1').prs),before);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.view.querySelector('.dv-live-note').textContent,'');
+ assert.equal(h.ghConnection().getAttribute('data-state'),'error');assert.equal(h.ghConnection().getAttribute('data-busy'),'false');assert.equal(h.view.querySelector('.dv-live-connection').getAttribute('data-state'),'connected','Jira state is untouched');
+ w.handler({type:'error',error:{code:'blocked_by_policy'}});assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,0);assert.equal(h.ghConnection().getAttribute('data-state'),'disconnected');assert.equal(h.ghConnection().textContent,'GitHub not connected');
+ await settle();assert.ok(h.github().every(w=>w.stopped===1),'policy answers retire every GitHub watch');assert.deepEqual(plain(h.ctl.liveStatus.state('AA-1').prs),before,'evidence already shown stays');h.ctl.liveStatus.destroy();
+});
+test('G8 queues GitHub watches at ten rotates fairly at 60 seconds and retires late callbacks',async()=>{
+ const raw=ghFixture();raw.page.sections[0].diagram.nodes={a:{tickets:Array.from({length:25},(_,i)=>'AA-'+i)}};const h=githubHarness(raw);await h.start();assert.equal(h.github().filter(w=>!w.stopped).length,10);assert.equal(h.github().length,10);
+ for(let i=0;i<3;i++){const timer=[...h.timers.entries()].find(([,t])=>t.ms===60000);assert.ok(timer);h.timers.delete(timer[0]);timer[1].fn();await settle();assert.ok(h.github().filter(w=>!w.stopped).length<=10);}
+ assert.equal(new Set(h.github().map(w=>w.input.query)).size,25,'queued tickets must eventually be watched');h.ctl.liveStatus.destroy();await settle();assert.ok(h.github().every(w=>w.stopped===1));assert.equal(h.timers.size,0);h.deliver(h.github()[0],{items:[searchPR(742)]});assert.equal(h.ctl.liveStatus.state('AA-0'),null);
+});
+test('G9 demo links survive mapping and G10 G12 docs scope and rebuilt example expose GitHub enrichment',()=>{
+ const C=storyContext(),timeline=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json'));const day=timeline.days[7],issue=day.issues['FW-45'];assert.ok(issue.prs.links?.length);assert.deepEqual(plain(C.liveStatusDemoMap(day,[]))['FW-45'].prs.links,issue.prs.links);
+ for(const d of timeline.days)for(const [key,entry] of Object.entries(d.issues))for(const link of entry.prs.links||[]){assert.ok(/^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(link.url),key);assert.ok(['open','draft','merged','closed'].includes(link.state));assert.equal(link.state==='merged',entry.prs.state==='MERGED',d.label+' '+key);assert.equal(link.updatedAt,undefined);}
+ const doc=fs.readFileSync('docs/live-status.md','utf8');for(const text of ['## Pull requests from GitHub','https://api.githubcopilot.com/mcp/','OAuth','search_pull_requests','pull_request_read','get_check_runs','get_reviews','get_status','GitHub scope','tracking.github'])assert.ok(doc.includes(text),text);
+ assert.match(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8').split('## 4. Publish')[1],/GitHub.*search_pull_requests.*pull_request_read/);
+ assert.match(fs.readFileSync('.claude/skills/hld-to-page/references/integrations.md','utf8'),/search_pull_requests.*pull_request_read/);
+ assert.match(fs.readFileSync('src/workbench/inspector.js','utf8'),/GitHub scope/);const built=fs.readFileSync('examples/live-status/live-status.html','utf8');assert.match(built,/search_pull_requests/);assert.match(built,/dv-live-pr/);
+});
+test('G11 a host provider may hand links directly; apply sanitizes them and the icons follow',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;mountStatus(h);
+ api.apply({'AA-1':{state:'active',prs:{links:[{url:'https://github.com/x/y/pull/1',number:1,title:'One',state:'open',checks:'failing',review:'approved',author:'kim',repo:'x/y',source:'github-search'},{url:'https://github.com/x/y/pull/1'},{url:'javascript:alert(1)'},{url:'https://github.com/x/y/pull/2',state:'bogus',checks:'bogus',review:'bogus',number:-2,updatedAt:'2026-01-01'}]}},'BB-1':{state:'done',prs:{count:3,state:'merged',links:[{url:'https://github.com/x/y/pull/3',state:'merged'}]}}});
+ assert.deepEqual(plain(api.state('AA-1').prs),{count:2,state:'open',links:[{url:'https://github.com/x/y/pull/1',state:'open',checks:'failing',review:'approved',source:'github-search',number:1,title:'One',repo:'x/y',author:'kim'},{url:'https://github.com/x/y/pull/2',state:'open',checks:'none',review:'none',source:'authored'}]});
+ assert.deepEqual(plain(api.state('BB-1').prs),{count:3,state:'merged',links:[{url:'https://github.com/x/y/pull/3',state:'merged',checks:'none',review:'none',source:'authored'}]});
+ const row=h.view.querySelector('tr[data-live-ticket="AA-1"]'),icons=row.querySelectorAll('a.dv-live-pr-link');assert.deepEqual(icons.map(a=>a.getAttribute('data-pr-state')),['open','open']);assert.equal(icons[0].querySelector('.dv-live-pr-checks').getAttribute('data-checks'),'failing');assert.equal(icons[1].querySelector('.dv-live-pr-checks'),null);
+ assert.equal(icons[1].getAttribute('aria-label'),'Pull request #2 · open');assert.equal(h.view.querySelector('tr[data-live-ticket="BB-1"] .dv-live-pr-summary').textContent,'3 merged');
+ api.apply({'AA-1':{state:'active'}});assert.equal(api.state('AA-1').prs,undefined);assert.equal(row.querySelectorAll('a.dv-live-pr-link').length,0);api.destroy();
+});

@@ -594,7 +594,7 @@ body .docview .explore-player>.termbar:is([data-playback-position="above"],[data
 body .docview .explore-player>.termbar[data-playback-position="beside"]>.step-transport{max-width:min(280px,30cqw);}
 
 /* Caption direction in the Standard grid reader. Auto path tracks retain their
-   original wrapping; simple steps use the grid for the default Below caption. */
+   original wrapping while simple steps use the grid for Below captions. */
 body .docview .termbar.standard-controls-layout{display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:auto auto;grid-template-areas:"transport tracks" "caption caption";gap:8px 12px;align-items:start;}
 body .docview .termbar.standard-controls-layout>.step-transport{grid-area:transport;}
 body .docview .termbar.standard-controls-layout>.schips{grid-area:tracks;min-width:0;width:auto;overflow:auto;}
@@ -606,3 +606,13 @@ body .docview .termbar.standard-controls-layout[data-playback-position="above"]{
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="above"]{grid-template-areas:"caption" "transport" "tracks";}
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="left"]{grid-template-columns:minmax(140px,1fr) minmax(0,1fr);grid-template-areas:"caption transport" "caption tracks";}
 body .docview .termbar.standard-controls-layout[data-playback-position="above"][data-step-text-position="right"]{grid-template-columns:minmax(0,1fr) minmax(140px,1fr);grid-template-areas:"transport caption" "tracks caption";}
+body .docview .termbar.standard-controls-layout[data-playback-position="beside"]:not([data-step-text-position="above"]):not([data-step-text-position="left"]):not([data-step-text-position="right"]){grid-template-columns:minmax(0,min(280px,55%)) minmax(100px,1fr);}
+/* Fixed steps tiles have a measured height; the Below row uses compact chrome. */
+body .docview .section-layout-tile[data-layout-key="steps"]{container-type:inline-size;}
+body .docview .section-layout-tile[data-layout-key="steps"]>.termbar.standard-controls-layout:not([data-step-text-position="above"]):not([data-step-text-position="left"]):not([data-step-text-position="right"]){padding-block:6px;row-gap:4px;}
+@container (max-width:500px){
+  body .docview .termbar.standard-controls-layout:not([data-playback-position="above"]):not([data-playback-position="beside"]):not([data-step-text-position="above"]):not([data-step-text-position="left"]):not([data-step-text-position="right"]){grid-template-columns:minmax(0,1fr);grid-template-areas:"transport" "tracks" "caption";}
+}
+@media(max-width:640px){
+  body .docview .termbar.standard-controls-layout:not([data-playback-position="above"]):not([data-playback-position="beside"]):not([data-step-text-position="above"]):not([data-step-text-position="left"]):not([data-step-text-position="right"]){grid-template-columns:minmax(0,1fr);grid-template-areas:"transport" "tracks" "caption";}
+}

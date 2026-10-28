@@ -98,6 +98,28 @@ test('Inspector moves a Standard caption from right to below immediately and pre
  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await standardCaptionBelow(page);
  await open(page,server,JSON.parse(after));await standardCaptionBelow(page);
 });
+test('Inspector places a fixed Standard steps tile caption below its tracks',async({page,server},info)=>{
+ const spec=story('simple','auto','right'),layout=spec.page.sections[0].diagram.layouts[0];
+ layout.sectionLayout.default=[{controls:'steps',x:0,y:0,w:24,h:3},{x:0,y:3,w:24,h:9}];
+ await page.setViewportSize({width:1600,height:1200});
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
+ const bar=page.locator('#docview .section-layout-tile[data-layout-key="steps"]>.termbar');await expect(bar).toBeVisible();
+ await bar.locator('.schips').click({position:{x:2,y:2}});
+ if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
+ const position=page.getByRole('combobox',{name:'Caption position',exact:true});await expect(position).toHaveValue('right');
+ await position.selectOption('below');await standardCaptionBelow(page);
+ await expect.poll(()=>bar.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(2);
+ const saved=JSON.parse(await page.locator('#src').inputValue());
+ expect(saved.page.sections[0].diagram.layouts[0].exploreLayout.steps).toBeUndefined();
+ await open(page,server,saved);await standardCaptionBelow(page);
+ await page.screenshot({path:info.outputPath('fixed-steps-tile-below.png')});
+});
+test('Constrained Standard steps tile keeps Beside playback beside a Below caption',async({page,server})=>{
+ const spec=story('simple','beside');
+ spec.page.sections[0].diagram.layouts[0].sectionLayout.default=[{controls:'steps',x:0,y:0,w:9,h:4},{x:9,y:0,w:15,h:12}];
+ await page.setViewportSize({width:1300,height:1000});await open(page,server,spec);
+ await geometry(page,'beside');await standardCaptionBelow(page);
+});
 
 test('switching arrangements restores their own placement and Auto retains the existing path layout',async({page,server})=>{
  const spec=story('standard','above'),d=spec.page.sections[0].diagram;

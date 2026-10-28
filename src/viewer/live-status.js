@@ -470,8 +470,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
   /* Carriers are their own ticket triggers (#762; Chuck 2026-10-27 removed the
-     canvas badges): a ticketed node's card, and an edge's label (its path when
-     unlabelled). Paint, coins and the break glyph already carry the state. In
+     canvas badges): a ticketed node's card, and an edge's line or label.
+     Pointer aliases on the line, halo and live break share the label's button
+     (the path or visible live break when unlabelled), so each edge has just
+     one keyboard stop. In
      the reader the trigger is a named button reached by Tab; under authoring
      the Workbench owns carrier clicks, selection and focus, so the trigger
      stays inert and the Tickets table remains the route to the popover. */
@@ -485,18 +487,26 @@ function createLiveStatus(ctl,page,options,renderOptions){
     el.setAttribute('aria-label','Live tickets for '+label+(state?' · '+state:'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
     return el;
   }
+  function clearTarget(el){
+    var saved=el._liveSaved || {};el.classList.remove('dv-live-target');el.removeAttribute('data-live-carrier');
+    CARRIER_ATTRS.forEach(function(name){if(saved[name]==null)el.removeAttribute(name);else el.setAttribute(name,saved[name]);});
+    el._liveSaved=null;el._liveCarrier=null;
+  }
   function clearTargets(){
-    view.querySelectorAll('.dv-live-target').forEach(function(el){
-      var saved=el._liveSaved || {};el.classList.remove('dv-live-target');el.removeAttribute('data-live-carrier');
-      CARRIER_ATTRS.forEach(function(name){if(saved[name]==null)el.removeAttribute(name);else el.setAttribute(name,saved[name]);});
-      el._liveSaved=null;el._liveCarrier=null;
-    });
+    view.querySelectorAll('.dv-live-pointer').forEach(function(el){el.classList.remove('dv-live-pointer');el._livePointerTarget=null;});
+    view.querySelectorAll('.dv-live-target').forEach(clearTarget);
+  }
+  function carrierPointer(el,target){
+    if(!el || !target || authoring)return;
+    el.classList.add('dv-live-pointer');el._livePointerTarget=target;
   }
   // A node's own controls (links menu, detail, handoff, anchors) keep their clicks.
   var CARRIER_SKIP='a,button,input,select,textarea,summary,[role="button"]:not(.dv-live-target),.nlink,.nbackref,[data-dv-detail],[data-dv-handoff]';
   function carrierFrom(target){
     if(!target || !target.closest)return null;
     var direct=target.closest('.dv-live-target');if(direct && view.contains(direct))return direct;
+    var pointer=target.closest('.dv-live-pointer');
+    if(pointer && view.contains(pointer) && view.contains(pointer._livePointerTarget))return pointer._livePointerTarget;
     var node=target.closest('g.node[data-dv-node]');if(!node || !view.contains(node) || target.closest(CARRIER_SKIP))return null;
     return node.querySelector('.card.dv-live-target');
   }
@@ -732,10 +742,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
       var waits=value && waiting[value.from+'->'+value.to],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
       if((!state && !waits) || !el.classList.contains('edge'))return;
-      var label=scope.querySelector('text.lbl[data-dv-edge="'+index+'"]');
-      carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,waits);
+      var svg=el.closest('svg'),label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');
+      var target=carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,waits);
+      carrierPointer(el,target);carrierPointer(svg.querySelector('path.halo[data-dv-edge="'+index+'"]'),target);
     });
     liveStatusEdgeBreaks(scope,d,map,on);
+    scope.querySelectorAll('g.dv-live-comm-failure[data-dv-edge]').forEach(function(el){
+      var svg=el.closest('svg'),path=svg && svg.querySelector('path.edge[data-dv-edge="'+el.getAttribute('data-dv-edge')+'"]');
+      var target=path && path._livePointerTarget;if(!target)return;
+      // A live break hides its original path. Without a label, move the single
+      // keyboard button onto the visible replacement so Escape can focus it.
+      if(target===path){
+        var carrier=path._liveCarrier;
+        target=carrierTarget(el,path.getAttribute('data-live-carrier'),carrier.value,'blocked',carrier.tracking,carrier.label,carrier.waiting);
+        clearTarget(path);carrierPointer(path,target);carrierPointer(svg.querySelector('path.halo[data-dv-edge="'+el.getAttribute('data-dv-edge')+'"]'),target);
+      }
+      carrierPointer(el,target);
+    });
     paintStory(binding);
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];

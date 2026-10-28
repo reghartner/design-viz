@@ -6,7 +6,7 @@
 | V3 | Rollup for one carrier with several tickets (docs/live-status.md): any blocked → blocked; else any missing → missing; else any active → active; else all done → done; else all todo → todo; else (mix of done and todo) → active. A carrier whose tickets are all absent from the map gets NO class. Implement as a pure function `liveStatusRollup(states[])` (exported as a global like other engine helpers) so it is unit-testable. |
 | V4 | `apply(map)` sets exactly one `dv-live-<state>` class (removing the others) on: every node `g.node[data-dv-node]` with tickets; every edge `path.edge[data-dv-edge]` with tickets, plus its halo path and its `text.lbl` label (same `data-dv-edge` index); every step coin `g.coin[data-dv-step]` and step chip `button.schip[data-step-source]` whose step involves (via `edges`/keys, `nodes`, failures) at least one carrier that has a state — rollup of those carriers' states; in path-timeline chips too. Text boxes (`g.node.node-text`) never get a class. |
 | V5 | CSS in src/style.core.css, for EVERY skin selector family that paints `.card`/edges today (aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac — check the skin list in the file): `.dv-live-todo` grey, `.dv-live-active` amber, `.dv-live-done` green, `.dv-live-blocked` and `.dv-live-missing` red. Node: card stroke + a soft halo (drop-shadow) in the state color and the status badge; edge: stroke color (main + halo) with the state color; coin: circle fill + ink via the same `--step-color`/`--step-ink` custom properties the `.step-colored` rules use (so precedence and `!important` match); chip: background via the same variables. Define the five colors once as CSS custom properties on `:root` (`--dv-live-todo`, …) and reuse. active/blocked/missing pulse: reuse the existing `runtime-pulse` keyframes (stroke-width) on the badge circle and a slow (≈2.4 s) opacity pulse on the card halo; `@media (prefers-reduced-motion: reduce)` disables both (follow the existing reduced-motion blocks). Live classes win over `tone-*` card fill/stroke while present. Step-mode dimming (`.stepmode .node:not(.lit)` etc.) still applies but with an opacity floor of .55 for live-classed elements, like `.stepmode .coin.step-colored:not(.lit)`. Print: no pulse, keep colors. |
-| V6 | No canvas badge (#762, Chuck 2026-10-27): state is carried by card stroke and halo, edge stroke, dashed todo/waiting strokes, step coins and the break glyph. The ticket popover (manual popover in the `.nbackpop` style: one row per ticket with key link to `tracking.jira.site + '/browse/' + key` when site exists, else `url`, else plain text; state pill, title, assignee, "PRs: n open/merged"; then authored `prs` URLs) opens from the carrier itself: a click on a ticketed node card (not its links/detail/handoff controls) or on an edge label (the edge path when unlabelled). In the reader the card/label is a named `role="button"` with `tabindex="0"`, opened by Enter/Space; Escape/outside click closes and returns focus to it. Under `authoring` (Workbench) carriers stay inert so selection keeps its clicks. |
+| V6 | No canvas badge (#762, Chuck 2026-10-27): state is carried by card stroke and halo, edge stroke, dashed todo/waiting strokes, step coins and the break glyph. The ticket popover (manual popover in the `.nbackpop` style: one row per ticket with key link to `tracking.jira.site + '/browse/' + key` when site exists, else `url`, else plain text; state pill, title, assignee, "PRs: n open/merged"; then authored `prs` URLs) opens from the carrier itself: a click on a ticketed node card (not its links/detail/handoff controls) or on an edge line, label or live break glyph (one keyboard trigger: the label, or path/visible live break when unlabelled). In the reader the card/label is a named `role="button"` with `tabindex="0"`, opened by Enter/Space; Escape/outside click closes and returns focus to it. Under `authoring` (Workbench) carriers stay inert so selection keeps its clicks. |
 | V7 | Node "⋯" menu: `nodeReferenceLinks` (`src/engine.js:257`) gains a "Tickets" group listing ticket keys (browse links when site is set) and authored PR links for that node, so the menu shows them even without a provider. |
 | V8 | Live controls live only in the authored `live-status` panel's `.dv-live-head`, below its engine-owned title; reader navigation has no Live control row. The header includes `button.dv-live-toggle` ("Live", `aria-pressed` reflecting `enabled()`), per-state counts hidden when zero, `time.dv-live-updated` when a timestamp exists, the provider note and action, First blocker when available, and Play/Pause plus Next day when demo controls are supplied. Without ticket references or epics the panel shows the empty-page message; before a provider or applied map is available it shows only the provider note and any required action. |
 | V9 | Re-apply after every rebuild: listen on the section element for `dv:pathrender` and `dv:pathchange`, on the view for `diagram-tab-change`, `tab-view-change`, `diagram-view-change`, `navigation-mounted`, `detail-navigation`, and use one MutationObserver (childList, subtree) scoped to step-control containers for chip rebuilds; coalesce with requestAnimationFrame. The classes survive a path switch (new SVG) and a detail flow open. `ctl.destroy()` disconnects everything. |
@@ -33,6 +33,20 @@ function fixture(){
 }
 // Clicks a node card in its empty right margin: the centre holds the title text.
 async function cardClick(card){await card.scrollIntoViewIfNeeded();const box=await card.boundingBox();await card.click({position:{x:box.width-6,y:box.height/2}});}
+// Find a visible point on the actual stroke, away from labels, coins and cards.
+// Use a real mouse click so SVG hit testing participates in the contract.
+async function strokeClick(page,path){
+ await path.scrollIntoViewIfNeeded();
+ const point=await path.evaluate(el=>{
+  const matrix=el.getScreenCTM(),length=el.getTotalLength();
+  for(const fraction of [.2,.3,.7,.8,.1,.9,.4,.6,.5]){
+   const p=el.getPointAtLength(length*fraction),screen=new DOMPoint(p.x,p.y).matrixTransform(matrix);
+   if(document.elementFromPoint(screen.x,screen.y)===el)return {x:screen.x,y:screen.y};
+  }
+  return null;
+ });
+ expect(point,'edge stroke has a visible pointer target').not.toBeNull();await page.mouse.click(point.x,point.y);
+}
 async function open(page,server,spec=fixture(),provider=true){
  await page.setViewportSize({width:1440,height:1000});
  if(provider)await page.addInitScript(map=>{window.flowviewLiveStatus={provider:async(refs,signal)=>{window.__liveRefs=refs;return map;}};},FIXED_MAP);
@@ -94,11 +108,10 @@ test('V11 a page without tickets has no Live control markup',async({page,server}
 */
 async function openStory(page,server,hash='#live=demo'){
  await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
- // At RED the page is not built yet: inject the existing example so failures
- // exercise the missing runtime behavior rather than ENOENT or HTTP errors.
+ // Exercise the production runtime rebuilt by global setup, keeping the
+ // authored example and its timeline. The checked-in export can be older.
  const out=path.join(server.root,'story-live.html');
- try{await writeFile(out,await readFile(path.join(repo,'examples/live-status/live-status.html')));}
- catch(error){if(error.code!=='ENOENT')throw error;execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out]);}
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out,'--timeline',path.join(repo,'examples/live-status/live-status.timeline.json')]);
  await page.goto(server.origin+'/story-live.html'+hash);return page.locator('#docview');
 }
 test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completion',async({page,server})=>{
@@ -444,6 +457,40 @@ test('R1 carriers paint without canvas badges and open the ticket popover from t
  await node('mcu').locator('.t1').click();await expect(pop).toHaveAttribute('aria-label','Live tickets for Doorbell controller');await page.keyboard.press('Escape');await expect(pop).toBeHidden();
  await node('mcu').locator('.nrefs-trigger').click();await expect(root.locator('.node-link-menu')).toBeVisible();await expect(pop).toBeHidden();
 });
+test('R1 edge lines labels live break segments and glyphs open Jira tickets with one keyboard stop',async({page,server})=>{
+ const spec=fixture(),d=spec.page.sections[0].diagram;delete d.edges[2].label;d.edges[2].tickets=['FW-45'];
+ const root=await open(page,server,spec),section=root.locator('#section-delivery'),pop=root.locator('.dv-live-popover');
+ const line=index=>section.locator('path.edge[data-dv-edge="'+index+'"]'),label=index=>section.locator('text.lbl[data-dv-edge="'+index+'"]');
+ await expect(line(1)).toHaveClass(/dv-live-missing/);
+ await expect(line(1)).not.toHaveAttribute('tabindex');await expect(label(1)).toHaveAttribute('tabindex','0');
+ await strokeClick(page,line(1));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for event');
+ await expect(pop.getByRole('link',{name:'BE-68',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/BE-68');await expect(pop.locator('.dv-live-ticket')).toHaveCount(1);
+ await root.getByRole('heading',{name:'Connected doorbell delivery',exact:true}).click();await expect(pop).toBeHidden();await expect(label(1)).toBeFocused();
+ await label(1).click();await expect(pop).toBeVisible();await page.keyboard.press('Escape');await expect(label(1)).toBeFocused();
+ const failure=section.locator('g.dv-live-comm-failure[data-dv-edge="0"]');
+ await strokeClick(page,failure.locator('.comm-before'));await expect(pop).toHaveAttribute('aria-label','Live tickets for press');
+ for(const key of ['HW-124','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/'+key);
+ await expect(pop.locator('.dv-live-ticket')).toHaveCount(2);await page.keyboard.press('Escape');await expect(label(0)).toBeFocused();
+ await strokeClick(page,failure.locator('.comm-break path'));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for press');await page.keyboard.press('Escape');await expect(label(0)).toBeFocused();
+ await expect(label(2)).toHaveCount(0);await expect(line(2)).toHaveAttribute('tabindex','0');await strokeClick(page,line(2));
+ await expect(pop).toHaveAttribute('aria-label','Live tickets for backend → ux');await expect(pop.getByRole('link',{name:'FW-45',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/FW-45');
+ await page.keyboard.press('Escape');await expect(line(2)).toBeFocused();await page.keyboard.press('Enter');await expect(pop).toBeVisible();await page.keyboard.press('Escape');await page.keyboard.press(' ');await expect(pop).toBeVisible();
+ await root.locator('.dv-live-toggle').click();await expect(pop).toBeHidden();await expect(root.locator('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure')).toHaveCount(0);await strokeClick(page,line(1));await expect(pop).toBeHidden();
+ await root.locator('.dv-live-toggle').click();await section.locator('.path-chip[data-dv-path="retry"]').click();
+ await strokeClick(page,line(1));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for event');
+});
+test('R1 unlabeled blocked edges use their visible live break for pointer keyboard and restored focus',async({page,server})=>{
+ const spec=fixture();delete spec.page.sections[0].diagram.edges[0].label;
+ const root=await open(page,server,spec),section=root.locator('#section-delivery'),pop=root.locator('.dv-live-popover');
+ const line=section.locator('path.edge[data-dv-edge="0"]'),failure=section.locator('g.dv-live-comm-failure[data-dv-edge="0"]');
+ await expect(failure).toHaveAttribute('role','button');await expect(failure).toHaveAttribute('tabindex','0');await expect(line).not.toHaveAttribute('tabindex');
+ await strokeClick(page,failure.locator('.comm-before'));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for hardware → firmware');
+ await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
+ await page.keyboard.press('Escape');await expect(failure).toBeFocused();await expect(failure).toBeVisible();
+ await page.keyboard.press('Enter');await expect(pop).toBeVisible();await page.keyboard.press('Escape');await page.keyboard.press(' ');await expect(pop).toBeVisible();await page.keyboard.press('Escape');
+ await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure')).toHaveCount(0);
+ await root.locator('.dv-live-toggle').click();await strokeClick(page,failure.locator('.comm-break path'));await expect(pop).toBeVisible();await page.keyboard.press('Escape');await expect(failure).toBeFocused();
+});
 test('R2 keyboard reaches ticketed carriers; coverage and First blocker focus the carrier itself',async({page,server})=>{
  const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]'),pop=root.locator('.dv-live-popover');await demoDay(root,4);
  const card=node('chime').locator('.card'),label=root.locator('text.lbl[data-dv-edge="1"]');
@@ -463,6 +510,8 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
  await expect(view.locator('.dv-live-badge')).toHaveCount(0);await expect(view.locator('.card[tabindex],text.lbl[role="button"]')).toHaveCount(0);
  await cardClick(view.locator('g.node[data-dv-node="firmware"] .card'));await expect(view.locator('.dv-live-popover')).toBeHidden();
  await expect(view.locator('g.node[data-dv-node="firmware"]')).toHaveClass(/\bdv-sel\b/);
+ await expect(view.locator('.dv-live-pointer')).toHaveCount(0);await strokeClick(page,view.locator('path.edge[data-dv-edge="1"]'));await expect(view.locator('.dv-live-popover')).toBeHidden();
+ await expect(view.locator('path.edge[data-dv-edge="1"]')).toHaveClass(/\bdv-sel\b/);
 });
 
 /* Canvas label hygiene (#761, Chuck 2026-10-27).

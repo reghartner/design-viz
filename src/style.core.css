@@ -4064,7 +4064,8 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 :is(.coin,.schip).dv-live-active{--step-color:#E9F2FF!important;}
 .coin.dv-live-active>circle{stroke:var(--dv-live-active)!important;}
 .schip.dv-live-active{border-color:var(--dv-live-active)!important;}
-.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
+/* Live selection stays compact; keyboard focus keeps its separate outline. */
+.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 1px var(--dv-live-color)!important;}
 .stepmode :is(.node,.edge,.halo,.lbl,.coin):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing):not(.lit):not(.comm-hidden):not(.dv-live-comm-hidden){opacity:max(var(--dv-dim,.45),.55)!important;}
 .dv-live-target,.dv-live-pointer,g.node:has(>.card.dv-live-target){cursor:pointer;}
 .dv-live-target:focus:not(:focus-visible){outline:none;}

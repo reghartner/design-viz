@@ -9,12 +9,13 @@ const diagram=raw=>raw.page.sections[0].diagram;
 const source=page=>page.locator('#src').inputValue();
 const node=(page,id='canon::api')=>page.locator('#docview g.node[data-dv-node="'+id+'"]');
 const pr='https://github.com/acme/api/pull/2';
-async function fixture(page,server){
+async function fixture(page,server,configure){
   await page.setViewportSize({width:1440,height:1000});
   const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
   const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
   const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon'}],panels:[{id:'status',type:'live-status',title:'Delivery status'}],steps:[{id:'persist',edge:'canon::api->canon::store',text:'Persist'}],autoplay:false});
   consumer.page.tracking={jira:{site:'https://acme.atlassian.net'},dependencies:[{ticket:'API-2',on:'CAN-1'}]};
+  if(configure)configure(provider,consumer);
   const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
   for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
@@ -92,4 +93,47 @@ test('retired imported tracking controls cannot edit a changed source',async({pa
   const raw=JSON.parse(await source(page));diagram(raw).topologyImports[0].export='missing';const changed=JSON.stringify(raw);
   await page.evaluate(text=>{const src=document.querySelector('#src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));window.oldTracking.value='AA-1';window.oldTracking.dispatchEvent(new Event('change',{bubbles:true}));},changed);
   await expect(page.locator('#src')).toHaveValue(changed);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+test('an Initiative board discovers stories over imported-only tracking and focuses both imported carriers',async({page,server},info)=>{
+  await fixture(page,server,(provider,consumer)=>{
+    consumer.page.tracking.jira.epic=['INIT-100','EP-101'];
+    const d=diagram(consumer);d.topologyImports[0].nodeTracking={api:{tickets:['API-2'],prs:[pr]}};
+    d.topologyImports[0].edgeTracking={'api->store':{tickets:['API-2'],prs:[pr]}};
+    d.sectionLayout={columns:24,default:[{x:0,y:0,w:10,h:18},{controls:'steps',x:0,y:18,w:10,h:5},{panel:'status',x:10,y:0,w:14,h:22}]};
+  });
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=JSON.parse(files[Object.keys(files).find(n=>n.endsWith('.spec.json'))]);
+  expect(diagram(json).nodes).toEqual({});expect(diagram(json).edges).toBeUndefined();expect(json.page.tracking.jira.epic).toEqual(['INIT-100','EP-101']);
+  const html=files[Object.keys(files).find(n=>n.endsWith('.html'))];await writeFile(path.join(server.root,'imported-initiative.html'),html);
+  await page.addInitScript(()=>{
+    const issue=(key,title,level,state,parent)=>({key,fields:{summary:title,issuetype:{name:level===2?'Program':level===1?'Epic':'Story',hierarchyLevel:level},status:{name:state==='done'?'Done':state==='blocked'?'Blocked':'To Do',statusCategory:{key:state==='done'?'done':'new'}},assignee:{displayName:'Alex'},...(parent?{parent:{key:parent}}:{})}});
+    const records={
+      'INIT-100':issue('INIT-100','Canonical service delivery',2,'todo'),
+      'EP-101':issue('EP-101','Service implementation',1,'todo','INIT-100'),
+      'EP-102':issue('EP-102','Storage delivery',1,'todo','INIT-100'),
+      'CAN-1':issue('CAN-1','Provider API contract',0,'done','EP-101'),
+      'API-2':issue('API-2','Consumer persistence integration',0,'todo','EP-101'),
+      'ST-3':issue('ST-3','Storage rollout',0,'blocked','EP-102')
+    };
+    records['API-2'].fields.issuelinks=[{type:{inward:'is blocked by'},inwardIssue:records['ST-3']}];
+    window.__initiativeImportWatches=[];
+    const result=input=>{
+      const parent=/^parent = ([A-Z0-9-]+)/.exec(input.jql),keys=/^key in \(([^)]+)\)/.exec(input.jql);
+      let issues=parent?Object.values(records).filter(row=>row.fields.parent?.key===parent[1]):(keys?.[1].split(', ')||[]).map(key=>records[key]).filter(Boolean);
+      if(input.jql.includes('Flagged'))issues=issues.filter(row=>row.key==='ST-3');return {payload:{issues}};
+    };
+    window.claude={use:async()=>({listTools:async()=>[{server:'Atlassian',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']}],callTool:async(s,t,input)=>t==='getAccessibleAtlassianResources'?{payload:[{id:'cloud',url:'https://acme.atlassian.net'}]}:result(input),watchTool(s,t,input,handler){const watch={input,stopped:false};window.__initiativeImportWatches.push(watch);queueMicrotask(()=>{if(!watch.stopped)handler({type:'data',result:result(input)});});return ()=>{watch.stopped=true;};}})};
+  });
+  await page.setViewportSize({width:1600,height:1200});await page.goto(server.origin+'/imported-initiative.html');
+  const root=page.locator('#docview'),panel=root.locator('.pt-live-status');
+  await expect(panel.locator('.dv-live-scope')).toHaveText('Initiative · 2 epics');await expect(panel.locator('.dv-live-epic-progress')).toHaveText('1 of 3 stories done · 2 of 3 on diagram');
+  await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(3);await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-ticket-epic')).toHaveText('epic EP-101');
+  await expect(panel.locator('tr[data-live-coverage-for="ST-3"]')).toContainText('NOT ON DIAGRAM');await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-dep')).toHaveAttribute('data-tone','red');
+  await expect(node(page)).toHaveClass(/dv-live-active/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-todo/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-waiting/);
+  const coverage=panel.locator('tr[data-live-coverage-for="API-2"]');await expect(coverage.getByRole('button')).toHaveText(['API','Persist']);
+  await coverage.getByRole('button',{name:'API',exact:true}).click();await expect(node(page).locator('.card')).toBeFocused();
+  await coverage.getByRole('button',{name:'Persist',exact:true}).click();await expect(root.locator('text.lbl[data-dv-edge="0"]')).toBeFocused();
+  expect(await page.evaluate(()=>window.__initiativeImportWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
+  await page.screenshot({path:info.outputPath('initiative-imported-tracking-board.png')});
 });

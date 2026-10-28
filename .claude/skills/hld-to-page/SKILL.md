@@ -1,6 +1,6 @@
 ---
 name: hld-to-page
-description: Author or update Flowview diagrams from business stories, engineering flows, HLDs or Honeycomb traces, with engineer enrichment and local pilot transcript capture. Produce source-grounded storyboards, specs, coverage ledgers and verified visual pages. For authoring, not renderer implementation or PR review.
+description: Author or update Flowview diagrams from stories, HLDs or Honeycomb traces. Produce grounded specs, coverage ledgers and pages, with enrichment and pilot capture. Not for renderer code or PR review.
 ---
 
 # HLD to page: packet first
@@ -82,19 +82,18 @@ After the packet, route source/handoff details:
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.
-- **Canon/topology:** use `--feature topology`; retain imports/exports and provider
-  context. `export:["a","b"]` merges same-section topology. Display: `nodeOverrides` / `edgeOverrides.label`; tickets/PRs: `nodeTracking` /
-  `edgeTracking` (additive). Re-export IDs for nesting.
-  [Topology](../../../docs/shared-topology.md).
+- **Canon/topology:** `--feature topology`; retain imports/exports/provider context.
+  Same-section `export:["a","b"]` merges; re-export imported IDs for nesting.
+  Display: `nodeOverrides`, `edgeOverrides.label`; additive tickets/PRs:
+  `nodeTracking`, `edgeTracking`. [Topology](../../../docs/shared-topology.md).
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
   preserves phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- Jira board: `live-status-board`; **Tracking → Parent** stores Epic/Initiative
-  keys in `tracking.jira.epic`. Jira detects type; never guess from keys or add
-  an initiative field. [Live status](../../../docs/live-status.md).
+- Jira: `live-status-board`; desktop **Parent** saves Epic/Initiative keys in
+  `tracking.jira.epic`. Jira detects type; never guess or add an initiative field.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

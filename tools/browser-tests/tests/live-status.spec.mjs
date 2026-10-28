@@ -5,7 +5,7 @@
 | V2 | `renderPage` attaches `ctl.liveStatus` with: `refs()` → `{tickets:[distinct keys], prs:[distinct urls]}` over every diagram of the page (all sections, all paths, detail flows) using `trackingRefs`; `apply(map)`; `clear()`; `enabled()`; `setEnabled(bool)`; `onChange(fn)` (fires after apply/clear/setEnabled with `{states, counts, updatedAt}`); `state(ref)`. `map` is `{ "<ticket key>": {state, title?, url?, assignee?, prs?: {count, state}, detail?, updatedAt?} }`, `state` ∈ `todo|active|done|blocked|missing`. Unknown state strings are ignored (treated as absent). |
 | V3 | Rollup for one carrier with several tickets (docs/live-status.md): any blocked → blocked; else any missing → missing; else any active → active; else all done → done; else all todo → todo; else (mix of done and todo) → active. A carrier whose tickets are all absent from the map gets NO class. Implement as a pure function `liveStatusRollup(states[])` (exported as a global like other engine helpers) so it is unit-testable. |
 | V4 | `apply(map)` sets exactly one `dv-live-<state>` class (removing the others) on: every node `g.node[data-dv-node]` with tickets; every edge `path.edge[data-dv-edge]` with tickets, plus its halo path and its `text.lbl` label (same `data-dv-edge` index); every step coin `g.coin[data-dv-step]` and step chip `button.schip[data-step-source]` whose step involves (via `edges`/keys, `nodes`, failures) at least one carrier that has a state — rollup of those carriers' states; in path-timeline chips too. Text boxes (`g.node.node-text`) never get a class. |
-| V5 | CSS in src/style.core.css, for EVERY skin selector family that paints `.card`/edges today (aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac — check the skin list in the file): `.dv-live-todo` grey, `.dv-live-active` amber, `.dv-live-done` green, `.dv-live-blocked` and `.dv-live-missing` red. Node: card stroke + a soft halo (drop-shadow) in the state color and the status badge; edge: stroke color (main + halo) with the state color; coin: circle fill + ink via the same `--step-color`/`--step-ink` custom properties the `.step-colored` rules use (so precedence and `!important` match); chip: background via the same variables. Define the five colors once as CSS custom properties on `:root` (`--dv-live-todo`, …) and reuse. active/blocked/missing pulse: reuse the existing `runtime-pulse` keyframes (stroke-width) on the badge circle and a slow (≈2.4 s) opacity pulse on the card halo; `@media (prefers-reduced-motion: reduce)` disables both (follow the existing reduced-motion blocks). Live classes win over `tone-*` card fill/stroke while present. Step-mode dimming (`.stepmode .node:not(.lit)` etc.) still applies but with an opacity floor of .55 for live-classed elements, like `.stepmode .coin.step-colored:not(.lit)`. Print: no pulse, keep colors. |
+| V5 | CSS in src/style.core.css, for EVERY skin selector family that paints `.card`/edges today (aurora, daylight, editorial, terminal, pastel, blueprint, rose, lavender, lilac — check the skin list in the file): `.dv-live-todo` grey, `.dv-live-active` azure, `.dv-live-done` green, `.dv-live-blocked` and `.dv-live-missing` red. Node: card stroke + a soft halo (drop-shadow) in the state color and the status badge; edge: stroke color (main + halo) with the state color; coin: circle fill + ink via the same `--step-color`/`--step-ink` custom properties the `.step-colored` rules use (so precedence and `!important` match); chip: background via the same variables. Define the five colors once as CSS custom properties on `:root` (`--dv-live-todo`, …) and reuse. active/blocked/missing pulse: reuse the existing `runtime-pulse` keyframes (stroke-width) on the badge circle and a slow (≈2.4 s) opacity pulse on the card halo; `@media (prefers-reduced-motion: reduce)` disables both (follow the existing reduced-motion blocks). Live classes win over `tone-*` card fill/stroke while present. Step-mode dimming (`.stepmode .node:not(.lit)` etc.) still applies but with an opacity floor of .55 for live-classed elements, like `.stepmode .coin.step-colored:not(.lit)`. Print: no pulse, keep colors. |
 | V6 | No canvas badge (#762, Chuck 2026-10-27): state is carried by card stroke and halo, edge stroke, dashed todo/waiting strokes, step coins and the break glyph. The ticket popover (manual popover in the `.nbackpop` style: one row per ticket with key link to `tracking.jira.site + '/browse/' + key` when site exists, else `url`, else plain text; state pill, title, assignee, "PRs: n open/merged"; then authored `prs` URLs) opens from the carrier itself: a click on a ticketed node card (not its links/detail/handoff controls) or on an edge line, label or live break glyph (one keyboard trigger: the label, or path/visible live break when unlabelled). In the reader the card/label is a named `role="button"` with `tabindex="0"`, opened by Enter/Space; Escape/outside click closes and returns focus to it. Under `authoring` (Workbench) carriers stay inert so selection keeps its clicks. |
 | V7 | Node "⋯" menu: `nodeReferenceLinks` (`src/engine.js:257`) gains a "Tickets" group listing ticket keys (browse links when site is set) and authored PR links for that node, so the menu shows them even without a provider. |
 | V8 | Live controls live only in the authored `live-status` panel's `.dv-live-head`, below its engine-owned title; reader navigation has no Live control row. The header includes `button.dv-live-toggle` ("Live", `aria-pressed` reflecting `enabled()`), per-state counts hidden when zero, `time.dv-live-updated` when a timestamp exists, the provider note and action, First blocker when available, and Play/Pause plus Next day when demo controls are supplied. Without ticket references or epics the panel shows the empty-page message; before a provider or applied map is available it shows only the provider note and any required action. |
@@ -68,7 +68,7 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await node('hardware').locator('.detail-trigger').click();await expect(root.locator('[data-dv-detail-preview] [data-dv-node="child"]')).toHaveClass(/dv-live-active/);
 });
 test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server})=>{
- const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';const root=await open(page,server,spec),section=root.locator('#section-delivery');
+ const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';d.edges.push({from:'hardware',to:'todo',label:'work',tickets:['HW-123']});d.steps.push({id:'active',edge:'hardware->todo',text:'Active work'});d.paths[0].steps.push('active');const root=await open(page,server,spec),section=root.locator('#section-delivery');
  await section.locator('.schip[data-step-source="0"]').first().click();
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
   if(['daylight','editorial'].includes(skin)){
@@ -83,14 +83,30 @@ test('V5 all skins keep live card, edge, coin and chip paint above tones and aut
    await expect(nav.locator('.reader-theme-menu > summary')).toHaveAttribute('data-current-skin',skin);
   }
   await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));
-  await expect(root.locator('.dv-live-head [data-live-count="active"]')).toHaveCSS('background-color',await presetLine(page,'amber'));
-  await expect(root.locator('.dv-live-tickets tr[data-live-ticket="HW-123"] .dv-live-state-pill')).toHaveCSS('background-color',await presetLine(page,'amber'));
-  await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'amber'));await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
+  const azure=['aurora','terminal','blueprint'].includes(skin)
+   ?{background:'rgb(23, 46, 76)',line:'rgb(114, 181, 255)',title:'rgb(226, 239, 255)',subtitle:'rgb(169, 200, 238)'}
+   :{background:'rgb(233, 242, 255)',line:'rgb(40, 120, 223)',title:'rgb(22, 61, 114)',subtitle:'rgb(52, 91, 136)'};
+  const hardware=section.locator('[data-dv-node="hardware"]');
+  await expect(hardware.locator('.card'),skin+' Azure background').toHaveCSS('fill',azure.background);
+  await expect(hardware.locator('.card'),skin+' Azure outline').toHaveCSS('stroke',azure.line);
+  await expect(hardware.locator('.t1'),skin+' Azure title over tone').toHaveCSS('fill',azure.title);
+  await expect(hardware.locator('.t2'),skin+' Azure subtitle over tone').toHaveCSS('fill',azure.subtitle);
+  await expect(hardware.locator('.dv-live-halo')).toHaveCSS('stroke',azure.line);
+  for(const selector of ['path.edge[data-dv-edge="3"]','path.halo[data-dv-edge="3"]'])await expect(section.locator(selector)).toHaveCSS('stroke',azure.line);
+  await expect(section.locator('text.lbl[data-dv-edge="3"]')).toHaveCSS('fill',azure.line);
+  await expect(section.locator('.coin[data-dv-step="3"] > circle')).toHaveCSS('fill',azure.line);
+  await expect(section.locator('.schip[data-step-source="3"]').first()).toHaveCSS('background-color',azure.line);
+  await expect(root.locator('.dv-live-head [data-live-count="active"]')).toHaveCSS('background-color',azure.line);
+  await expect(root.locator('.dv-live-tickets tr[data-live-ticket="HW-123"] .dv-live-state-pill')).toHaveCSS('background-color',azure.line);
+  await cardClick(hardware.locator('.card'));
+  await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveText('active');
+  await page.keyboard.press('Escape');
+  await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
  }
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');
  await page.emulateMedia({reducedMotion:'reduce'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');
  await expect.poll(()=>section.locator('[data-dv-node="ux"]').evaluate(el=>+getComputedStyle(el).opacity)).toBeGreaterThanOrEqual(.55);
- await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'amber'));
+ await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'azure'));
 });
 test('V7 V11 authored reference menus work without provider paint',async({page,server})=>{
  const root=await open(page,server,fixture(),false);await expect(root.locator('.dv-live-badge')).toHaveCount(0);await expect(root.locator('.dv-live-toggle')).toBeHidden();
@@ -619,16 +635,16 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
  expect(breaks,'blocked days still draw the break glyph').toBeGreaterThan(0);
 });
 
-/* Node Styles presets for live paint (#762 addition, Chuck 2026-10-27): no overlay palette of its own.
- P1 nodes wear `node-styled ns-<preset>` (todo slate, active amber, done moss, blocked/missing rose, waiting slate or rose by upstream tone);
+/* Live paint uses Node Styles rendering, with an internal Azure palette for Active.
+ P1 nodes wear `node-styled ns-<preset>` (todo slate, active azure, done moss, blocked/missing rose, waiting slate or rose by upstream tone);
     edges, coins and node cards take that preset's --ns-line in a light and a dark skin. Coin numerals follow the
     engine's step-colour rule (stepCircleInk: black or white, whichever contrasts more), which is black on every live fill.
  P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
  P3 an authored node `style` yields to live state and returns when Live is turned off. */
-const LIVE_PRESET={todo:'slate',active:'amber',done:'moss',blocked:'rose',missing:'rose'};
+const LIVE_PRESET={todo:'slate',active:'azure',done:'moss',blocked:'rose',missing:'rose'};
 async function presetLine(page,token){
  return page.evaluate(t=>{
-  const svg=document.querySelector('#docview g.node').ownerSVGElement,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node ns-'+t);svg.appendChild(g);
+  const svg=document.querySelector('#docview g.node').ownerSVGElement,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node ns-'+t+(t==='azure'?' dv-live-active':''));svg.appendChild(g);
   const probe=document.createElement('span');probe.style.color=getComputedStyle(g).getPropertyValue('--ns-line').trim();document.body.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();g.remove();return color;
  },token);
 }
@@ -638,17 +654,17 @@ test('P1 live nodes wear Node Styles presets; cards, edges and coins share the p
  for(const skin of ['daylight','aurora']){
   await page.evaluate(s=>window.dvSetSkin(s),skin);
   await expect(root.locator('path.edge[data-dv-edge="0"]'),skin).toHaveClass(/dv-live-active/);
-  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',await presetLine(page,'amber'));
+  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',await presetLine(page,'azure'));
   const coins=await root.locator('g.coin[data-dv-step]').evaluateAll(els=>els.map(el=>({state:(/dv-live-(todo|active|done|blocked|missing)/.exec(el.getAttribute('class'))||[])[1],fill:getComputedStyle(el.querySelector('circle')).fill,ink:getComputedStyle(el.querySelector('text')).fill})).filter(c=>c.state));
   expect(coins.length,skin+' painted coins').toBeGreaterThan(0);
   for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
  }
  await demoDay(root,4);
  // Day 4: mcu waits red on the blocked HW-124 (rose); ingest waits grey on the unfinished FW-45 (slate).
- for(const [id,token] of [['chime','rose'],['button','amber'],['mcu','rose'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
+ for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
  for(const skin of ['daylight','aurora']){
   await page.evaluate(s=>window.dvSetSkin(s),skin);
-  for(const [id,token] of [['chime','rose'],['button','amber'],['mcu','rose'],['ingest','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
+  for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
   await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveClass(/dv-live-waiting/);await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveCSS('stroke',await presetLine(page,'slate'));
  }
 });
@@ -660,12 +676,15 @@ test('P2 missing carriers are dotted rose, blocked ones solid rose',async({page,
  await expect(node('chime')).toHaveClass(/dv-live-blocked/);await expect(node('chime').locator('.card')).toHaveCSS('stroke-dasharray','none');
 });
 test('P3 an authored node style yields to live paint and returns when Live is off',async({page,server})=>{
- const spec=fixture();spec.page.sections[0].diagram.nodes.hardware.style='teal';
- const root=await open(page,server,spec),hw=root.locator('#section-delivery g.node[data-dv-node="hardware"]');
- await expect(hw).toHaveClass(/dv-live-active/);await expect(hw).toHaveClass(/\bns-amber\b/);await expect(hw).not.toHaveClass(/\bns-teal\b/);
- const live=root.locator('.dv-live-toggle');await live.click();await expect(hw).not.toHaveClass(/dv-live-active/);
- await expect(hw).toHaveClass(/\bnode-styled\b/);await expect(hw).toHaveClass(/\bns-teal\b/);await expect(hw).not.toHaveClass(/\bns-amber\b/);
- await live.click();await expect(hw).toHaveClass(/\bns-amber\b/);
+ for(const authored of ['teal','amber']){
+  const spec=fixture();spec.page.sections[0].diagram.nodes.hardware.style=authored;
+  const root=await open(page,server,spec),hw=root.locator('#section-delivery g.node[data-dv-node="hardware"]');
+  await expect(hw).toHaveClass(/dv-live-active/);await expect(hw).toHaveClass(/\bns-azure\b/);await expect(hw).not.toHaveClass(new RegExp('\\bns-'+authored+'\\b'));
+  const live=root.locator('.dv-live-toggle');await live.click();await expect(hw).not.toHaveClass(/dv-live-active/);
+  await expect(hw).toHaveClass(/\bnode-styled\b/);await expect(hw).toHaveClass(new RegExp('\\bns-'+authored+'\\b'));await expect(hw).not.toHaveClass(/\bns-azure\b/);
+  await expect(hw.locator('.card')).toHaveCSS('stroke',await presetLine(page,authored));
+  await live.click();await expect(hw).toHaveClass(/\bns-azure\b/);
+ }
 });
 
 test('G2 G7 G11 GitHub icons carry state checks and review in the Tickets table and popover while Jira-only stays plain',async({page,server})=>{

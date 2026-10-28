@@ -92,7 +92,9 @@ After the packet, route source/handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- Live Jira board: `live-status-board`.
+- Jira board: `live-status-board`; **Tracking → Parent** stores Epic/Initiative
+  keys in `tracking.jira.epic`. Jira detects type; never guess from keys or add
+  an initiative field. [Live status](../../../docs/live-status.md).
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

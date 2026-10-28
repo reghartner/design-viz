@@ -41,7 +41,13 @@ validation never turns them into errors.
 `tracking.jira.epic` accepts one Jira key or an array of keys using the same
 pattern as `tickets`. `trackingEpics(page)` returns valid keys once, in authored
 order. Invalid entries warn individually; an invalid field type warns once.
-Linking an epic automatically includes its child stories in the Tickets table.
+The **Parent** control keeps this existing `epic` storage field for compatibility;
+there is no new authored initiative field. Each key may name an Epic or Initiative.
+Jira issue-type metadata determines the kind (`hierarchyLevel` first, standard
+Epic/Initiative names as a fallback). An Epic includes its work items; an Initiative
+includes its child Epics and their work items. “Stories” in this board means those
+ordinary work items, including Tasks and Bugs. Containers never count as stories.
+This is a bounded two-level hierarchy, not arbitrary project-tree traversal.
 Assigning a story to a node or edge remains an authoring step.
 
 `tracking.github` bounds pull-request discovery through the viewer's GitHub
@@ -85,16 +91,20 @@ are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 and Export project keeps the references in its JSON.
 
 With no node selected, open **Inspect → Document settings → Tracking** to edit
-**Jira site**, **Epic** and **GitHub scope**. Enter a key in Epic and press Enter; use
-**Remove epic 1**, **Remove epic 2**, and so on to remove keys. In **GitHub scope**,
+**Jira site**, **Parent** and **GitHub scope**. Enter an Epic or Initiative key in Parent and press Enter; use
+**Remove parent 1**, **Remove parent 2**, and so on to remove keys. In **GitHub scope**,
 enter `owner/repo` names separated by commas, or `org:name`, and press Enter;
 an empty value removes `tracking.github`. Each change has one Undo/Redo, and
-Export project preserves the epic and scope references. These authoring
+Export project preserves the parent and scope references in the existing `tracking.jira.epic` field. These authoring
 controls are desktop-only.
 
 When the document has tickets, **Demo live status** beside **Preview** supplies
 sample states in sorted ticket order. It starts off and stays preview-only across
 ordinary edits and skin changes; it never saves status to the spec or contacts Jira.
+This offline preview treats the configured parent as a direct Epic: an opaque
+Jira key alone cannot establish its type. Automatic initiative detection requires
+Jira metadata. A standalone demo timeline or host provider can supply the runtime
+hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
 
@@ -184,7 +194,13 @@ The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
 left. The epic is shown large inside the panel only, never in the title bar;
-on a page without an epic the box keeps the ring and the blocked/waiting counts.
+on a page without a parent the box keeps the ring and the blocked/waiting counts.
+For an Initiative it identifies the initiative, gives a separate distinct Epic
+count, and counts only descendant stories for completion and diagram coverage.
+Every story shows its parent Epic under the key. Empty initiatives still show
+the root title and status and zero Epics/stories. Mixed Initiative and explicit
+Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
+path's carriers; it does not declare the entire initiative ready.
 There is no verdict line. Then come the Tickets table, **Blockers and dependency
 chains**, and Activity. Lane progress is not listed in the panel; it stays on
 the step lane pills, the lane colour stripe of each Tickets row and the lane
@@ -333,11 +349,32 @@ a retry is scheduled); the demo player reports “Demo”.
 Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
 Entries for stories without a carrier are accepted too. Set their `epic` to the
-configured parent key. `refs().epics` collects the root and loaded detail pages.
+configured Epic key. `refs().epics` collects configured parent roots from the root
+and approved loaded detail pages; its legacy name is unchanged. For initiative
+scope, supply the root entry with `kind: "initiative"`, its child Epic entries
+with `kind: "epic"` and `initiatives: ["INIT-1"]`, and stories with
+`epic: "EP-1"`, `parent: "EP-1"`, and the same `initiatives` membership array.
+All these fields are runtime evidence, never persisted into the authored spec.
+For example:
+
+```json
+{
+  "INIT-1": {"state":"active", "kind":"initiative", "title":"Program delivery"},
+  "EP-1": {"state":"active", "kind":"epic", "initiatives":["INIT-1"]},
+  "ST-1": {"state":"done", "epic":"EP-1", "parent":"EP-1", "initiatives":["INIT-1"]}
+}
+```
+
+Missing type metadata retains the legacy Epic interpretation; it never infers an
+initiative from a key prefix. Missing root records are shown as missing, not done.
 `liveStatusCoverage(page, map, refs)` returns `epics`, `onDiagram` (carrier keys),
 `notOnDiagram` (configured epic children without carriers), and `notInEpic`
 (carrier keys without evidence of membership in a configured epic). With no
-epics configured, `notInEpic` is empty. Extra stories do not affect carrier
+parents configured, `notInEpic` is empty. With initiative metadata, coverage also
+returns `initiatives`, and `epics` contains the distinct discovered/explicit Epic
+keys. `snapshot().epic` adds these same `initiatives` and `epics` arrays; `keys`
+contains the configured roots (initiatives first). Outside carrier rows say
+**NOT IN SCOPE** when an initiative is configured. Extra stories do not affect carrier
 colors, completion, or readiness.
 The map may carry numeric `storedAt` metadata (epoch milliseconds), including
 as a non-enumerable property. A valid cache timestamp supplies the control and
@@ -396,7 +433,7 @@ on the final day. Reduced motion uses manual advancement only. Hidden pages paus
 the timer. Requested ticket keys absent from a day become `missing`; a day's
 `prs` may carry `links` in the host-provider shape, which the demo passes
 through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
-carrier references it; entries may include `epic`, a lane ID in `lane`, and
+carrier references it; entries may include `kind`, `parent`, `initiatives`, `epic`, a lane ID in `lane`, and
 `links: [{"type": "is blocked by", "key": "HW-124"}]`, which the demo converts to
 Jira-sourced `dependsOn` entries. A timeline-level `epics: {"DOOR-100": {"summary": "…"}}`
 seeds the epic box; its state derives from that day's children. In the example FW-46 is blocked by HW-124 and
@@ -492,14 +529,23 @@ manifest exposes it takes any one that offers both
 **Atlassian MCP**, then **Atlassian**, then the first other qualifying
 connector. It then selects the resource matching `page.tracking.jira.site`
 (or the first resource when no site is specified), and watches batches of ten
-keys every 60 seconds. A second Flagged Impediment query detects blockers. Each configured epic also gets a
-`parent = KEY` watch and a `parent = KEY AND Flagged = Impediment` watch, requesting
-summary, status, assignee, updated, issuelinks and issuetype in pages of ten. The adapter
-follows `pageInfo.hasNextPage`/`endCursor` or `nextPageToken` until exhausted and
-tags the returned children with their epic key. When an approved detail page
-loads, new ticket and epic references get their own watches; reopening that
-detail reuses the existing watches. Epic query errors retain prior
-carrier evidence and use the same notices and bounded retry rules.
+keys every 60 seconds. A second Flagged Impediment query detects blockers.
+Configured parent roots also get a key lookup watch for title, status and issue
+type, including when they have no children. Each parent gets a `parent = KEY`
+watch and a `parent = KEY AND Flagged = Impediment` watch. The fields requested
+are summary, status, assignee, updated, issuelinks, parent and issuetype, in pages
+of ten. For an Initiative, only child Epics expand into another pair of watches;
+for an Epic, ordinary child work items become stories. The adapter follows
+`pageInfo.hasNextPage`/`endCursor` or `nextPageToken` at every level, including
+Flagged pages. Shared or explicitly configured Epics reuse the same watches.
+When approved details add/remove roots or membership changes, watches follow
+current reachability and retire branches that no remaining root reaches.
+
+Initial publication waits for root metadata. Initiative publication waits for
+complete root, Epic, story and Flagged evidence; failed, incomplete or superseded
+page chains retain the last complete map. Child containers and cycles cannot
+inflate story totals. A failed refresh uses the same notices and bounded retry
+rules. Destroy retires subscriptions, scheduled retries and late responses.
 Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.

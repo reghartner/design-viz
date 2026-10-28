@@ -524,11 +524,11 @@ function pageTrackingControls(val){
     },{placeholder:'https://acme.atlassian.net'})));
     trackingEpics(val).forEach(function(key,index){
       var row=document.createElement('div'),label=document.createElement('span');label.textContent=key;row.appendChild(label);
-      row.appendChild(actionButton('Remove epic '+(index+1),function(){return update(function(jira,page){
+      row.appendChild(actionButton('Remove parent '+(index+1),function(){return update(function(jira,page){
         var keys=trackingEpics(page).filter(function(value){return value!==key;});if(keys.length)jira.epic=keys;else delete jira.epic;
       });}));box.appendChild(row);
     });
-    box.appendChild(frow('Epic',textControl('',function(value){
+    box.appendChild(frow('Parent',textControl('',function(value){
       if(value==null)return true;var key=value.trim();
       if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
       var current=parseEditor();if(current.error){formError(current.error);return false;}

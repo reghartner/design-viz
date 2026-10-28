@@ -481,3 +481,12 @@ test('M12: issue links follow the day\'s story and reach both search and single-
   assert.equal(single.fields.issuelinks.find(link => link.outwardIssue?.key === 'FW-45').type.outward, 'depends on');
   assert.match(read(DIR + '/README.md'), /issuelinks/);
 });
+
+test('parent metadata search resolves the same epic as getJiraIssue without adding it to story queries',async()=>{
+ for(const day of [0,3,11]){
+  const context={...CONTEXT,day},single=result(await call('getJiraIssue',{issueIdOrKey:'DOOR-100'},context)).data;
+  const issues=result(await call('searchJiraIssuesUsingJql',{jql:'key in (DOOR-100)',fields:['summary','status','parent','issuetype']},context)).issues.nodes;
+  assert.equal(issues.length,1);assert.equal(issues[0].key,single.key);assert.deepEqual(issues[0].fields,single.fields);
+  assert.ok(result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},context)).issues.nodes.every(issue=>issue.key!=='DOOR-100'));
+ }
+});

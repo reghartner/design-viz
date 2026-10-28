@@ -177,7 +177,12 @@ function toolResult(name, args, env, id) {
     const parsed = parseJql(args.jql);
     const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
       ? Math.max(0, Math.min(100, Math.floor(args.maxResults))) : 50;
-    const matches = parsed ? Object.entries(issues).filter(([key, entry]) => {
+    // The viewer resolves parent metadata through the search tool too, so an
+    // explicitly requested epic must agree with getJiraIssue (including empty days).
+    const candidates = Object.entries(issues);
+    if (parsed?.keys?.includes('DOOR-100')) candidates.push(['DOOR-100',
+      { state: epicState('DOOR-100', issues), summary: 'Connected doorbell delivery', issueType: 'Epic' }]);
+    const matches = parsed ? candidates.filter(([key, entry]) => {
       return (!parsed.keys || parsed.keys.includes(key)) &&
         (!parsed.project || key.split('-')[0] === parsed.project) &&
         (!parsed.parent || entry.epic === parsed.parent) &&

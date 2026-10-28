@@ -63,6 +63,12 @@ function liveStatusJiraDependencies(issue,linkTypes){
 function liveStatusJiraChunks(keys){
   var chunks=[];for(var i=0;i<keys.length;i+=10)chunks.push(keys.slice(i,i+10));return chunks;
 }
+/* Jira hierarchyLevel is authoritative; standard names support older connector payloads. */
+function liveStatusJiraKind(issue){
+  var type=issue && issue.fields && issue.fields.issuetype || {};
+  if(typeof type.hierarchyLevel==='number')return type.hierarchyLevel>=2?'initiative':type.hierarchyLevel===1?'epic':'story';
+  return /^epic$/i.test(type.name || '')?'epic':/^initiative$/i.test(type.name || '')?'initiative':null;
+}
 function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt,linkTypes){
   var issues=Object.create(null),map=Object.create(null);
   (issuesByChunk || []).forEach(function(chunk){liveStatusJiraIssues(chunk).forEach(function(issue){if(issue && typeof issue.key==='string')issues[issue.key]=issue;});});
@@ -71,6 +77,8 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
     if(site)entry.url=site.replace(/\/+$/,'')+'/browse/'+key;
     if(issue){
       if(typeof fields.summary==='string')entry.title=fields.summary;
+      var kind=liveStatusJiraKind(issue);if(kind)entry.kind=kind;
+      var parent=fields.parent;if(parent && LIVE_STATUS_JIRA_KEY.test(parent.key)){entry.parent=parent.key;if(liveStatusJiraKind(parent)==='epic' && kind!=='epic' && kind!=='initiative')entry.epic=parent.key;}
       if(fields.assignee && typeof fields.assignee.displayName==='string')entry.assignee=fields.assignee.displayName;
       // Atlassian accountId (#764): the Tickets table links the owner to <site>/wiki/people/<id>. No extra tool call.
       if(fields.assignee && typeof fields.assignee.accountId==='string' && fields.assignee.accountId.trim())entry.assigneeId=fields.assignee.accountId.trim();
@@ -85,7 +93,7 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
     var parent=issues[key] && issues[key].fields && issues[key].fields.parent;
     if(!parent || typeof parent.key!=='string' || !LIVE_STATUS_JIRA_KEY.test(parent.key) || requestedKeys.indexOf(parent.key)>=0 || map[parent.key])return;
     var fields=parent.fields || {};if(!fields.status)return;
-    var entry={state:liveStatusJiraState(parent,flaggedKeys)};if(typeof fields.summary==='string')entry.title=fields.summary;
+    var entry={state:liveStatusJiraState(parent,flaggedKeys)};var kind=liveStatusJiraKind(parent);if(kind)entry.kind=kind;if(typeof fields.summary==='string')entry.title=fields.summary;
     if(site)entry.url=site.replace(/\/+$/,'')+'/browse/'+parent.key;
     map[parent.key]=entry;
   });
@@ -300,13 +308,13 @@ function wireLiveStatusClaude(ctl,page,win){
     return null;
   }
   var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
-  var watchedTickets=Object.create(null),watchedEpics=Object.create(null),syncing=false,linkTypes=typeof trackingDependencyLinks==='function'?trackingDependencyLinks(page):null;
+  var syncing=false,resync=false,linkTypes=typeof trackingDependencyLinks==='function'?trackingDependencyLinks(page):null;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null,github=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
   function status(value){if(typeof api.status==='function')api.status(value);}
   // busy = any job (discovery, resource lookup, watch, scheduled retry) still outstanding.
   function mark(job,on){if(job)job.inflight=!!on;}
-  function busy(){return jobs.some(function(job){return job.inflight;});}
+  function busy(){return jobs.some(function(job){return !job.retired && job.inflight;});}
   status({state:'connecting',source:'Jira',busy:true});
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
@@ -318,25 +326,40 @@ function wireLiveStatusClaude(ctl,page,win){
     if(job.timer!=null){win.clearTimeout(job.timer);var i=timers.indexOf(job.timer);if(i>=0)timers.splice(i,1);job.timer=null;}
   }
   function publish(){
-    if(stopped || publishing || !dirty || !api.enabled())return;
+    if(stopped || syncing || publishing || !dirty || !api.enabled())return;
+    // A hierarchy is a single piece of evidence. Keep the last complete map
+    // while any root, child or flagged page chain is incomplete or has failed.
+    var refs=api.refs(),roots=initiativeRoots();
+    if(chunks.some(function(chunk){return chunk.roots && !chunk.answered;}))return;
+    if(roots.length && (chunks.some(function(chunk){return !chunk.answered || !chunk.flaggedAnswered;}) || jobs.some(function(job){return !job.retired && (job.inflight || job.error);})))return;
     var keys=[],issues=[],flagged=Object.create(null),epics=Object.create(null),stamp=null;
     chunks.forEach(function(chunk){
       if(!chunk.answered)return;
-      var found=chunk.epic?chunk.issues.filter(function(issue){return issue && typeof issue.key==='string';}).map(function(issue){return issue.key;}):chunk.keys;
+      var found=chunk.epic || chunk.initiative?chunk.issues.filter(function(issue){return issue && typeof issue.key==='string';}).map(function(issue){return issue.key;}):chunk.keys.filter(function(key){return (chunk.roots?refs.epics:refs.tickets).indexOf(key)>=0;});
       found.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);if(chunk.epic && !epics[key])epics[key]=chunk.epic;});
       issues.push(chunk.issues);
       (chunk.flagged || []).forEach(function(issue){if(issue && issue.key)flagged[issue.key]=true;});
       [chunk.storedAt,chunk.flaggedAt].forEach(function(at){if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);});
     });
     dirty=false;publishing=true;
-    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp,linkTypes);Object.keys(epics).forEach(function(key){if(map[key])map[key].epic=epics[key];});if(github){github.sync(keys);github.enrich(map);}api.apply(map);}finally{publishing=false;}
+    try{var map=liveStatusJiraMap(keys,issues,flagged,site,stamp,linkTypes);
+      Object.keys(epics).forEach(function(key){if(map[key]){map[key].epic=epics[key];map[key].parent=epics[key];}});
+      var membership=Object.create(null);
+      chunks.forEach(function(chunk){if(chunk.initiative)chunk.issues.forEach(function(issue){var list=membership[issue.key] || (membership[issue.key]=[]);if(list.indexOf(chunk.initiative)<0)list.push(chunk.initiative);});});
+      Object.keys(map).forEach(function(key){
+        var entry=map[key];
+        if(roots.indexOf(key)>=0){entry.kind='initiative';delete entry.epic;}
+        else if((refs.epics || []).indexOf(key)>=0 || membership[key]){entry.kind='epic';delete entry.epic;}
+        var parents=membership[key] || membership[entry.epic];if(parents)entry.initiatives=parents.slice();
+      });
+      if(github){github.sync(keys);github.enrich(map);}api.apply(map);}finally{publishing=false;}
     // A GitHub watch answering synchronously inside sync() marks dirty again; one more pass folds it in.
     if(dirty)publish();
   }
   function notices(){
     if(stopped)return;
-    var approval=jobs.filter(function(job){return job.error && ['approval_required','consent_required'].indexOf(job.error.code)>=0 && !job.approvalUsed;})[0];
-    var failed=approval || jobs.filter(function(job){return job.error;})[0];
+    var approval=jobs.filter(function(job){return !job.retired && job.error && ['approval_required','consent_required'].indexOf(job.error.code)>=0 && !job.approvalUsed;})[0];
+    var failed=approval || jobs.filter(function(job){return !job.retired && job.error;})[0];
     api.action('',null);
     if(!failed){api.note('','info');return;}
     var error=failed.error,code=error.code;
@@ -350,15 +373,15 @@ function wireLiveStatusClaude(ctl,page,win){
     else api.note(code==='rate_limited'?'Jira is rate limited; retrying':error.retryable?'Jira did not answer; retrying':'Jira did not answer','info');
   }
   function fail(job,error,mayRetry){
-    if(stopped)return;
+    if(stopped || job.retired)return;
     error=error || {};job.error=error;
     var code=error.code,message=null,kind='info';
     mark(job,false);
-    if(code==='user_changed'){if(!job.chunk || !job.chunk.epic)api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
+    if(code==='user_changed'){if(!job.chunk || !(job.chunk.epic || job.chunk.initiative || job.chunk.roots || initiativeRoots().length))api.clear();api.note('','info');api.action('',null);status({state:'disconnected',busy:false});stop();return;}
     if(code==='needs_reauth'){message='Reconnect Atlassian in claude.ai Settings → Connectors';kind='error';}
     if(code==='server_not_connected' || code==='selection_required')message=addConnector;
     if(code==='not_in_manifest' || code==='blocked_by_policy'){message='This page is not allowed to read Jira for your account.';kind='warn';}
-    if(message){if(!job.chunk || !job.chunk.epic)api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
+    if(message){if(!job.chunk || !(job.chunk.epic || job.chunk.initiative || job.chunk.roots || initiativeRoots().length))api.clear();api.action('',null);api.note(message,kind);status({state:code==='needs_reauth' || code==='server_not_connected' || code==='selection_required'?'disconnected':'error',busy:false});stop();return;}
     var retry=code==='rate_limited' || (code==='server_unavailable' || code==='upstream_error') && error.retryable;
     // Unknown errors are non-retryable, even if a foreign code says otherwise.
     if(!retry && ['approval_required','consent_required','tool_error'].indexOf(code)<0)job.error={code:'upstream_error',retryable:false};
@@ -372,20 +395,20 @@ function wireLiveStatusClaude(ctl,page,win){
     mark(job,job.timer!=null);status({state:code==='approval_required' || code==='consent_required'?'approval':'error',busy:busy()});
   }
   function accept(job,result){
-    if(stopped)return;
-    cancelRetry(job);job.error=null;
+    if(stopped || job.retired)return;
+    cancelRetry(job);job.error=null;mark(job,true);
     var stored=result && result.cache && result.cache.storedAt,checkedAt=typeof stored==='number' && isFinite(stored)?stored:Date.now();
     if(job.accept){mark(job,false);status({state:'connected',busy:busy(),checkedAt:checkedAt});notices();job.accept(result);return;}
     status({state:'connected',checkedAt:checkedAt});
     var chunk=job.chunk,version=job.version,all=[],seen=Object.create(null),stamp=null;
     function pageResult(result){
-      if(stopped || version!==job.version)return;
+      if(stopped || job.retired || version!==job.version)return;
       var payload=result && result.payload,at=result && result.cache && result.cache.storedAt;
       all=all.concat(liveStatusJiraIssues(payload));
       if(typeof at==='number' && isFinite(at))stamp=stamp==null?at:Math.max(stamp,at);
       var info=payload && (payload.pageInfo || payload.issues && payload.issues.pageInfo);
       var token=payload && payload.nextPageToken || result && result.nextPageToken || info && info.hasNextPage && info.endCursor;
-      if(chunk.epic && token){
+      if(token){
         if(seen[token]){fail(job,{code:'tool_error',message:'Jira repeated a page cursor'},false);return;}
         seen[token]=true;
         var input=Object.assign({},job.input,{nextPageToken:token});
@@ -393,17 +416,22 @@ function wireLiveStatusClaude(ctl,page,win){
         return;
       }
       // Publish only a complete page chain. A failed refresh keeps all prior evidence.
-      if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;}
-      else{chunk.answered=true;chunk.issues=all;chunk.storedAt=stamp;}
+      if(job.flagged){chunk.flagged=all;chunk.flaggedAt=stamp;chunk.flaggedAnswered=true;}
+      else{
+        // Expand exactly Initiative -> Epic -> work item. Containers and cycles
+        // cannot enter story totals, even when Jira returns unexpected rows.
+        chunk.rawIssues=all;chunk.answered=true;chunk.issues=children(chunk,all);chunk.storedAt=stamp;
+      }
       mark(job,false);status({busy:busy()});
-      dirty=true;publish();notices();
+      dirty=true;syncWatches();publish();notices();
     }
     pageResult(result);
   }
   function runCall(job){
+    if(stopped || job.retired)return Promise.resolve();
     var version=++job.version;mark(job,true);status({busy:true});
     return Promise.resolve().then(function(){
-      if(stopped)return;
+      if(stopped || job.retired)return;
       return mcp.callTool(server,job.tool,job.input,job.options);
     }).then(function(result){if(!stopped && version===job.version)accept(job,result);},function(error){if(!stopped && version===job.version)fail(job,error,false);});
   }
@@ -412,7 +440,7 @@ function wireLiveStatusClaude(ctl,page,win){
     var subscription;mark(job,true);status({busy:true});
     try{
       subscription=mcp.watchTool(server,job.tool,job.input,function(event){
-        if(stopped || !event)return;
+        if(stopped || job.retired || !event)return;
         job.version++;
         if(event.type==='data')accept(job,event.result);
         else if(event.type==='error')fail(job,event.error,true);
@@ -420,30 +448,66 @@ function wireLiveStatusClaude(ctl,page,win){
     }catch(error){fail(job,error,true);return;}
     // A synchronous initial event can retire the adapter before registration
     // returns; an asynchronous registration can finish after destroy as well.
-    Promise.resolve(subscription).then(function(value){if(stopped)unsubscribe(value);else subscriptions.push(value);},function(error){fail(job,error,true);});
+    Promise.resolve(subscription).then(function(value){if(stopped || job.retired)unsubscribe(value);else{job.subscription=value;subscriptions.push(value);}},function(error){fail(job,error,true);});
   }
   function host(url){try{return new URL(url).host;}catch(ex){return null;}}
+  function retireChunk(chunk){
+    jobs.filter(function(job){return job.chunk===chunk;}).forEach(function(job){
+      job.retired=true;job.version++;mark(job,false);cancelRetry(job);
+      if(job.subscription){var index=subscriptions.indexOf(job.subscription);if(index>=0)subscriptions.splice(index,1);unsubscribe(job.subscription);job.subscription=null;}
+    });
+    jobs=jobs.filter(function(job){return job.chunk!==chunk;});
+  }
+  function children(chunk,all){
+    all=all.filter(function(issue){return issue && typeof issue.key==='string' && LIVE_STATUS_JIRA_KEY.test(issue.key);});
+    if(chunk.initiative)return all.filter(function(issue){return issue && issue.key!==chunk.initiative && liveStatusJiraKind(issue)==='epic' && initiativeRoots().indexOf(issue.key)<0;});
+    if(chunk.epic)return all.filter(function(issue){var kind=liveStatusJiraKind(issue);return issue && issue.key!==chunk.epic && kind!=='epic' && kind!=='initiative' && initiativeRoots().indexOf(issue.key)<0 && (api.refs().epics || []).indexOf(issue.key)<0;});
+    return all;
+  }
+  function initiativeRoots(){
+    var roots=api.refs().epics || [],found=[];
+    chunks.forEach(function(chunk){if(chunk.roots)chunk.issues.forEach(function(issue){if(roots.indexOf(issue.key)>=0 && liveStatusJiraKind(issue)==='initiative' && found.indexOf(issue.key)<0)found.push(issue.key);});});
+    return found;
+  }
   function syncWatches(){
-    if(stopped || !cloudId || syncing)return;
+    if(stopped || !cloudId)return;
+    if(syncing){resync=true;return;}
     syncing=true;
     try{
-      var refs=api.refs(),added=liveStatusJiraChunks(refs.tickets.filter(function(key){return !watchedTickets[key];})).map(function(keys){
-        keys.forEach(function(key){watchedTickets[key]=true;});return {keys:keys,answered:false,issues:[],flagged:[]};
-      });
-      (refs.epics || []).forEach(function(epic){
-        if(watchedEpics[epic])return;watchedEpics[epic]=true;
-        added.push({epic:epic,keys:[],answered:false,issues:[],flagged:[]});
-      });
-      // Register identities before a watch can synchronously publish data.
-      chunks=chunks.concat(added);
-      added.forEach(function(chunk){
-        [false,true].forEach(function(flagged){
-          var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.epic?'parent = '+chunk.epic:'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated','issuelinks'].concat(chunk.epic?['issuetype']:[]),maxResults:10}};
-          jobs.push(job);watch(job);
+      do{
+        resync=false;
+        var refs=api.refs(),configured=refs.epics || [],roots=initiativeRoots(),epics=configured.filter(function(key){return roots.indexOf(key)<0;}),wanted=refs.tickets,added=[];
+        chunks.forEach(function(chunk){
+          var key=chunk.epic || chunk.initiative;if(configured.indexOf(key)<0)return;
+          var initiative=roots.indexOf(key)>=0;
+          if(initiative!==!!chunk.initiative){delete chunk.epic;delete chunk.initiative;chunk[initiative?'initiative':'epic']=key;chunk.issues=children(chunk,chunk.rawIssues || []);dirty=true;}
         });
-      });
+        chunks.forEach(function(chunk){if(chunk.initiative && roots.indexOf(chunk.initiative)>=0)chunk.issues.forEach(function(issue){if(epics.indexOf(issue.key)<0)epics.push(issue.key);});});
+        chunks=chunks.filter(function(chunk){
+          var keep=chunk.roots?chunk.keys.some(function(key){return configured.indexOf(key)>=0;}):chunk.initiative?roots.indexOf(chunk.initiative)>=0:chunk.epic?epics.indexOf(chunk.epic)>=0:chunk.keys.some(function(key){return wanted.indexOf(key)>=0;});
+          if(!keep){retireChunk(chunk);dirty=true;}
+          return keep;
+        });
+        var watched=[],lookedUp=[];chunks.forEach(function(chunk){if(chunk.roots)lookedUp=lookedUp.concat(chunk.keys);else if(!chunk.epic && !chunk.initiative)watched=watched.concat(chunk.keys);});
+        liveStatusJiraChunks(wanted.filter(function(key){return watched.indexOf(key)<0;})).forEach(function(keys){added.push({keys:keys});});
+        roots.forEach(function(key){if(!chunks.some(function(chunk){return chunk.initiative===key;}))added.push({initiative:key,keys:[]});});
+        epics.forEach(function(key){if(!chunks.some(function(chunk){return chunk.epic===key;}))added.push({epic:key,keys:[]});});
+        // Root metadata has its own watch: empty parents still have a title and
+        // kind. The persisted legacy `epic` setting now accepts either kind.
+        liveStatusJiraChunks(configured.filter(function(key){return lookedUp.indexOf(key)<0;})).forEach(function(keys){added.push({roots:true,keys:keys});});
+        added.forEach(function(chunk){chunk.answered=false;chunk.flaggedAnswered=!!chunk.roots;chunk.issues=[];chunk.flagged=[];});
+        // Register all identities before a watch can synchronously answer.
+        chunks=chunks.concat(added);
+        added.forEach(function(chunk){
+          (chunk.roots?[false]:[false,true]).forEach(function(flagged){
+            var job={version:0,chunk:chunk,flagged:flagged,tool:'searchJiraIssuesUsingJql',input:{cloudId:cloudId,jql:(chunk.initiative || chunk.epic?'parent = '+(chunk.initiative || chunk.epic):'key in ('+chunk.keys.join(', ')+')')+(flagged?' AND Flagged = Impediment':''),fields:['summary','status','assignee','updated','issuelinks','parent','issuetype'],maxResults:10}};
+            jobs.push(job);watch(job);
+          });
+        });
+      }while(resync && !stopped);
       if(github)github.sync();
     }finally{syncing=false;}
+    publish();
   }
   function resources(result){
     if(stopped)return;

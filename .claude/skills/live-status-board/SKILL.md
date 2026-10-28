@@ -39,6 +39,16 @@ the layout can be checked. So, once publishing is authorized, after each spec
 change the agent rebuilds and republishes to the same artifact URL (section
 4), then tells the author to reload. A publish that creates a new artifact loses the old one's comments.
 
+Parent scope uses the existing `tracking.jira.epic` field (one key or an array).
+The desktop document control is **Tracking → Parent**. Jira metadata detects
+Epic versus Initiative: an Initiative discovers its child Epics and their stories,
+with distinct story totals and an Epic label per story. Do not add an authored
+initiative field or infer type from a key prefix. Use `parent = KEY` for each
+level when researching the hierarchy. Containers do not become story carriers
+merely because they were returned by a parent query. The offline Workbench demo
+cannot detect type without Jira; explicit runtime/demo metadata is documented in
+`docs/live-status.md`. “Diagram ready to demo” remains about primary-path carriers.
+
 ## 1. Settle the tracking facts before writing JSON
 
 Ask the author, in one batch, only what the source does not already state:

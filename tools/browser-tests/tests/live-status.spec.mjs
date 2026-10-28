@@ -337,19 +337,19 @@ test('E6 E10 E11 built epic Tickets table lists all children and coverage focuse
  await hw.getByRole('button',{name:'Indoor chime',exact:true}).click();await expect(root.locator('g.node[data-dv-node="chime"] .card')).toBeFocused();
  await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();expect(await panel.locator('.pbody').evaluate(el=>el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth)).toBe(true);
 });
-test('E8 desktop page Epic controls validate preserve history export and demo',async({page,server})=>{
+test('E8 desktop page Parent controls validate preserve history export and demo',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
  const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();
- const input=page.locator('#guide').getByLabel('Epic',{exact:true}),before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
- for(const key of ['DOOR-100','DOOR-200']){
+ const input=page.locator('#guide').getByLabel('Parent',{exact:true}),before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
+ for(const key of ['DOOR-100','INIT-100']){
   const previous=await src.inputValue();await input.fill(key);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toContain(key);const changed=await src.inputValue();
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(previous);await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await settings();
  }
- const both=await src.inputValue();await page.locator('#guide').getByRole('button',{name:'Remove epic 1',exact:true}).click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toEqual(['DOOR-200']);await page.locator('#undo-builder').click();await expect(src).toHaveValue(both);await page.locator('#redo-builder').click();
+ const both=await src.inputValue();await page.locator('#guide').getByRole('button',{name:'Remove parent 1',exact:true}).click();await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toEqual(['INIT-100']);await page.locator('#undo-builder').click();await expect(src).toHaveValue(both);await page.locator('#redo-builder').click();
  const demo=page.getByRole('checkbox',{name:'Demo live status',exact:true});await demo.check();await expect(page.locator('#docview g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-(todo|active|done|blocked)/);const final=await src.inputValue();
  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
  expect(saved.page.sections[0].diagram.panels).toEqual(raw.page.sections[0].diagram.panels);await expect(page.locator('#docview .pt-live-status .dv-live-head .dv-live-note')).toContainText('Demo day');
- expect(saved.page.tracking.jira).toEqual({site:'https://acme.atlassian.net',epic:['DOOR-200']});expect(await src.inputValue()).toBe(final);
+ expect(saved.page.tracking.jira).toEqual({site:'https://acme.atlassian.net',epic:['INIT-100']});expect(await src.inputValue()).toBe(final);
 });
 
 test('E6 rework coverage opens a closed detail and focuses its visible badge after each return',async({page,server})=>{
@@ -570,4 +570,29 @@ test('G12 desktop GitHub scope validates repos and org with one Undo Redo and ex
   const previous=await src.inputValue();await input.fill(value);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.github).toEqual(want);const changed=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(previous);await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await settings();
  }
  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);expect(saved.page.tracking.github).toEqual({org:'acme'});expect(saved.page.tracking.jira).toEqual(raw.page.tracking.jira);
+});
+
+test('I1 desktop initiative parent auto-detection renders story totals epic context and undisplayed blockers',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1600,height:1200});
+ await page.addInitScript(()=>{
+  const issue=(key,title,level,state,parent)=>({key,fields:{summary:title,issuetype:{name:level===2?'Program':level===1?'Epic':'Story',hierarchyLevel:level},status:{name:state==='done'?'Done':state==='blocked'?'Blocked':'In Progress',statusCategory:{key:state==='done'?'done':'indeterminate'}},assignee:{displayName:'Alex'},...(parent?{parent:{key:parent}}:{})}});
+  const records={
+   'INIT-100':issue('INIT-100','Connected resident experience',2,'active'),
+   'EP-101':issue('EP-101','Resident notifications',1,'active','INIT-100'),
+   'EP-102':issue('EP-102','Device event delivery',1,'active','INIT-100'),
+   'ST-1':issue('ST-1','Show the resident notification',0,'done','EP-101'),
+   'ST-2':issue('ST-2','Deliver the notification payload',0,'active','EP-101'),
+   'ST-3':issue('ST-3','Stabilize the device event signal',0,'blocked','EP-102')
+  };
+  records['ST-2'].fields.issuelinks=[{type:{inward:'is blocked by'},inwardIssue:records['ST-3']}];
+  window.__initiativeWatches=[];
+  const result=input=>{const parent=/^parent = ([A-Z0-9-]+)/.exec(input.jql),keys=/^key in \(([^)]+)\)/.exec(input.jql);let issues=parent?Object.values(records).filter(row=>row.fields.parent?.key===parent[1]):(keys?.[1].split(', ')||[]).map(key=>records[key]).filter(Boolean);if(input.jql.includes('Flagged'))issues=issues.filter(row=>row.key==='ST-3');return {payload:{issues}};};
+  window.claude={use:async()=>({listTools:async()=>[{server:'Atlassian',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql']}],callTool:async(s,t,input)=>t==='getAccessibleAtlassianResources'?{payload:[{id:'cloud',url:'https://acme.atlassian.net'}]}:result(input),watchTool(s,t,input,handler){const watch={input,stopped:false};window.__initiativeWatches.push(watch);queueMicrotask(()=>{if(!watch.stopped)handler({type:'data',result:result(input)});});return ()=>{watch.stopped=true;};}})};
+ });
+ const spec={page:{title:'Connected resident experience',tracking:{jira:{site:'https://acme.atlassian.net',epic:['INIT-100','EP-101']}},sections:[{id:'delivery',heading:'Implementation progress',diagram:{nodes:{resident:{title:'Resident notification',tickets:['ST-1']},service:{title:'Notification service',tickets:['ST-2']}},rows:[['service','resident']],edges:[{from:'service',to:'resident',label:'Notify'}],steps:[{edge:'service->resident',text:'The device event reaches the resident'}],sectionLayout:{columns:24,default:[{x:0,y:0,w:10,h:18},{controls:'steps',x:0,y:18,w:10,h:5},{panel:'status',x:10,y:0,w:14,h:22}]},panels:[{id:'status',type:'live-status',title:'Delivery status'}]}}]}};
+ const file=path.join(server.root,'initiative.spec.json'),out=path.join(server.root,'initiative.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/initiative.html');
+ const panel=page.locator('#docview .pt-live-status');await expect(panel.locator('.dv-live-scope')).toHaveText('Initiative · 2 epics');await expect(panel.locator('.dv-live-epic-key')).toHaveText('INIT-100');await expect(panel.locator('.dv-live-epic-title')).toHaveText('Connected resident experience');await expect(panel.locator('.dv-live-epic-progress')).toHaveText('1 of 3 stories done · 2 of 3 on diagram');
+ await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(3);await expect(panel.locator('tr[data-live-ticket="ST-3"] .dv-live-ticket-epic')).toHaveText('epic EP-102');await expect(panel.locator('tr[data-live-ticket="ST-1"] .dv-live-ticket-epic')).toHaveText('epic EP-101');await expect(panel.locator('tr[data-live-coverage-for="ST-3"]')).toContainText('NOT ON DIAGRAM');await expect(panel.locator('tr[data-live-coverage-for="ST-1"]')).not.toContainText('NOT IN');
+ await expect(panel.locator('tr[data-live-ticket="ST-2"] .dv-live-dep')).toHaveAttribute('data-tone','red');await expect(panel.locator('.dv-live-blocker')).toContainText('ST-3');expect(await page.evaluate(()=>window.__initiativeWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
+ await panel.screenshot({path:testInfo.outputPath('initiative-board.png')});
 });

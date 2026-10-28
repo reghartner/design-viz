@@ -665,16 +665,29 @@ demo controls and its body shows Blockers, Tickets and Activity. It has no autho
 initial or step state.
 
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
-configures the Jira site and optional epic:
+configures the Jira site and optional parent roots:
 `"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.
-`tracking.jira.epic` accepts one Jira key or an array using the ticket pattern.
+`tracking.jira.epic` keeps its existing storage name and accepts one Epic or
+Initiative Jira key or an array using the ticket pattern. There is no new authored
+initiative field or kind selector. The desktop control is labeled **Parent**.
+Jira issue-type metadata auto-detects Epic versus Initiative at runtime;
+Initiatives discover child Epics and then their stories (ordinary work items).
+This traversal is bounded to those two levels. Container records never count as
+stories. The board names the Initiative, counts Epics separately, and shows each
+story's parent Epic. Empty parents get their own metadata lookup. Shared and
+explicitly tracked Epics are deduplicated. Runtime `kind`, `parent`, `epic` and
+`initiatives` membership belong only in the live provider map, never in authored
+state. See `docs/live-status.md` for that transport contract.
 Valid keys are deduplicated in authored order; invalid entries warn individually
 and an invalid field type warns once, never errors. Epic children automatically
 appear in the Tickets table; mapping them to nodes and edges remains an authoring
 step. Unmapped children say NOT ON DIAGRAM; referenced tickets without evidence
 of membership in a configured epic say NOT IN EPIC. Extra children never change
 carrier colors or rollups. Desktop Workbench Tracking controls add and remove
-epics with one Undo/Redo per change and preserve them in Export project.
+parent roots with one Undo/Redo per change and preserve them in Export project.
+For initiative scope, unrecognized carrier membership says NOT IN SCOPE.
+Diagram readiness continues to describe only the primary path carriers.
+The offline Workbench demo cannot detect parent type without Jira metadata.
 Optional `tracking.dependencies` is an array of authored delivery dependencies,
 `[{"ticket": "UX-89", "on": "HW-124", "reason": "needs push payload"}]`: `ticket`
 waits on `on` while `on` is not done. Both are Jira keys; `reason` is optional

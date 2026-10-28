@@ -16,6 +16,14 @@ Text boxes allow up to 12,000 characters, 200 wrapped lines and 8,000 units of
 height. A rejected edit leaves the saved source intact; shorten the text, reduce
 the font size or widen the box. Clearing Color restores the theme color.
 
+For a live delivery board, **Inspect → Document settings → Tracking → Parent**
+accepts an Epic or Initiative Jira key. Add or remove a key with one Undo/Redo;
+Export project keeps the existing `tracking.jira.epic` setting. In the connected
+viewer, Jira identifies the parent type automatically. Initiatives show their
+Epics and descendant stories, with separate Epic counts and story coverage.
+The desktop **Demo live status** preview uses sample states without querying
+Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 

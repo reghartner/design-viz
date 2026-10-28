@@ -4113,6 +4113,12 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
 }
 
 /* Story evidence supplements the state color with text, progress and age. */
+.dv-live-board-lane{display:none!important;}
+.dv-live-step-tickets{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px;font-size:11px;}
+.dv-live-step-ticket{display:flex;align-items:baseline;gap:8px;}
+.dv-live-step-state{color:var(--dv-live-color,inherit);white-space:nowrap;}
+.dv-live-step-tickets .nbacklink{color:inherit;text-decoration:underline;text-underline-offset:2px;}
+.dv-live-step-tickets a:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:2px;}
 .dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
 .lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}

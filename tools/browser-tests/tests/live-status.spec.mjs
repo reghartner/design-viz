@@ -11,7 +11,7 @@
 | V8 | Live controls live only in the authored `live-status` panel's `.dv-live-head`, below its engine-owned title; reader navigation has no Live control row. The header includes `button.dv-live-toggle` ("Live", `aria-pressed` reflecting `enabled()`), per-state counts hidden when zero, `time.dv-live-updated` when a timestamp exists, the provider note and action, First blocker when available, and Play/Pause plus Next day when demo controls are supplied. Without ticket references or epics the panel shows the empty-page message; before a provider or applied map is available it shows only the provider note and any required action. |
 | V9 | Re-apply after every rebuild: listen on the section element for `dv:pathrender` and `dv:pathchange`, on the view for `diagram-tab-change`, `tab-view-change`, `diagram-view-change`, `navigation-mounted`, `detail-navigation`, and use one MutationObserver (childList, subtree) scoped to step-control containers for chip rebuilds; coalesce with requestAnimationFrame. The classes survive a path switch (new SVG) and a detail flow open. `ctl.destroy()` disconnects everything. |
 | V10 | Host hook: `renderPage(..., {liveStatus: {provider: function(refs, signal) → Promise<map>, refreshMs}})`. When present: call the provider after first paint, then every `max(refreshMs, 30000)` ms while `document.visibilityState === 'visible'` (pause when hidden, one catch-up call on return); an AbortController signal is passed and aborted on destroy; rejections set `note(message,'error')` and keep the last map. `mountNativeSpec` (src/native/mount.js) forwards `liveStatus` and src/native/mount.d.ts declares `liveStatus?: {provider: (refs: {tickets: string[]; prs: string[]}, signal: AbortSignal) => Promise<Record<string, LiveStatusEntry>>; refreshMs?: number}` with a `LiveStatusEntry` type. src/boot.flowview.js passes `window.flowviewLiveStatus` (if set before boot) as that option. |
-| V11 | No provider and no `apply` → no DOM/CSS difference versus today except the hidden Live control markup (keep it out of the DOM entirely when there are no ticket refs, so pages without tickets are byte-identical in structure). |
+| V11 | Without live evidence, tracked Step captions still show authored ticket references; no carrier paint is applied. Pages without ticket refs keep no Live control markup or derived ticket row. |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -263,12 +263,87 @@ test('S2 P1 explicit demo takes precedence over the claude connector',async({pag
  expect(await page.evaluate(()=>__mcpStub.watches)).toEqual([]);
 });
 
-/* B1–B10 story panel matrix: B1 lane totals/title; B2 caption;
+/* B1–B10 story panel matrix: B1 per-step tickets/team context; B2 caption;
  B3 shipped Play pauses and focuses badge; B4 First blocker uses current path;
  B5 real demo changes populate Activity; B6 stale helper/paint in VM;
  B7 dialog/ring/verdict/downstream/missing/Escape; B8 built demo final day;
  B9 reduced motion + print here and no-ticket DOM in V11; B10 docs/validator in VM.
  All cases use desktop reader dimensions; mobile document editing is out of scope. */
+test('B1 step ticket links sit beneath prose before evidence and follow navigation without team-wide tickets',async({page,server},testInfo)=>{
+ await page.clock.install();
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:()=>new Promise(resolve=>{window.__resolveStepStatus=resolve;})};});
+ const spec=fixture(),d=spec.page.sections[0].diagram;
+ spec.page.lanes={TEAM:{label:'Delivery team',color:'#146d55'}};spec.page.tracking.jira.epic='DEL-1';
+ // A local Jira stub exercises real new-tab activation while the browser audit keeps all traffic offline.
+ spec.page.tracking.jira.site=server.origin+'/jira';const ticketURL=server.origin+'/jira/browse/HW-124';
+ d.view='step';d.autoplay=false;d.steps.forEach(step=>{step.lane='TEAM';});
+ d.steps[0].text='Press the **doorbell** to send an event to the controller.';
+ d.steps.push({id:'untracked',lane:'TEAM',text:'Describe the next planning discussion.'});d.paths[0].steps.push('untracked');
+ const root=await open(page,server,spec,false),section=root.locator('#section-delivery'),bar=section.locator('.termbar'),row=bar.locator('.dv-live-step-tickets');
+ const keys=['HW-124','FW-46','HW-123','FW-45'];
+ await expect(row.locator('a')).toHaveText(keys);await expect(bar.locator('.dv-live-caption')).toHaveCount(0);
+ await expect(bar.locator('.lanepill')).toBeHidden();await expect(row.locator('.dv-live-step-state')).toHaveText(['No status','No status','No status','No status']);await expect(bar.locator('.step-text strong')).toHaveText('doorbell');
+ expect(await row.evaluate(el=>{
+  const host=el.parentElement,range=document.createRange();range.setStart(host,0);range.setEndBefore(el);
+  return el.getBoundingClientRect().top>=range.getBoundingClientRect().bottom;
+ })).toBe(true);
+ const ticket=row.getByRole('link',{name:'HW-124',exact:true});
+ await expect(ticket).toHaveAttribute('href',ticketURL);await expect(ticket).toHaveAttribute('rel','noopener noreferrer');
+ await page.context().route(server.origin+'/jira/browse/**',route=>route.fulfill({body:'Jira ticket'}));
+ for(const keyboard of [true,false]){
+  const popupPromise=page.waitForEvent('popup');
+  if(keyboard){await ticket.focus();await page.keyboard.press('Enter');}else await ticket.click();
+  const popup=await popupPromise;await popup.waitForLoadState();expect(popup.url()).toBe(ticketURL);await popup.close();
+ }
+ await ticket.focus();await expect.poll(()=>page.evaluate(()=>typeof window.__resolveStepStatus)).toBe('function');
+ await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'active'},'BE-67':{state:'done'},'DEL-99':{state:'todo',epic:'DEL-1',lane:'TEAM'}}));
+ await expect(bar.locator('.dv-live-caption')).toContainText('IN PROGRESS');await expect(ticket).toBeFocused();await expect(row.locator('a')).toHaveText(keys);await expect(row.locator('.dv-live-step-state')).toHaveText(['In progress','No status','No status','No status']);
+ await page.clock.runFor(30001);await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'done'},'FW-46':{state:'todo'},'HW-123':{state:'blocked'},'FW-45':{state:'missing'}}));
+ await expect(bar.locator('.dv-live-caption')).toContainText('BLOCKED');await expect(row).toHaveCount(1);await expect(ticket).toBeFocused();
+ await expect(row.locator('.dv-live-step-state')).toHaveText(['Done','To do','Blocked','Missing']);
+ expect(await row.locator('.dv-live-step-ticket').evaluateAll(els=>els.every((el,index)=>!index || el.getBoundingClientRect().top>=els[index-1].getBoundingClientRect().bottom))).toBe(true);
+ await row.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('step-ticket-links.png')});
+ await section.locator('.schip[data-step-source="1"]').first().click();await expect(row.locator('a')).toHaveText(['BE-67','UX-89','BE-68']);
+ await section.locator('.path-chip[data-dv-path="retry"]').click();await section.locator('.schip[data-step-source="2"]').first().click();
+ await expect(row.locator('a')).toHaveText(['HW-124','FW-46','HW-123','FW-45','BE-67','UX-89','BE-68']);
+ await expect(row.locator('.dv-live-step-state')).toHaveText(['Done','To do','Blocked','Missing','No status','No status','No status']);
+ await bar.locator('.stepline:not(.dv-caption-old)').scrollIntoViewIfNeeded();
+ await expect(row.locator('.dv-live-step-ticket').first()).toBeInViewport();await expect(row.locator('.dv-live-step-ticket').last()).toBeInViewport();await expect(bar.locator('.dv-live-caption')).toBeInViewport();
+ await page.screenshot({path:testInfo.outputPath('step-ticket-links-seven.png')});
+ await section.getByRole('button',{name:'Ambient',exact:true}).click();await expect(row).toHaveCount(0);
+ await section.locator('.schip[data-step-source="0"]').first().click();await expect(row).toHaveCount(1);
+ await root.locator('.dv-live-toggle').click();await expect(row).toHaveCount(0);await expect(bar.locator('.lanepill')).toBeHidden();await root.locator('.dv-live-toggle').click();await expect(row).toHaveCount(1);
+ await section.locator('.path-chip[data-dv-path="normal"]').click();await section.locator('.schip[data-step-source="3"]').first().click();await expect(row).toHaveCount(0);
+});
+test('B1 regular diagrams keep authored lane chips beside status boards, including when Live is off',async({page,server})=>{
+ const spec=fixture(),board=spec.page.sections[0].diagram;spec.page.lanes={TEAM:{label:'Delivery team',color:'#146d55'}};
+ board.view='step';board.autoplay=false;board.steps.forEach(step=>{step.lane='TEAM';});
+ spec.page.sections.push({id:'regular',heading:'Ordinary diagram',diagram:{view:'step',autoplay:false,nodes:{a:{title:'Ordinary work'}},rows:[['a']],steps:[{lane:'TEAM',nodes:['a'],text:'Keep the authored team context.'}]}});
+ const root=await open(page,server,spec),boardPill=root.locator('#section-delivery .lanepill'),regularPill=root.locator('#section-regular .lanepill');
+ await expect(boardPill).toBeHidden();
+ await root.getByRole('button',{name:'Ordinary diagram',exact:true}).click();await expect(regularPill).toBeVisible();await expect(regularPill).toHaveText('Delivery team');
+ await root.getByRole('button',{name:'From button press to resident notification',exact:true}).click();
+ await root.locator('.dv-live-toggle').click();await expect(boardPill).toBeHidden();
+ await root.getByRole('button',{name:'Ordinary diagram',exact:true}).click();await expect(regularPill).toBeVisible();
+ await root.getByRole('button',{name:'From button press to resident notification',exact:true}).click();
+ await root.locator('#section-delivery .schip[data-step-source="1"]').first().click();await expect(boardPill).toBeHidden();
+});
+test('B1 grid captions retain safe runtime ticket URLs and plain keys beneath authored prose',async({page,server})=>{
+ const spec=fixture(),d=spec.page.sections[0].diagram;delete spec.page.tracking;
+ d.view='step';d.autoplay=false;
+ d.layouts=[{id:'chapter',name:'Chapter',presentation:'standard',playbackPosition:'above',sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:12}]},exploreLayout:{steps:{textPosition:'right'}}}];
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:()=>({'HW-124':{state:'todo',url:'https://runtime.test/HW-124'},'FW-46':{state:'todo',url:'javascript:alert(1)'}})};});
+ const root=await open(page,server,spec,false),bar=root.locator('#section-delivery .termbar'),row=bar.locator('.dv-live-step-tickets');
+ await expect(row.locator('.nbacklink')).toHaveText(['HW-124','FW-46','HW-123','FW-45']);await expect(row.locator('a')).toHaveCount(1);await expect(row.locator('a')).toHaveAttribute('href','https://runtime.test/HW-124');
+ await expect(row.locator('span.nbacklink')).toHaveText(['FW-46','HW-123','FW-45']);await expect(row.locator('.dv-live-step-state')).toHaveText(['To do','To do','No status','No status']);
+ expect(await row.evaluate(el=>{const range=document.createRange();range.setStart(el.parentElement,0);range.setEndBefore(el);return el.getBoundingClientRect().top>=range.getBoundingClientRect().bottom;})).toBe(true);
+ await root.locator('#section-delivery .path-chip[data-dv-path="retry"]').click();await root.locator('#section-delivery .schip[data-step-source="2"]').first().click();
+ await expect(row.locator('.dv-live-step-ticket')).toHaveCount(7);
+ // Authored control regions may scroll; the last ticket and aggregate caption must remain reachable.
+ await row.locator('.dv-live-step-ticket').last().scrollIntoViewIfNeeded();await expect(row.locator('.dv-live-step-ticket').last()).toBeInViewport();
+ await bar.locator('.dv-live-caption').scrollIntoViewIfNeeded();await expect(bar.locator('.dv-live-caption')).toBeInViewport();
+ expect(await row.locator('.dv-live-step-ticket').evaluateAll(els=>els.every((el,index)=>!index || el.getBoundingClientRect().top>=els[index-1].getBoundingClientRect().bottom))).toBe(true);
+});
 test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach ready',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
  for(let day=2;day<=4;day++)await next.click();
@@ -280,7 +355,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);
  await expect(bar.locator('.dv-live-caption')).toContainText('BLOCKED · HW-124');
  await expect(root.locator('.dv-live-target:focus').locator('xpath=ancestor-or-self::*[contains(@class,"dv-live-blocked")][1]')).toHaveCount(1);
- await expect(bar.locator('.lanepill')).toContainText('Hardware · 0/4 done');await expect(bar.locator('.lanepill')).toHaveClass(/dv-live-blocked/);await expect(bar.locator('.lanepill')).toHaveAttribute('title',/HW-124 · blocked/);
+ await expect(bar.locator('.lanepill')).toBeHidden();
  await root.locator('.schip[data-step-source="5"]').first().click();await root.getByRole('button',{name:'First blocker',exact:true}).click();
  await expect(root.locator('.schip[data-step-source="0"][aria-current="true"]')).toHaveCount(1);await expect(root.locator('.dv-live-target:focus').locator('xpath=ancestor-or-self::*[contains(@class,"dv-live-blocked")][1]')).toHaveCount(1);
  const panel=root.locator('.pt-live-status');

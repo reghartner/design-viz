@@ -13,6 +13,8 @@ function element(){
     toggle(name, on){ if(on) classes.add(name); else classes.delete(name); },
     contains:name=>classes.has(name)},
     querySelector(){return null;},
+    // This sizing-only tree has no live-status targets or step captions.
+    querySelectorAll(){return [];},
     appendChild(child){ this.children.push(child); },
     setAttribute(name, value){ this.attrs[name] = value; },
     addEventListener(name, fn){ this.events[name] = fn; },

@@ -125,7 +125,7 @@ Live paint has no palette of its own: it uses the Node Styles presets
 (see `docs/node-styles.md`). A painted node wears `node-styled ns-<preset>`, so its
 card takes the preset's background, line and ink in the current skin, including
 the dark variants on Aurora, Terminal and Blueprint. Edge strokes, halos, the
-break glyph, step coins and chips, lane pills and the panel's count and state
+break glyph, step coins and chips, and the panel's count and state
 pills use the same preset line colours through `--dv-live-<state>`. Numerals and
 pill text use `--dv-live-on`, chosen by the engine's step-colour contrast rule
 (black or white, whichever contrasts more); it is black on every live fill.
@@ -204,9 +204,9 @@ the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
 There is no verdict line. Then come the Tickets table, **Blockers and dependency
-chains**, and Activity. Lane progress is not listed in the panel; it stays on
-the step lane pills, the lane colour stripe of each Tickets row and the lane
-names in Blockers.
+chains**, and Activity. Teams are identified by each Tickets row's lane colour
+stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
+even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket references or epics it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
@@ -682,11 +682,19 @@ page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
 
 ## Story mode
 
-Live evidence follows the story's nodes and edges. Team lane pills show **n/N done**, the worst ticket state, and a hover/focus title listing each ticket and
-state. Tickets are deduplicated across every step in that lane, including edge
-endpoints and failed communications. The Live status panel does not repeat these
-lanes; lane evidence stays on the step pills, the lane colour stripe of each
-Tickets row and the lane names in Blockers.
+Live evidence follows the story's nodes and edges. Diagrams with a Live status
+panel omit the team lane chip from their step captions. In Step mode, each Jira
+ticket appears on its own line immediately below the authored step text, with
+its state beside the key: **To do**, **In progress**, **Done**, **Blocked**,
+**Missing**, or **No status** before evidence arrives or when a key has no runtime
+entry. Ticket keys are deduplicated across that step's nodes, edges, edge
+endpoints and failed communications. Other steps in the same team and unmapped
+epic stories do not add tickets to this list. Authored references appear even
+before live status arrives. Keys link to the page's Jira site, or a safe runtime
+ticket URL when no site is configured; without either they remain plain text.
+The list updates with step/path navigation and new evidence, and disappears in
+Ambient mode or when Live is disabled. The Live status panel keeps its overall
+progress, Tickets team stripes and Blockers team names.
 
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
 **IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps

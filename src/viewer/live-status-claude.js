@@ -101,8 +101,13 @@ function liveStatusJiraMap(requestedKeys,issuesByChunk,flaggedKeys,site,storedAt
   requestedKeys.forEach(function(key){
     var issue=issues[key];if(!issue)return;
     liveStatusJiraDependencies(issue,linkTypes).forEach(function(dep){
-      if(requestedKeys.indexOf(dep.key)>=0 || map[dep.key])return;
+      if(requestedKeys.indexOf(dep.key)>=0)return;
+      var kind=liveStatusJiraKind(dep.issue);
+      // A later link may carry type metadata omitted by the first link. Keep
+      // existing evidence, but do not count a known hierarchy container as work.
+      if(map[dep.key]){if(kind && !map[dep.key].kind)map[dep.key].kind=kind;return;}
       var fields=dep.issue.fields || {},entry={state:liveStatusJiraState(dep.issue,flaggedKeys)};
+      if(kind)entry.kind=kind;
       if(typeof fields.summary==='string')entry.title=fields.summary;
       if(site)entry.url=site.replace(/\/+$/,'')+'/browse/'+dep.key;
       map[dep.key]=entry;

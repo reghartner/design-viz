@@ -255,7 +255,7 @@ class InjectTests(unittest.TestCase):
         # the edit loop, the tracking rules, the pointers and the post-publish checks
         for needle in ("`flowspec`", "same URL", "node tools/validate.js",
                        "^[A-Z][A-Z0-9_]+-[0-9]+$", "prs", "tracking.jira.site", "staleDays",
-                       "tracking.jira.epic", "tracking.github", "never stores",
+                       "tracking.jira.epic", "tracking.jira.exclude", "displayed upstream dependencies", "tracking.github", "never stores",
                        "built with Flowview 0.2.0", "Live", "Tickets", "screenshot",
                        "https://acme.atlassian.net", "DOOR-100"):
             self.assertIn(needle, guide, needle)

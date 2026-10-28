@@ -34,6 +34,16 @@ function trackingEpics(page,invalid){
     else if(out.indexOf(key)<0)out.push(key);
   });return out;
 }
+/* Exclusions affect inherited membership only; explicit carrier tickets win. */
+function trackingExclusions(page,invalid){
+  var jira=page && page.tracking && page.tracking.jira,out=[];
+  if(!jira || !Object.prototype.hasOwnProperty.call(jira,'exclude'))return out;
+  if(!Array.isArray(jira.exclude)){if(invalid)invalid(null);return out;}
+  jira.exclude.forEach(function(key,index){
+    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(index);}
+    else if(out.indexOf(key)<0)out.push(key);
+  });return out;
+}
 /* GitHub discovery is always bounded to authored repositories or an org. */
 var trackingGithubRepoPattern=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 var trackingGithubOrgPattern=/^[A-Za-z0-9_.-]+$/;

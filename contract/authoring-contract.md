@@ -687,6 +687,27 @@ carrier colors or rollups. Desktop Workbench Tracking controls add and remove
 parent roots with one Undo/Redo per change and preserve them in Export project.
 For initiative scope, unrecognized carrier membership says NOT IN SCOPE.
 Diagram readiness continues to describe only the primary path carriers.
+Use `tracking.jira.exclude: ["DOOR-108", "DOOR-109"]` for stories inherited
+from a parent that do not contribute to this diagram's delivery story. It must
+be an array of valid Jira keys; valid entries deduplicate in authored order,
+invalid entries warn and are ignored, and a non-array value warns once. The
+source and exported JSON preserve this authored field. Desktop **Document
+settings → Tracking → Exclude story** adds keys; **Remove excluded story 1**
+removes them, each with one Undo/Redo.
+
+Counted stories = distinct (parent stories minus source-page exclusions) union
+manually attached node/edge tickets union displayed upstream dependency stories.
+Manual tickets and needed dependencies add excluded keys back; missing-status
+keys count in the denominator but never as done. Outside-initiative dependencies
+shown on the board count too. Parent containers never count. Loaded approved
+sources apply exclusions independently, so an exclusion cannot remove another
+source's intended inclusion. Only dependency chains reachable from included
+parent/manual stories join the board. All story counts use this set; carrier
+paint, the carriers-done ring and diagram readiness remain carrier-based.
+The read-only **Excluded stories** list shows configured keys, available titles
+and states, and explains manual/dependency/other-source inclusion overrides.
+Extra upstream rows say **DEPENDENCY ONLY** and are included in story totals.
+
 The offline Workbench demo cannot detect parent type without Jira metadata.
 Optional `tracking.dependencies` is an array of authored delivery dependencies,
 `[{"ticket": "UX-89", "on": "HW-124", "reason": "needs push payload"}]`: `ticket`

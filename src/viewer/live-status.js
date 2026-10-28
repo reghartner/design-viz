@@ -292,17 +292,30 @@ function liveStatusReadiness(page,map,waiting){
 function liveStatusContainer(key,entry,roots){
   return (roots || []).indexOf(key)>=0 || !!(entry && (entry.kind==='epic' || entry.kind==='initiative'));
 }
-function liveStatusCoverage(page,map,refs){
-  var roots=refs && refs.epics || trackingEpics(page),initiatives=roots.filter(function(key){return map[key] && map[key].kind==='initiative';});
-  var epics=roots.filter(function(key){return initiatives.indexOf(key)<0;}),keys=(refs && refs.tickets || []).filter(function(key){return !liveStatusContainer(key,map[key],roots);});
-  Object.keys(map || {}).forEach(function(key){
-    var entry=map[key];if(!entry || !(entry.initiatives || []).some(function(root){return initiatives.indexOf(root)>=0;}))return;
-    var epic=entry.kind==='epic'?key:entry.epic;if(epic && epics.indexOf(epic)<0)epics.push(epic);
+function liveStatusCoverage(page,map,refs,pages){
+  var roots=refs && refs.epics || trackingEpics(page),keys=(refs && refs.tickets || []).filter(function(key){return !liveStatusContainer(key,map[key],roots);});
+  var epics=[],initiatives=[],members=[],included=[],excluded=[];
+  // Resolve each source separately: one page's exclusions cannot erase another
+  // approved detail page's intentional inherited membership.
+  (pages || [page]).forEach(function(source){
+    var sourceRoots=pages?trackingEpics(source):roots,omit=trackingExclusions(source);
+    var sourceInitiatives=sourceRoots.filter(function(key){return map[key] && map[key].kind==='initiative';});
+    var sourceEpics=sourceRoots.filter(function(key){return sourceInitiatives.indexOf(key)<0;});
+    Object.keys(map || {}).forEach(function(key){
+      var entry=map[key];if(!entry || !(entry.initiatives || []).some(function(root){return sourceInitiatives.indexOf(root)>=0;}))return;
+      var epic=entry.kind==='epic'?key:entry.epic;if(epic && sourceEpics.indexOf(epic)<0)sourceEpics.push(epic);
+    });
+    sourceEpics.forEach(function(key){if(epics.indexOf(key)<0)epics.push(key);});
+    sourceInitiatives.forEach(function(key){if(initiatives.indexOf(key)<0)initiatives.push(key);});
+    omit.forEach(function(key){if(!liveStatusContainer(key,map[key],roots) && excluded.indexOf(key)<0)excluded.push(key);});
+    Object.keys(map || {}).forEach(function(key){
+      var entry=map[key];if(!entry || liveStatusContainer(key,entry,roots) || sourceEpics.indexOf(entry.epic)<0)return;
+      if(members.indexOf(key)<0)members.push(key);
+      if(omit.indexOf(key)<0 && included.indexOf(key)<0)included.push(key);
+    });
   });
-  function member(key){return map[key] && !liveStatusContainer(key,map[key],roots) && epics.indexOf(map[key].epic)>=0;}
-  var out={epics:epics,onDiagram:keys,
-    notOnDiagram:Object.keys(map || {}).filter(function(key){return keys.indexOf(key)<0 && member(key);}),
-    notInEpic:roots.length?keys.filter(function(key){return !member(key);}):[]};
+  var out={epics:epics,onDiagram:keys,notOnDiagram:included.filter(function(key){return keys.indexOf(key)<0;}),
+    notInEpic:roots.length?keys.filter(function(key){return members.indexOf(key)<0;}):[],excluded:excluded};
   if(initiatives.length)out.initiatives=initiatives;
   return out;
 }
@@ -367,8 +380,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function sources(){return [page].concat(Object.keys(remotePages).map(function(key){return remotePages[key];}));}
   // Dependency evidence is recomputed from the map and the authored pairs on every paint (#765).
-  var dependencies=Object.create(null),ticketWaiting=Object.create(null);
-  function refreshDependencies(){dependencies=liveStatusDependencies(sources(),map);ticketWaiting=liveStatusTicketWaiting(dependencies,map);}
+  var dependencies=Object.create(null),ticketWaiting=Object.create(null),dependencyKeys=[];
+  function refreshDependencies(){
+    var all=liveStatusDependencies(sources(),map),coverage=liveStatusCoverage(page,map,refs(),sources()),queue=coverage.onDiagram.concat(coverage.notOnDiagram),seen=[];
+    dependencies=Object.create(null);
+    // Keep only upstream evidence reachable from an included story, including
+    // transitive links. Every displayed upstream story joins the board totals.
+    for(var i=0;i<queue.length;i++){
+      var key=queue[i];if(seen.indexOf(key)>=0)continue;seen.push(key);
+      if(all[key]){dependencies[key]=all[key];all[key].forEach(function(dep){queue.push(dep.key);});}
+    }
+    dependencyKeys=seen.filter(function(key){return coverage.onDiagram.indexOf(key)<0 && coverage.notOnDiagram.indexOf(key)<0 && !liveStatusContainer(key,map[key],refs().epics);});
+    ticketWaiting=liveStatusTicketWaiting(dependencies,map);
+  }
   // refs() collects the whole page; refs(key) narrows to the carriers that hold that ticket (their tickets are just the key).
   function refs(key){
     var byKey=typeof key==='string',out={tickets:[],prs:[],epics:[]};
@@ -382,35 +406,46 @@ function createLiveStatus(ctl,page,options,renderOptions){
     collect(page);Object.keys(remotePages).forEach(function(key){collect(remotePages[key]);});return out;
   }
   function snapshot(){
+    refreshDependencies();
+    var coverage=liveStatusCoverage(page,map,refs(),sources()),storyKeys=coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys);
+    coverage.dependencies=dependencyKeys.slice();
     var counts={todo:0,active:0,done:0,blocked:0,missing:0},latest=null,stamp=-Infinity;
-    refs().tickets.forEach(function(key){var entry=map[key];if(!entry)return;counts[entry.state]++;
+    storyKeys.forEach(function(key){var entry=map[key];if(!entry)return;counts[entry.state]++;
       var at=Date.parse(entry.updatedAt);if(isFinite(at) && at>stamp){stamp=at;latest=entry.updatedAt;}
     });
-    refreshDependencies();
-    var pages=laneRecords(),coverage=liveStatusCoverage(page,map,refs()),readiness=liveStatusReadiness(page,map,ticketWaiting);
-    var epicKeys=coverage.onDiagram.filter(function(key){return coverage.notInEpic.indexOf(key)<0 && coverage.epics.indexOf(map[key] && map[key].epic)>=0;}).concat(coverage.notOnDiagram),initiatives=coverage.initiatives || [],scopeKeys=initiatives.concat(refs().epics.filter(function(key){return initiatives.indexOf(key)<0;}));
-    var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
-    // Only count epic stories when the map actually carries epic membership; "0 of 0" says nothing.
-    if(coverage.epics.length && epicKeys.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
-    var tickets=ticketRows(pages,coverage),outside=tickets.filter(function(row){return row.tag==='OUTSIDE EPIC';}).length;
+    var pages=laneRecords(),readiness=liveStatusReadiness(page,map,ticketWaiting);
+    var initiatives=coverage.initiatives || [],scopeKeys=initiatives.concat(refs().epics.filter(function(key){return initiatives.indexOf(key)<0;}));
+    var blocked=storyKeys.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).length;
+    // Board waiting describes visible story dependents. Keep direct upstream
+    // container evidence, but never present a hidden container as a waiting row.
+    var boardWaiting=Object.create(null);storyKeys.forEach(function(key){if(ticketWaiting[key])boardWaiting[key]=ticketWaiting[key];});
+    var waiting=Object.keys(boardWaiting).length;
+    var verdict=(readiness.ready?'Ready to demo · ':'')+blocked+' blockers · '+waiting+' waiting';
+    if(storyKeys.length)verdict+=' · '+coverage.onDiagram.length+' of '+storyKeys.length+' stories on diagram';
+    var tickets=ticketRows(pages,coverage),outside=coverage.notInEpic.length+dependencyKeys.filter(function(key){return refs().epics.length && coverage.epics.indexOf(map[key] && map[key].epic)<0;}).length;
+    var excluded=coverage.excluded.map(function(key){
+      var entry=map[key] || {},source=sources().filter(function(source){return trackingExclusions(source).indexOf(key)>=0;})[0] || page;
+      return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
+        included:storyKeys.indexOf(key)>=0,reason:coverage.onDiagram.indexOf(key)>=0?'Included by manual attachment':dependencyKeys.indexOf(key)>=0?'Included as dependency':storyKeys.indexOf(key)>=0?'Included by another source':'Excluded from story totals'};
+    });
     // Authored pairs the Jira links do not know yet: a hint for the author, never a write.
     var suggestions=[];sources().forEach(function(source){trackingDependencies(source).forEach(function(pair){
       var linked=(dependencies[pair.ticket] || []).some(function(dep){return dep.key===pair.on && dep.sources.indexOf('jira')>=0;});
-      if(!linked && !suggestions.some(function(item){return item.ticket===pair.ticket && item.on===pair.on;}))suggestions.push({ticket:pair.ticket,on:pair.on});
+      if(storyKeys.indexOf(pair.ticket)>=0 && !linked && !suggestions.some(function(item){return item.ticket===pair.ticket && item.on===pair.on;}))suggestions.push({ticket:pair.ticket,on:pair.on});
     });});
     var epicState=null;if(scopeKeys.length){var entry=map[scopeKeys[0]];epicState=entry && LIVE_STATUS_STATES.indexOf(entry.state)>=0?entry.state:
-      !epicKeys.length?null:epicKeys.some(function(key){return map[key].state==='blocked';})?'blocked':epicKeys.every(function(key){return map[key].state==='done';})?'done':epicKeys.some(function(key){return map[key].state!=='todo';})?'active':'todo';}
+      !storyKeys.length?null:storyKeys.some(function(key){return map[key] && map[key].state==='blocked';})?'blocked':storyKeys.every(function(key){return map[key] && map[key].state==='done';})?'done':storyKeys.some(function(key){return !map[key] || map[key].state!=='todo';})?'active':'todo';}
     var epic={keys:scopeKeys,url:scopeKeys.length?liveStatusTicketURL(page.tracking,scopeKeys[0],map[scopeKeys[0]]):null,
       title:scopeKeys.length && map[scopeKeys[0]] && map[scopeKeys[0]].title || '',state:epicState,
       initiatives:initiatives.slice(),epics:coverage.epics.slice(),
-      stories:epicKeys.length,done:epicKeys.filter(function(key){return map[key].state==='done';}).length,onDiagram:epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length,
-      blocked:initiatives.length?tickets.filter(function(ticket){return ticket.state==='blocked' || ticket.state==='missing';}).length:readiness.blockers,waiting:Object.keys(ticketWaiting).length,outside:outside,ready:readiness.ready};
+      stories:storyKeys.length,done:storyKeys.filter(function(key){return map[key] && map[key].state==='done';}).length,onDiagram:storyKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length,
+      blocked:blocked,waiting:waiting,outside:outside,ready:readiness.ready};
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
-      available:!!(refs().tickets.length || refs().epics.length),hasData:!!(provider || applied),
+      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length),hasData:!!(provider || applied),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
-      lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,
-      dependencies:copy(dependencies),waiting:copy(ticketWaiting),chains:liveStatusDependencyChains(ticketWaiting),suggestions:suggestions,epic:epic,
-      coverage:coverage,readiness:readiness,activity:copy(activity).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
+      lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,excluded:excluded,
+      dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
+      coverage:coverage,readiness:readiness,activity:copy(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;})).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
@@ -682,8 +717,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });});return lanes;
   }
   function panelBlockers(pages){
-    var coverage=liveStatusCoverage(page,map,refs());
-    return coverage.onDiagram.concat(coverage.notOnDiagram).filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).map(function(key){
+    var coverage=liveStatusCoverage(page,map,refs(),sources());
+    return coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys).filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).map(function(key){
       var entry=map[key],labels=[],carriers=0,steps=0;
       pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
         var label=laneLabel(id,record.page);if(record.lanes[id].keys.indexOf(key)>=0 && labels.indexOf(label)<0)labels.push(label);
@@ -709,8 +744,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
       });
     });});
-    // Linked upstreams that are neither carriers nor epic children join the table as OUTSIDE EPIC rows.
-    var linked=[];Object.keys(dependencies).forEach(function(ticket){dependencies[ticket].forEach(function(dep){if(coverage.onDiagram.indexOf(dep.key)<0 && coverage.notOnDiagram.indexOf(dep.key)<0 && linked.indexOf(dep.key)<0)linked.push(dep.key);});});
+    // Use the same extra upstream stories as the summary counts.
+    var linked=dependencyKeys;
     return coverage.onDiagram.concat(coverage.notOnDiagram,linked).filter(function(key,index,all){return all.indexOf(key)===index && !liveStatusContainer(key,map[key],refs().epics);}).sort(function(a,b){
       var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');return diff || (a<b?-1:a>b?1:0);
     }).map(function(key){
@@ -733,7 +768,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
           return {id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || '',
             disabled:!on || (!mounted && (!route || (route.frames.length && (!ctl.details || !ctl.details.restore)))),
             title:!mounted?'Detail page: '+(carrier.section.heading || carrier.reference):''};
-        }),tag:linked.indexOf(key)>=0?'OUTSIDE EPIC':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?(coverage.initiatives?'NOT IN SCOPE':'NOT IN EPIC'):''};
+        }),tag:linked.indexOf(key)>=0?'DEPENDENCY ONLY':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?(coverage.initiatives?'NOT IN SCOPE':'NOT IN EPIC'):''};
     });
   }
   function paintBinding(binding){
@@ -875,7 +910,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var stamp=Date.parse(next[key] && next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
         activity.unshift({key:key,old:oldState,state:newState,at:at});
       });
-      if(applied)liveStatusCoverage(page,next,refs()).notOnDiagram.forEach(function(key){
+      if(applied)liveStatusCoverage(page,next,refs(),sources()).notOnDiagram.forEach(function(key){
         if(seenKeys[key])return;
         var stamp=Date.parse(next[key].updatedAt),at=isFinite(stamp)?new Date(stamp).toISOString():cacheUpdatedAt;
         activity.unshift({key:key,added:true,at:at});

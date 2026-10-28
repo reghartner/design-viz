@@ -94,6 +94,9 @@ After the packet, route source/handoff details:
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
 - Jira: `live-status-board`; desktop **Parent** saves Epic/Initiative keys in
   `tracking.jira.epic`. Jira detects type; never guess or add an initiative field.
+  Desktop **Exclude story** saves `tracking.jira.exclude`; totals subtract those
+  parent stories, then add manual tickets and displayed upstream dependencies,
+  deduplicated. See `live-status-board` for precedence and the audit list.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

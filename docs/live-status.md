@@ -50,6 +50,37 @@ ordinary work items, including Tasks and Bugs. Containers never count as stories
 This is a bounded two-level hierarchy, not arbitrary project-tree traversal.
 Assigning a story to a node or edge remains an authoring step.
 
+`tracking.jira.exclude` is an optional array of Jira story keys, for example
+`"exclude": ["DOOR-108", "DOOR-109"]`. `trackingExclusions(page)` returns valid
+keys once in authored order. Invalid entries warn and are ignored; a non-array
+value warns once and is ignored. The source stays intact through normalization
+and export. This list removes inherited parent membership only.
+
+The board's counted stories are the distinct union of:
+
+1. Parent-sourced stories, minus that source page's exclusions.
+2. Tickets manually attached to nodes or edges, including tickets outside the
+   configured parents and tickets without parent metadata.
+3. Dependency stories displayed because they are upstream of an included story,
+   including transitive upstream evidence and dependencies outside the initiative.
+
+Manual attachments and needed dependencies add an excluded story back. All
+three contributions deduplicate by Jira key; Epic and Initiative containers
+never count. A missing-status ticket still counts in the denominator and shows
+**No status**; it is never done. Done counts only entries with `state: "done"`.
+The same set drives story progress, state counts, blockers, waiting, outside-scope
+counts and the on-diagram fraction. Dependency rows count even when they have no
+diagram carrier. The carriers-done ring, carrier paint and diagram readiness keep
+their existing carrier-based meaning. Waiting counts and chains include only
+displayed story dependents; hidden containers and unrelated/excluded-only
+dependents cannot add a phantom wait. A displayed story still retains its
+direct upstream container evidence when such a link exists.
+
+Loaded approved detail pages apply their own parent exclusions before their
+stories join the board. One page cannot exclude another page's intentional
+inclusion. Dependency traversal starts from the included parent/manual stories;
+a chain belonging only to excluded stories does not reintroduce itself.
+
 `tracking.github` bounds pull-request discovery through the viewer's GitHub
 connector (see "Pull requests from GitHub"): `{"repos": ["acme/firmware"]}` or
 `{"org": "acme"}`. `repos` is an array of `owner/repo` names; `org` is one
@@ -91,11 +122,14 @@ are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 and Export project keeps the references in its JSON.
 
 With no node selected, open **Inspect → Document settings → Tracking** to edit
-**Jira site**, **Parent** and **GitHub scope**. Enter an Epic or Initiative key in Parent and press Enter; use
-**Remove parent 1**, **Remove parent 2**, and so on to remove keys. In **GitHub scope**,
+**Jira site**, **Parent**, **Exclude story** and **GitHub scope**. Enter an Epic or Initiative key in Parent and press Enter; use
+**Remove parent 1**, **Remove parent 2**, and so on to remove keys. Enter a story
+key in **Exclude story** and press Enter; **Remove excluded story 1** removes it
+from the exclusion list. Duplicates and invalid entries create no history. In **GitHub scope**,
 enter `owner/repo` names separated by commas, or `org:name`, and press Enter;
 an empty value removes `tracking.github`. Each change has one Undo/Redo, and
-Export project preserves the parent and scope references in the existing `tracking.jira.epic` field. These authoring
+Export project preserves parent keys in `tracking.jira.epic`, exclusions in
+`tracking.jira.exclude`, and the GitHub scope in `tracking.github`. These authoring
 controls are desktop-only.
 
 When the document has tickets, **Demo live status** beside **Preview** supplies
@@ -199,15 +233,19 @@ The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
 left. The epic is shown large inside the panel only, never in the title bar;
-on a page without a parent the box keeps the ring and the blocked/waiting counts.
+on a page without a parent the box keeps story progress, the ring and the blocked/waiting counts.
 For an Initiative it identifies the initiative, gives a separate distinct Epic
-count, and counts only descendant stories for completion and diagram coverage.
+count, and counts the effective story set described above for completion and diagram coverage.
 Every story shows its parent Epic under the key. Empty initiatives still show
 the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
-There is no verdict line. Then come the Tickets table, **Blockers and dependency
-chains**, and Activity. Teams are identified by each Tickets row's lane colour
+There is no verdict line. Then come the Tickets table, **Excluded stories**
+when configured, **Blockers and dependency chains**, and Activity. The exclusions
+list links each configured story to Jira and shows its available title and state,
+plus whether it remains excluded or was included by a manual attachment, another
+source, or a dependency. It is visible before a connector responds too. Edit the
+list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket references or epics it says “This page has no ticket references.”
@@ -223,8 +261,8 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
 ### Tickets table
 
-The Tickets table lists each distinct carrier ticket, every returned child of a
-linked epic, and every linked upstream ticket from another epic. Rows sort by
+The Tickets table lists every story in the effective counted set: inherited
+children after exclusions, manual tickets, and needed upstream dependency stories. Rows sort by
 blocked, missing, active, todo, done, then key. Columns show Key, Title, State,
 Owner (the assignee name, linked to their Confluence people page when the
 account is known), **Depends on** and PRs. Under each ticket a second
@@ -271,7 +309,7 @@ no authored route is available, the button is disabled with a title naming the
 detail page. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
 a configured epic say **NOT IN EPIC**. Linked upstreams that are neither carriers
-nor epic children say **OUTSIDE EPIC**. The epic box gives “m of N on diagram”. A child first received after the initial map adds
+nor included parent children say **DEPENDENCY ONLY** and still count in story totals. The epic box gives “m of N on diagram”. A child first received after the initial map adds
 “KEY · added to epic · not on diagram” to Activity using the existing time rules.
 The table scrolls for narrow read-only viewing and print retains the panel content.
 
@@ -334,9 +372,11 @@ function). Change callbacks receive `{states, counts, updatedAt}` after apply,
 clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
 Tickets rows (each with `dependsOn`, `waiting` tone and `epicLabel`), `dependencies`
-(merged by provenance), `waiting` (per ticket: tone and direct upstreams), `chains`,
+(merged by provenance), `waiting` (per displayed story: tone and direct upstreams), `chains`,
 `suggestions`, `epic` (keys, title, state, stories, done, onDiagram, blocked, waiting,
-outside, ready), coverage, activity, demo state, verdict and `connection` for subscribed
+outside, ready), `excluded` audit rows (key, URL, title, state, included, reason),
+coverage (including excluded keys and additional displayed dependency keys),
+activity, demo state, verdict and `connection` for subscribed
 panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
 `none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`.
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,

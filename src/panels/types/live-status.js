@@ -79,6 +79,8 @@
         });
         el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
       }
+      // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
+      if(doc.getElementById('dv-agent-guide'))el(host,'p','agent-guide','dv-live-agent-guide',"Editors: ask your agent to read this page's agent guide (id dv-agent-guide)");
       sweep(host);
       if(focused && host.contains(focused) && doc.activeElement!==focused && focused.focus)focused.focus({preventScroll:true});
     }
@@ -143,6 +145,7 @@
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
 .dv-live-empty{color:var(--dfaint)}
+.dv-live-agent-guide{margin:12px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
 @media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}

@@ -39,6 +39,9 @@ View and step, and keep step controls working in comment mode; see
 the page falls back to claude.ai's default comment placement.
 
 To update an existing artifact, read it first and republish to its same URL.
+The built page carries an agent guide block (`id="dv-agent-guide"`, written by
+`tools/inject.py`) with that loop and the declaration to pass; see
+`docs/live-status.md` ("Embedded agent guide").
 Comments stay with the artifact URL; publishing a new artifact starts with
 none. Older comments keep their saved location and label. claude.ai saves
 comment locations as position paths, so a rebuild that changes page structure

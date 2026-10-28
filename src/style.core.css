@@ -4024,11 +4024,11 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 /* Live evidence uses one palette in every skin. It wins over authored tone,
    protocol and step paint only for carriers present in the runtime map. */
 /* Live state colours are the Node Styles preset lines (#610): todo slate,
-   active ember, done moss, blocked and missing rose; dark values follow the
+   active amber, done moss, blocked and missing rose; dark values follow the
    presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
    (stepCircleInk: black or white, whichever contrasts more) for every fill. */
-:root{--dv-live-todo:#6E89A5;--dv-live-active:#CB6620;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
-.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#E28247;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
+:root{--dv-live-todo:#6E89A5;--dv-live-active:#AC7D00;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#C99414;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
 .dv-live-todo{--dv-live-color:var(--dv-live-todo);}
 .dv-live-active{--dv-live-color:var(--dv-live-active);}
 .dv-live-done{--dv-live-color:var(--dv-live-done);}

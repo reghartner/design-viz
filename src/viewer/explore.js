@@ -614,7 +614,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         // Readable notes can be taller than other cards; leaving their lower
         // space unused can consume the playback lane on desktop. Only reuse a
         // column that already has enough width, preserving its neighbors.
-        var priorFree=null,priorColumn=columns.find(function(column){priorFree=lockedFree(Math.max(12,column.right-r.w),column.right,column.y,r.h,columnBottom(column.right-column.width,column.right));return r.w<=column.width && priorFree!==null;});
+        // Same fit test as before locks existed; lockedFree only moves y past a locked rectangle.
+        var priorFree=null,priorColumn=columns.find(function(column){var bottom=columnBottom(column.right-column.width,column.right);priorFree=lockedFree(Math.max(12,column.right-r.w),column.right,column.y,r.h,bottom);return r.w<=column.width && priorFree!==null && priorFree+r.h<=bottom;});
         if(priorColumn){r.x=Math.max(12,priorColumn.right-r.w);r.y=priorFree;stackRects.set(w,r);priorColumn.y=priorFree+r.h+gap;stackLeft=Math.min(stackLeft,r.x);return;}
         // Authored panels retain their full size. An oversized panel owns a
         // top-aligned column (and may overflow below); the next panel wraps left.
@@ -1107,7 +1108,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         var placements=canvasLocked.filter(function(p){return windows.some(function(w){return !w.prose && w.panel.id===p.panel && canvasWindow(w);});}).map(function(p){return {panel:p.panel,placement:'canvas'};});
         if(placements.length)defaults.panelPlacements=placements;
       }
-      if(JSON.stringify(sectionExploreLayout(d,defaults))===current){status.textContent='Every panel is position-locked; Optimize layout changed nothing.';return;}
+      if(JSON.stringify(sectionExploreLayout(d,defaults))===current){status.textContent=floating.length || canvasLocked.length?'Every panel is position-locked; Optimize layout changed nothing.':'The arrangement is already automatic; Optimize layout changed nothing.';return;}
       var token=beginEdit(true);if(token===false)return;
       var previousMemory=memories[id];leave();delete memories[id];
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;

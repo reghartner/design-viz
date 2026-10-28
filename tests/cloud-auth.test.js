@@ -25,3 +25,7 @@ test('mock authentication accepts only same loopback API and never production or
  assert.throws(()=>setup({url:'http://127.0.0.1:8787',config:{mock:true,api:'http://127.0.0.1:9000',clientId:'mock'}}),/loopback/);
  assert.doesNotThrow(()=>setup({url:'http://127.0.0.1:8787',config:{mock:true,api:'/api',clientId:'mock'}}));
 });
+test('sign-out clears in-memory auth even if storage cleanup fails and supports preserving the current page',async()=>{
+ const f=setup({stored:{'flowview-cloud-auth:public':JSON.stringify({access:'valid',expires:Date.now()+3600000})}});await f.auth.init();assert.equal(f.auth.access(),'valid');
+ f.ctx.sessionStorage.removeItem=()=>{throw Error('Storage unavailable');};const url=f.auth.signOut({redirect:false});assert.equal(f.auth.access(),null);assert.equal(f.navigation.length,0);assert.equal(new URL(url).pathname,'/logout');
+});

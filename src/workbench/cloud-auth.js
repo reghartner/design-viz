@@ -31,6 +31,6 @@ function createFlowviewCloudAuth(config){
       storage.setItem(key+':pkce',JSON.stringify({verifier:verifier,state:state,at:Date.now(),returnTo:location.pathname+location.search+location.hash}));
       var url=new URL(endpoint('/oauth2/authorize'));url.search=new URLSearchParams({client_id:config.clientId,response_type:'code',redirect_uri:redirect(),scope:'openid email '+config.scope,state:state,code_challenge:challenge,code_challenge_method:'S256'});location.assign(url.href);
     },
-    signOut:function(){token=null;storage.removeItem(key);storage.removeItem(key+':pkce');if(!config.mock){var url=new URL(endpoint('/logout'));url.search=new URLSearchParams({client_id:config.clientId,logout_uri:redirect()});location.assign(url.href);}}
+    signOut:function(options){token=null;try{storage.removeItem(key);}catch(error){}try{storage.removeItem(key+':pkce');}catch(error){}if(!config.mock){var url=new URL(endpoint('/logout'));url.search=new URLSearchParams({client_id:config.clientId,logout_uri:redirect()});if(!options || options.redirect!==false)location.assign(url.href);return url.href;}return null;}
   };
 }

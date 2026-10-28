@@ -5,6 +5,8 @@ export function awsAdapters({db,s3,commands:C,presign,table,bucket}){
   const pk=t=>'TEAM#'+t,projectKey=(t,p)=>({pk:pk(t),sk:'PROJECT#'+p}),opKey=(t,o)=>({pk:pk(t),sk:'OP#'+o});
   async function get(Key){return (await db.send(new C.GetCommand({TableName:table,Key,ConsistentRead:true}))).Item;}
   async function query(t,prefix){let items=[],cursor;do{const r=await db.send(new C.QueryCommand({TableName:table,KeyConditionExpression:'pk = :pk AND begins_with(sk, :sk)',ExpressionAttributeValues:{':pk':pk(t),':sk':prefix},ConsistentRead:true,ExclusiveStartKey:cursor}));items.push(...(r.Items || []));cursor=r.LastEvaluatedKey;}while(cursor);return items;}
+  // The Lambda role grants ListBucket on this one private bucket so missing
+  // keys return 404. A 403 remains an authorization failure, never absence.
   const missing=e=>e.name==='NoSuchKey' || e.name==='NotFound' || e.$metadata?.httpStatusCode===404;
   async function read(Key,max=32*1024*1024){
     try{

@@ -298,7 +298,8 @@
         "workbench/brand.css",
         "workbench/agent-conversation.css",
         "workbench/story-brief.css",
-        "workbench/onboarding.css"
+        "workbench/onboarding.css",
+        "workbench/cloud.css"
       ]
     },
     "iconLibrary": "icons/library.js",

@@ -23,3 +23,11 @@ test('infrastructure structurally scopes auth, private storage, immutable data a
  assert.ok(!yaml.includes('Action: s3:Delete'));assert.ok(!yaml.includes('dynamodb:*'));assert.ok(!handler.includes('mock:'));assert.ok(!handler.includes("'./memory.mjs'"));
  assert.ok(stage.includes('--no-library'));assert.ok(stage.includes('--no-catalog'));assert.ok(stage.includes('--no-config'));assert.ok(stage.includes('mock auth is forbidden'));assert.ok(!stage.includes('recursive:true});await cp(repo'));
 });
+test('missing S3 keys require bucket-list permission; arbitrary 403 never becomes an absent snapshot',async()=>{
+ const f=await setup();let canList=false;
+ f.set(async command=>{assert.equal(command.name,'HeadObjectCommand');const error=Error(canList?'Not found':'Access denied');error.name=canList?'NotFound':'Forbidden';error.$metadata={httpStatusCode:canList?404:403};throw error;});
+ await assert.rejects(f.objects.readImmutable('revisions/team/project/new-operation.json'),{$metadata:{httpStatusCode:403}});
+ canList=true;assert.equal(await f.objects.readImmutable('revisions/team/project/new-operation.json'),null);
+ const yaml=fs.readFileSync('deploy/aws/template.yaml','utf8');assert.match(yaml,/Action: s3:ListBucket\n\s+Resource: !GetAtt Snapshots\.Arn/);
+ assert.ok(!yaml.includes('s3:ListAllMyBuckets'));
+});

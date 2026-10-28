@@ -202,6 +202,12 @@ Resources:
             - Effect: Allow
               Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:PutItem, dynamodb:TransactWriteItems]
               Resource: !GetAtt Projects.Arn
+            # HeadObject can distinguish missing keys (404) from denied access
+            # only with ListBucket. This is Lambda-only on this private bucket;
+            # no list capability is signed or exposed to the browser.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt Snapshots.Arn
             - Effect: Allow
               Action: [s3:GetObject, s3:GetObjectVersion, s3:PutObject]
               Resource: [!Sub '${Snapshots.Arn}/staging/*', !Sub '${Snapshots.Arn}/revisions/*']

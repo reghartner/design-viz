@@ -15,7 +15,7 @@ From the repository root, with Node 22+ and Python 3:
 npm run mock --prefix deploy/aws
 ```
 
-Open http://127.0.0.1:8787/ on desktop Chromium. Open **Online projects** and sign
+Open http://127.0.0.1:8787/ on desktop Chromium. Open **Team library** and sign
 in as Alice. Save any new/pasted/local draft. Bob shares the pilot library;
 read-only teammate cannot write; outsider is rejected. State is in memory until
 the server stops. The mock binds only 127.0.0.1 and rejects other Host/Origin
@@ -50,6 +50,14 @@ The desktop cloud browser spec runs in the ordinary required browser suite too.
 
 ## Saving and local folders
 
+Open **Team library** in the desktop header. The dialog follows the editor's
+selected theme and keeps account actions, revision history and recovery
+contextual. Start or open a project first: Home cannot save the hidden practice
+source. **Save current project online** uses the current title as its initial
+name; existing project names remain fixed, with **Save a separate copy** for a
+new project. **Revision history** exposes restore, while the authenticated share
+link opens a reader.
+
 Save online attaches the current exact source, coverage ledger and frozen
 provider context to a cloud project. Subsequent accepted edits, JSON handwriting,
 agent approvals and Undo/Redo autosave that same artifact pair. Invalid JSON is a
@@ -63,7 +71,13 @@ candidate or pilot metadata is uploaded. Saving does not publish Canon or refres
 frozen providers.
 
 Cloud-specific unsynced recovery is scoped by internal team/user ID. Sign-out
-retires in-flight operations and clears the displayed document. Existing local
+always retires in-flight operations and clears the app's token. If recovery is
+available it also clears the displayed document before Cognito logout. If browser
+recovery fails, the draft stays in memory and a recovery-download action appears;
+the app avoids redirecting away and offers **Finish account sign-out** in another
+tab to end Cognito's hosted session. Download the exact current draft before
+reauthenticating when recovery is unavailable. The recovery JSON contains the
+source, ledger and frozen context, never local agent transcripts. Existing local
 browser recovery, including earlier drafts, remains local to the browser profile
 and can contain opened cloud source. Shared computers should use separate browser
 profiles. Browser storage failure blocks destructive project replacement and
@@ -142,8 +156,10 @@ starter indexes. Never upload the repository, company files, libraries or drafts
 
 S3 URLs are short-lived bearer capabilities; do not log or share them. Share the
 stable authenticated project link instead. IAM grants only table Get/Query/Put/
-transaction writes and snapshot-prefix Get/GetVersion/Put. No bucket listing,
-public writes, arbitrary object keys, delete permissions or cloud credentials are
+transaction writes and snapshot-prefix Get/GetVersion/Put. Bucket listing is granted only to Lambda on the private snapshots bucket so
+S3 HeadObject returns 404 for missing keys; the browser receives no listing
+capability. This follows the [S3 HeadObject permission contract](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html).
+Arbitrary 403 errors remain failures. No public writes, arbitrary object keys, delete permissions or cloud credentials are
 available to the browser. Admin membership updates are operational actions, not
 client API routes. Bucket/table retention policies protect stored projects on
 stack deletion. Operational deletion, retention quotas, audit logs, custom domains

@@ -593,8 +593,8 @@ body .docview .explore-player>.termbar:is([data-playback-position="above"],[data
 body .docview .explore-player>.termbar:is([data-playback-position="above"],[data-playback-position="beside"])>.stepline{width:auto;height:100%;min-height:0;max-height:100%;}
 body .docview .explore-player>.termbar[data-playback-position="beside"]>.step-transport{max-width:min(280px,30cqw);}
 
-/* Authored caption direction in the Standard grid reader. Unauthored bars keep
-   their original layout; these rules do not change document/editor placement. */
+/* Caption direction in the Standard grid reader. Auto path tracks retain their
+   original wrapping; simple steps use the grid for the default Below caption. */
 body .docview .termbar.standard-controls-layout{display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:auto auto;grid-template-areas:"transport tracks" "caption caption";gap:8px 12px;align-items:start;}
 body .docview .termbar.standard-controls-layout>.step-transport{grid-area:transport;}
 body .docview .termbar.standard-controls-layout>.schips{grid-area:tracks;min-width:0;width:auto;overflow:auto;}

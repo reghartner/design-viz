@@ -34,6 +34,23 @@ async function geometry(page,position,caption='below',explore=false){
   await expect.poll(()=>bar.locator('.schips').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(2);
  }
 }
+async function standardCaptionBelow(page){
+ await expect.poll(()=>page.locator('.termbar').first().evaluate(el=>{
+  const tracks=el.querySelector('.schips').getBoundingClientRect();
+  const caption=el.querySelector('.stepline:not(.dv-caption-old)').getBoundingClientRect();
+  return caption.top>=tracks.bottom-1 && caption.height>=10;
+ })).toBe(true);
+}
+test('Standard keeps below captions beneath numbered steps and path tracks',async({page,server},info)=>{
+ await page.setViewportSize({width:1600,height:1200});
+ for(const mode of ['simple','standard'])for(const position of ['auto','above','beside'])for(const explicit of [false,true]){
+  const spec=story(mode,position);
+  if(!explicit)delete spec.page.sections[0].diagram.layouts[0].exploreLayout.steps;
+  await open(page,server,spec);
+  await standardCaptionBelow(page);
+  if(mode==='simple' && position==='auto' && !explicit)await page.screenshot({path:info.outputPath('standard-auto-below.png')});
+ }
+});
 for(const mode of ['simple','standard','floating','canvas'])for(const position of ['above','beside'])test(`${mode}: play buttons ${position} steps`,async({page,server},info)=>{
  await page.setViewportSize({width:1600,height:1200});await open(page,server,story(mode,position,'below',mode==='canvas'));
  await geometry(page,position,'below',['floating','canvas'].includes(mode));
@@ -60,6 +77,26 @@ test('Inspect saves placement in both presentations with exact Undo/Redo and exp
   const after=await page.locator('#src').inputValue();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
   await open(page,server,JSON.parse(after));await geometry(page,'above','below',mode==='floating');
  }
+});
+test('Inspector moves a Standard caption from right to below immediately and preserves Undo/Redo',async({page,server})=>{
+ const spec=story('simple','auto','right');
+ await page.setViewportSize({width:1600,height:1200});
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
+ const bar=page.locator('#docview .termbar').first();
+ await expect.poll(()=>bar.evaluate(el=>{
+  const tracks=el.querySelector('.schips').getBoundingClientRect(),caption=el.querySelector('.stepline').getBoundingClientRect();
+  return caption.left>=tracks.right-1;
+ })).toBe(true);
+ await bar.locator('.schips').click({position:{x:2,y:2}});
+ if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
+ const position=page.getByRole('combobox',{name:'Caption position',exact:true});await expect(position).toHaveValue('right');
+ const before=await page.locator('#src').inputValue();
+ await position.selectOption('below');await standardCaptionBelow(page);
+ const after=await page.locator('#src').inputValue();
+ expect(JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout.steps).toBeUndefined();
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await standardCaptionBelow(page);
+ await open(page,server,JSON.parse(after));await standardCaptionBelow(page);
 });
 
 test('switching arrangements restores their own placement and Auto retains the existing path layout',async({page,server})=>{

@@ -115,14 +115,17 @@ The overlay uses these runtime states. The spec never stores status.
 | State | Paint |
 | --- | --- |
 | `todo` | Slate preset |
-| `active` | Amber preset (gold), slow pulse |
+| `active` | Azure (blue), slow pulse |
 | `done` | Moss preset |
 | `blocked` | Rose preset, pulse |
 | `missing` | Rose preset with a dotted outline, pulse; the popover, caption and Tickets table say missing |
 | waiting (any state) | Slate preset, dashed, while the direct upstream is unfinished; Rose preset, dashed, when it is blocked or missing |
 
-Live paint has no palette of its own: it uses the Node Styles presets
-(see `docs/node-styles.md`). A painted node wears `node-styled ns-<preset>`, so its
+Live paint uses the Node Styles presets (see `docs/node-styles.md`) plus an
+internal Azure palette for Active. Azure is not an authored Node Styles choice.
+Its light background/line/title/subtitle are `#E9F2FF` / `#2878DF` / `#163D72` /
+`#345B88`; its dark values are `#172E4C` / `#72B5FF` / `#E2EFFF` / `#A9C8EE`.
+A painted node wears `node-styled ns-<preset>`, so its
 card takes the preset's background, line and ink in the current skin, including
 the dark variants on Aurora, Terminal and Blueprint. Edge strokes, halos, the
 break glyph, step coins and chips, and the panel's count and state

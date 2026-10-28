@@ -77,9 +77,10 @@ function liveStatusClass(el,state){
     else if(el.classList.contains(name))el.classList.remove(name);
   });
 }
-/* Live node paint is a Node Styles preset (#610), not an overlay palette.
+/* Live node paint uses Node Styles rendering (#610), with an internal Azure
+   palette for Active.
    An authored preset is saved on first paint and restored when paint clears. */
-var LIVE_STATUS_PRESETS = {todo:'slate',active:'amber',done:'moss',blocked:'rose',missing:'rose'};
+var LIVE_STATUS_PRESETS = {todo:'slate',active:'azure',done:'moss',blocked:'rose',missing:'rose'};
 function liveStatusPreset(el,token){
   var saved=el._livePreset;
   if(!saved && !token)return;

@@ -3,7 +3,7 @@
 function initFlowviewCloud(options){
   var config=JSON.parse(document.getElementById('flowview-cloud-config').textContent);
   var auth=createFlowviewCloudAuth(config),apiBase=new URL(config.api,location.href);
-  var disposed=false,generation=0,user=null,latest={state:'detached'},projects=[];
+  var disposed=false,generation=0,user=null,latest={state:'detached'},projects=[],replacingCloud=false;
   var reader=new URLSearchParams(location.search).get('view')==='read';
   var memoryOnlyDraft=false,exportedRecovery=null,beforeUnload;
   if(!config.mock && apiBase.protocol!=='https:')throw Error('The cloud API must use HTTPS.');
@@ -45,6 +45,16 @@ function initFlowviewCloud(options){
   function el(id){return document.getElementById('cloud-'+id);}
   function message(text,tone){el('message').textContent=text || '';el('feedback').hidden=!text;el('feedback').dataset.tone=tone || 'notice';}
   function title(){try{var raw=JSON.parse(options.builder.cloud.snapshot().source);return String((raw.page || raw).title || 'Untitled project');}catch(error){return 'Unfinished draft';}}
+  function editorURL(value){
+    // Screens have their own history state. Only the cloud binding belongs here;
+    // preserve other query bytes, fragments, and authenticated read-only links.
+    if(disposed || reader || replacingCloud)return;
+    var id=value.project && value.project.projectId || null,url=new URL(location.href);
+    if(!id && value.state!=='detached' || url.searchParams.get('cloud')===id)return;
+    var fields=url.search.slice(1).split('&').filter(function(field){return field && !new URLSearchParams(field).has('cloud');});
+    if(id)fields.push('cloud='+encodeURIComponent(id));
+    history.replaceState(history.state,'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
+  }
   function refreshCurrent(){
     var p=session && session.attachment(),opened=options.builder.isProjectOpen(),writable=user && user.role==='editor' && !reader;
     el('author').hidden=!writable;el('readonly-note').hidden=writable;
@@ -80,10 +90,16 @@ function initFlowviewCloud(options){
   async function download(url){var response=await fetch(new URL(url,apiBase),{cache:'no-store'});if(!response.ok)throw Error('Could not read the online snapshot.');return response.json();}
   function recoveryKey(){return 'flowview-cloud-recovery:'+(user?user.teamId+':'+user.userId:'signed-out');}
   function recover(value){try{localStorage.setItem(recoveryKey(),JSON.stringify(value));}catch(error){throw Error('Browser recovery is full or unavailable. Export your current draft or free recovery storage before switching projects. Cloud saving can continue.');}}
-  var session=createCloudProjectSession({snapshot:options.builder.cloud.snapshot,archive:options.builder.cloud.archive,replace:options.builder.cloud.replace,
+  var session=createCloudProjectSession({snapshot:options.builder.cloud.snapshot,archive:options.builder.cloud.archive,replace:function(value){
+    // Installing a fetched/recovered envelope retires the builder's old project
+    // synchronously. Its temporary detach is not a switch to a local draft.
+    replacingCloud=true;try{return options.builder.cloud.replace(value);}finally{replacingCloud=false;}
+  },
     api:api,download:download,upload:async function(url,value){var response=await fetch(new URL(url,apiBase),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(value)});if(!response.ok)throw Error('Snapshot upload failed. Your draft is still here. Retry to save it online.');},
-    uuid:function(){return crypto.randomUUID();},recover:recover,clearRecovery:function(){localStorage.removeItem(recoveryKey());},status:report});
+    uuid:function(){return crypto.randomUUID();},recover:recover,clearRecovery:function(){localStorage.removeItem(recoveryKey());},status:function(value){editorURL(value);report(value);}});
   options.builder.cloud.connect(session);
+  function navigated(){editorURL({state:session.attachment()?'attached':'detached',project:session.attachment()});}
+  window.addEventListener('popstate',navigated);
   function panel(open){if(disposed)return;refreshCurrent();if(open && !dialog.open)dialog.showModal();else if(!open && dialog.open)dialog.close();el('toggle').setAttribute('aria-expanded',String(open));}
   el('toggle').onclick=function(){panel(!dialog.open);};el('close').onclick=function(){panel(false);};
   function closed(){el('toggle').setAttribute('aria-expanded','false');if(!disposed)el('toggle').focus();}
@@ -167,6 +183,6 @@ function initFlowviewCloud(options){
   beforeUnload=function(event){try{session.preserve();if(memoryOnlyDraft && !currentDraftExported())throw Error('Draft remains in memory.');}catch(error){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',beforeUnload);
   if(reader)readerHost();
   auth.init().then(async function(){if(disposed)return;if(auth.access())await signedIn();else panel(true);}).catch(function(error){message(error.message,'error');panel(true);});
-  function destroy(){if(disposed)return;disposed=true;generation++;window.removeEventListener('beforeunload',beforeUnload);dialog.removeEventListener('close',closed);session.destroy();dialog.close();dialog.remove();root.remove();var host=document.getElementById('cloud-reader');if(host)host.remove();document.body.classList.remove('cloud-reading');}
+  function destroy(){if(disposed)return;disposed=true;generation++;window.removeEventListener('beforeunload',beforeUnload);window.removeEventListener('popstate',navigated);dialog.removeEventListener('close',closed);session.destroy();dialog.close();dialog.remove();root.remove();var host=document.getElementById('cloud-reader');if(host)host.remove();document.body.classList.remove('cloud-reading');}
   options.builder.cloud.own(destroy);return {destroy:destroy};
 }

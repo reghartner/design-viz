@@ -286,11 +286,13 @@ test('D7 canvas paint: waiting tone on class, attribute and preset; popover name
  const details=pop.querySelectorAll('.dv-live-waiting-detail').map(el=>el.textContent);assert.deepEqual(details,['Waiting on HW-2 · blocked','Waiting on OUT-9 · active']);
  assert.deepEqual(pop.querySelectorAll('.dv-live-waiting-detail').map(el=>el.getAttribute('data-tone')),['red','grey']);
  assert.deepEqual(pop.querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['HW-2 holds FW-1','OUT-9 holds FW-1']);
- // A chain this carrier only holds up (FW-1 as the root of BE-1's wait) belongs to the downstream popover, not here.
- const holding=depMap();holding['BE-1'].dependsOn=[{key:'FW-1',source:'jira',linkType:'is blocked by'}];api.apply(holding);h.view.dispatchEvent({type:'click',target:node('fw').querySelector('.card'),button:0,preventDefault(){},stopPropagation(){}});
- assert.deepEqual(h.view.querySelector('.dv-live-popover').querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['HW-2 holds FW-1','OUT-9 holds FW-1'],'no "FW-1 holds BE-1" chain on the controller popover');
- h.view.dispatchEvent({type:'click',target:node('be').querySelector('.card'),button:0,preventDefault(){},stopPropagation(){}});
- assert.deepEqual(h.view.querySelector('.dv-live-popover').querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['HW-2 holds FW-1 holds BE-1 holds UX-1','OUT-9 holds FW-1 holds BE-1 holds UX-1']);api.apply(depMap());
+ // A chain this carrier only holds up belongs to the downstream popover: the push edge carries BE-1 (active, a root
+ // holding HW-1 and UX-1) and UX-1 (waiting on BE-1); its popover lists "BE-1 holds UX-1" and not "BE-1 holds HW-1".
+ const holding=depMap();holding['BE-1']={state:'active',epic:'EP-1'};holding['HW-1']={state:'todo',epic:'EP-1',dependsOn:[{key:'BE-1',source:'jira',linkType:'is blocked by'}]};api.apply(holding);
+ h.view.dispatchEvent({type:'click',target:h.view.querySelector('text.lbl[data-dv-edge="2"]'),button:0,preventDefault(){},stopPropagation(){}});
+ assert.deepEqual(h.view.querySelector('.dv-live-popover').querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['BE-1 holds UX-1'],'only the chain the edge waits in');
+ h.view.dispatchEvent({type:'click',target:node('hw').querySelector('.card'),button:0,preventDefault(){},stopPropagation:function(){}});
+ assert.deepEqual(h.view.querySelector('.dv-live-popover').querySelectorAll('.dv-live-waiting-chain').map(el=>el.textContent),['BE-1 holds HW-1']);api.apply(depMap());
  api.setEnabled(false);assert.equal(node('fw').getAttribute('data-dv-live-waiting-tone'),null);assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);api.setEnabled(true);assert.ok(node('fw').classList.contains('dv-live-waiting'));
  const cleared=depMap();cleared['HW-2'].state='done';cleared['OUT-9'].state='done';api.apply(cleared);assert.ok(!node('fw').classList.contains('dv-live-waiting'));assert.ok(node('fw').classList.contains('ns-slate'),'own todo paint returns');
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);api.destroy();

@@ -137,3 +137,18 @@ test('an Initiative board discovers stories over imported-only tracking and focu
   expect(await page.evaluate(()=>window.__initiativeImportWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
   await page.screenshot({path:info.outputPath('initiative-imported-tracking-board.png')});
 });
+
+test('import-overlay-only source exports live-status capability without page tracking metadata',async({page,server})=>{
+  await fixture(page,server,(provider,consumer)=>{
+    delete consumer.page.tracking;delete diagram(provider).nodes.api.tickets;
+    diagram(consumer).topologyImports[0].edgeTracking={'api->store':{tickets:['API-2'],prs:[pr]}};
+  });
+  await expect(page.getByLabel('Demo live status',{exact:true})).toBeVisible();
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))],saved=JSON.parse(json);
+  expect(saved.page.tracking).toBeUndefined();expect(saved.page.flowview.features).toContain('flow.live-status');
+  expect(diagram(saved).nodes).toEqual({});expect(diagram(saved).edges).toBeUndefined();expect(diagram(saved).topologyImports[0].edgeTracking).toEqual({'api->store':{tickets:['API-2'],prs:[pr]}});
+  await page.locator('#file-input').setInputFiles({name:'overlay-only.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});
+  await page.reload();await expect(page.locator('#src')).toHaveValue(json);await page.getByLabel('Demo live status',{exact:true}).check();
+  await expect(page.locator('#docview path.edge')).toHaveClass(/dv-live-todo/);await expect(page.locator('#docview .pt-live-status tr[data-live-ticket="API-2"]')).toHaveCount(1);
+});

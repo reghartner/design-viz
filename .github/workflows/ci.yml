@@ -196,6 +196,11 @@ jobs:
           node-version: '24.22.1'
       - name: Rebuild HTML before tests
         run: python3 tools/build.py
+      - name: Build and smoke-test AWS Lambda package locally (no AWS calls)
+        run: |
+          mkdir -p "$RUNNER_TEMP/flowview-aws-lambda"
+          make -C deploy/aws build-Service ARTIFACTS_DIR="$RUNNER_TEMP/flowview-aws-lambda"
+          node deploy/aws/check-package.mjs "$RUNNER_TEMP/flowview-aws-lambda"
       # *.test.js glob keeps local (any node >=20) and CI invocations identical;
       # a bare directory arg behaves differently across node majors.
       - name: Node tests with structured diagnostics

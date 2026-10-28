@@ -7,7 +7,7 @@
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
       '<div class="dv-live-panel-body"><div class="dv-live-epic"><div class="dv-live-completion">11/11 carriers done</div><div class="dv-live-epic-main"><span class="dv-live-epic-key">DOOR-100</span> <span class="dv-live-epic-title">Connected doorbell delivery</span> <span class="dv-live-state-pill dv-live-epic-state">done</span><div class="dv-live-epic-progress">8 of 8 stories done · 7 of 8 epic stories on diagram</div><div class="dv-live-epic-counts">Ready to demo</div></div></div>'+
       '<h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>Depends on</th><th>PRs</th></tr></thead><tbody>'+
-      sample.map(function(row){return '<tr><td>'+esc(row.key)+'</td><td>'+esc(row.title)+'</td><td>done</td><td>'+esc(row.owner)+'</td><td>'+(row.key==='FW-46'?'<span class="dv-live-dep dv-live-dep-done" data-tone="done"><span class="dv-live-dep-icon" data-icon="check"></span><span class="dv-live-dep-key">HW-124</span> <span class="dv-live-state-pill">done</span></span>':'')+'</td><td>1 merged</td></tr><tr class="dv-live-coverage-row"><td colspan="6"><div class="dv-live-coverage">'+(row.key==='UX-90'?'<span class="dv-live-coverage-tag">NOT ON DIAGRAM</span>':'<span class="reader-button dv-live-chip">On diagram</span>')+'</div></td></tr>';}).join('')+'</tbody></table></div><h3>Blockers and dependency chains</h3><p>None</p><h3>Activity</h3></div>';
+      sample.map(function(row){return '<tr class="dv-live-ticket-row'+(row.key==='UX-90'?' dv-live-ticket-with-tag':'')+'"><td class="dv-live-ticket-key">'+esc(row.key)+'</td><td class="dv-live-ticket-title">'+esc(row.title)+'</td><td>done</td><td class="dv-live-ticket-owner">'+esc(row.owner)+'</td><td class="dv-live-ticket-depends">'+(row.key==='FW-46'?'<span class="dv-live-dep dv-live-dep-done" data-tone="done"><span class="dv-live-dep-icon" data-icon="check"></span><span class="dv-live-dep-key">HW-124</span> <span class="dv-live-state-pill">done</span></span>':'')+'</td><td class="dv-live-ticket-prs">1 merged</td></tr>'+(row.key==='UX-90'?'<tr class="dv-live-coverage-row"><td colspan="6"><div class="dv-live-coverage"><span class="dv-live-coverage-tag">NOT ON DIAGRAM</span></div></td></tr>':'');}).join('')+'</tbody></table></div><h3>Blockers and dependency chains</h3><p>None</p><h3>Activity</h3></div>';
   }
   function mount(host){
     if(host._panelMotionCleanup)host._panelMotionCleanup();
@@ -99,20 +99,18 @@
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
         var tr=el(el(table,'thead','thead',''),'tr','tr','');['Key','Title','State','Owner','Depends on','PRs'].forEach(function(label){el(tr,'th',label,'',label).setAttribute('scope','col');});
-        var tbody=el(table,'tbody','tbody','');value.tickets.forEach(function(item,index){
-          var row=el(tbody,'tr',item.key,'dv-live-ticket-row');row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
-          // Retain row and control identities through state changes and sorting (two rows per ticket: data, then its coverage chips).
-          if(tbody.children[2*index]!==row)tbody.insertBefore(row,tbody.children[2*index] || null);
-          var keyCell=el(row,'td','key','dv-live-ticket-key');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','',item.title);
+        var tbody=el(table,'tbody','tbody','');value.tickets.forEach(function(item){
+          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':''));row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
+          // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
+          var keyCell=el(row,'td','key','dv-live-ticket-key');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
           var ownerCell=el(row,'td','owner','dv-live-ticket-owner');if(item.ownerUrl)link(ownerCell,'link',item.owner,item.ownerUrl);else el(ownerCell,'span','text','',item.owner);var depends=el(row,'td','depends','dv-live-ticket-depends');(item.dependsOn || []).forEach(function(dep){depButton(depends,dep.key,dep);});
           var prs=el(row,'td','prs','dv-live-ticket-prs'),links=item.prs && item.prs.links || [],covered=links.map(function(pr){return pr.url;});
           links.forEach(function(pr){prLink(prs,pr);});item.urls.forEach(function(url){if(covered.indexOf(url)<0)prLink(prs,url);});
           // Jira's Development count stays informational; it is shown only when it says more than the icons do.
           if(item.prs && item.prs.count>links.length){var summary=el(prs,'span','summary','dv-live-pr-summary',item.prs.count+' '+item.prs.state);summary.setAttribute('title','Jira Development field: '+item.prs.count+' '+item.prs.state+' pull request'+(item.prs.count===1?'':'s')+'. Jira does not expose the link.');}
-          var coverageRow=el(tbody,'tr',item.key+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',item.key);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
-          if(tbody.children[2*index+1]!==coverageRow)tbody.insertBefore(coverageRow,tbody.children[2*index+1] || null);
-          var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','6');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');item.carriers.forEach(function(carrier){var key=JSON.stringify([carrier.pageKey,carrier.reference,carrier.id]),control=button(coverage,key,'reader-button dv-live-chip',carrier.label,'focusCarrier');control._liveArgument=carrier;control.disabled=carrier.disabled;if(carrier.title)control.setAttribute('title',carrier.title);else control.removeAttribute('title');});if(item.tag)el(coverage,'span','tag','dv-live-coverage-tag',item.tag);
+          if(item.tag){var coverageRow=el(tbody,'tr',item.key+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',item.key);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
+            var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','6');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');el(coverage,'span','tag','dv-live-coverage-tag',item.tag);}
         });
         excludedStories(body,value.excluded || []);
         // A light hint only: the agent, not the page, writes to Jira.
@@ -183,19 +181,21 @@
 .dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
-.dv-live-tickets{width:100%;min-width:480px;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets{width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
+.dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-prs{white-space:nowrap;}
-.dv-live-tickets .dv-live-ticket-row td{border-bottom:0;padding-bottom:4px;}
+.dv-live-ticket-title,.dv-live-ticket-owner{overflow-wrap:anywhere;}
+.dv-live-ticket-owner .nbacklink{display:inline-block;box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;vertical-align:top;}
+.dv-live-tickets .dv-live-ticket-prs{white-space:normal;}
+.dv-live-tickets .dv-live-ticket-with-tag td{border-bottom:0;padding-bottom:4px;}
 .dv-live-coverage-cell{padding-top:0!important;}
 .dv-live-coverage{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:6px;}
-.dv-live-coverage .dv-live-chip{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border:1px solid var(--explore-border);border-radius:999px;font:500 11px/1.4 'IBM Plex Sans',sans-serif;white-space:nowrap;}
 .dv-live-coverage-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;white-space:nowrap;background:color-mix(in srgb,var(--dv-live-active) 18%,transparent);color:var(--dink);}
 .dv-live-pr-summary{color:var(--dfaint);margin-left:4px;}
 .dv-live-ticket-epic{font:10px/1.4 'IBM Plex Mono',monospace;color:var(--dfaint);letter-spacing:.04em;margin-top:2px;}
-.dv-live-ticket-depends{min-width:140px;}
+.dv-live-ticket-depends:has(.dv-live-dep){min-width:130px;}
 .dv-live-dep{display:inline-flex;align-items:center;gap:5px;max-width:100%;margin:0 4px 4px 0;padding:2px 7px 2px 5px;border:1px solid var(--dv-live-todo);border-radius:6px;background:transparent;color:var(--dtext);font:600 11px/1.4 'IBM Plex Mono',monospace;cursor:pointer;white-space:nowrap;}
 .dv-live-dep:hover{background:color-mix(in srgb,var(--dink) 6%,transparent);}
 .dv-live-dep:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}

@@ -276,10 +276,13 @@ The Tickets table lists every story in the effective counted set: inherited
 children after exclusions, manual tickets, and needed upstream dependency stories. Rows sort by
 blocked, missing, active, todo, done, then key. Columns show Key, Title, State,
 Owner (the assignee name, linked to their Confluence people page when the
-account is known), **Depends on** and PRs. Under each ticket a second
-row holds its coverage as a left-aligned row of chips. The key uses the configured
+account is known), **Depends on** and PRs. Tickets with an informational
+coverage tag have a companion row under the ticket. The key uses the configured
 Jira site, and a colored stripe marks its team lane when known. A row from another
 epic shows `epic KEY` under its key; there is no Epic column.
+Key, State and PRs stay compact; titles and owners use the remaining width and
+wrap when needed. An empty Depends on column can shrink, while dependency buttons
+keep enough room to read. Linked owner names wrap inside one bordered pill.
 
 **Depends on** holds one bounded button per upstream ticket: an icon, the upstream
 key and its state pill. The icon is the shared `hand` glyph while the upstream is
@@ -313,11 +316,7 @@ presets' dark values on pure Aurora, Terminal and Blueprint); its tooltip and ac
 No icon shows a time since the pull request was updated. Jira's Development
 summary adds a muted, informational “n open/merged/declined” count only when it
 counts more pull requests than the icons show (its tooltip says Jira does not
-expose the link). Coverage
-chips name the story's carriers, open their containing section or detail when
-needed, and focus the carrier itself through the existing detail navigation. If
-no authored route is available, the button is disabled with a title naming the
-detail page. Stories without
+expose the link). The panel does not show diagram-part links beside tickets. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
 a configured epic say **NOT IN EPIC**. Linked upstreams that are neither carriers
 nor included parent children say **DEPENDENCY ONLY** and still count in story totals. The epic box gives “m of N on diagram”. A child first received after the initial map adds

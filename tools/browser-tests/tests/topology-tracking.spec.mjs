@@ -78,10 +78,10 @@ test('desktop imported node and edge tracking edits, history, export and reload 
   await expect(root.locator('g.coin[data-dv-step="0"]')).toHaveClass(/dv-live-blocked/);
   await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(2);await expect(panel.locator('[data-live-count="todo"]')).toContainText('1');
   await expect(panel.locator('.dv-live-epic-counts')).toContainText('1 blocked');
-  const coverage=panel.locator('tr[data-live-coverage-for="API-2"]');await expect(coverage.getByRole('button')).toHaveText(['API','Persist']);
-  await coverage.getByRole('button',{name:'API',exact:true}).click();await expect(node(page).locator('.card')).toBeFocused();
+  await expect(panel.locator('tr[data-live-coverage-for="API-2"],.dv-live-chip')).toHaveCount(0);
+  const card=node(page).locator('.card');await card.focus();await expect(card).toBeFocused();
   await page.keyboard.press('Enter');await expect(root.locator('.dv-live-popover')).toContainText('API-2');await expect(root.locator('.dv-live-popover').getByRole('link',{name:pr,exact:true})).toHaveAttribute('href',pr);await page.keyboard.press('Escape');
-  await coverage.getByRole('button',{name:'Persist',exact:true}).click();await expect(root.locator('text.lbl[data-dv-edge="0"]')).toBeFocused();await page.keyboard.press('Enter');
+  const label=root.locator('text.lbl[data-dv-edge="0"]');await label.focus();await expect(label).toBeFocused();await page.keyboard.press('Enter');
   await expect(root.locator('.dv-live-popover').getByRole('link',{name:'API-2',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/API-2');await expect(root.locator('.dv-live-popover')).toContainText(pr);await page.keyboard.press('Escape');
   await node(page).locator('.nrefs-trigger').click();await expect(root.locator('.node-link-menu')).toContainText('CAN-1');await expect(root.locator('.node-link-menu')).toContainText(pr);await page.keyboard.press('Escape');
   await page.screenshot({path:info.outputPath('imported-tracking-live-board.png')});
@@ -131,9 +131,9 @@ test('an Initiative board discovers stories over imported-only tracking and focu
   await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(3);await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-ticket-epic')).toHaveText('epic EP-101');
   await expect(panel.locator('tr[data-live-coverage-for="ST-3"]')).toContainText('NOT ON DIAGRAM');await expect(panel.locator('tr[data-live-ticket="API-2"] .dv-live-dep[data-live-dep-for="ST-3"]')).toHaveAttribute('data-tone','red');
   await expect(node(page)).toHaveClass(/dv-live-active/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-todo/);await expect(root.locator('path.edge')).toHaveClass(/dv-live-waiting/);
-  const coverage=panel.locator('tr[data-live-coverage-for="API-2"]');await expect(coverage.getByRole('button')).toHaveText(['API','Persist']);
-  await coverage.getByRole('button',{name:'API',exact:true}).click();await expect(node(page).locator('.card')).toBeFocused();
-  await coverage.getByRole('button',{name:'Persist',exact:true}).click();await expect(root.locator('text.lbl[data-dv-edge="0"]')).toBeFocused();
+  await expect(panel.locator('tr[data-live-coverage-for="API-2"],.dv-live-chip')).toHaveCount(0);
+  const card=node(page).locator('.card');await card.focus();await expect(card).toBeFocused();
+  const label=root.locator('text.lbl[data-dv-edge="0"]');await label.focus();await expect(label).toBeFocused();
   expect(await page.evaluate(()=>window.__initiativeImportWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
   await page.screenshot({path:info.outputPath('initiative-imported-tracking-board.png')});
 });

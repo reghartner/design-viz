@@ -11,7 +11,7 @@
 | V8 | Live control: in the reader controls (where the theme menu / Contents controls live, `src/viewer/contents.js`), a `button.dv-live-toggle` with text "Live" + counts chip per state (hidden when zero), `aria-pressed` reflecting `enabled()`, a `time.dv-live-updated` ("updated <relative>" from the newest `updatedAt`; omitted when none), and a `span.dv-live-note` text slot set by `ctl.liveStatus.note(text, kind)` (`kind` ∈ `info|warn|error`) plus `ctl.liveStatus.action(label, fn)` to show one button (used by #738 for "Allow"). The control is hidden until the page has at least one ticket ref (`refs().tickets.length > 0`). |
 | V9 | Re-apply after every rebuild: listen on the section element for `dv:pathrender` and `dv:pathchange`, on the view for `diagram-tab-change`, `tab-view-change`, `diagram-view-change`, `navigation-mounted`, `detail-navigation`, and use one MutationObserver (childList, subtree) scoped to step-control containers for chip rebuilds; coalesce with requestAnimationFrame. The classes survive a path switch (new SVG) and a detail flow open. `ctl.destroy()` disconnects everything. |
 | V10 | Host hook: `renderPage(..., {liveStatus: {provider: function(refs, signal) → Promise<map>, refreshMs}})`. When present: call the provider after first paint, then every `max(refreshMs, 30000)` ms while `document.visibilityState === 'visible'` (pause when hidden, one catch-up call on return); an AbortController signal is passed and aborted on destroy; rejections set `note(message,'error')` and keep the last map. `mountNativeSpec` (src/native/mount.js) forwards `liveStatus` and src/native/mount.d.ts declares `liveStatus?: {provider: (refs: {tickets: string[]; prs: string[]}, signal: AbortSignal) => Promise<Record<string, LiveStatusEntry>>; refreshMs?: number}` with a `LiveStatusEntry` type. src/boot.flowview.js passes `window.flowviewLiveStatus` (if set before boot) as that option. |
-| V11 | No provider and no `apply` → no DOM/CSS difference versus today except the hidden Live control markup (keep it out of the DOM entirely when there are no ticket refs, so pages without tickets are byte-identical in structure). |
+| V11 | Without live evidence, tracked Step captions still show authored ticket references; no carrier paint is applied. Pages without ticket refs keep no Live control markup or derived ticket row. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const {entrypoint}=require('../tools/source-loader.cjs');
@@ -639,7 +639,7 @@ test('P5 cache timestamps take precedence, validate, and reset without changing 
 });
 
 /* Story panel contract matrix (desktop reader; authoring remains desktop-only):
- B1 lane totals/state/title: VM + browser; B2 caption: VM + browser;
+ B1 per-step ticket references/team context: VM + browser; B2 caption: VM + browser;
  B3 shipped playback pause/focus: browser; B4 First blocker: browser;
  B5 diff/activity/cap/timestamps/pulse: VM + browser; B6 stale boundary/paint: VM;
  B7 primary-path readiness/ring/blockers/Escape: VM + browser;
@@ -654,6 +654,55 @@ test('B1 lanes deduplicate involved node and edge tickets and roll up worst stat
  assert.deepEqual(lanes.HW,{total:4,done:3,state:'blocked',keys:['HW-124','HW-123','FW-45','FW-46']});
  assert.deepEqual(lanes.APP,{total:1,done:1,state:'done',keys:['UX-89']});
  assert.equal(lanes.BE.total,3);assert.deepEqual(plain(C.liveStatusLanes({},map)),{});
+});
+function stepTicketControls(h,rec=h.ctl.sections[0]){
+ let index=0,mode='step';rec.stepper={sourceIndex:()=>index,mode:()=>mode,path:()=> 'default'};
+ const bar=rec.sectionEl.appendChild(new Element('div',{class:'termbar'}));
+ const host=bar.appendChild(new Element('div',{class:'step-text'}));host.textContent='Authored prose';
+ const pill=bar.appendChild(new Element('span',{class:'lanepill'}));
+ function change(nextIndex=index,nextMode=mode,type='dv:stepchange'){index=nextIndex;mode=nextMode;rec.sectionEl.dispatchEvent({type});h.flush();}
+ change();return {host,pill,change};
+}
+test('B1 step tickets use only involved carriers, including failed-hop endpoints, deduplicated before evidence arrives',()=>{
+ const raw={page:{tracking:{jira:{site:'https://jira.test/'}},lanes:{TEAM:{label:'One team'}},sections:[{diagram:{
+  nodes:{a:{tickets:['AA-1','SH-1']},b:{tickets:['BB-1','SH-1']},c:{tickets:['CC-1']},text:{type:'text',text:'Note',tickets:['TT-1']}},
+  edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}],steps:[{id:'first',lane:'TEAM',nodes:['text'],failures:{'a->b':'dropped'},text:'Original first prose'},{id:'second',lane:'TEAM',nodes:['c'],text:'Original second prose'},{id:'none',text:'No tickets'}]
+ }}]}};
+ const before=JSON.stringify(raw),h=harness(raw),normalized=JSON.stringify(h.ctl.page),api=h.ctl.liveStatus,{host,pill,change}=stepTicketControls(h);
+ const keys=()=>host.querySelectorAll('.dv-live-step-tickets .nbacklink').map(el=>el.textContent);
+ assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.equal(host.querySelectorAll('.dv-live-caption').length,0);
+ assert.equal(pill.textContent,'One team');assert.equal(pill.getAttribute('tabindex'),null);
+ change(1,'step','dv:pathchange');assert.deepEqual(keys(),['CC-1']);change(0);assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);
+ const row=host.querySelector('.dv-live-step-tickets'),first=row.children[0];
+ assert.equal(first.getAttribute('href'),'https://jira.test/browse/EE-1');assert.equal(first.getAttribute('target'),'_blank');assert.equal(first.getAttribute('rel'),'noopener noreferrer');
+ api.apply({'EE-1':{state:'blocked',url:'https://runtime.test/ignored'},'CC-1':{state:'done'},'EP-99':{state:'todo',epic:'EP-1',lane:'TEAM'}});
+ assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.ok(row===host.querySelector('.dv-live-step-tickets'),'unchanged references preserve the row and keyboard focus');
+ assert.equal(host.querySelector('.dv-live-caption').textContent,'BLOCKED · EE-1');assert.equal(host.textContent,'Authored prose');
+ change(1,'step','dv:pathrender');assert.deepEqual(keys(),['CC-1']);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);
+ change(2);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);
+ change(0);api.setEnabled(false);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);
+ api.setEnabled(true);assert.equal(keys().length,4);change(0,'ambient');assert.equal(keys().length,0);
+ change(0,'step');api.destroy();assert.equal(keys().length,0);assert.equal(host.textContent,'Authored prose');assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(h.ctl.page),normalized);
+});
+test('B1 ticket URLs refresh safely and authored plain keys survive absent runtime URLs',()=>{
+ const h=harness({nodes:{a:{tickets:['AA-1','BB-1']}},rows:[['a']],steps:[{nodes:['a']}]});
+ const {host}=stepTicketControls(h),api=h.ctl.liveStatus;
+ assert.deepEqual(host.querySelectorAll('.nbacklink').map(el=>el.textContent),['AA-1','BB-1']);
+ api.apply({'AA-1':{state:'todo',url:'https://runtime.test/AA-1'},'BB-1':{state:'todo',url:'javascript:alert(1)'}});
+ assert.equal(host.querySelector('a').getAttribute('href'),'https://runtime.test/AA-1');assert.equal(host.querySelectorAll('a').length,1);
+ api.apply({'AA-1':{state:'active',url:'https://updated.test/AA-1'}});assert.equal(host.querySelector('a').getAttribute('href'),'https://updated.test/AA-1');
+ api.clear();assert.equal(host.querySelectorAll('a').length,0);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);
+ api.destroy();assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,0);
+ const pending=harness({nodes:{a:{tickets:['AA-1']}},rows:[['a']],steps:[{nodes:['a']}]});const controls=stepTicketControls(pending);
+ pending.ctl.liveStatus.destroy();assert.equal(controls.host.querySelectorAll('.dv-live-step-tickets').length,0,'teardown before any provider map');
+});
+test('B1 external detail step links use the detail page Jira site',async()=>{
+ const h=await externalStoryHarness(),api=h.ctl.liveStatus;
+ const {host}=stepTicketControls(h,h.childRec);
+ // The approved external page owns the site; the root has none.
+ api.apply({'DD-1':{state:'todo',url:'https://detail-runtime.test/DD-1'}});
+ assert.equal(host.querySelector('a').getAttribute('href'),'https://detail-jira.test/browse/DD-3');
+ assert.deepEqual(host.querySelectorAll('.nbacklink').map(el=>el.textContent),['DD-3','DD-1','DD-2']);api.destroy();
 });
 test('B2 caption distinguishes blocked missing active done todo and untracked steps',()=>{
  const {C}=harness();assert.equal(typeof C.liveStatusCaption,'function','B2 caption helper');
@@ -721,7 +770,7 @@ test('B5 change class selects the card pulse without targeting the positioned no
 });
 
 async function externalStoryHarness(rootLanes){
- const detail={page:{tracking:{staleDays:2},lanes:{TEAM:{label:'Detail team'}},sections:[{id:'detail',diagram:{
+ const detail={page:{tracking:{staleDays:2,jira:{site:'https://detail-jira.test/'}},lanes:{TEAM:{label:'Detail team'}},sections:[{id:'detail',diagram:{
   nodes:{child:{tickets:['DD-1']},end:{tickets:['DD-2']}},rows:[['child','end']],edges:[{from:'child',to:'end',tickets:['DD-3']}],steps:[{id:'detail-step',lane:'TEAM',edge:'child->end'}]
  }}]}};
  const root={page:{lanes:rootLanes,sections:[{id:'main',diagram:{nodes:{parent:{tickets:['RR-1'],detail:{spec:'remote-story'}}},rows:[['parent']],steps:[{id:'root-step',lane:'TEAM',nodes:['parent']}]}}]}};
@@ -732,19 +781,18 @@ async function externalStoryHarness(rootLanes){
  await renderOptions.loadDetail({spec:'remote-story'},new AbortController().signal);h.flush();
  return {...h,rootRec,childRec};
 }
-test('B1 external detail lanes render progress state and titles when the root has no lanes',async()=>{
+test('B1 external detail team pills retain their page context without lane-wide progress',async()=>{
  for(const lanes of [undefined,{TEAM:{label:'Root team'}}]){
   const h=await externalStoryHarness(lanes),api=h.ctl.liveStatus;
   mountStatus(h);api.apply({'RR-1':{state:'done'},'DD-1':{state:'blocked'},'DD-2':{state:'done'},'DD-3':{state:'active'}});
   const pill=h.childRec.sectionEl.querySelector('.lanepill');
-  assert.equal(pill.textContent,'Detail team · 1/3 done');assert.ok(pill.classList.contains('dv-live-blocked'));
-  assert.equal(pill.getAttribute('title'),'DD-3 · active\nDD-1 · blocked\nDD-2 · done');assert.equal(pill.getAttribute('tabindex'),'0');
+  assert.equal(pill.textContent,'Detail team');assert.doesNotMatch(pill.className,/dv-live-/);
+  assert.equal(pill.getAttribute('title'),null);assert.equal(pill.getAttribute('tabindex'),null);
   assert.ok(h.view.querySelector('.dv-live-panel-body'));
-  // #767: the panel shows no Teams section; lane evidence stays on the step pills, the Tickets stripes and the Blockers rows.
-  assert.equal(h.view.querySelectorAll('.dv-live-lane').length,0);assert.equal(h.view.querySelectorAll('.dv-live-panel-body h3').map(el=>el.textContent).indexOf('Teams'),-1);
+  assert.equal(h.view.querySelectorAll('.dv-live-lane').length,0);
   assert.equal(h.view.querySelector('.dv-live-blocker-lanes').textContent,'Detail team');
-  if(lanes){assert.equal(h.rootRec.sectionEl.querySelector('.lanepill').textContent,'Root team · 1/1 done');}
-  api.setEnabled(false);assert.equal(pill.textContent,'Detail team');assert.equal(pill.getAttribute('title'),null);api.destroy();
+  if(lanes)assert.equal(h.rootRec.sectionEl.querySelector('.lanepill').textContent,'Root team');
+  api.setEnabled(false);assert.equal(pill.textContent,'Detail team');api.destroy();
  }
 });
 test('B6 external detail staleDays applies to its nodes edges badges and popovers independently of root default',async()=>{

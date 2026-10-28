@@ -553,11 +553,25 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!el._livePulseEnd){el._livePulseEnd=function(ev){if(!ev.animationName || ev.animationName==='dvnodepulse'){el.classList.remove('dv-live-changed');}};el.addEventListener('animationend',el._livePulseEnd);}
   }
   function paintStory(binding){
-    var stepper=binding.stepper,d=binding.section.diagram;
-    binding.el.querySelectorAll('.dv-live-caption').forEach(function(el){el.remove();});
-    if(!on || !stepper || stepper.mode()!=='step')return;
-    var step=d.steps[stepper.sourceIndex()],text=step && liveStatusCaption(d,step,map,ticketWaiting),host=binding.el.querySelector('.termbar .step-text');
-    if(text && host)element('span','dv-live-caption',text,host);
+    var stepper=binding.stepper,d=binding.section.diagram,scope=binding.el;
+    scope.querySelectorAll('.dv-live-caption').forEach(function(el){el.remove();});
+    var step=on && stepper && stepper.mode()==='step' && (d.steps || [])[stepper.sourceIndex()];
+    var host=step && scope.querySelector('.termbar .step-text'),keys=step?liveStatusStepTickets(d,step):[];
+    var row=host && host.querySelector('.dv-live-step-tickets');
+    scope.querySelectorAll('.dv-live-step-tickets').forEach(function(el){if(el!==row || !keys.length)el.remove();});
+    if(!host)return;
+    if(keys.length){
+      var tickets=keys.map(function(key){return {key:key,url:liveStatusTicketURL(binding.page.tracking,key,map[key])};});
+      var signature=JSON.stringify(tickets);
+      // Keep keyboard focus on an unchanged link when fresh status arrives.
+      if(!row || row._liveStepTickets!==signature){
+        if(row)row.remove();
+        row=element('span','dv-live-step-tickets','',host);row.setAttribute('role','group');row.setAttribute('aria-label','Jira tickets for this step');
+        tickets.forEach(function(ticket){link(row,ticket.key,ticket.url);});row._liveStepTickets=signature;
+      }
+    }
+    var text=liveStatusCaption(d,step,map,ticketWaiting);
+    if(text)element('span','dv-live-caption',text,host);
   }
   function laneLabel(id,source){return ((source.lanes || {})[id] || {}).label || id;}
   function laneRecords(){
@@ -565,23 +579,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return {page:source,lanes:liveStatusLanes(source,map)};
     });
   }
-  function decorateLane(el,id,lanes,source){
-    var lane=lanes[id];if(!lane)return;
-    var enabled=on && applied && refs().tickets.length>0;
-    el.textContent=laneLabel(id,source)+(enabled?' · '+lane.done+'/'+lane.total+' done':'');
-    liveStatusClass(el,enabled?lane.state:null);
-    if(enabled){el.setAttribute('title',lane.keys.map(function(key){return key+' · '+(map[key]?map[key].state:'No status');}).join('\n'));el.setAttribute('tabindex','0');}
-    else {el.removeAttribute('title');el.removeAttribute('tabindex');}
-  }
   function paintLanes(){
-    if(!applied || !refs().tickets.length)return;
-    var pages=laneRecords();
+    // The current-step pill is team context. Lane-wide progress belongs to the
+    // status model, not a caption that describes only one authored step.
     bindings.forEach(function(binding){var stepper=binding.stepper;if(!stepper)return;
-      var lanes=pages.find(function(record){return record.page===binding.page;}).lanes;
       var step=(binding.section.diagram.steps || [])[stepper.sourceIndex()];
       binding.el.querySelectorAll('.lanepill').forEach(function(el){
-        if(!step || !step.lane){liveStatusClass(el,null);el.removeAttribute('title');el.removeAttribute('tabindex');return;}
-        decorateLane(el,step.lane,lanes,binding.page);
+        if(step && step.lane)el.textContent=laneLabel(step.lane,binding.page);
+        liveStatusClass(el,null);el.removeAttribute('title');el.removeAttribute('tabindex');
       });
     });
   }
@@ -759,7 +764,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       carrierPointer(el,target);
     });
-    paintStory(binding);
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && step?liveStatusStep(d,step,map):null);
@@ -800,7 +804,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
-      paintLanes();
+      bindings.forEach(paintStory);paintLanes();
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
       changedKeys=[];
     }finally{
@@ -887,8 +891,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
       if(pop)pop.remove();listeners=[];
+      view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
       if(applied){
-        clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-caption').forEach(function(el){el.remove();});
+        clearTargets();view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
         view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed');});
       }
@@ -897,7 +902,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   };
   liveStatusControllers.set(view,api);
   connectPanels();
-  syncBindings();events.forEach(function(type){view.addEventListener(type,schedule);});
+  paint();events.forEach(function(type){view.addEventListener(type,schedule);});
   if(provider){document.addEventListener('visibilitychange',visibility);firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;fetchMap();});});}
   if(options.demo && typeof options.demo.mount==='function')demoDestroy=options.demo.mount(api);
   return api;

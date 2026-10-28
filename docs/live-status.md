@@ -105,7 +105,7 @@ The overlay uses these runtime states. The spec never stores status.
 | State | Paint |
 | --- | --- |
 | `todo` | Slate preset |
-| `active` | Ember preset (orange), slow pulse |
+| `active` | Amber preset (gold), slow pulse |
 | `done` | Moss preset |
 | `blocked` | Rose preset, pulse |
 | `missing` | Rose preset with a dotted outline, pulse; the popover, caption and Tickets table say missing |

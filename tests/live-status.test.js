@@ -437,10 +437,10 @@ test('P1 P3 live nodes wear Node Styles presets and restore authored styles when
  const data=fixture();data.page.sections[0].diagram.nodes.a.style='teal';const h=harness(data),api=h.ctl.liveStatus;
  const a=h.view.querySelector('[data-dv-node="a"]');a.classList.add('node-styled','ns-teal');
  api.apply(fixed);const b=h.view.querySelector('[data-dv-node="b"]'),c=h.view.querySelector('[data-dv-node="c"]');
- assert.ok(a.classList.contains('ns-ember') && !a.classList.contains('ns-teal'));assert.ok(c.classList.contains('ns-rose') && c.classList.contains('node-styled'));
+ assert.ok(a.classList.contains('ns-amber') && !a.classList.contains('ns-teal'));assert.ok(c.classList.contains('ns-rose') && c.classList.contains('node-styled'));
  assert.ok(b.classList.contains('dv-live-waiting') && b.classList.contains('ns-rose'),'red waiting on a blocked upstream wears rose');
- api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
- api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-ember'));assert.ok(!c.classList.contains('ns-rose'));
+ api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-amber'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
+ api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-amber'));assert.ok(!c.classList.contains('ns-rose'));
 });
 test('P4 text on live fills follows the engine step-colour contrast rule in light and dark skins',()=>{
  const C={URL};vm.runInNewContext(entrypoint('native').source,C);const css=fs.readFileSync('src/style.core.css','utf8');

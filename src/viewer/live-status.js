@@ -580,7 +580,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       var labels={todo:'To do',active:'In progress',done:'Done',blocked:'Blocked',missing:'Missing'};
       tickets.forEach(function(ticket,index){
-        var state=map[ticket.key] && map[ticket.key].state,pill=row.children[index].querySelector('.dv-live-step-state');
+        var entry=map[ticket.key],item=row.children[index],state=entry && entry.state,pill=item.querySelector('.dv-live-step-state');
+        var title=entry && entry.title && entry.title.trim(),titleEl=item.querySelector('.dv-live-step-title');
+        if(title){
+          if(!titleEl){titleEl=element('span','dv-live-step-title','',item);item.insertBefore(titleEl,pill);}
+          titleEl.textContent=title;titleEl.setAttribute('title',title);
+        }else if(titleEl)titleEl.remove();
         pill.textContent=labels[state] || 'No status';liveStatusClass(pill,state || null);
       });
     }

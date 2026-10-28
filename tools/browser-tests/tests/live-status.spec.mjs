@@ -298,6 +298,7 @@ test('B1 step ticket links sit beneath prose before evidence and follow navigati
  const root=await open(page,server,spec,false),section=root.locator('#section-delivery'),bar=section.locator('.termbar'),row=bar.locator('.dv-live-step-tickets');
  const keys=['HW-124','FW-46','HW-123','FW-45'];
  await expect(row.locator('a')).toHaveText(keys);await expect(bar.locator('.dv-live-caption')).toHaveCount(0);
+ await expect(row.locator('.dv-live-step-title')).toHaveCount(0);
  await expect(bar.locator('.lanepill')).toBeHidden();await expect(row.locator('.dv-live-step-state')).toHaveText(['No status','No status','No status','No status']);await expect(bar.locator('.step-text strong')).toHaveText('doorbell');
  expect(await row.evaluate(el=>{
   const host=el.parentElement,range=document.createRange();range.setStart(host,0);range.setEndBefore(el);
@@ -312,11 +313,28 @@ test('B1 step ticket links sit beneath prose before evidence and follow navigati
   const popup=await popupPromise;await popup.waitForLoadState();expect(popup.url()).toBe(ticketURL);await popup.close();
  }
  await ticket.focus();await expect.poll(()=>page.evaluate(()=>typeof window.__resolveStepStatus)).toBe('function');
- await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'active'},'BE-67':{state:'done'},'DEL-99':{state:'todo',epic:'DEL-1',lane:'TEAM'}}));
- await expect(bar.locator('.dv-live-caption')).toContainText('IN PROGRESS');await expect(ticket).toBeFocused();await expect(row.locator('a')).toHaveText(keys);await expect(row.locator('.dv-live-step-state')).toHaveText(['In progress','No status','No status','No status']);
+ await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'active',title:'Repair <strong>doorbell</strong> & delivery'},'FW-46':{state:'todo',title:'  '},'BE-67':{state:'done'},'DEL-99':{state:'todo',epic:'DEL-1',lane:'TEAM'}}));
+ await expect(row.locator('.dv-live-step-title')).toHaveText(['Repair <strong>doorbell</strong> & delivery']);await expect(row.locator('.dv-live-step-title strong')).toHaveCount(0);
+ await expect(bar.locator('.dv-live-caption')).toContainText('IN PROGRESS');await expect(ticket).toBeFocused();await expect(row.locator('a')).toHaveText(keys);await expect(row.locator('.dv-live-step-state')).toHaveText(['In progress','To do','No status','No status']);
+ await row.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('step-ticket-title.png')});
  await page.clock.runFor(30001);await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'done'},'FW-46':{state:'todo'},'HW-123':{state:'blocked'},'FW-45':{state:'missing'}}));
  await expect(bar.locator('.dv-live-caption')).toContainText('BLOCKED');await expect(row).toHaveCount(1);await expect(ticket).toBeFocused();
  await expect(row.locator('.dv-live-step-state')).toHaveText(['Done','To do','Blocked','Missing']);
+ await expect(row.locator('.dv-live-step-title')).toHaveCount(0);
+ const longTitle='Restore delivery after the controller reconnects and preserve every queued event. '.repeat(12)+'UnbrokenReference'.repeat(18);
+ await ticket.evaluate(el=>{el.__titleAnchor=true;});
+ await page.clock.runFor(30001);await page.evaluate(title=>window.__resolveStepStatus({'HW-124':{state:'done',title},'FW-46':{state:'todo'},'HW-123':{state:'blocked'},'FW-45':{state:'missing'}}),longTitle);
+ await expect(row.locator('.dv-live-step-title')).toHaveText(longTitle);await expect(row.locator('.dv-live-step-title')).toHaveAttribute('title',longTitle);await expect(ticket).toBeFocused();expect(await ticket.evaluate(el=>el.__titleAnchor)).toBe(true);
+ expect(await row.locator('.dv-live-step-ticket').first().evaluate(el=>{
+  const title=el.querySelector('.dv-live-step-title'),key=el.querySelector('.nbacklink'),state=el.querySelector('.dv-live-step-state');
+  const bounds=el.closest('.stepline').getBoundingClientRect(),titleBox=title.getBoundingClientRect(),keyBox=key.getBoundingClientRect(),stateBox=state.getBoundingClientRect();
+  const style=getComputedStyle(title),range=document.createRange();range.selectNodeContents(title);
+  const lines=Array.from(range.getClientRects());
+  return {singleLine:lines.length>0 && lines.every(rect=>Math.abs(rect.top-lines[0].top)<1) && getComputedStyle(el).flexWrap==='nowrap',separate:keyBox.right<=titleBox.left && titleBox.right<=stateBox.left,withinCaption:keyBox.left>=bounds.left-1 && stateBox.right<=bounds.right+1,truncated:title.scrollWidth>title.clientWidth && style.whiteSpace==='nowrap' && style.overflow==='hidden' && style.textOverflow==='ellipsis'};
+ })).toEqual({singleLine:true,separate:true,withinCaption:true,truncated:true});
+ await row.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('step-ticket-long-title.png')});
+ await page.clock.runFor(30001);await page.evaluate(()=>window.__resolveStepStatus({'HW-124':{state:'done',title:'  '},'FW-46':{state:'todo'},'HW-123':{state:'blocked'},'FW-45':{state:'missing'}}));
+ await expect(row.locator('.dv-live-step-title')).toHaveCount(0);await expect(ticket).toBeFocused();expect(await ticket.evaluate(el=>el.__titleAnchor)).toBe(true);
  expect(await row.locator('.dv-live-step-ticket').evaluateAll(els=>els.every((el,index)=>!index || el.getBoundingClientRect().top>=els[index-1].getBoundingClientRect().bottom))).toBe(true);
  await row.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('step-ticket-links.png')});
  await section.locator('.schip[data-step-source="1"]').first().click();await expect(row.locator('a')).toHaveText(['BE-67','UX-89','BE-68']);

@@ -699,6 +699,21 @@ test('B1 lane suppression belongs only to diagrams with an authored live-status 
  board.change(0,'ambient');assert.ok(board.pill.classList.contains('dv-live-board-lane'));h.ctl.liveStatus.destroy();
  assert.ok(!board.pill.classList.contains('dv-live-board-lane'));assert.equal(ordinary.pill.textContent,'Authored team');
 });
+test('B1 step ticket titles arrive, update and disappear without replacing links or authored prose',()=>{
+ const h=harness({page:{tracking:{jira:{site:'https://jira.test/'}},sections:[{diagram:{nodes:{a:{tickets:['AA-1','BB-1']}},rows:[['a']],steps:[{nodes:['a']}]}}]}});
+ const {host}=stepTicketControls(h),api=h.ctl.liveStatus,row=host.querySelector('.dv-live-step-tickets'),anchor=row.querySelector('a');
+ const titles=()=>host.querySelectorAll('.dv-live-step-title').map(el=>el.textContent);
+ assert.deepEqual(titles(),[],'pending evidence has no placeholder titles');
+ api.apply({'AA-1':{state:'active',title:'  Repair <strong>doorbell</strong> & delivery  '},'BB-1':{state:'todo',title:' \t '}});
+ assert.deepEqual(titles(),['Repair <strong>doorbell</strong> & delivery']);assert.equal(row.querySelectorAll('strong').length,0);
+ const title=row.querySelector('.dv-live-step-title');assert.equal(title.getAttribute('title'),'Repair <strong>doorbell</strong> & delivery');assert.equal(row.children[0].children[1],title);assert.equal(row.children[0].children[2].textContent,'In progress');
+ api.apply({'AA-1':{state:'active',title:'Updated ticket name'},'BB-1':{state:'todo'}});
+ assert.deepEqual(titles(),['Updated ticket name']);assert.equal(title.getAttribute('title'),'Updated ticket name');assert.equal(row.querySelector('.dv-live-step-title'),title);assert.equal(row.querySelector('a'),anchor);
+ api.apply({'AA-1':{state:'active'},'BB-1':{state:'todo',title:'Second ticket name'}});
+ assert.deepEqual(titles(),['Second ticket name']);assert.equal(row.querySelector('a'),anchor);
+ api.clear();assert.deepEqual(titles(),[]);assert.equal(host.querySelector('.dv-live-step-tickets'),row);assert.equal(row.querySelector('a'),anchor);assert.equal(host.textContent,'Authored prose');
+ api.destroy();
+});
 test('B1 ticket URLs refresh safely and authored plain keys survive absent runtime URLs',()=>{
  const h=harness({nodes:{a:{tickets:['AA-1','BB-1']}},rows:[['a']],steps:[{nodes:['a']}]});
  const {host}=stepTicketControls(h),api=h.ctl.liveStatus;

@@ -26,7 +26,7 @@ test('L1 L2 picker sample and render shell are useful without DOM registration',
  const d=definition(),sample=C.panelPickerExample('live-status'),result=d.render({},panel,{},'pastel',[],0,false);
  assert.match(result.html,/dv-live-head/);assert.equal(typeof result.mounted,'function');
  const preview=d.render({},sample.panel,sample.state,'pastel',sample.states,0,false).html;
- assert.match(preview,/Ready to demo/);assert.match(preview,/7 of 8 epic stories on diagram/);assert.match(preview,/UX-90/);
+ assert.match(preview,/Ready to demo/);assert.match(preview,/7 of 8 epic stories on diagram/);assert.match(preview,/UX-90/);assert.match(preview,/dv-live-ticket-owner/);assert.match(preview,/NOT ON DIAGRAM/);assert.doesNotMatch(preview,/dv-live-chip|On diagram<\/span>/);
  const css=readStyles('style.core.css');for(const cls of ['dv-live-head','dv-live-tickets','dv-live-ring-done'])assert.ok(d.styles.includes('.'+cls));
  assert.match(d.styles,/--dtext/);assert.match(d.styles,/--dink/);assert.match(d.styles,/--dfaint/);assert.match(d.styles,/--explore-border/);assert.match(d.styles,/IBM Plex/);
  assert.match(d.styles,/prefers-reduced-motion/);assert.match(d.styles,/@media print/);assert.doesNotMatch(css,/\.dv-live-panel[,{]/);

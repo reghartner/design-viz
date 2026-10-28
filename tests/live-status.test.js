@@ -329,7 +329,7 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const table=body.querySelector('table.dv-live-tickets');assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
  const rows=table.querySelectorAll('tr[data-live-ticket]'),row=key=>rows.find(el=>el.getAttribute('data-live-ticket')===key),coverage=key=>table.querySelector('tr[data-live-coverage-for="'+key+'"]');
  assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['HW-2','GONE-1','HW-1','OUT-9','BE-1','FW-1','UX-1']);
- assert.equal(coverage('FW-1').querySelector('td').getAttribute('colspan'),'6');
+ assert.equal(coverage('FW-1'),null,'tickets without an informational tag have no companion row');
  const deps=row('FW-1').querySelectorAll('.dv-live-dep');assert.equal(deps.length,2);
  assert.equal(deps[0].tagName,'button');assert.equal(deps[0].getAttribute('data-live-dep-for'),'HW-2');assert.equal(deps[0].getAttribute('data-tone'),'red');assert.ok(deps[0].classList.contains('dv-live-dep-red'));
  assert.equal(deps[0].querySelector('.dv-live-dep-key').textContent,'HW-2');assert.equal(deps[0].querySelector('.dv-live-state-pill').textContent,'blocked');assert.equal(deps[0].querySelector('.dv-live-dep-icon').getAttribute('data-icon'),'alarm');assert.match(deps[0].querySelector('.dv-live-dep-icon').innerHTML,/<svg[^>]*data-icon="alarm"/);
@@ -345,7 +345,7 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  assert.equal(coverage('OUT-9').querySelector('.dv-live-coverage-tag').textContent,'DEPENDENCY ONLY');assert.equal(row('OUT-9').querySelector('.dv-live-ticket-epic').textContent,'epic OTHER-1');
  assert.equal(coverage('GONE-1').querySelector('.dv-live-coverage-tag').textContent,'DEPENDENCY ONLY');assert.ok(row('GONE-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(row('GONE-1').querySelector('.dv-live-state-pill').textContent,'No status');
  assert.ok(row('FW-1').querySelector('.dv-live-ticket-epic')===null);assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('Epic'),-1,'no Epic column');
- assert.equal(table.querySelectorAll('th').map(el=>el.textContent).indexOf('On diagram'),-1,'coverage stays a chip row');
+ assert.equal(table.querySelectorAll('.dv-live-chip').length,0,'diagram links are absent from the panel');
  const suggest=body.querySelector('.dv-live-suggest');assert.equal(suggest.textContent,'1 authored dependency (UX-1 → BE-1) has no Jira link. Suggest link in Jira');assert.equal(suggest.querySelectorAll('button,a').length,0,'a hint only; the page never writes to Jira');
  const chains=body.querySelectorAll('.dv-live-chain');assert.deepEqual(chains.map(el=>el.querySelectorAll('.dv-live-dep .dv-live-dep-key').map(k=>k.textContent)),[['GONE-1','BE-1','UX-1'],['HW-2','FW-1'],['OUT-9','FW-1']]);
  assert.deepEqual(chains[0].querySelectorAll('.dv-live-chain-holds').map(el=>el.textContent),['holds','holds']);
@@ -882,19 +882,21 @@ test('E4 demo includes extra keys and epic metadata while missing requested keys
  const C=storyContext(),map=plain(C.liveStatusDemoMap({issues:{'AA-1':{state:'done',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',lane:'APP'}}},['AA-1','MISS-1']));
  assert.deepEqual(map['EX-1'],{state:'active',epic:'EP-1',lane:'APP'});assert.equal(map['AA-1'].epic,'EP-1');assert.deepEqual(map['MISS-1'],{state:'missing'});
 });
-test('E6 Tickets table orders states includes columns authored PRs lane stripe and coverage focus',()=>{
+test('E6 Tickets table orders states and keeps PRs, lane stripes and informational tags',()=>{
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
  api.apply({'AA-1':{state:'done',epic:'EP-1',title:'Client work',assignee:'Alex',prs:{count:2,state:'declined'}},'BB-1':{state:'todo'},'CC-1':{state:'active',epic:'EP-1'},'DD-1':{state:'missing',epic:'EP-1'},'EE-1':{state:'blocked',epic:'EP-1'},'FF-1':{state:'blocked',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',title:'Extra',lane:'APP'},'NO-1':{state:'blocked',epic:'OTHER-1'}});
  assert.ok(h.view.querySelector('.dv-live-panel-body'));const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
  assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
  const all=table.querySelectorAll('tbody')[0].children,rows=all.filter(el=>el.getAttribute('data-live-ticket')),coverageOf=key=>all.find(el=>el.getAttribute('data-live-coverage-for')===key);assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['EE-1','FF-1','DD-1','CC-1','EX-1','BB-1','AA-1']);
- assert.equal(all.length,14);assert.equal(all[1].getAttribute('data-live-coverage-for'),'EE-1');
- const aa=rows.at(-1),extra=coverageOf('EX-1'),aaCoverage=coverageOf('AA-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex/);assert.doesNotMatch(textOf(aa),/time unavailable|ago/);assert.match(textOf(aa),/2 declined/);
+ assert.equal(all.length,9);assert.equal(all[1].getAttribute('data-live-ticket'),'FF-1');
+ const aa=rows.at(-1),extra=coverageOf('EX-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex/);assert.doesNotMatch(textOf(aa),/time unavailable|ago/);assert.match(textOf(aa),/2 declined/);
  assert.deepEqual(aa.querySelectorAll('a').map(el=>el.getAttribute('href')),['https://jira.test/browse/AA-1','https://code.test/pull/1','https://code.test/pull/2']);
  assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
- assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.deepEqual(aaCoverage.querySelectorAll('button').map(el=>el.textContent),['Client','Call']);assert.equal(aa.querySelectorAll('button').length,0,'no coverage buttons inside the data row');
- let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;aaCoverage.querySelector('button').dispatchEvent({type:'click'});assert.equal(focused,true);
- assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/6 of 7 on diagram/);assert.match(api.snapshot().verdict,/6 of 7 stories on diagram/);api.destroy();
+ assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.equal(coverageOf('AA-1'),undefined);assert.equal(table.querySelectorAll('.dv-live-chip').length,0);
+ let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;api.focusCarrier(api.snapshot().tickets.find(item=>item.key==='AA-1').carriers[0]);assert.equal(focused,true,'controller navigation remains available');
+ assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/6 of 7 on diagram/);assert.match(api.snapshot().verdict,/6 of 7 stories on diagram/);
+ const exRow=rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1'),exTag=extra;api.apply({'EX-1':{state:'blocked',epic:'EP-1'},'BB-1':{state:'done',epic:'EP-1'}});
+ const reordered=table.querySelector('tbody').children;assert.ok(reordered[0]===exRow,'tagged ticket reorders with its keyed row');assert.ok(reordered[1]===exTag,'tag stays directly after its ticket');assert.equal(table.querySelector('tr[data-live-coverage-for="BB-1"]'),null,'tag row disappears when membership is supplied');api.destroy();
 });
 test('E7 later unreferenced epic children log addition once with evidence time and cap',()=>{
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'done',epic:'EP-1'}});assert.ok(h.view.querySelector('.dv-live-panel-body'));
@@ -978,7 +980,7 @@ test('E3 rework synchronous watch delivery and late detail completion retire cle
  assert.equal(h.watches.length,7);assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.frames.size,0);
 });
 
-test('E6 rework coverage opens inactive local and loaded external detail carriers before focusing',async()=>{
+test('E6 controller navigation opens inactive local and loaded external detail carriers before focusing',async()=>{
  for(const external of [false,true]){
   const childSection={id:'child',detailOnly:!external,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
   const detail={page:{sections:[childSection]}},ref=external?{spec:'remote',section:'child'}:{section:'child'};
@@ -997,7 +999,7 @@ test('E6 rework coverage opens inactive local and loaded external detail carrier
   mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
   for(let i=0;i<2;i++){
    assert.ok(h.view.querySelector('.dv-live-panel-body'));
-   const button=h.view.querySelector('tr[data-live-coverage-for="CH-1"]').querySelector('button');assert.equal(button.textContent,'Child carrier');button.dispatchEvent({type:'click'});await settle();h.flush();
+   assert.equal(h.view.querySelector('tr[data-live-coverage-for="CH-1"]'),null);const carrier=api.snapshot().tickets.find(item=>item.key==='CH-1').carriers[0];assert.equal(carrier.label,'Child carrier');api.focusCarrier(carrier);await settle();h.flush();
    assert.equal(restores.length,i+1);assert.deepEqual(restores[i],{section:'root',frames:[{node:'parent',state:{mode:'ambient'}}]});
    assert.ok(childRec.sectionEl.contains(h.doc.activeElement),'focus is in the active detail, not its hidden original');assert.equal(h.doc.activeElement.getAttribute('data-live-carrier'),'child');
    saved=null;active=[];rootRec.sectionEl.hidden=false;childRec.sectionEl.remove();h.view.dispatchEvent({type:'detail-navigation'});h.flush();
@@ -1016,7 +1018,7 @@ test('E3 rework an initially untracked page defers discovery until a detail intr
 });
 
 /* L3 supersedes disposable previews: keep unlinked local/remote node and edge coverage. */
-test('E6 unlinked local and loaded remote sections disable coverage without creating previews',async()=>{
+test('E6 unlinked local and loaded remote carriers have no panel links or previews',async()=>{
  for(const external of [false,true])for(const detailOnly of [false,true]){
   if(!external && !detailOnly)continue;
   const section={id:'unlinked',detailOnly,heading:'Unlinked work',diagram:{nodes:{child:{title:'Unlinked child',tickets:['CH-1']},end:{}},rows:[['child','end']],edges:[{from:'child',to:'end',label:'Unlinked edge',tickets:['CH-2']}]}};
@@ -1026,16 +1028,16 @@ test('E6 unlinked local and loaded remote sections disable coverage without crea
   if(external)await renderOptions.loadDetail({spec:'approved',section:'entry'},new AbortController().signal);else h.ctl.sections[1].sectionEl.hidden=true;
   h.ctl.details={snapshot:()=>null,activeSections:()=>[],restore(){assert.fail('no authored route exists');}};
   const before=JSON.stringify([h.ctl.page,remote]);mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'},'CH-2':{state:'missing'}});
-  for(const key of ['CH-1','CH-2']){const button=h.view.querySelector('tr[data-live-coverage-for="'+key+'"]').querySelector('button');assert.equal(button.disabled,true);assert.match(button.getAttribute('title'),/Unlinked work/);button.dispatchEvent({type:'click'});}
+  for(const key of ['CH-1','CH-2']){assert.equal(h.view.querySelector('tr[data-live-coverage-for="'+key+'"]'),null);const carrier=api.snapshot().tickets.find(item=>item.key===key).carriers[0];assert.equal(carrier.disabled,true);assert.match(carrier.title,/Unlinked work/);api.focusCarrier(carrier);}
   assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);assert.equal(loads,external?1:0);assert.equal(JSON.stringify([h.ctl.page,remote]),before);api.destroy();assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
  }
 });
-test('E6 pending coverage navigation cannot steal a newer panel control focus',async()=>{
+test('E6 pending controller navigation cannot steal a newer panel control focus',async()=>{
  const childSection={id:'child',detailOnly:true,diagram:{nodes:{child:{title:'Child carrier',tickets:['CH-1']}},rows:[['child']]}};
  const h=harness({page:{sections:[{id:'root',diagram:{nodes:{parent:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['parent']]}},childSection]}}),api=h.ctl.liveStatus,child=h.ctl.sections[1];child.sectionEl.hidden=true;
  let finish;h.ctl.details={snapshot:()=>null,activeSections:()=>[],showSection(){},restore:()=>new Promise(resolve=>finish=resolve)};
  mountStatus(h);api.apply({'AA-1':{state:'done'},'CH-1':{state:'active'}});
- h.view.querySelector('tr[data-live-coverage-for="CH-1"]').querySelector('button').dispatchEvent({type:'click'});assert.equal(typeof finish,'function');
+ api.focusCarrier(api.snapshot().tickets.find(item=>item.key==='CH-1').carriers[0]);assert.equal(typeof finish,'function');
  const toggle=h.view.querySelector('.dv-live-toggle');h.doc.activeElement=toggle;child.sectionEl.hidden=false;finish();await settle();h.flush();
  assert.equal(h.doc.activeElement,toggle);assert.equal(h.view.querySelector('.dv-live-carrier-preview'),null);api.destroy();assert.equal(h.frames.size,0);
 });
@@ -1086,11 +1088,11 @@ test('L2 early panels connect once after controller construction and cleanup rem
  kept.remount();kept.remount();assert.equal(subscriptions,2);assert.equal(unsubscriptions,1);kept.body._panelMotionCleanup();assert.equal(unsubscriptions,2);
  const before=textOf(kept.body);api.note('Hidden section');assert.equal(textOf(kept.body),before);kept.remount();assert.equal(kept.body.querySelector('.dv-live-note').textContent,'Hidden section');api.destroy();assert.equal(unsubscriptions,3);
 });
-test('L4 keyed Tickets rows retain a focused coverage button through reorder and update links',()=>{
+test('L4 keyed Tickets rows retain a focused control through reorder and update links',()=>{
  const raw=epicFixture();delete raw.page.tracking.jira.site;const h=harness(raw),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'active'}});const {body}=mountStatus(h);
- const dataRow=body.querySelector('tr[data-live-ticket="AA-1"]'),row=body.querySelector('tr[data-live-coverage-for="AA-1"]'),button=row.querySelector('button');h.doc.activeElement=button;
+ const dataRow=body.querySelector('tr[data-live-ticket="AA-1"]'),control=dataRow.querySelector('.dv-live-pr-link');h.doc.activeElement=control;
  api.apply({'AA-1':{state:'blocked',epic:'EP-1',url:'https://jira.test/browse/AA-1'},'BB-1':{state:'done'}});
- const tbody=body.querySelector('tbody');assert.ok(tbody.children[0]===dataRow,'data row first after reorder');assert.ok(tbody.children[1]===row,'its coverage row follows');assert.ok(row.querySelector('button')===button);assert.ok(h.doc.activeElement===button);
+ const tbody=body.querySelector('tbody');assert.ok(tbody.children[0]===dataRow,'data row first after reorder');assert.equal(body.querySelector('tr[data-live-coverage-for="AA-1"]'),null);assert.ok(dataRow.querySelector('.dv-live-pr-link')===control);assert.ok(h.doc.activeElement===control);
  assert.equal(dataRow.querySelector('a').getAttribute('href'),'https://jira.test/browse/AA-1');api.destroy();
 });
 test('L3 First blocker header action uses the current path and hides when disabled',()=>{

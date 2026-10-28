@@ -162,7 +162,9 @@ test('provider-only tracking stamps editable project and Confluence exports with
   expect(saved.page.flowview.features).toContain('flow.live-status');expect(saved.page.tracking).toBeUndefined();
   expect(diagram(saved)).toEqual(diagram(JSON.parse(before)));expect(diagram(saved).topologyImports[0].nodeTracking).toBeUndefined();
   await expect(page.locator('#src')).toHaveValue(before);
-  const handoff=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#confluence-export').click();
+  // The packaged Confluence action is hidden in the standalone desktop menu;
+  // dispatch its registered browser command to cover that handoff boundary too.
+  const handoff=page.waitForEvent('download');await page.locator('#confluence-export').dispatchEvent('click');
   const confluence=JSON.parse(await readFile(await (await handoff).path(),'utf8'));
   expect((confluence.page || confluence).flowview.features).toContain('flow.live-status');
   expect(JSON.stringify(confluence)).not.toContain('"canon::api":');expect(JSON.stringify(confluence)).toContain('topologyImports');

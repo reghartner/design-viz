@@ -53,7 +53,7 @@ cannot detect type without Jira; explicit runtime/demo metadata is documented in
 
 Ask the author, in one batch, only what the source does not already state:
 
-- **Carriers.** Which Jira keys deliver each node and each edge. A node is a
+- **Carriers.** Which Jira keys or browse URLs deliver each node and each edge. A node is a
   thing a team builds; an edge is an integration between two of them. Edges
   often carry the cross-team ticket. Steps, coins and chips never carry
   tickets; they derive their state from the nodes and edges they involve.
@@ -82,10 +82,16 @@ Ask the author, in one batch, only what the source does not already state:
 
 Write the diagram as usual, then add, per node or edge, `"tickets": ["HW-123"]`
 and optionally `"prs": ["https://..."]`. Keys must match
-`^[A-Z][A-Z0-9_]+-[0-9]+$` exactly (case sensitive). Put
+`^[A-Z][A-Z0-9_]+-[0-9]+$` exactly (case sensitive). Carrier tickets also accept
+absolute HTTP(S) Jira browse URLs, for example
+`"tickets": ["https://acme.atlassian.net/browse/HW-123"]`; self-hosted context
+paths, query strings and fragments are supported. References deduplicate by
+key; authored links remain available without a page Jira site. Imported carriers
+use `topologyImports[].nodeTracking` / `edgeTracking` with the same grammar.
+Parent roots and dependency pairs remain key-only. Put
 `"tracking": {"jira": {"site": "https://<site>.atlassian.net"}, "github": {"repos": ["acme/firmware"]}, "staleDays": 7}`
 on `page` beside `title` (omit `github` when no repositories are known), and list `flow.live-status` under
-`page.flowview.features`. The spec stores keys only, never status.
+`page.flowview.features`. The spec stores ticket references only, never status.
 
 ### Always add the Live status panel
 

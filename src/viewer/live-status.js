@@ -10,9 +10,17 @@ function liveStatusRollup(states){
   if(states.every(function(state){return state==='todo';}))return 'todo';
   return 'active';
 }
-function liveStatusTicketURL(tracking,key,entry){
+function liveStatusTicketURL(tracking,key,entry,authoredURL){
   var site=deltaLinkUrl(tracking && tracking.jira && tracking.jira.site);
-  return site?site.replace(/\/$/,'')+'/browse/'+key:deltaLinkUrl(entry && entry.url);
+  var authored=trackingTicket(authoredURL);
+  return site?site.replace(/\/$/,'')+'/browse/'+key:deltaLinkUrl(entry && entry.url) || (authored && authored.key===key?authored.url:null);
+}
+function liveStatusPageTicketURL(page,key){
+  var url=null;
+  sectionRecords(page).some(function(record){
+    var d=record.section.diagram || {};
+    return Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).some(function(value){url=trackingTicketURL(value,key);return !!url;});
+  });return url;
 }
 function liveStatusOwnerURL(tracking,entry){
   // Confluence people page of the Jira assignee (#764): page site plus a non-blank accountId, encoded as one path
@@ -451,7 +459,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     found.tickets.forEach(function(key){
       var entry=map[key],row=element('div','dv-live-ticket',null,pop);
-      link(row,key,liveStatusTicketURL(tracking,key,entry));
+      link(row,key,liveStatusTicketURL(tracking,key,entry,trackingTicketURL(value,key)));
       element('span','dv-live-ticket-state',entry?entry.state:'No status',row);
       if(entry){
         if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
@@ -561,7 +569,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     scope.querySelectorAll('.dv-live-step-tickets').forEach(function(el){if(el!==row || !keys.length)el.remove();});
     if(!host)return;
     if(keys.length){
-      var tickets=keys.map(function(key){return {key:key,url:liveStatusTicketURL(binding.page.tracking,key,map[key])};});
+      var tickets=keys.map(function(key){return {key:key,url:liveStatusTicketURL(binding.page.tracking,key,map[key],liveStatusPageTicketURL(binding.page,key))};});
       var signature=JSON.stringify(tickets);
       // Keep keyboard focus on an unchanged link when fresh status arrives.
       if(!row || row._liveStepTickets!==signature){
@@ -693,7 +701,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         carriers+=Object.keys(waiting).length;
         steps+=(d.steps || []).filter(function(step){return liveStatusStepCarriers(d,step).some(function(carrier){return waiting[carrier.id];});}).length;
       });
-      return {key:key,url:liveStatusTicketURL(page.tracking,key,entry),state:entry.state,lanes:labels.join(', '),
+      return {key:key,url:liveStatusTicketURL(page.tracking,key,entry,liveStatusPageTicketURL(page,key)),state:entry.state,lanes:labels.join(', '),
         downstream:carriers+' downstream carriers · '+steps+' steps'};
     });
   }
@@ -722,9 +730,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       var dependsOn=(dependencies[key] || []).map(function(dep){
         var up=map[dep.key],state=up && LIVE_STATUS_STATES.indexOf(up.state)>=0?up.state:'missing';
-        return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusWaitingTone(state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up)};
+        return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusWaitingTone(state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up,liveStatusPageTicketURL(source,dep.key))};
       });
-      return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
+      return {key:key,url:liveStatusTicketURL(source.tracking,key,entry,liveStatusPageTicketURL(source,key)),title:entry.title || '—',state:entry.state || 'No status',
         owner:entry.assignee || 'Unassigned',ownerUrl:entry.assignee?liveStatusOwnerURL(source.tracking,entry):null,dependsOn:dependsOn,waiting:ticketWaiting[key]?ticketWaiting[key].tone:null,
         epicLabel:entry.epic && ((coverage.initiatives || []).length || coverage.epics.indexOf(entry.epic)<0)?'epic '+entry.epic:'',
         prs:entry.prs?copy(entry.prs):null,urls:urls,laneColor:laneColor,

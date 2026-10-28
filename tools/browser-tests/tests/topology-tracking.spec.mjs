@@ -177,3 +177,42 @@ test('provider-only tracking survives project export while unsupported Confluenc
   await expect.poll(()=>page.evaluate(()=>window.__inheritedTrackingRefs)).toMatchObject({tickets:['CAN-1'],prs:[pr]});
   await expect(node(page)).toHaveClass(/dv-live-done/);await expect(page.locator('#docview .pt-live-status tr[data-live-ticket="CAN-1"]')).toHaveCount(1);
 });
+
+test('desktop browse URLs edit imported and local tickets and stay clickable without a Jira site',async({page,server},info)=>{
+  const url='https://jira.example.test/jira/browse/API-2?view=detail#comments';
+  await fixture(page,server,(provider,consumer)=>{
+    delete consumer.page.tracking;
+    diagram(provider).nodes.api.tickets=['https://provider.example.test/browse/CAN-1'];
+    diagram(consumer).nodes={local:{title:'Local'}};diagram(consumer).rows=[['local']];
+  });
+  await add(page,'node','Add ticket',url);
+  await select(page,'node');const after=await source(page);
+  for(const value of ['API-2','https://user:pass@jira.example.test/browse/BAD-3','https://jira.example.test/issues/BAD-3']){
+    const input=page.getByRole('textbox',{name:'Add ticket',exact:true});await input.fill(value);await input.press('Enter');
+    await expect(page.locator('#src')).toHaveValue(after);
+  }
+  await add(page,'edge','Add ticket',url);
+  await closeTools(page);await node(page,'local').click();await page.locator('#editor-tab-inspect').click();
+  const localBefore=await source(page),localURL='https://jira.example.test/browse/LOC-4';
+  await page.getByRole('textbox',{name:'Add ticket',exact:true}).fill(localURL);await page.getByRole('textbox',{name:'Add ticket',exact:true}).press('Enter');
+  await expect.poll(()=>source(page)).not.toBe(localBefore);await history(page,localBefore);
+  const raw=JSON.parse(await source(page)),d=diagram(raw);expect(d.nodes.local.tickets).toEqual([localURL]);
+  expect(d.nodes['canon::api']).toBeUndefined();expect(d.topologyImports[0].nodeTracking.api.tickets).toEqual([url]);
+  expect(d.topologyImports[0].edgeTracking['api->store'].tickets).toEqual([url]);
+  await select(page,'node');const beforeRemoval=await source(page);await page.getByRole('button',{name:'Remove ticket 1',exact:true}).click();
+  await history(page,beforeRemoval);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeRemoval);
+  await closeTools(page);await page.getByLabel('Demo live status',{exact:true}).check();
+  await node(page).locator('.nrefs-trigger').click();await expect(page.locator('.node-link-menu').getByRole('link',{name:'API-2 ↗',exact:true})).toHaveAttribute('href',url);await page.keyboard.press('Escape');
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))],html=files[Object.keys(files).find(n=>n.endsWith('.html'))];
+  expect(diagram(JSON.parse(json))).toEqual(d);
+  await writeFile(path.join(server.root,'jira-url-tracking.html'),html);
+  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>{window.__jiraURLRefs=refs;return {'CAN-1':{state:'todo'},'API-2':{state:'active'},'LOC-4':{state:'todo'}};}};});
+  await page.goto(server.origin+'/jira-url-tracking.html');
+  await expect.poll(()=>page.evaluate(()=>window.__jiraURLRefs)).toMatchObject({tickets:['LOC-4','CAN-1','API-2']});
+  const root=page.locator('#docview');await expect(root.locator('tr[data-live-ticket="API-2"]').getByRole('link',{name:'API-2',exact:true})).toHaveAttribute('href',url);
+  await node(page).locator('.card').focus();await page.keyboard.press('Enter');
+  await expect(root.locator('.dv-live-popover').getByRole('link',{name:'API-2',exact:true})).toHaveAttribute('href',url);
+  await expect(root.locator('.dv-live-popover').getByRole('link',{name:'CAN-1',exact:true})).toHaveAttribute('href','https://provider.example.test/browse/CAN-1');
+  await page.screenshot({path:info.outputPath('jira-url-tracking-desktop.png')});
+});

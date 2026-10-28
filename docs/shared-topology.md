@@ -466,7 +466,7 @@ The delivery board imports that structure without copying nodes or edges:
       "nodes": {}, "rows": [[]],
       "topologyImports": [{
         "spec": "service", "export": "core", "as": "canon",
-        "nodeTracking": {"api": {"tickets": ["API-101"], "prs": ["https://github.com/acme/api/pull/2"]}},
+        "nodeTracking": {"api": {"tickets": ["https://acme.atlassian.net/browse/API-101"], "prs": ["https://github.com/acme/api/pull/2"]}},
         "edgeTracking": {"api->store": {"tickets": ["API-102"]}}
       }],
       "steps": [{"id": "persist", "edge": "canon::api->canon::store", "text": "Persist data"}],
@@ -482,11 +482,12 @@ Inherited references are displayed read-only. Removal applies only to consumer
 additions; each edit has one Undo/Redo. Duplicate additions do nothing.
 
 `nodeTracking` and `edgeTracking` values accept only `tickets` and `prs` arrays.
-Jira keys and PR URLs follow the [tracking parser](live-status.md#fields); invalid
+Jira keys or browse URLs, and PR URLs, follow the [tracking parser](live-status.md#fields); invalid
 entries, unknown fields, and missing/deselected identities fail validation.
 Nested imports use complete provider-relative keys such as `inner::api` and
 `inner::api->inner::store`. The resolver appends local references after inherited
-ones and deduplicates normalized values in order. Provider refreshes preserve
+ones and deduplicates tickets by Jira key in order, retaining the first authored
+reference and its browse URL when present. Provider refreshes preserve
 local additions, including when a provider later adopts the same reference;
 removing the local copy still leaves that inherited reference.
 

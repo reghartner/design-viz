@@ -92,11 +92,9 @@ var FlowTopology = (function(){
   }
   function applyTracking(value,addition){
     if(!addition)return;
-    var inherited=trackingRefs(value),local=trackingRefs(addition);
-    ['tickets','prs'].forEach(function(field){
-      var refs=inherited[field].concat(local[field]).filter(function(ref,index,all){return all.indexOf(ref)===index;});
-      if(refs.length)value[field]=refs;
-    });
+    var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
+    var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});
+    ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
   }
 
   function materialize(specs){

@@ -193,7 +193,7 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   if(t.error)return t;
   if(!t.owner)return {error:'Choose a node or connection in an authored topology import.'};
   t.field=kind==='node'?'nodeTracking':'edgeTracking';
-  t.local=trackingRefs((t.got.d.topologyImports[t.index][t.field] || {})[t.relative]);
+  t.local=trackingStoredRefs((t.got.d.topologyImports[t.index][t.field] || {})[t.relative]);
   // Resolve without this consumer addition to distinguish inherited duplicates
   // even when a refreshed provider now carries a formerly local reference.
   var base=builderClone(raw),imp=specValueAt(base,t.got.path).topologyImports[t.index];
@@ -208,11 +208,12 @@ function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,
   if(field!=='tickets' && field!=='prs')return {error:'Choose tickets or pull requests.'};
   var annotation={};annotation[field]=[ref];
   try{FlowTopology.validateTracking(annotation,'tracking');}catch(ex){return {error:ex.message};}
-  ref=trackingRefs(annotation)[field][0];
+  var identity=trackingRefs(annotation)[field][0];
+  ref=trackingStoredRefs(annotation)[field][0];
   var t=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(t.error)return t;
-  var refs=t.local[field],at=refs.indexOf(ref);
+  var refs=t.local[field],at=trackingRefs(t.local)[field].indexOf(identity);
   if(remove){if(at<0)return {text:text};refs.splice(at,1);}
-  else {if(at>=0 || t.inherited[field].indexOf(ref)>=0)return {text:text};refs.push(ref);}
+  else {if(at>=0 || t.inherited[field].indexOf(identity)>=0)return {text:text};refs.push(ref);}
   var value={};['tickets','prs'].forEach(function(key){if(t.local[key].length)value[key]=t.local[key];});
   return topologyLocalPlan(text,raw,t,t.field,t.relative,Object.keys(value).length?value:null,context);
 }

@@ -132,6 +132,39 @@ class ValidateCliTest(unittest.TestCase):
             self.assertIn("missing spec platform", missing.stdout)
             self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
 
+    def test_invalid_first_then_valid_browse_url_import_batch(self):
+        def model(identity, diagram):
+            return {"page": {"title": identity, "canon": {"version": 1, "id": identity,
+                    "kind": "canonical", "owner": "group:default/test"},
+                    "sections": [{"id": "main", "diagram": diagram}]}}
+        provider = model("provider", {"nodes": {"api": {}, "store": {}},
+            "rows": [["api", "store"]], "edges": [{"from": "api", "to": "store"}],
+            "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}})
+        def consumer(identity, ticket):
+            return model(identity, {"topologyImports": [{"spec": "provider", "export": "core", "as": "shared",
+                "nodeTracking": {"api": {"tickets": [ticket]}},
+                "edgeTracking": {"api->store": {"tickets": ["https://jira.test/jira/browse/API-2?view=detail#comments"]}}}]})
+        with tempfile.TemporaryDirectory() as temp:
+            paths = [pathlib.Path(temp) / name for name in ["invalid.json", "valid.json", "provider.json"]]
+            fixtures = [consumer("invalid", "https://jira.test/issues/API-1"),
+                        consumer("valid", "https://jira.test/browse/API-1"), provider]
+            for file, data in zip(paths, fixtures):
+                file.write_text(json.dumps(data))
+            malformed = run_cli(str(paths[0]), str(paths[2]))
+            self.assertEqual(malformed.returncode, 1, malformed.stdout + malformed.stderr)
+            self.assertIn("invalid tickets entry 0", malformed.stdout)
+            # Topology snapshots validate atomically; a JSON parse failure is
+            # skipped so the following valid closure must still be reported.
+            paths[0].write_text('{"page":')
+            before = [file.read_bytes() for file in paths]
+            result = run_cli(*(str(file) for file in paths))
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("ERROR JSON parse:", result.stdout)
+            self.assertIn(f"{paths[1]}: 0 errors", result.stdout)
+            self.assertIn(f"{paths[2]}: 0 errors", result.stdout)
+            self.assertNotIn("tickets[0]:", result.stdout)
+            self.assertEqual([file.read_bytes() for file in paths], before)
+
 
 class ContractCardCliTest(unittest.TestCase):
     """A malformed message-contract card degrades with warnings, never errors."""

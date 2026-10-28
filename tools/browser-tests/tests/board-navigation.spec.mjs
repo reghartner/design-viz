@@ -67,16 +67,14 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   const fitted=await board.evaluate(el=>{const b=el.getBoundingClientRect(),s=el.querySelector('.boardcanvas>svg').getBoundingClientRect();return {width:s.width,available:el.clientWidth,bottom:s.bottom,frameBottom:b.bottom};});
   expect(fitted.width).toBeLessThanOrEqual(fitted.available+1);expect(fitted.bottom).toBeLessThanOrEqual(fitted.frameBottom+1);
   await board.getByRole('button',{name:'Auto',exact:true}).click();
-  // Compare the same full-width surface across the mobile gutter breakpoint.
-  if(surface==='standalone')await page.locator('.reader-top>button').click();
-  await page.setViewportSize({width:680,height:1000});const wide=await width(board);
-  await page.setViewportSize({width:620,height:1000});
-  // Page gutters also change at a mobile breakpoint; the SVG should follow
-  // its actual column, never jump back to the old 1180px readable floor.
+  // Reader viewing crosses its narrow gutter breakpoint with Contents closed.
+  // Workbench authoring stays at desktop widths.
+  if(surface==='standalone')await expect(page.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
+  await page.setViewportSize({width:surface==='standalone'?680:1440,height:1000});const wide=await width(board);
+  await page.setViewportSize({width:surface==='standalone'?620:1024,height:1000});
+  // Auto follows the board's actual column at both sizes.
   expect(await width(board)).toBeCloseTo(await board.evaluate(el=>el.clientWidth),0);
-  // The pushed Contents column closes at the compact breakpoint, returning its
-  // width to the Standard page rather than preserving a desktop-sized gutter.
-  if(surface==='workbench')expect(await width(board)).toBeGreaterThan(wide);
+  if(surface==='workbench')expect(await width(board)).toBeLessThan(wide);
   else expect(Math.abs(await width(board)-wide)).toBeLessThan(100);
   expect(await board.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({path:testInfo.outputPath('regular-navigation.png'),fullPage:true});

@@ -163,6 +163,7 @@ test('marquee follows zoom; source handwriting retires the menu and view actions
  }
  await fit(page);await marquee(page,true);await page.keyboard.press('Escape');await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
  await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(node(page)).toHaveClass(/dv-sel/);
+ await navigation(page).locator('.reader-top>button').click();await expect(page.locator('.dv-sel')).toHaveCount(1);
  const current=navigation(page).locator('.reader-tree-tab.reader-tree-leaf[data-tab-view="section-1-canvas"]');await expect(current).toHaveAccessibleName('Spatial edit');await expect(current).toHaveAttribute('aria-current','page');await expect(navigation(page).getByRole('tab',{name:'Canvas',exact:true})).toHaveAttribute('aria-selected','true');await current.click();
  await expect(page.locator('.dv-sel')).toHaveCount(0);await expect(current).toHaveAttribute('aria-current','page');expect(await source(page)).toBe(original+' ');
 });

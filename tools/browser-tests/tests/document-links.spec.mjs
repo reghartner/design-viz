@@ -32,6 +32,7 @@ test('desktop settings persist '+route+' identity and URL through undo, redo and
  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await download);
  const saved=JSON.parse(files['document-destinations.spec.json']);expect(saved.page.canon).toBeUndefined();expect(saved.page.documentLinks).toEqual({id:'existing_diagram',claudeUrl:artifactURL,claudeArtifactId:artifactId});
  await writeFile(path.join(server.root,'exported-links.html'),files['document-destinations.html']);const reader=await context.newPage();await reader.goto(server.origin+'/exported-links.html');
+ await reader.getByRole('button',{name:'Open Contents',exact:true}).click();
  await expect(reader.locator('.reader-document-links').getByRole('link',{name:'Open in Claude'})).toHaveAttribute('href',artifactURL);
  await expect(reader.locator('.reader-document-links').getByRole('link',{name:'Open on internal site'})).toHaveCount(0);await reader.close();
 });
@@ -47,6 +48,7 @@ test('standalone snapshot keeps nested source destinations and copy actions with
  const B={URL};vm.createContext(B);for(const file of ['canon.js','validator.js','workbench/io-model.js'])vm.runInContext(readSource(file),B);
  const snapshot=B.prepareExportSnapshot(JSON.stringify(consumer),()=>B.FlowTopology.materialize([provider,middle,consumer])[2]);expect(snapshot.error).toBeUndefined();expect(snapshot.text).not.toMatch(/topologyImports|topologyProvenance|"specs"|"catalog"/);
  await page.goto(await standalone(server,'source-links',JSON.parse(snapshot.text)));await clipboard(page);
+ await page.getByRole('button',{name:'Open Contents',exact:true}).click();
  const menu=page.locator('.reader-document-links');await expect(menu.getByRole('link',{name:'Open on internal site'})).toHaveAttribute('href',base+'?diagram=consumer');await expect(menu.getByRole('link',{name:'Open in Claude'})).toHaveAttribute('href',claude);
  await menu.getByRole('button',{name:'Copy Claude link'}).click();expect(await page.evaluate(()=>copied.pop())).toBe(claude);
  await page.locator('[data-dv-node="m::p::a"] .nrefs-trigger').click();
@@ -61,6 +63,7 @@ test('native reader shows configured destinations and supports copied links in i
  await page.goto(server.origin+'/links-native.html');await page.waitForFunction(()=>!!window.mount);await clipboard(page);
  const raw=spec();raw.page.documentLinks={id:'existing_diagram',claudeUrl:claude};
  await page.evaluate(({raw,base})=>{window.viewer=mount(document.querySelector('#host'),raw,{siteBaseUrl:base});},{raw,base:server.origin+'/internal/'});
+ await page.locator('#host').getByRole('button',{name:'Open Contents',exact:true}).click();
  const menu=page.locator('#host .reader-document-links');await expect(menu.getByRole('link',{name:'Open on internal site'})).toHaveAttribute('href',server.origin+'/internal/?diagram=existing_diagram');
  await menu.getByRole('button',{name:'Copy internal site link'}).click();expect(await page.evaluate(()=>copied.pop())).toBe(server.origin+'/internal/?diagram=existing_diagram');
  await page.evaluate(()=>viewer.destroy());await expect(page.locator('#host')).toBeEmpty();

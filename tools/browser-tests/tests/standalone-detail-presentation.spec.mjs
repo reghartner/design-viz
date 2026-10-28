@@ -15,15 +15,16 @@ function story(rootType,childType){
   }
   return {page:{title:'Detail presentation inheritance',sections:[section('root','child',rootType),section('child','grandchild',childType),section('grandchild')]}};
 }
-async function surface(page,section,explore){
+async function surface(page,section,explore,contentsOpen=false){
   await expect(section).toBeVisible();
   await expect(section.locator('.explore-stage'))[explore?'toBeVisible':'toBeHidden']();
   if(explore){
     await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+    await expect(page.locator('#docview > .explore-navigation .reader-top>button')).toHaveAttribute('aria-expanded',String(contentsOpen));
     const shell=await section.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('#docview > .explore-navigation').boundingBox();
     const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox(),viewport=page.viewportSize();
     expect(nav.y).toBe(0);expect(nav.x).toBe(0);expect(nav.width).toBe(viewport.width);
-    expect(shell).toEqual({x:284,y:nav.height,width:viewport.width-284,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+    expect(shell).toEqual({x:contentsOpen?284:0,y:nav.height,width:viewport.width-(contentsOpen?284:0),height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
     expect(board).toEqual(stage);
   }else{
     await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
@@ -41,8 +42,14 @@ for(const [rootType,childType,childExplore] of [
   await page.goto(server.origin+'/detail-types.html#d=root&v=flow');
   const root=page.locator('#section-root'),child=()=>page.locator('[data-dv-detail-preview]:visible');
   await surface(page,root,rootType==='explore');
+  if(rootType==='explore'){
+    const toggle=page.locator('#docview > .explore-navigation .reader-top>button');await toggle.click();await surface(page,root,true,true);await toggle.click();
+  }
   await root.locator('[data-dv-detail="service"]').click();await expect(root).toBeHidden();
   await expect(child()).toHaveCount(1);await surface(page,child(),childExplore);
+  if(childExplore && rootType!=='explore'){
+    const toggle=page.locator('#docview > .explore-navigation .reader-top>button');await toggle.click();await surface(page,child(),true,true);await toggle.click();
+  }
   await page.screenshot({path:info.outputPath('child-presentation.png'),fullPage:true});
   await child().locator('[data-dv-detail="service"]').click();await surface(page,child(),childExplore);
   await expect(child().locator('.sec-h')).toHaveText('grandchild story');

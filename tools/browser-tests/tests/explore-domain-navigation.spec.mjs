@@ -47,6 +47,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
   if(host==='workbench'){await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(story()));await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();root=page.locator('#docview');}
   else root=await open(page,server,story(),host==='native');
   await expect(root.locator('.explore-navigation-diagrams')).toBeHidden();
+  if(host!=='workbench')await expect(root.locator('.reader-top>button')).toHaveAttribute('aria-expanded','false');
   for(let depth=0;depth<2;depth++){
     const parent=depth?root.locator('[data-dv-detail-preview]:visible'):root.locator('#section-root');
     // Sample every painted frame from the gesture, including the entry animation.
@@ -65,7 +66,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
     const chrome=host==='workbench'?await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0})):null;
-    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84+chrome.inset,sy:chrome.top,sw:viewport.width-96-chrome.inset,sh:viewport.height-chrome.top-12}:{sx:284,sy:first.navBottom,sw:viewport.width-284,sh:viewport.height-first.navBottom};
+    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84+chrome.inset,sy:chrome.top,sw:viewport.width-96-chrome.inset,sh:viewport.height-chrome.top-12}:{sx:0,sy:first.navBottom,sw:viewport.width,sh:viewport.height-first.navBottom};
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');
       expect({sx:frame.sx,sy:frame.sy,sw:frame.sw,sh:frame.sh}).toEqual(expectedShell);

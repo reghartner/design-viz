@@ -10,6 +10,8 @@ async function exportPage(server,raw){const input=path.join(server.root,'geometr
 async function assertStandard(page,id='standard'){
  const nav=page.locator('.explore-navigation').first(),leaf=nav.locator('.reader-contents-tree .reader-tree-leaf'),view=nav.getByRole('tab',{name:'Standard',exact:true});
  await expect(nav.locator('.reader-top-view')).toHaveCount(1);await expect(view).toBeVisible();await expect(view).toHaveAttribute('aria-selected','true');await expect(view).toHaveAttribute('data-tab-view',id);
+ const contentsToggle=nav.locator('.reader-top>button');if(await contentsToggle.getAttribute('aria-expanded')==='false')await contentsToggle.click();
+ await expect(nav.locator('.reader-contents')).toBeVisible();
  await expect(leaf).toHaveCount(1);await expect(leaf).toHaveAccessibleName('Geometry without extra Views');await expect(leaf).toHaveAttribute('data-reader-section','story');await expect(leaf).toHaveAttribute('data-tab-view',id);await expect(leaf).toHaveAttribute('aria-current','page');await expect(leaf).not.toHaveAttribute('aria-expanded');
  await expect(page.locator('[data-view-layout], [data-view-focus]')).toHaveCount(0);await expect(nav.getByRole('button',{name:'Layout',exact:true})).toHaveCount(0);await expect(nav.getByRole('button',{name:'Data flow',exact:true})).toHaveCount(0);await expect(page.locator('.section-layout-grid')).toBeVisible();
 }

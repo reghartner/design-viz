@@ -18,6 +18,7 @@ test('Claude-positive standalone handoff clicks the saved artifact while explici
  await context.addInitScript(()=>{try{localStorage.setItem('dv_tour_v1','done');}catch(_){}window.claude={use:()=>Promise.resolve(null)};});
  try{const page=await context.newPage();await page.goto(server.origin+'/context-links.html');
   const link=page.locator('[data-dv-node="next"] .handoff-link');await expect(link).toHaveAttribute('href',claude);
+  await page.getByRole('button',{name:'Open Contents',exact:true}).click();
   await expect(page.locator('.reader-document-links').getByRole('link',{name:'Open on internal site'})).toHaveAttribute('href',server.origin+'/internal/view.html?diagram=origin');
   const opened=context.waitForEvent('page');await link.click();const target=await opened;await expect(target.getByRole('heading')).toHaveText('Target artifact');expect(target.url()).toBe(claude);expect(errors).toEqual([]);expect(requests.some(url=>url.includes('diagram=target'))).toBe(false);
  }finally{await context.close();}

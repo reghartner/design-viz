@@ -76,14 +76,15 @@ test('Explore canvas and floating panel locks fix their rectangles through nudge
 });
 
 test('Standard tile locks show only while arranging, block gestures and survive Optimize in the active profile',async({page,server},info)=>{
- const raw=fixture(),d=raw.page.sections[0].diagram;d.layouts[0].presentation='standard';delete d.layouts[0].exploreLayout;
+ // Declare the 24-column grid up front so the saved tile keeps these exact numbers.
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.layouts[0].presentation='standard';delete d.layouts[0].exploreLayout;d.layouts[0].sectionLayout={columns:24,default:[{x:0,y:0,w:16,h:12},{panel:'p',x:16,y:0,w:8,h:4},{panel:'q',x:16,y:4,w:8,h:4}]};
  await openRaw(page,server,raw);await expect(page.locator('[data-dv-node=a]')).toBeVisible();
  const original=await source(page);
  await arrangeChapter(page);await expect(page.locator('.section-layout-grid')).toBeVisible();
  await page.getByRole('combobox',{name:'Layout element',exact:true}).selectOption('panel:p');
  const lock=page.getByRole('checkbox',{name:'Lock position of Canvas status',exact:true});await expect(lock).not.toBeChecked();await lock.check();
  const locked=await source(page);expect(locked).not.toBe(original);
- const tile=diagram(locked).layouts[0].sectionLayout.default.find(t=>t.panel==='p');expect(tile).toEqual({panel:'p',x:8,y:0,w:4,h:4,locked:true});
+ const tile=diagram(locked).layouts[0].sectionLayout.default.find(t=>t.panel==='p');expect(tile).toEqual({panel:'p',x:16,y:0,w:8,h:4,locked:true});expect(diagram(locked).layouts[0].sectionLayout.columns).toBe(24);
  const tileEl=page.locator('.section-layout-tile[data-layout-key="panel:p"]');
  await expect(tileEl).toHaveClass(/dv-position-locked/);await expect(tileEl.locator('.dv-position-lock-badge')).toHaveAccessibleName('Position locked');
  await expect(page.getByRole('spinbutton',{name:'Column',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Apply size / position',exact:true})).toBeDisabled();
@@ -119,6 +120,6 @@ test('exported reader shows locked panels in place without lock chrome or lock c
   expect(chrome.outline).toBe('none');expect(chrome.after).toBe('none');expect(chrome.before).toBe('none');
  }
  await expect(floating(page).locator('.explore-window-grip')).toHaveAccessibleName('Move Floating status; use arrow keys');
- const r=await floating(page).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();expect(r.x/stage.width).toBeCloseTo(.05,1);
+ const r=await floating(page).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();expect((r.x-stage.x)/stage.width).toBeCloseTo(.05,1);expect((r.y-stage.y)/stage.height).toBeCloseTo(.1,1);
  expect(await readFile(output,'utf8')).not.toMatch(/dv-position-lock/);
 });

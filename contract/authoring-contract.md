@@ -180,6 +180,21 @@ the reference’s ⋯ handle moves the entire block by changing only `position`.
 Reset node arrangement removes `nodePositions` and preserves `position`.
 Optional `nodeCodeRefs: {providerNodeId: [codeReference, ...]}` appends consumer
 references after inherited references; it never replaces inherited evidence.
+Optional `nodeTracking: {providerNodeId: {tickets: [...], prs: [...]}}` and
+`edgeTracking: {"providerFrom->providerTo": {tickets: [...], prs: [...]}}`
+add delivery annotations to imported nodes and edges. Only `tickets` and `prs`
+arrays are allowed, using the ordinary Jira key and absolute HTTP(S) PR URL
+parser. Unlike tolerant carrier metadata, malformed overlay fields are errors.
+Keys must identify selected exported members, including full nested paths.
+Resolution merges inherited references first, then local additions in authored
+order, deduplicating normalized values. Removing a local reference never removes
+an inherited one. Presentation and routing resets preserve tracking maps.
+Desktop Inspector **Add ticket** / **Add PR** and local removal each make one Undo
+transaction; resolved-only snapshots remain read-only. Runtime providers, live
+colors, readiness, ticket coverage and carrier links use resolved tracking.
+A status-board consumer can keep `nodes: {}`, `rows: [[]]`, a topology import,
+consumer steps and a `live-status` panel, with Jira settings on `page.tracking`.
+See [the complete consumer example](../docs/shared-topology.md#delivery-tracking-on-canonical-topology).
 Optional `edgeOverrides: {"providerFrom->providerTo": geometry}` changes only
 `labelDx`, `labelDy`, `curvePoints`, `curveControls`, `bend`, `fromPort`,
 `toPort`, `fromDx`, `fromDy`, `toDx`, `toDy`. Null suppresses an inherited field;
@@ -650,16 +665,29 @@ demo controls and its body shows Blockers, Tickets and Activity. It has no autho
 initial or step state.
 
 At page level, beside `title`, `contract` and `flowview`, optional `tracking`
-configures the Jira site and optional epic:
+configures the Jira site and optional parent roots:
 `"tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"}}`.
-`tracking.jira.epic` accepts one Jira key or an array using the ticket pattern.
+`tracking.jira.epic` keeps its existing storage name and accepts one Epic or
+Initiative Jira key or an array using the ticket pattern. There is no new authored
+initiative field or kind selector. The desktop control is labeled **Parent**.
+Jira issue-type metadata auto-detects Epic versus Initiative at runtime;
+Initiatives discover child Epics and then their stories (ordinary work items).
+This traversal is bounded to those two levels. Container records never count as
+stories. The board names the Initiative, counts Epics separately, and shows each
+story's parent Epic. Empty parents get their own metadata lookup. Shared and
+explicitly tracked Epics are deduplicated. Runtime `kind`, `parent`, `epic` and
+`initiatives` membership belong only in the live provider map, never in authored
+state. See `docs/live-status.md` for that transport contract.
 Valid keys are deduplicated in authored order; invalid entries warn individually
 and an invalid field type warns once, never errors. Epic children automatically
 appear in the Tickets table; mapping them to nodes and edges remains an authoring
 step. Unmapped children say NOT ON DIAGRAM; referenced tickets without evidence
 of membership in a configured epic say NOT IN EPIC. Extra children never change
 carrier colors or rollups. Desktop Workbench Tracking controls add and remove
-epics with one Undo/Redo per change and preserve them in Export project.
+parent roots with one Undo/Redo per change and preserve them in Export project.
+For initiative scope, unrecognized carrier membership says NOT IN SCOPE.
+Diagram readiness continues to describe only the primary path carriers.
+The offline Workbench demo cannot detect parent type without Jira metadata.
 Optional `tracking.dependencies` is an array of authored delivery dependencies,
 `[{"ticket": "UX-89", "on": "HW-124", "reason": "needs push payload"}]`: `ticket`
 waits on `on` while `on` is not done. Both are Jira keys; `reason` is optional

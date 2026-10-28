@@ -77,12 +77,14 @@
         el(completion,'strong','count','',value.readiness.done+'/'+value.readiness.total+' carriers done');
         var main=el(box,'div','main','dv-live-epic-main');
         if(epic.keys.length){
+          var initiative=epic.initiatives && epic.initiatives.length;
+          if(initiative)el(main,'div','scope','dv-live-scope',(initiative>1?'Initiatives':'Initiative')+' · '+epic.epics.length+' '+(epic.epics.length===1?'epic':'epics'));
           var keyRow=el(main,'div','keys','dv-live-epic-keys');link(keyRow,'key',epic.keys[0],epic.url).className='nbacklink dv-live-epic-key';if(epic.keys.length>1)el(keyRow,'span','more','dv-live-epic-more','+'+(epic.keys.length-1)+' more');
           el(main,'div','title','dv-live-epic-title',epic.title || '');
           var pill=el(main,'span','state','dv-live-state-pill dv-live-epic-state'+(value.enabled && epic.state?' dv-live-'+epic.state:''),epic.state || 'No status');pill.hidden=!epic.state;
-          var progress=el(main,'div','progress','dv-live-epic-progress',epic.done+' of '+epic.stories+' stories done · '+epic.onDiagram+' of '+epic.stories+' on diagram');progress.hidden=!epic.stories;
+          var progress=el(main,'div','progress','dv-live-epic-progress',epic.done+' of '+epic.stories+' stories done · '+epic.onDiagram+' of '+epic.stories+' on diagram');progress.hidden=!epic.stories && !initiative;
         }
-        var countParts=[epic.blocked+' blocked',epic.waiting+' waiting'];if(epic.keys.length)countParts.push(epic.outside+' outside epic');if(epic.ready)countParts.unshift('Ready to demo');
+        var countParts=[epic.blocked+' blocked',epic.waiting+' waiting'];if(epic.keys.length)countParts.push(epic.outside+(epic.initiatives && epic.initiatives.length?' outside scope':' outside epic'));if(epic.ready)countParts.unshift(epic.initiatives && epic.initiatives.length?'Diagram ready to demo':'Ready to demo');
         el(main,'div','counts','dv-live-epic-counts',countParts.join(' · '));
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');

@@ -70,3 +70,12 @@ test('L8 rework the panel reference is extractable by widget_doc and publishing 
  const skill=fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8');
  assert.match(skill,/After Continue the Live status panel header/);assert.doesNotMatch(skill,/Live chip/);
 });
+
+test('import-local ticket refs participate in live-status panel warnings before provider resolution',()=>{
+ for(const field of ['nodeTracking','edgeTracking']){
+  const raw={page:{sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',[field]:{[field==='nodeTracking'?'api':'api->db']:{tickets:['AA-1']}}}]}}]}};
+  assert.ok(C.validate(C.normalize(raw)).warnings.some(x=>x.includes('no live-status panel declared')));
+  raw.page.sections[0].diagram.panels=[{...panel}];
+  assert.ok(!C.validate(C.normalize(raw)).warnings.some(x=>x.includes('this page has no ticket references')));
+ }
+});

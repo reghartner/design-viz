@@ -162,7 +162,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   if(demoOn){
     var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
     function paintDemo(){
-      Object.keys(initialDemo).forEach(function(key){demoMap[key]={state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]};});
+      Object.keys(initialDemo).forEach(function(key){demoMap[key]=Object.assign({},initialDemo[key],{state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]});});
       ctl.liveStatus.apply(demoMap);ctl.liveStatus.note('Demo day '+(demoDay+1),'info');
       ctl.liveStatus.setDemoControls({playing:false,manual:true,ended:demoDay===3,toggle:function(){},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
     }

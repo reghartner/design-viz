@@ -306,7 +306,9 @@ function createBuilderIO(opts){
   function confluenceHandoff(copy){
     closeExportMenu(true);
     var run = ++confluenceCopyRun;
-    var handoffText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
+    var handoffText=session.text();
+    try{if(typeof FlowviewCompatibility!=='undefined')handoffText=FlowviewCompatibility.stampText(handoffText,session.resolve(JSON.parse(handoffText)));}
+    catch(ex){inspectorMessage('Confluence export: '+errorText(ex));return;}
     var built = buildConfluenceExport(handoffText);
     closeConfluenceHandoff();
     if (built.error){inspectorMessage('Confluence export: ' + built.error); return;}
@@ -370,7 +372,9 @@ function createBuilderIO(opts){
     if(parsed.error){inspectorMessage('export needs valid JSON — '+parsed.error+'. Copy unfinished text from the JSON workspace to keep a repair copy.');return;}
     // Source, topology and accepted ledger are read synchronously before any
     // picker/fetch. Preview proposals and later edits never enter this bundle.
-    var exportText=typeof FlowviewCompatibility!=='undefined'?FlowviewCompatibility.stampText(parsed.text):parsed.text;
+    var exportText=parsed.text;
+    try{if(typeof FlowviewCompatibility!=='undefined')exportText=FlowviewCompatibility.stampText(parsed.text,session.resolve(parsed.raw));}
+    catch(ex){inspectorMessage('Export failed: '+errorText(ex));return;}
     var ledger=opts.exportLedger?opts.exportLedger(parsed.project):null;
     var snapshot=prepareExportSnapshot(exportText,session.resolve);
     if(snapshot.error){inspectorMessage(snapshot.error);return;}

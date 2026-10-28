@@ -288,11 +288,22 @@ function liveStatusReadiness(page,map,waiting){
   });result.ready=result.ready && primaryCount>0;result.blockers=blockers.length;return result;
 }
 /* Coverage counts keys, independently of paint, readiness and lane rollups. */
+function liveStatusContainer(key,entry,roots){
+  return (roots || []).indexOf(key)>=0 || !!(entry && (entry.kind==='epic' || entry.kind==='initiative'));
+}
 function liveStatusCoverage(page,map,refs){
-  var epics=refs && refs.epics || trackingEpics(page),keys=refs && refs.tickets || [];
-  return {epics:epics.slice(),onDiagram:keys.slice(),
-    notOnDiagram:Object.keys(map || {}).filter(function(key){return keys.indexOf(key)<0 && map[key] && epics.indexOf(map[key].epic)>=0;}),
-    notInEpic:epics.length?keys.filter(function(key){return !map[key] || epics.indexOf(map[key].epic)<0;}):[]};
+  var roots=refs && refs.epics || trackingEpics(page),initiatives=roots.filter(function(key){return map[key] && map[key].kind==='initiative';});
+  var epics=roots.filter(function(key){return initiatives.indexOf(key)<0;}),keys=(refs && refs.tickets || []).filter(function(key){return !liveStatusContainer(key,map[key],roots);});
+  Object.keys(map || {}).forEach(function(key){
+    var entry=map[key];if(!entry || !(entry.initiatives || []).some(function(root){return initiatives.indexOf(root)>=0;}))return;
+    var epic=entry.kind==='epic'?key:entry.epic;if(epic && epics.indexOf(epic)<0)epics.push(epic);
+  });
+  function member(key){return map[key] && !liveStatusContainer(key,map[key],roots) && epics.indexOf(map[key].epic)>=0;}
+  var out={epics:epics,onDiagram:keys,
+    notOnDiagram:Object.keys(map || {}).filter(function(key){return keys.indexOf(key)<0 && member(key);}),
+    notInEpic:roots.length?keys.filter(function(key){return !member(key);}):[]};
+  if(initiatives.length)out.initiatives=initiatives;
+  return out;
 }
 /* Panels can mount before renderPage finishes constructing its controller. The
    pending bridge is released by the same panel cleanup as ordinary listeners. */
@@ -376,7 +387,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     refreshDependencies();
     var pages=laneRecords(),coverage=liveStatusCoverage(page,map,refs()),readiness=liveStatusReadiness(page,map,ticketWaiting);
-    var epicKeys=Object.keys(map).filter(function(key){return coverage.epics.indexOf(map[key].epic)>=0;});
+    var epicKeys=coverage.onDiagram.filter(function(key){return coverage.notInEpic.indexOf(key)<0 && coverage.epics.indexOf(map[key] && map[key].epic)>=0;}).concat(coverage.notOnDiagram),initiatives=coverage.initiatives || [],scopeKeys=initiatives.concat(refs().epics.filter(function(key){return initiatives.indexOf(key)<0;}));
     var verdict=readiness.ready?'Ready to demo':readiness.blockers+' blockers · '+readiness.waiting+' waiting';
     // Only count epic stories when the map actually carries epic membership; "0 of 0" says nothing.
     if(coverage.epics.length && epicKeys.length)verdict+=' · '+epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length+' of '+epicKeys.length+' epic stories on diagram';
@@ -386,12 +397,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var linked=(dependencies[pair.ticket] || []).some(function(dep){return dep.key===pair.on && dep.sources.indexOf('jira')>=0;});
       if(!linked && !suggestions.some(function(item){return item.ticket===pair.ticket && item.on===pair.on;}))suggestions.push({ticket:pair.ticket,on:pair.on});
     });});
-    var epicState=null;if(coverage.epics.length){var entry=map[coverage.epics[0]];epicState=entry && LIVE_STATUS_STATES.indexOf(entry.state)>=0?entry.state:
+    var epicState=null;if(scopeKeys.length){var entry=map[scopeKeys[0]];epicState=entry && LIVE_STATUS_STATES.indexOf(entry.state)>=0?entry.state:
       !epicKeys.length?null:epicKeys.some(function(key){return map[key].state==='blocked';})?'blocked':epicKeys.every(function(key){return map[key].state==='done';})?'done':epicKeys.some(function(key){return map[key].state!=='todo';})?'active':'todo';}
-    var epic={keys:coverage.epics.slice(),url:coverage.epics.length?liveStatusTicketURL(page.tracking,coverage.epics[0],map[coverage.epics[0]]):null,
-      title:coverage.epics.length && map[coverage.epics[0]] && map[coverage.epics[0]].title || '',state:epicState,
+    var epic={keys:scopeKeys,url:scopeKeys.length?liveStatusTicketURL(page.tracking,scopeKeys[0],map[scopeKeys[0]]):null,
+      title:scopeKeys.length && map[scopeKeys[0]] && map[scopeKeys[0]].title || '',state:epicState,
+      initiatives:initiatives.slice(),epics:coverage.epics.slice(),
       stories:epicKeys.length,done:epicKeys.filter(function(key){return map[key].state==='done';}).length,onDiagram:epicKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length,
-      blocked:readiness.blockers,waiting:Object.keys(ticketWaiting).length,outside:outside,ready:readiness.ready};
+      blocked:initiatives.length?tickets.filter(function(ticket){return ticket.state==='blocked' || ticket.state==='missing';}).length:readiness.blockers,waiting:Object.keys(ticketWaiting).length,outside:outside,ready:readiness.ready};
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
       available:!!(refs().tickets.length || refs().epics.length),hasData:!!(provider || applied),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
@@ -647,7 +659,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });});return lanes;
   }
   function panelBlockers(pages){
-    return refs().tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).map(function(key){
+    var coverage=liveStatusCoverage(page,map,refs());
+    return coverage.onDiagram.concat(coverage.notOnDiagram).filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).map(function(key){
       var entry=map[key],labels=[],carriers=0,steps=0;
       pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
         var label=laneLabel(id,record.page);if(record.lanes[id].keys.indexOf(key)>=0 && labels.indexOf(label)<0)labels.push(label);
@@ -675,7 +688,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });});
     // Linked upstreams that are neither carriers nor epic children join the table as OUTSIDE EPIC rows.
     var linked=[];Object.keys(dependencies).forEach(function(ticket){dependencies[ticket].forEach(function(dep){if(coverage.onDiagram.indexOf(dep.key)<0 && coverage.notOnDiagram.indexOf(dep.key)<0 && linked.indexOf(dep.key)<0)linked.push(dep.key);});});
-    return coverage.onDiagram.concat(coverage.notOnDiagram,linked).filter(function(key,index,all){return all.indexOf(key)===index;}).sort(function(a,b){
+    return coverage.onDiagram.concat(coverage.notOnDiagram,linked).filter(function(key,index,all){return all.indexOf(key)===index && !liveStatusContainer(key,map[key],refs().epics);}).sort(function(a,b){
       var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');return diff || (a<b?-1:a>b?1:0);
     }).map(function(key){
       var entry=map[key] || {},owners=carriers[key] || [],laneColor=null,urls=[];
@@ -683,7 +696,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(record.lanes[id].keys.indexOf(key)<0 && entry.lane!==id)return false;
         laneColor=(record.page.lanes[id] || {}).color;return !!laneColor;
       });});
-      var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).indexOf(entry.epic)>=0;}).map(function(record){return record.page;})[0] || page;
+      var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).some(function(root){return root===entry.epic || (entry.initiatives || []).indexOf(root)>=0;});}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       var dependsOn=(dependencies[key] || []).map(function(dep){
         var up=map[dep.key],state=up && LIVE_STATUS_STATES.indexOf(up.state)>=0?up.state:'missing';
@@ -691,13 +704,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       });
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry),title:entry.title || '—',state:entry.state || 'No status',
         owner:entry.assignee || 'Unassigned',ownerUrl:entry.assignee?liveStatusOwnerURL(source.tracking,entry):null,dependsOn:dependsOn,waiting:ticketWaiting[key]?ticketWaiting[key].tone:null,
-        epicLabel:entry.epic && coverage.epics.indexOf(entry.epic)<0?'epic '+entry.epic:'',
+        epicLabel:entry.epic && ((coverage.initiatives || []).length || coverage.epics.indexOf(entry.epic)<0)?'epic '+entry.epic:'',
         prs:entry.prs?copy(entry.prs):null,urls:urls,laneColor:laneColor,
         carriers:owners.map(function(carrier){var route=carrierRoute(carrier),mounted=carrierBinding(carrier);
           return {id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || '',
             disabled:!on || (!mounted && (!route || (route.frames.length && (!ctl.details || !ctl.details.restore)))),
             title:!mounted?'Detail page: '+(carrier.section.heading || carrier.reference):''};
-        }),tag:linked.indexOf(key)>=0?'OUTSIDE EPIC':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?'NOT IN EPIC':''};
+        }),tag:linked.indexOf(key)>=0?'OUTSIDE EPIC':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?(coverage.initiatives?'NOT IN SCOPE':'NOT IN EPIC'):''};
     });
   }
   function paintBinding(binding){
@@ -801,7 +814,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired)return;var next=Object.create(null);
       Object.keys(value || {}).forEach(function(key){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
-        var item={state:entry.state};['title','assignee','assigneeId','detail','updatedAt','epic','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
+        var item={state:entry.state};if(['initiative','epic','story'].indexOf(entry.kind)>=0)item.kind=entry.kind;
+        if(Array.isArray(entry.initiatives))item.initiatives=entry.initiatives.filter(function(key,index,all){return typeof key==='string' && trackingKeyPattern.test(key) && all.indexOf(key)===index;});
+        ['title','assignee','assigneeId','detail','updatedAt','epic','parent','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
         var url=deltaLinkUrl(entry.url);if(url)item.url=url;
         var links=liveStatusPRLinks(entry.prs && entry.prs.links);
         if(Array.isArray(entry.dependsOn)){var deps=[];entry.dependsOn.forEach(function(dep){

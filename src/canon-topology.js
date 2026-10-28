@@ -86,6 +86,19 @@ var FlowTopology = (function(){
     });
   }
 
+  function validateTracking(value,at){
+    shape(value,['tickets','prs'],at);
+    trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
+  }
+  function applyTracking(value,addition){
+    if(!addition)return;
+    var inherited=trackingRefs(value),local=trackingRefs(addition);
+    ['tickets','prs'].forEach(function(field){
+      var refs=inherited[field].concat(local[field]).filter(function(ref,index,all){return all.indexOf(ref)===index;});
+      if(refs.length)value[field]=refs;
+    });
+  }
+
   function materialize(specs){
     if(!Array.isArray(specs))fail('snapshot','expected an array of specs');
     var copies=specs.map(clone),byId=new Map(),states=new Map(),exportsById=new Map();
@@ -123,11 +136,16 @@ var FlowTopology = (function(){
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','edgeOverrides','presentation'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
           if(!validExports(imp.export))fail(where,'export must be a name or a nonempty array of unique export names');
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           if(own(imp,'presentation') && imp.presentation!=='baseline')fail(where,'presentation must be baseline');
           ['nodes','edges'].forEach(function(key){if(own(imp,key))list(imp[key],where+' '+key);});
+          ['nodeTracking','edgeTracking'].forEach(function(field){
+            if(!own(imp,field))return;
+            if(!object(imp[field]))fail(where,field+' must be an object keyed by exported identity');
+            Object.keys(imp[field]).forEach(function(key){validateTracking(imp[field][key],where+' '+field+' '+key);});
+          });
           if(own(imp,'nodeOverrides')){
             if(!object(imp.nodeOverrides))fail(where,'nodeOverrides must be an object keyed by exported node identity');
             Object.keys(imp.nodeOverrides).forEach(function(key){validateNodeOverride(imp.nodeOverrides[key],where+' nodeOverrides '+key);});
@@ -190,6 +208,8 @@ var FlowTopology = (function(){
           Object.keys(imp.nodeOverrides || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeOverrides identity is not selected/exported: '+key);});
           Object.keys(imp.nodeCodeRefs || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeCodeRefs identity is not selected/exported: '+key);});
           Object.keys(imp.edgeOverrides || {}).forEach(function(key){if(!exp.edges.includes(key))fail(where,'edgeOverrides identity is not selected/exported: '+key);});
+          Object.keys(imp.nodeTracking || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeTracking identity is not selected/exported: '+key);});
+          Object.keys(imp.edgeTracking || {}).forEach(function(key){if(!exp.edges.includes(key))fail(where,'edgeTracking identity is not selected/exported: '+key);});
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
           if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];
@@ -215,6 +235,7 @@ var FlowTopology = (function(){
             if(!own(nodes,key) || !object(nodes[key]))fail(where,'missing exported node '+key);
             var value=clone(nodes[key]);if(value.group){group(value.group,new Set());value.group=prefix+value.group;}
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
+            applyTracking(value,(imp.nodeTracking || {})[key]);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
             // Reveal indices belong to the provider's story, not the consumer.
@@ -242,7 +263,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);if(imp.presentation)edge.presentation=imp.presentation;
+            var edge=clone(matches[0]);applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
             Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
@@ -384,7 +405,7 @@ var FlowTopology = (function(){
     if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
-  return {mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+  return {validateTracking:validateTracking,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

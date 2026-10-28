@@ -68,8 +68,13 @@ export interface LiveStatusEntry {
   detail?: string;
   updatedAt?: string;
   /** Epic key this issue belongs to; entries for keys no carrier references are
-   * listed in the Tickets table as NOT ON DIAGRAM when their epic is configured. */
+   * listed as NOT ON DIAGRAM when their epic or initiative ancestor is configured. */
   epic?: string;
+  /** Hierarchy container classification; omitted for ordinary work items. */
+  kind?: 'initiative' | 'epic' | 'story';
+  parent?: string;
+  /** Configured initiative roots reaching this epic/story (deduplicated). */
+  initiatives?: string[];
   /** Team lane id for an entry no carrier references (epic children). */
   lane?: string;
   /** Upstream tickets this one waits on: Jira issue links (inward types such as
@@ -80,6 +85,7 @@ export interface LiveStatusEntry {
 export interface NativeViewerOptions {
   /** Host-owned ticket transport; refresh pauses while the document is hidden. */
   liveStatus?: {
+    /** refs.epics holds configured parent roots (Epic or Initiative); legacy name retained. */
     provider: (refs: {tickets: string[]; prs: string[]; epics: string[]}, signal: AbortSignal) => Promise<Record<string, LiveStatusEntry>>;
     refreshMs?: number;
   };

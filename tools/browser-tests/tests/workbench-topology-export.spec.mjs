@@ -48,7 +48,7 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
       await page.goto(url+(local?'':'?diagram=consumer'));
       if(local)await pastePage(page,JSON.stringify(source.provider,null,3));
       else{await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();}
-      const original=await page.locator('#src').inputValue(),expected=C.compatibility.stampText(original);
+      const original=await page.locator('#src').inputValue();
       const prefix=local?'':nested?'shared::base::':'shared::';
       await expect(page.locator('g.node[data-dv-node="'+prefix+'api"]')).toBeVisible();
       if(!local){
@@ -76,8 +76,9 @@ for(const [mode,action] of [['local-provider','file'],['direct-consumer','file']
           return {json:await read('.spec.json'),html:await read('.html')};
         },name);
       }
-      expect(files.json).toBe(expected);await expect(page.locator('#src')).toHaveValue(original);
+      await expect(page.locator('#src')).toHaveValue(original);
       const snapshot=JSON.parse(files.html.match(/^<script type="application\/json" id="flowspec">\n([\s\S]*?)\n<\/script>/m)[1]);
+      expect(files.json).toBe(C.compatibility.stampText(original,snapshot));
       expect(JSON.stringify(snapshot)).not.toMatch(/"topology(?:Imports|Exports|Provenance)"/);
       expect(files.html).not.toContain('id="flowview-topology"');
       expect(diagram(snapshot).nodes[prefix+'api'].title).toBe(local?'API':'API </ScRiPt><script>window.topologyInjection=true</script><!--');

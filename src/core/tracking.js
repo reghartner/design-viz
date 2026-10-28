@@ -22,7 +22,8 @@ function trackingRefs(obj, invalid){
   });
   return refs;
 }
-/* Page-level epic references share the ticket key grammar. */
+/* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
+   Jira metadata determines whether each root is an Epic or an Initiative. */
 function trackingEpics(page,invalid){
   var jira=page && page.tracking && page.tracking.jira,out=[];
   if(!jira || !Object.prototype.hasOwnProperty.call(jira,'epic'))return out;

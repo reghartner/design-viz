@@ -376,13 +376,13 @@ test('D9 the Jira adapter requests issue links, reads inward and outward depende
  assert.deepEqual(map['HW-2'],{state:'blocked',title:'Signal',url:'https://jira.test/browse/HW-2'});assert.deepEqual(map['OUT-9'],{state:'active',title:'Vendor driver',url:'https://jira.test/browse/OUT-9'});
  assert.equal(map['DOWN-1'],undefined);assert.equal(map['REL-1'],undefined);
  const child=jira('AA-1');child.fields.parent={key:'EP-1',fields:{summary:'Doorbell epic',status:{name:'In Progress',statusCategory:{key:'indeterminate'}},issuetype:{name:'Epic'}}};
- const seeded=plain(C.liveStatusJiraMap(['AA-1'],[[child]],new Set(),'https://jira.test',null));assert.deepEqual(seeded['EP-1'],{state:'active',title:'Doorbell epic',url:'https://jira.test/browse/EP-1'},'the epic rides the child parent payload');
+ const seeded=plain(C.liveStatusJiraMap(['AA-1'],[[child]],new Set(),'https://jira.test',null));assert.deepEqual(seeded['EP-1'],{state:'active',kind:'epic',title:'Doorbell epic',url:'https://jira.test/browse/EP-1'},'the epic rides the child parent payload');
  const bare=jira('AA-1');bare.fields.parent={key:'EP-1',fields:{summary:'No status here'}};assert.equal(plain(C.liveStatusJiraMap(['AA-1'],[[bare]],new Set(),'',null))['EP-1'],undefined,'no status, no entry');
  const requested=plain(C.liveStatusJiraMap(['FW-1','HW-2'],[[issue,jira('HW-2','done')]],new Set(),'https://jira.test',null,['is blocked by']));assert.equal(requested['HW-2'].state,'done','a requested issue is never replaced by its link payload');
  assert.deepEqual(plain(C.liveStatusJiraMap(['FW-1'],[[issue]],new Set(),'',null))['FW-1'].dependsOn.map(d=>d.key),['HW-2','OUT-9'],'default link types');
  const h=providerHarness(depFixture());await h.start();for(const w of h.watches)assert.ok(w.input.fields.includes('issuelinks'),w.input.jql);
- h.data(0,[issue]);assert.deepEqual(plain(h.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['HW-2','OUT-9']);assert.equal(h.ctl.liveStatus.state('OUT-9').title,'Vendor driver');
- const custom=providerHarness((()=>{const raw=depFixture();raw.page.tracking.jira.dependencyLinks=['relates to'];return raw;})());await custom.start();custom.data(0,[issue]);
+ h.data(0,[issue]);h.data(1,[]);hierarchyBranch(h,'EP-1',[]);assert.deepEqual(plain(h.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['HW-2','OUT-9']);assert.equal(h.ctl.liveStatus.state('OUT-9').title,'Vendor driver');
+ const custom=providerHarness((()=>{const raw=depFixture();raw.page.tracking.jira.dependencyLinks=['relates to'];return raw;})());await custom.start();custom.data(0,[issue]);custom.data(1,[]);hierarchyBranch(custom,'EP-1',[]);
  assert.deepEqual(plain(custom.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['REL-1']);h.ctl.liveStatus.destroy();custom.ctl.liveStatus.destroy();
 });
 test('D10 the demo map converts timeline links into Jira-sourced dependencies',()=>{
@@ -483,12 +483,16 @@ function providerContext(C={URL}){
 }
 const jira=(key,category='indeterminate',name='In Progress')=>({key,fields:{summary:'Work '+key,status:{name,statusCategory:{key:category}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
 const settle=()=>new Promise(setImmediate);
-function providerHarness(raw=fixture(),renderOptions={}){
+function providerHarness(raw=fixture(),renderOptions={},autoParentMetadata=true){
  const h=harness(raw,{},renderOptions);providerContext(h.C);assert.equal(typeof h.C.wireLiveStatusClaude,'function');
  mountStatus(h);
  const watches=[],calls=[],servers=[{server:'Atlassian MCP',authStatus:'unknown',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]}];
  const mcp={listTools:()=>Promise.resolve(servers),callTool:(...args)=>{calls.push(plain(args));return Promise.resolve({payload:[{id:'cloud',url:'https://jira.test'}]});},
-  watchTool:(server,tool,input,handler,opts)=>{const watch={server,tool,input:plain(input),handler,opts:plain(opts),stopped:0};watches.push(watch);return ()=>watch.stopped++;}};
+  watchTool:(server,tool,input,handler,opts)=>{const watch={server,tool,input:plain(input),handler,opts:plain(opts),stopped:0};watches.push(watch);
+   // Existing epic fixtures answer the new parent metadata lookup synchronously.
+   const roots=h.ctl.liveStatus.refs().epics || [],match=/^key in \(([^)]+)\)$/.exec(input.jql || '');
+   if(autoParentMetadata && match && match[1].split(', ').every(key=>roots.includes(key)))handler({type:'data',result:{payload:{issues:match[1].split(', ').map(key=>Object.assign(jira(key),{fields:{...jira(key).fields,issuetype:{name:'Epic',hierarchyLevel:1}}}))}}});
+   return ()=>watch.stopped++;}};
  h.win.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
  return Object.assign(h,{mcp,watches,calls,servers,start(){return h.C.wireLiveStatusClaude(h.ctl,h.ctl.page,h.win);},data(i,issues,at=1793000000000){watches[i].handler({type:'data',result:{payload:{issues:{nodes:issues}},cache:{storedAt:at}}});}});
 }
@@ -543,7 +547,7 @@ test('P3 P4 connector preference, site host, resource cache and unavailable note
 });
 test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies and dispose',async()=>{
  const keys=Array.from({length:25},(_,i)=>'AA-'+i),h=providerHarness({nodes:{a:{tickets:keys}},rows:[['a']]});await h.start();assert.equal(h.watches.length,6);
- for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated','issuelinks']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
+ for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
  h.data(0,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'active');assert.equal(h.ctl.liveStatus.state('AA-1').state,'missing');assert.equal(h.ctl.liveStatus.state('AA-10'),null);
  assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,new Date(1793000000000).toISOString());assert.equal(h.view.querySelector('time'),null);
  h.data(1,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');
@@ -760,8 +764,8 @@ test('E3 epic watches paginate both cursor envelopes tag children and keep evide
  const h=providerHarness(epicFixture());await h.start();
  const epic=h.watches.find(w=>w.input.jql==='parent = EP-1'),flag=h.watches.find(w=>w.input.jql==='parent = EP-1 AND Flagged = Impediment');
  assert.ok(epic,'one epic watch');assert.ok(flag,'paired flagged watch');assert.equal(h.watches.filter(w=>/^parent =/.test(w.input.jql)).length,4);
- assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuelinks','issuetype']);assert.equal(epic.input.maxResults,10);
- h.data(0,[jira('AA-1')]);const calls=[];
+ assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.equal(epic.input.maxResults,10);
+ h.data(0,[jira('AA-1')]);h.data(1,[]);hierarchyBranch(h,'EP-2',[]);hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);const calls=[];
  h.mcp.callTool=async(server,tool,input)=>{calls.push(plain(input));return input.nextPageToken==='two'?{payload:{issues:[jira('EX-2')],nextPageToken:'three'}}:{payload:{issues:[jira('EX-3')]}};};
  epic.handler({type:'data',result:{payload:{issues:{nodes:[jira('AA-1'),jira('EX-1')]},pageInfo:{hasNextPage:true,endCursor:'two'}}}});await settle();await settle();
  assert.deepEqual(calls.map(c=>c.nextPageToken),['two','three']);assert.ok(calls.every(c=>c.jql==='parent = EP-1' && c.maxResults===10));
@@ -808,7 +812,7 @@ test('E7 a previously seen child returning after absence is not a new epic addit
 test('E3 failed and superseded pagination cannot replace complete carrier or epic evidence',async()=>{
  const h=providerHarness(epicFixture());await h.start();h.data(0,[jira('AA-1')]);const watch=h.watches.find(w=>w.input.jql==='parent = EP-1');
  const deliver=payload=>watch.handler({type:'data',result:{payload}});
- deliver({issues:[jira('EX-1')]});let resolve;
+ deliver({issues:[jira('EX-1')]});h.data(1,[]);hierarchyBranch(h,'EP-2',[]);hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);let resolve;
  h.mcp.callTool=()=>Promise.reject({code:'upstream_error',retryable:true});
  deliver({issues:[jira('EX-2')],pageInfo:{hasNextPage:true,endCursor:'two'}});await settle();
  assert.equal(h.ctl.liveStatus.state('EX-1').state,'active');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,1);
@@ -818,8 +822,8 @@ test('E3 failed and superseded pagination cannot replace complete carrier or epi
 });
 test('E3 an epic without carrier tickets still starts its two watches and exposes details',async()=>{
  const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
- assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment']);
- h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-head').hidden,false);h.ctl.liveStatus.destroy();
+ assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment','key in (EP-1)']);
+ h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1'),null,'initial epic children wait for Flagged evidence');h.data(1,[]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-head').hidden,false);h.ctl.liveStatus.destroy();
 });
 
 /* Round 2 regressions: preserve the frozen E1–E11 RED rows above. */
@@ -842,19 +846,20 @@ test('E8 rework Workbench demo entries paint carrier badges with page epics conf
 test('E3 rework loaded detail epics add deduplicated paginated watches without replacing carrier evidence',async()=>{
  const detail={page:{tracking:{jira:{epic:['EP-2','EP-3']}},sections:[{id:'child',diagram:{nodes:{child:{tickets:['CH-1']}},rows:[['child']]}}]}};
  const renderOptions={loadDetail:async()=>detail},h=providerHarness(epicFixture(),renderOptions),api=h.ctl.liveStatus;
- await h.start();h.data(0,[jira('AA-1')]);assert.equal(h.watches.length,6);
+ await h.start();h.data(0,[jira('AA-1')]);h.data(1,[]);hierarchyBranch(h,'EP-1',[]);hierarchyBranch(h,'EP-2',[]);assert.equal(h.watches.length,7);
  await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
- assert.equal(h.watches.length,10,'one new key batch and one new epic, each with Flagged');
+ assert.equal(h.watches.length,12,'one new key batch and one new epic, each with Flagged');
  const watch=h.watches.find(w=>w.input.jql==='parent = EP-3'),flag=h.watches.find(w=>w.input.jql==='parent = EP-3 AND Flagged = Impediment');
- assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuelinks','issuetype']);assert.equal(watch.input.maxResults,10);
+ assert.ok(watch);assert.ok(flag);assert.deepEqual(watch.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.equal(watch.input.maxResults,10);
  assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-1'),null,'new unanswered chunks do not erase or invent evidence');
  h.mcp.callTool=async(server,tool,input)=>{h.calls.push(plain(input));return {payload:{issues:[jira('CH-2')]}};};
  watch.handler({type:'data',result:{payload:{issues:[jira('CH-1')],pageInfo:{hasNextPage:true,endCursor:'second'}}}});await settle();
- assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
+ assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2'),null,'new scope waits for its ticket and Flagged evidence');
+ hierarchyData(h,'key in (CH-1)',[jira('CH-1')]);hierarchyData(h,'key in (CH-1) AND Flagged = Impediment',[]);hierarchyData(h,'parent = EP-3 AND Flagged = Impediment',[]);assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
  flag.handler({type:'data',result:{payload:{issues:[jira('CH-2')]}}});assert.equal(api.state('CH-2').state,'blocked');
  watch.handler({type:'error',error:{code:'tool_error',message:'Temporary epic failure'}});assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-2').state,'blocked');
  for(let i=0;i<3;i++){await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.view.dispatchEvent({type:'detail-navigation'});h.flush();api.setEnabled(i%2===0);}
- assert.equal(h.watches.length,10,'reopening details and toggles never duplicate watches');
+ assert.equal(h.watches.length,12,'reopening details and toggles never duplicate watches');
  api.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });
 
@@ -863,10 +868,10 @@ test('E3 rework synchronous watch delivery and late detail completion retire cle
  const originalWatch=h.mcp.watchTool;h.mcp.watchTool=(server,tool,input,handler,options)=>{
   const off=originalWatch(server,tool,input,handler,options);handler({type:'data',result:{payload:{issues:[]}}});return off;
  };
- await h.start();assert.equal(h.watches.length,6);
+ await h.start();assert.equal(h.watches.length,7);
  const pending=renderOptions.loadDetail({spec:'late'},new AbortController().signal);h.ctl.liveStatus.destroy();
  resolve({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}}}}]}});await pending;await settle();
- assert.equal(h.watches.length,6);assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.frames.size,0);
+ assert.equal(h.watches.length,7);assert.ok(h.watches.every(w=>w.stopped===1));assert.equal(h.frames.size,0);
 });
 
 test('E6 rework coverage opens inactive local and loaded external detail carriers before focusing',async()=>{
@@ -901,8 +906,8 @@ test('E3 rework an initially untracked page defers discovery until a detail intr
  const renderOptions={loadDetail:async()=>({page:{tracking:{jira:{epic:'EP-9'}},sections:[{diagram:{nodes:{child:{tickets:['CH-9']}},rows:[['child']]}}]}})},h=providerHarness({nodes:{parent:{}},rows:[['parent']]},renderOptions);
  assert.equal(h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.watches.length,0);
  await renderOptions.loadDetail({spec:'first-tracked-detail'},new AbortController().signal);await settle();
- assert.equal(h.calls.length,1);assert.deepEqual(h.watches.map(w=>w.input.jql),['key in (CH-9)','key in (CH-9) AND Flagged = Impediment','parent = EP-9','parent = EP-9 AND Flagged = Impediment']);
- h.data(2,[jira('EX-9')]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
+ assert.equal(h.calls.length,1);assert.deepEqual(h.watches.map(w=>w.input.jql),['key in (CH-9)','key in (CH-9) AND Flagged = Impediment','parent = EP-9','parent = EP-9 AND Flagged = Impediment','key in (EP-9)']);
+ h.data(2,[jira('EX-9')]);h.data(0,[jira('CH-9')]);h.data(1,[]);h.data(3,[]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
  h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });
 
@@ -1208,4 +1213,131 @@ test('G11 a host provider may hand links directly; apply sanitizes them and the 
  const row=h.view.querySelector('tr[data-live-ticket="AA-1"]'),icons=row.querySelectorAll('a.dv-live-pr-link');assert.deepEqual(icons.map(a=>a.getAttribute('data-pr-state')),['open','open']);assert.equal(icons[0].querySelector('.dv-live-pr-checks').getAttribute('data-checks'),'failing');assert.equal(icons[1].querySelector('.dv-live-pr-checks'),null);
  assert.equal(icons[1].getAttribute('aria-label'),'Pull request #2 · open');assert.equal(h.view.querySelector('tr[data-live-ticket="BB-1"] .dv-live-pr-summary').textContent,'3 merged');
  api.apply({'AA-1':{state:'active'}});assert.equal(api.state('AA-1').prs,undefined);assert.equal(row.querySelectorAll('a.dv-live-pr-link').length,0);api.destroy();
+});
+
+test('imported consumer tracking drives refs, carrier coverage, dependencies, readiness and refresh without local carriers',()=>{
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']},db:{tickets:['AA-2']}},edgeTracking:{'api->db':{tickets:['AA-2'],prs:['https://github.com/acme/api/pull/1']}}}],steps:[{id:'persist',edge:'canon::api->canon::db'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'},dependencies:[{ticket:'AA-2',on:'AA-1'}]};
+ const resolved=C.FlowTopology.materialize([provider,consumer])[1],h=harness(resolved),api=h.ctl.liveStatus;
+ assert.deepEqual(plain(api.refs()).tickets,['AA-1','AA-2']);assert.deepEqual(plain(api.refs()).prs,['https://github.com/acme/api/pull/1']);
+ api.apply({'AA-1':{state:'blocked'},'AA-2':{state:'todo'}});
+ const snap=api.snapshot();
+ assert.deepEqual(plain(snap.counts),{todo:1,active:0,done:0,blocked:1,missing:0});
+ assert.equal(snap.readiness.total,3);assert.equal(snap.readiness.done,0);assert.equal(snap.readiness.ready,false);assert.equal(snap.readiness.blockers,1);
+ assert.deepEqual(plain(snap.coverage.onDiagram),['AA-1','AA-2']);
+ assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-waiting'));assert.ok(h.view.querySelector('g.coin').classList.contains('dv-live-blocked'));
+ api.apply({'AA-1':{state:'done'},'AA-2':{state:'done'}});
+ assert.equal(api.snapshot().readiness.total,3);assert.equal(api.snapshot().readiness.done,3);assert.equal(api.snapshot().readiness.ready,true);
+ assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
+ assert.deepEqual(Object.keys(consumer.page.sections[0].diagram.nodes),[]);assert.equal(consumer.page.sections[0].diagram.edges,undefined);
+ api.destroy();
+});
+
+/* Initiative support reuses the existing parent roots; no authored type selector. */
+const initiativeFixture=(parents=['IN-1'],tickets=[])=>({page:{tracking:{jira:{site:'https://jira.test',epic:parents}},sections:[{id:'main',diagram:{nodes:{a:{title:'Delivery',tickets}},rows:[['a']],steps:[{id:'delivery',nodes:['a']}],panels:[{id:'status',type:'live-status',title:'Delivery status'}]}}]}});
+function hierarchyIssue(key,level,category='indeterminate',parent){
+ const issue=jira(key,category);issue.fields.issuetype={name:level===2?'Custom program':level===1?'Delivery epic':'Task',hierarchyLevel:level};
+ if(parent)issue.fields.parent={key:parent,fields:{summary:'Work '+parent,status:{statusCategory:{key:'indeterminate'}},issuetype:{hierarchyLevel:level+1}}};return issue;
+}
+function hierarchyWatch(h,jql){const watch=h.watches.find(w=>!w.stopped && w.input.jql===jql);assert.ok(watch,'active query '+jql);return watch;}
+function hierarchyData(h,jql,issues,extra={}){hierarchyWatch(h,jql).handler({type:'data',result:{payload:{issues,...extra}}});}
+function hierarchyBranch(h,key,issues){hierarchyData(h,'parent = '+key,issues);hierarchyData(h,'parent = '+key+' AND Flagged = Impediment',[]);}
+async function completeInitiative(parents=['IN-1'],tickets=[]){
+ const h=providerHarness(initiativeFixture(parents,tickets),{},false);await h.start();
+ hierarchyData(h,'key in ('+parents.join(', ')+')',parents.map(key=>hierarchyIssue(key,key.startsWith('IN-')?2:1)));
+ hierarchyBranch(h,'IN-1',[hierarchyIssue('EP-1',1,'indeterminate','IN-1'),hierarchyIssue('EP-2',1,'indeterminate','IN-1')]);
+ if(tickets.length){hierarchyData(h,'key in ('+tickets.join(', ')+')',tickets.map(key=>hierarchyIssue(key,0,'done','EP-1')));hierarchyData(h,'key in ('+tickets.join(', ')+') AND Flagged = Impediment',[]);}
+ hierarchyBranch(h,'EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('ST-2',0,'indeterminate','EP-1')]);
+ hierarchyBranch(h,'EP-2',[hierarchyIssue('ST-3',0,'new','EP-2')]);return h;
+}
+test('I1 parent roots auto-detect custom hierarchy types; two levels produce distinct story-only totals and coverage',async()=>{
+ const h=await completeInitiative(['IN-1','EP-1'],['ST-1']);
+ hierarchyData(h,'parent = EP-2 AND Flagged = Impediment',[hierarchyIssue('ST-3',0,'new','EP-2')]);
+ const api=h.ctl.liveStatus,s=plain(api.snapshot());assert.deepEqual(s.epic.keys,['IN-1','EP-1']);assert.equal(s.epic.title,'Work IN-1');assert.deepEqual(s.epic.epics,['EP-1','EP-2']);assert.equal(s.epic.stories,3);assert.equal(s.epic.done,1);assert.equal(s.epic.onDiagram,1);
+ assert.deepEqual(s.tickets.map(t=>t.key).sort(),['ST-1','ST-2','ST-3']);assert.deepEqual(s.coverage.notInEpic,[]);assert.deepEqual(s.coverage.notOnDiagram.sort(),['ST-2','ST-3']);assert.ok(s.tickets.every(t=>/^epic EP-/.test(t.epicLabel)));assert.equal(s.blockers[0].key,'ST-3');assert.equal(s.readiness.ready,true,'readiness remains about diagram carriers');
+ assert.match(textOf(h.view.querySelector('.dv-live-scope')),/Initiative · 2 epics/);assert.match(textOf(h.view.querySelector('.dv-live-epic-counts')),/Diagram ready to demo/);
+ assert.equal(h.watches.filter(w=>w.input.jql==='parent = EP-1').length,1,'explicit and discovered epic share a watch');
+ assert.ok(h.watches.every(w=>w.input.fields.includes('parent') && w.input.fields.includes('issuetype')));
+ assert.equal(api.state('EP-1').kind,'epic');assert.deepEqual(plain(api.state('ST-2').initiatives),['IN-1']);assert.equal(api.state('ST-2').parent,'EP-1');api.destroy();
+});
+test('I2 initiative-only and empty roots have their own metadata; pre-detection epic rows never become stories',async()=>{
+ const h=providerHarness(initiativeFixture(),{},false);await h.start();
+ hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-1',1,'indeterminate','IN-1')]);assert.equal(h.ctl.liveStatus.snapshot().hasData,false);
+ const root=hierarchyIssue('IN-1',2);delete root.fields.issuetype.hierarchyLevel;root.fields.issuetype.name='Initiative';
+ hierarchyData(h,'key in (IN-1)',[root]);hierarchyData(h,'parent = IN-1 AND Flagged = Impediment',[]);
+ hierarchyBranch(h,'EP-1',[]);let s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.title,'Work IN-1');assert.equal(s.epic.stories,0);assert.equal(s.epic.epics.length,1);assert.equal(s.tickets.length,0);
+ hierarchyBranch(h,'IN-1',[]);s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.title,'Work IN-1');assert.equal(s.epic.stories,0);assert.equal(s.epic.epics.length,0);assert.equal(s.readiness.ready,false);assert.equal(s.epic.state,'active');assert.equal(s.available,true);
+ assert.equal(h.view.querySelector('.dv-live-epic-progress').hidden,false);assert.equal(h.ctl.liveStatus.state('EP-1'),null);h.ctl.liveStatus.destroy();
+});
+test('I3 root, story and flagged cursor chains all paginate; cycles and unexpected hierarchy containers stay out',async()=>{
+ const h=providerHarness(initiativeFixture(),{},false);await h.start();hierarchyData(h,'key in (IN-1)',[hierarchyIssue('IN-1',2)]);
+ const calls=[];h.mcp.callTool=async(server,tool,input)=>{calls.push(plain(input));return {payload:{issues:input.nextPageToken==='epics'?[hierarchyIssue('EP-2',1,'indeterminate','IN-1')]:input.nextPageToken==='root-flags'?[hierarchyIssue('EP-2',1)]:[hierarchyIssue('ST-2',0,'done','EP-1')]}};};
+ hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-1',1),hierarchyIssue('IN-1',2),hierarchyIssue('BAD-1',0)],{nextPageToken:'epics'});
+ hierarchyData(h,'parent = IN-1 AND Flagged = Impediment',[],{pageInfo:{hasNextPage:true,endCursor:'root-flags'}});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('EP-1',1),hierarchyIssue('BAD-2',2)],{nextPageToken:'stories'});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{nextPageToken:'story-flags'});hierarchyBranch(h,'EP-2',[hierarchyIssue('ST-1',0,'done','EP-1')]);await settle();
+ const s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.stories,2);assert.equal(s.epic.done,1);assert.equal(h.ctl.liveStatus.state('ST-2').state,'blocked');assert.deepEqual(calls.map(c=>c.nextPageToken).sort(),['epics','root-flags','stories','story-flags']);assert.ok(!s.tickets.some(t=>t.key.startsWith('BAD-')));assert.equal(h.watches.filter(w=>w.input.jql==='parent = IN-1').length,1);h.ctl.liveStatus.destroy();
+});
+test('I4 failed and superseded root and flagged refreshes retain the last complete hierarchy',async()=>{
+ const h=await completeInitiative(),api=h.ctl.liveStatus,before=plain(api.snapshot().states);
+ h.mcp.callTool=()=>Promise.reject({code:'tool_error',message:'page failed'});
+ hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-9',1)],{nextPageToken:'fail'});await settle();assert.deepEqual(plain(api.snapshot().states),before);assert.ok(!h.watches.some(w=>w.input.jql==='parent = EP-9'));
+ let resolve;h.mcp.callTool=()=>new Promise(r=>resolve=r);hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-9',1)],{nextPageToken:'old'});await settle();
+ hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-1',1),hierarchyIssue('EP-2',1)]);resolve({payload:{issues:[hierarchyIssue('EP-8',1)]}});await settle();assert.ok(!h.watches.some(w=>w.input.jql==='parent = EP-8' || w.input.jql==='parent = EP-9'));
+ const stable=plain(api.snapshot().states);h.mcp.callTool=()=>Promise.reject({code:'tool_error',message:'flags failed'});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{nextPageToken:'flags'});await settle();hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-4',0,'done','EP-1')]);assert.deepEqual(plain(api.snapshot().states),stable,'failed flagged evidence cannot publish new partial totals');
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);assert.equal(api.state('ST-1'),null);assert.equal(api.state('ST-4').state,'done');api.destroy();
+});
+test('I5 membership replacement retires old child watches and late results; explicit overlapping epics stay reachable',async()=>{
+ for(const explicit of [false,true]){
+  const h=await completeInitiative(explicit?['IN-1','EP-2']:['IN-1']),api=h.ctl.liveStatus,old=hierarchyWatch(h,'parent = EP-2');await settle();
+  hierarchyData(h,'parent = IN-1',[hierarchyIssue('EP-1',1),hierarchyIssue('EP-3',1)]);assert.equal(api.snapshot().epic.stories,3,'wait for new branch');
+  hierarchyBranch(h,'EP-3',[hierarchyIssue('ST-4',0,'done','EP-3')]);assert.equal(api.state('ST-4').epic,'EP-3');assert.equal(!!api.state('ST-3'),explicit);assert.equal(old.stopped,explicit?0:1);
+  old.handler({type:'data',result:{payload:{issues:[hierarchyIssue('LATE-1',0)]}}});assert.equal(!!api.state('LATE-1'),explicit);
+  api.setEnabled(false);hierarchyData(h,'parent = EP-3',[hierarchyIssue('ST-5',0,'done','EP-3')]);assert.equal(api.state('ST-5'),null);api.setEnabled(true);assert.equal(api.state('ST-5').state,'done');
+  api.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));hierarchyDataAfterDestroy(old);assert.equal(api.state('AFTER-1'),null);assert.equal(h.timers.size,0);
+ }
+ function hierarchyDataAfterDestroy(w){w.handler({type:'data',result:{payload:{issues:[hierarchyIssue('AFTER-1',0)]}}});}
+});
+test('I6 loaded detail parent roots deduplicate and removal keeps only descendants reachable from remaining roots',async()=>{
+ let detail=initiativeFixture(['IN-1','IN-2']);const options={loadDetail:async()=>detail},h=providerHarness(initiativeFixture(),options,false);await h.start();hierarchyData(h,'key in (IN-1)',[hierarchyIssue('IN-1',2)]);hierarchyBranch(h,'IN-1',[hierarchyIssue('EP-1',1)]);hierarchyBranch(h,'EP-1',[hierarchyIssue('ST-1',0)]);
+ await options.loadDetail({spec:'detail'},new AbortController().signal);hierarchyData(h,'key in (IN-2)',[hierarchyIssue('IN-2',2)]);hierarchyBranch(h,'IN-2',[hierarchyIssue('EP-1',1),hierarchyIssue('EP-2',1)]);hierarchyBranch(h,'EP-2',[hierarchyIssue('ST-2',0)]);
+ assert.deepEqual(plain(h.ctl.liveStatus.refs().epics),['IN-1','IN-2']);assert.equal(h.watches.filter(w=>w.input.jql==='parent = EP-1').length,1);assert.deepEqual(plain(h.ctl.liveStatus.state('ST-1').initiatives),['IN-1','IN-2']);assert.equal(h.ctl.liveStatus.snapshot().epic.stories,2);
+ detail=initiativeFixture([]);await options.loadDetail({spec:'detail'},new AbortController().signal);await settle();assert.deepEqual(plain(h.ctl.liveStatus.refs().epics),['IN-1']);assert.equal(h.ctl.liveStatus.state('ST-2'),null);assert.equal(h.ctl.liveStatus.state('IN-2'),null);assert.deepEqual(plain(h.ctl.liveStatus.state('ST-1').initiatives),['IN-1']);assert.ok(h.watches.filter(w=>w.input.jql==='parent = EP-2').every(w=>w.stopped===1));h.ctl.liveStatus.destroy();
+});
+test('I7 runtime and demo metadata preserve initiative scope without new authored fields',()=>{
+ const h=harness(initiativeFixture(['IN-1'],['ST-1'])),C=storyContext(),map=plain(C.liveStatusDemoMap({issues:{'IN-1':{state:'active',kind:'initiative',summary:'Program'},'EP-1':{state:'active',kind:'epic',initiatives:['IN-1']},'ST-1':{state:'done',epic:'EP-1',parent:'EP-1',initiatives:['IN-1']},'ST-2':{state:'blocked',epic:'EP-1',initiatives:['IN-1'],links:[{key:'ST-1',type:'depends on'}]}}},['ST-1']));
+ h.ctl.liveStatus.apply(map);const s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.title,'Program');assert.equal(s.epic.stories,2);assert.equal(s.epic.done,1);assert.deepEqual(s.coverage.notInEpic,[]);assert.deepEqual(s.tickets.map(t=>t.key).sort(),['ST-1','ST-2']);assert.equal(h.ctl.liveStatus.state('ST-1').parent,'EP-1');assert.equal(h.ctl.page.tracking.jira.initiative,undefined);h.ctl.liveStatus.destroy();
+});
+test('I8 missing or unknown root types never pretend to be a completed initiative; malformed rows are ignored',async()=>{
+ for(const payload of [[],[jira('IN-1')],[null,{}, {key:'not-a-key'},hierarchyIssue('IN-1',2)]]){
+  const h=providerHarness(initiativeFixture(),{},false);await h.start();hierarchyData(h,'key in (IN-1)',payload);hierarchyBranch(h,'IN-1',[]);
+  const s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.stories,0);assert.equal(s.readiness.ready,false);assert.notEqual(s.epic.state,'done');assert.equal(s.epic.initiatives.length,payload.length>1?1:0);h.ctl.liveStatus.destroy();
+ }
+});
+test('I9 direct Epic parents publish only complete child and Flagged evidence across failures and supersession',async()=>{
+ const h=providerHarness(initiativeFixture(['EP-1']),{},false);await h.start();const api=h.ctl.liveStatus;
+ hierarchyData(h,'key in (EP-1)',[hierarchyIssue('EP-1',1)]);
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'indeterminate','EP-1')]);
+ assert.equal(api.snapshot().hasData,false,'initial child evidence waits for the Flagged answer');
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);
+ const baseline=plain(api.snapshot().states);assert.equal(baseline['ST-1'].state,'active');
+ let rejectPage;h.mcp.callTool=()=>new Promise((resolve,reject)=>{rejectPage=reject;});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{nextPageToken:'pending-flags'});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('ST-2',0,'done','EP-1')]);
+ assert.deepEqual(plain(api.snapshot().states),baseline,'a successful child refresh cannot publish while Flagged pagination is in flight');
+ rejectPage({code:'tool_error',message:'Flagged continuation failed'});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('ST-2',0,'done','EP-1')]);
+ assert.deepEqual(plain(api.snapshot().states),baseline,'a failed Flagged refresh retains the previous complete board');
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[hierarchyIssue('ST-2',0)]);
+ assert.equal(api.state('ST-1').state,'done');assert.equal(api.state('ST-2').state,'blocked');
+ const complete=plain(api.snapshot().states);let resolveOld;h.mcp.callTool=()=>new Promise(resolve=>{resolveOld=resolve;});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{pageInfo:{hasNextPage:true,endCursor:'stale-flags'}});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-3',0,'done','EP-1')]);assert.deepEqual(plain(api.snapshot().states),complete);
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[hierarchyIssue('ST-3',0)]);assert.equal(api.state('ST-3').state,'blocked');assert.equal(api.state('ST-2'),null);
+ const latest=plain(api.snapshot().states);resolveOld({payload:{issues:[]}});await settle();assert.deepEqual(plain(api.snapshot().states),latest,'a superseded empty Flagged page cannot clear the current blocker');
+ api.destroy();
 });

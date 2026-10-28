@@ -432,3 +432,73 @@ authored consumer and its complete provider closure to `tools/validate.js` in on
 invocation. It resolves that batch in memory, reports results against the original
 filenames, and never writes a flattened source. The Canon publisher remains the
 authority for validating and resolving the centrally enrolled source snapshot.
+
+## Delivery tracking on canonical topology
+
+Keep the architecture in Canon and place delivery annotations on the consumer's
+imports. For example, the canonical provider exports its two components and their
+connection:
+
+```json
+{
+  "page": {
+    "title": "Canonical service",
+    "canon": {"version": 1, "id": "service", "kind": "canonical", "owner": "group:default/platform"},
+    "sections": [{"id": "architecture", "diagram": {
+      "nodes": {"api": {"title": "API"}, "store": {"title": "Store"}},
+      "rows": [["api", "store"]],
+      "edges": [{"from": "api", "to": "store", "label": "Persist"}],
+      "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}
+    }}]
+  }
+}
+```
+
+The delivery board imports that structure without copying nodes or edges:
+
+```json
+{
+  "page": {
+    "title": "Service delivery",
+    "canon": {"version": 1, "id": "service-delivery", "kind": "design", "owner": "group:default/platform"},
+    "tracking": {"jira": {"site": "https://acme.atlassian.net", "epic": "API-100"}},
+    "sections": [{"id": "delivery", "diagram": {
+      "nodes": {}, "rows": [[]],
+      "topologyImports": [{
+        "spec": "service", "export": "core", "as": "canon",
+        "nodeTracking": {"api": {"tickets": ["API-101"], "prs": ["https://github.com/acme/api/pull/2"]}},
+        "edgeTracking": {"api->store": {"tickets": ["API-102"]}}
+      }],
+      "steps": [{"id": "persist", "edge": "canon::api->canon::store", "text": "Persist data"}],
+      "panels": [{"id": "delivery-status", "type": "live-status", "title": "Delivery status"}]
+    }}]
+  }
+}
+```
+
+Open the authored consumer with its approved providers. In the desktop Inspector,
+select an imported node or connection and use **Add ticket** or **Add PR**.
+Inherited references are displayed read-only. Removal applies only to consumer
+additions; each edit has one Undo/Redo. Duplicate additions do nothing.
+
+`nodeTracking` and `edgeTracking` values accept only `tickets` and `prs` arrays.
+Jira keys and PR URLs follow the [tracking parser](live-status.md#fields); invalid
+entries, unknown fields, and missing/deselected identities fail validation.
+Nested imports use complete provider-relative keys such as `inner::api` and
+`inner::api->inner::store`. The resolver appends local references after inherited
+ones and deduplicates normalized values in order. Provider refreshes preserve
+local additions, including when a provider later adopts the same reference;
+removing the local copy still leaves that inherited reference.
+
+Tracking is independent of `nodeOverrides`, `nodePositions`, `nodeCodeRefs` and
+`edgeOverrides`, so presentation and layout resets preserve it. Saved authoring
+JSON retains only imports and overlays. Session recovery retains the approved
+provider closure; offline HTML freezes the resolved effective values. A resolved
+snapshot without its authored import remains read-only.
+
+The live-status provider receives the resolved, distinct ticket keys and PR URLs.
+Imported nodes, connections and consumer steps receive the same state colors,
+dependency presentation and readiness calculations as locally authored carriers.
+A repeated key counts once in ticket totals but each carrier contributes to
+carrier coverage; board coverage buttons focus the imported node or connection.
+Reader node menus and node/edge ticket popovers expose the merged links.

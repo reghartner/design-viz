@@ -359,7 +359,7 @@ test('direct and nested imports freeze the stamped click revision and safely esc
     const d=directory(),h=harness({pickDirectory:()=>Promise.resolve(d.dir)}),fixture=topologyFixture(nested);
     fixture.provider.page.sections[0].diagram.nodes.api.title='API </ScRiPt><script>injected()</script>';
     const original=JSON.stringify(fixture.consumer,null,3)+'\n';h.session.replaceProject(original,null,{topologyContext:fixture.context});
-    const expected=C.FlowviewCompatibility.stampText(original);
+    const expected=C.FlowviewCompatibility.stampText(original,h.session.resolve(JSON.parse(original)));
     h.click('file-save');await settle();
     h.session.resolve=()=>{throw Error('must not resolve after click');};h.type('src','later unfinished handwriting');
     h.requests[0].resolve(response());await settle();

@@ -92,11 +92,8 @@ After the packet, route source/handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- Jira: `live-status-board`; desktop **Parent** saves Epic/Initiative keys in
-  `tracking.jira.epic`. Jira detects type; never guess or add an initiative field.
-  Desktop **Exclude story** saves `tracking.jira.exclude`; totals subtract those
-  parent stories, then add manual tickets and displayed upstream dependencies,
-  deduplicated. See `live-status-board` for precedence and the audit list.
+- [Jira](../live-status-board/SKILL.md): desktop `tracking.jira.exclude`.
+  Count parent stories − exclusions + manual tickets + displayed dependencies once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

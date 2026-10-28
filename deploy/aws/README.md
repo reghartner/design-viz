@@ -7,6 +7,11 @@ the static editor shell. The shell is publicly downloadable; **all project data
 requires an invited account**. A share link is authenticated, read-only viewing.
 This implementation has local mock evidence, not a deployed-AWS validation claim.
 
+For an agent using the company's rollout platform, start with
+[Company deployment requirements](AGENT-ONBOARDING.md). It describes the resource,
+identity, packaging and validation contracts without prescribing Terraform, SAM
+or another infrastructure deployment tool.
+
 ## Local rehearsal (no account, credentials, Docker or AWS calls)
 
 From the repository root, with Node 22+ and Python 3:
@@ -86,25 +91,22 @@ browser quota, so very large drafts may require a local export before switching.
 Tokens are tab-session storage only, never project artifacts. Access tokens expire
 after an hour; the UI asks for another managed sign-in without losing the draft.
 
-## Reproducible AWS preparation (operator-run, no deploy performed here)
+## AWS configuration reference (no deploy performed here)
 
-`template.yaml` is a SAM/CloudFormation template. Keep the stack region compatible
-with your SES sender identity. EMAIL_OTP requires Cognito ESSENTIALS (or higher),
+Use the company's existing rollout platform to implement the requirements in
+[AGENT-ONBOARDING.md](AGENT-ONBOARDING.md). `template.yaml` is a reference
+SAM/CloudFormation configuration, not a required deployment path. Keep the region
+compatible with your SES sender identity. EMAIL_OTP requires Cognito ESSENTIALS (or higher),
 SES DEVELOPER email configuration, a verified sender and appropriate SES sending
 access. The template disables self-signup and uses a public code-grant app client
 with PKCE; there is no frontend secret. Provision users with `AdminCreateUser`,
 omitting `TemporaryPassword` when passwordless EMAIL_OTP is enabled, and verify
 the email through your invitation process. No automatic linking by email occurs.
 
-```sh
-npm ci --prefix deploy/aws --ignore-scripts --no-audit --no-fund
-sam build --template-file deploy/aws/template.yaml
-sam deploy --guided
-```
-
-Set `CognitoDomainPrefix`, `SesIdentityArn`, `FromEmail` during deployment. SAM
-packages the pinned dependency lockfile with the Lambda handler. Never enable
-mock auth in a production build. No real AWS calls are needed for local tests.
+The reference inputs are `CognitoDomainPrefix`, `SesIdentityArn` and `FromEmail`;
+map them into the company platform's configuration. Package the Lambda handler
+and pinned production dependencies using the allowlist in `Makefile`. Never
+enable mock auth in a production build. No real AWS calls are needed for local tests.
 
 For each invited Cognito subject, an administrator creates exactly one membership
 item in the output `MembershipTable`:

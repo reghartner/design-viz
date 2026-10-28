@@ -159,11 +159,13 @@ node styles, node tones and step colors while enabled.
 
 The canvas has no status badges (#762): card stroke and halo, edge stroke, the
 dashed todo and waiting strokes, step coins and the break glyph carry the state.
-Click a painted node's card or an edge's label (the edge itself when it has no
-label) for ticket status, title, assignee and the informational PR summary. The
+Click a painted node's card or an edge's line, label or live break glyph for
+ticket status, title, assignee and the informational PR summary. The
 node's own links, detail and handoff controls keep their clicks. In the reader
-that card or label is a keyboard button named for its tickets and state; press
-Enter/Space to open the popover. Escape or an outside click closes it and
+that card or edge label is one keyboard button named for its tickets and state.
+An unlabelled edge uses its path, or its visible live break when blocked.
+Press Enter/Space to open the popover.
+Escape or an outside click closes it and
 returns focus to the carrier. In the Workbench, clicks keep selecting for
 editing and the Tickets table is the route to a carrier. Jira browse links
 use the page tracking site, falling back to the provider URL. Each ticket row of

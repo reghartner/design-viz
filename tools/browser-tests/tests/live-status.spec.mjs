@@ -68,7 +68,7 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await node('hardware').locator('.detail-trigger').click();await expect(root.locator('[data-dv-detail-preview] [data-dv-node="child"]')).toHaveClass(/dv-live-active/);
 });
 test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server})=>{
- const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';d.edges.push({from:'hardware',to:'todo',label:'work',tickets:['HW-123']});d.steps.push({id:'active',edge:'hardware->todo',text:'Active work'});d.paths[0].steps.push('active');const root=await open(page,server,spec),section=root.locator('#section-delivery');
+ const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';d.edges.push({from:'hardware',to:'todo',label:'work',tickets:['HW-123']});d.steps.push({id:'active',edge:'hardware->todo',text:'Active work',color:'#654321'});d.paths[0].steps.push('active');const root=await open(page,server,spec),section=root.locator('#section-delivery');
  await section.locator('.schip[data-step-source="0"]').first().click();
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
   if(['daylight','editorial'].includes(skin)){
@@ -94,19 +94,30 @@ test('V5 all skins keep live card, edge, coin and chip paint above tones and aut
   await expect(hardware.locator('.dv-live-halo')).toHaveCSS('stroke',azure.line);
   for(const selector of ['path.edge[data-dv-edge="3"]','path.halo[data-dv-edge="3"]'])await expect(section.locator(selector)).toHaveCSS('stroke',azure.line);
   await expect(section.locator('text.lbl[data-dv-edge="3"]')).toHaveCSS('fill',azure.line);
-  await expect(section.locator('.coin[data-dv-step="3"] > circle')).toHaveCSS('fill',azure.line);
-  await expect(section.locator('.schip[data-step-source="3"]').first()).toHaveCSS('background-color',azure.line);
+  const activeCoin=section.locator('.coin[data-dv-step="3"]'),activeChip=section.locator('.schip[data-step-source="3"]').first();
+  await expect(activeCoin.locator('circle')).toHaveCSS('fill','rgb(233, 242, 255)');
+  await expect(activeCoin.locator('circle')).toHaveCSS('stroke',azure.line);
+  await expect(activeCoin.locator('text')).toHaveCSS('fill','rgb(0, 0, 0)');
+  await expect(activeChip).toHaveCSS('background-color','rgb(233, 242, 255)');
+  await expect(activeChip).toHaveCSS('border-color',azure.line);
+  await expect(activeChip).toHaveCSS('color','rgb(0, 0, 0)');
+  await activeChip.click();await expect(activeChip).toHaveAttribute('aria-current','true');await expect(activeChip).not.toHaveCSS('box-shadow','none');
+  const live=root.locator('.dv-live-toggle');await live.click();
+  await expect(activeCoin.locator('circle')).toHaveCSS('fill','rgb(101, 67, 33)');
+  await expect(activeChip).toHaveCSS('background-color','rgb(101, 67, 33)');
+  await live.click();await expect(activeChip).toHaveCSS('background-color','rgb(233, 242, 255)');
   await expect(root.locator('.dv-live-head [data-live-count="active"]')).toHaveCSS('background-color',azure.line);
   await expect(root.locator('.dv-live-tickets tr[data-live-ticket="HW-123"] .dv-live-state-pill')).toHaveCSS('background-color',azure.line);
   await cardClick(hardware.locator('.card'));
   await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveText('active');
   await page.keyboard.press('Escape');
   await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
+  await section.locator('.schip[data-step-source="0"]').first().click();
  }
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');
  await page.emulateMedia({reducedMotion:'reduce'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');
  await expect.poll(()=>section.locator('[data-dv-node="ux"]').evaluate(el=>+getComputedStyle(el).opacity)).toBeGreaterThanOrEqual(.55);
- await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'azure'));
+ await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'azure'));await expect(section.locator('.coin[data-dv-step="3"] > circle')).toHaveCSS('fill','rgb(233, 242, 255)');
 });
 test('V7 V11 authored reference menus work without provider paint',async({page,server})=>{
  const root=await open(page,server,fixture(),false);await expect(root.locator('.dv-live-badge')).toHaveCount(0);await expect(root.locator('.dv-live-toggle')).toBeHidden();
@@ -637,7 +648,7 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
 
 /* Live paint uses Node Styles rendering, with an internal Azure palette for Active.
  P1 nodes wear `node-styled ns-<preset>` (todo slate, active azure, done moss, blocked/missing rose, waiting slate or rose by upstream tone);
-    edges, coins and node cards take that preset's --ns-line in a light and a dark skin. Coin numerals follow the
+    edges and node cards take that preset's --ns-line in a light and a dark skin; Active coins use a pale Azure fill. Coin numerals follow the
     engine's step-colour rule (stepCircleInk: black or white, whichever contrasts more), which is black on every live fill.
  P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
  P3 an authored node `style` yields to live state and returns when Live is turned off. */
@@ -648,7 +659,7 @@ async function presetLine(page,token){
   const probe=document.createElement('span');probe.style.color=getComputedStyle(g).getPropertyValue('--ns-line').trim();document.body.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();g.remove();return color;
  },token);
 }
-test('P1 live nodes wear Node Styles presets; cards, edges and coins share the preset line in daylight and aurora',async({page,server})=>{
+test('P1 live nodes wear Node Styles presets; Active coins keep pale Azure interiors in daylight and aurora',async({page,server})=>{
  const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
  await demoDay(root,2);
  for(const skin of ['daylight','aurora']){
@@ -657,7 +668,7 @@ test('P1 live nodes wear Node Styles presets; cards, edges and coins share the p
   await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',await presetLine(page,'azure'));
   const coins=await root.locator('g.coin[data-dv-step]').evaluateAll(els=>els.map(el=>({state:(/dv-live-(todo|active|done|blocked|missing)/.exec(el.getAttribute('class'))||[])[1],fill:getComputedStyle(el.querySelector('circle')).fill,ink:getComputedStyle(el.querySelector('text')).fill})).filter(c=>c.state));
   expect(coins.length,skin+' painted coins').toBeGreaterThan(0);
-  for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
+  for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(coin.state==='active'?'rgb(233, 242, 255)':await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
  }
  await demoDay(root,4);
  // Day 4: mcu waits red on the blocked HW-124 (rose); ingest waits grey on the unfinished FW-45 (slate).

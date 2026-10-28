@@ -4026,7 +4026,8 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 /* Live state colours use the Node Styles preset lines (#610): todo slate,
    done moss, blocked and missing rose, plus the internal Active Azure palette.
    Dark values follow the presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
-   (stepCircleInk: black or white, whichever contrasts more) for every fill. */
+   (stepCircleInk: black or white, whichever contrasts more). Active markers use
+   a pale Azure interior with the state colour retained on their outline. */
 /* Runtime-only: Azure is not an authored Node Styles choice. */
 .node.dv-live-active.ns-azure{--ns-bg:#E9F2FF;--ns-line:#2878DF;--ns-ink:#163D72;--ns-sub:#345B88;}
 .sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.dv-live-active.ns-azure{--ns-bg:#172E4C;--ns-line:#72B5FF;--ns-ink:#E2EFFF;--ns-sub:#A9C8EE;}
@@ -4059,6 +4060,10 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 .coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
 .coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>text{fill:var(--step-ink)!important;}
 .schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
+/* Keep small Active markers light enough for their dark numerals in every skin. */
+:is(.coin,.schip).dv-live-active{--step-color:#E9F2FF!important;}
+.coin.dv-live-active>circle{stroke:var(--dv-live-active)!important;}
+.schip.dv-live-active{border-color:var(--dv-live-active)!important;}
 .schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
 .stepmode :is(.node,.edge,.halo,.lbl,.coin):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing):not(.lit):not(.comm-hidden):not(.dv-live-comm-hidden){opacity:max(var(--dv-dim,.45),.55)!important;}
 .dv-live-target,.dv-live-pointer,g.node:has(>.card.dv-live-target){cursor:pointer;}

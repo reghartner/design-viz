@@ -67,7 +67,7 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await node('firmware').locator('.card').press('Enter');await expect(pop.getByRole('link',{name:'FW-45',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'FW-46',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'https://github.com/acme/firmware/pull/88',exact:true})).toBeVisible();await page.keyboard.press('Escape');
  await node('hardware').locator('.detail-trigger').click();await expect(root.locator('[data-dv-detail-preview] [data-dv-node="child"]')).toHaveClass(/dv-live-active/);
 });
-test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server})=>{
+test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server},testInfo)=>{
  const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';d.edges.push({from:'hardware',to:'todo',label:'work',tickets:['HW-123']});d.steps.push({id:'active',edge:'hardware->todo',text:'Active work',color:'#654321'});d.paths[0].steps.push('active');const root=await open(page,server,spec),section=root.locator('#section-delivery');
  await section.locator('.schip[data-step-source="0"]').first().click();
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
@@ -101,7 +101,13 @@ test('V5 all skins keep live card, edge, coin and chip paint above tones and aut
   await expect(activeChip).toHaveCSS('background-color','rgb(233, 242, 255)');
   await expect(activeChip).toHaveCSS('border-color',azure.line);
   await expect(activeChip).toHaveCSS('color','rgb(0, 0, 0)');
-  await activeChip.click();await expect(activeChip).toHaveAttribute('aria-current','true');await expect(activeChip).not.toHaveCSS('box-shadow','none');
+  await activeChip.click();await expect(activeChip).toHaveAttribute('aria-current','true');
+  await expect(activeChip,skin+' compact status-colored selection over authored color').toHaveCSS('box-shadow',azure.line+' 0px 0px 0px 1px');
+  if(['aurora','pastel'].includes(skin))await section.locator('.termbar').screenshot({path:testInfo.outputPath('selected-active-'+skin+'.png')});
+  // Native keyboard navigation must still expose a distinct focus cue.
+  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+  await expect(activeChip).toBeFocused();await expect(activeChip).toHaveCSS('outline-style','solid');
+  expect(await activeChip.evaluate(el=>el.matches(':focus-visible')&&parseFloat(getComputedStyle(el).outlineWidth)>=1&&parseFloat(getComputedStyle(el).outlineOffset)>=2),skin+' keyboard focus outline').toBe(true);
   const live=root.locator('.dv-live-toggle');await live.click();
   await expect(activeCoin.locator('circle')).toHaveCSS('fill','rgb(101, 67, 33)');
   await expect(activeChip).toHaveCSS('background-color','rgb(101, 67, 33)');
@@ -112,7 +118,11 @@ test('V5 all skins keep live card, edge, coin and chip paint above tones and aut
   await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveText('active');
   await page.keyboard.press('Escape');
   await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
-  await section.locator('.schip[data-step-source="0"]').first().click();
+  const blockedChip=section.locator('.schip[data-step-source="0"]').first();await blockedChip.click();
+  await expect(blockedChip).toHaveAttribute('aria-current','true');
+  await expect(blockedChip,skin+' compact blocked selection').toHaveCSS('box-shadow',(await presetLine(page,'rose'))+' 0px 0px 0px 1px');
+  await expect(activeChip).toHaveAttribute('aria-current','false');
+  await expect(activeChip).not.toHaveCSS('box-shadow',azure.line+' 0px 0px 0px 1px');
  }
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');
  await page.emulateMedia({reducedMotion:'reduce'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');

@@ -74,8 +74,12 @@ Ask the author, in one batch, only what the source does not already state:
   tickets; they derive their state from the nodes and edges they involve.
 - **Teams.** Which `lanes` exist and which step belongs to which lane. Lane
   chips are omitted from status-board step captions. Beneath the step's text,
-  each Jira ticket appears on its own line with its state, derived from involved
-  nodes and edges, including endpoints and failures. Unresolved keys say No status.
+  each Jira ticket appears on its own line with its state, derived from nodes
+  explicitly added to the step and selected edges, including failed edges.
+  A delivered edge highlights both endpoints and a failed edge its source,
+  without adding endpoint-node tickets to the list; add those endpoints to the step's `nodes` when their work belongs in that step.
+  Keys are deduplicated within each step. Aggregate captions, coin states and
+  readiness still include edge endpoints. Unresolved keys say No status.
 - **Blocked.** The overlay marks a ticket blocked when Jira has it Flagged
   (JQL `Flagged = Impediment`) or its status name contains "block". Confirm
   the team uses one of those; otherwise blockers will not show.

@@ -30,6 +30,16 @@ test('autoplay accepts strict booleans and warns on values that would otherwise 
   }
 });
 
+test('followActive is optional, retains strict false and warns on malformed authored values',()=>{
+  for(const value of [undefined,true,false,'false',0,null,{},[]]){
+    const diagram={nodes:{a:{}},rows:[['a']]};if(value!==undefined)diagram.followActive=value;
+    const normalized=C.normalize(diagram),result=C.validate(normalized);
+    assert.strictEqual(result.errors.length,0);
+    assert.strictEqual(result.warnings.filter(w=>w.includes('.followActive:')).length,value===undefined || typeof value==='boolean'?0:1);
+    assert.strictEqual(normalized.sections[0].diagram.followActive,value);
+  }
+});
+
 test('diagramHasDelta detects only strict boolean marks on declared nodes, edges, or steps', () => {
   assert.strictEqual(C.diagramHasDelta({}), false);
   assert.strictEqual(C.diagramHasDelta({nodes: {a: {}}, edges: [{}], steps: [{}]}), false);

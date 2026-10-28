@@ -3,6 +3,7 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
+import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 
 function fixture(presentation='standard'){
  return {page:{title:'Follow active camera',sections:[{id:'follow',heading:'Follow the request',diagram:{
@@ -247,4 +248,46 @@ for(const presentation of ['standard','explore'])for(const reader of [false,true
  await nav.getByRole('tab',{name:'Main',exact:true}).click();await frames(page,5);await expect(follow(page)).toHaveAttribute('aria-pressed','false');
  const paused=await camera(page);await section(page).locator('.path-chip[data-dv-path="remote"]').click();await frames(page,50);expect(await camera(page)).toEqual(paused);
  if(!reader){await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();}
+});
+
+
+for(const presentation of ['standard','explore'])test(`${presentation} authored follow off keeps reader step and path cameras fixed until Resume`,async({page,server})=>{
+ const data=pathFixture(presentation);data.page.sections[0].diagram.followActive=false;
+ await open(page,server,presentation,true,data);await frames(page,5);await expect(follow(page)).toHaveText('Resume follow');
+ const initial=await camera(page);
+ await section(page).locator('.schip[data-step-source="1"]').click();await frames(page,5);expect(await camera(page)).toEqual(initial);
+ await section(page).locator('.path-chip[data-dv-path="remote"]').click();await frames(page,5);expect(await camera(page)).toEqual(initial);
+ await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ await fit(page,['[data-dv-node=b]','[data-dv-node=c]']);expect(await camera(page)).not.toEqual(initial);
+});
+
+test('explicit true and malformed follow defaults retain enabled reader navigation',async({page,server})=>{
+ for(const value of [true,'false']){
+  const data=fixture();data.page.sections[0].diagram.followActive=value;
+  await open(page,server,'standard',true,data);await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+  await next(page).click();await frames(page,3);await fit(page,['[data-dv-node=c]']);
+ }
+});
+
+for(const presentation of ['standard','explore'])test(`${presentation} saved follow checkbox honors author changes Undo Redo and export without moving the camera`,async({page,server})=>{
+ await useProjectDownloads({page});const data=fixture(presentation),other=structuredClone(data.page.sections[0]);
+ other.id='other';other.heading='Other section';data.page.sections.push(other);
+ const input=await open(page,server,presentation,false,data);await frames(page,5);
+ await page.locator('#editor-tab-steps').click();await page.locator('.playback-settings > summary').click();
+ const setting=page.getByLabel('Follow active when opened',{exact:true});await expect(setting).toBeChecked();
+ const initial=await camera(page);await setting.uncheck();await frames(page,5);
+ await expect(follow(page)).toHaveText('Resume follow');expect(await camera(page)).toEqual(initial);
+ const edited=await page.locator('#src').inputValue(),parsed=JSON.parse(edited);
+ expect(parsed.page.sections[0].diagram.followActive).toBe(false);expect(parsed.page.sections[1].diagram.followActive).toBeUndefined();
+ await page.locator('#undo-builder').click();await frames(page,5);await expect(page.locator('#src')).toHaveValue(input);
+ await expect(setting).toBeChecked();await expect(follow(page)).toHaveAttribute('aria-pressed','true');expect(await camera(page)).toEqual(initial);
+ await page.locator('#redo-builder').click();await frames(page,5);await expect(page.locator('#src')).toHaveValue(edited);
+ await expect(setting).not.toBeChecked();await expect(follow(page)).toHaveText('Resume follow');expect(await camera(page)).toEqual(initial);
+ // A session override must survive unrelated edits and Render without rewriting its saved default.
+ await closeTools(page);await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','true');
+ await page.locator('#editor-tab-json').click();await page.locator('#go').click();await frames(page,5);
+ await expect(follow(page)).toHaveAttribute('aria-pressed','true');await expect(page.locator('#src')).toHaveValue(edited);
+ await closeTools(page);await page.locator('#workspace-export-trigger').click();
+ const download=page.waitForEvent('download');await page.locator('#file-save').click();
+ const exported=JSON.parse(await projectSource(await download));expect(exported.page.sections[0].diagram.followActive).toBe(false);expect(exported.page.sections[1].diagram.followActive).toBeUndefined();
 });

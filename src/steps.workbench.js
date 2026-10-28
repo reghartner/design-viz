@@ -49,8 +49,10 @@ function initWorkbenchStepList(opts){
   var pathBase=document.getElementById('steps-path-base');
   var pathSignature='';
   var showStepIdsInput=document.getElementById('steps-show-ids');
+  var followActiveInput=document.getElementById('steps-follow-active');
   var autoplayInput = document.getElementById('steps-autoplay'), openingView = document.getElementById('steps-opening-view');
   function playbackSettings(){
+    if(followActiveInput)followActiveInput.checked=!chosen || chosen.diagram.followActive!==false;
     if(showStepIdsInput)showStepIdsInput.checked=!chosen || chosen.diagram.showStepIds!==false;
     if (autoplayInput) autoplayInput.checked = !!chosen && chosen.diagram.autoplay === true;
     if (openingView) openingView.value = chosen && VIEW_SET.indexOf(chosen.diagram.view) >= 0 ? chosen.diagram.view : 'ambient';
@@ -61,6 +63,7 @@ function initWorkbenchStepList(opts){
     if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
     if (opts.configure && opts.configure(plan, chosen.section)) refresh(); else playbackSettings();
   }
+  if(followActiveInput)life.listen(followActiveInput,'change',function(){configurePlayback('followActive',followActiveInput.checked);});
   if(showStepIdsInput)life.listen(showStepIdsInput,'change',function(){configurePlayback('showStepIds',showStepIdsInput.checked);});
   if (autoplayInput) life.listen(autoplayInput,'change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
   if (openingView) life.listen(openingView,'change', function(){ configurePlayback('view', openingView.value); });
@@ -132,6 +135,7 @@ function initWorkbenchStepList(opts){
     select.disabled = blocked; search.disabled = blocked;
     if(pathBase)pathBase.disabled=blocked;
     if(showStepIdsInput)showStepIdsInput.disabled=blocked;
+    if(followActiveInput)followActiveInput.disabled=blocked;
     if (autoplayInput) autoplayInput.disabled = blocked || chosen.diagram.view === 'ambient-only';
     if (openingView) openingView.disabled = blocked;
     if(pathSelect){pathSelect.disabled=blocked;pathLabel.disabled=blocked;pathColor.disabled=blocked;savePath.disabled=blocked;

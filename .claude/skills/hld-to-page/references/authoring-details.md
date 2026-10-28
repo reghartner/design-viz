@@ -77,7 +77,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
 | Add a Flowview/Mermaid graph onto an existing canvas | `docs/workbench-clipboard.md` → Add a diagram; preview the source section and counts, then merge graph-only with one Undo; local section/timeline dependencies and unresolved topology must be resolved first |
 | Plain text annotations on the diagram canvas, with fonts and formatting | Canvas text boxes below; executable `examples/text-boxes/text-boxes.spec.json` |
-| Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
+| Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view`, `autoplay` and `followActive` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
 | Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
@@ -116,6 +116,10 @@ For an automatically playing story use `view:"step", autoplay:true`; do not
 assume `view:"step"` starts playback by itself. The workbench exposes this in
 Steps → Playback settings and keeps its editing preview paused. Published
 Confluence snapshots honor the same setting; configuration previews stay paused.
+`diagram.followActive` defaults to `true`; use `followActive:false` when the
+author wants step/path navigation to keep the camera fixed. The desktop Steps
+→ Playback settings checkbox saves this default; the diagram’s Resume follow
+button affects only the viewer’s session.
 
 In the workbench, **Edit layout** on a homemap opens shared size/room/device
 settings from either view. Ambient map clicks select this layout inspector;

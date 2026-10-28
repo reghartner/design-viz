@@ -296,10 +296,42 @@ test('S2 P1 explicit demo takes precedence over the claude connector',async({pag
  B7 dialog/ring/verdict/downstream/missing/Escape; B8 built demo final day;
  B9 reduced motion + print here and no-ticket DOM in V11; B10 docs/validator in VM.
  All cases use desktop reader dimensions; mobile document editing is out of scope. */
+test('B1 selected edges highlight endpoints but list only directly authored tickets',async({page,server})=>{
+ const spec=fixture(),d=spec.page.sections[0].diagram;
+ d.view='step';d.autoplay=false;
+ d.steps=[
+  {id:'edge',edge:'hardware->firmware',text:'Integration work only'},
+  {id:'failed',failures:{'hardware->firmware':'dropped'},text:'Failed integration work only'},
+  {id:'explicit',edges:['hardware->firmware'],nodes:['firmware'],text:'Include firmware implementation'},
+  {id:'untracked',edge:'backend->ux',text:'Untracked integration'}
+ ];delete d.paths;
+ const root=await open(page,server,spec),section=root.locator('#section-delivery'),bar=section.locator('.termbar'),row=bar.locator('.dv-live-step-tickets');
+ async function endpoints(){
+  for(const id of ['hardware','firmware'])await expect(section.locator('g.node[data-dv-node="'+id+'"]')).toHaveClass(/\blit\b/);
+ }
+ await expect(row.locator('a')).toHaveText(['HW-124','FW-46']);await endpoints();
+ await expect(bar.locator('.dv-live-caption')).toContainText('BLOCKED · HW-124');
+ await section.locator('.schip[data-step-source="1"]').first().click();
+ await expect(row.locator('a')).toHaveText(['HW-124','FW-46']);
+ // Failed delivery keeps the existing source-only focus.
+ await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/\blit\b/);
+ await expect(section.locator('g.comm-failure')).not.toHaveCount(0);
+ await section.locator('.schip[data-step-source="2"]').first().click();
+ await expect(row.locator('a')).toHaveText(['HW-124','FW-46','FW-45']);await endpoints();
+ await expect(row.getByRole('link',{name:'HW-123',exact:true})).toHaveCount(0);
+ await section.locator('.schip[data-step-source="0"]').first().click();
+ await expect(row.locator('a')).toHaveText(['HW-124','FW-46']);
+ await section.locator('.schip[data-step-source="3"]').first().click();await expect(row).toHaveCount(0);
+ await expect(section.locator('g.node[data-dv-node="backend"]')).toHaveClass(/\blit\b/);
+ await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/\blit\b/);
+ await expect(bar.locator('.dv-live-caption')).toContainText('MISSING · BE-68');
+});
 test('B1 step ticket links sit beneath prose before evidence and follow navigation without team-wide tickets',async({page,server},testInfo)=>{
  await page.clock.install();
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:()=>new Promise(resolve=>{window.__resolveStepStatus=resolve;})};});
  const spec=fixture(),d=spec.page.sections[0].diagram;
+ // This layout/focus scenario intentionally includes endpoint work in each step.
+ d.steps[0].nodes=['hardware','firmware'];d.steps[1].nodes=['backend','ux'];d.steps[2].nodes=['hardware','firmware','backend','ux'];
  spec.page.lanes={TEAM:{label:'Delivery team',color:'#146d55'}};spec.page.tracking.jira.epic='DEL-1';
  // A local Jira stub exercises real new-tab activation while the browser audit keeps all traffic offline.
  spec.page.tracking.jira.site=server.origin+'/jira';const ticketURL=server.origin+'/jira/browse/HW-124';
@@ -375,6 +407,8 @@ test('B1 regular diagrams keep authored lane chips beside status boards, includi
 });
 test('B1 grid captions retain safe runtime ticket URLs and plain keys beneath authored prose',async({page,server})=>{
  const spec=fixture(),d=spec.page.sections[0].diagram;delete spec.page.tracking;
+ // Explicit work keeps four/seven ticket rows for the grid overflow contract.
+ d.steps[0].nodes=['hardware','firmware'];d.steps[2].nodes=['hardware','firmware','backend','ux'];
  d.view='step';d.autoplay=false;
  d.layouts=[{id:'chapter',name:'Chapter',presentation:'standard',playbackPosition:'above',sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:12}]},exploreLayout:{steps:{textPosition:'right'}}}];
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:()=>({'HW-124':{state:'todo',url:'https://runtime.test/HW-124'},'FW-46':{state:'todo',url:'javascript:alert(1)'}})};});

@@ -520,6 +520,22 @@ open paused in the current renderer. To retain their earlier automatic behavior,
 add `"autoplay": true`. No schema version flag is required; rebuild older
 self-contained HTML exports to use the updated controls.
 
+### followActive
+
+Optional boolean on `diagram`, default `true`. Set `"followActive": false` to
+open with camera following paused. Standard and Explore keep their existing
+camera as readers select steps or paths; **Resume follow** enables following
+for that session. Omitted or malformed values retain the enabled default;
+malformed values produce a validation warning.
+
+In the desktop workbench, **Steps → Playback settings → Follow active when
+opened** saves this default per diagram, for all paths, with normal Undo/Redo
+and export. Changing the default preserves the current preview camera until
+the next step action. The diagram's **Follow active / Resume follow** button
+only changes session navigation and creates no source edit or Undo entry.
+Manual pan, zoom and object editing still pause following. This option is
+independent of `autoplay`.
+
 ### Shared icons and company branding
 
 Icons are IDs from the shared 58-icon library. Nodes, group labels, Home

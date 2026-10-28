@@ -315,7 +315,9 @@ In the desktop editor, select the step controls and open **Inspect → Play butt
 
 **Follow active**, beside **Ambient / Step**, pans and zooms the diagram to the current step’s nodes and complete connections, including their labels. Selecting a path chip frames the highlighted route; selecting a step returns to that step. Standard moves only the diagram panel. Explore moves the canvas, keeping floating panels and controls clear.
 
-Movement takes about 720 ms, with breathing room and a maximum automatic zoom of 135%. Reduced-motion preferences apply immediately. Pan, zoom, Fit, or start editing a diagram object to pause; **Resume follow** frames the current activity again. Empty steps and Ambient hold the camera. Opening or restoring a view preserves its existing camera until the next step action. Following and its toggle do not change the document or create Undo entries.
+Movement takes about 720 ms, with breathing room and a maximum automatic zoom of 135%. Reduced-motion preferences apply immediately. Pan, zoom, Fit, or start editing a diagram object to pause; **Resume follow** frames the current activity again. Empty steps and Ambient hold the camera. Opening or restoring a view preserves its existing camera until the next step action. The diagram’s Follow active / Resume follow button changes only this session and creates no Undo entries.
+
+To save whether following starts enabled, open **Steps → Playback settings** and toggle **Follow active when opened**. It is on by default and applies to the selected section and all its paths in Standard and Explore. Turning it off keeps the camera fixed during step and path navigation until the reader chooses Resume follow. The saved checkbox supports Undo/Redo and export; changing it preserves the current preview camera until the next step action.
 
 ### Local repositories and shared topology
 

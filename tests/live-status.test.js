@@ -663,31 +663,45 @@ function stepTicketControls(h,rec=h.ctl.sections[0]){
  function change(nextIndex=index,nextMode=mode,type='dv:stepchange'){index=nextIndex;mode=nextMode;rec.sectionEl.dispatchEvent({type});h.flush();}
  change();return {host,pill,change};
 }
-test('B1 step tickets use only involved carriers, including failed-hop endpoints, deduplicated before evidence arrives',()=>{
+test('B1 step tickets use directly selected nodes and edges, excluding implicit failed-hop endpoints, deduplicated before evidence arrives',()=>{
  const raw={page:{tracking:{jira:{site:'https://jira.test/'}},lanes:{TEAM:{label:'One team'}},sections:[{diagram:{
   nodes:{a:{tickets:['AA-1','SH-1']},b:{tickets:['BB-1','SH-1']},c:{tickets:['CC-1']},text:{type:'text',text:'Note',tickets:['TT-1']}},
   panels:[{id:'status',type:'live-status'}],edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}],steps:[{id:'first',lane:'TEAM',nodes:['text'],failures:{'a->b':'dropped'},text:'Original first prose'},{id:'second',lane:'TEAM',nodes:['c'],text:'Original second prose'},{id:'none',text:'No tickets'}]
  }}]}};
  const before=JSON.stringify(raw),h=harness(raw),normalized=JSON.stringify(h.ctl.page),api=h.ctl.liveStatus,{host,pill,change}=stepTicketControls(h);
  const keys=()=>host.querySelectorAll('.dv-live-step-tickets .nbacklink').map(el=>el.textContent);
- assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.equal(host.querySelectorAll('.dv-live-caption').length,0);
+ assert.deepEqual(keys(),['EE-1','SH-1']);assert.equal(host.querySelectorAll('.dv-live-caption').length,0);
  assert.ok(pill.classList.contains('dv-live-board-lane'));assert.equal(pill.getAttribute('tabindex'),null);
- assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['No status','No status','No status','No status']);
- change(1,'step','dv:pathchange');assert.deepEqual(keys(),['CC-1']);change(0);assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['No status','No status']);
+ change(1,'step','dv:pathchange');assert.deepEqual(keys(),['CC-1']);change(0);assert.deepEqual(keys(),['EE-1','SH-1']);
  const row=host.querySelector('.dv-live-step-tickets'),first=row.querySelector('.nbacklink');
  assert.equal(first.getAttribute('href'),'https://jira.test/browse/EE-1');assert.equal(first.getAttribute('target'),'_blank');assert.equal(first.getAttribute('rel'),'noopener noreferrer');
  api.apply({'EE-1':{state:'blocked',url:'https://runtime.test/ignored'},'CC-1':{state:'done'},'EP-99':{state:'todo',epic:'EP-1',lane:'TEAM'}});
- assert.deepEqual(keys(),['EE-1','SH-1','AA-1','BB-1']);assert.ok(row===host.querySelector('.dv-live-step-tickets'),'unchanged references preserve the row and keyboard focus');
+ assert.deepEqual(keys(),['EE-1','SH-1']);assert.ok(row===host.querySelector('.dv-live-step-tickets'),'unchanged references preserve the row and keyboard focus');
  assert.equal(host.querySelector('.dv-live-caption').textContent,'BLOCKED · EE-1');assert.equal(host.textContent,'Authored prose');
- assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Blocked','No status','No status','No status']);
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Blocked','No status']);
  api.apply({'EE-1':{state:'missing'},'SH-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'todo'}});
- assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Missing','In progress','Done','To do']);
+ assert.deepEqual(host.querySelectorAll('.dv-live-step-state').map(el=>el.textContent),['Missing','In progress']);
  assert.ok(first===row.querySelector('.nbacklink'),'state-only updates retain the ticket anchor');
  change(1,'step','dv:pathrender');assert.deepEqual(keys(),['CC-1']);assert.equal(host.querySelectorAll('.dv-live-step-tickets').length,1);
  change(2);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);
  change(0);api.setEnabled(false);assert.equal(host.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').length,0);assert.ok(pill.classList.contains('dv-live-board-lane'));
- api.setEnabled(true);assert.equal(keys().length,4);change(0,'ambient');assert.equal(keys().length,0);
+ api.setEnabled(true);assert.equal(keys().length,2);change(0,'ambient');assert.equal(keys().length,0);
  change(0,'step');api.destroy();assert.equal(keys().length,0);assert.ok(!pill.classList.contains('dv-live-board-lane'));assert.equal(host.textContent,'Authored prose');assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(h.ctl.page),normalized);
+});
+test('B1 direct ticket selection preserves aliases, edge tickets and broader endpoint rollups',()=>{
+ const {C}=harness(),d={nodes:{a:{tickets:['AA-1','SH-1']},b:{tickets:['BB-1','SH-1']},text:{type:'text',text:'Note',tickets:['TT-1']}},edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}]};
+ for(const step of [{edge:'a->b'},{edges:['a->b']},{failures:{'a->b':'blocked'}},{failures:{'a->b':'dropped'}}]){
+  assert.deepEqual(plain(C.liveStatusStepTickets(d,step,true)),['EE-1','SH-1']);
+  assert.deepEqual(plain(C.liveStatusStepTickets(d,{...step,nodes:['a','a','text']},true)),['EE-1','SH-1','AA-1']);
+  assert.deepEqual(plain(C.liveStatusStepTickets(d,step)),['EE-1','SH-1','AA-1','BB-1']);
+  assert.deepEqual(plain(C.liveStatusStepCarriers(d,step).map(carrier=>carrier.id)),['a->b','a','b']);
+  assert.equal(C.liveStatusStep(d,step,{'AA-1':{state:'blocked'}}),'blocked');
+  assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'blocked',detail:'Endpoint work'}}),'BLOCKED · AA-1 · Endpoint work');
+  assert.equal(C.liveStatusCaption(d,step,{'BB-1':{state:'missing'}}),'MISSING · BB-1');
+ }
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,{nodes:['a','text']},true)),['AA-1','SH-1']);
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,{nodes:['text']},true)),[]);
 });
 test('B1 lane suppression belongs only to diagrams with an authored live-status panel',()=>{
  const diagram=panel=>({nodes:{a:{tickets:['AA-1']}},rows:[['a']],panels:panel?[{id:'status',type:'live-status'}]:[],steps:[{lane:'TEAM',nodes:['a']}]});
@@ -732,7 +746,7 @@ test('B1 external detail step links use the detail page Jira site',async()=>{
  // The approved external page owns the site; the root has none.
  api.apply({'DD-1':{state:'todo',url:'https://detail-runtime.test/DD-1'}});
  assert.equal(host.querySelector('a').getAttribute('href'),'https://detail-jira.test/browse/DD-3');
- assert.deepEqual(host.querySelectorAll('.nbacklink').map(el=>el.textContent),['DD-3','DD-1','DD-2']);api.destroy();
+ assert.deepEqual(host.querySelectorAll('.nbacklink').map(el=>el.textContent),['DD-3']);api.destroy();
 });
 test('B2 caption distinguishes blocked missing active done todo and untracked steps',()=>{
  const {C}=harness();assert.equal(typeof C.liveStatusCaption,'function','B2 caption helper');

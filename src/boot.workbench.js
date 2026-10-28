@@ -46,6 +46,7 @@ var CONTRACT = [
   '    "view": "ambient",               // "ambient" (toggle to step) | "step" (opens as',
   '                                     // click-through) | "ambient-only" (no toggle)',
   '    "autoplay": false,               // optional; true = advance every 3s on step entry',
+  '    "followActive": true,            // optional; false = keep camera fixed until Resume follow',
   '    "brand": {"app":"<company/app name>", "icon":"house", "accent":"#318585"}, // optional shared panel brand',
   '    "nodes":  {"<id>": {"title":"<name>", "sub":"<one-line detail>",',
   '                        "icon":"<icon>", "tint":"<tint>", "style":"<node style>", // style optional: preset card colors',

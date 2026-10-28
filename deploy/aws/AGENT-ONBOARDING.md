@@ -5,6 +5,8 @@ Implement these requirements through the company's existing rollout platform.
 Do not introduce a separate Terraform/SAM/CDK deployment path or assume access
 to company tooling from this repository. [template.yaml](template.yaml) is a
 reference resource configuration, not a required deployment mechanism.
+The application's hosted infrastructure stays AWS-native; company tooling owns
+provisioning and rollout.
 
 This documents the current implementation. Local mocks have been validated;
 live AWS provisioning, email delivery and integration still need company-side
@@ -96,7 +98,10 @@ email ownership. In the same DynamoDB table, provision one membership per subjec
 
 `reader` allows authenticated viewing without writes. Missing membership,
 unrecognized roles or `disabled: true` deny access. Team selection comes from
-membership, never browser input. Later Okta/Auth0 federation must preserve the
+membership, never browser input. `teamId` and `userId` must each contain 1–100
+ASCII letters, digits, underscores or hyphens; map company identifiers to that
+format rather than putting email addresses in these fields.
+Later Okta/Auth0 federation must preserve the
 Cognito token contract and explicitly map verified subjects to internal users;
 matching email addresses must not automatically link identities. Reusing a
 company pool is conditional on meeting these requirements, not assumed compatible.

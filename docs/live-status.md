@@ -541,8 +541,8 @@ Flagged pages. Shared or explicitly configured Epics reuse the same watches.
 When approved details add/remove roots or membership changes, watches follow
 current reachability and retire branches that no remaining root reaches.
 
-Initial publication waits for root metadata. Initiative publication waits for
-complete root, Epic, story and Flagged evidence; failed, incomplete or superseded
+Initial publication waits for root metadata. Tracked parent publication (Epic or
+Initiative) waits for complete root, Epic, story and Flagged evidence; failed, incomplete or superseded
 page chains retain the last complete map. Child containers and cycles cannot
 inflate story totals. A failed refresh uses the same notices and bounded retry
 rules. Destroy retires subscriptions, scheduled retries and late responses.

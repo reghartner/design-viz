@@ -381,8 +381,8 @@ test('D9 the Jira adapter requests issue links, reads inward and outward depende
  const requested=plain(C.liveStatusJiraMap(['FW-1','HW-2'],[[issue,jira('HW-2','done')]],new Set(),'https://jira.test',null,['is blocked by']));assert.equal(requested['HW-2'].state,'done','a requested issue is never replaced by its link payload');
  assert.deepEqual(plain(C.liveStatusJiraMap(['FW-1'],[[issue]],new Set(),'',null))['FW-1'].dependsOn.map(d=>d.key),['HW-2','OUT-9'],'default link types');
  const h=providerHarness(depFixture());await h.start();for(const w of h.watches)assert.ok(w.input.fields.includes('issuelinks'),w.input.jql);
- h.data(0,[issue]);assert.deepEqual(plain(h.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['HW-2','OUT-9']);assert.equal(h.ctl.liveStatus.state('OUT-9').title,'Vendor driver');
- const custom=providerHarness((()=>{const raw=depFixture();raw.page.tracking.jira.dependencyLinks=['relates to'];return raw;})());await custom.start();custom.data(0,[issue]);
+ h.data(0,[issue]);h.data(1,[]);hierarchyBranch(h,'EP-1',[]);assert.deepEqual(plain(h.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['HW-2','OUT-9']);assert.equal(h.ctl.liveStatus.state('OUT-9').title,'Vendor driver');
+ const custom=providerHarness((()=>{const raw=depFixture();raw.page.tracking.jira.dependencyLinks=['relates to'];return raw;})());await custom.start();custom.data(0,[issue]);custom.data(1,[]);hierarchyBranch(custom,'EP-1',[]);
  assert.deepEqual(plain(custom.ctl.liveStatus.state('FW-1').dependsOn).map(d=>d.key),['REL-1']);h.ctl.liveStatus.destroy();custom.ctl.liveStatus.destroy();
 });
 test('D10 the demo map converts timeline links into Jira-sourced dependencies',()=>{
@@ -765,7 +765,7 @@ test('E3 epic watches paginate both cursor envelopes tag children and keep evide
  const epic=h.watches.find(w=>w.input.jql==='parent = EP-1'),flag=h.watches.find(w=>w.input.jql==='parent = EP-1 AND Flagged = Impediment');
  assert.ok(epic,'one epic watch');assert.ok(flag,'paired flagged watch');assert.equal(h.watches.filter(w=>/^parent =/.test(w.input.jql)).length,4);
  assert.deepEqual(epic.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.equal(epic.input.maxResults,10);
- h.data(0,[jira('AA-1')]);const calls=[];
+ h.data(0,[jira('AA-1')]);h.data(1,[]);hierarchyBranch(h,'EP-2',[]);hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);const calls=[];
  h.mcp.callTool=async(server,tool,input)=>{calls.push(plain(input));return input.nextPageToken==='two'?{payload:{issues:[jira('EX-2')],nextPageToken:'three'}}:{payload:{issues:[jira('EX-3')]}};};
  epic.handler({type:'data',result:{payload:{issues:{nodes:[jira('AA-1'),jira('EX-1')]},pageInfo:{hasNextPage:true,endCursor:'two'}}}});await settle();await settle();
  assert.deepEqual(calls.map(c=>c.nextPageToken),['two','three']);assert.ok(calls.every(c=>c.jql==='parent = EP-1' && c.maxResults===10));
@@ -812,7 +812,7 @@ test('E7 a previously seen child returning after absence is not a new epic addit
 test('E3 failed and superseded pagination cannot replace complete carrier or epic evidence',async()=>{
  const h=providerHarness(epicFixture());await h.start();h.data(0,[jira('AA-1')]);const watch=h.watches.find(w=>w.input.jql==='parent = EP-1');
  const deliver=payload=>watch.handler({type:'data',result:{payload}});
- deliver({issues:[jira('EX-1')]});let resolve;
+ deliver({issues:[jira('EX-1')]});h.data(1,[]);hierarchyBranch(h,'EP-2',[]);hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);let resolve;
  h.mcp.callTool=()=>Promise.reject({code:'upstream_error',retryable:true});
  deliver({issues:[jira('EX-2')],pageInfo:{hasNextPage:true,endCursor:'two'}});await settle();
  assert.equal(h.ctl.liveStatus.state('EX-1').state,'active');assert.equal(h.ctl.liveStatus.state('EX-2'),null);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,1);
@@ -823,7 +823,7 @@ test('E3 failed and superseded pagination cannot replace complete carrier or epi
 test('E3 an epic without carrier tickets still starts its two watches and exposes details',async()=>{
  const h=providerHarness({page:{tracking:{jira:{epic:'EP-1'}},sections:[{diagram:{nodes:{a:{}},rows:[['a']]}}]}});await h.start();
  assert.deepEqual(h.watches.map(w=>w.input.jql),['parent = EP-1','parent = EP-1 AND Flagged = Impediment','key in (EP-1)']);
- h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-head').hidden,false);h.ctl.liveStatus.destroy();
+ h.data(0,[jira('EX-1')]);assert.equal(h.ctl.liveStatus.state('EX-1'),null,'initial epic children wait for Flagged evidence');h.data(1,[]);assert.equal(h.ctl.liveStatus.state('EX-1').epic,'EP-1');assert.equal(h.view.querySelector('.dv-live-head').hidden,false);h.ctl.liveStatus.destroy();
 });
 
 /* Round 2 regressions: preserve the frozen E1–E11 RED rows above. */
@@ -846,7 +846,7 @@ test('E8 rework Workbench demo entries paint carrier badges with page epics conf
 test('E3 rework loaded detail epics add deduplicated paginated watches without replacing carrier evidence',async()=>{
  const detail={page:{tracking:{jira:{epic:['EP-2','EP-3']}},sections:[{id:'child',diagram:{nodes:{child:{tickets:['CH-1']}},rows:[['child']]}}]}};
  const renderOptions={loadDetail:async()=>detail},h=providerHarness(epicFixture(),renderOptions),api=h.ctl.liveStatus;
- await h.start();h.data(0,[jira('AA-1')]);assert.equal(h.watches.length,7);
+ await h.start();h.data(0,[jira('AA-1')]);h.data(1,[]);hierarchyBranch(h,'EP-1',[]);hierarchyBranch(h,'EP-2',[]);assert.equal(h.watches.length,7);
  await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
  assert.equal(h.watches.length,12,'one new key batch and one new epic, each with Flagged');
  const watch=h.watches.find(w=>w.input.jql==='parent = EP-3'),flag=h.watches.find(w=>w.input.jql==='parent = EP-3 AND Flagged = Impediment');
@@ -854,7 +854,8 @@ test('E3 rework loaded detail epics add deduplicated paginated watches without r
  assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-1'),null,'new unanswered chunks do not erase or invent evidence');
  h.mcp.callTool=async(server,tool,input)=>{h.calls.push(plain(input));return {payload:{issues:[jira('CH-2')]}};};
  watch.handler({type:'data',result:{payload:{issues:[jira('CH-1')],pageInfo:{hasNextPage:true,endCursor:'second'}}}});await settle();
- assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
+ assert.equal(h.calls.at(-1).nextPageToken,'second');assert.equal(api.state('CH-2'),null,'new scope waits for its ticket and Flagged evidence');
+ hierarchyData(h,'key in (CH-1)',[jira('CH-1')]);hierarchyData(h,'key in (CH-1) AND Flagged = Impediment',[]);hierarchyData(h,'parent = EP-3 AND Flagged = Impediment',[]);assert.equal(api.state('CH-2').epic,'EP-3');assert.equal(api.state('CH-1').epic,'EP-3');
  flag.handler({type:'data',result:{payload:{issues:[jira('CH-2')]}}});assert.equal(api.state('CH-2').state,'blocked');
  watch.handler({type:'error',error:{code:'tool_error',message:'Temporary epic failure'}});assert.equal(api.state('AA-1').state,'active');assert.equal(api.state('CH-2').state,'blocked');
  for(let i=0;i<3;i++){await renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.view.dispatchEvent({type:'detail-navigation'});h.flush();api.setEnabled(i%2===0);}
@@ -906,7 +907,7 @@ test('E3 rework an initially untracked page defers discovery until a detail intr
  assert.equal(h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.watches.length,0);
  await renderOptions.loadDetail({spec:'first-tracked-detail'},new AbortController().signal);await settle();
  assert.equal(h.calls.length,1);assert.deepEqual(h.watches.map(w=>w.input.jql),['key in (CH-9)','key in (CH-9) AND Flagged = Impediment','parent = EP-9','parent = EP-9 AND Flagged = Impediment','key in (EP-9)']);
- h.data(2,[jira('EX-9')]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
+ h.data(2,[jira('EX-9')]);h.data(0,[jira('CH-9')]);h.data(1,[]);h.data(3,[]);assert.equal(h.ctl.liveStatus.state('EX-9').epic,'EP-9');
  h.ctl.liveStatus.destroy();await settle();assert.ok(h.watches.every(w=>w.stopped===1));
 });
 
@@ -1316,4 +1317,27 @@ test('I8 missing or unknown root types never pretend to be a completed initiativ
   const h=providerHarness(initiativeFixture(),{},false);await h.start();hierarchyData(h,'key in (IN-1)',payload);hierarchyBranch(h,'IN-1',[]);
   const s=plain(h.ctl.liveStatus.snapshot());assert.equal(s.epic.stories,0);assert.equal(s.readiness.ready,false);assert.notEqual(s.epic.state,'done');assert.equal(s.epic.initiatives.length,payload.length>1?1:0);h.ctl.liveStatus.destroy();
  }
+});
+test('I9 direct Epic parents publish only complete child and Flagged evidence across failures and supersession',async()=>{
+ const h=providerHarness(initiativeFixture(['EP-1']),{},false);await h.start();const api=h.ctl.liveStatus;
+ hierarchyData(h,'key in (EP-1)',[hierarchyIssue('EP-1',1)]);
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'indeterminate','EP-1')]);
+ assert.equal(api.snapshot().hasData,false,'initial child evidence waits for the Flagged answer');
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[]);
+ const baseline=plain(api.snapshot().states);assert.equal(baseline['ST-1'].state,'active');
+ let rejectPage;h.mcp.callTool=()=>new Promise((resolve,reject)=>{rejectPage=reject;});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{nextPageToken:'pending-flags'});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('ST-2',0,'done','EP-1')]);
+ assert.deepEqual(plain(api.snapshot().states),baseline,'a successful child refresh cannot publish while Flagged pagination is in flight');
+ rejectPage({code:'tool_error',message:'Flagged continuation failed'});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-1',0,'done','EP-1'),hierarchyIssue('ST-2',0,'done','EP-1')]);
+ assert.deepEqual(plain(api.snapshot().states),baseline,'a failed Flagged refresh retains the previous complete board');
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[hierarchyIssue('ST-2',0)]);
+ assert.equal(api.state('ST-1').state,'done');assert.equal(api.state('ST-2').state,'blocked');
+ const complete=plain(api.snapshot().states);let resolveOld;h.mcp.callTool=()=>new Promise(resolve=>{resolveOld=resolve;});
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[],{pageInfo:{hasNextPage:true,endCursor:'stale-flags'}});await settle();
+ hierarchyData(h,'parent = EP-1',[hierarchyIssue('ST-3',0,'done','EP-1')]);assert.deepEqual(plain(api.snapshot().states),complete);
+ hierarchyData(h,'parent = EP-1 AND Flagged = Impediment',[hierarchyIssue('ST-3',0)]);assert.equal(api.state('ST-3').state,'blocked');assert.equal(api.state('ST-2'),null);
+ const latest=plain(api.snapshot().states);resolveOld({payload:{issues:[]}});await settle();assert.deepEqual(plain(api.snapshot().states),latest,'a superseded empty Flagged page cannot clear the current blocker');
+ api.destroy();
 });

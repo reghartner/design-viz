@@ -331,7 +331,7 @@ function wireLiveStatusClaude(ctl,page,win){
     // while any root, child or flagged page chain is incomplete or has failed.
     var refs=api.refs(),roots=initiativeRoots();
     if(chunks.some(function(chunk){return chunk.roots && !chunk.answered;}))return;
-    if(roots.length && (chunks.some(function(chunk){return !chunk.answered || !chunk.flaggedAnswered;}) || jobs.some(function(job){return !job.retired && (job.inflight || job.error);})))return;
+    if((refs.epics || []).length && (chunks.some(function(chunk){return !chunk.answered || !chunk.flaggedAnswered;}) || jobs.some(function(job){return !job.retired && (job.inflight || job.error);})))return;
     var keys=[],issues=[],flagged=Object.create(null),epics=Object.create(null),stamp=null;
     chunks.forEach(function(chunk){
       if(!chunk.answered)return;

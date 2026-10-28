@@ -1,5 +1,19 @@
 # Changelog
 
+## Browser recovery storage cleanup (2026-10-28)
+
+- Workbench frees its own browser recovery data without developer tools (#406):
+  **Free browser storage** sits beside the File pane's **Browser recovery
+  unavailable** status, in the draft-recovery banner after a failed archive, and
+  under Home → **Earlier drafts**. It removes only Flowview's earlier drafts,
+  reports how much it freed, keeps other site data, and saves the open draft
+  again. Each earlier draft has **Export** and **Delete**; the current browser
+  draft is removed only after an in-page confirmation with a download offered.
+- Recovery copies cost about four times the spec size instead of seven: the Diff
+  baseline names its draft by fingerprint instead of a second copy, and an
+  earlier draft stores no baseline when it equals the text. Measurements and the
+  keys sharing the quota are in `docs/workbench-modules.md`.
+
 ## Flexible table and contract columns (2026-10-21)
 
 - Data tables can hide the Change column from desktop setup with

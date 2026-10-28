@@ -189,6 +189,7 @@ function initWorkbenchWelcome(opts){
   var recovery=el('workbench-draft-recovery');
   function recoveryError(ex){
     el('workbench-draft-recovery-message').textContent=ex && ex.message || String(ex);
+    el('workbench-draft-recovery-result').hidden=true;
     recovery.hidden=false;
     recovery.scrollIntoView({block:'nearest'});
   }
@@ -197,6 +198,47 @@ function initWorkbenchWelcome(opts){
     try{builder.downloadRecoveryDraft();}
     catch(ex){recoveryError('The draft could not be downloaded: '+(ex.message || ex));}
   });
+  /* Storage housekeeping (#406): the cleanup frees only Flowview's earlier drafts
+     and says how much it freed; the current draft goes only after the in-page
+     confirmation below. No browser dialogs. */
+  function plural(count,noun){return count+' '+noun+(count===1?'':'s');}
+  function freedMessage(result){
+    return result.archive?'Freed about '+recoveryBytesLabel(result.freed)+' by removing '+plural(result.archive,'earlier draft')+'.':'No earlier drafts were stored, so nothing was freed.';
+  }
+  el('workbench-draft-recovery-cleanup').addEventListener('click',function(){
+    var out=el('workbench-draft-recovery-result');
+    try{
+      var result=builder.recovery.cleanup();
+      out.textContent=freedMessage(result)+(result.archive?' Try the action again.':' Download the current draft to keep it.');out.hidden=false;
+      updateResume();
+    }catch(ex){recoveryError('Browser storage could not be freed: '+(ex.message || ex));}
+  });
+  function recoveryResult(message){var out=el('welcome-recovery-result');out.textContent=message;out.hidden=false;}
+  function hideRecoveryConfirm(){el('welcome-recovery-confirm').hidden=true;}
+  el('welcome-recovery-cleanup').addEventListener('click',function(){
+    try{var result=builder.recovery.cleanup();recoveryResult(freedMessage(result)+(result.archive?' The current draft was kept.':''));updateResume();}
+    catch(ex){recoveryError('Browser storage could not be freed: '+(ex.message || ex));}
+  });
+  el('welcome-recovery-draft').addEventListener('click',function(){
+    var info=builder.draftInfo();
+    el('welcome-recovery-confirm-text').textContent='Remove the current browser draft “'+(info?info.title:'Unfinished diagram')+'”? It is saved nowhere else. Download it first to keep a copy.';
+    el('welcome-recovery-confirm').hidden=false;el('welcome-recovery-confirm-remove').focus();
+  });
+  el('welcome-recovery-confirm-download').addEventListener('click',function(){
+    try{builder.downloadRecoveryDraft();}
+    catch(ex){recoveryError('The draft could not be downloaded: '+(ex.message || ex));}
+  });
+  el('welcome-recovery-confirm-keep').addEventListener('click',function(){hideRecoveryConfirm();el('welcome-recovery-draft').focus();});
+  el('welcome-recovery-confirm-remove').addEventListener('click',function(){
+    try{
+      var result=builder.recovery.cleanup({draft:true});hideRecoveryConfirm();
+      recoveryResult('Removed the current browser draft and freed about '+recoveryBytesLabel(result.freed)+'.');updateResume();
+    }catch(ex){recoveryError('The draft could not be removed: '+(ex.message || ex));}
+  });
+  function textButton(label,description){
+    var button=document.createElement('button');button.type='button';button.className='welcome-text-button';
+    button.textContent=label;button.setAttribute('aria-label',label+' '+description);return button;
+  }
   function projectTitle(){
     try { var raw = JSON.parse(opts.src.value); return (raw.page || raw).title || 'Untitled project'; }
     catch (ex){ return 'Unfinished diagram'; }
@@ -209,15 +251,34 @@ function initWorkbenchWelcome(opts){
     var date = draft && new Date(draft.savedAt);
     el('welcome-resume-detail').textContent = current ? 'Your current project is still here, including its undo history.' :
       'Saved in this browser' + (date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : '') + '.';
-    var earlier=el('welcome-earlier-drafts'),list=el('welcome-earlier-list'),drafts=builder.earlierDrafts();
-    earlier.hidden=!drafts.length;list.replaceChildren();
+    var earlier=el('welcome-earlier-drafts'),list=el('welcome-earlier-list'),drafts=builder.earlierDrafts(),usage=builder.recovery.footprint();
+    earlier.hidden=!drafts.length && !usage.total && el('welcome-recovery-result').hidden;list.replaceChildren();
     drafts.forEach(function(entry){
       var name='Unfinished diagram';try{var raw=JSON.parse(entry.text);name=(raw.page || raw).title || name;}catch(ex){}
+      var row=document.createElement('div');row.className='welcome-earlier-entry';
       var button=document.createElement('button');button.type='button';button.className='welcome-button';
       button.textContent=name+' · '+new Date(entry.at).toLocaleString();
       button.addEventListener('click',function(){try{if(builder.restoreEarlierDraft(entry))enterEditor();}catch(ex){recoveryError(ex);}});
-      list.appendChild(button);
+      var exportButton=textButton('Export',name),deleteButton=textButton('Delete',name);
+      exportButton.addEventListener('click',function(){
+        try{builder.recovery.exportEarlierDraft(entry);}
+        catch(ex){recoveryError('The earlier draft could not be exported: '+(ex.message || ex));}
+      });
+      deleteButton.addEventListener('click',function(){
+        try{var result=builder.recovery.removeEarlierDraft(entry);recoveryResult('Removed “'+name+'” and freed about '+recoveryBytesLabel(result.freed)+'.');updateResume();}
+        catch(ex){recoveryError('The earlier draft could not be removed: '+(ex.message || ex));}
+      });
+      row.appendChild(button);row.appendChild(exportButton);row.appendChild(deleteButton);
+      list.appendChild(row);
     });
+    var parts=[];
+    if(usage.count)parts.push(plural(usage.count,'earlier draft')+' ('+recoveryBytesLabel(usage.archive)+')');
+    if(usage.draft)parts.push('current draft ('+recoveryBytesLabel(usage.draft+usage.baseline)+')');
+    el('welcome-recovery-storage').textContent=usage.unavailable?'Browser storage is unavailable, so nothing is saved in this browser.':
+      'Flowview recovery data in this browser: about '+recoveryBytesLabel(usage.total)+(parts.length?' · '+parts.join(' · '):'')+'. Other site data is never touched.';
+    el('welcome-recovery-cleanup').disabled=!usage.archive;
+    el('welcome-recovery-draft').hidden=!(draft && !current && usage.draft);
+    if(el('welcome-recovery-draft').hidden)hideRecoveryConfirm();
   }
   function selectScreen(name, focus){
     retireRead();
@@ -225,7 +286,7 @@ function initWorkbenchWelcome(opts){
     screen = name;
     Object.keys(screens).forEach(function(key){ el(screens[key]).hidden = key !== name; });
     error('welcome-file-error', '');error('welcome-link-error', '');
-    recovery.hidden=true;
+    recovery.hidden=true;el('welcome-recovery-result').hidden=true;hideRecoveryConfirm();
     updateResume();
     if (name === 'new') loadManifest();
     if(library && (name==='library' || name==='reader'))library.show(name,navigation.diagram());

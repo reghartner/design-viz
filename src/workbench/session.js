@@ -191,6 +191,7 @@ function createBuilderSession(options){
     saveInitial:function(){if(!options.deferInitialSave && (!initialDraft || initialDraft.text===text()))save();},
     discardDraft:function(){if(disposed)return;persistence.clear();initialDraft=null;save();},
     draft:function(){return initialDraft?{text:initialDraft.text,at:initialDraft.at}:null;},
+    forgetDraft:function(){if(!disposed){initialDraft=null;recoveredBaseline=null;}}, // Storage removal is the persistence cleanup.
     preserveDraft:preserveDraft,
     resetHistory:function(){undoStack.length=redoStack.length=0;historyVersion++;historyChanged();},
     earlierDrafts:persistence.archived,

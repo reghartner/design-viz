@@ -42,8 +42,17 @@ Opening another project starts a fresh Undo/Redo history. The two most recent
 distinct outgoing drafts are kept in **Earlier drafts** in this browser; older
 browser snapshots are removed, so save files to disk for longer-term recovery.
 If browser storage cannot fit two snapshots, Workbench keeps only the newest
-outgoing draft. If even that copy cannot be saved, the project switch stops.
-Undo never changes which file is open. Welcome
+outgoing draft. If even that copy cannot be saved, the project switch stops and
+the recovery banner offers **Download current draft** and **Free browser storage**
+in place; the cleanup removes Flowview's earlier drafts from this browser, keeps
+the current draft and any other site data, and reports how much it freed, so you
+can retry without opening browser developer tools. The same control sits beside
+the File pane's **Browser recovery unavailable** status, where it also saves the
+draft again. Each entry under **Earlier drafts** has **Export** (the exact source
+as a `.spec.json` file) and **Delete**; the section also shows how much browser
+storage Flowview's recovery data uses. **Remove current draft…** appears only
+while no project is open and asks for confirmation in the page, with a download
+offered first. Undo never changes which file is open. Welcome
 navigation cancels temporary editor modes and pauses playback while retaining
 the current project's source and panel history.
 

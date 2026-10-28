@@ -117,6 +117,8 @@ body.welcome-active{background:#f7f8fc;margin:0;}
 .workbench-draft-recovery{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#fff2f0;border-bottom:1px solid #e4b6b1;color:#9b3d3c;flex-wrap:wrap;}
 .workbench-draft-recovery[hidden]{display:none;}
 .workbench-draft-recovery p{margin:0;flex:1 1 300px;}
+.workbench-draft-recovery p[hidden]{display:none;}
+.workbench-draft-recovery-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .welcome-narrow{max-width:800px;margin:auto;}
 .welcome-paste-form{margin-top:26px;}
 .welcome label:not(.welcome-prompt-kinds label){display:block;font-size:12px;font-weight:600;color:#525c72;margin:18px 0 8px;}
@@ -281,7 +283,17 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .folder-agent-folder{overflow-wrap:anywhere;color:var(--sub);}
 .welcome-build{margin-top:20px;font-size:16px;padding:13px 22px;}
 #welcome-earlier-drafts{margin:16px 0;color:var(--sub);}
-#welcome-earlier-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+#welcome-earlier-list{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.welcome-earlier-entry{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.welcome-recovery-storage{margin-top:14px;font-size:12px;}
+.welcome-recovery-storage p{margin:0 0 6px;}
+.welcome-recovery-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.welcome-recovery-actions [hidden]{display:none;}
+.welcome-recovery-confirm{margin-top:10px;padding:12px 14px;border:1px solid #e4b6b1;border-radius:8px;background:#fff2f0;color:#9b3d3c;}
+.welcome-recovery-confirm[hidden],#welcome-recovery-result[hidden]{display:none;}
+#welcome-recovery-result{margin:8px 0 0;}
+.welcome-button-danger{color:#9b3d3c;border-color:#e4b6b1;}
+.welcome-button-danger:hover{background:#fff2f0;border-color:#c0392b;}
 .folder-agent-guide{box-sizing:border-box;width:min(600px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:26px 30px;border:1px solid var(--line);border-radius:16px;background:var(--bg);color:var(--ink);box-shadow:0 20px 70px #14244230;font:14px/1.55 'IBM Plex Sans',sans-serif;overflow:auto;}
 .folder-agent-guide::backdrop{background:#19253b26;}
 .folder-agent-guide [hidden]{display:none!important;}

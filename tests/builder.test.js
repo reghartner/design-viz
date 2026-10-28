@@ -1082,6 +1082,43 @@ test('new projects and pasted JSON have independent history and preserve exact e
   assert.strictEqual(JSON.parse(w.ids.src.value).page.title, 'Second project');
 });
 
+test('browser recovery cleanup frees Flowview keys only, saves the open project again, and keeps the current draft unless asked', () => {
+  const storage = new Map([['host-preference', 'kept']]);
+  const w = diffWorkbench(storage, {deferInitialSave:true});
+  const first = diffFixture(); first.page.title = 'First project';
+  w.builder.loadSpec(first); w.builder.prepareWelcome();
+  const second = diffFixture(); second.page.title = 'Second project';
+  w.builder.loadSpec(second);
+  const before = w.builder.recovery.footprint();
+  assert.ok(before.archive > 0); assert.equal(before.count, 1);
+  const [entry] = w.builder.earlierDrafts();
+  assert.equal(w.builder.recovery.exportEarlierDraft(entry), 'flowview-earlier-draft-first-project.spec.json');
+  const result = w.builder.recovery.cleanup();
+  assert.deepStrictEqual(plain(result), {freed: before.archive, archive: 1, draft: false});
+  assert.strictEqual(storage.has('dv-workbench-earlier-drafts'), false);
+  assert.strictEqual(storage.get('host-preference'), 'kept');
+  assert.strictEqual(JSON.parse(storage.get('dv-workbench-draft')).text, w.ids.src.value, 'the open project is saved again after cleanup');
+  assert.deepStrictEqual(plain(w.builder.earlierDrafts()), []);
+  w.builder.prepareWelcome(); w.builder.loadSpec(first);
+  const removed = w.builder.recovery.removeEarlierDraft(w.builder.earlierDrafts()[0]);
+  assert.ok(removed.removed && removed.freed > 0); assert.deepStrictEqual(plain(w.builder.earlierDrafts()), []);
+});
+
+test('removing the current browser draft from Home needs the explicit option and clears Resume without saving the boot source', () => {
+  const saved = {text:'{ "title": "old" }', at:5};
+  const storage = new Map([['dv-workbench-draft', JSON.stringify(saved)]]);
+  const w = diffWorkbench(storage, {deferInitialSave:true});
+  w.builder.prepareWelcome();
+  assert.ok(w.builder.draftInfo());
+  w.builder.recovery.cleanup();
+  assert.strictEqual(storage.get('dv-workbench-draft'), JSON.stringify(saved), 'plain cleanup keeps the current draft');
+  const result = w.builder.recovery.cleanup({draft:true});
+  assert.ok(result.freed > 0); assert.strictEqual(result.draft, true);
+  assert.strictEqual(storage.has('dv-workbench-draft'), false);
+  assert.strictEqual(w.builder.draftInfo(), null); assert.strictEqual(w.builder.isProjectOpen(), false);
+  assert.strictEqual(w.builder.restoreDraft(), false);
+});
+
 test('removed sections stay in their tab list across reordered tabs and page aliases', () => {
   const old = {page: {blocks: [{tabs: [
     {label: 'A', sections: [{heading: 'Gone'}]},

@@ -676,3 +676,23 @@ whose `updatedAt` is strictly older than that many days. The carrier gets
 `dv-live-stale` and its popover says “no activity N d”; the rollup color is unchanged.
 Missing/invalid timestamps are never stale; invalid thresholds warn and use 7.
 All story features work with `#live=demo`; pages without tickets or epics show the empty-page message.
+
+## Delivery boards over imported Canon topology
+
+A delivery board can reference a canonical diagram and own only tracking:
+`topologyImports[].nodeTracking` maps provider node IDs to `{tickets, prs}`;
+`edgeTracking` maps provider `from->to` identities to the same shape. Add these
+references through the desktop imported-selection Inspector. Inherited references
+stay read-only; local additions can be removed, undone and redone. The maps use
+strict validation and full provider-relative identities, including nested paths.
+They do not change provider structure or presentation/geometry overrides.
+
+The resolver merges inherited and consumer references before rendering, so the
+same live-status provider discovers all imported tickets and PRs. The live-status
+panel, carrier colors, steps, dependencies, readiness, coverage navigation and
+reader ticket menus/popovers all use those merged values. Distinct ticket totals
+count repeated references once, while carrier coverage counts every tracked
+node/edge. A consumer needs only an import, page tracking settings, a live-status
+panel and its own steps; it need not copy any topology.
+
+See [the canonical provider and tracking-only consumer example](shared-topology.md#delivery-tracking-on-canonical-topology).

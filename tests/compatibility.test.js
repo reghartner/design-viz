@@ -425,3 +425,19 @@ test('live-status detection ignores absent, empty and non-array references and s
     assert.ok(C.stamp(raw).page.flowview.features.includes('flow.live-status'));
   }
 });
+
+test('import-only tracking declares live-status in authored exports without materializing providers',()=>{
+  for(const field of ['nodeTracking','edgeTracking'])for(const refs of [{tickets:['AA-1']},{prs:['https://github.com/acme/api/pull/1']}]){
+    const raw={page:{sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',[field]:{[field==='nodeTracking'?'api':'api->db']:refs}}]}}]}};
+    const before=JSON.stringify(raw),stamped=C.stamp(raw);
+    assert.ok(C.detect(raw).includes('flow.live-status'));
+    assert.ok(stamped.page.flowview.features.includes('flow.live-status'));
+    assert.deepEqual(plain(stamped.page.sections[0].diagram),raw.page.sections[0].diagram);
+    assert.equal(JSON.stringify(raw),before);
+    const older={...C.features};delete older['flow.live-status'];
+    assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.live-status'));
+  }
+  for(const value of [null,[],{}, {api:{tickets:[],prs:[]}}]){
+    assert.ok(!C.detect({nodes:{},rows:[[]],topologyImports:[{nodeTracking:value}]}).includes('flow.live-status'));
+  }
+});

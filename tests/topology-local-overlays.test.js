@@ -111,3 +111,72 @@ test('baseline import presentation lowers onto members and permits per-node inhe
   const f=fixtures();d(f.source).topologyImports[0].presentation='baseline';d(f.source).topologyImports[0].nodeOverrides={api:{presentation:null}};
   const effective=d(c.FlowTopology.resolveSource(f.source,f.context));assert.equal(effective.nodes['shared::api'].presentation,undefined);assert.equal(effective.nodes['shared::store'].presentation,'baseline');assert.equal(effective.edges[1].presentation,'baseline');
 });
+
+test('node and edge tracking append/dedupe inherited references without copying topology or changing providers',()=>{
+  const f=fixtures();d(f.provider).nodes.api.tickets=['API-1'];d(f.provider).edges[0].prs=['https://github.com/acme/api/pull/1'];
+  const before=plain(f.context),pr='https://github.com/acme/api/pull/2';
+  let source=apply(f,(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','tickets','API-2',false,f.context));
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','prs',pr,false,f.context));
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge','shared::api->shared::store','tickets','API-2',false,f.context,1));
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge','shared::api->shared::store','prs',pr,false,f.context,1));
+  const effective=d(c.FlowTopology.resolveSource(source,f.context)),imp=d(source).topologyImports[0];
+  assert.deepEqual(imp.nodeTracking,{api:{tickets:['API-2'],prs:[pr]}});
+  assert.deepEqual(imp.edgeTracking,{'api->store':{tickets:['API-2'],prs:[pr]}});
+  assert.deepEqual(plain(effective.nodes['shared::api'].tickets),['API-1','API-2']);
+  assert.deepEqual(plain(effective.edges[1].prs),['https://github.com/acme/api/pull/1',pr]);
+  assert.deepEqual(f.context,before);assert.deepEqual(d(source).nodes,d(f.source).nodes);assert.deepEqual(d(source).edges,d(f.source).edges);
+  for(const [ref,remove] of [['API-1',false],['API-1',true],['API-2',false]]){
+    const text=JSON.stringify(source);assert.equal(c.planTopologyTracking(text,source,0,'node','shared::api','tickets',ref,remove,f.context).text,text);
+  }
+  source=apply({...f,source},(t,r)=>c.planResetTopologyEdgeLayout(t,r,0,1,'shared::api->shared::store',f.context));
+  assert.deepEqual(d(source).topologyImports[0].edgeTracking,imp.edgeTracking);
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','tickets','API-2',true,f.context));
+  assert.deepEqual(d(source).topologyImports[0].nodeTracking.api,{prs:[pr]});
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','prs',pr,true,f.context));
+  assert.equal(d(source).topologyImports[0].nodeTracking,undefined);
+});
+test('tracking overlay validation rejects unsafe values, unknown fields, deselected identities and stale targets',()=>{
+  const f=fixtures();
+  for(const field of ['nodeTracking','edgeTracking'])for(const value of [[],null,{tickets:'AA-1'},{tickets:[null]},{tickets:['not a key']},{prs:['javascript:alert(1)']},{prs:[{}]},{status:'done'},{tickets:[],other:[]}]){
+    const source=plain(f.source);d(source).topologyImports[0][field]={[field==='nodeTracking'?'api':'api->store']:value};
+    assert.throws(()=>c.FlowTopology.resolveSource(source,f.context),/Topology/);
+  }
+  for(const [field,key] of [['nodeTracking','missing'],['edgeTracking','store->api']]){
+    const source=plain(f.source);d(source).topologyImports[0][field]={[key]:{tickets:['AA-1']}};
+    assert.throws(()=>c.FlowTopology.resolveSource(source,f.context),/identity is not selected\/exported/);
+  }
+  const source=plain(f.source);d(source).topologyImports[0].edgeTracking={'api->store':{tickets:['AA-1']}};d(source).topologyImports[0].edges=[];
+  assert.throws(()=>c.FlowTopology.resolveSource(source,f.context),/edgeTracking identity/);
+  const text=JSON.stringify(f.source),call=(raw,kind,id,field,ref,context,index)=>c.planTopologyTracking(text,raw,0,kind,id,field,ref,false,context,index);
+  assert.match(call({...f.source,extra:1},'node','shared::api','tickets','AA-1',f.context).error,/source changed/);
+  assert.match(call(f.source,'edge','shared::api->shared::store','tickets','AA-1',f.context,0).error,/connection changed/);
+  assert.ok(call(f.source,'node','shared::api','status','AA-1',f.context).error);
+  assert.ok(call(f.source,'node','shared::missing','tickets','AA-1',f.context).error);
+  const snapshot=c.FlowTopology.resolveSource(f.source,f.context);
+  assert.match(c.planTopologyTracking(JSON.stringify(snapshot),snapshot,0,'node','shared::api','tickets','AA-1',false,null).error,/authored consumer/);
+});
+test('nested tracking uses full provider paths, refresh dedupes and retains locally removable additions',()=>{
+  const f=fixtures(),middle=plain(f.source);middle.page.canon.id='middle';d(middle).edges=[];d(middle).topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store']}};
+  d(f.source).topologyImports=[{spec:'middle',export:'nested',as:'outer'}];d(f.source).edges=[];f.context.specs=[f.provider,middle,f.source];
+  let source=apply(f,(t,r)=>c.planTopologyTracking(t,r,0,'node','outer::shared::api','tickets','AA-2',false,f.context));
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge','outer::shared::api->outer::shared::store','tickets','AA-3',false,f.context,0));
+  assert.deepEqual(d(source).topologyImports[0].nodeTracking,{'shared::api':{tickets:['AA-2']}});
+  assert.deepEqual(d(source).topologyImports[0].edgeTracking,{'shared::api->shared::store':{tickets:['AA-3']}});
+  d(f.provider).nodes.api.tickets=['AA-1','AA-2'];d(f.provider).edges[0].tickets=['AA-4'];
+  assert.deepEqual(plain(d(c.FlowTopology.resolveSource(source,f.context)).nodes['outer::shared::api'].tickets),['AA-1','AA-2']);
+  assert.deepEqual(plain(d(c.FlowTopology.resolveSource(source,f.context)).edges[0].tickets),['AA-4','AA-3']);
+  source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'node','outer::shared::api','tickets','AA-2',true,f.context));
+  assert.deepEqual(plain(d(c.FlowTopology.resolveSource(source,f.context)).nodes['outer::shared::api'].tickets),['AA-1','AA-2']);
+  assert.equal(d(source).topologyImports[0].nodeTracking,undefined);
+});
+test('tracking has single-transaction undo/redo and restores using a frozen provider closure',()=>{
+  const f=fixtures();let text=JSON.stringify(f.source,null,2),saved;
+  const session=c.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){},persistence:{read:()=>({}),preserve(){},cancel(){},save:(value,baseline,artifacts)=>saved={value,artifacts}}});
+  session.replaceProject(text,null,{topologyContext:f.context});const before=text,snapshot=session.snapshot();
+  const plan=c.planTopologyTracking(text,snapshot.raw,0,'edge','shared::api->shared::store','tickets','AA-1',false,session.topologyContext(),1);
+  assert.equal(session.accept(plan,{snapshot}),true);const after=text;
+  session.undo();assert.equal(text,before);session.redo();assert.equal(text,after);
+  d(f.provider).edges[0].tickets=['AA-9'];
+  assert.deepEqual(plain(d(c.FlowTopology.resolveSource(JSON.parse(after),saved.artifacts.topologyContext)).edges[1].tickets),['AA-1']);
+  assert.equal(d(JSON.parse(after)).edges.length,1);assert.equal(d(JSON.parse(after)).topologyProvenance,undefined);
+});

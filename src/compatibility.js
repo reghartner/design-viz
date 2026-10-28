@@ -70,6 +70,12 @@ var FlowviewCompatibility = (function(){
       if(!object(d))return;
       function tracked(value){return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
       if(Object.values(d.nodes || {}).some(tracked) || (Array.isArray(d.edges)?d.edges:[]).some(tracked))used['flow.live-status']=true;
+      (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
+        if(!object(imp))return;
+        ['nodeTracking','edgeTracking'].forEach(function(field){
+          if(object(imp[field]) && Object.values(imp[field]).some(tracked))used['flow.live-status']=true;
+        });
+      });
       if(d.graphFrame!=null)used['layout.graph-frame']=true;
       if(d.brand)used['media.branding']=true;
       function icons(value,inStep){

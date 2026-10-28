@@ -1209,3 +1209,24 @@ test('G11 a host provider may hand links directly; apply sanitizes them and the 
  assert.equal(icons[1].getAttribute('aria-label'),'Pull request #2 · open');assert.equal(h.view.querySelector('tr[data-live-ticket="BB-1"] .dv-live-pr-summary').textContent,'3 merged');
  api.apply({'AA-1':{state:'active'}});assert.equal(api.state('AA-1').prs,undefined);assert.equal(row.querySelectorAll('a.dv-live-pr-link').length,0);api.destroy();
 });
+
+test('imported consumer tracking drives refs, carrier coverage, dependencies, readiness and refresh without local carriers',()=>{
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']},db:{tickets:['AA-2']}},edgeTracking:{'api->db':{tickets:['AA-2'],prs:['https://github.com/acme/api/pull/1']}}}],steps:[{id:'persist',edge:'canon::api->canon::db'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'},dependencies:[{ticket:'AA-2',on:'AA-1'}]};
+ const resolved=C.FlowTopology.materialize([provider,consumer])[1],h=harness(resolved),api=h.ctl.liveStatus;
+ assert.deepEqual(plain(api.refs()).tickets,['AA-1','AA-2']);assert.deepEqual(plain(api.refs()).prs,['https://github.com/acme/api/pull/1']);
+ api.apply({'AA-1':{state:'blocked'},'AA-2':{state:'todo'}});
+ const snap=api.snapshot();
+ assert.deepEqual(plain(snap.counts),{todo:1,active:0,done:0,blocked:1,missing:0});
+ assert.equal(snap.readiness.total,3);assert.equal(snap.readiness.done,0);assert.equal(snap.readiness.ready,false);assert.equal(snap.readiness.blockers,1);
+ assert.deepEqual(plain(snap.coverage.onDiagram),['AA-1','AA-2']);
+ assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-waiting'));assert.ok(h.view.querySelector('g.coin').classList.contains('dv-live-blocked'));
+ api.apply({'AA-1':{state:'done'},'AA-2':{state:'done'}});
+ assert.equal(api.snapshot().readiness.total,3);assert.equal(api.snapshot().readiness.done,3);assert.equal(api.snapshot().readiness.ready,true);
+ assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);
+ assert.deepEqual(Object.keys(consumer.page.sections[0].diagram.nodes),[]);assert.equal(consumer.page.sections[0].diagram.edges,undefined);
+ api.destroy();
+});

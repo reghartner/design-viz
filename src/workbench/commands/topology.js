@@ -185,6 +185,37 @@ function planTopologyNodeCodeRefs(text,raw,section,id,refs,context){
   if(!Array.isArray(refs))return {error:'Additional code references must be a JSON array.'};
   return topologyLocalPlan(text,raw,t,'nodeCodeRefs',t.relative,refs.length?refs:null,context);
 }
+/* Tickets and PRs belong to the consumer; provider tracking is always inherited.
+   Keep this map separate from presentation/geometry so resets cannot erase work. */
+function topologyTrackingTarget(text,raw,section,kind,id,context,index){
+  if(kind!=='node' && kind!=='edge')return {error:'Choose an imported node or connection.'};
+  var t=kind==='edge'?builderEdgeLayoutTarget(text,raw,section,index,id,context):topologyLocalTarget(text,raw,section,'nodes',id,context);
+  if(t.error)return t;
+  if(!t.owner)return {error:'Choose a node or connection in an authored topology import.'};
+  t.field=kind==='node'?'nodeTracking':'edgeTracking';
+  t.local=trackingRefs((t.got.d.topologyImports[t.index][t.field] || {})[t.relative]);
+  // Resolve without this consumer addition to distinguish inherited duplicates
+  // even when a refreshed provider now carries a formerly local reference.
+  var base=builderClone(raw),imp=specValueAt(base,t.got.path).topologyImports[t.index];
+  if(imp[t.field])delete imp[t.field][t.relative];
+  try{
+    var resolved=FlowTopology.resolveSource(base,context),d=specValueAt(resolved,t.got.path);
+    t.inherited=trackingRefs(kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;}));
+  }catch(ex){return {error:ex.message};}
+  return t;
+}
+function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
+  if(field!=='tickets' && field!=='prs')return {error:'Choose tickets or pull requests.'};
+  var annotation={};annotation[field]=[ref];
+  try{FlowTopology.validateTracking(annotation,'tracking');}catch(ex){return {error:ex.message};}
+  ref=trackingRefs(annotation)[field][0];
+  var t=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(t.error)return t;
+  var refs=t.local[field],at=refs.indexOf(ref);
+  if(remove){if(at<0)return {text:text};refs.splice(at,1);}
+  else {if(at>=0 || t.inherited[field].indexOf(ref)>=0)return {text:text};refs.push(ref);}
+  var value={};['tickets','prs'].forEach(function(key){if(t.local[key].length)value[key]=t.local[key];});
+  return topologyLocalPlan(text,raw,t,t.field,t.relative,Object.keys(value).length?value:null,context);
+}
 function builderEdgeLayoutTarget(text,raw,section,index,key,context){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var resolved;try{resolved=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}

@@ -82,10 +82,10 @@ After the packet, route source/handoff details:
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.
-- **Canon/topology:** select `--feature topology`. Never flatten imports/exports
-  or provider context. Same-section `export:["a","b"]` merges nodes/connections.
-  Use `nodeOverrides` and `edgeOverrides.label` for display; re-export stable
-  imported IDs for nested reuse. See [shared topology](../../../docs/shared-topology.md).
+- **Canon/topology:** use `--feature topology`; retain imports/exports and provider
+  context. `export:["a","b"]` merges same-section topology. Display: `nodeOverrides` / `edgeOverrides.label`; tickets/PRs: `nodeTracking` /
+  `edgeTracking` (additive). Re-export IDs for nesting.
+  [Topology](../../../docs/shared-topology.md).
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
   preserves phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.

@@ -595,6 +595,12 @@ function validate(page){
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
     Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(carrier){if(trackingRefs(carrier).tickets.length)hasTickets=true;});
+    (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
+      if(!specObject(imp))return;
+      ['nodeTracking','edgeTracking'].forEach(function(field){
+        if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(id){if(trackingRefs(imp[field][id]).tickets.length)hasTickets=true;});
+      });
+    });
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
   if((hasTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');

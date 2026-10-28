@@ -549,10 +549,11 @@ function pageTrackingControls(val){
     return box;
   }
 
-function trackingControls(val){
+function trackingControls(val,overlay){
     var box=document.createElement('fieldset'),legend=document.createElement('legend');
     box.className='tracking-editor';legend.textContent='Tracking';box.appendChild(legend);
     function update(field,ref,remove){
+      if(overlay)return overlay.update(field,ref,remove);
       var parsed=parseEditor();
       if(parsed.error){formError(parsed.error);return false;}
       var path=builderTargetPath(parsed.raw,session.target),current=path && specValueAt(parsed.raw,path);
@@ -568,6 +569,11 @@ function trackingControls(val){
       return ok;
     }
     var refs=trackingRefs(val);
+    if(overlay){
+      var inherited=document.createElement('p');inherited.className='fnote';
+      inherited.textContent='Inherited tracking (read only): '+(overlay.inherited.tickets.concat(overlay.inherited.prs).join(', ') || 'None')+'. Additional references are saved only in this consumer.';
+      box.appendChild(inherited);
+    }
     [['tickets','Tickets','ticket'],['prs','Pull requests','PR']].forEach(function(field){
       if(!refs[field[0]].length)return;
       var title=document.createElement('p'),list=document.createElement('ul');
@@ -2747,7 +2753,7 @@ function renderInspector(){
       var authoredRecord=specSectionPaths(parsed.raw)[t.section],authoredDiagram=authoredRecord && specValueAt(parsed.raw,authoredRecord.diagram);
       var hasAuthoredImport=(authoredDiagram && authoredDiagram.topologyImports || []).some(function(imp){return imp.as===imported.as;});
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s presentation, arrangement, additional code references, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s presentation, arrangement, additional code references, tracking, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
       documentDestinations(imported.destination || {spec:imported.spec},null,(normalize(parsed.raw).documentLinks || {}).siteBaseUrl).forEach(function(item){var link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open source diagram · '+item.label;guide.appendChild(link);});
       if(t.kind==='node'){
@@ -2760,6 +2766,17 @@ function renderInspector(){
       if(t.kind==='node' || t.kind==='edge'){
         var importedActions=actionGroup('Imported topology actions','inspector-actions');
         importedActions.appendChild(clearCustomEdgesAction({targets:[t]},renderInspector));guide.appendChild(importedActions);
+      }
+      if(hasAuthoredImport && (t.kind==='node' || t.kind==='edge')){
+        var trackingContext=session.topologyContext(),trackingContextKey=JSON.stringify(trackingContext);
+        var trackingId=t.kind==='node'?t.id:builderEdgeKey(resolvedValue);
+        var trackingTarget=topologyTrackingTarget(parsed.text,parsed.raw,t.section,t.kind,trackingId,trackingContext,t.index);
+        if(!trackingTarget.error)guide.appendChild(trackingControls(trackingTarget.local,{inherited:trackingTarget.inherited,update:function(field,ref,remove){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==trackingContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var plan=planTopologyTracking(parsed.text,parsed.raw,t.section,t.kind,trackingId,field,ref,remove,trackingContext,t.index);
+          if(!plan.error && plan.text===parsed.text){formError('');return true;}
+          var ok=applyPlan(plan,null,parsed);if(ok)refreshFormSoon();return ok;
+        }}));
       }
       if(hasAuthoredImport && t.kind==='node'){
         var localImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeNode=t.id.slice(imported.as.length+2);

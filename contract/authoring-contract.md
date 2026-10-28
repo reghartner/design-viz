@@ -180,6 +180,21 @@ the reference’s ⋯ handle moves the entire block by changing only `position`.
 Reset node arrangement removes `nodePositions` and preserves `position`.
 Optional `nodeCodeRefs: {providerNodeId: [codeReference, ...]}` appends consumer
 references after inherited references; it never replaces inherited evidence.
+Optional `nodeTracking: {providerNodeId: {tickets: [...], prs: [...]}}` and
+`edgeTracking: {"providerFrom->providerTo": {tickets: [...], prs: [...]}}`
+add delivery annotations to imported nodes and edges. Only `tickets` and `prs`
+arrays are allowed, using the ordinary Jira key and absolute HTTP(S) PR URL
+parser. Unlike tolerant carrier metadata, malformed overlay fields are errors.
+Keys must identify selected exported members, including full nested paths.
+Resolution merges inherited references first, then local additions in authored
+order, deduplicating normalized values. Removing a local reference never removes
+an inherited one. Presentation and routing resets preserve tracking maps.
+Desktop Inspector **Add ticket** / **Add PR** and local removal each make one Undo
+transaction; resolved-only snapshots remain read-only. Runtime providers, live
+colors, readiness, ticket coverage and carrier links use resolved tracking.
+A status-board consumer can keep `nodes: {}`, `rows: [[]]`, a topology import,
+consumer steps and a `live-status` panel, with Jira settings on `page.tracking`.
+See [the complete consumer example](../docs/shared-topology.md#delivery-tracking-on-canonical-topology).
 Optional `edgeOverrides: {"providerFrom->providerTo": geometry}` changes only
 `labelDx`, `labelDy`, `curvePoints`, `curveControls`, `bend`, `fromPort`,
 `toPort`, `fromDx`, `fromDy`, `toDx`, `toDy`. Null suppresses an inherited field;

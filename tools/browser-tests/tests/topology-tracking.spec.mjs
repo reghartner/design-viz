@@ -1,4 +1,4 @@
-import {readFile,writeFile} from 'node:fs/promises';
+import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,closeTools} from '../helpers/test.mjs';
@@ -153,7 +153,7 @@ test('import-overlay-only source exports live-status capability without page tra
   await expect(page.locator('#docview path.edge')).toHaveClass(/dv-live-todo/);await expect(page.locator('#docview .pt-live-status tr[data-live-ticket="API-2"]')).toHaveCount(1);
 });
 
-test('provider-only tracking stamps editable project and Confluence exports without copying topology',async({page,server})=>{
+test('provider-only tracking survives project export while unsupported Confluence imports are refused',async({page,server})=>{
   await fixture(page,server,(provider,consumer)=>{
     delete consumer.page.tracking;diagram(provider).nodes.api.prs=[pr];
   });
@@ -162,13 +162,18 @@ test('provider-only tracking stamps editable project and Confluence exports with
   expect(saved.page.flowview.features).toContain('flow.live-status');expect(saved.page.tracking).toBeUndefined();
   expect(diagram(saved)).toEqual(diagram(JSON.parse(before)));expect(diagram(saved).topologyImports[0].nodeTracking).toBeUndefined();
   await expect(page.locator('#src')).toHaveValue(before);
-  // The packaged Confluence action is hidden in the standalone desktop menu;
-  // dispatch its registered browser command to cover that handoff boundary too.
-  const handoff=page.waitForEvent('download');await page.locator('#confluence-export').dispatchEvent('click');
-  const confluence=JSON.parse(await readFile(await (await handoff).path(),'utf8'));
-  expect((confluence.page || confluence).flowview.features).toContain('flow.live-status');
-  expect(JSON.stringify(confluence)).not.toContain('"canon::api":');expect(JSON.stringify(confluence)).toContain('topologyImports');
+  // The packaged handoff cannot publish unresolved topology; preserve its
+  // explicit refusal instead of downloading a payload without its providers.
+  const downloads=[];page.on('download',download=>downloads.push(download));
+  await page.locator('#confluence-export').dispatchEvent('click');
+  await expect(page.getByText(/Confluence export:.*unresolved topology declarations/)).toBeVisible();
+  expect(downloads).toHaveLength(0);await expect(page.locator('#src')).toHaveValue(before);
   await page.locator('#file-input').setInputFiles({name:'inherited-only.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});
   await page.reload();await expect(page.locator('#src')).toHaveValue(json);await select(page,'node');
   await expect(page.locator('#guide')).toContainText('Inherited tracking (read only): CAN-1, '+pr);await expect(page.getByRole('button',{name:'Remove ticket 1',exact:true})).toHaveCount(0);
+  const html=files[Object.keys(files).find(n=>n.endsWith('.html'))];await writeFile(path.join(server.root,'provider-only-tracking.html'),html);
+  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>{window.__inheritedTrackingRefs=refs;return {'CAN-1':{state:'done'}};}};});
+  await page.goto(server.origin+'/provider-only-tracking.html');
+  await expect.poll(()=>page.evaluate(()=>window.__inheritedTrackingRefs)).toMatchObject({tickets:['CAN-1'],prs:[pr]});
+  await expect(node(page)).toHaveClass(/dv-live-done/);await expect(page.locator('#docview .pt-live-status tr[data-live-ticket="CAN-1"]')).toHaveCount(1);
 });

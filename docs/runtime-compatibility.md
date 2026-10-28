@@ -127,10 +127,15 @@ when old renderers would omit or misinterpret it. No versioning system can infer
 an unregistered future semantic change. The company release process is
 responsible for maintaining these declarations.
 
-Workbench project and Confluence exports stamp the authored source using the
+Workbench project exports stamp the authored source using the
 frozen resolved provider closure as additional capability evidence. Thus a
 consumer inherits `flow.live-status` requirements from provider ticket/PR refs
 even when it has no local tracking metadata. Only feature IDs and their required
 versions are added; saved source keeps its imports and never copies provider
 nodes or edges. The shared `stamp(spec, effective?)` and
 `stampText(text, effective?)` helpers accept this optional resolved evidence.
+
+The Confluence handoff uses the same context-aware stamping for supported
+documents, but its payload validator still rejects unresolved topology imports.
+It produces no partial download and leaves authoring source unchanged; use the
+project's resolved standalone HTML to share an imported diagram offline.
